@@ -16,11 +16,17 @@ export function StatusBar({ state, activeTab }: StatusBarProps) {
       borderColor={theme.border}
       paddingLeft={1}
       paddingRight={1}
-      justifyContent="space-between"
+      paddingTop={0}
+      paddingBottom={0}
+      flexDirection="column"
       backgroundColor={theme.panel}
     >
-      <text fg={theme.text}>{model.left}</text>
-      <text fg={theme.textMuted}>{model.right}</text>
+      <box width="100%">
+        <text fg={theme.text}>{model.left}</text>
+      </box>
+      <box width="100%">
+        <text fg={theme.textMuted}>{model.right}</text>
+      </box>
     </box>
   );
 }

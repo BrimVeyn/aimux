@@ -8,7 +8,7 @@ describe("getStatusBarModel", () => {
     const state = createInitialState();
     const model = getStatusBarModel(state);
 
-    expect(model.left).toContain("navigation");
+    expect(model.left).toContain("nav");
     expect(model.right).toContain("Ctrl+n new");
   });
 
@@ -25,6 +25,21 @@ describe("getStatusBarModel", () => {
 
     expect(model.right).toContain("Ctrl+w close");
     expect(model.right).toContain("Shift+J/K reorder");
+  });
+
+  test("truncates long active tab labels in footer model", () => {
+    const state = createInitialState();
+    const model = getStatusBarModel(state, {
+      id: "tab-1",
+      assistant: "claude",
+      title: "Claude session with a very long descriptive title",
+      status: "running",
+      buffer: "",
+      command: "claude",
+    });
+
+    expect(model.left).toContain("...");
+    expect(model.left.length).toBeLessThan(80);
   });
 
   test("shows focused terminal hints for active tab", () => {
