@@ -39,8 +39,12 @@ export function App() {
   const ptyManager = ptyManagerRef.current;
 
   useEffect(() => {
-    const handleRender = (tabId: string, buffer: string) => {
-      dispatch({ type: "replace-tab-buffer", tabId, buffer });
+    const handleRender = (tabId: string, viewport: TabSession["viewport"]) => {
+      if (!viewport) {
+        return;
+      }
+
+      dispatch({ type: "replace-tab-viewport", tabId, viewport });
     };
 
     const handleExit = (tabId: string, exitCode: number) => {

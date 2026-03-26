@@ -1,11 +1,15 @@
-import type { AppState } from "../../state/types";
+import type { AppState, TabSession } from "../../state/types";
 import { theme } from "../theme";
+import { getStatusBarModel } from "../status-bar-model";
 
 interface StatusBarProps {
   state: AppState;
+  activeTab?: TabSession;
 }
 
-export function StatusBar({ state }: StatusBarProps) {
+export function StatusBar({ state, activeTab }: StatusBarProps) {
+  const model = getStatusBarModel(state, activeTab);
+
   return (
     <box
       border
@@ -15,10 +19,8 @@ export function StatusBar({ state }: StatusBarProps) {
       justifyContent="space-between"
       backgroundColor={theme.panel}
     >
-      <text fg={theme.text}>
-        mode: {state.focusMode} | sidebar: {state.sidebar.visible ? `${state.sidebar.width} cols` : "hidden"}
-      </text>
-      <text fg={theme.textMuted}>j/k move | i focus | Ctrl+z unfocus | Ctrl+h/l resize</text>
+      <text fg={theme.text}>{model.left}</text>
+      <text fg={theme.textMuted}>{model.right}</text>
     </box>
   );
 }

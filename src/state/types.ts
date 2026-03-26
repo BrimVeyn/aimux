@@ -6,12 +6,30 @@ export type FocusMode = "navigation" | "terminal-input" | "modal";
 
 export type ModalType = "new-tab" | null;
 
+export interface TerminalSpan {
+  text: string;
+  fg?: string;
+  bg?: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
+export interface TerminalLine {
+  spans: TerminalSpan[];
+}
+
+export interface TerminalSnapshot {
+  lines: TerminalLine[];
+}
+
 export interface TabSession {
   id: string;
   assistant: AssistantId;
   title: string;
   status: TabStatus;
   buffer: string;
+  viewport?: TerminalSnapshot;
   command: string;
   errorMessage?: string;
   exitCode?: number;
@@ -54,7 +72,7 @@ export type AppAction =
   | { type: "resize-sidebar"; delta: number }
   | { type: "set-focus-mode"; focusMode: FocusMode }
   | { type: "append-tab-buffer"; tabId: string; chunk: string }
-  | { type: "replace-tab-buffer"; tabId: string; buffer: string }
+  | { type: "replace-tab-viewport"; tabId: string; viewport: TerminalSnapshot }
   | { type: "set-tab-status"; tabId: string; status: TabStatus; exitCode?: number }
   | { type: "set-tab-error"; tabId: string; message: string }
   | { type: "set-terminal-size"; cols: number; rows: number };

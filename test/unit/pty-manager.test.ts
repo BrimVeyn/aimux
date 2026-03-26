@@ -12,8 +12,10 @@ describe("PtyManager", () => {
         reject(new Error("Timed out waiting for PTY session"));
       }, 5_000);
 
-      manager.on("render", (_tabId, buffer) => {
-        latestBuffer = buffer;
+      manager.on("render", (_tabId, viewport) => {
+        latestBuffer = viewport.lines
+          .map((line) => line.spans.map((span) => span.text).join(""))
+          .join("\n");
       });
 
       manager.on("error", (_tabId, message) => {

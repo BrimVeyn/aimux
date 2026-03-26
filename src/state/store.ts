@@ -152,12 +152,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           status: tab.status === "starting" ? "running" : tab.status,
         })),
       };
-    case "replace-tab-buffer":
+    case "replace-tab-viewport":
       return {
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          buffer: clampBuffer(action.buffer),
+          viewport: action.viewport,
           status: tab.status === "starting" ? "running" : tab.status,
         })),
       };

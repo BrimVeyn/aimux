@@ -19,7 +19,7 @@ export function RootView({ state }: RootViewProps) {
         <Sidebar state={state} />
         <TerminalPane tab={activeTab} focusMode={state.focusMode} />
       </box>
-      <StatusBar state={state} />
+      <StatusBar state={state} activeTab={activeTab} />
       {state.modal.type === "new-tab" ? <NewTabModal selectedIndex={state.modal.selectedIndex} /> : null}
     </box>
   );
