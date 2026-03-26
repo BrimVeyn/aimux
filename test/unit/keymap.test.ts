@@ -59,6 +59,13 @@ describe("resolveKeyIntent", () => {
       data: "\u0017",
     });
   });
+
+  test("normalizes Tab while terminal is focused", () => {
+    expect(resolveKeyIntent({ name: "tab", ctrl: false, meta: false, shift: false, sequence: "\u001b[9u", code: "Tab", baseCode: 9, source: "kitty" }, "terminal-input")).toEqual({
+      type: "send-to-pty",
+      data: "\t",
+    });
+  });
 });
 
 describe("keyEventToPtyInput", () => {
@@ -68,5 +75,7 @@ describe("keyEventToPtyInput", () => {
     expect(keyEventToPtyInput({ name: "c", ctrl: true, meta: false, shift: false, sequence: "\u0003" })).toBe("\u0003");
     expect(keyEventToPtyInput({ name: "delete", ctrl: false, meta: false, shift: false, sequence: "" })).toBe("\u001b[3~");
     expect(keyEventToPtyInput({ name: "x", ctrl: false, meta: true, shift: false, sequence: "x" })).toBe("\u001bx");
+    expect(keyEventToPtyInput({ name: "tab", ctrl: false, meta: false, shift: false, sequence: "\u001b[9u", code: "Tab", baseCode: 9, source: "kitty" })).toBe("\t");
+    expect(keyEventToPtyInput({ name: "tab", ctrl: false, meta: false, shift: true, sequence: "\u001b[1;2Z", code: "Tab", baseCode: 9, source: "kitty" })).toBe("\u001b[Z");
   });
 });

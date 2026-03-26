@@ -22,8 +22,16 @@ function ctrlLetter(letter: string): string {
 }
 
 export function keyEventToPtyInput(
-  key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence">,
+  key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence"> & {
+    code?: string;
+    baseCode?: number;
+    source?: "raw" | "kitty";
+  },
 ): string | null {
+  if (key.name === "tab" || key.code === "Tab" || key.baseCode === 9) {
+    return key.shift ? "\u001b[Z" : "\t";
+  }
+
   if (key.ctrl && key.name.length === 1) {
     return ctrlLetter(key.name);
   }
@@ -37,8 +45,6 @@ export function keyEventToPtyInput(
       return "\r";
     case "backspace":
       return "\u007f";
-    case "tab":
-      return "\t";
     case "escape":
       return "\u001b";
     case "space":
@@ -70,7 +76,7 @@ export function keyEventToPtyInput(
     case "f4":
       return "\u001bOS";
     default:
-      if (key.sequence && key.sequence.length > 0) {
+      if (key.sequence && key.sequence.length === 1) {
         return key.sequence;
       }
 
@@ -83,7 +89,11 @@ export function keyEventToPtyInput(
 }
 
 export function resolveKeyIntent(
-  key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence">,
+  key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence"> & {
+    code?: string;
+    baseCode?: number;
+    source?: "raw" | "kitty";
+  },
   focusMode: FocusMode,
 ): AppIntent | null {
   if (key.ctrl && key.name === "c" && focusMode !== "terminal-input") {
