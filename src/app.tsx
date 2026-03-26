@@ -126,6 +126,12 @@ export function App() {
       case "open-new-tab-modal":
         dispatch({ type: "open-new-tab-modal" });
         return;
+      case "close-tab":
+        if (state.activeTabId) {
+          ptyManager.disposeSession(state.activeTabId);
+          dispatch({ type: "close-active-tab" });
+        }
+        return;
       case "close-modal":
         dispatch({ type: "close-modal" });
         return;
@@ -139,6 +145,9 @@ export function App() {
         return;
       case "move-tab":
         dispatch({ type: "move-active-tab", delta: intent.delta });
+        return;
+      case "reorder-tab":
+        dispatch({ type: "reorder-active-tab", delta: intent.delta });
         return;
       case "enter-terminal-input":
         dispatch({ type: "set-focus-mode", focusMode: "terminal-input" });

@@ -9,6 +9,20 @@ describe("resolveKeyIntent", () => {
       delta: 1,
     });
 
+    expect(resolveKeyIntent({ name: "w", ctrl: true, meta: false, shift: false, sequence: "\u0017" }, "navigation")).toEqual({
+      type: "close-tab",
+    });
+
+    expect(resolveKeyIntent({ name: "j", ctrl: false, meta: false, shift: true, sequence: "J" }, "navigation")).toEqual({
+      type: "reorder-tab",
+      delta: 1,
+    });
+
+    expect(resolveKeyIntent({ name: "k", ctrl: false, meta: false, shift: true, sequence: "K" }, "navigation")).toEqual({
+      type: "reorder-tab",
+      delta: -1,
+    });
+
     expect(resolveKeyIntent({ name: "i", ctrl: false, meta: false, shift: false, sequence: "i" }, "navigation")).toEqual({
       type: "enter-terminal-input",
     });
@@ -36,6 +50,13 @@ describe("resolveKeyIntent", () => {
     expect(resolveKeyIntent({ name: "l", ctrl: true, meta: false, shift: false, sequence: "\f" }, "terminal-input")).toEqual({
       type: "send-to-pty",
       data: "\f",
+    });
+  });
+
+  test("does not steal close shortcut while terminal is focused", () => {
+    expect(resolveKeyIntent({ name: "w", ctrl: true, meta: false, shift: false, sequence: "\u0017" }, "terminal-input")).toEqual({
+      type: "send-to-pty",
+      data: "\u0017",
     });
   });
 });

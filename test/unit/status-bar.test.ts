@@ -12,6 +12,21 @@ describe("getStatusBarModel", () => {
     expect(model.right).toContain("Ctrl+n new");
   });
 
+  test("shows close and reorder hints when an active tab exists", () => {
+    const state = createInitialState();
+    const model = getStatusBarModel(state, {
+      id: "tab-1",
+      assistant: "claude",
+      title: "Claude",
+      status: "running",
+      buffer: "",
+      command: "claude",
+    });
+
+    expect(model.right).toContain("Ctrl+w close");
+    expect(model.right).toContain("Shift+J/K reorder");
+  });
+
   test("shows focused terminal hints for active tab", () => {
     const state = {
       ...createInitialState(),

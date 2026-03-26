@@ -66,8 +66,10 @@ export type AppAction =
   | { type: "close-modal" }
   | { type: "move-modal-selection"; delta: number }
   | { type: "add-tab"; tab: TabSession }
+  | { type: "close-active-tab" }
   | { type: "set-active-tab"; tabId: string }
   | { type: "move-active-tab"; delta: number }
+  | { type: "reorder-active-tab"; delta: number }
   | { type: "toggle-sidebar" }
   | { type: "resize-sidebar"; delta: number }
   | { type: "set-focus-mode"; focusMode: FocusMode }

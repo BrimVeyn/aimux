@@ -5,10 +5,12 @@ import type { FocusMode } from "../state/types";
 export type AppIntent =
   | { type: "quit" }
   | { type: "open-new-tab-modal" }
+  | { type: "close-tab" }
   | { type: "close-modal" }
   | { type: "confirm-modal" }
   | { type: "move-modal-selection"; delta: number }
   | { type: "move-tab"; delta: number }
+  | { type: "reorder-tab"; delta: number }
   | { type: "enter-terminal-input" }
   | { type: "leave-terminal-input" }
   | { type: "toggle-sidebar" }
@@ -113,6 +115,10 @@ export function resolveKeyIntent(
       return { type: "open-new-tab-modal" };
     }
 
+    if (key.ctrl && key.name === "w") {
+      return { type: "close-tab" };
+    }
+
     if (key.ctrl && key.name === "b") {
       return { type: "toggle-sidebar" };
     }
@@ -125,8 +131,16 @@ export function resolveKeyIntent(
       return { type: "resize-sidebar", delta: 2 };
     }
 
+    if (key.shift && key.name === "j") {
+      return { type: "reorder-tab", delta: 1 };
+    }
+
     if (key.name === "j") {
       return { type: "move-tab", delta: 1 };
+    }
+
+    if (key.shift && key.name === "k") {
+      return { type: "reorder-tab", delta: -1 };
     }
 
     if (key.name === "k") {

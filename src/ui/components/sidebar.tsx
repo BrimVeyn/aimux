@@ -22,7 +22,7 @@ export function Sidebar({ state }: SidebarProps) {
       gap={1}
     >
       <text fg={theme.accent}>aimux</text>
-      <text fg={theme.textMuted}>Ctrl+n new / Ctrl+b hide</text>
+      <text fg={theme.textMuted}>Ctrl+n new / Ctrl+w close / Shift+J/K reorder</text>
       <box flexDirection="column" gap={1} flexGrow={1}>
         {state.tabs.length === 0 ? (
           <box paddingTop={1}>

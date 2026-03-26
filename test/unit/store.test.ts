@@ -47,6 +47,68 @@ describe("appReducer", () => {
     expect(next.activeTabId).toBe("2");
   });
 
+  test("closes the active tab and picks the next tab at same index", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+      ],
+      activeTabId: "2",
+    };
+
+    const next = appReducer(initial, { type: "close-active-tab" });
+    expect(next.tabs.map((tab) => tab.id)).toEqual(["1", "3"]);
+    expect(next.activeTabId).toBe("3");
+  });
+
+  test("closes the last remaining tab to empty state", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+      ],
+      activeTabId: "1",
+      focusMode: "terminal-input" as const,
+    };
+
+    const next = appReducer(initial, { type: "close-active-tab" });
+    expect(next.tabs).toHaveLength(0);
+    expect(next.activeTabId).toBeNull();
+    expect(next.focusMode).toBe("navigation");
+  });
+
+  test("reorders active tab upward without changing the active id", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+      ],
+      activeTabId: "2",
+    };
+
+    const next = appReducer(initial, { type: "reorder-active-tab", delta: -1 });
+    expect(next.tabs.map((tab) => tab.id)).toEqual(["2", "1", "3"]);
+    expect(next.activeTabId).toBe("2");
+  });
+
+  test("does not reorder beyond boundaries", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+      ],
+      activeTabId: "1",
+    };
+
+    const next = appReducer(initial, { type: "reorder-active-tab", delta: -1 });
+    expect(next.tabs.map((tab) => tab.id)).toEqual(["1", "2"]);
+  });
+
   test("clamps sidebar resize", () => {
     const initial = createInitialState();
     const smaller = appReducer(initial, { type: "resize-sidebar", delta: -50 });

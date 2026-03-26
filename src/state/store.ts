@@ -18,6 +18,14 @@ function updateTab(
   return tabs.map((tab) => (tab.id === tabId ? updater(tab) : tab));
 }
 
+function getActiveIndex(state: AppState): number {
+  if (!state.activeTabId) {
+    return -1;
+  }
+
+  return state.tabs.findIndex((tab) => tab.id === state.activeTabId);
+}
+
 export function createInitialState(): AppState {
   return {
     tabs: [],
@@ -96,6 +104,22 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           selectedIndex: 0,
         },
       };
+    case "close-active-tab": {
+      const activeIndex = getActiveIndex(state);
+      if (activeIndex === -1) {
+        return state;
+      }
+
+      const tabs = state.tabs.filter((_, index) => index !== activeIndex);
+      const nextActiveTab = tabs[activeIndex] ?? tabs[activeIndex - 1] ?? null;
+
+      return {
+        ...state,
+        tabs,
+        activeTabId: nextActiveTab?.id ?? null,
+        focusMode: tabs.length === 0 ? "navigation" : state.focusMode,
+      };
+    }
     case "set-active-tab":
       return {
         ...state,
@@ -114,6 +138,33 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         activeTabId: state.tabs[nextIndex]?.id ?? state.activeTabId,
+      };
+    }
+    case "reorder-active-tab": {
+      const activeIndex = getActiveIndex(state);
+      if (activeIndex === -1) {
+        return state;
+      }
+
+      const nextIndex = activeIndex + action.delta;
+      if (nextIndex < 0 || nextIndex >= state.tabs.length) {
+        return state;
+      }
+
+      const tabs = [...state.tabs];
+      const current = tabs[activeIndex];
+      const target = tabs[nextIndex];
+
+      if (!current || !target) {
+        return state;
+      }
+
+      tabs[activeIndex] = target;
+      tabs[nextIndex] = current;
+
+      return {
+        ...state,
+        tabs,
       };
     }
     case "toggle-sidebar":
