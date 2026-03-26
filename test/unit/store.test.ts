@@ -31,6 +31,7 @@ describe("appReducer", () => {
     expect(next.tabs).toHaveLength(1);
     expect(next.activeTabId).toBe("tab-1");
     expect(next.modal.type).toBeNull();
+    expect(next.tabs[0]?.activity).toBe("idle");
   });
 
   test("moves active tab vertically", () => {
@@ -77,6 +78,50 @@ describe("appReducer", () => {
     expect(next.tabs).toHaveLength(0);
     expect(next.activeTabId).toBeNull();
     expect(next.focusMode).toBe("navigation");
+  });
+
+  test("closes a background tab without changing active tab", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+      ],
+      activeTabId: "1",
+    };
+
+    const next = appReducer(initial, { type: "close-tab", tabId: "2" });
+    expect(next.tabs.map((tab) => tab.id)).toEqual(["1"]);
+    expect(next.activeTabId).toBe("1");
+  });
+
+  test("ignores unknown tab id when closing by id", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+      ],
+      activeTabId: "1",
+    };
+
+    const next = appReducer(initial, { type: "close-tab", tabId: "missing" });
+    expect(next).toEqual(initial);
+  });
+
+  test("updates tab activity state", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+      ],
+      activeTabId: "1",
+    };
+
+    const busy = appReducer(initial, { type: "set-tab-activity", tabId: "1", activity: "busy" });
+    const idle = appReducer(busy, { type: "set-tab-activity", tabId: "1", activity: "idle" });
+
+    expect(busy.tabs[0]?.activity).toBe("busy");
+    expect(idle.tabs[0]?.activity).toBe("idle");
   });
 
   test("reorders active tab upward without changing the active id", () => {

@@ -8,6 +8,9 @@ import { appReducer, createInitialState } from "./state/store";
 import type { AssistantId, TabSession } from "./state/types";
 import { RootView } from "./ui/root";
 
+const IDLE_TIMEOUT_MS = 2_000;
+const STARTUP_GRACE_MS = 5_000;
+
 function createTabId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -21,6 +24,7 @@ function createTabSession(assistant: AssistantId): TabSession {
     assistant,
     title: option.label,
     status: "starting",
+    activity: "idle",
     buffer: "",
     command: option.command,
   };
@@ -31,12 +35,51 @@ export function App() {
   const dimensions = useTerminalDimensions();
   const [state, dispatch] = useReducer(appReducer, undefined, createInitialState);
   const ptyManagerRef = useRef<PtyManager | null>(null);
+  const idleTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const startupGraceTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   if (!ptyManagerRef.current) {
     ptyManagerRef.current = new PtyManager();
   }
 
   const ptyManager = ptyManagerRef.current;
+
+  function clearIdleTimer(tabId: string) {
+    const timeout = idleTimeoutsRef.current.get(tabId);
+    if (timeout) {
+      clearTimeout(timeout);
+      idleTimeoutsRef.current.delete(tabId);
+    }
+  }
+
+  function clearStartupGrace(tabId: string) {
+    const timeout = startupGraceTimeoutsRef.current.get(tabId);
+    if (timeout) {
+      clearTimeout(timeout);
+      startupGraceTimeoutsRef.current.delete(tabId);
+    }
+  }
+
+  function isStartupGraceActive(tabId: string): boolean {
+    return startupGraceTimeoutsRef.current.has(tabId);
+  }
+
+  function startStartupGrace(tabId: string) {
+    clearStartupGrace(tabId);
+    const timeout = setTimeout(() => {
+      startupGraceTimeoutsRef.current.delete(tabId);
+    }, STARTUP_GRACE_MS);
+    startupGraceTimeoutsRef.current.set(tabId, timeout);
+  }
+
+  function scheduleIdle(tabId: string) {
+    clearIdleTimer(tabId);
+    const timeout = setTimeout(() => {
+      dispatch({ type: "set-tab-activity", tabId, activity: "idle" });
+      idleTimeoutsRef.current.delete(tabId);
+    }, IDLE_TIMEOUT_MS);
+    idleTimeoutsRef.current.set(tabId, timeout);
+  }
 
   useEffect(() => {
     const handleRender = (tabId: string, viewport: TabSession["viewport"]) => {
@@ -45,18 +88,35 @@ export function App() {
       }
 
       dispatch({ type: "replace-tab-viewport", tabId, viewport });
+      if (isStartupGraceActive(tabId)) {
+        return;
+      }
+
+      dispatch({ type: "set-tab-activity", tabId, activity: "busy" });
+      scheduleIdle(tabId);
     };
 
     const handleExit = (tabId: string, exitCode: number) => {
+      clearIdleTimer(tabId);
+      clearStartupGrace(tabId);
+
+      if (exitCode === 0) {
+        dispatch({ type: "close-tab", tabId });
+        return;
+      }
+
       dispatch({ type: "set-tab-status", tabId, status: "exited", exitCode });
+      dispatch({ type: "set-tab-activity", tabId, activity: undefined });
       dispatch({
-        type: "append-tab-buffer",
+        type: "set-tab-error",
         tabId,
-        chunk: `\n[process exited with code ${exitCode}]\n`,
+        message: `[process exited with code ${exitCode}]`,
       });
     };
 
     const handleError = (tabId: string, message: string) => {
+      clearIdleTimer(tabId);
+      clearStartupGrace(tabId);
       dispatch({ type: "set-tab-error", tabId, message });
     };
 
@@ -65,6 +125,14 @@ export function App() {
     ptyManager.on("error", handleError);
 
     return () => {
+      for (const timeout of idleTimeoutsRef.current.values()) {
+        clearTimeout(timeout);
+      }
+      idleTimeoutsRef.current.clear();
+      for (const timeout of startupGraceTimeoutsRef.current.values()) {
+        clearTimeout(timeout);
+      }
+      startupGraceTimeoutsRef.current.clear();
       ptyManager.off("render", handleRender);
       ptyManager.off("exit", handleExit);
       ptyManager.off("error", handleError);
@@ -91,8 +159,10 @@ export function App() {
   function launchAssistant(assistant: AssistantId) {
     const tab = createTabSession(assistant);
     dispatch({ type: "add-tab", tab });
+    startStartupGrace(tab.id);
 
     if (!isCommandAvailable(tab.command)) {
+      clearStartupGrace(tab.id);
       dispatch({
         type: "set-tab-error",
         tabId: tab.id,
@@ -128,8 +198,10 @@ export function App() {
         return;
       case "close-tab":
         if (state.activeTabId) {
+          clearIdleTimer(state.activeTabId);
+          clearStartupGrace(state.activeTabId);
           ptyManager.disposeSession(state.activeTabId);
-          dispatch({ type: "close-active-tab" });
+          dispatch({ type: "close-tab", tabId: state.activeTabId });
         }
         return;
       case "close-modal":

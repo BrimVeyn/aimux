@@ -136,3 +136,43 @@ export function snapshotTerminal(terminal: Terminal): TerminalSnapshot {
 
   return { lines };
 }
+
+function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
+  return (
+    left.text === right.text &&
+    left.fg === right.fg &&
+    left.bg === right.bg &&
+    left.bold === right.bold &&
+    left.italic === right.italic &&
+    left.underline === right.underline
+  );
+}
+
+function areLinesEqual(left: TerminalLine, right: TerminalLine): boolean {
+  if (left.spans.length !== right.spans.length) {
+    return false;
+  }
+
+  return left.spans.every((span, index) => {
+    const other = right.spans[index];
+    return other ? areSpansEqual(span, other) : false;
+  });
+}
+
+export function areTerminalSnapshotsEqual(
+  left?: TerminalSnapshot,
+  right?: TerminalSnapshot,
+): boolean {
+  if (!left || !right) {
+    return left === right;
+  }
+
+  if (left.lines.length !== right.lines.length) {
+    return false;
+  }
+
+  return left.lines.every((line, index) => {
+    const other = right.lines[index];
+    return other ? areLinesEqual(line, other) : false;
+  });
+}

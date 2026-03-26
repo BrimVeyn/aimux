@@ -4,7 +4,7 @@ import { Terminal as XTerm } from "@xterm/headless";
 import { spawn, type IPty } from "bun-pty";
 
 import type { TerminalSnapshot } from "../state/types";
-import { snapshotTerminal } from "./terminal-snapshot";
+import { areTerminalSnapshotsEqual, snapshotTerminal } from "./terminal-snapshot";
 
 type PtyManagerEvents = {
   render: [tabId: string, viewport: TerminalSnapshot];
@@ -16,12 +16,23 @@ interface SessionHandle {
   tabId: string;
   pty: IPty;
   emulator: XTerm;
+  lastSnapshot?: TerminalSnapshot;
   pendingWrites: number;
   pendingExitCode: number | null;
 }
 
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
   private sessions = new Map<string, SessionHandle>();
+
+  private emitRenderIfChanged(session: SessionHandle): void {
+    const nextSnapshot = snapshotTerminal(session.emulator);
+    if (areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot)) {
+      return;
+    }
+
+    session.lastSnapshot = nextSnapshot;
+    this.emit("render", session.tabId, nextSnapshot);
+  }
 
   private finalizeSession(session: SessionHandle, exitCode: number): void {
     const current = this.sessions.get(session.tabId);
@@ -30,7 +41,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
 
     this.sessions.delete(session.tabId);
-    this.emit("render", session.tabId, snapshotTerminal(session.emulator));
+    this.emitRenderIfChanged(session);
     session.emulator.dispose();
     this.emit("exit", session.tabId, exitCode);
   }
@@ -67,6 +78,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         tabId: options.tabId,
         pty,
         emulator,
+        lastSnapshot: undefined,
         pendingWrites: 0,
         pendingExitCode: null,
       };
@@ -75,7 +87,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         session.pendingWrites += 1;
         emulator.write(data, () => {
           session.pendingWrites -= 1;
-          this.emit("render", options.tabId, snapshotTerminal(emulator));
+          this.emitRenderIfChanged(session);
 
           if (session.pendingWrites === 0 && session.pendingExitCode !== null) {
             this.finalizeSession(session, session.pendingExitCode);
@@ -98,7 +110,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       });
 
       this.sessions.set(options.tabId, session);
-      this.emit("render", options.tabId, snapshotTerminal(emulator));
+      this.emitRenderIfChanged(session);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.emit("error", options.tabId, `Failed to start session: ${message}`);
@@ -116,7 +128,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     for (const session of this.sessions.values()) {
       session.pty.resize(safeCols, safeRows);
       session.emulator.resize(safeCols, safeRows);
-      this.emit("render", session.tabId, snapshotTerminal(session.emulator));
+      this.emitRenderIfChanged(session);
     }
   }
 

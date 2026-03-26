@@ -20,8 +20,22 @@ function getStatusColor(status: TabSession["status"]): string {
   }
 }
 
+function getActivityLabel(tab: TabSession): string {
+  if (tab.status === "error") {
+    return "error";
+  }
+
+  if (tab.activity) {
+    return tab.activity;
+  }
+
+  return tab.status;
+}
+
 export function TabItem({ tab, active, focused }: TabItemProps) {
   const label = tab.assistant.toUpperCase();
+  const activityLabel = getActivityLabel(tab);
+  const activityColor = tab.activity === "busy" ? theme.accent : getStatusColor(tab.status);
 
   return (
     <box
@@ -38,8 +52,8 @@ export function TabItem({ tab, active, focused }: TabItemProps) {
       <text fg={active ? theme.text : theme.textMuted}>
         {active ? (focused ? "[>]" : "[*]") : "[ ]"} {tab.title}
       </text>
-      <text fg={getStatusColor(tab.status)}>
-        {label} - {tab.status}
+      <text fg={activityColor}>
+        {label} - {activityLabel}
       </text>
     </box>
   );

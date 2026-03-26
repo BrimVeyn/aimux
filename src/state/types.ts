@@ -2,6 +2,8 @@ export type AssistantId = "claude" | "codex" | "opencode";
 
 export type TabStatus = "starting" | "running" | "exited" | "error";
 
+export type TabActivity = "busy" | "idle";
+
 export type FocusMode = "navigation" | "terminal-input" | "modal";
 
 export type ModalType = "new-tab" | null;
@@ -28,6 +30,7 @@ export interface TabSession {
   assistant: AssistantId;
   title: string;
   status: TabStatus;
+  activity?: TabActivity;
   buffer: string;
   viewport?: TerminalSnapshot;
   command: string;
@@ -66,6 +69,7 @@ export type AppAction =
   | { type: "close-modal" }
   | { type: "move-modal-selection"; delta: number }
   | { type: "add-tab"; tab: TabSession }
+  | { type: "close-tab"; tabId: string }
   | { type: "close-active-tab" }
   | { type: "set-active-tab"; tabId: string }
   | { type: "move-active-tab"; delta: number }
@@ -75,6 +79,7 @@ export type AppAction =
   | { type: "set-focus-mode"; focusMode: FocusMode }
   | { type: "append-tab-buffer"; tabId: string; chunk: string }
   | { type: "replace-tab-viewport"; tabId: string; viewport: TerminalSnapshot }
+  | { type: "set-tab-activity"; tabId: string; activity?: TabActivity }
   | { type: "set-tab-status"; tabId: string; status: TabStatus; exitCode?: number }
   | { type: "set-tab-error"; tabId: string; message: string }
   | { type: "set-terminal-size"; cols: number; rows: number };

@@ -26,6 +26,26 @@ function getActiveIndex(state: AppState): number {
   return state.tabs.findIndex((tab) => tab.id === state.activeTabId);
 }
 
+function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
+  if (indexToClose < 0 || indexToClose >= state.tabs.length) {
+    return state;
+  }
+
+  const closingTabId = state.tabs[indexToClose]?.id;
+  const tabs = state.tabs.filter((_, index) => index !== indexToClose);
+  const nextActiveTab =
+    state.activeTabId === closingTabId
+      ? tabs[indexToClose] ?? tabs[indexToClose - 1] ?? null
+      : tabs.find((tab) => tab.id === state.activeTabId) ?? null;
+
+  return {
+    ...state,
+    tabs,
+    activeTabId: nextActiveTab?.id ?? null,
+    focusMode: tabs.length === 0 ? "navigation" : state.focusMode,
+  };
+}
+
 export function createInitialState(): AppState {
   return {
     tabs: [],
@@ -96,7 +116,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "add-tab":
       return {
         ...state,
-        tabs: [...state.tabs, action.tab],
+        tabs: [
+          ...state.tabs,
+          {
+            ...action.tab,
+            activity: action.tab.activity ?? "idle",
+          },
+        ],
         activeTabId: action.tab.id,
         focusMode: "navigation",
         modal: {
@@ -104,21 +130,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           selectedIndex: 0,
         },
       };
+    case "close-tab": {
+      const tabIndex = state.tabs.findIndex((tab) => tab.id === action.tabId);
+      return closeTabAtIndex(state, tabIndex);
+    }
     case "close-active-tab": {
       const activeIndex = getActiveIndex(state);
-      if (activeIndex === -1) {
-        return state;
-      }
-
-      const tabs = state.tabs.filter((_, index) => index !== activeIndex);
-      const nextActiveTab = tabs[activeIndex] ?? tabs[activeIndex - 1] ?? null;
-
-      return {
-        ...state,
-        tabs,
-        activeTabId: nextActiveTab?.id ?? null,
-        focusMode: tabs.length === 0 ? "navigation" : state.focusMode,
-      };
+      return closeTabAtIndex(state, activeIndex);
     }
     case "set-active-tab":
       return {
@@ -212,6 +230,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           status: tab.status === "starting" ? "running" : tab.status,
         })),
       };
+    case "set-tab-activity":
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          activity: action.activity,
+        })),
+      };
     case "set-tab-status":
       return {
         ...state,
@@ -219,6 +245,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
           ...tab,
           status: action.status,
           exitCode: action.exitCode,
+          activity: action.status === "running" ? tab.activity : undefined,
         })),
       };
     case "set-tab-error":
@@ -227,6 +254,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
           status: "error",
+          activity: undefined,
           errorMessage: action.message,
           buffer: clampBuffer(`${tab.buffer}${action.message}\n`),
         })),
