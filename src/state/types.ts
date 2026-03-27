@@ -15,6 +15,7 @@ export interface TerminalSpan {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  cursor?: boolean;
 }
 
 export interface TerminalLine {
@@ -25,6 +26,12 @@ export interface TerminalSnapshot {
   lines: TerminalLine[];
 }
 
+export interface TerminalModeState {
+  mouseTrackingMode: "none" | "x10" | "vt200" | "drag" | "any";
+  sendFocusMode: boolean;
+  alternateScrollMode: boolean;
+}
+
 export interface TabSession {
   id: string;
   assistant: AssistantId;
@@ -33,6 +40,7 @@ export interface TabSession {
   activity?: TabActivity;
   buffer: string;
   viewport?: TerminalSnapshot;
+  terminalModes: TerminalModeState;
   command: string;
   errorMessage?: string;
   exitCode?: number;
@@ -80,7 +88,7 @@ export type AppAction =
   | { type: "resize-sidebar"; delta: number }
   | { type: "set-focus-mode"; focusMode: FocusMode }
   | { type: "append-tab-buffer"; tabId: string; chunk: string }
-  | { type: "replace-tab-viewport"; tabId: string; viewport: TerminalSnapshot }
+  | { type: "replace-tab-viewport"; tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState }
   | { type: "set-tab-activity"; tabId: string; activity?: TabActivity }
   | { type: "set-tab-status"; tabId: string; status: TabStatus; exitCode?: number }
   | { type: "set-tab-error"; tabId: string; message: string }

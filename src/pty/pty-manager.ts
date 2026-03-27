@@ -3,11 +3,11 @@ import { EventEmitter } from "node:events";
 import { Terminal as XTerm } from "@xterm/headless";
 import { spawn, type IPty } from "bun-pty";
 
-import type { TerminalSnapshot } from "../state/types";
+import type { TerminalModeState, TerminalSnapshot } from "../state/types";
 import { areTerminalSnapshotsEqual, snapshotTerminal } from "./terminal-snapshot";
 
 type PtyManagerEvents = {
-  render: [tabId: string, viewport: TerminalSnapshot];
+  render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState];
   exit: [tabId: string, exitCode: number];
   error: [tabId: string, message: string];
 };
@@ -17,8 +17,52 @@ interface SessionHandle {
   pty: IPty;
   emulator: XTerm;
   lastSnapshot?: TerminalSnapshot;
+  lastTerminalModes?: TerminalModeState;
+  alternateScrollMode: boolean;
+  pendingModeSequence: string;
   pendingWrites: number;
   pendingExitCode: number | null;
+}
+
+const PRIVATE_MODE_RE = /\x1b\[\?([0-9;]+)([hl])/g;
+
+function getPendingModeSequence(sequence: string): string {
+  const escapeIndex = sequence.lastIndexOf("\x1b");
+  if (escapeIndex === -1) {
+    return "";
+  }
+
+  const suffix = sequence.slice(escapeIndex);
+  return /^\x1b(?:\[\??[0-9;]*)?$/.test(suffix) ? suffix : "";
+}
+
+function trackAlternateScrollMode(currentMode: boolean, pendingSequence: string, data: string): {
+  alternateScrollMode: boolean;
+  pendingSequence: string;
+} {
+  const sequence = `${pendingSequence}${data}`;
+  let alternateScrollMode = currentMode;
+  for (const match of sequence.matchAll(PRIVATE_MODE_RE)) {
+    const parameters = match[1]?.split(";") ?? [];
+    if (!parameters.includes("1007")) {
+      continue;
+    }
+
+    alternateScrollMode = match[2] === "h";
+  }
+
+  return {
+    alternateScrollMode,
+    pendingSequence: getPendingModeSequence(sequence),
+  };
+}
+
+function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): TerminalModeState {
+  return {
+    mouseTrackingMode: emulator.modes.mouseTrackingMode,
+    sendFocusMode: emulator.modes.sendFocusMode,
+    alternateScrollMode,
+  };
 }
 
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
@@ -26,12 +70,21 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
   private emitRenderIfChanged(session: SessionHandle): void {
     const nextSnapshot = snapshotTerminal(session.emulator);
-    if (areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot)) {
+    const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode);
+    const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot);
+    const modesChanged =
+      !session.lastTerminalModes
+      || session.lastTerminalModes.mouseTrackingMode !== nextTerminalModes.mouseTrackingMode
+      || session.lastTerminalModes.sendFocusMode !== nextTerminalModes.sendFocusMode
+      || session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode;
+
+    if (!snapshotChanged && !modesChanged) {
       return;
     }
 
     session.lastSnapshot = nextSnapshot;
-    this.emit("render", session.tabId, nextSnapshot);
+    session.lastTerminalModes = nextTerminalModes;
+    this.emit("render", session.tabId, nextSnapshot, nextTerminalModes);
   }
 
   private finalizeSession(session: SessionHandle, exitCode: number): void {
@@ -80,11 +133,21 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         pty,
         emulator,
         lastSnapshot: undefined,
+        lastTerminalModes: undefined,
+        alternateScrollMode: false,
+        pendingModeSequence: "",
         pendingWrites: 0,
         pendingExitCode: null,
       };
 
       pty.onData((data) => {
+        const trackedModes = trackAlternateScrollMode(
+          session.alternateScrollMode,
+          session.pendingModeSequence,
+          data,
+        );
+        session.alternateScrollMode = trackedModes.alternateScrollMode;
+        session.pendingModeSequence = trackedModes.pendingSequence;
         session.pendingWrites += 1;
         emulator.write(data, () => {
           session.pendingWrites -= 1;

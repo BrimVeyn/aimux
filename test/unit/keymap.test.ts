@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { keyEventToPtyInput, resolveKeyIntent } from "../../src/input/keymap";
+import { resolveKeyIntent } from "../../src/input/keymap";
 
 describe("resolveKeyIntent", () => {
   test("maps navigation shortcuts", () => {
@@ -40,42 +40,9 @@ describe("resolveKeyIntent", () => {
     expect(resolveKeyIntent({ name: "b", ctrl: true, meta: false, shift: false, sequence: "\u0002" }, "modal")).toBeNull();
   });
 
-  test("maps terminal unfocus shortcut", () => {
-    expect(resolveKeyIntent({ name: "z", ctrl: true, meta: false, shift: false, sequence: "\u001a" }, "terminal-input")).toEqual({
-      type: "leave-terminal-input",
-    });
-  });
-
-  test("does not steal resize shortcuts while terminal is focused", () => {
-    expect(resolveKeyIntent({ name: "l", ctrl: true, meta: false, shift: false, sequence: "\f" }, "terminal-input")).toEqual({
-      type: "send-to-pty",
-      data: "\f",
-    });
-  });
-
-  test("does not steal close shortcut while terminal is focused", () => {
-    expect(resolveKeyIntent({ name: "w", ctrl: true, meta: false, shift: false, sequence: "\u0017" }, "terminal-input")).toEqual({
-      type: "send-to-pty",
-      data: "\u0017",
-    });
-  });
-
-  test("normalizes Tab while terminal is focused", () => {
-    expect(resolveKeyIntent({ name: "tab", ctrl: false, meta: false, shift: false, sequence: "\u001b[9u", code: "Tab", baseCode: 9, source: "kitty" }, "terminal-input")).toEqual({
-      type: "send-to-pty",
-      data: "\t",
-    });
-  });
-});
-
-describe("keyEventToPtyInput", () => {
-  test("serializes common terminal keys", () => {
-    expect(keyEventToPtyInput({ name: "return", ctrl: false, meta: false, shift: false, sequence: "\r" })).toBe("\r");
-    expect(keyEventToPtyInput({ name: "up", ctrl: false, meta: false, shift: false, sequence: "" })).toBe("\u001b[A");
-    expect(keyEventToPtyInput({ name: "c", ctrl: true, meta: false, shift: false, sequence: "\u0003" })).toBe("\u0003");
-    expect(keyEventToPtyInput({ name: "delete", ctrl: false, meta: false, shift: false, sequence: "" })).toBe("\u001b[3~");
-    expect(keyEventToPtyInput({ name: "x", ctrl: false, meta: true, shift: false, sequence: "x" })).toBe("\u001bx");
-    expect(keyEventToPtyInput({ name: "tab", ctrl: false, meta: false, shift: false, sequence: "\u001b[9u", code: "Tab", baseCode: 9, source: "kitty" })).toBe("\t");
-    expect(keyEventToPtyInput({ name: "tab", ctrl: false, meta: false, shift: true, sequence: "\u001b[1;2Z", code: "Tab", baseCode: 9, source: "kitty" })).toBe("\u001b[Z");
+  test("ignores all keys in terminal-input mode (handled by raw input handler)", () => {
+    expect(resolveKeyIntent({ name: "z", ctrl: true, meta: false, shift: false, sequence: "\u001a" }, "terminal-input")).toBeNull();
+    expect(resolveKeyIntent({ name: "l", ctrl: true, meta: false, shift: false, sequence: "\f" }, "terminal-input")).toBeNull();
+    expect(resolveKeyIntent({ name: "w", ctrl: true, meta: false, shift: false, sequence: "\u0017" }, "terminal-input")).toBeNull();
   });
 });

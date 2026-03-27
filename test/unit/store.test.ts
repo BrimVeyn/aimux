@@ -2,6 +2,24 @@ import { describe, expect, test } from "bun:test";
 
 import { appReducer, createInitialState } from "../../src/state/store";
 
+function createTab(overrides: Partial<ReturnType<typeof createInitialState>["tabs"][number]> & {
+  id: string;
+  assistant: "claude" | "codex" | "opencode";
+  title: string;
+  status: "starting" | "running" | "exited" | "error";
+  command: string;
+}) {
+  return {
+    buffer: "",
+    terminalModes: {
+      mouseTrackingMode: "none" as const,
+      sendFocusMode: false,
+      alternateScrollMode: false,
+    },
+    ...overrides,
+  };
+}
+
 describe("appReducer", () => {
   test("opens and closes the new tab modal", () => {
     const initial = createInitialState();
@@ -18,14 +36,13 @@ describe("appReducer", () => {
     const initial = createInitialState();
     const next = appReducer(initial, {
       type: "add-tab",
-      tab: {
+      tab: createTab({
         id: "tab-1",
         assistant: "claude",
         title: "Claude",
         status: "starting",
-        buffer: "",
         command: "claude",
-      },
+      }),
     });
 
     expect(next.tabs).toHaveLength(1);
@@ -38,8 +55,8 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
       ],
       activeTabId: "1",
     };
@@ -52,9 +69,9 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
-        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
       ],
       activeTabId: "3",
     };
@@ -67,9 +84,9 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
-        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
       ],
       activeTabId: "1",
     };
@@ -82,7 +99,7 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
       ],
       activeTabId: "1",
     };
@@ -95,9 +112,9 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
-        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
       ],
       activeTabId: "2",
     };
@@ -111,7 +128,7 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
       ],
       activeTabId: "1",
       focusMode: "terminal-input" as const,
@@ -127,8 +144,8 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
       ],
       activeTabId: "1",
     };
@@ -142,7 +159,7 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
       ],
       activeTabId: "1",
     };
@@ -155,7 +172,7 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
       ],
       activeTabId: "1",
     };
@@ -171,9 +188,9 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
-        { id: "3", assistant: "opencode" as const, title: "OpenCode", status: "running" as const, buffer: "", command: "opencode" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
       ],
       activeTabId: "2",
     };
@@ -187,8 +204,8 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        { id: "1", assistant: "claude" as const, title: "Claude", status: "running" as const, buffer: "", command: "claude" },
-        { id: "2", assistant: "codex" as const, title: "Codex", status: "running" as const, buffer: "", command: "codex" },
+        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
       ],
       activeTabId: "1",
     };

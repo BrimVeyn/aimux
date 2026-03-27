@@ -67,7 +67,8 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
     previous.bg === span.bg &&
     previous.bold === span.bold &&
     previous.italic === span.italic &&
-    previous.underline === span.underline
+    previous.underline === span.underline &&
+    previous.cursor === span.cursor
   ) {
     previous.text += span.text;
     return;
@@ -76,7 +77,7 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
   spans.push(span);
 }
 
-function buildLine(terminal: Terminal, lineIndex: number): TerminalLine {
+function buildLine(terminal: Terminal, lineIndex: number, cursorColumn: number | null): TerminalLine {
   const line = terminal.buffer.active.getLine(lineIndex);
 
   if (!line) {
@@ -113,6 +114,13 @@ function buildLine(terminal: Terminal, lineIndex: number): TerminalLine {
       [fg, bg] = [resolvedBg, resolvedFg];
     }
 
+    const isCursorCell = cursorColumn === column;
+    if (isCursorCell) {
+      const resolvedFg = fg ?? DEFAULT_TERMINAL_FG;
+      const resolvedBg = bg ?? DEFAULT_TERMINAL_BG;
+      [fg, bg] = [resolvedBg, resolvedFg];
+    }
+
     pushSpan(spans, {
       text,
       fg,
@@ -120,6 +128,7 @@ function buildLine(terminal: Terminal, lineIndex: number): TerminalLine {
       bold: current.isBold() ? true : undefined,
       italic: current.isItalic() ? true : undefined,
       underline: current.isUnderline() ? true : undefined,
+      cursor: isCursorCell ? true : undefined,
     });
   }
 
@@ -127,11 +136,14 @@ function buildLine(terminal: Terminal, lineIndex: number): TerminalLine {
 }
 
 export function snapshotTerminal(terminal: Terminal): TerminalSnapshot {
-  const startLine = terminal.buffer.active.viewportY;
+  const buffer = terminal.buffer.active;
+  const startLine = buffer.viewportY;
+  const cursorRow = buffer.cursorY;
+  const cursorColumn = Math.min(buffer.cursorX, Math.max(terminal.cols - 1, 0));
   const lines: TerminalLine[] = [];
 
   for (let row = 0; row < terminal.rows; row += 1) {
-    lines.push(buildLine(terminal, startLine + row));
+    lines.push(buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null));
   }
 
   return { lines };
@@ -144,7 +156,8 @@ function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
     left.bg === right.bg &&
     left.bold === right.bold &&
     left.italic === right.italic &&
-    left.underline === right.underline
+    left.underline === right.underline &&
+    left.cursor === right.cursor
   );
 }
 

@@ -238,6 +238,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
           viewport: action.viewport,
+          terminalModes: action.terminalModes,
           status: tab.status === "starting" ? "running" : tab.status,
         })),
       };

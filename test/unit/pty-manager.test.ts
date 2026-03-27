@@ -83,4 +83,138 @@ describe("PtyManager", () => {
     expect(renderCount).toBeLessThanOrEqual(3);
     manager.disposeAll();
   });
+
+  test("tracks mouse and focus modes from terminal output", async () => {
+    const manager = new PtyManager();
+    const seenModes: Array<{ mouseTrackingMode: string; sendFocusMode: boolean; alternateScrollMode: boolean }> = [];
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for PTY session"));
+      }, 5_000);
+
+      manager.on("render", (_tabId, _viewport, terminalModes) => {
+        seenModes.push(terminalModes);
+      });
+
+      manager.on("error", (_tabId, message) => {
+        clearTimeout(timeout);
+        reject(new Error(message));
+      });
+
+      manager.on("exit", (_tabId, code) => {
+        clearTimeout(timeout);
+        resolve(code);
+      });
+
+      manager.createSession({
+        tabId: "tab-3",
+        command: "/bin/sh",
+        cols: 80,
+        rows: 24,
+        cwd: process.cwd(),
+      });
+
+      setTimeout(() => {
+        manager.write("tab-3", "printf '\\033[?1002h\\033[?1004h\\033[?1007h'; exit\r");
+      }, 50);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(seenModes).toContainEqual({
+      mouseTrackingMode: "none",
+      sendFocusMode: false,
+      alternateScrollMode: false,
+    });
+    expect(seenModes).toContainEqual({
+      mouseTrackingMode: "drag",
+      sendFocusMode: true,
+      alternateScrollMode: true,
+    });
+    manager.disposeAll();
+  });
+
+  test("tracks alternate scroll mode across split PTY output", async () => {
+    const manager = new PtyManager();
+    const seenModes: Array<boolean> = [];
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for PTY session"));
+      }, 5_000);
+
+      manager.on("render", (_tabId, _viewport, terminalModes) => {
+        seenModes.push(terminalModes.alternateScrollMode);
+      });
+
+      manager.on("error", (_tabId, message) => {
+        clearTimeout(timeout);
+        reject(new Error(message));
+      });
+
+      manager.on("exit", (_tabId, code) => {
+        clearTimeout(timeout);
+        resolve(code);
+      });
+
+      manager.createSession({
+        tabId: "tab-4",
+        command: "/bin/sh",
+        cols: 80,
+        rows: 24,
+        cwd: process.cwd(),
+      });
+
+      setTimeout(() => {
+        manager.write("tab-4", "printf '\\033[?10'; sleep 0.05; printf '07h'; sleep 0.05; printf '\\033[?1007l'; exit\r");
+      }, 50);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(seenModes).toContain(true);
+    expect(seenModes[seenModes.length - 1]).toBe(false);
+    manager.disposeAll();
+  });
+
+  test("tracks alternate scroll mode in bundled private-mode sequences", async () => {
+    const manager = new PtyManager();
+    const seenModes: Array<boolean> = [];
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for PTY session"));
+      }, 5_000);
+
+      manager.on("render", (_tabId, _viewport, terminalModes) => {
+        seenModes.push(terminalModes.alternateScrollMode);
+      });
+
+      manager.on("error", (_tabId, message) => {
+        clearTimeout(timeout);
+        reject(new Error(message));
+      });
+
+      manager.on("exit", (_tabId, code) => {
+        clearTimeout(timeout);
+        resolve(code);
+      });
+
+      manager.createSession({
+        tabId: "tab-5",
+        command: "/bin/sh",
+        cols: 80,
+        rows: 24,
+        cwd: process.cwd(),
+      });
+
+      setTimeout(() => {
+        manager.write("tab-5", "printf '\\033[?1002;1007h'; sleep 0.05; printf '\\033[?1000;1007l'; exit\r");
+      }, 50);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(seenModes).toContain(true);
+    expect(seenModes[seenModes.length - 1]).toBe(false);
+    manager.disposeAll();
+  });
 });

@@ -67,4 +67,33 @@ describe("snapshotTerminal", () => {
     expect(areTerminalSnapshotsEqual(before, after)).toBe(false);
     terminal.dispose();
   });
+
+  test("marks the cursor cell in the snapshot", async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 });
+
+    await new Promise<void>((resolve) => {
+      terminal.write("hello", resolve);
+    });
+
+    const snapshot = snapshotTerminal(terminal);
+    expect(snapshot.lines[0]?.spans.some((span) => span.cursor)).toBe(true);
+    terminal.dispose();
+  });
+
+  test("detects cursor-only movement between snapshots", async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 });
+
+    await new Promise<void>((resolve) => {
+      terminal.write("hello", resolve);
+    });
+    const before = snapshotTerminal(terminal);
+
+    await new Promise<void>((resolve) => {
+      terminal.write("\u001b[D", resolve);
+    });
+    const after = snapshotTerminal(terminal);
+
+    expect(areTerminalSnapshotsEqual(before, after)).toBe(false);
+    terminal.dispose();
+  });
 });

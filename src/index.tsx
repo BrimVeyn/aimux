@@ -8,11 +8,7 @@ const renderer = await createCliRenderer({
   useAlternateScreen: true,
   useConsole: false,
   autoFocus: true,
-  useKittyKeyboard: {
-    disambiguate: true,
-    allKeysAsEscapes: true,
-    events: true,
-  },
+  useMouse: true,
 });
 
 createRoot(renderer).render(<App />);

@@ -2,11 +2,12 @@ import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
 import { useEffect, useMemo, useReducer, useRef } from "react";
 
 import { resolveKeyIntent } from "./input/keymap";
+import { createRawInputHandler, type TerminalContentOrigin } from "./input/raw-input-handler";
 import { loadConfig, saveConfig } from "./config";
 import { ASSISTANT_OPTIONS, getAssistantOption, isCommandAvailable, parseCommand } from "./pty/command-registry";
 import { PtyManager } from "./pty/pty-manager";
 import { appReducer, createInitialState } from "./state/store";
-import type { AssistantId, TabSession } from "./state/types";
+import type { AssistantId, TabSession, TerminalModeState } from "./state/types";
 import { RootView } from "./ui/root";
 
 const IDLE_TIMEOUT_MS = 2_000;
@@ -17,6 +18,7 @@ const STATUS_BAR_HEIGHT = 4;
 const TERMINAL_PANE_VERTICAL_CHROME = 4;
 const MIN_TERMINAL_ROWS = 1;
 const MIN_TERMINAL_COLS = 20;
+const DISABLE_TERMINAL_PASSTHROUGH = "\x1b[?9l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1004l\x1b[?1006l\x1b[?1007l";
 
 function createTabId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -33,8 +35,48 @@ function createTabSession(assistant: AssistantId, customCommand?: string): TabSe
     status: "starting",
     activity: "idle",
     buffer: "",
+    terminalModes: {
+      mouseTrackingMode: "none",
+      sendFocusMode: false,
+      alternateScrollMode: false,
+    },
     command: customCommand ?? option.command,
   };
+}
+
+function buildTerminalPassthroughEnableSequence(terminalModes: TerminalModeState): string {
+  let sequence = "";
+
+  switch (terminalModes.mouseTrackingMode) {
+    case "x10":
+      sequence += "\x1b[?9h";
+      break;
+    case "vt200":
+      sequence += "\x1b[?1000h";
+      break;
+    case "drag":
+      sequence += "\x1b[?1002h";
+      break;
+    case "any":
+      sequence += "\x1b[?1003h";
+      break;
+    default:
+      break;
+  }
+
+  if (terminalModes.mouseTrackingMode !== "none") {
+    sequence += "\x1b[?1006h";
+  }
+
+  if (terminalModes.sendFocusMode) {
+    sequence += "\x1b[?1004h";
+  }
+
+  if (terminalModes.alternateScrollMode) {
+    sequence += "\x1b[?1007h";
+  }
+
+  return sequence;
 }
 
 export function App() {
@@ -53,6 +95,75 @@ export function App() {
   }
 
   const ptyManager = ptyManagerRef.current;
+  const activeTab = useMemo(
+    () => state.tabs.find((tab) => tab.id === state.activeTabId),
+    [state.activeTabId, state.tabs],
+  );
+  const activeMouseTrackingMode = activeTab?.terminalModes.mouseTrackingMode ?? "none";
+  const activeSendFocusMode = activeTab?.terminalModes.sendFocusMode ?? false;
+  const activeAlternateScrollMode = activeTab?.terminalModes.alternateScrollMode ?? false;
+  const activeMousePassthroughEnabled =
+    activeMouseTrackingMode !== "none" || activeAlternateScrollMode;
+
+  const focusModeRef = useRef(state.focusMode);
+  focusModeRef.current = state.focusMode;
+
+  const activeTabIdRef = useRef(state.activeTabId);
+  activeTabIdRef.current = state.activeTabId;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+
+  const contentOriginRef = useRef<TerminalContentOrigin>({ x: 0, y: 0, cols: 0, rows: 0 });
+
+  useEffect(() => {
+    const handler = createRawInputHandler({
+      getFocusMode: () => focusModeRef.current,
+      getActiveTabId: () => activeTabIdRef.current,
+      getContentOrigin: () => contentOriginRef.current,
+      getMousePassthroughEnabled: () => {
+        const terminalModes = activeTabRef.current?.terminalModes;
+        return !!terminalModes && (
+          terminalModes.mouseTrackingMode !== "none" || terminalModes.alternateScrollMode
+        );
+      },
+      writeToPty: (tabId, data) => ptyManager.write(tabId, data),
+      leaveTerminalInput: () =>
+        dispatch({ type: "set-focus-mode", focusMode: "navigation" }),
+    });
+
+    renderer.prependInputHandler(handler);
+    return () => renderer.removeInputHandler(handler);
+  }, [renderer, ptyManager]);
+
+  useEffect(() => {
+    const shouldPassthroughTerminalInput =
+      state.focusMode === "terminal-input"
+      && !!activeTab
+      && (activeMousePassthroughEnabled || activeSendFocusMode);
+
+    if (shouldPassthroughTerminalInput) {
+      renderer.useMouse = false;
+      process.stdout.write(
+        `${DISABLE_TERMINAL_PASSTHROUGH}${buildTerminalPassthroughEnableSequence({
+          mouseTrackingMode: activeMouseTrackingMode,
+          sendFocusMode: activeSendFocusMode,
+          alternateScrollMode: activeAlternateScrollMode,
+        })}`,
+      );
+      return;
+    }
+
+    process.stdout.write(DISABLE_TERMINAL_PASSTHROUGH);
+    renderer.useMouse = true;
+  }, [
+    activeAlternateScrollMode,
+    activeMousePassthroughEnabled,
+    activeMouseTrackingMode,
+    activeSendFocusMode,
+    activeTab?.id,
+    renderer,
+    state.focusMode,
+  ]);
 
   function clearIdleTimer(tabId: string) {
     const timeout = idleTimeoutsRef.current.get(tabId);
@@ -92,12 +203,16 @@ export function App() {
   }
 
   useEffect(() => {
-    const handleRender = (tabId: string, viewport: TabSession["viewport"]) => {
+    const handleRender = (
+      tabId: string,
+      viewport: TabSession["viewport"],
+      terminalModes: TerminalModeState,
+    ) => {
       if (!viewport) {
         return;
       }
 
-      dispatch({ type: "replace-tab-viewport", tabId, viewport });
+      dispatch({ type: "replace-tab-viewport", tabId, viewport, terminalModes });
       if (isStartupGraceActive(tabId)) {
         return;
       }
@@ -156,6 +271,17 @@ export function App() {
       MAIN_AREA_VERTICAL_PADDING + STATUS_BAR_HEIGHT + TERMINAL_PANE_VERTICAL_CHROME;
     const cols = Math.max(MIN_TERMINAL_COLS, Math.floor(dimensions.width - sidebarWidth - MAIN_AREA_HORIZONTAL_CHROME));
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows));
+
+    // Terminal content origin in 0-based screen cells.
+    // X: root padding(1) + sidebar outer(sidebarWidth) + terminal border(1) + terminal padding(1)
+    // Y: root padding(1) + terminal border(1) + terminal padding(1)
+    contentOriginRef.current = {
+      x: 1 + sidebarWidth + 1 + 1,
+      y: 1 + 1 + 1,
+      cols,
+      rows,
+    };
+
     return { cols, rows };
   }, [dimensions.height, dimensions.width, state.sidebar.visible, state.sidebar.width]);
 
@@ -248,11 +374,6 @@ export function App() {
         return;
       case "resize-sidebar":
         dispatch({ type: "resize-sidebar", delta: intent.delta });
-        return;
-      case "send-to-pty":
-        if (state.activeTabId) {
-          ptyManager.write(state.activeTabId, intent.data);
-        }
         return;
       case "begin-command-edit":
         dispatch({ type: "begin-command-edit" });

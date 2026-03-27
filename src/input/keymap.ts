@@ -15,82 +15,10 @@ export type AppIntent =
   | { type: "leave-terminal-input" }
   | { type: "toggle-sidebar" }
   | { type: "resize-sidebar"; delta: number }
-  | { type: "send-to-pty"; data: string }
   | { type: "begin-command-edit" }
   | { type: "command-edit-input"; char: string }
   | { type: "commit-command-edit" }
   | { type: "cancel-command-edit" };
-
-function ctrlLetter(letter: string): string {
-  return String.fromCharCode(letter.toLowerCase().charCodeAt(0) - 96);
-}
-
-export function keyEventToPtyInput(
-  key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence"> & {
-    code?: string;
-    baseCode?: number;
-    source?: "raw" | "kitty";
-  },
-): string | null {
-  if (key.name === "tab" || key.code === "Tab" || key.baseCode === 9) {
-    return key.shift ? "\u001b[Z" : "\t";
-  }
-
-  if (key.ctrl && key.name.length === 1) {
-    return ctrlLetter(key.name);
-  }
-
-  if (key.meta && key.name.length === 1) {
-    return `\u001b${key.shift ? key.name.toUpperCase() : key.name}`;
-  }
-
-  switch (key.name) {
-    case "return":
-      return "\r";
-    case "backspace":
-      return "\u007f";
-    case "escape":
-      return "\u001b";
-    case "space":
-      return " ";
-    case "up":
-      return "\u001b[A";
-    case "down":
-      return "\u001b[B";
-    case "right":
-      return "\u001b[C";
-    case "left":
-      return "\u001b[D";
-    case "delete":
-      return "\u001b[3~";
-    case "home":
-      return "\u001b[H";
-    case "end":
-      return "\u001b[F";
-    case "pageup":
-      return "\u001b[5~";
-    case "pagedown":
-      return "\u001b[6~";
-    case "f1":
-      return "\u001bOP";
-    case "f2":
-      return "\u001bOQ";
-    case "f3":
-      return "\u001bOR";
-    case "f4":
-      return "\u001bOS";
-    default:
-      if (key.sequence && key.sequence.length === 1) {
-        return key.sequence;
-      }
-
-      if (key.name.length === 1) {
-        return key.shift ? key.name.toUpperCase() : key.name;
-      }
-
-      return null;
-  }
-}
 
 export function resolveKeyIntent(
   key: Pick<KeyEvent, "name" | "ctrl" | "meta" | "shift" | "sequence"> & {
@@ -197,15 +125,6 @@ export function resolveKeyIntent(
     }
 
     return null;
-  }
-
-  if (focusMode === "terminal-input") {
-    if (key.ctrl && key.name === "z") {
-      return { type: "leave-terminal-input" };
-    }
-
-    const data = keyEventToPtyInput(key);
-    return data ? { type: "send-to-pty", data } : null;
   }
 
   return null;
