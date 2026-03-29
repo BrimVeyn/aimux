@@ -10,6 +10,7 @@ import { createRawInputHandler, type TerminalContentOrigin } from "./input/raw-i
 import { loadConfig, saveConfig } from "./config";
 import { ASSISTANT_OPTIONS, getAssistantOption, isCommandAvailable, parseCommand } from "./pty/command-registry";
 import { PtyManager } from "./pty/pty-manager";
+import { serializeWorkspace } from "./state/session-persistence";
 import { appReducer, createInitialState } from "./state/store";
 import type { AssistantId, TabSession, TerminalModeState } from "./state/types";
 import { RootView } from "./ui/root";
@@ -22,6 +23,7 @@ const STATUS_BAR_HEIGHT = 4;
 const TERMINAL_PANE_VERTICAL_CHROME = 4;
 const MIN_TERMINAL_ROWS = 1;
 const MIN_TERMINAL_COLS = 20;
+const WORKSPACE_SAVE_DEBOUNCE_MS = 250;
 
 function createTabId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -85,12 +87,13 @@ export function App() {
   const renderer = useRenderer();
   const dimensions = useTerminalDimensions();
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
-    const { customCommands } = loadConfig();
-    return createInitialState(customCommands);
+    const { customCommands, workspaceSnapshot } = loadConfig();
+    return createInitialState(customCommands, workspaceSnapshot);
   });
   const ptyManagerRef = useRef<PtyManager | null>(null);
   const idleTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const startupGraceTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const workspaceSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (!ptyManagerRef.current) {
     ptyManagerRef.current = new PtyManager();
@@ -294,6 +297,27 @@ export function App() {
   }
 
   useEffect(() => {
+    if (workspaceSaveTimeoutRef.current) {
+      clearTimeout(workspaceSaveTimeoutRef.current);
+    }
+
+    workspaceSaveTimeoutRef.current = setTimeout(() => {
+      saveConfig({
+        ...loadConfig(),
+        customCommands: state.customCommands,
+        workspaceSnapshot: serializeWorkspace(state),
+      });
+      workspaceSaveTimeoutRef.current = null;
+    }, WORKSPACE_SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (workspaceSaveTimeoutRef.current) {
+        clearTimeout(workspaceSaveTimeoutRef.current);
+      }
+    };
+  }, [state]);
+
+  useEffect(() => {
     const handleRender = (
       tabId: string,
       viewport: TabSession["viewport"],
@@ -338,6 +362,9 @@ export function App() {
         clearTimeout(timeout);
       }
       startupGraceTimeoutsRef.current.clear();
+      if (workspaceSaveTimeoutRef.current) {
+        clearTimeout(workspaceSaveTimeoutRef.current);
+      }
       ptyManager.off("render", handleRender);
       ptyManager.off("exit", handleExit);
       ptyManager.off("error", handleError);
@@ -415,6 +442,11 @@ export function App() {
 
     switch (intent.type) {
       case "quit":
+        saveConfig({
+          ...loadConfig(),
+          customCommands: state.customCommands,
+          workspaceSnapshot: serializeWorkspace(state),
+        });
         ptyManager.disposeAll();
         renderer.destroy();
         process.exit(0);
@@ -483,7 +515,11 @@ export function App() {
           } else {
             delete newCustomCommands[option.id];
           }
-          saveConfig({ customCommands: newCustomCommands });
+          saveConfig({
+            ...loadConfig(),
+            customCommands: newCustomCommands,
+            workspaceSnapshot: serializeWorkspace({ ...state, customCommands: newCustomCommands }),
+          });
         }
         return;
       }

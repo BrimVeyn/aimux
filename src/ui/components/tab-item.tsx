@@ -12,6 +12,8 @@ function getStatusColor(status: TabSession["status"]): string {
   switch (status) {
     case "running":
       return theme.success;
+    case "disconnected":
+      return theme.warning;
     case "error":
       return theme.danger;
     case "exited":
@@ -24,6 +26,10 @@ function getStatusColor(status: TabSession["status"]): string {
 function getActivityLabel(tab: TabSession): string {
   if (tab.status === "error") {
     return "error";
+  }
+
+  if (tab.status === "disconnected") {
+    return "restore";
   }
 
   if (tab.activity) {

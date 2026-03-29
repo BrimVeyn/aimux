@@ -1,15 +1,23 @@
 # aimux
 
-To install dependencies:
+A terminal multiplexer for AI CLIs.
+
+## Install
 
 ```bash
 bun install
 ```
 
-To run:
+## Run
 
 ```bash
-bun run index.ts
+bun run src/index.tsx
 ```
 
-This project was created using `bun init` in bun v1.2.23. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+## Doctor
+
+```bash
+bun run src/index.tsx doctor
+```
+
+This checks whether your assistant CLIs are available in `PATH` and whether aimux can find its config.

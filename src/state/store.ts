@@ -1,4 +1,5 @@
 import { ASSISTANT_OPTIONS } from "../pty/command-registry";
+import { restoreWorkspaceState, type WorkspaceSnapshotV1 } from "./session-persistence";
 import type { AppAction, AppState, TabSession } from "./types";
 
 const MAX_BUFFER_LENGTH = 50_000;
@@ -47,8 +48,11 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
   };
 }
 
-export function createInitialState(customCommands: Record<string, string> = {}): AppState {
-  return {
+export function createInitialState(
+  customCommands: Record<string, string> = {},
+  workspaceSnapshot?: WorkspaceSnapshotV1,
+): AppState {
+  const baseState: AppState = {
     tabs: [],
     activeTabId: null,
     focusMode: "navigation",
@@ -68,6 +72,15 @@ export function createInitialState(customCommands: Record<string, string> = {}):
       terminalRows: 24,
     },
     customCommands,
+  };
+
+  if (!workspaceSnapshot) {
+    return baseState;
+  }
+
+  return {
+    ...baseState,
+    ...restoreWorkspaceState(baseState, workspaceSnapshot),
   };
 }
 

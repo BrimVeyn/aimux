@@ -123,6 +123,9 @@ export function TerminalPane({
       {tab?.status === "exited" && tab.exitCode !== undefined ? (
         <text fg={theme.warning}>Process exited with code {tab.exitCode}</text>
       ) : null}
+      {tab?.status === "disconnected" ? (
+        <text fg={theme.warning}>Restored snapshot. Press Ctrl+r to restart this session.</text>
+      ) : null}
       {tab?.errorMessage ? <text fg={theme.danger}>{tab.errorMessage}</text> : null}
     </box>
   );

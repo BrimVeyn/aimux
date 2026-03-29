@@ -67,4 +67,11 @@ describe("getStatusBarModel", () => {
     expect(model.left).toContain("modal");
     expect(model.right).toContain("Enter confirm");
   });
+
+  test("shows restored tab restart hint", () => {
+    const state = createInitialState();
+    const model = getStatusBarModel(state, { ...createTab("Claude"), status: "disconnected" as const });
+
+    expect(model.right).toContain("Ctrl+r restart restored tab");
+  });
 });

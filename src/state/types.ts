@@ -1,6 +1,6 @@
 export type AssistantId = "claude" | "codex" | "opencode";
 
-export type TabStatus = "starting" | "running" | "exited" | "error";
+export type TabStatus = "starting" | "running" | "disconnected" | "exited" | "error";
 
 export type TabActivity = "busy" | "idle";
 

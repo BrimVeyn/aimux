@@ -23,6 +23,18 @@ function getActiveTabLabel(tab?: TabSession): string {
   return `${truncateLabel(tab.title)} (${tab.status})`;
 }
 
+function getNavigationHint(activeTab?: TabSession): string {
+  if (!activeTab) {
+    return "Ctrl+n new | Ctrl+b toggle | Ctrl+h/l resize";
+  }
+
+  if (activeTab.status === "disconnected") {
+    return "Ctrl+r restart restored tab | Ctrl+w close | i focus";
+  }
+
+  return "j/k move | Shift+J/K reorder | Ctrl+r restart | Ctrl+w close | i focus";
+}
+
 export function getStatusBarModel(state: AppState, activeTab?: TabSession): StatusBarModel {
   const sidebar = state.sidebar.visible ? `${state.sidebar.width} cols` : "hidden";
 
@@ -31,7 +43,9 @@ export function getStatusBarModel(state: AppState, activeTab?: TabSession): Stat
       return {
         left: `input -> ${getActiveTabLabel(activeTab)} | sb: ${sidebar}`,
         right: activeTab
-          ? "Ctrl+z unfocus | typing goes to active tab"
+          ? activeTab.status === "disconnected"
+            ? "Ctrl+z unfocus | Ctrl+r restart restored tab"
+            : "Ctrl+z unfocus | typing goes to active tab"
           : "Ctrl+n new | no active tab to focus",
       };
     case "modal":
@@ -43,9 +57,7 @@ export function getStatusBarModel(state: AppState, activeTab?: TabSession): Stat
     default:
       return {
         left: `nav | active: ${getActiveTabLabel(activeTab)} | sb: ${sidebar}`,
-        right: activeTab
-          ? "j/k move | Shift+J/K reorder | Ctrl+r restart | Ctrl+w close | i focus"
-          : "Ctrl+n new | Ctrl+b toggle | Ctrl+h/l resize",
+        right: getNavigationHint(activeTab),
       };
   }
 }
