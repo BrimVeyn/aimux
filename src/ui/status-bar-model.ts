@@ -44,7 +44,7 @@ export function getStatusBarModel(state: AppState, activeTab?: TabSession): Stat
       return {
         left: `nav | active: ${getActiveTabLabel(activeTab)} | sb: ${sidebar}`,
         right: activeTab
-          ? "j/k move | Shift+J/K reorder | Ctrl+w close | i focus"
+          ? "j/k move | Shift+J/K reorder | Ctrl+r restart | Ctrl+w close | i focus"
           : "Ctrl+n new | Ctrl+b toggle | Ctrl+h/l resize",
       };
   }

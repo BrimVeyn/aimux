@@ -224,4 +224,52 @@ describe("appReducer", () => {
     expect(smaller.sidebar.width).toBe(initial.sidebar.minWidth);
     expect(larger.sidebar.width).toBe(initial.sidebar.maxWidth);
   });
+
+  test("reset-tab-session keeps tab but clears runtime state", () => {
+    const initial = {
+      ...createInitialState(),
+      tabs: [
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "exited",
+          command: "claude",
+          activity: "busy",
+          buffer: "old output",
+          viewport: { lines: [], viewportY: 1, baseY: 2, cursorVisible: true },
+          errorMessage: "boom",
+          exitCode: 2,
+          terminalModes: {
+            mouseTrackingMode: "drag",
+            sendFocusMode: true,
+            alternateScrollMode: true,
+            isAlternateBuffer: true,
+            bracketedPasteMode: true,
+          },
+        }),
+      ],
+      activeTabId: "1",
+      focusMode: "terminal-input" as const,
+    };
+
+    const next = appReducer(initial, { type: "reset-tab-session", tabId: "1" });
+    expect(next.activeTabId).toBe("1");
+    expect(next.focusMode).toBe("navigation");
+    expect(next.tabs[0]).toMatchObject({
+      status: "starting",
+      activity: "idle",
+      buffer: "",
+      viewport: undefined,
+      errorMessage: undefined,
+      exitCode: undefined,
+      terminalModes: {
+        mouseTrackingMode: "none",
+        sendFocusMode: false,
+        alternateScrollMode: false,
+        isAlternateBuffer: false,
+        bracketedPasteMode: false,
+      },
+    });
+  });
 });

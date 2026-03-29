@@ -49,6 +49,38 @@ function createTabSession(assistant: AssistantId, customCommand?: string): TabSe
   };
 }
 
+function startTabSession(
+  ptyManager: PtyManager,
+  dispatch: (action: Parameters<typeof appReducer>[1]) => void,
+  clearStartupGrace: (tabId: string) => void,
+  startStartupGrace: (tabId: string) => void,
+  tab: Pick<TabSession, "id" | "command">,
+  cols: number,
+  rows: number,
+): void {
+  startStartupGrace(tab.id);
+
+  const { executable, args } = parseCommand(tab.command);
+
+  if (!isCommandAvailable(executable)) {
+    clearStartupGrace(tab.id);
+    dispatch({
+      type: "set-tab-error",
+      tabId: tab.id,
+      message: `[command not found] ${executable} is not available in PATH.`,
+    });
+    return;
+  }
+
+  ptyManager.createSession({
+    tabId: tab.id,
+    command: executable,
+    args,
+    cols,
+    rows,
+  });
+}
+
 export function App() {
   const renderer = useRenderer();
   const dimensions = useTerminalDimensions();
@@ -283,7 +315,8 @@ export function App() {
     const handleExit = (tabId: string, exitCode: number) => {
       clearIdleTimer(tabId);
       clearStartupGrace(tabId);
-      dispatch({ type: "close-tab", tabId });
+      dispatch({ type: "set-tab-status", tabId, status: "exited", exitCode });
+      dispatch({ type: "set-tab-activity", tabId, activity: undefined });
     };
 
     const handleError = (tabId: string, message: string) => {
@@ -345,27 +378,31 @@ export function App() {
     const customCommand = state.customCommands[assistant];
     const tab = createTabSession(assistant, customCommand);
     dispatch({ type: "add-tab", tab });
-    startStartupGrace(tab.id);
+    startTabSession(
+      ptyManager,
+      dispatch,
+      clearStartupGrace,
+      startStartupGrace,
+      tab,
+      state.layout.terminalCols,
+      state.layout.terminalRows,
+    );
+  }
 
-    const { executable, args } = parseCommand(tab.command);
-
-    if (!isCommandAvailable(executable)) {
-      clearStartupGrace(tab.id);
-      dispatch({
-        type: "set-tab-error",
-        tabId: tab.id,
-        message: `[command not found] ${executable} is not available in PATH.`,
-      });
-      return;
-    }
-
-    ptyManager.createSession({
-      tabId: tab.id,
-      command: executable,
-      args,
-      cols: state.layout.terminalCols,
-      rows: state.layout.terminalRows,
-    });
+  function restartTab(tab: TabSession): void {
+    clearIdleTimer(tab.id);
+    clearStartupGrace(tab.id);
+    ptyManager.disposeSession(tab.id);
+    dispatch({ type: "reset-tab-session", tabId: tab.id });
+    startTabSession(
+      ptyManager,
+      dispatch,
+      clearStartupGrace,
+      startStartupGrace,
+      tab,
+      state.layout.terminalCols,
+      state.layout.terminalRows,
+    );
   }
 
   useKeyboard((key) => {
@@ -409,6 +446,11 @@ export function App() {
         return;
       case "reorder-tab":
         dispatch({ type: "reorder-active-tab", delta: intent.delta });
+        return;
+      case "restart-tab":
+        if (activeTab) {
+          restartTab(activeTab);
+        }
         return;
       case "enter-terminal-input":
         if (state.activeTabId) {

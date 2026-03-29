@@ -11,6 +11,7 @@ export type AppIntent =
   | { type: "move-modal-selection"; delta: number }
   | { type: "move-tab"; delta: number }
   | { type: "reorder-tab"; delta: number }
+  | { type: "restart-tab" }
   | { type: "enter-terminal-input" }
   | { type: "leave-terminal-input" }
   | { type: "toggle-sidebar" }
@@ -94,6 +95,10 @@ export function resolveKeyIntent(
 
     if (key.ctrl && key.name === "b") {
       return { type: "toggle-sidebar" };
+    }
+
+    if (key.ctrl && key.name === "r") {
+      return { type: "restart-tab" };
     }
 
     if (key.ctrl && key.name === "h") {

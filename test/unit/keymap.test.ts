@@ -13,6 +13,10 @@ describe("resolveKeyIntent", () => {
       type: "close-tab",
     });
 
+    expect(resolveKeyIntent({ name: "r", ctrl: true, meta: false, shift: false, sequence: "\u0012" }, "navigation")).toEqual({
+      type: "restart-tab",
+    });
+
     expect(resolveKeyIntent({ name: "j", ctrl: false, meta: false, shift: true, sequence: "J" }, "navigation")).toEqual({
       type: "reorder-tab",
       delta: 1,

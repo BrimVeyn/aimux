@@ -196,6 +196,28 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         tabs,
       };
     }
+    case "reset-tab-session":
+      return {
+        ...state,
+        activeTabId: action.tabId,
+        focusMode: "navigation",
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          status: "starting",
+          activity: "idle",
+          buffer: "",
+          viewport: undefined,
+          errorMessage: undefined,
+          exitCode: undefined,
+          terminalModes: {
+            mouseTrackingMode: "none",
+            sendFocusMode: false,
+            alternateScrollMode: false,
+            isAlternateBuffer: false,
+            bracketedPasteMode: false,
+          },
+        })),
+      };
     case "toggle-sidebar":
       return {
         ...state,

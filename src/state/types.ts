@@ -89,6 +89,7 @@ export type AppAction =
   | { type: "set-active-tab"; tabId: string }
   | { type: "move-active-tab"; delta: number }
   | { type: "reorder-active-tab"; delta: number }
+  | { type: "reset-tab-session"; tabId: string }
   | { type: "toggle-sidebar" }
   | { type: "resize-sidebar"; delta: number }
   | { type: "set-focus-mode"; focusMode: FocusMode }
