@@ -10,7 +10,9 @@ interface TerminalPaneProps {
   focusMode: "navigation" | "terminal-input" | "modal" | "command-edit";
   contentOrigin: TerminalContentOrigin;
   mouseForwardingEnabled: boolean;
+  localScrollbackEnabled: boolean;
   onTerminalMouseEvent: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void;
+  onTerminalScrollEvent: (event: OtuiMouseEvent) => void;
 }
 
 function getTitle(tab?: TabSession): string {
@@ -55,8 +57,17 @@ function renderViewport(tab: TabSession): ReactNode {
   return <text fg={theme.text}>{tab.buffer.length > 0 ? tab.buffer : "Waiting for session output..."}</text>;
 }
 
-export function TerminalPane({ tab, focusMode, contentOrigin, mouseForwardingEnabled, onTerminalMouseEvent }: TerminalPaneProps) {
+export function TerminalPane({
+  tab,
+  focusMode,
+  contentOrigin,
+  mouseForwardingEnabled,
+  localScrollbackEnabled,
+  onTerminalMouseEvent,
+  onTerminalScrollEvent,
+}: TerminalPaneProps) {
   const canForwardMouse = focusMode === "terminal-input" && !!tab && mouseForwardingEnabled;
+  const canUseLocalScrollback = focusMode === "terminal-input" && !!tab && localScrollbackEnabled;
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
     if (!canForwardMouse) {
       return;
@@ -65,6 +76,21 @@ export function TerminalPane({ tab, focusMode, contentOrigin, mouseForwardingEna
     event.preventDefault();
     event.stopPropagation();
     onTerminalMouseEvent(event, contentOrigin);
+  };
+  const forwardScrollEvent = (event: OtuiMouseEvent) => {
+    if (!canForwardMouse && !canUseLocalScrollback) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (canForwardMouse) {
+      onTerminalMouseEvent(event, contentOrigin);
+      return;
+    }
+
+    onTerminalScrollEvent(event);
   };
 
   return (
@@ -89,7 +115,7 @@ export function TerminalPane({ tab, focusMode, contentOrigin, mouseForwardingEna
             onMouseDown={forwardMouseEvent}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
-            onMouseScroll={forwardMouseEvent}
+            onMouseScroll={forwardScrollEvent}
           >
             {renderViewport(tab)}
           </box>

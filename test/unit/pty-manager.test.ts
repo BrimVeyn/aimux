@@ -86,7 +86,7 @@ describe("PtyManager", () => {
 
   test("tracks mouse and focus modes from terminal output", async () => {
     const manager = new PtyManager();
-    const seenModes: Array<{ mouseTrackingMode: string; sendFocusMode: boolean; alternateScrollMode: boolean }> = [];
+    const seenModes: Array<{ mouseTrackingMode: string; sendFocusMode: boolean; alternateScrollMode: boolean; isAlternateBuffer: boolean }> = [];
 
     const exitCode = await new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -125,11 +125,13 @@ describe("PtyManager", () => {
       mouseTrackingMode: "none",
       sendFocusMode: false,
       alternateScrollMode: false,
+      isAlternateBuffer: false,
     });
     expect(seenModes).toContainEqual({
       mouseTrackingMode: "drag",
       sendFocusMode: true,
       alternateScrollMode: true,
+      isAlternateBuffer: false,
     });
     manager.disposeAll();
   });
@@ -215,6 +217,48 @@ describe("PtyManager", () => {
     expect(exitCode).toBe(0);
     expect(seenModes).toContain(true);
     expect(seenModes[seenModes.length - 1]).toBe(false);
+    manager.disposeAll();
+  });
+
+  test("scrollViewport exposes scrollback history", async () => {
+    const manager = new PtyManager();
+    let latestViewportText = "";
+    let latestViewportY = 0;
+
+    manager.on("render", (tabId, viewport) => {
+      if (tabId !== "tab-6") {
+        return;
+      }
+
+      latestViewportText = viewport.lines
+        .map((line) => line.spans.map((span) => span.text).join(""))
+        .join("\n");
+      latestViewportY = viewport.viewportY;
+    });
+
+    manager.createSession({
+      tabId: "tab-6",
+      command: "/bin/sh",
+      cols: 80,
+      rows: 8,
+      cwd: process.cwd(),
+    });
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    manager.write("tab-6", "for i in $(seq 1 20); do printf \"line-$i\\r\\n\"; done\r");
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+
+    const atBottomViewportY = latestViewportY;
+    manager.scrollViewport("tab-6", -3);
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+    expect(latestViewportY).toBeLessThan(atBottomViewportY);
+    expect(latestViewportText).toContain("line-11");
+
+    manager.scrollViewportToBottom("tab-6");
+    await new Promise<void>((resolve) => setTimeout(resolve, 20));
+    expect(latestViewportY).toBeGreaterThanOrEqual(atBottomViewportY);
+
     manager.disposeAll();
   });
 });

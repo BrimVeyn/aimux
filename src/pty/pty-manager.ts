@@ -62,6 +62,7 @@ function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): Termin
     mouseTrackingMode: emulator.modes.mouseTrackingMode,
     sendFocusMode: emulator.modes.sendFocusMode,
     alternateScrollMode,
+    isAlternateBuffer: emulator.buffer.active === emulator.buffer.alternate,
   };
 }
 
@@ -183,6 +184,26 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
   write(tabId: string, input: string): void {
     this.sessions.get(tabId)?.pty.write(input);
+  }
+
+  scrollViewport(tabId: string, deltaLines: number): void {
+    const session = this.sessions.get(tabId);
+    if (!session) {
+      return;
+    }
+
+    session.emulator.scrollLines(deltaLines);
+    this.emitRenderIfChanged(session);
+  }
+
+  scrollViewportToBottom(tabId: string): void {
+    const session = this.sessions.get(tabId);
+    if (!session) {
+      return;
+    }
+
+    session.emulator.scrollToBottom();
+    this.emitRenderIfChanged(session);
   }
 
   resizeAll(cols: number, rows: number): void {

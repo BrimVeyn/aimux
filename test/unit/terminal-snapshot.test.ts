@@ -16,6 +16,8 @@ describe("snapshotTerminal", () => {
 
     expect(firstLine?.spans[0]?.text.trim()).toBe("red");
     expect(firstLine?.spans[0]?.fg).toBe("#cd0000");
+    expect(snapshot.viewportY).toBe(0);
+    expect(snapshot.baseY).toBe(0);
 
     terminal.dispose();
   });
@@ -93,6 +95,22 @@ describe("snapshotTerminal", () => {
     });
     const after = snapshotTerminal(terminal);
 
+    expect(areTerminalSnapshotsEqual(before, after)).toBe(false);
+    terminal.dispose();
+  });
+
+  test("detects viewport scroll changes between snapshots", async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4, scrollback: 100 });
+
+    await new Promise<void>((resolve) => {
+      terminal.write("1\r\n2\r\n3\r\n4\r\n5\r\n6", resolve);
+    });
+    const before = snapshotTerminal(terminal);
+
+    terminal.scrollLines(-1);
+    const after = snapshotTerminal(terminal);
+
+    expect(before.viewportY).not.toBe(after.viewportY);
     expect(areTerminalSnapshotsEqual(before, after)).toBe(false);
     terminal.dispose();
   });

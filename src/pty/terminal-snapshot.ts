@@ -146,7 +146,11 @@ export function snapshotTerminal(terminal: Terminal): TerminalSnapshot {
     lines.push(buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null));
   }
 
-  return { lines };
+  return {
+    lines,
+    viewportY: buffer.viewportY,
+    baseY: buffer.baseY,
+  };
 }
 
 function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
@@ -181,6 +185,10 @@ export function areTerminalSnapshotsEqual(
   }
 
   if (left.lines.length !== right.lines.length) {
+    return false;
+  }
+
+  if (left.viewportY !== right.viewportY || left.baseY !== right.baseY) {
     return false;
   }
 

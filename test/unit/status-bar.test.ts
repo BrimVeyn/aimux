@@ -14,6 +14,7 @@ function createTab(title: string) {
       mouseTrackingMode: "none" as const,
       sendFocusMode: false,
       alternateScrollMode: false,
+      isAlternateBuffer: false,
     },
     command: "claude",
   };

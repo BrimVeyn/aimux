@@ -15,6 +15,7 @@ function createTab(overrides: Partial<ReturnType<typeof createInitialState>["tab
       mouseTrackingMode: "none" as const,
       sendFocusMode: false,
       alternateScrollMode: false,
+      isAlternateBuffer: false,
     },
     ...overrides,
   };

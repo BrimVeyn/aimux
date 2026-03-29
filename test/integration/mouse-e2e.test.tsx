@@ -29,6 +29,7 @@ const INITIAL_TERMINAL_MODES: TerminalModeState = {
   mouseTrackingMode: "none",
   sendFocusMode: false,
   alternateScrollMode: false,
+  isAlternateBuffer: false,
 };
 
 const cleanups: Array<() => void> = [];
@@ -58,6 +59,24 @@ function createMouseFixtureCommand(): string {
   return commandPath;
 }
 
+function createScrollbackFixtureCommand(): string {
+  const tempDir = mkdtempSync(join(tmpdir(), "aimux-scroll-"));
+  const commandPath = join(tempDir, "aimux-scrollback-fixture");
+  writeFileSync(
+    commandPath,
+    [
+      "#!/usr/bin/env bun",
+      "for (let i = 1; i <= 40; i += 1) {",
+      '  process.stdout.write(`line-${i}\\r\\n`);',
+      "}",
+      'setInterval(() => {}, 1000);',
+      "",
+    ].join("\n"),
+  );
+  chmodSync(commandPath, 0o755);
+  return commandPath;
+}
+
 async function waitFor(
   renderOnce: () => Promise<void>,
   predicate: () => boolean,
@@ -76,7 +95,15 @@ async function waitFor(
   throw new Error(`Timed out waiting for integration condition\n${describeState()}`);
 }
 
-function MouseHarness({ command }: { command: string }) {
+function MouseHarness({
+  command,
+  mouseForwardingEnabled,
+  localScrollbackEnabled,
+}: {
+  command: string;
+  mouseForwardingEnabled: boolean;
+  localScrollbackEnabled: boolean;
+}) {
   const dimensions = useTerminalDimensions();
   const ptyManagerRef = useRef<PtyManager | null>(null);
   if (!ptyManagerRef.current) {
@@ -177,26 +204,51 @@ function MouseHarness({ command }: { command: string }) {
         },
       }}
       contentOrigin={contentOriginRef.current}
-      mouseForwardingEnabled
+      mouseForwardingEnabled={mouseForwardingEnabled}
+      localScrollbackEnabled={localScrollbackEnabled}
       onTerminalMouseEvent={(event, origin) => {
         const sequence = encodeMouseEventForPty(event, origin);
         if (sequence) {
           ptyManager.write(TEST_TAB_ID, sequence);
         }
       }}
+      onTerminalScrollEvent={(event) => {
+        if (event.type !== "scroll") {
+          return;
+        }
+
+        const direction = event.scroll?.direction;
+        if (direction === "up") {
+          ptyManager.scrollViewport(TEST_TAB_ID, -3);
+        } else if (direction === "down") {
+          ptyManager.scrollViewport(TEST_TAB_ID, 3);
+        }
+      }}
     />
   );
 }
 
-async function mountMouseHarness() {
-  const command = createMouseFixtureCommand();
+async function mountMouseHarness(
+  command: string,
+  options: {
+    mouseForwardingEnabled: boolean;
+    localScrollbackEnabled: boolean;
+    readyText?: string;
+  },
+) {
   const { renderer, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({
     width: TEST_WIDTH,
     height: TEST_HEIGHT,
     useMouse: true,
   });
   const root = createRoot(renderer);
-  root.render(<MouseHarness command={command} />);
+  root.render(
+    <MouseHarness
+      command={command}
+      mouseForwardingEnabled={options.mouseForwardingEnabled}
+      localScrollbackEnabled={options.localScrollbackEnabled}
+    />,
+  );
 
   let cleanedUp = false;
   const cleanup = () => {
@@ -208,14 +260,19 @@ async function mountMouseHarness() {
   };
   cleanups.push(cleanup);
 
-  await waitFor(renderOnce, () => captureCharFrame().includes("READY"), captureCharFrame, 8_000);
+  const readyText = options.readyText ?? "READY";
+  await waitFor(renderOnce, () => captureCharFrame().includes(readyText), captureCharFrame, 8_000);
 
   return { captureCharFrame, cleanup, mockMouse, renderOnce };
 }
 
 describe("mouse passthrough integration", () => {
   test("forwards click events to the PTY in terminal-input mode", async () => {
-    const app = await mountMouseHarness();
+    const app = await mountMouseHarness(createMouseFixtureCommand(), {
+      mouseForwardingEnabled: true,
+      localScrollbackEnabled: false,
+      readyText: "READY",
+    });
 
     await app.mockMouse.click(TERMINAL_CLICK_X, TERMINAL_CLICK_Y);
 
@@ -231,13 +288,36 @@ describe("mouse passthrough integration", () => {
   }, 15_000);
 
   test("forwards scroll events to the PTY in terminal-input mode", async () => {
-    const app = await mountMouseHarness();
+    const app = await mountMouseHarness(createMouseFixtureCommand(), {
+      mouseForwardingEnabled: true,
+      localScrollbackEnabled: false,
+      readyText: "READY",
+    });
 
     await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, "up");
 
     await waitFor(
       app.renderOnce,
       () => app.captureCharFrame().includes(`[<64;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`),
+      app.captureCharFrame,
+    );
+  }, 15_000);
+
+  test("uses local scrollback when mouse forwarding is disabled", async () => {
+    const app = await mountMouseHarness(createScrollbackFixtureCommand(), {
+      mouseForwardingEnabled: false,
+      localScrollbackEnabled: true,
+      readyText: "line-40",
+    });
+    await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, "up");
+    await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, "up");
+
+    await waitFor(
+      app.renderOnce,
+      () => {
+        const frame = app.captureCharFrame();
+        return frame.includes("line-6") && !frame.includes("line-40");
+      },
       app.captureCharFrame,
     );
   }, 15_000);

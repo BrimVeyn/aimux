@@ -24,12 +24,15 @@ export interface TerminalLine {
 
 export interface TerminalSnapshot {
   lines: TerminalLine[];
+  viewportY: number;
+  baseY: number;
 }
 
 export interface TerminalModeState {
   mouseTrackingMode: "none" | "x10" | "vt200" | "drag" | "any";
   sendFocusMode: boolean;
   alternateScrollMode: boolean;
+  isAlternateBuffer: boolean;
 }
 
 export interface TabSession {

@@ -40,6 +40,7 @@ function createTabSession(assistant: AssistantId, customCommand?: string): TabSe
       mouseTrackingMode: "none",
       sendFocusMode: false,
       alternateScrollMode: false,
+      isAlternateBuffer: false,
     },
     command: customCommand ?? option.command,
   };
@@ -66,6 +67,7 @@ export function App() {
     [state.activeTabId, state.tabs],
   );
   const activeMouseForwardingEnabled = activeTab?.terminalModes.mouseTrackingMode !== "none";
+  const activeLocalScrollbackEnabled = !!activeTab && !activeMouseForwardingEnabled && !activeTab.terminalModes.isAlternateBuffer;
 
   const focusModeRef = useRef(state.focusMode);
   focusModeRef.current = state.focusMode;
@@ -83,7 +85,13 @@ export function App() {
       getActiveTabId: () => activeTabIdRef.current,
       getContentOrigin: () => contentOriginRef.current,
       getMousePassthroughEnabled: () => activeTabRef.current !== undefined,
-      writeToPty: (tabId, data) => ptyManager.write(tabId, data),
+      writeToPty: (tabId, data) => {
+        const viewport = activeTabRef.current?.viewport;
+        if (viewport && viewport.viewportY < viewport.baseY) {
+          ptyManager.scrollViewportToBottom(tabId);
+        }
+        ptyManager.write(tabId, data);
+      },
       leaveTerminalInput: () =>
         dispatch({ type: "set-focus-mode", focusMode: "navigation" }),
     });
@@ -107,6 +115,27 @@ export function App() {
     }
 
     ptyManager.write(state.activeTabId, sequence);
+  };
+
+  const handleTerminalScrollEvent = (event: OtuiMouseEvent) => {
+    if (state.focusMode !== "terminal-input" || !state.activeTabId) {
+      return;
+    }
+
+    if (activeMouseForwardingEnabled) {
+      return;
+    }
+
+    if (!activeLocalScrollbackEnabled || event.type !== "scroll") {
+      return;
+    }
+
+    const direction = event.scroll?.direction;
+    if (direction === "up") {
+      ptyManager.scrollViewport(state.activeTabId, -3);
+    } else if (direction === "down") {
+      ptyManager.scrollViewport(state.activeTabId, 3);
+    }
   };
 
   function clearIdleTimer(tabId: string) {
@@ -353,7 +382,9 @@ export function App() {
       state={state}
       contentOrigin={contentOriginRef.current}
       mouseForwardingEnabled={activeMouseForwardingEnabled}
+      localScrollbackEnabled={activeLocalScrollbackEnabled}
       onTerminalMouseEvent={handleTerminalMouseEvent}
+      onTerminalScrollEvent={handleTerminalScrollEvent}
     />
   );
 }
