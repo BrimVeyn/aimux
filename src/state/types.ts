@@ -26,6 +26,7 @@ export interface TerminalSnapshot {
   lines: TerminalLine[];
   viewportY: number;
   baseY: number;
+  cursorVisible: boolean;
 }
 
 export interface TerminalModeState {

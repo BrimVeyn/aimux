@@ -77,7 +77,12 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
   spans.push(span);
 }
 
-function buildLine(terminal: Terminal, lineIndex: number, cursorColumn: number | null): TerminalLine {
+function buildLine(
+  terminal: Terminal,
+  lineIndex: number,
+  cursorColumn: number | null,
+  cursorVisible: boolean,
+): TerminalLine {
   const line = terminal.buffer.active.getLine(lineIndex);
 
   if (!line) {
@@ -114,7 +119,7 @@ function buildLine(terminal: Terminal, lineIndex: number, cursorColumn: number |
       [fg, bg] = [resolvedBg, resolvedFg];
     }
 
-    const isCursorCell = cursorColumn === column;
+    const isCursorCell = cursorVisible && cursorColumn === column;
     if (isCursorCell) {
       const resolvedFg = fg ?? DEFAULT_TERMINAL_FG;
       const resolvedBg = bg ?? DEFAULT_TERMINAL_BG;
@@ -135,7 +140,7 @@ function buildLine(terminal: Terminal, lineIndex: number, cursorColumn: number |
   return { spans };
 }
 
-export function snapshotTerminal(terminal: Terminal): TerminalSnapshot {
+export function snapshotTerminal(terminal: Terminal, cursorVisible = true): TerminalSnapshot {
   const buffer = terminal.buffer.active;
   const startLine = buffer.viewportY;
   const cursorRow = buffer.cursorY;
@@ -143,13 +148,14 @@ export function snapshotTerminal(terminal: Terminal): TerminalSnapshot {
   const lines: TerminalLine[] = [];
 
   for (let row = 0; row < terminal.rows; row += 1) {
-    lines.push(buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null));
+    lines.push(buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible));
   }
 
   return {
     lines,
     viewportY: buffer.viewportY,
     baseY: buffer.baseY,
+    cursorVisible,
   };
 }
 
@@ -188,7 +194,11 @@ export function areTerminalSnapshotsEqual(
     return false;
   }
 
-  if (left.viewportY !== right.viewportY || left.baseY !== right.baseY) {
+  if (
+    left.viewportY !== right.viewportY
+    || left.baseY !== right.baseY
+    || left.cursorVisible !== right.cursorVisible
+  ) {
     return false;
   }
 

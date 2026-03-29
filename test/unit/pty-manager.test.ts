@@ -220,6 +220,53 @@ describe("PtyManager", () => {
     manager.disposeAll();
   });
 
+  test("tracks cursor visibility from terminal output", async () => {
+    const manager = new PtyManager();
+    const seenCursorStates: boolean[] = [];
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for PTY session"));
+      }, 5_000);
+
+      manager.on("render", (tabId, viewport) => {
+        if (tabId !== "tab-cursor") {
+          return;
+        }
+
+        seenCursorStates.push(viewport.cursorVisible);
+      });
+
+      manager.on("error", (_tabId, message) => {
+        clearTimeout(timeout);
+        reject(new Error(message));
+      });
+
+      manager.on("exit", (_tabId, code) => {
+        clearTimeout(timeout);
+        resolve(code);
+      });
+
+      manager.createSession({
+        tabId: "tab-cursor",
+        command: "/bin/sh",
+        cols: 80,
+        rows: 24,
+        cwd: process.cwd(),
+      });
+
+      setTimeout(() => {
+        manager.write("tab-cursor", "printf '\\033[?25l'; sleep 0.05; printf '\\033[?25h'; exit\r");
+      }, 50);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(seenCursorStates).toContain(true);
+    expect(seenCursorStates).toContain(false);
+    expect(seenCursorStates[seenCursorStates.length - 1]).toBe(true);
+    manager.disposeAll();
+  });
+
   test("scrollViewport exposes scrollback history", async () => {
     const manager = new PtyManager();
     let latestViewportText = "";

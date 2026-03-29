@@ -19,6 +19,7 @@ interface SessionHandle {
   lastSnapshot?: TerminalSnapshot;
   lastTerminalModes?: TerminalModeState;
   alternateScrollMode: boolean;
+  cursorVisible: boolean;
   pendingModeSequence: string;
   pendingWrites: number;
   pendingExitCode: number | null;
@@ -36,23 +37,32 @@ function getPendingModeSequence(sequence: string): string {
   return /^\x1b(?:\[\??[0-9;]*)?$/.test(suffix) ? suffix : "";
 }
 
-function trackAlternateScrollMode(currentMode: boolean, pendingSequence: string, data: string): {
+function trackPrivateModes(
+  alternateScrollMode: boolean,
+  cursorVisible: boolean,
+  pendingSequence: string,
+  data: string,
+): {
   alternateScrollMode: boolean;
+  cursorVisible: boolean;
   pendingSequence: string;
 } {
   const sequence = `${pendingSequence}${data}`;
-  let alternateScrollMode = currentMode;
+  let nextAlternateScrollMode = alternateScrollMode;
+  let nextCursorVisible = cursorVisible;
   for (const match of sequence.matchAll(PRIVATE_MODE_RE)) {
     const parameters = match[1]?.split(";") ?? [];
-    if (!parameters.includes("1007")) {
-      continue;
+    if (parameters.includes("1007")) {
+      nextAlternateScrollMode = match[2] === "h";
     }
-
-    alternateScrollMode = match[2] === "h";
+    if (parameters.includes("25")) {
+      nextCursorVisible = match[2] === "h";
+    }
   }
 
   return {
-    alternateScrollMode,
+    alternateScrollMode: nextAlternateScrollMode,
+    cursorVisible: nextCursorVisible,
     pendingSequence: getPendingModeSequence(sequence),
   };
 }
@@ -70,7 +80,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
   private sessions = new Map<string, SessionHandle>();
 
   private emitRenderIfChanged(session: SessionHandle): void {
-    const nextSnapshot = snapshotTerminal(session.emulator);
+    const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible);
     const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode);
     const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot);
     const modesChanged =
@@ -136,18 +146,21 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         lastSnapshot: undefined,
         lastTerminalModes: undefined,
         alternateScrollMode: false,
+        cursorVisible: true,
         pendingModeSequence: "",
         pendingWrites: 0,
         pendingExitCode: null,
       };
 
       pty.onData((data) => {
-        const trackedModes = trackAlternateScrollMode(
+        const trackedModes = trackPrivateModes(
           session.alternateScrollMode,
+          session.cursorVisible,
           session.pendingModeSequence,
           data,
         );
         session.alternateScrollMode = trackedModes.alternateScrollMode;
+        session.cursorVisible = trackedModes.cursorVisible;
         session.pendingModeSequence = trackedModes.pendingSequence;
         session.pendingWrites += 1;
         emulator.write(data, () => {

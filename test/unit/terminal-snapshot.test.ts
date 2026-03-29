@@ -18,6 +18,7 @@ describe("snapshotTerminal", () => {
     expect(firstLine?.spans[0]?.fg).toBe("#cd0000");
     expect(snapshot.viewportY).toBe(0);
     expect(snapshot.baseY).toBe(0);
+    expect(snapshot.cursorVisible).toBe(true);
 
     terminal.dispose();
   });
@@ -112,6 +113,19 @@ describe("snapshotTerminal", () => {
 
     expect(before.viewportY).not.toBe(after.viewportY);
     expect(areTerminalSnapshotsEqual(before, after)).toBe(false);
+    terminal.dispose();
+  });
+
+  test("hides cursor highlight when cursor visibility is off", async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 });
+
+    await new Promise<void>((resolve) => {
+      terminal.write("hello", resolve);
+    });
+
+    const snapshot = snapshotTerminal(terminal, false);
+    expect(snapshot.cursorVisible).toBe(false);
+    expect(snapshot.lines[0]?.spans.some((span) => span.cursor)).toBe(false);
     terminal.dispose();
   });
 });
