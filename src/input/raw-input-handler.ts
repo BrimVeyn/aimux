@@ -76,14 +76,14 @@ export function createRawInputHandler(deps: {
       return false;
     }
 
-    const activeTabId = deps.getActiveTabId();
-    if (!activeTabId) {
-      return false;
-    }
-
     if (sequence === CTRL_Z_RAW || sequence === CTRL_Z_KITTY) {
       deps.leaveTerminalInput();
       return true;
+    }
+
+    const activeTabId = deps.getActiveTabId();
+    if (!activeTabId) {
+      return false;
     }
 
     deps.writeToPty(activeTabId, normalizeControlSequence(sequence));

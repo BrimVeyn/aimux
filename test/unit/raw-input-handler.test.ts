@@ -43,6 +43,13 @@ describe("createRawInputHandler", () => {
     expect(writeToPty).not.toHaveBeenCalled();
   });
 
+  test("leaves terminal-input on Ctrl+Z even without an active tab", () => {
+    const { handler, leaveTerminalInput, writeToPty } = setup({ activeTabId: null });
+    expect(handler("\x1a")).toBe(true);
+    expect(leaveTerminalInput).toHaveBeenCalled();
+    expect(writeToPty).not.toHaveBeenCalled();
+  });
+
   test("intercepts raw Ctrl+Z and leaves terminal-input", () => {
     const { handler, leaveTerminalInput, writeToPty } = setup();
     expect(handler("\x1a")).toBe(true);

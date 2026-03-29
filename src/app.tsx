@@ -197,19 +197,7 @@ export function App() {
     const handleExit = (tabId: string, exitCode: number) => {
       clearIdleTimer(tabId);
       clearStartupGrace(tabId);
-
-      if (exitCode === 0) {
-        dispatch({ type: "close-tab", tabId });
-        return;
-      }
-
-      dispatch({ type: "set-tab-status", tabId, status: "exited", exitCode });
-      dispatch({ type: "set-tab-activity", tabId, activity: undefined });
-      dispatch({
-        type: "set-tab-error",
-        tabId,
-        message: `[process exited with code ${exitCode}]`,
-      });
+      dispatch({ type: "close-tab", tabId });
     };
 
     const handleError = (tabId: string, message: string) => {
@@ -337,7 +325,9 @@ export function App() {
         dispatch({ type: "reorder-active-tab", delta: intent.delta });
         return;
       case "enter-terminal-input":
-        dispatch({ type: "set-focus-mode", focusMode: "terminal-input" });
+        if (state.activeTabId) {
+          dispatch({ type: "set-focus-mode", focusMode: "terminal-input" });
+        }
         return;
       case "leave-terminal-input":
         dispatch({ type: "set-focus-mode", focusMode: "navigation" });
