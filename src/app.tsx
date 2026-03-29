@@ -2,8 +2,10 @@ import type { MouseEvent as OtuiMouseEvent } from "@opentui/core";
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useEffect, useMemo, useReducer, useRef } from "react";
 
+import { INPUT_DEBUG_LOG_PATH, logInputDebug } from "./debug/input-log";
 import { resolveKeyIntent } from "./input/keymap";
 import { encodeMouseEventForPty } from "./input/mouse-forwarding";
+import { buildPtyPastePayload } from "./input/paste";
 import { createRawInputHandler, type TerminalContentOrigin } from "./input/raw-input-handler";
 import { loadConfig, saveConfig } from "./config";
 import { ASSISTANT_OPTIONS, getAssistantOption, isCommandAvailable, parseCommand } from "./pty/command-registry";
@@ -41,6 +43,7 @@ function createTabSession(assistant: AssistantId, customCommand?: string): TabSe
       sendFocusMode: false,
       alternateScrollMode: false,
       isAlternateBuffer: false,
+      bracketedPasteMode: false,
     },
     command: customCommand ?? option.command,
   };
@@ -85,6 +88,7 @@ export function App() {
       getActiveTabId: () => activeTabIdRef.current,
       getContentOrigin: () => contentOriginRef.current,
       getMousePassthroughEnabled: () => activeTabRef.current !== undefined,
+      getBracketedPasteModeEnabled: () => activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       writeToPty: (tabId, data) => {
         const viewport = activeTabRef.current?.viewport;
         if (viewport && viewport.viewportY < viewport.baseY) {
@@ -94,6 +98,7 @@ export function App() {
       },
       leaveTerminalInput: () =>
         dispatch({ type: "set-focus-mode", focusMode: "navigation" }),
+      toggleSidebar: () => dispatch({ type: "toggle-sidebar" }),
     });
 
     renderer.prependInputHandler(handler);
@@ -101,8 +106,43 @@ export function App() {
   }, [renderer, ptyManager]);
 
   useEffect(() => {
+    const handlePasteEvent = (event: { bytes: Uint8Array; defaultPrevented?: boolean }) => {
+      logInputDebug("app.rendererPaste", {
+        defaultPrevented: event.defaultPrevented ?? false,
+        byteLength: event.bytes.length,
+      });
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      handleTerminalPaste(event);
+    };
+
+    renderer.keyInput.on("paste", handlePasteEvent);
+    return () => {
+      renderer.keyInput.off("paste", handlePasteEvent);
+    };
+  }, [renderer, state.activeTabId, state.focusMode, activeTab]);
+
+  useEffect(() => {
     renderer.useMouse = true;
   }, [renderer]);
+
+  useEffect(() => {
+    const shouldEnableBracketedPaste = state.focusMode === "terminal-input" && !!state.activeTabId;
+    logInputDebug("app.bracketedPasteMode", {
+      enabled: shouldEnableBracketedPaste,
+      activeTabId: state.activeTabId,
+      focusMode: state.focusMode,
+      logPath: INPUT_DEBUG_LOG_PATH,
+    });
+    process.stdout.write(shouldEnableBracketedPaste ? "\x1b[?2004h" : "\x1b[?2004l");
+
+    return () => {
+      process.stdout.write("\x1b[?2004l");
+    };
+  }, [state.activeTabId, state.focusMode]);
 
   const handleTerminalMouseEvent = (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
     if (state.focusMode !== "terminal-input" || !state.activeTabId || !activeMouseForwardingEnabled) {
@@ -136,6 +176,30 @@ export function App() {
     } else if (direction === "down") {
       ptyManager.scrollViewport(state.activeTabId, 3);
     }
+  };
+
+  const handleTerminalPaste = (event: { bytes: Uint8Array }) => {
+    logInputDebug("app.onTerminalPaste", {
+      activeTabId: state.activeTabId,
+      focusMode: state.focusMode,
+      byteLength: event.bytes.length,
+      decodedPreview: new TextDecoder().decode(event.bytes).slice(0, 120),
+      bracketedPasteMode: activeTab?.terminalModes.bracketedPasteMode ?? false,
+    });
+
+    if (state.focusMode !== "terminal-input" || !state.activeTabId || !activeTab) {
+      return;
+    }
+
+    if (activeTab.viewport && activeTab.viewport.viewportY < activeTab.viewport.baseY) {
+      ptyManager.scrollViewportToBottom(state.activeTabId);
+    }
+
+    const payload = new TextDecoder().decode(event.bytes);
+    ptyManager.write(
+      state.activeTabId,
+      buildPtyPastePayload(payload, activeTab.terminalModes.bracketedPasteMode),
+    );
   };
 
   function clearIdleTimer(tabId: string) {

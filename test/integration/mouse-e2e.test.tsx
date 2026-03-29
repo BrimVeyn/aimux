@@ -30,6 +30,7 @@ const INITIAL_TERMINAL_MODES: TerminalModeState = {
   sendFocusMode: false,
   alternateScrollMode: false,
   isAlternateBuffer: false,
+  bracketedPasteMode: false,
 };
 
 const cleanups: Array<() => void> = [];

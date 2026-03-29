@@ -92,7 +92,6 @@ export function TerminalPane({
 
     onTerminalScrollEvent(event);
   };
-
   return (
     <box flexDirection="column" flexGrow={1} gap={1}>
       <box

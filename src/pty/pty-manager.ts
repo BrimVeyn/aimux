@@ -73,6 +73,7 @@ function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): Termin
     sendFocusMode: emulator.modes.sendFocusMode,
     alternateScrollMode,
     isAlternateBuffer: emulator.buffer.active === emulator.buffer.alternate,
+    bracketedPasteMode: emulator.modes.bracketedPasteMode,
   };
 }
 
@@ -87,7 +88,9 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       !session.lastTerminalModes
       || session.lastTerminalModes.mouseTrackingMode !== nextTerminalModes.mouseTrackingMode
       || session.lastTerminalModes.sendFocusMode !== nextTerminalModes.sendFocusMode
-      || session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode;
+      || session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode
+      || session.lastTerminalModes.isAlternateBuffer !== nextTerminalModes.isAlternateBuffer
+      || session.lastTerminalModes.bracketedPasteMode !== nextTerminalModes.bracketedPasteMode;
 
     if (!snapshotChanged && !modesChanged) {
       return;

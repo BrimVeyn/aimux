@@ -15,6 +15,7 @@ function createTab(title: string) {
       sendFocusMode: false,
       alternateScrollMode: false,
       isAlternateBuffer: false,
+      bracketedPasteMode: false,
     },
     command: "claude",
   };

@@ -34,6 +34,7 @@ export interface TerminalModeState {
   sendFocusMode: boolean;
   alternateScrollMode: boolean;
   isAlternateBuffer: boolean;
+  bracketedPasteMode: boolean;
 }
 
 export interface TabSession {

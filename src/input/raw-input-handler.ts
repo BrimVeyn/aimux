@@ -1,7 +1,11 @@
 import type { FocusMode } from "../state/types";
+import { logInputDebug } from "../debug/input-log";
+import { BRACKETED_PASTE_END, BRACKETED_PASTE_START, buildPtyPastePayload } from "./paste";
 
 const CTRL_Z_RAW = "\x1a";
 const CTRL_Z_KITTY = "\x1b[122;5u";
+const CTRL_B_RAW = "\x02";
+const CTRL_B_KITTY = "\x1b[98;5u";
 const KITTY_CTRL_RE = /^\x1b\[(\d+);(\d+)u$/;
 
 function normalizeControlSequence(sequence: string): string {
@@ -68,16 +72,100 @@ export function createRawInputHandler(deps: {
   getActiveTabId: () => string | null;
   getContentOrigin: () => TerminalContentOrigin;
   getMousePassthroughEnabled: () => boolean;
+  getBracketedPasteModeEnabled: () => boolean;
   writeToPty: (tabId: string, data: string) => void;
   leaveTerminalInput: () => void;
+  toggleSidebar: () => void;
 }): (sequence: string) => boolean {
+  let bracketedPasteBuffer: string | null = null;
+
+  function flushPaste(tabId: string, payload: string): void {
+    logInputDebug("raw.flushPaste", {
+      tabId,
+      bracketedPasteModeEnabled: deps.getBracketedPasteModeEnabled(),
+      payloadLength: payload.length,
+      payloadPreview: payload.slice(0, 120),
+    });
+    deps.writeToPty(tabId, buildPtyPastePayload(payload, deps.getBracketedPasteModeEnabled()));
+  }
+
+  function handleSequence(tabId: string, sequence: string): boolean {
+    if (sequence.length === 0) {
+      return true;
+    }
+
+    if (bracketedPasteBuffer !== null) {
+      logInputDebug("raw.collectPasteChunk", {
+        tabId,
+        chunkLength: sequence.length,
+        chunkPreview: sequence.slice(0, 120),
+      });
+      const endIndex = sequence.indexOf(BRACKETED_PASTE_END);
+      if (endIndex === -1) {
+        bracketedPasteBuffer += sequence;
+        return true;
+      }
+
+      bracketedPasteBuffer += sequence.slice(0, endIndex);
+      flushPaste(tabId, bracketedPasteBuffer);
+      bracketedPasteBuffer = null;
+      return handleSequence(tabId, sequence.slice(endIndex + BRACKETED_PASTE_END.length));
+    }
+
+    const startIndex = sequence.indexOf(BRACKETED_PASTE_START);
+    if (startIndex !== -1) {
+      logInputDebug("raw.detectBracketedPasteStart", {
+        tabId,
+        sequenceLength: sequence.length,
+        sequencePreview: sequence.slice(0, 120),
+      });
+      if (!handleSequence(tabId, sequence.slice(0, startIndex))) {
+        return false;
+      }
+
+      const afterStart = sequence.slice(startIndex + BRACKETED_PASTE_START.length);
+      const endIndex = afterStart.indexOf(BRACKETED_PASTE_END);
+      if (endIndex === -1) {
+        bracketedPasteBuffer = afterStart;
+        return true;
+      }
+
+      flushPaste(tabId, afterStart.slice(0, endIndex));
+      return handleSequence(tabId, afterStart.slice(endIndex + BRACKETED_PASTE_END.length));
+    }
+
+    if (bracketedPasteBuffer === null && (sequence === CTRL_Z_RAW || sequence === CTRL_Z_KITTY)) {
+      deps.leaveTerminalInput();
+      return true;
+    }
+
+    if (bracketedPasteBuffer === null && (sequence === CTRL_B_RAW || sequence === CTRL_B_KITTY)) {
+      deps.toggleSidebar();
+      return true;
+    }
+
+    deps.writeToPty(tabId, normalizeControlSequence(sequence));
+    return true;
+  }
+
   return (sequence: string): boolean => {
     if (deps.getFocusMode() !== "terminal-input") {
       return false;
     }
 
+    logInputDebug("raw.sequence", {
+      activeTabId: deps.getActiveTabId(),
+      sequenceLength: sequence.length,
+      sequencePreview: sequence.slice(0, 120),
+    });
+
     if (sequence === CTRL_Z_RAW || sequence === CTRL_Z_KITTY) {
       deps.leaveTerminalInput();
+      return true;
+    }
+
+    if (sequence === CTRL_B_RAW || sequence === CTRL_B_KITTY) {
+      deps.toggleSidebar();
       return true;
     }
 
@@ -86,7 +174,6 @@ export function createRawInputHandler(deps: {
       return false;
     }
 
-    deps.writeToPty(activeTabId, normalizeControlSequence(sequence));
-    return true;
+    return handleSequence(activeTabId, sequence);
   };
 }

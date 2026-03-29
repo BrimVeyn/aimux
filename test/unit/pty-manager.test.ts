@@ -80,13 +80,19 @@ describe("PtyManager", () => {
 
     expect(exitCode).toBe(0);
     expect(renderCount).toBeGreaterThan(0);
-    expect(renderCount).toBeLessThanOrEqual(3);
+    expect(renderCount).toBeLessThanOrEqual(5);
     manager.disposeAll();
   });
 
   test("tracks mouse and focus modes from terminal output", async () => {
     const manager = new PtyManager();
-    const seenModes: Array<{ mouseTrackingMode: string; sendFocusMode: boolean; alternateScrollMode: boolean; isAlternateBuffer: boolean }> = [];
+    const seenModes: Array<{
+      mouseTrackingMode: string;
+      sendFocusMode: boolean;
+      alternateScrollMode: boolean;
+      isAlternateBuffer: boolean;
+      bracketedPasteMode: boolean;
+    }> = [];
 
     const exitCode = await new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -126,12 +132,14 @@ describe("PtyManager", () => {
       sendFocusMode: false,
       alternateScrollMode: false,
       isAlternateBuffer: false,
+      bracketedPasteMode: false,
     });
     expect(seenModes).toContainEqual({
       mouseTrackingMode: "drag",
       sendFocusMode: true,
       alternateScrollMode: true,
       isAlternateBuffer: false,
+      bracketedPasteMode: false,
     });
     manager.disposeAll();
   });
@@ -264,6 +272,52 @@ describe("PtyManager", () => {
     expect(seenCursorStates).toContain(true);
     expect(seenCursorStates).toContain(false);
     expect(seenCursorStates[seenCursorStates.length - 1]).toBe(true);
+    manager.disposeAll();
+  });
+
+  test("tracks bracketed paste mode from terminal output", async () => {
+    const manager = new PtyManager();
+    const seenModes: boolean[] = [];
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Timed out waiting for PTY session"));
+      }, 5_000);
+
+      manager.on("render", (tabId, _viewport, terminalModes) => {
+        if (tabId !== "tab-paste") {
+          return;
+        }
+
+        seenModes.push(terminalModes.bracketedPasteMode);
+      });
+
+      manager.on("error", (_tabId, message) => {
+        clearTimeout(timeout);
+        reject(new Error(message));
+      });
+
+      manager.on("exit", (_tabId, code) => {
+        clearTimeout(timeout);
+        resolve(code);
+      });
+
+      manager.createSession({
+        tabId: "tab-paste",
+        command: "/bin/sh",
+        cols: 80,
+        rows: 24,
+        cwd: process.cwd(),
+      });
+
+      setTimeout(() => {
+        manager.write("tab-paste", "printf '\\033[?2004h'; sleep 0.05; printf '\\033[?2004l'; exit\r");
+      }, 50);
+    });
+
+    expect(exitCode).toBe(0);
+    expect(seenModes).toContain(true);
+    expect(seenModes[seenModes.length - 1]).toBe(false);
     manager.disposeAll();
   });
 
