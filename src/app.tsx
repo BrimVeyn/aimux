@@ -128,6 +128,8 @@ export function App({ backend }: { backend: SessionBackend }) {
   const attachRequestIdRef = useRef(0);
   const resizingRef = useRef(false);
   const resizingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const layoutRef = useRef(state.layout);
+  layoutRef.current = state.layout;
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeTabId),
     [state.activeTabId, state.tabs],
@@ -151,6 +153,11 @@ export function App({ backend }: { backend: SessionBackend }) {
   const contentOriginRef = useRef<TerminalContentOrigin>({ x: 0, y: 0, cols: 0, rows: 0 });
 
   useEffect(() => {
+    renderer.useMouse = true;
+    renderer.useConsole = false;
+    renderer.console.hide();
+    renderer.console.show = () => {};
+
     const handler = createRawInputHandler({
       getFocusMode: () => focusModeRef.current,
       getActiveTabId: () => activeTabIdRef.current,
@@ -169,11 +176,6 @@ export function App({ backend }: { backend: SessionBackend }) {
       toggleSidebar: () => dispatch({ type: "toggle-sidebar" }),
     });
 
-    renderer.prependInputHandler(handler);
-    return () => renderer.removeInputHandler(handler);
-  }, [backend, renderer]);
-
-  useEffect(() => {
     const handlePasteEvent = (event: { bytes: Uint8Array; defaultPrevented?: boolean }) => {
       logInputDebug("app.rendererPaste", {
         defaultPrevented: event.defaultPrevented ?? false,
@@ -184,16 +186,30 @@ export function App({ backend }: { backend: SessionBackend }) {
         return;
       }
 
-      handleTerminalPaste(event);
+      const tab = activeTabRef.current;
+      const tabId = activeTabIdRef.current;
+      const focusMode = focusModeRef.current;
+
+      logInputDebug("app.onTerminalPaste", {
+        activeTabId: tabId,
+        focusMode,
+        byteLength: event.bytes.length,
+        decodedPreview: new TextDecoder().decode(event.bytes).slice(0, 120),
+        bracketedPasteMode: tab?.terminalModes.bracketedPasteMode ?? false,
+      });
+
+      if (focusMode !== "terminal-input" || !tabId || !tab) {
+        return;
+      }
+
+      if (tab.viewport && tab.viewport.viewportY < tab.viewport.baseY) {
+        backend.scrollViewportToBottom(tabId);
+      }
+
+      const payload = new TextDecoder().decode(event.bytes);
+      backend.write(tabId, buildPtyPastePayload(payload, tab.terminalModes.bracketedPasteMode));
     };
 
-    renderer.keyInput.on("paste", handlePasteEvent);
-    return () => {
-      renderer.keyInput.off("paste", handlePasteEvent);
-    };
-  }, [renderer, state.activeTabId, state.focusMode, activeTab]);
-
-  useEffect(() => {
     const handleSelection = (selection: { isDragging?: boolean; getSelectedText(): string }) => {
       const selectedText = selection.getSelectedText();
       logInputDebug("app.selection", {
@@ -209,21 +225,15 @@ export function App({ backend }: { backend: SessionBackend }) {
       renderer.copyToClipboardOSC52(selectedText);
     };
 
+    renderer.prependInputHandler(handler);
+    renderer.keyInput.on("paste", handlePasteEvent);
     renderer.on("selection", handleSelection);
     return () => {
+      renderer.removeInputHandler(handler);
+      renderer.keyInput.off("paste", handlePasteEvent);
       renderer.off("selection", handleSelection);
     };
-  }, [renderer]);
-
-  useEffect(() => {
-    renderer.useMouse = true;
-  }, [renderer]);
-
-  useEffect(() => {
-    renderer.useConsole = false;
-    renderer.console.hide();
-    renderer.console.show = () => {};
-  }, [renderer]);
+  }, [backend, renderer]);
 
   useEffect(() => {
     const shouldEnableBracketedPaste = state.focusMode === "terminal-input" && !!state.activeTabId;
@@ -278,30 +288,6 @@ export function App({ backend }: { backend: SessionBackend }) {
     }
   };
 
-  const handleTerminalPaste = (event: { bytes: Uint8Array }) => {
-    logInputDebug("app.onTerminalPaste", {
-      activeTabId: state.activeTabId,
-      focusMode: state.focusMode,
-      byteLength: event.bytes.length,
-      decodedPreview: new TextDecoder().decode(event.bytes).slice(0, 120),
-      bracketedPasteMode: activeTab?.terminalModes.bracketedPasteMode ?? false,
-    });
-
-    if (state.focusMode !== "terminal-input" || !state.activeTabId || !activeTab) {
-      return;
-    }
-
-    if (activeTab.viewport && activeTab.viewport.viewportY < activeTab.viewport.baseY) {
-      backend.scrollViewportToBottom(state.activeTabId);
-    }
-
-    const payload = new TextDecoder().decode(event.bytes);
-    backend.write(
-      state.activeTabId,
-      buildPtyPastePayload(payload, activeTab.terminalModes.bracketedPasteMode),
-    );
-  };
-
   useEffect(() => {
     if (!state.currentSessionId) {
       return;
@@ -324,8 +310,8 @@ export function App({ backend }: { backend: SessionBackend }) {
     void backend
       .attach({
         sessionId: currentSessionId,
-        cols: state.layout.terminalCols,
-        rows: state.layout.terminalRows,
+        cols: layoutRef.current.terminalCols,
+        rows: layoutRef.current.terminalRows,
         workspaceSnapshot: currentSession?.workspaceSnapshot,
       })
       .then((result) => {
@@ -455,6 +441,9 @@ export function App({ backend }: { backend: SessionBackend }) {
   }, [state]);
 
   useEffect(() => {
+    const idleTimeouts = idleTimeoutsRef.current;
+    const startupGraceTimeouts = startupGraceTimeoutsRef.current;
+
     const handleRender = (
       tabId: string,
       viewport: TabSession["viewport"],
@@ -491,14 +480,14 @@ export function App({ backend }: { backend: SessionBackend }) {
     backend.on("error", handleError);
 
     return () => {
-      for (const timeout of idleTimeoutsRef.current.values()) {
+      for (const timeout of idleTimeouts.values()) {
         clearTimeout(timeout);
       }
-      idleTimeoutsRef.current.clear();
-      for (const timeout of startupGraceTimeoutsRef.current.values()) {
+      idleTimeouts.clear();
+      for (const timeout of startupGraceTimeouts.values()) {
         clearTimeout(timeout);
       }
-      startupGraceTimeoutsRef.current.clear();
+      startupGraceTimeouts.clear();
       if (workspaceSaveTimeoutRef.current) {
         clearTimeout(workspaceSaveTimeoutRef.current);
       }
