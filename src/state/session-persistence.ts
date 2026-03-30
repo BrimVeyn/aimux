@@ -1,4 +1,4 @@
-import type { AppState, FocusMode, TabSession, TabStatus, WorkspaceSnapshotV1 } from "./types";
+import type { AppState, TabSession, TabStatus, WorkspaceSnapshotV1 } from "./types";
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   return {
@@ -78,7 +78,7 @@ export function restoreWorkspaceState(
   return {
     tabs,
     activeTabId,
-    focusMode: "navigation" satisfies FocusMode,
+    focusMode: "navigation",
     sidebar: {
       ...state.sidebar,
       visible: workspaceSnapshot?.sidebar.visible ?? state.sidebar.visible,

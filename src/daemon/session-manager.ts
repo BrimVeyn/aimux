@@ -22,11 +22,9 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
   private getOrCreateRegistry(sessionId: string): SessionRegistry {
     const existing = this.registries.get(sessionId);
     if (existing) {
-      logDebug("daemon.sessionManager.reuseRegistry", { sessionId });
       return existing;
     }
 
-    logDebug("daemon.sessionManager.createRegistry", { sessionId });
     const registry = new SessionRegistry();
     registry.on("render", (tabId, viewport, terminalModes) => {
       this.emit("render", sessionId, tabId, viewport, terminalModes);
@@ -61,32 +59,26 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
   }
 
   write(sessionId: string, tabId: string, data: string): void {
-    logDebug("daemon.sessionManager.write", { sessionId, tabId, inputLength: data.length });
     this.getOrCreateRegistry(sessionId).write(tabId, data);
   }
 
   resize(sessionId: string, cols: number, rows: number): void {
-    logDebug("daemon.sessionManager.resize", { sessionId, cols, rows });
     this.getOrCreateRegistry(sessionId).resizeAll(cols, rows);
   }
 
   scroll(sessionId: string, tabId: string, deltaLines: number): void {
-    logDebug("daemon.sessionManager.scroll", { sessionId, tabId, deltaLines });
     this.getOrCreateRegistry(sessionId).scrollViewport(tabId, deltaLines);
   }
 
   scrollToBottom(sessionId: string, tabId: string): void {
-    logDebug("daemon.sessionManager.scrollToBottom", { sessionId, tabId });
     this.getOrCreateRegistry(sessionId).scrollViewportToBottom(tabId);
   }
 
   setActiveTab(sessionId: string, tabId: string | null): void {
-    logDebug("daemon.sessionManager.setActiveTab", { sessionId, tabId });
     this.getOrCreateRegistry(sessionId).setActiveTab(tabId);
   }
 
   closeTab(sessionId: string, tabId: string): void {
-    logDebug("daemon.sessionManager.closeTab", { sessionId, tabId });
     this.getOrCreateRegistry(sessionId).closeTab(tabId);
   }
 

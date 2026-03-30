@@ -61,12 +61,6 @@ export class RemoteSessionBackend
     return this.socket;
   }
 
-  private ensureAttached(): void {
-    if (!this.attached) {
-      throw new Error("Remote backend is not attached");
-    }
-  }
-
   private send(request: ClientRequest): Promise<ServerResponse> {
     const socket = this.getConnectedSocket();
     logDebug("backend.remote.send", { type: request.type, id: request.id });
@@ -213,8 +207,6 @@ export class RemoteSessionBackend
       return;
     }
 
-    this.ensureAttached();
-
     logDebug("backend.remote.createSession", {
       sessionId: this.currentSessionId,
       tabId: options.tabId,
@@ -232,7 +224,6 @@ export class RemoteSessionBackend
       logDebug("backend.remote.skipWriteBeforeAttach", { tabId, inputLength: input.length });
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.write", {
       sessionId: this.currentSessionId,
       tabId,
@@ -245,7 +236,6 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.scroll", { sessionId: this.currentSessionId, tabId, deltaLines });
     void this.send({ id: crypto.randomUUID(), type: "scroll", payload: { tabId, deltaLines } });
   }
@@ -254,7 +244,6 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.scrollToBottom", { sessionId: this.currentSessionId, tabId });
     void this.send({ id: crypto.randomUUID(), type: "scrollToBottom", payload: { tabId } });
   }
@@ -263,7 +252,6 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.setActiveTab", { sessionId: this.currentSessionId, tabId });
     void this.send({ id: crypto.randomUUID(), type: "setActiveTab", payload: { tabId } });
   }
@@ -273,7 +261,6 @@ export class RemoteSessionBackend
       logDebug("backend.remote.skipResizeBeforeAttach", { cols, rows });
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.resize", { sessionId: this.currentSessionId, cols, rows });
     void this.send({ id: crypto.randomUUID(), type: "resizeClient", payload: { cols, rows } });
   }
@@ -282,7 +269,6 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.disposeSession", { sessionId: this.currentSessionId, tabId });
     void this.send({ id: crypto.randomUUID(), type: "closeTab", payload: { tabId } });
   }
@@ -291,7 +277,6 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return;
     }
-    this.ensureAttached();
     logDebug("backend.remote.disposeAll", { sessionId: this.currentSessionId });
     void this.send({ id: crypto.randomUUID(), type: "disposeAll", payload: {} });
   }

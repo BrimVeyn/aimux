@@ -130,7 +130,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         return state;
       }
       const optionCount =
-        state.modal.type === "new-tab" ? 3 : Math.max(1, state.sessions.length + 1);
+        state.modal.type === "new-tab"
+          ? ASSISTANT_OPTIONS.length
+          : Math.max(1, state.sessions.length + 1);
       return {
         ...state,
         modal: {
@@ -221,8 +223,6 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         },
       };
     }
-    case "modal-delete-selected-session":
-      return state;
     case "close-tab":
       return closeTabAtIndex(
         state,

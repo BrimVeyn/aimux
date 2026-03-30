@@ -411,6 +411,21 @@ export function App({ backend }: { backend: SessionBackend }) {
     return () => {
       if (workspaceSaveTimeoutRef.current) {
         clearTimeout(workspaceSaveTimeoutRef.current);
+        workspaceSaveTimeoutRef.current = null;
+        const sessionsToSave = state.sessions.map((session) =>
+          session.id === state.currentSessionId
+            ? {
+                ...session,
+                updatedAt: new Date().toISOString(),
+                workspaceSnapshot: serializeWorkspace(state),
+              }
+            : session,
+        );
+        saveConfig({
+          ...loadConfig(),
+          customCommands: state.customCommands,
+        });
+        saveSessionCatalog(sessionsToSave);
       }
     };
   }, [state]);

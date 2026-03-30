@@ -2,6 +2,20 @@ import { describe, expect, test } from "bun:test";
 
 import { appReducer, createInitialState } from "../../src/state/store";
 
+describe("initial state", () => {
+  test("can start in startup picker mode", () => {
+    const state = createInitialState({}, [], true);
+    expect(state.focusMode).toBe("modal");
+    expect(state.modal.type).toBe("session-picker");
+  });
+
+  test("defaults to navigation mode without startup picker", () => {
+    const state = createInitialState();
+    expect(state.focusMode).toBe("navigation");
+    expect(state.modal.type).toBeNull();
+  });
+});
+
 function createTab(
   overrides: Partial<ReturnType<typeof createInitialState>["tabs"][number]> & {
     id: string;

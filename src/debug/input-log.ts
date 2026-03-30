@@ -8,10 +8,6 @@ export function isInputDebugEnabled(): boolean {
 }
 
 function serialize(value: unknown): string {
-  if (typeof value === "string") {
-    return JSON.stringify(value);
-  }
-
   return JSON.stringify(value);
 }
 

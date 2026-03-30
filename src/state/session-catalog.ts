@@ -32,21 +32,13 @@ function readCatalogFile(): SessionCatalogFile | null {
 export function loadSessionCatalog(): SessionRecord[] {
   const file = readCatalogFile();
   if (file) {
-    logDebug("sessions.catalog.load", {
-      path: SESSIONS_PATH,
-      sessionCount: file.sessions.length,
-      source: "catalog",
-    });
+    logDebug("sessions.catalog.load", { sessionCount: file.sessions.length });
     return file.sessions;
   }
 
   const config = loadConfig();
   if (!config.workspaceSnapshot) {
-    logDebug("sessions.catalog.load", {
-      path: SESSIONS_PATH,
-      sessionCount: 0,
-      source: "empty",
-    });
+    logDebug("sessions.catalog.load", { sessionCount: 0 });
     return [];
   }
 
@@ -63,7 +55,6 @@ export function loadSessionCatalog(): SessionRecord[] {
   saveSessionCatalog([migrated]);
   saveConfig({ ...config, workspaceSnapshot: undefined });
   logDebug("sessions.catalog.migrateLegacyWorkspace", {
-    path: SESSIONS_PATH,
     migratedSessionId: migrated.id,
     tabCount: migrated.workspaceSnapshot?.tabs.length ?? 0,
   });
@@ -73,11 +64,7 @@ export function loadSessionCatalog(): SessionRecord[] {
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
   mkdirSync(dirname(SESSIONS_PATH), { recursive: true });
   writeFileSync(SESSIONS_PATH, JSON.stringify({ version: 1, sessions }, null, 2) + "\n");
-  logDebug("sessions.catalog.save", {
-    path: SESSIONS_PATH,
-    sessionCount: sessions.length,
-    sessionIds: sessions.map((session) => session.id),
-  });
+  logDebug("sessions.catalog.save", { sessionCount: sessions.length });
 }
 
 export function getSessionCatalogPath(): string {

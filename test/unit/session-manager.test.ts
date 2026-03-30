@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { SessionManager } from "../../src/daemon/session-manager";
 
 describe("SessionManager", () => {
-  test("keeps snapshots isolated per session", () => {
+  test("returns correct snapshot for each session", () => {
     const manager = new SessionManager();
 
     const alpha = manager.attachSession("alpha", {

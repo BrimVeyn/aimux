@@ -95,7 +95,7 @@ export interface ModalState {
   type: ModalType;
   selectedIndex: number;
   editBuffer: string | null;
-  sessionTargetId?: string | null;
+  sessionTargetId: string | null;
 }
 
 export interface LayoutState {
@@ -119,10 +119,9 @@ export type AppAction =
   | { type: "open-new-tab-modal" }
   | { type: "open-help-modal" }
   | { type: "open-session-picker" }
-  | { type: "open-session-name-modal"; sessionTargetId?: string | null; initialName?: string }
+  | { type: "open-session-name-modal"; sessionTargetId?: string; initialName?: string }
   | { type: "close-modal" }
   | { type: "move-modal-selection"; delta: number }
-  | { type: "modal-delete-selected-session" }
   | { type: "add-tab"; tab: TabSession }
   | { type: "hydrate-workspace"; tabs: TabSession[]; activeTabId: string | null }
   | { type: "load-session"; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
