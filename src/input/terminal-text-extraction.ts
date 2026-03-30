@@ -12,17 +12,18 @@ export function getWordAtColumn(
     return { text: "", startCol: column, endCol: column };
   }
 
-  if (!/\S/.test(lineText[column])) {
+  const ch = lineText[column];
+  if (!ch || !/\S/.test(ch)) {
     return { text: "", startCol: column, endCol: column };
   }
 
   let startCol = column;
-  while (startCol > 0 && /\S/.test(lineText[startCol - 1])) {
+  while (startCol > 0 && /\S/.test(lineText[startCol - 1] as string)) {
     startCol--;
   }
 
   let endCol = column;
-  while (endCol < lineText.length && /\S/.test(lineText[endCol])) {
+  while (endCol < lineText.length && /\S/.test(lineText[endCol] as string)) {
     endCol++;
   }
 
