@@ -12,6 +12,7 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 - **Multi-tab sessions** -- Run Claude, Codex, and OpenCode in parallel with instant tab switching
 - **Full terminal emulation** -- Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
 - **Vim-style navigation** -- `j`/`k` to switch tabs, `i` to enter input mode, familiar keybindings throughout
+- **Text selection** -- Double-click to select a word, triple-click to select a line, drag to select a region. Selections are copied to the system clipboard automatically
 - **Project-scoped sessions** -- Associate a git repository with each session; all tabs spawn in that directory
 - **Directory picker** -- Fuzzy-search git repos and worktrees from `$HOME` using `fzf` when creating sessions
 - **Session management** -- Create, rename, delete, filter, and switch between sessions with `Ctrl+G`
@@ -21,8 +22,28 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 - **Git branch display** -- Current branch shown in the sidebar for project-scoped sessions
 - **Daemon mode** -- Background daemon keeps sessions alive across terminal restarts
 - **Live activity indicators** -- Animated spinner for busy tabs, colored indicators for idle/focused states
+- **Snippets** -- Save and reuse prompt snippets across sessions with `Ctrl+S`
+- **Theme picker** -- Switch between themes on the fly with `Ctrl+T`
 - **Built-in help** -- Press `?` to see all keybindings at a glance
 - **Rich TUI** -- Sidebar with git info, status bar with session context, and modal dialogs built with OpenTUI + React
+
+### Session Management
+
+Create project-scoped sessions, switch between them, and filter by name:
+
+![Session management](assets/sessions.gif)
+
+### Multi-Tab Workflow
+
+Run multiple AI assistants side by side, rename tabs, and navigate with vim keys:
+
+![Multi-tab workflow](assets/tabs.gif)
+
+### Text Selection
+
+Double-click to select a word, triple-click to select a line -- copied to clipboard automatically:
+
+![Text selection](assets/selection.gif)
 
 ## Install
 
@@ -127,8 +148,11 @@ bun test
 # Type check
 bun run check
 
-# Record demo GIF (requires vhs)
+# Record demo GIFs (requires vhs)
 bun run demo
+bun run demo:sessions
+bun run demo:tabs
+bun run demo:selection
 ```
 
 ## License

@@ -1,4 +1,4 @@
-Output assets/demo.gif
+Output assets/tabs.gif
 
 Set Shell "bash"
 Set FontSize 14
@@ -8,22 +8,18 @@ Set Padding 0
 Set Theme "Dracula"
 Set TypingSpeed 60ms
 
-# Start aimux
+# Start aimux (assume a session already exists)
 Type "bun run start"
 Enter
 Sleep 3s
 
-# Create a new session
+# Create session if needed
 Type "n"
 Sleep 1s
-
-# Search for a project directory
 Type "aimux"
 Sleep 2s
 Enter
 Sleep 1s
-
-# Confirm session name
 Enter
 Sleep 2s
 
@@ -33,7 +29,7 @@ Sleep 1s
 Enter
 Sleep 4s
 
-# Enter input mode and chat
+# Enter input mode and send a message
 Type "i"
 Sleep 500ms
 Type "Say hello in one sentence"
@@ -44,23 +40,29 @@ Sleep 5s
 Ctrl+Z
 Sleep 1s
 
-# Open a second tab
+# Open another tab
 Ctrl+N
 Sleep 1s
 Enter
 Sleep 4s
 
-# Rename it
+# Rename the tab
 Type "r"
 Sleep 500ms
-Type "refactor"
+Type "code-review"
 Enter
 Sleep 1s
 
-# Navigate between tabs
+# Navigate tabs with j/k
 Type "k"
 Sleep 1s
 Type "j"
+Sleep 1s
+
+# Reorder tabs with Shift+J
+Type "J"
+Sleep 1s
+Type "K"
 Sleep 1s
 
 # Toggle sidebar
