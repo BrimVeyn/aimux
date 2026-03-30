@@ -2,6 +2,7 @@ import type { AppState } from "../state/types";
 
 import type { TerminalContentOrigin } from "../input/raw-input-handler";
 import type { MouseEvent } from "@opentui/core";
+import { HelpModal } from "./components/help-modal";
 import { NewTabModal } from "./components/new-tab-modal";
 import { SessionNameModal } from "./components/session-name-modal";
 import { SessionPickerModal } from "./components/session-picker-modal";
@@ -60,6 +61,7 @@ export function RootView({
           value={state.modal.editBuffer ?? ""}
         />
       ) : null}
+      {state.modal.type === "help" ? <HelpModal /> : null}
     </box>
   );
 }

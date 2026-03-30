@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import type { TabSession } from "../../state/types";
 import { theme } from "../theme";
 
@@ -6,6 +8,7 @@ interface TabItemProps {
   tab: TabSession;
   active: boolean;
   focused: boolean;
+  isFocusedInput: boolean;
 }
 
 function getStatusColor(status: TabSession["status"]): string {
@@ -23,26 +26,51 @@ function getStatusColor(status: TabSession["status"]): string {
   }
 }
 
-function getActivityLabel(tab: TabSession): string {
+const BUSY_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+function BusyIndicator() {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFrame((prev) => (prev + 1) % BUSY_FRAMES.length);
+    }, 80);
+    return () => clearInterval(interval);
+  }, []);
+
+  return <text fg={theme.accent}>{BUSY_FRAMES[frame]} busy</text>;
+}
+
+function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocusedInput: boolean }) {
   if (tab.status === "error") {
-    return "error";
+    return <text fg={theme.danger}>✗ error</text>;
   }
 
   if (tab.status === "disconnected") {
-    return "restore";
+    return <text fg={theme.warning}>⏸ restore</text>;
   }
 
-  if (tab.activity) {
-    return tab.activity;
+  if (tab.status === "exited") {
+    return <text fg={theme.warning}>⏹ exited</text>;
   }
 
-  return tab.status;
+  if (isFocusedInput) {
+    return <text fg={theme.borderActive}>▸ focused</text>;
+  }
+
+  if (tab.activity === "busy") {
+    return <BusyIndicator />;
+  }
+
+  if (tab.activity === "idle") {
+    return <text fg={theme.success}>● idle</text>;
+  }
+
+  return <text fg={getStatusColor(tab.status)}>{tab.status}</text>;
 }
 
-export function TabItem({ id, tab, active, focused }: TabItemProps) {
+export function TabItem({ id, tab, active, focused, isFocusedInput }: TabItemProps) {
   const label = tab.assistant.toUpperCase();
-  const activityLabel = getActivityLabel(tab);
-  const activityColor = tab.activity === "busy" ? theme.accent : getStatusColor(tab.status);
 
   return (
     <box
@@ -60,9 +88,10 @@ export function TabItem({ id, tab, active, focused }: TabItemProps) {
       <text fg={active ? theme.text : theme.textMuted}>
         {active ? (focused ? "[>]" : "[*]") : "[ ]"} {tab.title}
       </text>
-      <text fg={activityColor}>
-        {label} - {activityLabel}
-      </text>
+      <box flexDirection="row">
+        <text fg={theme.textMuted}>{label} </text>
+        <ActivityIndicator tab={tab} isFocusedInput={isFocusedInput} />
+      </box>
     </box>
   );
 }

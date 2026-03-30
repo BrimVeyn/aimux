@@ -25,14 +25,14 @@ function getActiveTabLabel(tab?: TabSession): string {
 
 function getNavigationHint(activeTab?: TabSession): string {
   if (!activeTab) {
-    return "Ctrl+g sessions | Ctrl+n new | Ctrl+b toggle | Ctrl+h/l resize";
+    return "Ctrl+g sessions | Ctrl+n new | Ctrl+b toggle | Ctrl+h/l resize | ? help";
   }
 
   if (activeTab.status === "disconnected") {
     return "Ctrl+r restart restored tab | Ctrl+w close | i focus";
   }
 
-  return "Ctrl+g sessions | j/k move | Shift+J/K reorder | Ctrl+r restart | Ctrl+w close | i focus";
+  return "Ctrl+g sessions | j/k move | Shift+J/K reorder | Ctrl+r restart | Ctrl+w close | i focus | ? help";
 }
 
 export function getStatusBarModel(state: AppState, activeTab?: TabSession): StatusBarModel {

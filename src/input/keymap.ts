@@ -5,6 +5,7 @@ import type { FocusMode } from "../state/types";
 export type AppIntent =
   | { type: "quit" }
   | { type: "open-new-tab-modal" }
+  | { type: "open-help-modal" }
   | { type: "open-session-picker" }
   | { type: "open-session-name-modal" }
   | { type: "delete-selected-session" }
@@ -146,6 +147,10 @@ export function resolveKeyIntent(
 
     if (key.name === "i") {
       return { type: "enter-terminal-input" };
+    }
+
+    if (key.sequence === "?") {
+      return { type: "open-help-modal" };
     }
 
     return null;

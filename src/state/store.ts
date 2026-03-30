@@ -87,6 +87,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         focusMode: "modal",
         modal: { type: "new-tab", selectedIndex: 0, editBuffer: null, sessionTargetId: null },
       };
+    case "open-help-modal":
+      return {
+        ...state,
+        focusMode: "modal",
+        modal: { type: "help", selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+      };
     case "open-session-picker":
       return {
         ...state,

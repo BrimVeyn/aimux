@@ -613,6 +613,9 @@ export function App({ backend }: { backend: SessionBackend }) {
       case "open-new-tab-modal":
         dispatch({ type: "open-new-tab-modal" });
         return;
+      case "open-help-modal":
+        dispatch({ type: "open-help-modal" });
+        return;
       case "open-session-picker":
         dispatch({ type: "open-session-picker" });
         return;

@@ -6,7 +6,7 @@ export type TabActivity = "busy" | "idle";
 
 export type FocusMode = "navigation" | "terminal-input" | "modal" | "command-edit";
 
-export type ModalType = "new-tab" | "session-picker" | "session-name" | null;
+export type ModalType = "new-tab" | "session-picker" | "session-name" | "help" | null;
 
 export interface TerminalSpan {
   text: string;
@@ -117,6 +117,7 @@ export interface AppState {
 
 export type AppAction =
   | { type: "open-new-tab-modal" }
+  | { type: "open-help-modal" }
   | { type: "open-session-picker" }
   | { type: "open-session-name-modal"; sessionTargetId?: string | null; initialName?: string }
   | { type: "close-modal" }

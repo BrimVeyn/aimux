@@ -71,7 +71,6 @@ export function Sidebar({ state }: SidebarProps) {
     >
       <text fg={theme.accent}>aimux</text>
       <text fg={theme.textMuted}>{state.currentSessionId ? `Session: ${state.sessions.find((s) => s.id === state.currentSessionId)?.name ?? "unknown"}` : "No session selected"}</text>
-      <text fg={theme.textMuted}>Ctrl+g sessions / Ctrl+n new tab / Ctrl+r restart / Ctrl+w close</text>
       <scrollbox
         ref={scrollRef}
         flexGrow={1}
@@ -91,6 +90,7 @@ export function Sidebar({ state }: SidebarProps) {
               tab={tab}
               active={tab.id === state.activeTabId}
               focused={state.focusMode === "navigation"}
+              isFocusedInput={tab.id === state.activeTabId && state.focusMode === "terminal-input"}
             />
           ))
         )}
