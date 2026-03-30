@@ -3,8 +3,11 @@ import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from "./debug/input-log";
-import { resolveKeyIntent } from "./input/keymap";
 import { encodeMouseEventForPty } from "./input/mouse-forwarding";
+import { deriveModeId } from "./input/modes/bridge";
+import { registerAllModes } from "./input/modes/handlers";
+import { getHandler, transitionTo } from "./input/modes/registry";
+import type { KeyResult, ModeContext, SideEffect } from "./input/modes/types";
 import { buildPtyPastePayload } from "./input/paste";
 import { createRawInputHandler, type TerminalContentOrigin } from "./input/raw-input-handler";
 import { loadConfig, saveConfig } from "./config";
@@ -30,6 +33,8 @@ import { searchDirectories } from "./ui/directory-search";
 import { RootView } from "./ui/root";
 import { applyTheme } from "./ui/theme";
 import { type ThemeId, THEME_IDS } from "./ui/themes";
+
+registerAllModes();
 
 const IDLE_TIMEOUT_MS = 2_000;
 const STARTUP_GRACE_MS = 5_000;
@@ -732,27 +737,20 @@ export function App({ backend }: { backend: SessionBackend }) {
     );
   }
 
-  useKeyboard((key) => {
-    const intent = resolveKeyIntent(key, state.focusMode);
-    if (!intent) {
-      return;
-    }
-
-    key.preventDefault();
-
-    switch (intent.type) {
-      case "quit":
+  function executeSideEffect(effect: SideEffect): void {
+    switch (effect.type) {
+      case "quit": {
         saveConfig({
           ...loadConfig(),
-          customCommands: state.customCommands,
+          customCommands: effect.state.customCommands,
         });
         saveSessionCatalog(
-          state.sessions.map((session) =>
-            session.id === state.currentSessionId
+          effect.state.sessions.map((session) =>
+            session.id === effect.state.currentSessionId
               ? {
                   ...session,
                   updatedAt: new Date().toISOString(),
-                  workspaceSnapshot: serializeWorkspace(state),
+                  workspaceSnapshot: serializeWorkspace(effect.state),
                 }
               : session,
           ),
@@ -761,249 +759,126 @@ export function App({ backend }: { backend: SessionBackend }) {
         renderer.destroy();
         process.exit(0);
         return;
-      case "open-new-tab-modal":
-        dispatch({ type: "open-new-tab-modal" });
+      }
+      case "launch-selected-assistant": {
+        const option = getAssistantOption(state.modal.selectedIndex);
+        launchAssistant(option.id);
         return;
-      case "open-help-modal":
-        dispatch({ type: "open-help-modal" });
-        return;
-      case "open-session-picker":
-        dispatch({ type: "open-session-picker" });
-        return;
-      case "close-tab":
-        if (state.activeTabId) {
-          clearIdleTimer(state.activeTabId);
-          clearStartupGrace(state.activeTabId);
-          backend.disposeSession(state.activeTabId);
-          dispatch({ type: "close-tab", tabId: state.activeTabId });
-        }
-        return;
-      case "close-modal":
-        if (state.modal.type === "session-picker" && !state.currentSessionId) {
-          return;
-        }
-        if (state.modal.type === "theme-picker") {
-          applyTheme(themeId);
-        }
-        dispatch({ type: "close-modal" });
-        return;
-      case "confirm-modal": {
-        if (state.modal.type === "new-tab") {
-          const option = getAssistantOption(state.modal.selectedIndex);
-          launchAssistant(option.id);
-          return;
-        }
-
-        if (state.modal.type === "theme-picker") {
-          const selectedId = THEME_IDS[state.modal.selectedIndex];
-          if (selectedId) {
-            applyTheme(selectedId);
-            setThemeId(selectedId);
-            saveConfig({ ...loadConfig(), themeId: selectedId });
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-
-        if (state.modal.type === "snippet-picker") {
-          const filtered = getFilteredSnippets();
-          const snippet = filtered[state.modal.selectedIndex];
-          if (snippet && state.activeTabId && activeTab) {
-            const payload = buildPtyPastePayload(
-              snippet.content,
-              activeTab.terminalModes.bracketedPasteMode,
-            );
-            backend.write(state.activeTabId, payload);
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-
-        if (state.modal.type === "session-picker") {
-          const filtered = getFilteredSessions();
-          logInputDebug("app.sessionPicker.confirm", {
-            selectedIndex: state.modal.selectedIndex,
-            selectedSessionId: filtered[state.modal.selectedIndex]?.id ?? null,
-            creatingNew: state.modal.selectedIndex === filtered.length,
-          });
-          const selectedSession = filtered[state.modal.selectedIndex];
-          if (selectedSession) {
-            switchToSession(selectedSession);
-          } else {
-            dispatch({ type: "open-create-session-modal" });
-          }
+      }
+      case "confirm-selected-session": {
+        const filtered = getFilteredSessions();
+        logInputDebug("app.sessionPicker.confirm", {
+          selectedIndex: state.modal.selectedIndex,
+          selectedSessionId: filtered[state.modal.selectedIndex]?.id ?? null,
+          creatingNew: state.modal.selectedIndex === filtered.length,
+        });
+        const selectedSession = filtered[state.modal.selectedIndex];
+        if (selectedSession) {
+          switchToSession(selectedSession);
+        } else {
+          dispatch({ type: "open-create-session-modal" });
         }
         return;
       }
-      case "move-modal-selection":
-        if (state.modal.type === "theme-picker") {
-          const count = THEME_IDS.length;
-          const nextIndex = (state.modal.selectedIndex + intent.delta + count) % count;
-          const previewId = THEME_IDS[nextIndex];
-          if (previewId) {
-            applyTheme(previewId);
-          }
-        }
-        dispatch({ type: "move-modal-selection", delta: intent.delta });
-        return;
-      case "create-new-session":
-        if (state.modal.type === "snippet-picker") {
-          dispatch({ type: "open-snippet-editor" });
-          return;
-        }
-        dispatch({ type: "open-create-session-modal" });
-        return;
-      case "rename-selected-session":
-        if (state.modal.type === "snippet-picker") {
-          const snippet = getFilteredSnippets()[state.modal.selectedIndex];
-          if (snippet) {
-            dispatch({ type: "open-snippet-editor", snippetId: snippet.id });
-          }
-          return;
-        }
-        if (state.modal.type === "session-picker") {
-          const selectedSession = getFilteredSessions()[state.modal.selectedIndex];
-          if (selectedSession) {
-            logInputDebug("app.sessionPicker.openRenameModal", {
-              selectedIndex: state.modal.selectedIndex,
-              selectedSessionId: selectedSession.id,
-            });
-            dispatch({
-              type: "open-session-name-modal",
-              sessionTargetId: selectedSession.id,
-              initialName: selectedSession.name,
-            });
-          }
+      case "delete-selected-session": {
+        const filtered = getFilteredSessions();
+        const selectedSession = filtered[state.modal.selectedIndex];
+        logInputDebug("app.sessionPicker.deleteSelected", {
+          selectedIndex: state.modal.selectedIndex,
+          selectedSessionId: selectedSession?.id ?? null,
+        });
+        if (selectedSession) {
+          deleteSession(selectedSession.id);
         }
         return;
-      case "delete-selected-session":
-        if (state.modal.type === "snippet-picker") {
-          const snippet = getFilteredSnippets()[state.modal.selectedIndex];
-          if (snippet) {
-            const updated = state.snippets.filter((s) => s.id !== snippet.id);
-            saveSnippetCatalog(updated);
-            dispatch({ type: "delete-snippet", snippetId: snippet.id });
-          }
-          return;
-        }
-        if (state.modal.type === "session-picker") {
-          const selectedSession = getFilteredSessions()[state.modal.selectedIndex];
-          logInputDebug("app.sessionPicker.deleteSelected", {
+      }
+      case "open-rename-selected-session": {
+        const filtered = getFilteredSessions();
+        const selectedSession = filtered[state.modal.selectedIndex];
+        if (selectedSession) {
+          logInputDebug("app.sessionPicker.openRenameModal", {
             selectedIndex: state.modal.selectedIndex,
-            selectedSessionId: selectedSession?.id ?? null,
+            selectedSessionId: selectedSession.id,
           });
-          if (selectedSession) {
-            deleteSession(selectedSession.id);
-          }
+          dispatch({
+            type: "open-session-name-modal",
+            sessionTargetId: selectedSession.id,
+            initialName: selectedSession.name,
+          });
         }
         return;
-      case "move-tab":
-        dispatch({ type: "move-active-tab", delta: intent.delta });
+      }
+      case "create-session":
+        createSessionFromCurrent(effect.name, effect.projectPath);
         return;
-      case "reorder-tab":
-        dispatch({ type: "reorder-active-tab", delta: intent.delta });
+      case "close-tab": {
+        clearIdleTimer(effect.tabId);
+        clearStartupGrace(effect.tabId);
+        backend.disposeSession(effect.tabId);
         return;
+      }
       case "restart-tab":
-        if (activeTab) {
-          restartTab(activeTab);
+        restartTab(effect.tab);
+        return;
+      case "paste-selected-snippet": {
+        const filtered = getFilteredSnippets();
+        const snippet = filtered[state.modal.selectedIndex];
+        if (snippet && state.activeTabId && activeTab) {
+          const payload = buildPtyPastePayload(
+            snippet.content,
+            activeTab.terminalModes.bracketedPasteMode,
+          );
+          backend.write(state.activeTabId, payload);
         }
         return;
-      case "enter-terminal-input":
-        if (state.activeTabId) {
-          dispatch({ type: "set-focus-mode", focusMode: "terminal-input" });
+      }
+      case "edit-selected-snippet": {
+        const filtered = getFilteredSnippets();
+        const snippet = filtered[state.modal.selectedIndex];
+        if (snippet) {
+          dispatch({ type: "open-snippet-editor", snippetId: snippet.id });
         }
         return;
-      case "leave-terminal-input":
-        dispatch({ type: "set-focus-mode", focusMode: "navigation" });
+      }
+      case "delete-selected-snippet": {
+        const filtered = getFilteredSnippets();
+        const snippet = filtered[state.modal.selectedIndex];
+        if (snippet) {
+          const updated = state.snippets.filter((s) => s.id !== snippet.id);
+          saveSnippetCatalog(updated);
+          dispatch({ type: "delete-snippet", snippetId: snippet.id });
+        }
         return;
-      case "toggle-sidebar":
-        dispatch({ type: "toggle-sidebar" });
-        return;
-      case "resize-sidebar":
-        dispatch({ type: "resize-sidebar", delta: intent.delta });
-        return;
-      case "begin-command-edit":
-        if (state.modal.type === "snippet-picker") {
-          const snippet = getFilteredSnippets()[state.modal.selectedIndex];
-          if (snippet) {
-            dispatch({ type: "open-snippet-editor", snippetId: snippet.id });
+      }
+      case "save-snippet-editor": {
+        const modal = state.modal;
+        const name =
+          modal.activeField === "directory"
+            ? (modal.editBuffer ?? "").trim()
+            : (modal.secondaryBuffer ?? "").trim();
+        const content =
+          modal.activeField === "name"
+            ? (modal.editBuffer ?? "").trim()
+            : (modal.secondaryBuffer ?? "").trim();
+        if (name && content) {
+          const snippetId = modal.sessionTargetId;
+          let updated: SnippetRecord[];
+          if (snippetId) {
+            updated = state.snippets.map((s) => (s.id === snippetId ? { ...s, name, content } : s));
+          } else {
+            const newSnippet: SnippetRecord = {
+              id: `snip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              name,
+              content,
+            };
+            updated = [...state.snippets, newSnippet];
           }
-          return;
+          saveSnippetCatalog(updated);
+          dispatch({ type: "set-snippets", snippets: updated });
         }
-        dispatch({ type: "begin-command-edit" });
         return;
-      case "command-edit-input":
-        dispatch({ type: "update-command-edit", char: intent.char });
-        return;
-      case "commit-command-edit": {
-        if (state.modal.type === "create-session" && state.modal.editBuffer !== null) {
-          if (state.modal.activeField === "directory") {
-            dispatch({ type: "select-directory" });
-            return;
-          }
-          const trimmed = state.modal.editBuffer.trim();
-          const projectPath = state.modal.pendingProjectPath ?? undefined;
-          const sessionName = trimmed || (projectPath ? projectPath.split("/").pop()! : "");
-          if (sessionName) {
-            createSessionFromCurrent(sessionName, projectPath);
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-        if (state.modal.type === "snippet-editor" && state.modal.editBuffer !== null) {
-          const name =
-            state.modal.activeField === "directory"
-              ? (state.modal.editBuffer ?? "").trim()
-              : (state.modal.secondaryBuffer ?? "").trim();
-          const content =
-            state.modal.activeField === "name"
-              ? (state.modal.editBuffer ?? "").trim()
-              : (state.modal.secondaryBuffer ?? "").trim();
-          if (name && content) {
-            const snippetId = state.modal.sessionTargetId;
-            let updated: SnippetRecord[];
-            if (snippetId) {
-              updated = state.snippets.map((s) =>
-                s.id === snippetId ? { ...s, name, content } : s,
-              );
-            } else {
-              const newSnippet: SnippetRecord = {
-                id: `snip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                name,
-                content,
-              };
-              updated = [...state.snippets, newSnippet];
-            }
-            saveSnippetCatalog(updated);
-            dispatch({ type: "set-snippets", snippets: updated });
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-        if (state.modal.type === "rename-tab" && state.modal.editBuffer !== null) {
-          const trimmed = state.modal.editBuffer.trim();
-          if (trimmed && state.modal.sessionTargetId) {
-            dispatch({ type: "rename-tab", tabId: state.modal.sessionTargetId, title: trimmed });
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-        if (state.modal.type === "session-name" && state.modal.editBuffer !== null) {
-          const trimmed = state.modal.editBuffer.trim();
-          logInputDebug("app.sessionName.commit", {
-            sessionTargetId: state.modal.sessionTargetId ?? null,
-            value: trimmed,
-          });
-          if (trimmed) {
-            if (state.modal.sessionTargetId) {
-              renameSession(state.modal.sessionTargetId, trimmed);
-              return;
-            }
-          }
-          dispatch({ type: "close-modal" });
-          return;
-        }
-        dispatch({ type: "commit-command-edit" });
+      }
+      case "save-custom-command": {
         const option = ASSISTANT_OPTIONS[state.modal.selectedIndex];
         if (option && state.modal.editBuffer !== null) {
           const trimmed = state.modal.editBuffer.trim();
@@ -1020,35 +895,76 @@ export function App({ backend }: { backend: SessionBackend }) {
         }
         return;
       }
-      case "cancel-command-edit":
-        dispatch({ type: "cancel-command-edit" });
-        return;
-      case "switch-create-session-field":
-        dispatch({ type: "switch-create-session-field" });
-        return;
-      case "select-directory":
-        dispatch({ type: "select-directory" });
-        return;
-      case "begin-session-filter":
-        if (state.modal.type === "snippet-picker") {
-          dispatch({ type: "begin-snippet-filter" });
-          return;
+      case "apply-theme": {
+        if (effect.themeId === "__open__") {
+          applyTheme(THEME_IDS[0] ?? "aimux");
+        } else if (effect.themeId === "__restore__") {
+          applyTheme(themeId);
+        } else if (effect.themeId === "__confirm__") {
+          const selectedId = THEME_IDS[state.modal.selectedIndex];
+          if (selectedId) {
+            applyTheme(selectedId);
+            setThemeId(selectedId);
+            saveConfig({ ...loadConfig(), themeId: selectedId });
+          }
+        } else if (effect.themeId === "__preview_next__" || effect.themeId === "__preview_prev__") {
+          const delta = effect.themeId === "__preview_next__" ? 1 : -1;
+          const count = THEME_IDS.length;
+          const nextIndex = (state.modal.selectedIndex + delta + count) % count;
+          const previewId = THEME_IDS[nextIndex];
+          if (previewId) {
+            applyTheme(previewId);
+          }
+        } else {
+          applyTheme(effect.themeId as ThemeId);
         }
-        dispatch({ type: "begin-session-filter" });
         return;
-      case "rename-active-tab":
-        dispatch({ type: "open-rename-tab-modal" });
+      }
+      case "rename-session": {
+        renameSession(effect.sessionId, effect.name);
         return;
-      case "open-snippet-picker":
-        dispatch({ type: "open-snippet-picker" });
-        return;
-      case "open-theme-picker":
-        applyTheme(THEME_IDS[0] ?? "aimux");
-        dispatch({ type: "open-theme-picker" });
-        return;
-      default:
-        return;
+      }
     }
+  }
+
+  function processKeyResult(result: KeyResult, modeId: string): void {
+    for (const action of result.actions) {
+      dispatch(action);
+    }
+
+    if (result.transition) {
+      const transResult = transitionTo(modeId as any, result.transition, { state } as ModeContext);
+      for (const action of transResult.actions) {
+        dispatch(action);
+      }
+      for (const effect of transResult.effects) {
+        executeSideEffect(effect);
+      }
+    }
+
+    for (const effect of result.effects) {
+      executeSideEffect(effect);
+    }
+  }
+
+  useKeyboard((key) => {
+    // Global quit: Ctrl+C in any mode except terminal-input
+    if (key.ctrl && key.name === "c" && state.focusMode !== "terminal-input") {
+      key.preventDefault();
+      executeSideEffect({ type: "quit", state });
+      return;
+    }
+
+    const modeId = deriveModeId(state);
+    const handler = getHandler(modeId);
+    if (!handler) return;
+
+    const ctx: ModeContext = { state };
+    const result = handler.handleKey(key, ctx);
+    if (!result) return;
+
+    key.preventDefault();
+    processKeyResult(result, modeId);
   });
 
   return (

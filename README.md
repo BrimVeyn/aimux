@@ -64,6 +64,8 @@ Press `?` in navigation mode to see the full keybinding reference.
 | `Ctrl+G`              | Session picker            |
 | `Ctrl+B`              | Toggle sidebar            |
 | `Ctrl+H` / `Ctrl+L`   | Resize sidebar            |
+| `Ctrl+S`              | Snippet picker            |
+| `Ctrl+T`              | Theme picker              |
 | `?`                   | Show help                 |
 | `Ctrl+C`              | Quit                      |
 
@@ -90,7 +92,7 @@ All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigatio
 | `Tab`      | Switch between directory / name |
 | `Ctrl+N/P` | Navigate search results         |
 | `Enter`    | Select directory / confirm      |
-| `Esc`      | Cancel                          |
+| `Esc`      | Back to session picker          |
 
 ## Architecture
 
@@ -106,6 +108,7 @@ src/
   daemon/            # Background session daemon
   ipc/               # Inter-process communication protocol
   input/             # Keyboard and mouse input handling
+    modes/           # State-machine mode handlers (one per interaction context)
 ```
 
 ## Tech Stack
