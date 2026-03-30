@@ -47,19 +47,19 @@ Press `?` in navigation mode to see the full keybinding reference.
 
 ### Navigation Mode
 
-| Key | Action |
-|---|---|
-| `j` / `k` | Next / previous tab |
-| `Shift+J` / `Shift+K` | Reorder tabs |
-| `i` | Enter terminal input mode |
-| `Ctrl+N` | New tab |
-| `Ctrl+W` | Close tab |
-| `Ctrl+R` | Restart tab |
-| `Ctrl+G` | Session picker |
-| `Ctrl+B` | Toggle sidebar |
-| `Ctrl+H` / `Ctrl+L` | Resize sidebar |
-| `?` | Show help |
-| `Ctrl+C` | Quit |
+| Key                   | Action                    |
+| --------------------- | ------------------------- |
+| `j` / `k`             | Next / previous tab       |
+| `Shift+J` / `Shift+K` | Reorder tabs              |
+| `i`                   | Enter terminal input mode |
+| `Ctrl+N`              | New tab                   |
+| `Ctrl+W`              | Close tab                 |
+| `Ctrl+R`              | Restart tab               |
+| `Ctrl+G`              | Session picker            |
+| `Ctrl+B`              | Toggle sidebar            |
+| `Ctrl+H` / `Ctrl+L`   | Resize sidebar            |
+| `?`                   | Show help                 |
+| `Ctrl+C`              | Quit                      |
 
 ### Input Mode
 
@@ -67,14 +67,14 @@ All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigatio
 
 ### Session Picker
 
-| Key | Action |
-|---|---|
+| Key       | Action            |
+| --------- | ----------------- |
 | `j` / `k` | Navigate sessions |
-| `Enter` | Resume session |
-| `n` | New session |
-| `r` | Rename session |
-| `d` | Delete session |
-| `Esc` | Cancel |
+| `Enter`   | Resume session    |
+| `n`       | New session       |
+| `r`       | Rename session    |
+| `d`       | Delete session    |
+| `Esc`     | Cancel            |
 
 ## Architecture
 

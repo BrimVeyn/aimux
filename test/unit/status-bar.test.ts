@@ -41,7 +41,10 @@ describe("getStatusBarModel", () => {
 
   test("truncates long active tab labels in footer model", () => {
     const state = createInitialState();
-    const model = getStatusBarModel(state, createTab("Claude session with a very long descriptive title"));
+    const model = getStatusBarModel(
+      state,
+      createTab("Claude session with a very long descriptive title"),
+    );
 
     expect(model.left).toContain("...");
     expect(model.left.length).toBeLessThan(100);
@@ -89,7 +92,10 @@ describe("getStatusBarModel", () => {
 
   test("shows restored tab restart hint", () => {
     const state = createInitialState();
-    const model = getStatusBarModel(state, { ...createTab("Claude"), status: "disconnected" as const });
+    const model = getStatusBarModel(state, {
+      ...createTab("Claude"),
+      status: "disconnected" as const,
+    });
 
     expect(model.right).toContain("Ctrl+r restart restored tab");
   });

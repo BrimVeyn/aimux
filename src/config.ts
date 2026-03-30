@@ -17,7 +17,9 @@ const DEFAULT_CONFIG: AimuxConfig = {
 };
 
 function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
-  return typeof value === "object" && value !== null && (value as { version?: number }).version === 1;
+  return (
+    typeof value === "object" && value !== null && (value as { version?: number }).version === 1
+  );
 }
 
 export function loadConfig(): AimuxConfig {
@@ -32,7 +34,9 @@ export function loadConfig(): AimuxConfig {
       return {
         version: 2,
         customCommands: parsed.customCommands ?? {},
-        workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot) ? parsed.workspaceSnapshot : undefined,
+        workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
+          ? parsed.workspaceSnapshot
+          : undefined,
       };
     }
   } catch {

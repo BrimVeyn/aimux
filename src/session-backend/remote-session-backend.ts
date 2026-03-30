@@ -3,13 +3,26 @@ import { Socket, connect } from "node:net";
 
 import { logDebug } from "../debug/input-log";
 import { getDaemonSocketPath } from "../daemon/runtime-paths";
-import { encodeMessage, MessageDecoder, type AttachResult, type ClientRequest, type ServerEvent, type ServerResponse } from "../ipc/protocol";
+import {
+  encodeMessage,
+  MessageDecoder,
+  type AttachResult,
+  type ClientRequest,
+  type ServerEvent,
+  type ServerResponse,
+} from "../ipc/protocol";
 import type { WorkspaceSnapshotV1 } from "../state/types";
 import type { SessionBackend, SessionBackendEvents } from "./types";
 
-export class RemoteSessionBackend extends EventEmitter<SessionBackendEvents> implements SessionBackend {
+export class RemoteSessionBackend
+  extends EventEmitter<SessionBackendEvents>
+  implements SessionBackend
+{
   private socket: Socket | null = null;
-  private readonly pending = new Map<string, { resolve: (message: ServerResponse) => void; reject: (error: Error) => void }>();
+  private readonly pending = new Map<
+    string,
+    { resolve: (message: ServerResponse) => void; reject: (error: Error) => void }
+  >();
   private decoder = new MessageDecoder<ServerResponse | ServerEvent>();
   private attached = false;
   private currentSessionId: string | null = null;
@@ -77,7 +90,12 @@ export class RemoteSessionBackend extends EventEmitter<SessionBackendEvents> imp
     logDebug("backend.remote.event", { type: message.type });
     switch (message.type) {
       case "tabRender":
-        this.emit("render", message.payload.tabId, message.payload.viewport, message.payload.terminalModes);
+        this.emit(
+          "render",
+          message.payload.tabId,
+          message.payload.viewport,
+          message.payload.terminalModes,
+        );
         break;
       case "tabExit":
         this.emit("exit", message.payload.tabId, message.payload.exitCode);
@@ -88,7 +106,12 @@ export class RemoteSessionBackend extends EventEmitter<SessionBackendEvents> imp
     }
   }
 
-  async attach(options: { sessionId: string; cols: number; rows: number; workspaceSnapshot?: WorkspaceSnapshotV1 }): Promise<AttachResult> {
+  async attach(options: {
+    sessionId: string;
+    cols: number;
+    rows: number;
+    workspaceSnapshot?: WorkspaceSnapshotV1;
+  }): Promise<AttachResult> {
     const socketPath = getDaemonSocketPath();
     logDebug("backend.remote.attach.start", {
       socketPath,
@@ -159,7 +182,9 @@ export class RemoteSessionBackend extends EventEmitter<SessionBackendEvents> imp
     if (response.type !== "attachResult") {
       logDebug("backend.remote.attach.unexpected", { type: response.type });
       this.resetConnection(`Unexpected attach response: ${response.type}`);
-      throw new Error(response.type === "error" ? response.payload.message : "Unexpected attach response");
+      throw new Error(
+        response.type === "error" ? response.payload.message : "Unexpected attach response",
+      );
     }
 
     this.attached = true;
@@ -208,7 +233,11 @@ export class RemoteSessionBackend extends EventEmitter<SessionBackendEvents> imp
       return;
     }
     this.ensureAttached();
-    logDebug("backend.remote.write", { sessionId: this.currentSessionId, tabId, inputLength: input.length });
+    logDebug("backend.remote.write", {
+      sessionId: this.currentSessionId,
+      tabId,
+      inputLength: input.length,
+    });
     void this.send({ id: crypto.randomUUID(), type: "write", payload: { tabId, data: input } });
   }
 

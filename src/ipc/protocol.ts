@@ -44,7 +44,10 @@ export type ServerResponse =
   | { id: string; type: "error"; payload: { message: string } };
 
 export type ServerEvent =
-  | { type: "tabRender"; payload: { tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState } }
+  | {
+      type: "tabRender";
+      payload: { tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState };
+    }
   | { type: "tabExit"; payload: { tabId: string; exitCode: number } }
   | { type: "tabError"; payload: { tabId: string; message: string } };
 

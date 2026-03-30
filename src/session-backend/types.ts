@@ -1,6 +1,11 @@
 import type { EventEmitter } from "node:events";
 
-import type { TabSession, TerminalModeState, TerminalSnapshot, WorkspaceSnapshotV1 } from "../state/types";
+import type {
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from "../state/types";
 
 export type SessionBackendEvents = {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState];

@@ -5,7 +5,10 @@ import { SessionManager } from "../daemon/session-manager";
 import type { WorkspaceSnapshotV1 } from "../state/types";
 import type { SessionBackend, SessionBackendEvents } from "./types";
 
-export class LocalSessionBackend extends EventEmitter<SessionBackendEvents> implements SessionBackend {
+export class LocalSessionBackend
+  extends EventEmitter<SessionBackendEvents>
+  implements SessionBackend
+{
   private readonly sessionManager = new SessionManager();
   private currentSessionId: string | null = null;
 
@@ -28,7 +31,12 @@ export class LocalSessionBackend extends EventEmitter<SessionBackendEvents> impl
     });
   }
 
-  async attach(options: { sessionId: string; cols: number; rows: number; workspaceSnapshot?: WorkspaceSnapshotV1 }) {
+  async attach(options: {
+    sessionId: string;
+    cols: number;
+    rows: number;
+    workspaceSnapshot?: WorkspaceSnapshotV1;
+  }) {
     logDebug("backend.local.attach", {
       sessionId: options.sessionId,
       cols: options.cols,
@@ -67,7 +75,11 @@ export class LocalSessionBackend extends EventEmitter<SessionBackendEvents> impl
       logDebug("backend.local.skipWriteWithoutSession", { tabId, inputLength: input.length });
       return;
     }
-    logDebug("backend.local.write", { sessionId: this.currentSessionId, tabId, inputLength: input.length });
+    logDebug("backend.local.write", {
+      sessionId: this.currentSessionId,
+      tabId,
+      inputLength: input.length,
+    });
     this.sessionManager.write(this.currentSessionId, tabId, input);
   }
 

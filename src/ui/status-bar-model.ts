@@ -38,7 +38,7 @@ function getNavigationHint(activeTab?: TabSession): string {
 export function getStatusBarModel(state: AppState, activeTab?: TabSession): StatusBarModel {
   const sidebar = state.sidebar.visible ? `${state.sidebar.width} cols` : "hidden";
   const sessionLabel = state.currentSessionId
-    ? state.sessions.find((session) => session.id === state.currentSessionId)?.name ?? "unknown"
+    ? (state.sessions.find((session) => session.id === state.currentSessionId)?.name ?? "unknown")
     : "no session";
 
   switch (state.focusMode) {

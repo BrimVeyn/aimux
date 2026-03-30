@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { encodeMessage, MessageDecoder, type ClientRequest, type IpcMessage } from "../../src/ipc/protocol";
+import {
+  encodeMessage,
+  MessageDecoder,
+  type ClientRequest,
+  type IpcMessage,
+} from "../../src/ipc/protocol";
 
 describe("ipc protocol framing", () => {
   test("round-trips messages with embedded newlines", () => {
@@ -47,7 +52,6 @@ describe("ipc protocol framing", () => {
 
   test("rejects malformed frame headers", () => {
     const decoder = new MessageDecoder<IpcMessage>();
-    expect(() => decoder.push("oops\n{}"))
-      .toThrow('Invalid IPC frame header: "oops"');
+    expect(() => decoder.push("oops\n{}")).toThrow('Invalid IPC frame header: "oops"');
   });
 });

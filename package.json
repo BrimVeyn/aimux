@@ -1,21 +1,19 @@
 {
   "name": "aimux",
-  "module": "src/index.tsx",
-  "type": "module",
   "private": true,
+  "type": "module",
+  "module": "src/index.tsx",
   "scripts": {
     "dev": "bun --watch src/index.tsx",
     "start": "bun run src/index.tsx",
     "test": "bun test",
     "check": "tsc --noEmit",
     "demo": "vhs assets/demo.tape",
-    "restart-daemon": "bun run src/index.tsx restart-daemon"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "@types/node": "^25.5.0",
-    "@types/react": "^19.2.14",
-    "typescript": "^6.0.2"
+    "restart-daemon": "bun run src/index.tsx restart-daemon",
+    "lint": "oxlint",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
+    "prepare": "lefthook install"
   },
   "dependencies": {
     "@opentui/core": "^0.1.90",
@@ -23,5 +21,14 @@
     "@xterm/headless": "^6.0.0",
     "bun-pty": "^0.4.8",
     "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "lefthook": "^2.1.4",
+    "oxfmt": "^0.42.0",
+    "oxlint": "^1.57.0",
+    "typescript": "^6.0.2"
   }
 }

@@ -3,7 +3,13 @@ import { createServer, type Socket } from "node:net";
 import { logDebug } from "../debug/input-log";
 import { getDaemonSocketPath, removeDaemonSocketIfExists } from "./runtime-paths";
 import { SessionManager } from "./session-manager";
-import { encodeMessage, MessageDecoder, type ClientRequest, type ServerEvent, type ServerResponse } from "../ipc/protocol";
+import {
+  encodeMessage,
+  MessageDecoder,
+  type ClientRequest,
+  type ServerEvent,
+  type ServerResponse,
+} from "../ipc/protocol";
 
 function send(socket: Socket, message: ServerResponse | ServerEvent): void {
   socket.write(encodeMessage(message));
@@ -57,8 +63,15 @@ export async function runDaemon(): Promise<void> {
             switch (message.type) {
               case "attach": {
                 attachedSessions.set(socket, message.payload.sessionId);
-                sessionManager.resize(message.payload.sessionId, message.payload.cols, message.payload.rows);
-                const attachResult = sessionManager.attachSession(message.payload.sessionId, message.payload.workspaceSnapshot);
+                sessionManager.resize(
+                  message.payload.sessionId,
+                  message.payload.cols,
+                  message.payload.rows,
+                );
+                const attachResult = sessionManager.attachSession(
+                  message.payload.sessionId,
+                  message.payload.workspaceSnapshot,
+                );
                 send(socket, { id: message.id, type: "attachResult", payload: attachResult });
                 break;
               }
@@ -73,21 +86,33 @@ export async function runDaemon(): Promise<void> {
                 if (!attachedSessions.get(socket)) {
                   throw new Error("No session attached");
                 }
-                sessionManager.write(attachedSessions.get(socket)!, message.payload.tabId, message.payload.data);
+                sessionManager.write(
+                  attachedSessions.get(socket)!,
+                  message.payload.tabId,
+                  message.payload.data,
+                );
                 send(socket, { id: message.id, type: "ok", payload: {} });
                 break;
               case "resizeClient":
                 if (!attachedSessions.get(socket)) {
                   throw new Error("No session attached");
                 }
-                sessionManager.resize(attachedSessions.get(socket)!, message.payload.cols, message.payload.rows);
+                sessionManager.resize(
+                  attachedSessions.get(socket)!,
+                  message.payload.cols,
+                  message.payload.rows,
+                );
                 send(socket, { id: message.id, type: "ok", payload: {} });
                 break;
               case "scroll":
                 if (!attachedSessions.get(socket)) {
                   throw new Error("No session attached");
                 }
-                sessionManager.scroll(attachedSessions.get(socket)!, message.payload.tabId, message.payload.deltaLines);
+                sessionManager.scroll(
+                  attachedSessions.get(socket)!,
+                  message.payload.tabId,
+                  message.payload.deltaLines,
+                );
                 send(socket, { id: message.id, type: "ok", payload: {} });
                 break;
               case "scrollToBottom":

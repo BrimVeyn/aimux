@@ -3,7 +3,12 @@ import { EventEmitter } from "node:events";
 import { logDebug } from "../debug/input-log";
 import { PtyManager } from "../pty/pty-manager";
 import { restoreTabsFromWorkspace } from "../state/session-persistence";
-import type { TabSession, TerminalModeState, TerminalSnapshot, WorkspaceSnapshotV1 } from "../state/types";
+import type {
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from "../state/types";
 
 type SessionRegistryEvents = {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState];
@@ -64,7 +69,10 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     });
   }
 
-  attachFromSnapshot(snapshot: WorkspaceSnapshotV1 | undefined): { tabs: TabSession[]; activeTabId: string | null } {
+  attachFromSnapshot(snapshot: WorkspaceSnapshotV1 | undefined): {
+    tabs: TabSession[];
+    activeTabId: string | null;
+  } {
     logDebug("daemon.registry.attach", {
       hasSnapshot: !!snapshot,
       existingTabs: this.tabs.size,

@@ -53,7 +53,12 @@ export function RootView({
         />
       ) : null}
       {state.modal.type === "session-picker" ? (
-        <SessionPickerModal sessions={state.sessions} selectedIndex={state.modal.selectedIndex} currentSessionId={state.currentSessionId} currentTabCount={state.tabs.length} />
+        <SessionPickerModal
+          sessions={state.sessions}
+          selectedIndex={state.modal.selectedIndex}
+          currentSessionId={state.currentSessionId}
+          currentTabCount={state.tabs.length}
+        />
       ) : null}
       {state.modal.type === "session-name" ? (
         <SessionNameModal

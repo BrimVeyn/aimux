@@ -10,7 +10,8 @@ function setup(overrides?: {
   bracketedPasteModeEnabled?: boolean;
 }) {
   const focusMode = overrides?.focusMode ?? "terminal-input";
-  const activeTabId: string | null = overrides && "activeTabId" in overrides ? (overrides.activeTabId ?? null) : "tab-1";
+  const activeTabId: string | null =
+    overrides && "activeTabId" in overrides ? (overrides.activeTabId ?? null) : "tab-1";
   const bracketedPasteModeEnabled = overrides?.bracketedPasteModeEnabled ?? false;
   const writeToPty = mock((_tabId: string, _data: string) => {});
   const leaveTerminalInput = mock(() => {});

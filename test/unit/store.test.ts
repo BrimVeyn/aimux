@@ -2,13 +2,15 @@ import { describe, expect, test } from "bun:test";
 
 import { appReducer, createInitialState } from "../../src/state/store";
 
-function createTab(overrides: Partial<ReturnType<typeof createInitialState>["tabs"][number]> & {
-  id: string;
-  assistant: "claude" | "codex" | "opencode";
-  title: string;
-  status: "starting" | "running" | "exited" | "error";
-  command: string;
-}) {
+function createTab(
+  overrides: Partial<ReturnType<typeof createInitialState>["tabs"][number]> & {
+    id: string;
+    assistant: "claude" | "codex" | "opencode";
+    title: string;
+    status: "starting" | "running" | "exited" | "error";
+    command: string;
+  },
+) {
   return {
     buffer: "",
     terminalModes: {
@@ -66,10 +68,15 @@ describe("appReducer", () => {
         },
       ]),
       focusMode: "modal" as const,
-      modal: { type: "session-picker" as const, selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+      modal: {
+        type: "session-picker" as const,
+        selectedIndex: 0,
+        editBuffer: null,
+        sessionTargetId: null,
+      },
     };
 
-    const next = appReducer(initial, { type: "load-session", sessionId: "session-1", tabs: [], activeTabId: "tab-1" });
+    const next = appReducer(initial, { type: "load-session", sessionId: "session-1" });
     expect(next.currentSessionId).toBe("session-1");
     expect(next.activeTabId).toBe("tab-1");
     expect(next.tabs[0]?.status).toBe("disconnected");
@@ -88,7 +95,15 @@ describe("appReducer", () => {
         },
       ]),
       currentSessionId: "session-1",
-      tabs: [createTab({ id: "tab-1", assistant: "claude", title: "Claude", status: "running", command: "claude" })],
+      tabs: [
+        createTab({
+          id: "tab-1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+      ],
       activeTabId: "tab-1",
     };
 
@@ -133,8 +148,20 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
       ],
       activeTabId: "1",
     };
@@ -147,9 +174,27 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
-        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
+        createTab({
+          id: "3",
+          assistant: "opencode",
+          title: "OpenCode",
+          status: "running",
+          command: "opencode",
+        }),
       ],
       activeTabId: "3",
     };
@@ -162,9 +207,27 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
-        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
+        createTab({
+          id: "3",
+          assistant: "opencode",
+          title: "OpenCode",
+          status: "running",
+          command: "opencode",
+        }),
       ],
       activeTabId: "1",
     };
@@ -177,7 +240,13 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
       ],
       activeTabId: "1",
     };
@@ -190,9 +259,27 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
-        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
+        createTab({
+          id: "3",
+          assistant: "opencode",
+          title: "OpenCode",
+          status: "running",
+          command: "opencode",
+        }),
       ],
       activeTabId: "2",
     };
@@ -206,7 +293,13 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
       ],
       activeTabId: "1",
       focusMode: "terminal-input" as const,
@@ -222,8 +315,20 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
       ],
       activeTabId: "1",
     };
@@ -237,7 +342,13 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
       ],
       activeTabId: "1",
     };
@@ -250,7 +361,13 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
       ],
       activeTabId: "1",
     };
@@ -266,9 +383,27 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
-        createTab({ id: "3", assistant: "opencode", title: "OpenCode", status: "running", command: "opencode" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
+        createTab({
+          id: "3",
+          assistant: "opencode",
+          title: "OpenCode",
+          status: "running",
+          command: "opencode",
+        }),
       ],
       activeTabId: "2",
     };
@@ -282,8 +417,20 @@ describe("appReducer", () => {
     const initial = {
       ...createInitialState(),
       tabs: [
-        createTab({ id: "1", assistant: "claude", title: "Claude", status: "running", command: "claude" }),
-        createTab({ id: "2", assistant: "codex", title: "Codex", status: "running", command: "codex" }),
+        createTab({
+          id: "1",
+          assistant: "claude",
+          title: "Claude",
+          status: "running",
+          command: "claude",
+        }),
+        createTab({
+          id: "2",
+          assistant: "codex",
+          title: "Codex",
+          status: "running",
+          command: "codex",
+        }),
       ],
       activeTabId: "1",
     };

@@ -8,7 +8,10 @@ import { RemoteSessionBackend } from "./remote-session-backend";
 import type { SessionBackend } from "./types";
 
 async function spawnDaemon(): Promise<void> {
-  logDebug("backend.spawnDaemon.start", { socketPath: getDaemonSocketPath(), execPath: process.execPath });
+  logDebug("backend.spawnDaemon.start", {
+    socketPath: getDaemonSocketPath(),
+    execPath: process.execPath,
+  });
   Bun.spawn([process.execPath, "run", "src/index.tsx", "daemon"], {
     stdout: "ignore",
     stderr: "ignore",

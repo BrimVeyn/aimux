@@ -24,7 +24,9 @@ if (command === "daemon") {
 }
 
 if (command === "--help" || command === "-h") {
-  console.log(`aimux\n\nUsage:\n  bun run src/index.tsx\n  bun run src/index.tsx doctor\n  bun run src/index.tsx restart-daemon\n`);
+  console.log(
+    `aimux\n\nUsage:\n  bun run src/index.tsx\n  bun run src/index.tsx doctor\n  bun run src/index.tsx restart-daemon\n`,
+  );
   process.exit(0);
 }
 

@@ -8,7 +8,12 @@ import { encodeMouseEventForPty } from "./input/mouse-forwarding";
 import { buildPtyPastePayload } from "./input/paste";
 import { createRawInputHandler, type TerminalContentOrigin } from "./input/raw-input-handler";
 import { loadConfig, saveConfig } from "./config";
-import { ASSISTANT_OPTIONS, getAssistantOption, isCommandAvailable, parseCommand } from "./pty/command-registry";
+import {
+  ASSISTANT_OPTIONS,
+  getAssistantOption,
+  isCommandAvailable,
+  parseCommand,
+} from "./pty/command-registry";
 import type { SessionBackend } from "./session-backend/types";
 import { loadSessionCatalog, saveSessionCatalog } from "./state/session-catalog";
 import { createEmptyWorkspaceSnapshot, serializeWorkspace } from "./state/session-persistence";
@@ -108,7 +113,8 @@ export function App({ backend }: { backend: SessionBackend }) {
     [state.currentSessionId, state.sessions],
   );
   const activeMouseForwardingEnabled = activeTab?.terminalModes.mouseTrackingMode !== "none";
-  const activeLocalScrollbackEnabled = !!activeTab && !activeMouseForwardingEnabled && !activeTab.terminalModes.isAlternateBuffer;
+  const activeLocalScrollbackEnabled =
+    !!activeTab && !activeMouseForwardingEnabled && !activeTab.terminalModes.isAlternateBuffer;
 
   const focusModeRef = useRef(state.focusMode);
   focusModeRef.current = state.focusMode;
@@ -126,7 +132,8 @@ export function App({ backend }: { backend: SessionBackend }) {
       getActiveTabId: () => activeTabIdRef.current,
       getContentOrigin: () => contentOriginRef.current,
       getMousePassthroughEnabled: () => activeTabRef.current !== undefined,
-      getBracketedPasteModeEnabled: () => activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
+      getBracketedPasteModeEnabled: () =>
+        activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       writeToPty: (tabId, data) => {
         const viewport = activeTabRef.current?.viewport;
         if (viewport && viewport.viewportY < viewport.baseY) {
@@ -134,8 +141,7 @@ export function App({ backend }: { backend: SessionBackend }) {
         }
         backend.write(tabId, data);
       },
-      leaveTerminalInput: () =>
-        dispatch({ type: "set-focus-mode", focusMode: "navigation" }),
+      leaveTerminalInput: () => dispatch({ type: "set-focus-mode", focusMode: "navigation" }),
       toggleSidebar: () => dispatch({ type: "toggle-sidebar" }),
     });
 
@@ -211,7 +217,11 @@ export function App({ backend }: { backend: SessionBackend }) {
   }, [state.activeTabId, state.focusMode]);
 
   const handleTerminalMouseEvent = (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
-    if (state.focusMode !== "terminal-input" || !state.activeTabId || !activeMouseForwardingEnabled) {
+    if (
+      state.focusMode !== "terminal-input" ||
+      !state.activeTabId ||
+      !activeMouseForwardingEnabled
+    ) {
       return;
     }
 
@@ -220,7 +230,7 @@ export function App({ backend }: { backend: SessionBackend }) {
       return;
     }
 
-      backend.write(state.activeTabId, sequence);
+    backend.write(state.activeTabId, sequence);
   };
 
   const handleTerminalScrollEvent = (event: OtuiMouseEvent) => {
@@ -287,36 +297,51 @@ export function App({ backend }: { backend: SessionBackend }) {
     attachRequestIdRef.current = attachRequestId;
     let cancelled = false;
 
-    void backend.attach({
-      sessionId: currentSessionId,
-      cols: state.layout.terminalCols,
-      rows: state.layout.terminalRows,
-      workspaceSnapshot: currentSession?.workspaceSnapshot,
-    }).then((result) => {
-      if (cancelled || attachRequestIdRef.current !== attachRequestId) {
-        return;
-      }
-      logInputDebug("app.backend.attachResult", {
-        hasResult: !!result,
-        tabs: result?.tabs.length ?? 0,
-        activeTabId: result?.activeTabId ?? null,
+    void backend
+      .attach({
+        sessionId: currentSessionId,
+        cols: state.layout.terminalCols,
+        rows: state.layout.terminalRows,
+        workspaceSnapshot: currentSession?.workspaceSnapshot,
+      })
+      .then((result) => {
+        if (cancelled || attachRequestIdRef.current !== attachRequestId) {
+          return;
+        }
+        logInputDebug("app.backend.attachResult", {
+          hasResult: !!result,
+          tabs: result?.tabs.length ?? 0,
+          activeTabId: result?.activeTabId ?? null,
+        });
+        if (result) {
+          dispatch({
+            type: "hydrate-workspace",
+            tabs: result.tabs,
+            activeTabId: result.activeTabId,
+          });
+        } else if (currentSession?.workspaceSnapshot) {
+          dispatch({
+            type: "load-session",
+            sessionId: currentSessionId,
+            workspaceSnapshot: currentSession.workspaceSnapshot,
+          });
+        }
+      })
+      .catch((error) => {
+        if (cancelled || attachRequestIdRef.current !== attachRequestId) {
+          return;
+        }
+        logInputDebug("app.backend.attachError", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        if (currentSession?.workspaceSnapshot) {
+          dispatch({
+            type: "load-session",
+            sessionId: currentSessionId,
+            workspaceSnapshot: currentSession.workspaceSnapshot,
+          });
+        }
       });
-      if (result) {
-        dispatch({ type: "hydrate-workspace", tabs: result.tabs, activeTabId: result.activeTabId });
-      } else if (currentSession?.workspaceSnapshot) {
-        dispatch({ type: "load-session", sessionId: currentSessionId, tabs: [], activeTabId: currentSession.workspaceSnapshot.activeTabId });
-      }
-    }).catch((error) => {
-      if (cancelled || attachRequestIdRef.current !== attachRequestId) {
-        return;
-      }
-      logInputDebug("app.backend.attachError", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      if (currentSession?.workspaceSnapshot) {
-        dispatch({ type: "load-session", sessionId: currentSessionId, tabs: [], activeTabId: currentSession.workspaceSnapshot.activeTabId });
-      }
-    });
 
     return () => {
       cancelled = true;
@@ -368,7 +393,11 @@ export function App({ backend }: { backend: SessionBackend }) {
     workspaceSaveTimeoutRef.current = setTimeout(() => {
       const sessionsToSave = state.sessions.map((session) =>
         session.id === state.currentSessionId
-          ? { ...session, updatedAt: new Date().toISOString(), workspaceSnapshot: serializeWorkspace(state) }
+          ? {
+              ...session,
+              updatedAt: new Date().toISOString(),
+              workspaceSnapshot: serializeWorkspace(state),
+            }
           : session,
       );
       saveConfig({
@@ -445,7 +474,10 @@ export function App({ backend }: { backend: SessionBackend }) {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 3 : 0;
     const reservedRows =
       MAIN_AREA_VERTICAL_PADDING + STATUS_BAR_HEIGHT + TERMINAL_PANE_VERTICAL_CHROME;
-    const cols = Math.max(MIN_TERMINAL_COLS, Math.floor(dimensions.width - sidebarWidth - MAIN_AREA_HORIZONTAL_CHROME));
+    const cols = Math.max(
+      MIN_TERMINAL_COLS,
+      Math.floor(dimensions.width - sidebarWidth - MAIN_AREA_HORIZONTAL_CHROME),
+    );
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows));
 
     // Terminal content origin in 0-based screen cells.
@@ -500,9 +532,10 @@ export function App({ backend }: { backend: SessionBackend }) {
 
   function createSessionFromCurrent(name: string): void {
     const now = new Date().toISOString();
-    const workspaceSnapshot = state.currentSessionId || state.tabs.length === 0
-      ? createEmptyWorkspaceSnapshot()
-      : serializeWorkspace(state);
+    const workspaceSnapshot =
+      state.currentSessionId || state.tabs.length === 0
+        ? createEmptyWorkspaceSnapshot()
+        : serializeWorkspace(state);
     const session: SessionRecord = {
       id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name,
@@ -511,7 +544,16 @@ export function App({ backend }: { backend: SessionBackend }) {
       lastOpenedAt: now,
       workspaceSnapshot,
     };
-    const sessions = [...state.sessions, session];
+    let updatedSessions = state.sessions;
+    if (state.currentSessionId) {
+      const currentSnapshot = serializeWorkspace(state);
+      updatedSessions = state.sessions.map((s) =>
+        s.id === state.currentSessionId
+          ? { ...s, updatedAt: now, workspaceSnapshot: currentSnapshot }
+          : s,
+      );
+    }
+    const sessions = [...updatedSessions, session];
     logInputDebug("app.session.create", {
       sessionId: session.id,
       name,
@@ -519,14 +561,20 @@ export function App({ backend }: { backend: SessionBackend }) {
       tabCount: workspaceSnapshot.tabs.length,
     });
     saveSessionCatalog(sessions);
-    dispatch({ type: "create-session-record", session });
-    dispatch({ type: "load-session", sessionId: session.id, tabs: [], activeTabId: session.workspaceSnapshot?.activeTabId ?? null });
+    dispatch({ type: "set-sessions", sessions });
+    dispatch({
+      type: "load-session",
+      sessionId: session.id,
+      workspaceSnapshot: session.workspaceSnapshot,
+    });
   }
 
   function renameSession(sessionId: string, name: string): void {
     logInputDebug("app.session.rename", { sessionId, name });
     const sessions = state.sessions.map((session) =>
-      session.id === sessionId ? { ...session, name, updatedAt: new Date().toISOString() } : session,
+      session.id === sessionId
+        ? { ...session, name, updatedAt: new Date().toISOString() }
+        : session,
     );
     saveSessionCatalog(sessions);
     dispatch({ type: "rename-session-record", sessionId, name });
@@ -543,7 +591,11 @@ export function App({ backend }: { backend: SessionBackend }) {
     const currentSnapshot = state.currentSessionId ? serializeWorkspace(state) : undefined;
     const sessions = state.sessions.map((entry) => {
       if (entry.id === state.currentSessionId && currentSnapshot) {
-        return { ...entry, updatedAt: new Date().toISOString(), workspaceSnapshot: currentSnapshot };
+        return {
+          ...entry,
+          updatedAt: new Date().toISOString(),
+          workspaceSnapshot: currentSnapshot,
+        };
       }
       if (entry.id === session.id) {
         return { ...entry, lastOpenedAt: new Date().toISOString() };
@@ -553,10 +605,13 @@ export function App({ backend }: { backend: SessionBackend }) {
     saveSessionCatalog(sessions);
     void backend.destroy(true);
     dispatch({ type: "set-sessions", sessions });
-    dispatch({ type: "load-session", sessionId: session.id, tabs: [], activeTabId: session.workspaceSnapshot?.activeTabId ?? null });
+    dispatch({
+      type: "load-session",
+      sessionId: session.id,
+      workspaceSnapshot: session.workspaceSnapshot,
+    });
     logInputDebug("app.session.switch.dispatched", {
       toSessionId: session.id,
-      activeTabId: session.workspaceSnapshot?.activeTabId ?? null,
     });
   }
 
@@ -612,7 +667,11 @@ export function App({ backend }: { backend: SessionBackend }) {
         saveSessionCatalog(
           state.sessions.map((session) =>
             session.id === state.currentSessionId
-              ? { ...session, updatedAt: new Date().toISOString(), workspaceSnapshot: serializeWorkspace(state) }
+              ? {
+                  ...session,
+                  updatedAt: new Date().toISOString(),
+                  workspaceSnapshot: serializeWorkspace(state),
+                }
               : session,
           ),
         );

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { createTestRenderer } from "@opentui/core/testing";
 import { createRoot, useTerminalDimensions } from "@opentui/react";
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, test } from "bun:test";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { encodeMouseEventForPty } from "../../src/input/mouse-forwarding";
@@ -48,10 +48,10 @@ function createMouseFixtureCommand(): string {
     commandPath,
     [
       "#!/usr/bin/env bun",
-      'const decoder = new TextDecoder();',
+      "const decoder = new TextDecoder();",
       'process.stdout.write("READY\\r\\n");',
-      'for await (const chunk of Bun.stdin.stream()) {',
-      '  process.stdout.write(`INPUT:${JSON.stringify(decoder.decode(chunk))}\\r\\n`);',
+      "for await (const chunk of Bun.stdin.stream()) {",
+      "  process.stdout.write(`INPUT:${JSON.stringify(decoder.decode(chunk))}\\r\\n`);",
       "}",
       "",
     ].join("\n"),
@@ -68,9 +68,9 @@ function createScrollbackFixtureCommand(): string {
     [
       "#!/usr/bin/env bun",
       "for (let i = 1; i <= 40; i += 1) {",
-      '  process.stdout.write(`line-${i}\\r\\n`);',
+      "  process.stdout.write(`line-${i}\\r\\n`);",
       "}",
-      'setInterval(() => {}, 1000);',
+      "setInterval(() => {}, 1000);",
       "",
     ].join("\n"),
   );
@@ -135,7 +135,11 @@ function MouseHarness({
   };
 
   useEffect(() => {
-    const handleRender = (tabId: string, nextViewport: TerminalSnapshot, nextModes: TerminalModeState) => {
+    const handleRender = (
+      tabId: string,
+      nextViewport: TerminalSnapshot,
+      nextModes: TerminalModeState,
+    ) => {
       if (tabId !== TEST_TAB_ID) {
         return;
       }
@@ -284,8 +288,10 @@ describe("mouse passthrough integration", () => {
       app.renderOnce,
       () => {
         const frame = app.captureCharFrame();
-        return frame.includes(`[<0;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}M`)
-          && frame.includes(`[<3;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`);
+        return (
+          frame.includes(`[<0;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}M`) &&
+          frame.includes(`[<3;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`)
+        );
       },
       app.captureCharFrame,
     );

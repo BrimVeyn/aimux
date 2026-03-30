@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { serializeWorkspace, restoreTabsFromWorkspace, restoreWorkspaceState } from "../../src/state/session-persistence";
+import {
+  serializeWorkspace,
+  restoreTabsFromWorkspace,
+  restoreWorkspaceState,
+} from "../../src/state/session-persistence";
 import { createInitialState } from "../../src/state/store";
 
 describe("session persistence", () => {

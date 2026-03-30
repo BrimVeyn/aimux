@@ -5,7 +5,12 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { getDaemonSocketPath } from "../../src/daemon/runtime-paths";
-import { encodeMessage, MessageDecoder, type ClientRequest, type ServerResponse } from "../../src/ipc/protocol";
+import {
+  encodeMessage,
+  MessageDecoder,
+  type ClientRequest,
+  type ServerResponse,
+} from "../../src/ipc/protocol";
 import { RemoteSessionBackend } from "../../src/session-backend/remote-session-backend";
 
 function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_000): Promise<T> {
@@ -62,9 +67,10 @@ describe("RemoteSessionBackend", () => {
         for (const message of decoder.push(chunk)) {
           requests.push(message);
 
-          const response: ServerResponse = message.type === "attach"
-            ? { id: message.id, type: "attachResult", payload: { tabs: [], activeTabId: null } }
-            : { id: message.id, type: "ok", payload: {} };
+          const response: ServerResponse =
+            message.type === "attach"
+              ? { id: message.id, type: "attachResult", payload: { tabs: [], activeTabId: null } }
+              : { id: message.id, type: "ok", payload: {} };
           socket.write(encodeMessage(response));
         }
       });

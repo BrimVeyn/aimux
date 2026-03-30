@@ -28,22 +28,34 @@ const SECTIONS = [
   },
   {
     title: "Terminal Input",
-    bindings: [
-      ["Ctrl+z", "Back to navigation"],
-    ],
+    bindings: [["Ctrl+z", "Back to navigation"]],
   },
   {
     title: "General",
-    bindings: [
-      ["Ctrl+c", "Quit"],
-    ],
+    bindings: [["Ctrl+c", "Quit"]],
   },
 ] as const;
 
 export function HelpModal() {
   return (
-    <box position="absolute" top={0} left={0} width="100%" height="100%" justifyContent="center" alignItems="center">
-      <box width={50} border borderColor={theme.borderActive} padding={1} backgroundColor={theme.panel} flexDirection="column" gap={1}>
+    <box
+      position="absolute"
+      top={0}
+      left={0}
+      width="100%"
+      height="100%"
+      justifyContent="center"
+      alignItems="center"
+    >
+      <box
+        width={50}
+        border
+        borderColor={theme.borderActive}
+        padding={1}
+        backgroundColor={theme.panel}
+        flexDirection="column"
+        gap={1}
+      >
         <text fg={theme.accent}>Keybindings</text>
         {SECTIONS.map((section) => (
           <box key={section.title} flexDirection="column">

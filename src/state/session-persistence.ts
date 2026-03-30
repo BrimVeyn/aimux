@@ -73,7 +73,7 @@ export function restoreWorkspaceState(
   const activeTabId =
     workspaceSnapshot?.activeTabId && tabs.some((tab) => tab.id === workspaceSnapshot.activeTabId)
       ? workspaceSnapshot.activeTabId
-      : tabs[0]?.id ?? null;
+      : (tabs[0]?.id ?? null);
 
   return {
     tabs,

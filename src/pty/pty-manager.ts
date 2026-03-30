@@ -85,12 +85,12 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode);
     const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot);
     const modesChanged =
-      !session.lastTerminalModes
-      || session.lastTerminalModes.mouseTrackingMode !== nextTerminalModes.mouseTrackingMode
-      || session.lastTerminalModes.sendFocusMode !== nextTerminalModes.sendFocusMode
-      || session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode
-      || session.lastTerminalModes.isAlternateBuffer !== nextTerminalModes.isAlternateBuffer
-      || session.lastTerminalModes.bracketedPasteMode !== nextTerminalModes.bracketedPasteMode;
+      !session.lastTerminalModes ||
+      session.lastTerminalModes.mouseTrackingMode !== nextTerminalModes.mouseTrackingMode ||
+      session.lastTerminalModes.sendFocusMode !== nextTerminalModes.sendFocusMode ||
+      session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode ||
+      session.lastTerminalModes.isAlternateBuffer !== nextTerminalModes.isAlternateBuffer ||
+      session.lastTerminalModes.bracketedPasteMode !== nextTerminalModes.bracketedPasteMode;
 
     if (!snapshotChanged && !modesChanged) {
       return;

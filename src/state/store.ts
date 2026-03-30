@@ -5,10 +5,16 @@ import type { AppAction, AppState, SessionRecord, TabSession } from "./types";
 const MAX_BUFFER_LENGTH = 50_000;
 
 function clampBuffer(buffer: string): string {
-  return buffer.length <= MAX_BUFFER_LENGTH ? buffer : buffer.slice(buffer.length - MAX_BUFFER_LENGTH);
+  return buffer.length <= MAX_BUFFER_LENGTH
+    ? buffer
+    : buffer.slice(buffer.length - MAX_BUFFER_LENGTH);
 }
 
-function updateTab(tabs: TabSession[], tabId: string, updater: (tab: TabSession) => TabSession): TabSession[] {
+function updateTab(
+  tabs: TabSession[],
+  tabId: string,
+  updater: (tab: TabSession) => TabSession,
+): TabSession[] {
   return tabs.map((tab) => (tab.id === tabId ? updater(tab) : tab));
 }
 
@@ -29,8 +35,8 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
   const tabs = state.tabs.filter((_, index) => index !== indexToClose);
   const nextActiveTab =
     state.activeTabId === closingTabId
-      ? tabs[indexToClose] ?? tabs[indexToClose - 1] ?? null
-      : tabs.find((tab) => tab.id === state.activeTabId) ?? null;
+      ? (tabs[indexToClose] ?? tabs[indexToClose - 1] ?? null)
+      : (tabs.find((tab) => tab.id === state.activeTabId) ?? null);
 
   return {
     ...state,
@@ -66,7 +72,9 @@ export function createInitialState(
       minWidth: 18,
       maxWidth: 42,
     },
-    modal: showSessionPicker ? { type: "session-picker", selectedIndex: 0, editBuffer: null, sessionTargetId: null } : emptyModal(),
+    modal: showSessionPicker
+      ? { type: "session-picker", selectedIndex: 0, editBuffer: null, sessionTargetId: null }
+      : emptyModal(),
     layout: {
       terminalCols: 80,
       terminalRows: 24,
@@ -97,7 +105,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         focusMode: "modal",
-        modal: { type: "session-picker", selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+        modal: {
+          type: "session-picker",
+          selectedIndex: 0,
+          editBuffer: null,
+          sessionTargetId: null,
+        },
       };
     case "open-session-name-modal":
       return {
@@ -116,7 +129,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       if (state.modal.type !== "new-tab" && state.modal.type !== "session-picker") {
         return state;
       }
-      const optionCount = state.modal.type === "new-tab" ? 3 : Math.max(1, state.sessions.length + 1);
+      const optionCount =
+        state.modal.type === "new-tab" ? 3 : Math.max(1, state.sessions.length + 1);
       return {
         ...state,
         modal: {
@@ -134,16 +148,27 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         modal: emptyModal(),
       };
     case "hydrate-workspace":
-      return { ...state, tabs: action.tabs, activeTabId: action.activeTabId, focusMode: "navigation" };
-    case "load-session": {
-      const session = state.sessions.find((entry) => entry.id === action.sessionId);
       return {
         ...state,
-        ...restoreWorkspaceState(state, session?.workspaceSnapshot),
+        tabs: action.tabs,
+        activeTabId: action.activeTabId,
+        focusMode: "navigation",
+      };
+    case "load-session": {
+      const snapshot =
+        action.workspaceSnapshot ??
+        state.sessions.find((entry) => entry.id === action.sessionId)?.workspaceSnapshot;
+      return {
+        ...state,
+        ...restoreWorkspaceState(state, snapshot),
         currentSessionId: action.sessionId,
         sessions: state.sessions.map((entry) =>
           entry.id === action.sessionId
-            ? { ...entry, lastOpenedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            ? {
+                ...entry,
+                lastOpenedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }
             : entry,
         ),
         focusMode: "navigation",
@@ -164,10 +189,17 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         sessions: state.sessions.map((session) =>
-          session.id === action.sessionId ? { ...session, name: action.name, updatedAt: new Date().toISOString() } : session,
+          session.id === action.sessionId
+            ? { ...session, name: action.name, updatedAt: new Date().toISOString() }
+            : session,
         ),
         focusMode: "modal",
-        modal: { type: "session-picker", selectedIndex: state.modal.selectedIndex, editBuffer: null, sessionTargetId: null },
+        modal: {
+          type: "session-picker",
+          selectedIndex: state.modal.selectedIndex,
+          editBuffer: null,
+          sessionTargetId: null,
+        },
       };
     case "delete-session-record": {
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId);
@@ -176,17 +208,26 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         sessions: newSessions,
-        currentSessionId: action.sessionId === state.currentSessionId ? null : state.currentSessionId,
+        currentSessionId:
+          action.sessionId === state.currentSessionId ? null : state.currentSessionId,
         tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
         activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
         focusMode: "modal",
-        modal: { type: "session-picker", selectedIndex: clampedIndex, editBuffer: null, sessionTargetId: null },
+        modal: {
+          type: "session-picker",
+          selectedIndex: clampedIndex,
+          editBuffer: null,
+          sessionTargetId: null,
+        },
       };
     }
     case "modal-delete-selected-session":
       return state;
     case "close-tab":
-      return closeTabAtIndex(state, state.tabs.findIndex((tab) => tab.id === action.tabId));
+      return closeTabAtIndex(
+        state,
+        state.tabs.findIndex((tab) => tab.id === action.tabId),
+      );
     case "close-active-tab":
       return closeTabAtIndex(state, getActiveIndex(state));
     case "set-active-tab":
@@ -199,7 +240,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const safeIndex = currentIndex === -1 ? 0 : currentIndex;
       const nextIndex = (safeIndex + action.delta + state.tabs.length) % state.tabs.length;
       const nextTabId = state.tabs[nextIndex]?.id;
-      return !nextTabId || nextTabId === state.activeTabId ? state : { ...state, activeTabId: nextTabId };
+      return !nextTabId || nextTabId === state.activeTabId
+        ? state
+        : { ...state, activeTabId: nextTabId };
     }
     case "reorder-active-tab": {
       const activeIndex = getActiveIndex(state);
@@ -245,7 +288,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "toggle-sidebar":
       return { ...state, sidebar: { ...state.sidebar, visible: !state.sidebar.visible } };
     case "resize-sidebar": {
-      const width = Math.min(state.sidebar.maxWidth, Math.max(state.sidebar.minWidth, state.sidebar.width + action.delta));
+      const width = Math.min(
+        state.sidebar.maxWidth,
+        Math.max(state.sidebar.minWidth, state.sidebar.width + action.delta),
+      );
       return { ...state, sidebar: { ...state.sidebar, width } };
     }
     case "set-focus-mode":
@@ -270,7 +316,10 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         })),
       };
     case "set-tab-activity":
-      return { ...state, tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, activity: action.activity })) };
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, activity: action.activity })),
+      };
     case "set-tab-status":
       return {
         ...state,
@@ -303,14 +352,22 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       }
       const option = ASSISTANT_OPTIONS[state.modal.selectedIndex];
       const assistantId = option?.id;
-      const currentCmd = (assistantId && state.customCommands[assistantId]) ?? option?.command ?? "";
-      return { ...state, focusMode: "command-edit", modal: { ...state.modal, editBuffer: currentCmd } };
+      const currentCmd =
+        (assistantId && state.customCommands[assistantId]) ?? option?.command ?? "";
+      return {
+        ...state,
+        focusMode: "command-edit",
+        modal: { ...state.modal, editBuffer: currentCmd },
+      };
     }
     case "update-command-edit": {
       if (state.modal.editBuffer === null) {
         return state;
       }
-      const buf = action.char === "\b" ? state.modal.editBuffer.slice(0, -1) : state.modal.editBuffer + action.char;
+      const buf =
+        action.char === "\b"
+          ? state.modal.editBuffer.slice(0, -1)
+          : state.modal.editBuffer + action.char;
       return { ...state, modal: { ...state.modal, editBuffer: buf } };
     }
     case "commit-command-edit": {
@@ -335,7 +392,12 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       } else {
         delete newCustomCommands[assistantId];
       }
-      return { ...state, focusMode: "modal", customCommands: newCustomCommands, modal: { ...state.modal, editBuffer: null } };
+      return {
+        ...state,
+        focusMode: "modal",
+        customCommands: newCustomCommands,
+        modal: { ...state.modal, editBuffer: null },
+      };
     }
     case "cancel-command-edit":
       return { ...state, focusMode: "modal", modal: { ...state.modal, editBuffer: null } };

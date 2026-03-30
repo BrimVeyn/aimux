@@ -36,7 +36,9 @@ export function buildDoctorReport(): DoctorReport {
   checks.push({
     name: "config",
     ok: true,
-    details: existsSync(CONFIG_PATH) ? `loaded ${CONFIG_PATH}` : `using defaults (${CONFIG_PATH} not found)`,
+    details: existsSync(CONFIG_PATH)
+      ? `loaded ${CONFIG_PATH}`
+      : `using defaults (${CONFIG_PATH} not found)`,
   });
 
   for (const option of ASSISTANT_OPTIONS) {
@@ -45,9 +47,10 @@ export function buildDoctorReport(): DoctorReport {
     checks.push({
       name: `assistant:${option.id}`,
       ok: executable.length > 0 && isCommandAvailable(executable),
-      details: executable.length === 0
-        ? "empty command"
-        : `${configuredCommand}${args.length > 0 ? ` (${args.length} args)` : ""}`,
+      details:
+        executable.length === 0
+          ? "empty command"
+          : `${configuredCommand}${args.length > 0 ? ` (${args.length} args)` : ""}`,
     });
   }
 

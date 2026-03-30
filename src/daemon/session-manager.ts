@@ -6,7 +6,12 @@ import { SessionRegistry } from "./session-registry";
 import type { TerminalModeState, TerminalSnapshot } from "../state/types";
 
 type SessionManagerEvents = {
-  render: [sessionId: string, tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState];
+  render: [
+    sessionId: string,
+    tabId: string,
+    viewport: TerminalSnapshot,
+    terminalModes: TerminalModeState,
+  ];
   exit: [sessionId: string, tabId: string, exitCode: number];
   error: [sessionId: string, tabId: string, message: string];
 };
@@ -86,7 +91,10 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
   }
 
   disposeSession(sessionId: string): void {
-    logDebug("daemon.sessionManager.disposeSession", { sessionId, hadRegistry: this.registries.has(sessionId) });
+    logDebug("daemon.sessionManager.disposeSession", {
+      sessionId,
+      hadRegistry: this.registries.has(sessionId),
+    });
     const registry = this.registries.get(sessionId);
     if (!registry) {
       return;

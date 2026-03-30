@@ -2,7 +2,10 @@ import { MouseButton, type MouseEvent } from "@opentui/core";
 
 import type { TerminalContentOrigin } from "./raw-input-handler";
 
-function clampPtyCoordinates(event: MouseEvent, origin: TerminalContentOrigin): { x: number; y: number } | null {
+function clampPtyCoordinates(
+  event: MouseEvent,
+  origin: TerminalContentOrigin,
+): { x: number; y: number } | null {
   const x = event.x + 1 - origin.x;
   const y = event.y + 1 - origin.y;
 
@@ -14,9 +17,11 @@ function clampPtyCoordinates(event: MouseEvent, origin: TerminalContentOrigin): 
 }
 
 function getModifierBits(event: MouseEvent): number {
-  return (event.modifiers.shift ? 4 : 0)
-    | (event.modifiers.alt ? 8 : 0)
-    | (event.modifiers.ctrl ? 16 : 0);
+  return (
+    (event.modifiers.shift ? 4 : 0) |
+    (event.modifiers.alt ? 8 : 0) |
+    (event.modifiers.ctrl ? 16 : 0)
+  );
 }
 
 function getBaseButtonCode(event: MouseEvent): number | null {
@@ -51,7 +56,10 @@ function getBaseButtonCode(event: MouseEvent): number | null {
   }
 }
 
-export function encodeMouseEventForPty(event: MouseEvent, origin: TerminalContentOrigin): string | null {
+export function encodeMouseEventForPty(
+  event: MouseEvent,
+  origin: TerminalContentOrigin,
+): string | null {
   const coordinates = clampPtyCoordinates(event, origin);
   if (!coordinates) {
     return null;
@@ -75,7 +83,7 @@ export function encodeMouseEventForPty(event: MouseEvent, origin: TerminalConten
       if (buttonCode === null) {
         return null;
       }
-      return `\x1b[<${(buttonCode | 32) | modifierBits};${coordinates.x};${coordinates.y}M`;
+      return `\x1b[<${buttonCode | 32 | modifierBits};${coordinates.x};${coordinates.y}M`;
     }
     case "scroll": {
       const buttonCode = getBaseButtonCode(event);

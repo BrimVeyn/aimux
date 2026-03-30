@@ -176,7 +176,10 @@ describe("PtyManager", () => {
       });
 
       setTimeout(() => {
-        manager.write("tab-4", "printf '\\033[?10'; sleep 0.05; printf '07h'; sleep 0.05; printf '\\033[?1007l'; exit\r");
+        manager.write(
+          "tab-4",
+          "printf '\\033[?10'; sleep 0.05; printf '07h'; sleep 0.05; printf '\\033[?1007l'; exit\r",
+        );
       }, 50);
     });
 
@@ -218,7 +221,10 @@ describe("PtyManager", () => {
       });
 
       setTimeout(() => {
-        manager.write("tab-5", "printf '\\033[?1002;1007h'; sleep 0.05; printf '\\033[?1000;1007l'; exit\r");
+        manager.write(
+          "tab-5",
+          "printf '\\033[?1002;1007h'; sleep 0.05; printf '\\033[?1000;1007l'; exit\r",
+        );
       }, 50);
     });
 
@@ -311,7 +317,10 @@ describe("PtyManager", () => {
       });
 
       setTimeout(() => {
-        manager.write("tab-paste", "printf '\\033[?2004h'; sleep 0.05; printf '\\033[?2004l'; exit\r");
+        manager.write(
+          "tab-paste",
+          "printf '\\033[?2004h'; sleep 0.05; printf '\\033[?2004l'; exit\r",
+        );
       }, 50);
     });
 
@@ -346,7 +355,7 @@ describe("PtyManager", () => {
     });
 
     await new Promise<void>((resolve) => setTimeout(resolve, 50));
-    manager.write("tab-6", "for i in $(seq 1 20); do printf \"line-$i\\r\\n\"; done\r");
+    manager.write("tab-6", 'for i in $(seq 1 20); do printf "line-$i\\r\\n"; done\r');
     await new Promise<void>((resolve) => setTimeout(resolve, 150));
 
     const atBottomViewportY = latestViewportY;

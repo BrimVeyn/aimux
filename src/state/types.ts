@@ -125,7 +125,7 @@ export type AppAction =
   | { type: "modal-delete-selected-session" }
   | { type: "add-tab"; tab: TabSession }
   | { type: "hydrate-workspace"; tabs: TabSession[]; activeTabId: string | null }
-  | { type: "load-session"; sessionId: string; tabs: TabSession[]; activeTabId: string | null; sidebar?: Pick<SidebarState, "visible" | "width"> }
+  | { type: "load-session"; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
   | { type: "set-sessions"; sessions: SessionRecord[] }
   | { type: "create-session-record"; session: SessionRecord }
   | { type: "rename-session-record"; sessionId: string; name: string }
@@ -140,7 +140,12 @@ export type AppAction =
   | { type: "resize-sidebar"; delta: number }
   | { type: "set-focus-mode"; focusMode: FocusMode }
   | { type: "append-tab-buffer"; tabId: string; chunk: string }
-  | { type: "replace-tab-viewport"; tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState }
+  | {
+      type: "replace-tab-viewport";
+      tabId: string;
+      viewport: TerminalSnapshot;
+      terminalModes: TerminalModeState;
+    }
   | { type: "set-tab-activity"; tabId: string; activity?: TabActivity }
   | { type: "set-tab-status"; tabId: string; status: TabStatus; exitCode?: number }
   | { type: "set-tab-error"; tabId: string; message: string }

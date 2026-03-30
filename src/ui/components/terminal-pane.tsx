@@ -49,12 +49,20 @@ function renderViewport(tab: TabSession): ReactNode {
   if (tab.viewport && tab.viewport.lines.length > 0) {
     return tab.viewport.lines.map((line, lineIndex) => (
       <box key={`line-${lineIndex}`} flexDirection="row" minHeight={1}>
-        {line.spans.length > 0 ? line.spans.map((span, spanIndex) => renderSpan(span, spanIndex)) : <text> </text>}
+        {line.spans.length > 0 ? (
+          line.spans.map((span, spanIndex) => renderSpan(span, spanIndex))
+        ) : (
+          <text> </text>
+        )}
       </box>
     ));
   }
 
-  return <text fg={theme.text}>{tab.buffer.length > 0 ? tab.buffer : "Waiting for session output..."}</text>;
+  return (
+    <text fg={theme.text}>
+      {tab.buffer.length > 0 ? tab.buffer : "Waiting for session output..."}
+    </text>
+  );
 }
 
 export function TerminalPane({
@@ -105,7 +113,9 @@ export function TerminalPane({
       >
         {!tab ? (
           <box flexGrow={1} justifyContent="center" alignItems="center">
-            <text fg={theme.textMuted}>Create a tab with Ctrl+n to launch Claude, Codex, or OpenCode.</text>
+            <text fg={theme.textMuted}>
+              Create a tab with Ctrl+n to launch Claude, Codex, or OpenCode.
+            </text>
           </box>
         ) : (
           <box

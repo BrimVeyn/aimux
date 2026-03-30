@@ -32,7 +32,8 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
         {editBuffer !== null ? (
           <>
             <text fg={theme.textMuted}>
-              Editing command for {ASSISTANT_OPTIONS[selectedIndex]?.label}. Enter to confirm, Esc to cancel.
+              Editing command for {ASSISTANT_OPTIONS[selectedIndex]?.label}. Enter to confirm, Esc
+              to cancel.
             </text>
             <box
               border

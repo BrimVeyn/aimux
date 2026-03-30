@@ -44,11 +44,7 @@ function paletteToHex(index: number): string {
   const b = normalized % 6;
   const channel = [0, 95, 135, 175, 215, 255];
 
-  return toHex(
-    ((channel[r] ?? 0) << 16) |
-      ((channel[g] ?? 0) << 8) |
-      (channel[b] ?? 0),
-  );
+  return toHex(((channel[r] ?? 0) << 16) | ((channel[g] ?? 0) << 8) | (channel[b] ?? 0));
 }
 
 function getColorHex(color: number, mode: "rgb" | "palette" | "default"): string | undefined {
@@ -99,16 +95,8 @@ function buildLine(
     }
 
     const text = current.getChars() || " ";
-    const fgMode = current.isFgRGB()
-      ? "rgb"
-      : current.isFgPalette()
-        ? "palette"
-        : "default";
-    const bgMode = current.isBgRGB()
-      ? "rgb"
-      : current.isBgPalette()
-        ? "palette"
-        : "default";
+    const fgMode = current.isFgRGB() ? "rgb" : current.isFgPalette() ? "palette" : "default";
+    const bgMode = current.isBgRGB() ? "rgb" : current.isBgPalette() ? "palette" : "default";
 
     let fg = getColorHex(current.getFgColor(), fgMode);
     let bg = getColorHex(current.getBgColor(), bgMode);
@@ -148,7 +136,9 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
   const lines: TerminalLine[] = [];
 
   for (let row = 0; row < terminal.rows; row += 1) {
-    lines.push(buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible));
+    lines.push(
+      buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible),
+    );
   }
 
   return {
@@ -195,9 +185,9 @@ export function areTerminalSnapshotsEqual(
   }
 
   if (
-    left.viewportY !== right.viewportY
-    || left.baseY !== right.baseY
-    || left.cursorVisible !== right.cursorVisible
+    left.viewportY !== right.viewportY ||
+    left.baseY !== right.baseY ||
+    left.cursorVisible !== right.cursorVisible
   ) {
     return false;
   }
