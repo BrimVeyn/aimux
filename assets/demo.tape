@@ -14,21 +14,21 @@ Enter
 Sleep 3s
 
 # Session picker appears on startup
-# Navigate to "Create new session" and press Enter
+# Create a new session with n
+Type "n"
+Sleep 1s
+
+# Directory picker: search for a project
+Type "aimux"
+Sleep 2s
+
+# Select the directory with Enter
 Enter
 Sleep 1s
 
-# Name the session
-Type "my-project"
+# Session name is auto-filled, confirm it
 Enter
 Sleep 2s
-
-# Now in navigation mode with empty workspace
-# Show help modal with ?
-Type "?"
-Sleep 2s
-Escape
-Sleep 1s
 
 # Open new tab modal (Ctrl+N)
 Ctrl+N
@@ -59,6 +59,13 @@ Sleep 1s
 Enter
 Sleep 4s
 
+# Rename the tab with r
+Type "r"
+Sleep 1s
+Type "refactor-session"
+Enter
+Sleep 1s
+
 # Switch between tabs with k (go to first tab)
 Type "k"
 Sleep 1s
@@ -82,15 +89,38 @@ Sleep 1s
 # Create a second session
 Type "n"
 Sleep 1s
-Type "other-project"
+Type "other"
+Sleep 2s
+
+# Select a directory
+Enter
+Sleep 1s
+
+# Confirm session name
 Enter
 Sleep 2s
 
 # Switch back to first session
 Ctrl+G
 Sleep 1s
+
+# Filter sessions
+Type "/"
+Sleep 500ms
+Type "aimux"
+Sleep 1s
+Enter
+Sleep 500ms
+
+# Select and switch
 Enter
 Sleep 2s
+
+# Show help modal
+Type "?"
+Sleep 2s
+Escape
+Sleep 1s
 
 # Exit
 Ctrl+C

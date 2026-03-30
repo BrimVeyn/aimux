@@ -12,12 +12,17 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 - **Multi-tab sessions** -- Run Claude, Codex, and OpenCode in parallel with instant tab switching
 - **Full terminal emulation** -- Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
 - **Vim-style navigation** -- `j`/`k` to switch tabs, `i` to enter input mode, familiar keybindings throughout
-- **Session management** -- Create, rename, delete, and switch between named sessions with `Ctrl+G`
-- **Session persistence** -- Workspace state saved to `~/.config/aimux/` and restored on restart
+- **Project-scoped sessions** -- Associate a git repository with each session; all tabs spawn in that directory
+- **Directory picker** -- Fuzzy-search git repos and worktrees from `$HOME` using `fzf` when creating sessions
+- **Session management** -- Create, rename, delete, filter, and switch between sessions with `Ctrl+G`
+- **Session search** -- Press `/` in the session picker to filter sessions by name or project path
+- **Tab renaming** -- Press `r` to rename tabs for easy identification across multiple assistant instances
+- **Session persistence** -- Workspace state (tabs, titles, layout) saved to `~/.config/aimux/` and restored on restart
+- **Git branch display** -- Current branch shown in the sidebar for project-scoped sessions
 - **Daemon mode** -- Background daemon keeps sessions alive across terminal restarts
 - **Live activity indicators** -- Animated spinner for busy tabs, colored indicators for idle/focused states
 - **Built-in help** -- Press `?` to see all keybindings at a glance
-- **Rich TUI** -- Sidebar with assistant info, status bar, and modal dialogs built with OpenTUI + React
+- **Rich TUI** -- Sidebar with git info, status bar with session context, and modal dialogs built with OpenTUI + React
 
 ## Install
 
@@ -52,6 +57,7 @@ Press `?` in navigation mode to see the full keybinding reference.
 | `j` / `k`             | Next / previous tab       |
 | `Shift+J` / `Shift+K` | Reorder tabs              |
 | `i`                   | Enter terminal input mode |
+| `r`                   | Rename active tab         |
 | `Ctrl+N`              | New tab                   |
 | `Ctrl+W`              | Close tab                 |
 | `Ctrl+R`              | Restart tab               |
@@ -67,14 +73,24 @@ All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigatio
 
 ### Session Picker
 
-| Key       | Action            |
-| --------- | ----------------- |
-| `j` / `k` | Navigate sessions |
-| `Enter`   | Resume session    |
-| `n`       | New session       |
-| `r`       | Rename session    |
-| `d`       | Delete session    |
-| `Esc`     | Cancel            |
+| Key          | Action            |
+| ------------ | ----------------- |
+| `j` / `k`    | Navigate sessions |
+| `Enter`      | Resume session    |
+| `n`          | New session       |
+| `r`          | Rename session    |
+| `d`          | Delete session    |
+| `/`          | Filter sessions   |
+| `Esc`        | Cancel            |
+
+### Create Session Modal
+
+| Key          | Action                          |
+| ------------ | ------------------------------- |
+| `Tab`        | Switch between directory / name |
+| `Ctrl+N/P`   | Navigate search results         |
+| `Enter`      | Select directory / confirm      |
+| `Esc`        | Cancel                          |
 
 ## Architecture
 
