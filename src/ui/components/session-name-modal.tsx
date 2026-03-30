@@ -20,7 +20,7 @@ export function SessionNameModal({ title, value }: { title: string; value: strin
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>{title}</text>
+        <text fg={theme.accentAlt}>{title}</text>
         <text fg={theme.textMuted}>Type a session name. Enter confirm, Esc cancel.</text>
         <box border borderColor={theme.borderActive} backgroundColor={theme.panelMuted} padding={1}>
           <text fg={theme.text}>{value}_</text>

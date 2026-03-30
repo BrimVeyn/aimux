@@ -88,8 +88,10 @@ export function Sidebar({ state }: SidebarProps) {
       backgroundColor={theme.panelMuted}
       gap={1}
     >
-      <text fg={theme.accent}>aimux</text>
-      <text fg={theme.textMuted}>
+      <text fg={theme.accent}>
+        <strong>aimux</strong>
+      </text>
+      <text fg={theme.accentAlt}>
         {currentSession ? currentSession.name : "No session selected"}
       </text>
       {branch ? (
@@ -98,6 +100,7 @@ export function Sidebar({ state }: SidebarProps) {
           <text fg={theme.textMuted}>{branch}</text>
         </box>
       ) : null}
+      <text fg={theme.dim}>{"─".repeat(Math.max(0, state.sidebar.width - 4))}</text>
       <scrollbox
         paddingTop={1}
         ref={scrollRef}

@@ -51,7 +51,7 @@ export function CreateSessionModal({
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>Create session</text>
+        <text fg={theme.accentAlt}>Create session</text>
         <text fg={theme.textMuted}>Tab switch field. Ctrl+n/p nav. Esc cancel.</text>
 
         <text fg={dirActive ? theme.text : theme.textMuted}>Search git repos:</text>

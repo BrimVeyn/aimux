@@ -112,10 +112,14 @@ export function TerminalPane({
         backgroundColor={theme.background}
       >
         {!tab ? (
-          <box flexGrow={1} justifyContent="center" alignItems="center">
-            <text fg={theme.textMuted}>
-              Create a tab with Ctrl+n to launch Claude, Codex, or OpenCode.
-            </text>
+          <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
+            <text fg={theme.dim}>· · ·</text>
+            <text fg={theme.textMuted}> </text>
+            <box flexDirection="row">
+              <text fg={theme.textMuted}>Press </text>
+              <text fg={theme.accent}>Ctrl+n</text>
+              <text fg={theme.textMuted}> to launch an assistant</text>
+            </box>
           </box>
         ) : (
           <box

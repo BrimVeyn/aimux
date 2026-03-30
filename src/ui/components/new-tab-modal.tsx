@@ -28,7 +28,7 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>New assistant tab</text>
+        <text fg={theme.accentAlt}>New assistant tab</text>
         {editBuffer !== null ? (
           <>
             <text fg={theme.textMuted}>

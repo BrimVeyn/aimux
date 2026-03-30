@@ -66,7 +66,7 @@ export function SessionPickerModal({
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>Sessions</text>
+        <text fg={theme.accentAlt}>Sessions</text>
         <text fg={theme.textMuted}>
           j/k move, Enter resume, n new, r rename, d delete, / filter, Esc cancel.
         </text>

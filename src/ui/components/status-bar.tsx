@@ -7,6 +7,18 @@ interface StatusBarProps {
   activeTab?: TabSession;
 }
 
+function getModeBorderColor(focusMode: AppState["focusMode"]): string {
+  switch (focusMode) {
+    case "terminal-input":
+      return theme.accent;
+    case "modal":
+      return theme.warning;
+    case "navigation":
+    default:
+      return theme.accentAlt;
+  }
+}
+
 export function StatusBar({ state, activeTab }: StatusBarProps) {
   const model = getStatusBarModel(state, activeTab);
 
@@ -14,7 +26,7 @@ export function StatusBar({ state, activeTab }: StatusBarProps) {
     <box
       minHeight={4}
       border
-      borderColor={theme.border}
+      borderColor={getModeBorderColor(state.focusMode)}
       paddingLeft={1}
       paddingRight={1}
       paddingTop={0}

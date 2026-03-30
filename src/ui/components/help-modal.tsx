@@ -56,14 +56,14 @@ export function HelpModal() {
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>Keybindings</text>
+        <text fg={theme.accentAlt}>Keybindings</text>
         {SECTIONS.map((section) => (
           <box key={section.title} flexDirection="column">
             <text fg={theme.text}>{section.title}</text>
             {section.bindings.map(([key, desc]) => (
               <box key={key} flexDirection="row">
                 <box width={18}>
-                  <text fg={theme.accent}> {key}</text>
+                  <text fg={theme.accentAlt}> {key}</text>
                 </box>
                 <text fg={theme.textMuted}>{desc}</text>
               </box>

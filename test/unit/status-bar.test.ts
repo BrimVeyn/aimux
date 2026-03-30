@@ -26,7 +26,7 @@ describe("getStatusBarModel", () => {
     const state = createInitialState();
     const model = getStatusBarModel(state);
 
-    expect(model.left).toContain("nav");
+    expect(model.left).toContain("NAV");
     expect(model.right).toContain("Ctrl+g sessions");
     expect(model.right).toContain("Ctrl+n new");
   });
@@ -68,7 +68,7 @@ describe("getStatusBarModel", () => {
     };
     const model = getStatusBarModel(state);
 
-    expect(model.left).toContain("modal");
+    expect(model.left).toContain("MODAL");
     expect(model.right).toContain("Enter confirm");
   });
 

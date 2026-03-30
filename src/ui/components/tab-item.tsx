@@ -70,7 +70,9 @@ function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocused
 }
 
 export function TabItem({ id, tab, active, focused, isFocusedInput }: TabItemProps) {
-  const label = tab.assistant.toUpperCase();
+  const label = tab.assistant.charAt(0).toUpperCase() + tab.assistant.slice(1).toLowerCase();
+  const indicator = active ? (focused ? "▶" : "◆") : "│";
+  const indicatorColor = active ? (focused ? theme.accent : theme.accentAlt) : theme.dim;
 
   return (
     <box
@@ -81,15 +83,16 @@ export function TabItem({ id, tab, active, focused, isFocusedInput }: TabItemPro
       paddingBottom={1}
       border={active}
       borderColor={active ? theme.borderActive : theme.border}
-      backgroundColor={active ? theme.panel : theme.panelMuted}
+      backgroundColor={active ? theme.panelHighlight : theme.panelMuted}
       flexDirection="column"
       gap={0}
     >
-      <text fg={active ? theme.text : theme.textMuted}>
-        {active ? (focused ? "[>]" : "[*]") : "[ ]"} {tab.title}
-      </text>
       <box flexDirection="row">
-        <text fg={theme.textMuted}>{label} </text>
+        <text fg={indicatorColor}>{indicator} </text>
+        <text fg={active ? theme.text : theme.textMuted}>{tab.title}</text>
+      </box>
+      <box flexDirection="row">
+        <text fg={theme.textMuted}> {label} </text>
         <ActivityIndicator tab={tab} isFocusedInput={isFocusedInput} />
       </box>
     </box>
