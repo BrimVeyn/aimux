@@ -11,6 +11,7 @@ import {
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseServerMessage,
+  ProtocolMismatchError,
   type AttachResult,
   type ClientRequest,
   type ServerEvent,
@@ -206,8 +207,10 @@ export class RemoteSessionBackend
     }
 
     if (response.payload.protocolVersion !== IPC_PROTOCOL_VERSION) {
-      this.resetConnection(`Unsupported protocol version: ${response.payload.protocolVersion}`)
-      throw new Error(`Unsupported protocol version: ${response.payload.protocolVersion}`)
+      this.resetConnection(
+        `Protocol mismatch: client v${IPC_PROTOCOL_VERSION}, daemon v${response.payload.protocolVersion}`
+      )
+      throw new ProtocolMismatchError(IPC_PROTOCOL_VERSION, response.payload.protocolVersion)
     }
 
     this.attached = true

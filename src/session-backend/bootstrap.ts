@@ -9,7 +9,8 @@ import {
   removeDaemonSocketIfExists,
 } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
-import { spawnDetachedDaemon } from '../platform/daemon-control'
+import { ProtocolMismatchError } from '../ipc/protocol'
+import { findDaemonPid, killDaemon, spawnDetachedDaemon } from '../platform/daemon-control'
 import { LocalSessionBackend } from './local-session-backend'
 import { RemoteSessionBackend } from './remote-session-backend'
 
@@ -54,6 +55,16 @@ async function canConnectToDaemon(socketPath: string): Promise<boolean> {
   })
 }
 
+async function restartDaemon(socketPath: string): Promise<void> {
+  const pid = await findDaemonPid(socketPath)
+  if (pid !== null) {
+    logDebug('backend.restartDaemon.killing', { pid })
+    await killDaemon(pid)
+  }
+  removeDaemonSocketIfExists()
+  await spawnDaemon()
+}
+
 export async function createSessionBackend(): Promise<SessionBackend> {
   try {
     const socketPath = getDaemonSocketPath()
@@ -73,6 +84,22 @@ export async function createSessionBackend(): Promise<SessionBackend> {
     logDebug('backend.create.remote', { socketPath })
     return new RemoteSessionBackend()
   } catch (error) {
+    if (error instanceof ProtocolMismatchError) {
+      logDebug('backend.create.protocolMismatch', {
+        clientVersion: error.clientVersion,
+        daemonVersion: error.daemonVersion,
+      })
+      try {
+        await restartDaemon(getDaemonSocketPath())
+        logDebug('backend.create.remoteAfterRestart')
+        return new RemoteSessionBackend()
+      } catch (retryError) {
+        logDebug('backend.create.retryFailed', {
+          error: retryError instanceof Error ? retryError.message : String(retryError),
+        })
+      }
+    }
+
     logDebug('backend.create.localFallback', {
       error: error instanceof Error ? error.message : String(error),
     })

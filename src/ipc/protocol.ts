@@ -66,6 +66,16 @@ export class IpcProtocolError extends Error {
   }
 }
 
+export class ProtocolMismatchError extends Error {
+  constructor(
+    public readonly clientVersion: number,
+    public readonly daemonVersion: number
+  ) {
+    super(`Protocol mismatch: client v${clientVersion}, daemon v${daemonVersion}`)
+    this.name = 'ProtocolMismatchError'
+  }
+}
+
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
