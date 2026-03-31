@@ -11,7 +11,7 @@
     "demo": "vhs assets/demo.tape",
     "demo:sessions": "vhs assets/sessions.tape",
     "demo:tabs": "vhs assets/tabs.tape",
-    "demo:selection": "vhs assets/selection.tape",
+    "demo:themes": "vhs assets/themes.tape",
     "restart-daemon": "bun run src/index.tsx restart-daemon",
     "lint": "oxlint",
     "format": "oxfmt --write .",

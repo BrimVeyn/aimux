@@ -39,11 +39,11 @@ Run multiple AI assistants side by side, rename tabs, and navigate with vim keys
 
 ![Multi-tab workflow](assets/tabs.gif)
 
-### Text Selection
+### Themes
 
-Double-click to select a word, triple-click to select a line -- copied to clipboard automatically:
+Switch between 9 built-in themes on the fly:
 
-![Text selection](assets/selection.gif)
+![Themes](assets/themes.gif)
 
 ## Install
 
@@ -152,7 +152,7 @@ bun run check
 bun run demo
 bun run demo:sessions
 bun run demo:tabs
-bun run demo:selection
+bun run demo:themes
 ```
 
 ## License
