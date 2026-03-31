@@ -3,7 +3,11 @@ import { connect } from 'node:net'
 
 import type { SessionBackend } from './types'
 
-import { getDaemonSocketPath, removeDaemonSocketIfExists } from '../daemon/runtime-paths'
+import {
+  getDaemonSocketPath,
+  getDaemonSocketSecurityIssue,
+  removeDaemonSocketIfExists,
+} from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import { spawnDetachedDaemon } from '../platform/daemon-control'
 import { LocalSessionBackend } from './local-session-backend'
@@ -24,6 +28,12 @@ async function spawnDaemon(): Promise<void> {
 }
 
 async function canConnectToDaemon(socketPath: string): Promise<boolean> {
+  const securityIssue = getDaemonSocketSecurityIssue(socketPath)
+  if (securityIssue) {
+    logDebug('backend.healthcheck.socketIssue', { socketPath, issue: securityIssue })
+    return false
+  }
+
   return await new Promise<boolean>((resolve) => {
     const socket = connect(socketPath)
     const finish = (result: boolean) => {

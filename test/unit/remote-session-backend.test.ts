@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { getDaemonSocketPath } from '../../src/daemon/runtime-paths'
 import {
   encodeMessage,
+  IPC_PROTOCOL_VERSION,
   MessageDecoder,
   type ClientRequest,
   type ServerResponse,
@@ -69,7 +70,15 @@ describe('RemoteSessionBackend', () => {
 
           const response: ServerResponse =
             message.type === 'attach'
-              ? { id: message.id, type: 'attachResult', payload: { tabs: [], activeTabId: null } }
+              ? {
+                  id: message.id,
+                  type: 'attachResult',
+                  payload: {
+                    protocolVersion: IPC_PROTOCOL_VERSION,
+                    tabs: [],
+                    activeTabId: null,
+                  },
+                }
               : { id: message.id, type: 'ok', payload: {} }
           socket.write(encodeMessage(response))
         }
@@ -100,6 +109,7 @@ describe('RemoteSessionBackend', () => {
       const writeRequest = requests.find((message) => message.type === 'write')
 
       expect(attachRequests).toHaveLength(2)
+      expect(attachRequests[0]?.payload.protocolVersion).toBe(IPC_PROTOCOL_VERSION)
       expect(attachRequests[0]?.payload.sessionId).toBe('session-a')
       expect(attachRequests[1]?.payload.sessionId).toBe('session-b')
       expect(writeRequest?.payload.data).toBe('hello\nworld')
@@ -136,7 +146,15 @@ describe('RemoteSessionBackend', () => {
 
           const response: ServerResponse =
             message.type === 'attach'
-              ? { id: message.id, type: 'attachResult', payload: { tabs: [], activeTabId: null } }
+              ? {
+                  id: message.id,
+                  type: 'attachResult',
+                  payload: {
+                    protocolVersion: IPC_PROTOCOL_VERSION,
+                    tabs: [],
+                    activeTabId: null,
+                  },
+                }
               : message.type === 'write'
                 ? { id: message.id, type: 'error', payload: { message: 'write rejected' } }
                 : { id: message.id, type: 'ok', payload: {} }
@@ -169,6 +187,62 @@ describe('RemoteSessionBackend', () => {
 
       expect(backendError).toEqual({ tabId: 'tab-1', message: 'write rejected' })
       expect(requests.find((message) => message.type === 'write')).toBeDefined()
+    } finally {
+      await backend.destroy(true)
+      for (const socket of sockets) {
+        socket.destroy()
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve()
+        })
+      })
+    }
+  })
+
+  test('rejects mismatched attach protocol versions', async () => {
+    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-protocol-'))
+    process.env.XDG_RUNTIME_DIR = tempRuntimeDir
+
+    const sockets = new Set<Socket>()
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      const decoder = new MessageDecoder<ClientRequest>()
+
+      socket.on('data', (chunk) => {
+        for (const message of decoder.push(chunk)) {
+          const response: ServerResponse =
+            message.type === 'attach'
+              ? {
+                  id: message.id,
+                  type: 'attachResult',
+                  payload: { protocolVersion: 999, tabs: [], activeTabId: null },
+                }
+              : { id: message.id, type: 'ok', payload: {} }
+          socket.write(encodeMessage(response))
+        }
+      })
+
+      socket.on('close', () => {
+        sockets.delete(socket)
+      })
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(getDaemonSocketPath(), () => resolve())
+    })
+
+    const backend = new RemoteSessionBackend()
+
+    try {
+      await expect(backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })).rejects.toThrow(
+        'Unsupported protocol version: 999'
+      )
     } finally {
       await backend.destroy(true)
       for (const socket of sockets) {

@@ -3,13 +3,18 @@ import { createServer, type Socket } from 'node:net'
 import { logDebug } from '../debug/input-log'
 import {
   encodeMessage,
+  IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseClientRequest,
   type ClientRequest,
   type ServerEvent,
   type ServerResponse,
 } from '../ipc/protocol'
-import { getDaemonSocketPath, removeDaemonSocketIfExists } from './runtime-paths'
+import {
+  getDaemonSocketPath,
+  removeDaemonSocketIfExists,
+  tightenDaemonSocketPermissions,
+} from './runtime-paths'
 import { SessionManager } from './session-manager'
 
 function send(socket: Socket, message: ServerResponse | ServerEvent): void {
@@ -85,7 +90,11 @@ export async function runDaemon(): Promise<void> {
                   message.payload.sessionId,
                   message.payload.workspaceSnapshot
                 )
-                send(socket, { id: message.id, type: 'attachResult', payload: attachResult })
+                send(socket, {
+                  id: message.id,
+                  type: 'attachResult',
+                  payload: { protocolVersion: IPC_PROTOCOL_VERSION, ...attachResult },
+                })
                 break
               }
               case 'createTab': {
@@ -172,6 +181,7 @@ export async function runDaemon(): Promise<void> {
     server.once('error', reject)
     server.listen(socketPath, () => resolve())
   })
+  tightenDaemonSocketPermissions(socketPath)
   logDebug('daemon.listening', { socketPath })
 
   process.on('SIGTERM', () => {

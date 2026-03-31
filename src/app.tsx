@@ -7,6 +7,18 @@ import type { KeyResult, ModeContext, ModeId, SideEffect } from './input/modes/t
 import type { SessionBackend } from './session-backend/types'
 import type { AssistantId, SessionRecord, SnippetRecord, TabSession } from './state/types'
 
+import {
+  handleCreateSessionEffect,
+  handleDeleteSessionEffect,
+  handleRenameSessionEffect,
+  handleSwitchSessionEffect,
+  restartTabSession,
+} from './app-runtime/session-actions'
+import {
+  handleDeleteSnippetEffect,
+  handleSaveSnippetEditorEffect,
+  pasteSnippetToTab,
+} from './app-runtime/snippet-actions'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
@@ -28,11 +40,10 @@ import {
   parseCommand,
 } from './pty/command-registry'
 import { filterSessions, filterSnippets } from './state/selectors'
-import { loadSessionCatalog, saveSessionCatalog } from './state/session-catalog'
-import { createEmptyWorkspaceSnapshot, serializeWorkspace } from './state/session-persistence'
-import { loadSnippetCatalog, saveSnippetCatalog } from './state/snippet-catalog'
+import { loadSessionCatalog } from './state/session-catalog'
+import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
-import { buildSessionsWithCurrentSnapshot, saveCurrentWorkspace } from './state/workspace-save'
+import { saveCurrentWorkspace } from './state/workspace-save'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
 import { type ThemeId, THEME_IDS } from './ui/themes'
@@ -431,108 +442,7 @@ export function App({ backend }: { backend: SessionBackend }) {
     )
   }
 
-  function createSessionFromCurrent(name: string, projectPath?: string): void {
-    const now = new Date().toISOString()
-    const workspaceSnapshot =
-      state.currentSessionId || state.tabs.length === 0
-        ? createEmptyWorkspaceSnapshot()
-        : serializeWorkspace(state)
-    const session: SessionRecord = {
-      id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name,
-      projectPath,
-      createdAt: now,
-      updatedAt: now,
-      lastOpenedAt: now,
-      workspaceSnapshot,
-    }
-    let updatedSessions = state.sessions
-    if (state.currentSessionId) {
-      const currentSnapshot = serializeWorkspace(state)
-      updatedSessions = state.sessions.map((s) =>
-        s.id === state.currentSessionId
-          ? { ...s, updatedAt: now, workspaceSnapshot: currentSnapshot }
-          : s
-      )
-    }
-    const sessions = [...updatedSessions, session]
-    logInputDebug('app.session.create', {
-      sessionId: session.id,
-      name,
-      fromCurrentWorkspace: !state.currentSessionId && state.tabs.length > 0,
-      tabCount: workspaceSnapshot.tabs.length,
-    })
-    saveSessionCatalog(sessions)
-    dispatch({ type: 'set-sessions', sessions })
-    dispatch({
-      type: 'load-session',
-      sessionId: session.id,
-      workspaceSnapshot: session.workspaceSnapshot,
-    })
-  }
-
-  function renameSession(sessionId: string, name: string): void {
-    logInputDebug('app.session.rename', { sessionId, name })
-    const sessions = state.sessions.map((session) =>
-      session.id === sessionId ? { ...session, name, updatedAt: new Date().toISOString() } : session
-    )
-    saveSessionCatalog(sessions)
-    dispatch({ type: 'rename-session-record', sessionId, name })
-  }
-
-  function switchToSession(session: SessionRecord): void {
-    logInputDebug('app.session.switch.start', {
-      fromSessionId: state.currentSessionId,
-      toSessionId: session.id,
-      toName: session.name,
-      currentTabCount: state.tabs.length,
-      restoredTabCount: session.workspaceSnapshot?.tabs.length ?? 0,
-    })
-    const sessionsWithSnapshot = buildSessionsWithCurrentSnapshot(
-      state.sessions,
-      state.currentSessionId,
-      state
-    )
-    const sessions = sessionsWithSnapshot.map((entry) =>
-      entry.id === session.id ? { ...entry, lastOpenedAt: new Date().toISOString() } : entry
-    )
-    saveSessionCatalog(sessions)
-    void backend.destroy(true)
-    dispatch({ type: 'set-sessions', sessions })
-    dispatch({
-      type: 'load-session',
-      sessionId: session.id,
-      workspaceSnapshot: session.workspaceSnapshot,
-    })
-    logInputDebug('app.session.switch.dispatched', {
-      toSessionId: session.id,
-    })
-  }
-
-  function deleteSession(sessionId: string): void {
-    const remaining = state.sessions.filter((session) => session.id !== sessionId)
-    logInputDebug('app.session.delete', {
-      sessionId,
-      wasCurrent: sessionId === state.currentSessionId,
-      remainingCount: remaining.length,
-    })
-    saveSessionCatalog(remaining)
-    if (sessionId === state.currentSessionId) {
-      void backend.destroy(true)
-    }
-    dispatch({ type: 'delete-session-record', sessionId })
-  }
-
-  function restartTab(tab: TabSession): void {
-    logInputDebug('app.restartTab', {
-      tabId: tab.id,
-      command: tab.command,
-      status: tab.status,
-    })
-    clearIdleTimer(tab.id)
-    clearStartupGrace(tab.id)
-    backend.disposeSession(tab.id)
-    dispatch({ type: 'reset-tab-session', tabId: tab.id })
+  function startExistingTab(tab: TabSession): void {
     startTabSession(
       backend,
       dispatch,
@@ -568,7 +478,7 @@ export function App({ backend }: { backend: SessionBackend }) {
         })
         const selectedSession = filtered[state.modal.selectedIndex]
         if (selectedSession) {
-          switchToSession(selectedSession)
+          handleSwitchSessionEffect(state, backend, dispatch, selectedSession)
         } else {
           dispatch({ type: 'open-create-session-modal' })
         }
@@ -582,7 +492,7 @@ export function App({ backend }: { backend: SessionBackend }) {
           selectedSessionId: selectedSession?.id ?? null,
         })
         if (selectedSession) {
-          deleteSession(selectedSession.id)
+          handleDeleteSessionEffect(state, backend, dispatch, selectedSession.id)
         }
         return
       }
@@ -603,7 +513,7 @@ export function App({ backend }: { backend: SessionBackend }) {
         return
       }
       case 'create-session':
-        createSessionFromCurrent(effect.name, effect.projectPath)
+        handleCreateSessionEffect(state, dispatch, effect.name, effect.projectPath)
         return
       case 'close-tab': {
         clearIdleTimer(effect.tabId)
@@ -612,18 +522,23 @@ export function App({ backend }: { backend: SessionBackend }) {
         return
       }
       case 'restart-tab':
-        restartTab(effect.tab)
+        restartTabSession(
+          backend,
+          dispatch,
+          clearIdleTimer,
+          clearStartupGrace,
+          startExistingTab,
+          effect.tab
+        )
         return
       case 'paste-selected-snippet': {
         const filtered = getFilteredSnippets()
-        const snippet = filtered[state.modal.selectedIndex]
-        if (snippet && state.activeTabId && activeTab) {
-          const payload = buildPtyPastePayload(
-            snippet.content,
-            activeTab.terminalModes.bracketedPasteMode
-          )
-          backend.write(state.activeTabId, payload)
-        }
+        pasteSnippetToTab(
+          backend,
+          state.activeTabId,
+          activeTab,
+          filtered[state.modal.selectedIndex]
+        )
         return
       }
       case 'edit-selected-snippet': {
@@ -638,39 +553,12 @@ export function App({ backend }: { backend: SessionBackend }) {
         const filtered = getFilteredSnippets()
         const snippet = filtered[state.modal.selectedIndex]
         if (snippet) {
-          const updated = state.snippets.filter((s) => s.id !== snippet.id)
-          saveSnippetCatalog(updated)
-          dispatch({ type: 'delete-snippet', snippetId: snippet.id })
+          handleDeleteSnippetEffect(state.snippets, dispatch, snippet.id)
         }
         return
       }
       case 'save-snippet-editor': {
-        if (state.modal.type !== 'snippet-editor') return
-        const modal = state.modal
-        const name =
-          modal.activeField === 'directory'
-            ? (modal.editBuffer ?? '').trim()
-            : (modal.secondaryBuffer ?? '').trim()
-        const content =
-          modal.activeField === 'name'
-            ? (modal.editBuffer ?? '').trim()
-            : (modal.secondaryBuffer ?? '').trim()
-        if (name && content) {
-          const snippetId = modal.sessionTargetId
-          let updated: SnippetRecord[]
-          if (snippetId) {
-            updated = state.snippets.map((s) => (s.id === snippetId ? { ...s, name, content } : s))
-          } else {
-            const newSnippet: SnippetRecord = {
-              id: `snip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-              name,
-              content,
-            }
-            updated = [...state.snippets, newSnippet]
-          }
-          saveSnippetCatalog(updated)
-          dispatch({ type: 'set-snippets', snippets: updated })
-        }
+        handleSaveSnippetEditorEffect(state, dispatch)
         return
       }
       case 'save-custom-command': {
@@ -720,7 +608,7 @@ export function App({ backend }: { backend: SessionBackend }) {
         return
       }
       case 'rename-session': {
-        renameSession(effect.sessionId, effect.name)
+        handleRenameSessionEffect(state.sessions, dispatch, effect.sessionId, effect.name)
         return
       }
     }

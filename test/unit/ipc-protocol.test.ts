@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   encodeMessage,
+  IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseClientRequest,
   parseServerMessage,
@@ -62,9 +63,24 @@ describe('ipc protocol framing', () => {
       parseClientRequest({
         id: '5',
         type: 'attach',
-        payload: { sessionId: 'session-a', cols: '80', rows: 24 },
+        payload: {
+          protocolVersion: IPC_PROTOCOL_VERSION,
+          sessionId: 'session-a',
+          cols: '80',
+          rows: 24,
+        },
       })
     ).toThrow('attach.cols must be a number')
+  })
+
+  test('rejects mismatched attach protocol versions', () => {
+    expect(() =>
+      parseClientRequest({
+        id: '6',
+        type: 'attach',
+        payload: { protocolVersion: 999, sessionId: 'session-a', cols: 80, rows: 24 },
+      })
+    ).toThrow(`attach.protocolVersion must be ${IPC_PROTOCOL_VERSION}`)
   })
 
   test('rejects malformed server event payloads', () => {

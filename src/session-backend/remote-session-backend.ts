@@ -8,6 +8,7 @@ import { getDaemonSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
   encodeMessage,
+  IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseServerMessage,
   type AttachResult,
@@ -193,7 +194,7 @@ export class RemoteSessionBackend
     const response = await this.send({
       id: crypto.randomUUID(),
       type: 'attach',
-      payload: options,
+      payload: { ...options, protocolVersion: IPC_PROTOCOL_VERSION },
     })
 
     if (response.type !== 'attachResult') {
@@ -202,6 +203,11 @@ export class RemoteSessionBackend
       throw new Error(
         response.type === 'error' ? response.payload.message : 'Unexpected attach response'
       )
+    }
+
+    if (response.payload.protocolVersion !== IPC_PROTOCOL_VERSION) {
+      this.resetConnection(`Unsupported protocol version: ${response.payload.protocolVersion}`)
+      throw new Error(`Unsupported protocol version: ${response.payload.protocolVersion}`)
     }
 
     this.attached = true

@@ -3,7 +3,10 @@ import type { WorkspaceSnapshotV1 } from '../state/types'
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
+export const IPC_PROTOCOL_VERSION = 1
+
 export interface AttachRequest {
+  protocolVersion: number
   sessionId: string
   cols: number
   rows: number
@@ -11,6 +14,7 @@ export interface AttachRequest {
 }
 
 export interface AttachResult {
+  protocolVersion: number
   tabs: TabSession[]
   activeTabId: string | null
 }
@@ -127,6 +131,7 @@ function isTerminalModeState(value: unknown): value is TerminalModeState {
 function isAttachResult(value: unknown): value is AttachResult {
   return (
     isObjectRecord(value) &&
+    isFiniteNumber(value.protocolVersion) &&
     Array.isArray(value.tabs) &&
     value.tabs.every(
       (tab) =>
@@ -165,6 +170,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
 
   switch (value.type) {
     case 'attach':
+      assert(
+        value.payload.protocolVersion === IPC_PROTOCOL_VERSION,
+        `attach.protocolVersion must be ${IPC_PROTOCOL_VERSION}`
+      )
       assert(isString(value.payload.sessionId), 'attach.sessionId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'attach.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'attach.rows must be a number')
