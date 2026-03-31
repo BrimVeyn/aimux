@@ -241,7 +241,7 @@ describe('RemoteSessionBackend', () => {
 
     try {
       await expect(backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })).rejects.toThrow(
-        'Unsupported protocol version: 999'
+        'Protocol mismatch: client v1, daemon v999'
       )
     } finally {
       await backend.destroy(true)
