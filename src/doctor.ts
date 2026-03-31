@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 
-import { CONFIG_PATH, loadConfig } from './config'
+import { CONFIG_PATH, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
 
 export interface DoctorCheck {
@@ -18,7 +18,8 @@ function formatStatus(ok: boolean): string {
 }
 
 export function buildDoctorReport(): DoctorReport {
-  const config = loadConfig()
+  const configResult = loadConfigResult()
+  const config = configResult.config
   const checks: DoctorCheck[] = []
 
   checks.push({
@@ -35,10 +36,13 @@ export function buildDoctorReport(): DoctorReport {
 
   checks.push({
     name: 'config',
-    ok: true,
-    details: existsSync(CONFIG_PATH)
-      ? `loaded ${CONFIG_PATH}`
-      : `using defaults (${CONFIG_PATH} not found)`,
+    ok: configResult.issues.length === 0,
+    details:
+      configResult.issues.length > 0
+        ? configResult.issues.join('; ')
+        : existsSync(CONFIG_PATH)
+          ? `loaded ${CONFIG_PATH}`
+          : `using defaults (${CONFIG_PATH} not found)`,
   })
 
   for (const option of ASSISTANT_OPTIONS) {

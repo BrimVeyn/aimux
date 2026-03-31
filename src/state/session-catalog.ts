@@ -5,6 +5,7 @@ import type { SessionRecord } from './types'
 
 import { CONFIG_PATH, loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
+import { isSessionRecord } from './validation'
 
 interface SessionCatalogFile {
   version: 1
@@ -13,28 +14,42 @@ interface SessionCatalogFile {
 
 const SESSIONS_PATH = join(dirname(CONFIG_PATH), 'aimux-sessions.json')
 
-function readCatalogFile(): SessionCatalogFile | null {
+function readCatalogFile(): { file: SessionCatalogFile | null; issue?: string } {
   try {
     if (!existsSync(SESSIONS_PATH)) {
-      return null
+      return { file: null }
     }
 
-    const parsed = JSON.parse(readFileSync(SESSIONS_PATH, 'utf8')) as SessionCatalogFile
+    const parsed = JSON.parse(readFileSync(SESSIONS_PATH, 'utf8')) as {
+      version?: unknown
+      sessions?: unknown
+    }
     if (parsed.version !== 1 || !Array.isArray(parsed.sessions)) {
-      return null
+      return { file: null, issue: 'invalid session catalog header' }
     }
 
-    return parsed
-  } catch {
-    return null
+    if (!parsed.sessions.every(isSessionRecord)) {
+      return { file: null, issue: 'invalid session catalog entries' }
+    }
+
+    return { file: { version: 1, sessions: parsed.sessions } }
+  } catch (error) {
+    return {
+      file: null,
+      issue: `failed to load session catalog: ${error instanceof Error ? error.message : String(error)}`,
+    }
   }
 }
 
 export function loadSessionCatalog(): SessionRecord[] {
-  const file = readCatalogFile()
+  const { file, issue } = readCatalogFile()
   if (file) {
     logDebug('sessions.catalog.load', { sessionCount: file.sessions.length })
     return file.sessions
+  }
+
+  if (issue) {
+    logDebug('sessions.catalog.loadIssue', { path: SESSIONS_PATH, issue })
   }
 
   const config = loadConfig()
@@ -63,9 +78,17 @@ export function loadSessionCatalog(): SessionRecord[] {
 }
 
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
-  mkdirSync(dirname(SESSIONS_PATH), { recursive: true })
-  writeFileSync(SESSIONS_PATH, `${JSON.stringify({ version: 1, sessions }, null, 2)}\n`)
-  logDebug('sessions.catalog.save', { sessionCount: sessions.length })
+  try {
+    mkdirSync(dirname(SESSIONS_PATH), { recursive: true })
+    writeFileSync(SESSIONS_PATH, `${JSON.stringify({ version: 1, sessions }, null, 2)}\n`)
+    logDebug('sessions.catalog.save', { sessionCount: sessions.length })
+  } catch (error) {
+    logDebug('sessions.catalog.saveError', {
+      path: SESSIONS_PATH,
+      error: error instanceof Error ? error.message : String(error),
+      sessionCount: sessions.length,
+    })
+  }
 }
 
 export function getSessionCatalogPath(): string {

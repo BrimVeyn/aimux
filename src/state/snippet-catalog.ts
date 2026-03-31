@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 import { CONFIG_PATH } from '../config'
+import { logDebug } from '../debug/input-log'
+import { isSnippetRecord } from './validation'
 
 export interface SnippetRecord {
   id: string
@@ -51,12 +53,30 @@ export function loadSnippetCatalog(): SnippetRecord[] {
       saveSnippetCatalog(DEFAULT_SNIPPETS)
       return DEFAULT_SNIPPETS
     }
-    const parsed = JSON.parse(readFileSync(SNIPPETS_PATH, 'utf8')) as SnippetCatalogFile
+    const parsed = JSON.parse(readFileSync(SNIPPETS_PATH, 'utf8')) as {
+      version?: unknown
+      snippets?: unknown
+    }
     if (parsed.version !== 1 || !Array.isArray(parsed.snippets)) {
+      logDebug('snippets.catalog.loadIssue', {
+        path: SNIPPETS_PATH,
+        issue: 'invalid snippet catalog header',
+      })
+      return []
+    }
+    if (!parsed.snippets.every(isSnippetRecord)) {
+      logDebug('snippets.catalog.loadIssue', {
+        path: SNIPPETS_PATH,
+        issue: 'invalid snippet catalog entries',
+      })
       return []
     }
     return parsed.snippets
-  } catch {
+  } catch (error) {
+    logDebug('snippets.catalog.loadIssue', {
+      path: SNIPPETS_PATH,
+      issue: error instanceof Error ? error.message : String(error),
+    })
     return []
   }
 }
@@ -65,7 +85,11 @@ export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
   try {
     mkdirSync(dirname(SNIPPETS_PATH), { recursive: true })
     writeFileSync(SNIPPETS_PATH, `${JSON.stringify({ version: 1, snippets }, null, 2)}\n`)
-  } catch {
-    // ignore write errors
+  } catch (error) {
+    logDebug('snippets.catalog.saveError', {
+      path: SNIPPETS_PATH,
+      error: error instanceof Error ? error.message : String(error),
+      snippetCount: snippets.length,
+    })
   }
 }

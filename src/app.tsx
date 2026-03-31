@@ -23,6 +23,7 @@ import { MultiClickDetector } from './input/multi-click-detector'
 import { buildPtyPastePayload } from './input/paste'
 import { createRawInputHandler, type TerminalContentOrigin } from './input/raw-input-handler'
 import { getLineText, getWordAtColumn } from './input/terminal-text-extraction'
+import { copyToSystemClipboard } from './platform/clipboard'
 import {
   ASSISTANT_OPTIONS,
   getAssistantOption,
@@ -40,12 +41,6 @@ import { applyTheme } from './ui/theme'
 import { type ThemeId, THEME_IDS } from './ui/themes'
 
 registerAllModes()
-
-function copyToSystemClipboard(text: string): void {
-  const proc = Bun.spawn(['pbcopy'], { stdin: 'pipe' })
-  proc.stdin.write(text)
-  proc.stdin.end()
-}
 
 const IDLE_TIMEOUT_MS = 2_000
 const STARTUP_GRACE_MS = 5_000

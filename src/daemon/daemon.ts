@@ -4,6 +4,7 @@ import { logDebug } from '../debug/input-log'
 import {
   encodeMessage,
   MessageDecoder,
+  parseClientRequest,
   type ClientRequest,
   type ServerEvent,
   type ServerResponse,
@@ -65,7 +66,7 @@ export async function runDaemon(): Promise<void> {
   const server = createServer((socket) => {
     logDebug('daemon.client.connected')
     sockets.add(socket)
-    const decoder = new MessageDecoder<ClientRequest>()
+    const decoder = new MessageDecoder<ClientRequest>(parseClientRequest)
 
     socket.on('data', (chunk) => {
       try {

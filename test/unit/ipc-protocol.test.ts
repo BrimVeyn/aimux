@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   encodeMessage,
   MessageDecoder,
+  parseClientRequest,
+  parseServerMessage,
   type ClientRequest,
   type IpcMessage,
 } from '../../src/ipc/protocol'
@@ -53,5 +55,34 @@ describe('ipc protocol framing', () => {
   test('rejects malformed frame headers', () => {
     const decoder = new MessageDecoder<IpcMessage>()
     expect(() => decoder.push('oops\n{}')).toThrow('Invalid IPC frame header: "oops"')
+  })
+
+  test('rejects malformed client request payloads', () => {
+    expect(() =>
+      parseClientRequest({
+        id: '5',
+        type: 'attach',
+        payload: { sessionId: 'session-a', cols: '80', rows: 24 },
+      })
+    ).toThrow('attach.cols must be a number')
+  })
+
+  test('rejects malformed server event payloads', () => {
+    expect(() =>
+      parseServerMessage({
+        type: 'tabRender',
+        payload: {
+          tabId: 'tab-1',
+          viewport: { lines: [], viewportY: 0, baseY: 0, cursorVisible: true },
+          terminalModes: {
+            mouseTrackingMode: 'bogus',
+            sendFocusMode: false,
+            alternateScrollMode: false,
+            isAlternateBuffer: false,
+            bracketedPasteMode: false,
+          },
+        },
+      })
+    ).toThrow('tabRender.terminalModes is invalid')
   })
 })

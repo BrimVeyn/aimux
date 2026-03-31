@@ -4,6 +4,10 @@ import { dirname, join } from 'node:path'
 import type { WorkspaceSnapshotV1 } from './state/types'
 import type { ThemeId } from './ui/themes'
 
+import { logDebug } from './debug/input-log'
+import { isWorkspaceSnapshotV1 } from './state/validation'
+import { THEME_IDS } from './ui/themes'
+
 export const CONFIG_PATH = join(process.env.HOME ?? '~', '.config', 'aimux.json')
 
 export interface AimuxConfig {
@@ -18,42 +22,103 @@ const DEFAULT_CONFIG: AimuxConfig = {
   customCommands: {},
 }
 
-function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
-  return (
-    typeof value === 'object' && value !== null && (value as { version?: number }).version === 1
+export interface ConfigLoadResult {
+  config: AimuxConfig
+  source: 'defaults' | 'file'
+  issues: string[]
+}
+
+function isThemeId(value: unknown): value is ThemeId {
+  return typeof value === 'string' && THEME_IDS.includes(value as ThemeId)
+}
+
+function isCustomCommandsRecord(value: unknown): value is Record<string, string> {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  return Object.entries(value).every(
+    ([key, entryValue]) =>
+      (key === 'claude' || key === 'codex' || key === 'opencode') && typeof entryValue === 'string'
   )
 }
 
-export function loadConfig(): AimuxConfig {
+export function loadConfigResult(): ConfigLoadResult {
   try {
-    if (existsSync(CONFIG_PATH)) {
-      const raw = readFileSync(CONFIG_PATH, 'utf8')
-      const parsed = JSON.parse(raw) as {
-        version?: number
-        customCommands?: Record<string, string>
-        themeId?: string
-        workspaceSnapshot?: unknown
-      }
-      return {
+    if (!existsSync(CONFIG_PATH)) {
+      return { config: DEFAULT_CONFIG, source: 'defaults', issues: [] }
+    }
+
+    const raw = readFileSync(CONFIG_PATH, 'utf8')
+    const parsed = JSON.parse(raw) as {
+      version?: number
+      customCommands?: unknown
+      themeId?: unknown
+      workspaceSnapshot?: unknown
+    }
+
+    const issues: string[] = []
+
+    if (parsed.version !== undefined && parsed.version !== 2) {
+      issues.push(`unsupported config version ${String(parsed.version)}`)
+    }
+
+    if (parsed.customCommands !== undefined && !isCustomCommandsRecord(parsed.customCommands)) {
+      issues.push('ignored invalid customCommands')
+    }
+
+    if (parsed.themeId !== undefined && !isThemeId(parsed.themeId)) {
+      issues.push('ignored invalid themeId')
+    }
+
+    if (
+      parsed.workspaceSnapshot !== undefined &&
+      !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
+    ) {
+      issues.push('ignored invalid workspaceSnapshot')
+    }
+
+    if (issues.length > 0) {
+      logDebug('config.load.validationIssue', { path: CONFIG_PATH, issues })
+    }
+
+    return {
+      config: {
         version: 2,
-        customCommands: parsed.customCommands ?? {},
-        themeId: (parsed.themeId as ThemeId) ?? undefined,
+        customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
+        themeId: isThemeId(parsed.themeId) ? parsed.themeId : undefined,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot
           : undefined,
-      }
+      },
+      source: 'file',
+      issues,
     }
-  } catch {
-    // ignore missing or malformed config
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    logDebug('config.load.error', { path: CONFIG_PATH, error: message })
+    return {
+      config: DEFAULT_CONFIG,
+      source: 'defaults',
+      issues: [`failed to load config: ${message}`],
+    }
   }
-  return DEFAULT_CONFIG
 }
 
-export function saveConfig(config: AimuxConfig): void {
+export function loadConfig(): AimuxConfig {
+  return loadConfigResult().config
+}
+
+export function saveConfig(config: AimuxConfig): boolean {
   try {
     mkdirSync(dirname(CONFIG_PATH), { recursive: true })
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
-  } catch {
-    // ignore write errors silently
+    return true
+  } catch (error) {
+    logDebug('config.save.error', {
+      path: CONFIG_PATH,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return false
   }
 }

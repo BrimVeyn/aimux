@@ -119,4 +119,70 @@ describe('RemoteSessionBackend', () => {
       })
     }
   })
+
+  test('surfaces server command errors for tab-scoped mutations', async () => {
+    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-error-'))
+    process.env.XDG_RUNTIME_DIR = tempRuntimeDir
+
+    const requests: ClientRequest[] = []
+    const sockets = new Set<Socket>()
+    const server = createServer((socket) => {
+      sockets.add(socket)
+      const decoder = new MessageDecoder<ClientRequest>()
+
+      socket.on('data', (chunk) => {
+        for (const message of decoder.push(chunk)) {
+          requests.push(message)
+
+          const response: ServerResponse =
+            message.type === 'attach'
+              ? { id: message.id, type: 'attachResult', payload: { tabs: [], activeTabId: null } }
+              : message.type === 'write'
+                ? { id: message.id, type: 'error', payload: { message: 'write rejected' } }
+                : { id: message.id, type: 'ok', payload: {} }
+          socket.write(encodeMessage(response))
+        }
+      })
+
+      socket.on('close', () => {
+        sockets.delete(socket)
+      })
+    })
+
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(getDaemonSocketPath(), () => resolve())
+    })
+
+    const backend = new RemoteSessionBackend()
+    let backendError: { tabId: string; message: string } | undefined
+
+    backend.on('error', (tabId, message) => {
+      backendError = { tabId, message }
+    })
+
+    try {
+      await backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })
+      backend.write('tab-1', 'hello')
+
+      await waitFor(() => backendError)
+
+      expect(backendError).toEqual({ tabId: 'tab-1', message: 'write rejected' })
+      expect(requests.find((message) => message.type === 'write')).toBeDefined()
+    } finally {
+      await backend.destroy(true)
+      for (const socket of sockets) {
+        socket.destroy()
+      }
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error)
+            return
+          }
+          resolve()
+        })
+      })
+    }
+  })
 })
