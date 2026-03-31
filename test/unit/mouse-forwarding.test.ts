@@ -1,49 +1,49 @@
-import { MouseButton, MouseEvent } from "@opentui/core";
-import { describe, expect, test } from "bun:test";
+import { MouseButton, MouseEvent } from '@opentui/core'
+import { describe, expect, test } from 'bun:test'
 
-import { encodeMouseEventForPty } from "../../src/input/mouse-forwarding";
+import { encodeMouseEventForPty } from '../../src/input/mouse-forwarding'
 
-const ORIGIN = { x: 34, y: 3, cols: 80, rows: 24 };
+const ORIGIN = { x: 34, y: 3, cols: 80, rows: 24 }
 
 function createMouseEvent(attributes: ConstructorParameters<typeof MouseEvent>[1]): MouseEvent {
-  return new MouseEvent(null, attributes);
+  return new MouseEvent(null, attributes)
 }
 
-describe("encodeMouseEventForPty", () => {
-  test("encodes click events", () => {
+describe('encodeMouseEventForPty', () => {
+  test('encodes click events', () => {
     const event = createMouseEvent({
-      type: "down",
+      type: 'down',
       button: MouseButton.LEFT,
       x: 40,
       y: 10,
       modifiers: { shift: false, alt: false, ctrl: false },
-    });
+    })
 
-    expect(encodeMouseEventForPty(event, ORIGIN)).toBe("\x1b[<0;7;8M");
-  });
+    expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<0;7;8M')
+  })
 
-  test("encodes mouse release with SGR release code", () => {
+  test('encodes mouse release with SGR release code', () => {
     const event = createMouseEvent({
-      type: "up",
+      type: 'up',
       button: MouseButton.LEFT,
       x: 40,
       y: 10,
       modifiers: { shift: false, alt: false, ctrl: false },
-    });
+    })
 
-    expect(encodeMouseEventForPty(event, ORIGIN)).toBe("\x1b[<3;7;8m");
-  });
+    expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<3;7;8m')
+  })
 
-  test("encodes scroll events from scroll direction", () => {
+  test('encodes scroll events from scroll direction', () => {
     const event = createMouseEvent({
-      type: "scroll",
+      type: 'scroll',
       button: MouseButton.LEFT,
       x: 40,
       y: 10,
       modifiers: { shift: false, alt: false, ctrl: false },
-      scroll: { direction: "up", delta: 1 },
-    });
+      scroll: { direction: 'up', delta: 1 },
+    })
 
-    expect(encodeMouseEventForPty(event, ORIGIN)).toBe("\x1b[<64;7;8M");
-  });
-});
+    expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<64;7;8M')
+  })
+})

@@ -1,9 +1,9 @@
-import { theme } from "../theme";
-import { type ThemeId, THEMES, THEME_IDS } from "../themes";
+import { theme } from '../theme'
+import { type ThemeId, THEMES, THEME_IDS } from '../themes'
 
 interface ThemePickerModalProps {
-  selectedIndex: number;
-  currentThemeId: ThemeId;
+  selectedIndex: number
+  currentThemeId: ThemeId
 }
 
 export function ThemePickerModal({ selectedIndex, currentThemeId }: ThemePickerModalProps) {
@@ -29,19 +29,19 @@ export function ThemePickerModal({ selectedIndex, currentThemeId }: ThemePickerM
         <text fg={theme.accent}>Select theme</text>
         <text fg={theme.textMuted}>j/k move, Enter confirm, Esc cancel.</text>
         {THEME_IDS.map((id, index) => {
-          const entry = THEMES[id];
-          const active = index === selectedIndex;
-          const isCurrent = id === currentThemeId;
+          const entry = THEMES[id]
+          const active = index === selectedIndex
+          const isCurrent = id === currentThemeId
           return (
             <box key={id} flexDirection="row">
               <text fg={active ? theme.text : theme.textMuted}>
-                {active ? ">" : " "} {entry.name}
+                {active ? '>' : ' '} {entry.name}
               </text>
               {isCurrent ? <text fg={theme.accent}> *</text> : null}
             </box>
-          );
+          )
         })}
       </box>
     </box>
-  );
+  )
 }

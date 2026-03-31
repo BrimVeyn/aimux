@@ -1,49 +1,50 @@
-import type { MouseEvent as OtuiMouseEvent } from "@opentui/core";
-import type { ReactNode } from "react";
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { ReactNode } from 'react'
 
-import type { TerminalContentOrigin } from "../../input/raw-input-handler";
-import type { TabSession, TerminalSpan } from "../../state/types";
-import { theme } from "../theme";
+import type { TerminalContentOrigin } from '../../input/raw-input-handler'
+import type { TabSession, TerminalSpan } from '../../state/types'
+
+import { theme } from '../theme'
 
 interface TerminalPaneProps {
-  tab?: TabSession;
-  focusMode: "navigation" | "terminal-input" | "modal" | "command-edit";
-  contentOrigin: TerminalContentOrigin;
-  mouseForwardingEnabled: boolean;
-  localScrollbackEnabled: boolean;
-  onTerminalMouseEvent: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void;
-  onTerminalScrollEvent: (event: OtuiMouseEvent) => void;
-  onTerminalClick?: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void;
+  tab?: TabSession
+  focusMode: 'navigation' | 'terminal-input' | 'modal' | 'command-edit'
+  contentOrigin: TerminalContentOrigin
+  mouseForwardingEnabled: boolean
+  localScrollbackEnabled: boolean
+  onTerminalMouseEvent: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void
+  onTerminalScrollEvent: (event: OtuiMouseEvent) => void
+  onTerminalClick?: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void
 }
 
 function getTitle(tab?: TabSession): string {
   if (!tab) {
-    return "No active session";
+    return 'No active session'
   }
 
-  return `${tab.title} - ${tab.status}`;
+  return `${tab.title} - ${tab.status}`
 }
 
 function renderSpan(span: TerminalSpan, index: number): ReactNode {
-  let node: ReactNode = span.text;
+  let node: ReactNode = span.text
 
   if (span.underline) {
-    node = <u>{node}</u>;
+    node = <u>{node}</u>
   }
 
   if (span.italic) {
-    node = <em>{node}</em>;
+    node = <em>{node}</em>
   }
 
   if (span.bold) {
-    node = <strong>{node}</strong>;
+    node = <strong>{node}</strong>
   }
 
   return (
     <text key={`span-${index}`} fg={span.fg ?? theme.text} bg={span.bg}>
       {node}
     </text>
-  );
+  )
 }
 
 function renderViewport(tab: TabSession): ReactNode {
@@ -56,14 +57,14 @@ function renderViewport(tab: TabSession): ReactNode {
           <text> </text>
         )}
       </box>
-    ));
+    ))
   }
 
   return (
     <text fg={theme.text}>
-      {tab.buffer.length > 0 ? tab.buffer : "Waiting for session output..."}
+      {tab.buffer.length > 0 ? tab.buffer : 'Waiting for session output...'}
     </text>
-  );
+  )
 }
 
 export function TerminalPane({
@@ -76,46 +77,46 @@ export function TerminalPane({
   onTerminalScrollEvent,
   onTerminalClick,
 }: TerminalPaneProps) {
-  const canForwardMouse = focusMode === "terminal-input" && !!tab && mouseForwardingEnabled;
-  const canUseLocalScrollback = focusMode === "terminal-input" && !!tab && localScrollbackEnabled;
+  const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
+  const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
     if (!canForwardMouse) {
       if (
-        focusMode === "terminal-input" &&
+        focusMode === 'terminal-input' &&
         tab &&
-        event.type === "down" &&
+        event.type === 'down' &&
         event.button === 0 &&
         onTerminalClick
       ) {
-        onTerminalClick(event, contentOrigin);
+        onTerminalClick(event, contentOrigin)
       }
-      return;
+      return
     }
 
-    event.preventDefault();
-    event.stopPropagation();
-    onTerminalMouseEvent(event, contentOrigin);
-  };
+    event.preventDefault()
+    event.stopPropagation()
+    onTerminalMouseEvent(event, contentOrigin)
+  }
   const forwardScrollEvent = (event: OtuiMouseEvent) => {
     if (!canForwardMouse && !canUseLocalScrollback) {
-      return;
+      return
     }
 
-    event.preventDefault();
-    event.stopPropagation();
+    event.preventDefault()
+    event.stopPropagation()
 
     if (canForwardMouse) {
-      onTerminalMouseEvent(event, contentOrigin);
-      return;
+      onTerminalMouseEvent(event, contentOrigin)
+      return
     }
 
-    onTerminalScrollEvent(event);
-  };
+    onTerminalScrollEvent(event)
+  }
   return (
     <box flexDirection="column" flexGrow={1} gap={1}>
       <box
         border
-        borderColor={focusMode === "terminal-input" ? theme.borderActive : theme.border}
+        borderColor={focusMode === 'terminal-input' ? theme.borderActive : theme.border}
         title={getTitle(tab)}
         padding={1}
         flexDirection="column"
@@ -145,13 +146,13 @@ export function TerminalPane({
           </box>
         )}
       </box>
-      {tab?.status === "exited" && tab.exitCode !== undefined ? (
+      {tab?.status === 'exited' && tab.exitCode !== undefined ? (
         <text fg={theme.warning}>Process exited with code {tab.exitCode}</text>
       ) : null}
-      {tab?.status === "disconnected" ? (
+      {tab?.status === 'disconnected' ? (
         <text fg={theme.warning}>Restored snapshot. Press Ctrl+r to restart this session.</text>
       ) : null}
       {tab?.errorMessage ? <text fg={theme.danger}>{tab.errorMessage}</text> : null}
     </box>
-  );
+  )
 }

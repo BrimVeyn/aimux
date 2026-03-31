@@ -1,17 +1,17 @@
-import type { KeyInput, KeyResult, ModeContext, ModeHandler } from "../types";
+import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 export const modalHelpMode: ModeHandler = {
-  id: "modal.help",
+  id: 'modal.help',
 
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
-    if (key.name === "escape") {
+    if (key.name === 'escape') {
       return {
-        actions: [{ type: "close-modal" }],
+        actions: [{ type: 'close-modal' }],
         effects: [],
-        transition: "navigation",
-      };
+        transition: 'navigation',
+      }
     }
 
-    return null;
+    return null
   },
-};
+}

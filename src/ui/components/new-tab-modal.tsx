@@ -1,11 +1,12 @@
-import { ASSISTANT_OPTIONS } from "../../pty/command-registry";
-import type { AssistantId } from "../../state/types";
-import { theme } from "../theme";
+import type { AssistantId } from '../../state/types'
+
+import { ASSISTANT_OPTIONS } from '../../pty/command-registry'
+import { theme } from '../theme'
 
 interface NewTabModalProps {
-  selectedIndex: number;
-  customCommands: Record<AssistantId, string>;
-  editBuffer: string | null;
+  selectedIndex: number
+  customCommands: Record<AssistantId, string>
+  editBuffer: string | null
 }
 
 export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTabModalProps) {
@@ -50,8 +51,8 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
               Use j/k or arrows, Enter to confirm, e to edit command, Esc to cancel.
             </text>
             {ASSISTANT_OPTIONS.map((option, index) => {
-              const active = index === selectedIndex;
-              const customCmd = customCommands[option.id];
+              const active = index === selectedIndex
+              const customCmd = customCommands[option.id]
 
               return (
                 <box
@@ -63,16 +64,16 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
                   flexDirection="column"
                 >
                   <text fg={active ? theme.text : theme.textMuted}>
-                    {active ? ">" : " "} {option.label}
+                    {active ? '>' : ' '} {option.label}
                   </text>
                   <text fg={theme.textMuted}>{option.description}</text>
                   {customCmd ? <text fg={theme.accent}>{customCmd}</text> : null}
                 </box>
-              );
+              )
             })}
           </>
         )}
       </box>
     </box>
-  );
+  )
 }

@@ -1,78 +1,79 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react'
 
-import type { TabSession } from "../../state/types";
-import { theme } from "../theme";
+import type { TabSession } from '../../state/types'
+
+import { theme } from '../theme'
 
 interface TabItemProps {
-  id?: string;
-  tab: TabSession;
-  active: boolean;
-  focused: boolean;
-  isFocusedInput: boolean;
+  id?: string
+  tab: TabSession
+  active: boolean
+  focused: boolean
+  isFocusedInput: boolean
 }
 
-function getStatusColor(status: TabSession["status"]): string {
+function getStatusColor(status: TabSession['status']): string {
   switch (status) {
-    case "running":
-      return theme.success;
-    case "disconnected":
-      return theme.warning;
-    case "error":
-      return theme.danger;
-    case "exited":
-      return theme.warning;
+    case 'running':
+      return theme.success
+    case 'disconnected':
+      return theme.warning
+    case 'error':
+      return theme.danger
+    case 'exited':
+      return theme.warning
     default:
-      return theme.textMuted;
+      return theme.textMuted
   }
 }
 
-const BUSY_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+const BUSY_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 function BusyIndicator() {
-  const [frame, setFrame] = useState(0);
+  const [frame, setFrame] = useState(0)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setFrame((prev) => (prev + 1) % BUSY_FRAMES.length);
-    }, 80);
-    return () => clearInterval(interval);
-  }, []);
+      setFrame((prev) => (prev + 1) % BUSY_FRAMES.length)
+    }, 80)
+    return () => clearInterval(interval)
+  }, [])
 
-  return <text fg={theme.accent}>{BUSY_FRAMES[frame]} busy</text>;
+  return <text fg={theme.accent}>{BUSY_FRAMES[frame]} busy</text>
 }
 
 function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocusedInput: boolean }) {
-  if (tab.status === "error") {
-    return <text fg={theme.danger}>✗ error</text>;
+  if (tab.status === 'error') {
+    return <text fg={theme.danger}>✗ error</text>
   }
 
-  if (tab.status === "disconnected") {
-    return <text fg={theme.warning}>⏸ restore</text>;
+  if (tab.status === 'disconnected') {
+    return <text fg={theme.warning}>⏸ restore</text>
   }
 
-  if (tab.status === "exited") {
-    return <text fg={theme.warning}>⏹ exited</text>;
+  if (tab.status === 'exited') {
+    return <text fg={theme.warning}>⏹ exited</text>
   }
 
   if (isFocusedInput) {
-    return <text fg={theme.borderActive}>▸ focused</text>;
+    return <text fg={theme.borderActive}>▸ focused</text>
   }
 
-  if (tab.activity === "busy") {
-    return <BusyIndicator />;
+  if (tab.activity === 'busy') {
+    return <BusyIndicator />
   }
 
-  if (tab.activity === "idle") {
-    return <text fg={theme.success}>● idle</text>;
+  if (tab.activity === 'idle') {
+    return <text fg={theme.success}>● idle</text>
   }
 
-  return <text fg={getStatusColor(tab.status)}>{tab.status}</text>;
+  return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
 }
 
 export function TabItem({ id, tab, active, focused, isFocusedInput }: TabItemProps) {
-  const label = tab.assistant.charAt(0).toUpperCase() + tab.assistant.slice(1).toLowerCase();
-  const indicator = active ? (focused ? "▶" : "◆") : "│";
-  const indicatorColor = active ? (focused ? theme.accent : theme.accentAlt) : theme.dim;
+  const label = tab.assistant.charAt(0).toUpperCase() + tab.assistant.slice(1).toLowerCase()
+  const indicator = active ? (focused ? '▶' : '◆') : '│'
+  const indicatorColor = active ? (focused ? theme.accent : theme.accentAlt) : theme.dim
 
   return (
     <box
@@ -96,5 +97,5 @@ export function TabItem({ id, tab, active, focused, isFocusedInput }: TabItemPro
         <ActivityIndicator tab={tab} isFocusedInput={isFocusedInput} />
       </box>
     </box>
-  );
+  )
 }

@@ -1,10 +1,10 @@
-import { theme } from "../theme";
+import { theme } from '../theme'
 
 interface SnippetEditorModalProps {
-  activeField: "directory" | "name";
-  snippetName: string;
-  snippetContent: string;
-  isEditing: boolean;
+  activeField: 'directory' | 'name'
+  snippetName: string
+  snippetContent: string
+  isEditing: boolean
 }
 
 export function SnippetEditorModal({
@@ -13,8 +13,8 @@ export function SnippetEditorModal({
   snippetContent,
   isEditing,
 }: SnippetEditorModalProps) {
-  const nameActive = activeField === "directory";
-  const contentActive = activeField === "name";
+  const nameActive = activeField === 'directory'
+  const contentActive = activeField === 'name'
 
   return (
     <box
@@ -35,7 +35,7 @@ export function SnippetEditorModal({
         flexDirection="column"
         gap={1}
       >
-        <text fg={theme.accent}>{isEditing ? "Edit snippet" : "Create snippet"}</text>
+        <text fg={theme.accent}>{isEditing ? 'Edit snippet' : 'Create snippet'}</text>
         <text fg={theme.textMuted}>Tab switch field. Enter on content to save. Esc cancel.</text>
 
         <text fg={nameActive ? theme.text : theme.textMuted}>Name:</text>
@@ -47,7 +47,7 @@ export function SnippetEditorModal({
         >
           <text fg={nameActive ? theme.text : theme.textMuted}>
             {snippetName}
-            {nameActive ? "_" : ""}
+            {nameActive ? '_' : ''}
           </text>
         </box>
 
@@ -60,10 +60,10 @@ export function SnippetEditorModal({
         >
           <text fg={contentActive ? theme.text : theme.textMuted}>
             {snippetContent}
-            {contentActive ? "_" : ""}
+            {contentActive ? '_' : ''}
           </text>
         </box>
       </box>
     </box>
-  );
+  )
 }

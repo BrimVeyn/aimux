@@ -1,29 +1,30 @@
-import type { SnippetRecord } from "../../state/types";
-import { theme } from "../theme";
+import type { SnippetRecord } from '../../state/types'
+
+import { theme } from '../theme'
 
 interface SnippetPickerModalProps {
-  snippets: SnippetRecord[];
-  selectedIndex: number;
-  filter: string | null;
+  snippets: SnippetRecord[]
+  selectedIndex: number
+  filter: string | null
 }
 
 function filterSnippets(snippets: SnippetRecord[], filter: string | null): SnippetRecord[] {
-  if (!filter) return snippets;
-  const lower = filter.toLowerCase();
+  if (!filter) return snippets
+  const lower = filter.toLowerCase()
   return snippets.filter(
-    (s) => s.name.toLowerCase().includes(lower) || s.content.toLowerCase().includes(lower),
-  );
+    (s) => s.name.toLowerCase().includes(lower) || s.content.toLowerCase().includes(lower)
+  )
 }
 
-const MAX_PREVIEW_LENGTH = 60;
+const MAX_PREVIEW_LENGTH = 60
 
 function truncateContent(content: string): string {
-  if (content.length <= MAX_PREVIEW_LENGTH) return content;
-  return `${content.slice(0, MAX_PREVIEW_LENGTH - 3)}...`;
+  if (content.length <= MAX_PREVIEW_LENGTH) return content
+  return `${content.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
 }
 
 export function SnippetPickerModal({ snippets, selectedIndex, filter }: SnippetPickerModalProps) {
-  const filtered = filterSnippets(snippets, filter);
+  const filtered = filterSnippets(snippets, filter)
 
   return (
     <box
@@ -61,12 +62,12 @@ export function SnippetPickerModal({ snippets, selectedIndex, filter }: SnippetP
         {filtered.length === 0 ? (
           <box padding={1}>
             <text fg={theme.textMuted}>
-              {filter ? "No matching snippets." : "No snippets yet. Press n to create one."}
+              {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
             </text>
           </box>
         ) : null}
         {filtered.map((snippet, index) => {
-          const active = index === selectedIndex;
+          const active = index === selectedIndex
           return (
             <box
               key={snippet.id}
@@ -77,13 +78,13 @@ export function SnippetPickerModal({ snippets, selectedIndex, filter }: SnippetP
               flexDirection="column"
             >
               <text fg={active ? theme.text : theme.textMuted}>
-                {active ? ">" : " "} {snippet.name}
+                {active ? '>' : ' '} {snippet.name}
               </text>
               <text fg={theme.textMuted}> {truncateContent(snippet.content)}</text>
             </box>
-          );
+          )
         })}
       </box>
     </box>
-  );
+  )
 }

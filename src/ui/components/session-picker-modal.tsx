@@ -1,41 +1,42 @@
-import { homedir } from "node:os";
+import { homedir } from 'node:os'
 
-import type { SessionRecord } from "../../state/types";
-import { theme } from "../theme";
+import type { SessionRecord } from '../../state/types'
+
+import { theme } from '../theme'
 
 function abbreviatePath(path: string): string {
-  const home = homedir();
-  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  const home = homedir()
+  return path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 
 interface SessionPickerModalProps {
-  sessions: SessionRecord[];
-  selectedIndex: number;
-  currentSessionId: string | null;
-  currentTabCount: number;
-  filter: string | null;
+  sessions: SessionRecord[]
+  selectedIndex: number
+  currentSessionId: string | null
+  currentTabCount: number
+  filter: string | null
 }
 
 function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
-  if (!filter) return sessions;
-  const lower = filter.toLowerCase();
+  if (!filter) return sessions
+  const lower = filter.toLowerCase()
   return sessions.filter(
     (s) =>
       s.name.toLowerCase().includes(lower) ||
-      (s.projectPath && s.projectPath.toLowerCase().includes(lower)),
-  );
+      (s.projectPath && s.projectPath.toLowerCase().includes(lower))
+  )
 }
 
 function formatSessionLine(
   session: SessionRecord,
   currentSessionId: string | null,
-  currentTabCount: number,
+  currentTabCount: number
 ): string {
   const tabCount =
     session.id === currentSessionId
       ? currentTabCount
-      : (session.workspaceSnapshot?.tabs.length ?? 0);
-  return `${session.name} (${tabCount} tab${tabCount === 1 ? "" : "s"})`;
+      : (session.workspaceSnapshot?.tabs.length ?? 0)
+  return `${session.name} (${tabCount} tab${tabCount === 1 ? '' : 's'})`
 }
 
 export function SessionPickerModal({
@@ -45,7 +46,7 @@ export function SessionPickerModal({
   currentTabCount,
   filter,
 }: SessionPickerModalProps) {
-  const filtered = filterSessions(sessions, filter);
+  const filtered = filterSessions(sessions, filter)
 
   return (
     <box
@@ -84,8 +85,8 @@ export function SessionPickerModal({
           <box padding={1}>
             <text fg={theme.textMuted}>
               {filter
-                ? "No matching sessions."
-                : "No sessions yet. Press Enter or n to create your first session."}
+                ? 'No matching sessions.'
+                : 'No sessions yet. Press Enter or n to create your first session.'}
             </text>
           </box>
         ) : null}
@@ -97,7 +98,7 @@ export function SessionPickerModal({
           </box>
         ) : null}
         {filtered.map((session, index) => {
-          const active = index === selectedIndex;
+          const active = index === selectedIndex
           return (
             <box
               key={session.id}
@@ -108,13 +109,13 @@ export function SessionPickerModal({
               flexDirection="column"
             >
               <text fg={active ? theme.text : theme.textMuted}>
-                {active ? ">" : " "} {formatSessionLine(session, currentSessionId, currentTabCount)}
+                {active ? '>' : ' '} {formatSessionLine(session, currentSessionId, currentTabCount)}
               </text>
               {session.projectPath ? (
                 <text fg={theme.textMuted}> {abbreviatePath(session.projectPath)}</text>
               ) : null}
             </box>
-          );
+          )
         })}
         <box
           border
@@ -123,10 +124,10 @@ export function SessionPickerModal({
           padding={1}
         >
           <text fg={selectedIndex === filtered.length ? theme.text : theme.textMuted}>
-            {selectedIndex === filtered.length ? ">" : " "} Create new session
+            {selectedIndex === filtered.length ? '>' : ' '} Create new session
           </text>
         </box>
       </box>
     </box>
-  );
+  )
 }

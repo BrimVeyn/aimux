@@ -1,40 +1,40 @@
-import { theme } from "../theme";
+import { theme } from '../theme'
 
 const SECTIONS = [
   {
-    title: "Navigation",
+    title: 'Navigation',
     bindings: [
-      ["j / k", "Move between tabs"],
-      ["Shift+J / K", "Reorder tabs"],
-      ["i", "Focus terminal input"],
-      ["?", "Show this help"],
+      ['j / k', 'Move between tabs'],
+      ['Shift+J / K', 'Reorder tabs'],
+      ['i', 'Focus terminal input'],
+      ['?', 'Show this help'],
     ],
   },
   {
-    title: "Tabs & Sessions",
+    title: 'Tabs & Sessions',
     bindings: [
-      ["Ctrl+n", "New tab"],
-      ["Ctrl+w", "Close tab"],
-      ["Ctrl+r", "Restart tab"],
-      ["Ctrl+g", "Session picker"],
+      ['Ctrl+n', 'New tab'],
+      ['Ctrl+w', 'Close tab'],
+      ['Ctrl+r', 'Restart tab'],
+      ['Ctrl+g', 'Session picker'],
     ],
   },
   {
-    title: "Layout",
+    title: 'Layout',
     bindings: [
-      ["Ctrl+b", "Toggle sidebar"],
-      ["Ctrl+h / l", "Resize sidebar"],
+      ['Ctrl+b', 'Toggle sidebar'],
+      ['Ctrl+h / l', 'Resize sidebar'],
     ],
   },
   {
-    title: "Terminal Input",
-    bindings: [["Ctrl+z", "Back to navigation"]],
+    title: 'Terminal Input',
+    bindings: [['Ctrl+z', 'Back to navigation']],
   },
   {
-    title: "General",
-    bindings: [["Ctrl+c", "Quit"]],
+    title: 'General',
+    bindings: [['Ctrl+c', 'Quit']],
   },
-] as const;
+] as const
 
 export function HelpModal() {
   return (
@@ -73,5 +73,5 @@ export function HelpModal() {
         <text fg={theme.textMuted}>Press Esc to close</text>
       </box>
     </box>
-  );
+  )
 }

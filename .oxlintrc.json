@@ -1,15 +1,49 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "unicorn", "oxc"],
+  "plugins": ["typescript", "unicorn", "react"],
   "categories": {
-    "correctness": "error",
-    "suspicious": "warn"
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "node": true,
+    "es6": true
   },
   "rules": {
-    "no-console": "off",
-    "no-control-regex": "off",
-    "react/react-in-jsx-scope": "off",
-    "react-hooks/exhaustive-deps": "warn"
+    "no-console": "error",
+    "prefer-template": "error",
+    "no-unused-vars": "off",
+    "typescript/no-empty-object-type": "off",
+    "unicorn/filename-case": [
+      "error",
+      {
+        "cases": {
+          "kebabCase": true,
+          "snakeCase": true
+        }
+      }
+    ],
+    "unicorn/prefer-module": "error",
+    "react/no-unescaped-entities": "error"
   },
-  "ignorePatterns": ["node_modules", "dist", "assets"]
+  "overrides": [
+    {
+      "files": ["**/routes/**/$*.tsx"],
+      "rules": {
+        "unicorn/filename-case": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "**/*.js",
+    "**/dist/**",
+    "**/routeTree.gen.ts",
+    "**/build/**",
+    "**/.adonisjs/api.ts",
+    "**/.adonisjs/prisma.ts",
+    "**/generated/prisma/**",
+    "**/*.cjs",
+    "**/*.mjs",
+    "**/*.d.ts"
+  ]
 }

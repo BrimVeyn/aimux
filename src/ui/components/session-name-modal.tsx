@@ -1,4 +1,4 @@
-import { theme } from "../theme";
+import { theme } from '../theme'
 
 export function SessionNameModal({ title, value }: { title: string; value: string }) {
   return (
@@ -27,5 +27,5 @@ export function SessionNameModal({ title, value }: { title: string; value: strin
         </box>
       </box>
     </box>
-  );
+  )
 }

@@ -1,26 +1,27 @@
-import type { AppState, TabSession } from "../../state/types";
-import { theme } from "../theme";
-import { getStatusBarModel } from "../status-bar-model";
+import type { AppState, TabSession } from '../../state/types'
+
+import { getStatusBarModel } from '../status-bar-model'
+import { theme } from '../theme'
 
 interface StatusBarProps {
-  state: AppState;
-  activeTab?: TabSession;
+  state: AppState
+  activeTab?: TabSession
 }
 
-function getModeBorderColor(focusMode: AppState["focusMode"]): string {
+function getModeBorderColor(focusMode: AppState['focusMode']): string {
   switch (focusMode) {
-    case "terminal-input":
-      return theme.accent;
-    case "modal":
-      return theme.warning;
-    case "navigation":
+    case 'terminal-input':
+      return theme.accent
+    case 'modal':
+      return theme.warning
+    case 'navigation':
     default:
-      return theme.accentAlt;
+      return theme.accentAlt
   }
 }
 
 export function StatusBar({ state, activeTab }: StatusBarProps) {
-  const model = getStatusBarModel(state, activeTab);
+  const model = getStatusBarModel(state, activeTab)
 
   return (
     <box
@@ -41,5 +42,5 @@ export function StatusBar({ state, activeTab }: StatusBarProps) {
         <text fg={theme.textMuted}>{model.right}</text>
       </box>
     </box>
-  );
+  )
 }

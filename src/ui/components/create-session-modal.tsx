@@ -1,24 +1,24 @@
-import { homedir } from "node:os";
+import { homedir } from 'node:os'
 
-import { theme } from "../theme";
+import { theme } from '../theme'
 
 interface DirectoryResult {
-  path: string;
-  isWorktree: boolean;
+  path: string
+  isWorktree: boolean
 }
 
 interface CreateSessionModalProps {
-  activeField: "directory" | "name";
-  directoryQuery: string;
-  sessionName: string;
-  results: DirectoryResult[];
-  selectedIndex: number;
-  pendingProjectPath: string | null;
+  activeField: 'directory' | 'name'
+  directoryQuery: string
+  sessionName: string
+  results: DirectoryResult[]
+  selectedIndex: number
+  pendingProjectPath: string | null
 }
 
 function abbreviatePath(path: string): string {
-  const home = homedir();
-  return path.startsWith(home) ? `~${path.slice(home.length)}` : path;
+  const home = homedir()
+  return path.startsWith(home) ? `~${path.slice(home.length)}` : path
 }
 
 export function CreateSessionModal({
@@ -29,8 +29,8 @@ export function CreateSessionModal({
   selectedIndex,
   pendingProjectPath,
 }: CreateSessionModalProps) {
-  const dirActive = activeField === "directory";
-  const nameActive = activeField === "name";
+  const dirActive = activeField === 'directory'
+  const nameActive = activeField === 'name'
 
   return (
     <box
@@ -63,7 +63,7 @@ export function CreateSessionModal({
         >
           <text fg={dirActive ? theme.text : theme.textMuted}>
             {pendingProjectPath && !dirActive ? abbreviatePath(pendingProjectPath) : directoryQuery}
-            {dirActive ? "_" : ""}
+            {dirActive ? '_' : ''}
           </text>
         </box>
 
@@ -72,18 +72,18 @@ export function CreateSessionModal({
         ) : null}
         {dirActive
           ? results.map((result, index) => {
-              const active = index === selectedIndex;
-              const icon = result.isWorktree ? "\u{e728}" : "\u{e702}";
-              const iconColor = result.isWorktree ? theme.warning : theme.accent;
+              const active = index === selectedIndex
+              const icon = result.isWorktree ? '\u{e728}' : '\u{e702}'
+              const iconColor = result.isWorktree ? theme.warning : theme.accent
               return (
                 <box key={result.path} flexDirection="row">
-                  <text fg={active ? theme.text : theme.textMuted}>{active ? ">" : " "} </text>
+                  <text fg={active ? theme.text : theme.textMuted}>{active ? '>' : ' '} </text>
                   <text fg={iconColor}>{icon} </text>
                   <text fg={active ? theme.text : theme.textMuted}>
                     {abbreviatePath(result.path)}
                   </text>
                 </box>
-              );
+              )
             })
           : null}
 
@@ -96,10 +96,10 @@ export function CreateSessionModal({
         >
           <text fg={nameActive ? theme.text : theme.textMuted}>
             {sessionName}
-            {nameActive ? "_" : ""}
+            {nameActive ? '_' : ''}
           </text>
         </box>
       </box>
     </box>
-  );
+  )
 }

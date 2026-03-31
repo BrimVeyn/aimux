@@ -1,60 +1,61 @@
-import type { Terminal } from "@xterm/headless";
+import type { Terminal } from '@xterm/headless'
 
-import type { TerminalLine, TerminalSnapshot, TerminalSpan } from "../state/types";
-import { theme } from "../ui/theme";
+import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/types'
+
+import { theme } from '../ui/theme'
 
 const ANSI_PALETTE = [
-  "#000000",
-  "#cd0000",
-  "#00cd00",
-  "#cdcd00",
-  "#0000ee",
-  "#cd00cd",
-  "#00cdcd",
-  "#e5e5e5",
-  "#7f7f7f",
-  "#ff0000",
-  "#00ff00",
-  "#ffff00",
-  "#5c5cff",
-  "#ff00ff",
-  "#00ffff",
-  "#ffffff",
-];
+  '#000000',
+  '#cd0000',
+  '#00cd00',
+  '#cdcd00',
+  '#0000ee',
+  '#cd00cd',
+  '#00cdcd',
+  '#e5e5e5',
+  '#7f7f7f',
+  '#ff0000',
+  '#00ff00',
+  '#ffff00',
+  '#5c5cff',
+  '#ff00ff',
+  '#00ffff',
+  '#ffffff',
+]
 
 function toHex(value: number): string {
-  return `#${value.toString(16).padStart(6, "0")}`;
+  return `#${value.toString(16).padStart(6, '0')}`
 }
 
 function paletteToHex(index: number): string {
   if (index < ANSI_PALETTE.length) {
-    return ANSI_PALETTE[index] ?? ANSI_PALETTE[0]!;
+    return ANSI_PALETTE[index] ?? ANSI_PALETTE[0]!
   }
 
   if (index >= 232) {
-    const shade = 8 + (index - 232) * 10;
-    return toHex((shade << 16) | (shade << 8) | shade);
+    const shade = 8 + (index - 232) * 10
+    return toHex((shade << 16) | (shade << 8) | shade)
   }
 
-  const normalized = index - 16;
-  const r = Math.floor(normalized / 36);
-  const g = Math.floor((normalized % 36) / 6);
-  const b = normalized % 6;
-  const channel = [0, 95, 135, 175, 215, 255];
+  const normalized = index - 16
+  const r = Math.floor(normalized / 36)
+  const g = Math.floor((normalized % 36) / 6)
+  const b = normalized % 6
+  const channel = [0, 95, 135, 175, 215, 255]
 
-  return toHex(((channel[r] ?? 0) << 16) | ((channel[g] ?? 0) << 8) | (channel[b] ?? 0));
+  return toHex(((channel[r] ?? 0) << 16) | ((channel[g] ?? 0) << 8) | (channel[b] ?? 0))
 }
 
-function getColorHex(color: number, mode: "rgb" | "palette" | "default"): string | undefined {
-  if (mode === "default") {
-    return undefined;
+function getColorHex(color: number, mode: 'rgb' | 'palette' | 'default'): string | undefined {
+  if (mode === 'default') {
+    return undefined
   }
 
-  return mode === "rgb" ? toHex(color) : paletteToHex(color);
+  return mode === 'rgb' ? toHex(color) : paletteToHex(color)
 }
 
 function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
-  const previous = spans.at(-1);
+  const previous = spans.at(-1)
   if (
     previous &&
     previous.fg === span.fg &&
@@ -64,52 +65,52 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
     previous.underline === span.underline &&
     previous.cursor === span.cursor
   ) {
-    previous.text += span.text;
-    return;
+    previous.text += span.text
+    return
   }
 
-  spans.push(span);
+  spans.push(span)
 }
 
 function buildLine(
   terminal: Terminal,
   lineIndex: number,
   cursorColumn: number | null,
-  cursorVisible: boolean,
+  cursorVisible: boolean
 ): TerminalLine {
-  const line = terminal.buffer.active.getLine(lineIndex);
+  const line = terminal.buffer.active.getLine(lineIndex)
 
   if (!line) {
-    return { spans: [] };
+    return { spans: [] }
   }
 
-  const cell = terminal.buffer.active.getNullCell();
-  const spans: TerminalSpan[] = [];
+  const cell = terminal.buffer.active.getNullCell()
+  const spans: TerminalSpan[] = []
 
   for (let column = 0; column < terminal.cols; column += 1) {
-    const current = line.getCell(column, cell);
+    const current = line.getCell(column, cell)
     if (!current || current.getWidth() === 0) {
-      continue;
+      continue
     }
 
-    const text = current.getChars() || " ";
-    const fgMode = current.isFgRGB() ? "rgb" : current.isFgPalette() ? "palette" : "default";
-    const bgMode = current.isBgRGB() ? "rgb" : current.isBgPalette() ? "palette" : "default";
+    const text = current.getChars() || ' '
+    const fgMode = current.isFgRGB() ? 'rgb' : current.isFgPalette() ? 'palette' : 'default'
+    const bgMode = current.isBgRGB() ? 'rgb' : current.isBgPalette() ? 'palette' : 'default'
 
-    let fg = getColorHex(current.getFgColor(), fgMode);
-    let bg = getColorHex(current.getBgColor(), bgMode);
+    let fg = getColorHex(current.getFgColor(), fgMode)
+    let bg = getColorHex(current.getBgColor(), bgMode)
 
     if (current.isInverse()) {
-      const resolvedFg = fg ?? theme.text;
-      const resolvedBg = bg ?? theme.background;
-      [fg, bg] = [resolvedBg, resolvedFg];
+      const resolvedFg = fg ?? theme.text
+      const resolvedBg = bg ?? theme.background
+      ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 
-    const isCursorCell = cursorVisible && cursorColumn === column;
+    const isCursorCell = cursorVisible && cursorColumn === column
     if (isCursorCell) {
-      const resolvedFg = fg ?? theme.text;
-      const resolvedBg = bg ?? theme.background;
-      [fg, bg] = [resolvedBg, resolvedFg];
+      const resolvedFg = fg ?? theme.text
+      const resolvedBg = bg ?? theme.background
+      ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 
     pushSpan(spans, {
@@ -120,23 +121,23 @@ function buildLine(
       italic: current.isItalic() ? true : undefined,
       underline: current.isUnderline() ? true : undefined,
       cursor: isCursorCell ? true : undefined,
-    });
+    })
   }
 
-  return { spans };
+  return { spans }
 }
 
 export function snapshotTerminal(terminal: Terminal, cursorVisible = true): TerminalSnapshot {
-  const buffer = terminal.buffer.active;
-  const startLine = buffer.viewportY;
-  const cursorRow = buffer.cursorY;
-  const cursorColumn = Math.min(buffer.cursorX, Math.max(terminal.cols - 1, 0));
-  const lines: TerminalLine[] = [];
+  const buffer = terminal.buffer.active
+  const startLine = buffer.viewportY
+  const cursorRow = buffer.cursorY
+  const cursorColumn = Math.min(buffer.cursorX, Math.max(terminal.cols - 1, 0))
+  const lines: TerminalLine[] = []
 
   for (let row = 0; row < terminal.rows; row += 1) {
     lines.push(
-      buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible),
-    );
+      buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible)
+    )
   }
 
   return {
@@ -144,7 +145,7 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
     viewportY: buffer.viewportY,
     baseY: buffer.baseY,
     cursorVisible,
-  };
+  }
 }
 
 function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
@@ -156,30 +157,30 @@ function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
     left.italic === right.italic &&
     left.underline === right.underline &&
     left.cursor === right.cursor
-  );
+  )
 }
 
 function areLinesEqual(left: TerminalLine, right: TerminalLine): boolean {
   if (left.spans.length !== right.spans.length) {
-    return false;
+    return false
   }
 
   return left.spans.every((span, index) => {
-    const other = right.spans[index];
-    return other ? areSpansEqual(span, other) : false;
-  });
+    const other = right.spans[index]
+    return other ? areSpansEqual(span, other) : false
+  })
 }
 
 export function areTerminalSnapshotsEqual(
   left?: TerminalSnapshot,
-  right?: TerminalSnapshot,
+  right?: TerminalSnapshot
 ): boolean {
   if (!left || !right) {
-    return left === right;
+    return left === right
   }
 
   if (left.lines.length !== right.lines.length) {
-    return false;
+    return false
   }
 
   if (
@@ -187,11 +188,11 @@ export function areTerminalSnapshotsEqual(
     left.baseY !== right.baseY ||
     left.cursorVisible !== right.cursorVisible
   ) {
-    return false;
+    return false
   }
 
   return left.lines.every((line, index) => {
-    const other = right.lines[index];
-    return other ? areLinesEqual(line, other) : false;
-  });
+    const other = right.lines[index]
+    return other ? areLinesEqual(line, other) : false
+  })
 }
