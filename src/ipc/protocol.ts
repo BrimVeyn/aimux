@@ -137,7 +137,10 @@ function isAttachResult(value: unknown): value is AttachResult {
       (tab) =>
         isObjectRecord(tab) &&
         isString(tab.id) &&
-        (tab.assistant === 'claude' || tab.assistant === 'codex' || tab.assistant === 'opencode') &&
+        (tab.assistant === 'claude' ||
+          tab.assistant === 'codex' ||
+          tab.assistant === 'opencode' ||
+          tab.assistant === 'terminal') &&
         isString(tab.title) &&
         (tab.status === 'starting' ||
           tab.status === 'running' ||
@@ -188,7 +191,8 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(
         value.payload.assistant === 'claude' ||
           value.payload.assistant === 'codex' ||
-          value.payload.assistant === 'opencode',
+          value.payload.assistant === 'opencode' ||
+          value.payload.assistant === 'terminal',
         'createTab.assistant must be a valid assistant id'
       )
       assert(isString(value.payload.title), 'createTab.title must be a string')

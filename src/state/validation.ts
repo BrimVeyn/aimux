@@ -84,7 +84,10 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
       (tab) =>
         isObjectRecord(tab) &&
         isString(tab.id) &&
-        (tab.assistant === 'claude' || tab.assistant === 'codex' || tab.assistant === 'opencode') &&
+        (tab.assistant === 'claude' ||
+          tab.assistant === 'codex' ||
+          tab.assistant === 'opencode' ||
+          tab.assistant === 'terminal') &&
         isString(tab.title) &&
         isString(tab.command) &&
         (tab.status === 'starting' ||

@@ -211,6 +211,7 @@ function MouseHarness({
           claude: command,
           codex: 'codex',
           opencode: 'opencode',
+          terminal: 'zsh',
         },
       }}
       contentOrigin={contentOriginRef.current}

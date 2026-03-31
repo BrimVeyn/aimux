@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { Socket, connect } from 'node:net'
 
-import type { WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { getDaemonSocketPath } from '../daemon/runtime-paths'
@@ -223,7 +223,7 @@ export class RemoteSessionBackend
 
   createSession(options: {
     tabId: string
-    assistant: 'claude' | 'codex' | 'opencode'
+    assistant: AssistantId
     title: string
     command: string
     args?: string[]

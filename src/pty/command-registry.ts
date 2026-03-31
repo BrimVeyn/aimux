@@ -26,6 +26,12 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     command: 'opencode',
     description: 'OpenCode CLI',
   },
+  {
+    id: 'terminal',
+    label: 'Terminal',
+    command: 'zsh',
+    description: 'Plain terminal (zsh)',
+  },
 ]
 
 export function getAssistantOption(index: number): AssistantOption {

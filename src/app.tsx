@@ -64,7 +64,7 @@ function createTabId(): string {
 }
 
 function createTabSession(assistant: AssistantId, customCommand?: string): TabSession {
-  const index = ['claude', 'codex', 'opencode'].indexOf(assistant)
+  const index = ASSISTANT_OPTIONS.findIndex((o) => o.id === assistant)
   const option = getAssistantOption(index)
 
   return {

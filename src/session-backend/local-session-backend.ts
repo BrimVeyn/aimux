@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 
-import type { WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
@@ -51,7 +51,7 @@ export class LocalSessionBackend
 
   createSession(options: {
     tabId: string
-    assistant: 'claude' | 'codex' | 'opencode'
+    assistant: AssistantId
     title: string
     command: string
     args?: string[]
