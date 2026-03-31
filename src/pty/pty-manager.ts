@@ -1,62 +1,63 @@
-import { EventEmitter } from "node:events";
+import { Terminal as XTerm } from '@xterm/headless'
+import { spawn, type IPty } from 'bun-pty'
+import { EventEmitter } from 'node:events'
 
-import { Terminal as XTerm } from "@xterm/headless";
-import { spawn, type IPty } from "bun-pty";
+import type { TerminalModeState, TerminalSnapshot } from '../state/types'
 
-import type { TerminalModeState, TerminalSnapshot } from "../state/types";
-import { areTerminalSnapshotsEqual, snapshotTerminal } from "./terminal-snapshot";
+import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
 
 type PtyManagerEvents = {
-  render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState];
-  exit: [tabId: string, exitCode: number];
-  error: [tabId: string, message: string];
-};
-
-interface SessionHandle {
-  tabId: string;
-  pty: IPty;
-  emulator: XTerm;
-  lastSnapshot?: TerminalSnapshot;
-  lastTerminalModes?: TerminalModeState;
-  alternateScrollMode: boolean;
-  cursorVisible: boolean;
-  pendingModeSequence: string;
-  pendingWrites: number;
-  pendingExitCode: number | null;
+  render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
+  exit: [tabId: string, exitCode: number]
+  error: [tabId: string, message: string]
 }
 
-const PRIVATE_MODE_RE = /\x1b\[\?([0-9;]+)([hl])/g;
+interface SessionHandle {
+  tabId: string
+  pty: IPty
+  emulator: XTerm
+  lastSnapshot?: TerminalSnapshot
+  lastTerminalModes?: TerminalModeState
+  alternateScrollMode: boolean
+  cursorVisible: boolean
+  pendingModeSequence: string
+  pendingWrites: number
+  pendingExitCode: number | null
+}
+
+const ESC = '\x1b'
+const PRIVATE_MODE_RE = new RegExp(`${ESC}\\[\\?([0-9;]+)([hl])`, 'g')
 
 function getPendingModeSequence(sequence: string): string {
-  const escapeIndex = sequence.lastIndexOf("\x1b");
+  const escapeIndex = sequence.lastIndexOf('\x1b')
   if (escapeIndex === -1) {
-    return "";
+    return ''
   }
 
-  const suffix = sequence.slice(escapeIndex);
-  return /^\x1b(?:\[\??[0-9;]*)?$/.test(suffix) ? suffix : "";
+  const suffix = sequence.slice(escapeIndex)
+  return new RegExp(`^${ESC}(?:\\[\\??[0-9;]*)?$`).test(suffix) ? suffix : ''
 }
 
 function trackPrivateModes(
   alternateScrollMode: boolean,
   cursorVisible: boolean,
   pendingSequence: string,
-  data: string,
+  data: string
 ): {
-  alternateScrollMode: boolean;
-  cursorVisible: boolean;
-  pendingSequence: string;
+  alternateScrollMode: boolean
+  cursorVisible: boolean
+  pendingSequence: string
 } {
-  const sequence = `${pendingSequence}${data}`;
-  let nextAlternateScrollMode = alternateScrollMode;
-  let nextCursorVisible = cursorVisible;
+  const sequence = `${pendingSequence}${data}`
+  let nextAlternateScrollMode = alternateScrollMode
+  let nextCursorVisible = cursorVisible
   for (const match of sequence.matchAll(PRIVATE_MODE_RE)) {
-    const parameters = match[1]?.split(";") ?? [];
-    if (parameters.includes("1007")) {
-      nextAlternateScrollMode = match[2] === "h";
+    const parameters = match[1]?.split(';') ?? []
+    if (parameters.includes('1007')) {
+      nextAlternateScrollMode = match[2] === 'h'
     }
-    if (parameters.includes("25")) {
-      nextCursorVisible = match[2] === "h";
+    if (parameters.includes('25')) {
+      nextCursorVisible = match[2] === 'h'
     }
   }
 
@@ -64,7 +65,7 @@ function trackPrivateModes(
     alternateScrollMode: nextAlternateScrollMode,
     cursorVisible: nextCursorVisible,
     pendingSequence: getPendingModeSequence(sequence),
-  };
+  }
 }
 
 function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): TerminalModeState {
@@ -74,54 +75,54 @@ function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): Termin
     alternateScrollMode,
     isAlternateBuffer: emulator.buffer.active === emulator.buffer.alternate,
     bracketedPasteMode: emulator.modes.bracketedPasteMode,
-  };
+  }
 }
 
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
-  private sessions = new Map<string, SessionHandle>();
+  private sessions = new Map<string, SessionHandle>()
 
   private emitRenderIfChanged(session: SessionHandle): void {
-    const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible);
-    const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode);
-    const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot);
+    const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible)
+    const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode)
+    const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot)
     const modesChanged =
       !session.lastTerminalModes ||
       session.lastTerminalModes.mouseTrackingMode !== nextTerminalModes.mouseTrackingMode ||
       session.lastTerminalModes.sendFocusMode !== nextTerminalModes.sendFocusMode ||
       session.lastTerminalModes.alternateScrollMode !== nextTerminalModes.alternateScrollMode ||
       session.lastTerminalModes.isAlternateBuffer !== nextTerminalModes.isAlternateBuffer ||
-      session.lastTerminalModes.bracketedPasteMode !== nextTerminalModes.bracketedPasteMode;
+      session.lastTerminalModes.bracketedPasteMode !== nextTerminalModes.bracketedPasteMode
 
     if (!snapshotChanged && !modesChanged) {
-      return;
+      return
     }
 
-    session.lastSnapshot = nextSnapshot;
-    session.lastTerminalModes = nextTerminalModes;
-    this.emit("render", session.tabId, nextSnapshot, nextTerminalModes);
+    session.lastSnapshot = nextSnapshot
+    session.lastTerminalModes = nextTerminalModes
+    this.emit('render', session.tabId, nextSnapshot, nextTerminalModes)
   }
 
   private finalizeSession(session: SessionHandle, exitCode: number): void {
-    const current = this.sessions.get(session.tabId);
+    const current = this.sessions.get(session.tabId)
     if (current !== session) {
-      return;
+      return
     }
 
-    this.sessions.delete(session.tabId);
-    this.emitRenderIfChanged(session);
-    session.emulator.dispose();
-    this.emit("exit", session.tabId, exitCode);
+    this.sessions.delete(session.tabId)
+    this.emitRenderIfChanged(session)
+    session.emulator.dispose()
+    this.emit('exit', session.tabId, exitCode)
   }
 
   createSession(options: {
-    tabId: string;
-    command: string;
-    args?: string[];
-    cols: number;
-    rows: number;
-    cwd?: string;
+    tabId: string
+    command: string
+    args?: string[]
+    cols: number
+    rows: number
+    cwd?: string
   }): void {
-    this.disposeSession(options.tabId);
+    this.disposeSession(options.tabId)
 
     try {
       const emulator = new XTerm({
@@ -129,18 +130,18 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         cols: options.cols,
         rows: options.rows,
         scrollback: 1000,
-      });
+      })
 
       const pty = spawn(options.command, options.args ?? [], {
-        name: "xterm-256color",
+        name: 'xterm-256color',
         cols: options.cols,
         rows: options.rows,
         cwd: options.cwd ?? process.cwd(),
         env: {
           ...process.env,
-          TERM: "xterm-256color",
+          TERM: 'xterm-256color',
         },
-      });
+      })
 
       const session: SessionHandle = {
         tabId: options.tabId,
@@ -150,106 +151,106 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         lastTerminalModes: undefined,
         alternateScrollMode: false,
         cursorVisible: true,
-        pendingModeSequence: "",
+        pendingModeSequence: '',
         pendingWrites: 0,
         pendingExitCode: null,
-      };
+      }
 
       pty.onData((data) => {
         const trackedModes = trackPrivateModes(
           session.alternateScrollMode,
           session.cursorVisible,
           session.pendingModeSequence,
-          data,
-        );
-        session.alternateScrollMode = trackedModes.alternateScrollMode;
-        session.cursorVisible = trackedModes.cursorVisible;
-        session.pendingModeSequence = trackedModes.pendingSequence;
-        session.pendingWrites += 1;
+          data
+        )
+        session.alternateScrollMode = trackedModes.alternateScrollMode
+        session.cursorVisible = trackedModes.cursorVisible
+        session.pendingModeSequence = trackedModes.pendingSequence
+        session.pendingWrites += 1
         emulator.write(data, () => {
-          session.pendingWrites -= 1;
-          this.emitRenderIfChanged(session);
+          session.pendingWrites -= 1
+          this.emitRenderIfChanged(session)
 
           if (session.pendingWrites === 0 && session.pendingExitCode !== null) {
-            this.finalizeSession(session, session.pendingExitCode);
+            this.finalizeSession(session, session.pendingExitCode)
           }
-        });
-      });
+        })
+      })
 
       pty.onExit(({ exitCode }) => {
-        const current = this.sessions.get(options.tabId);
+        const current = this.sessions.get(options.tabId)
         if (!current || current.pty !== pty) {
-          return;
+          return
         }
 
         if (session.pendingWrites > 0) {
-          session.pendingExitCode = exitCode;
-          return;
+          session.pendingExitCode = exitCode
+          return
         }
 
-        this.finalizeSession(session, exitCode);
-      });
+        this.finalizeSession(session, exitCode)
+      })
 
-      this.sessions.set(options.tabId, session);
-      this.emitRenderIfChanged(session);
+      this.sessions.set(options.tabId, session)
+      this.emitRenderIfChanged(session)
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.emit("error", options.tabId, `Failed to start session: ${message}`);
+      const message = error instanceof Error ? error.message : String(error)
+      this.emit('error', options.tabId, `Failed to start session: ${message}`)
     }
   }
 
   write(tabId: string, input: string): void {
-    this.sessions.get(tabId)?.pty.write(input);
+    this.sessions.get(tabId)?.pty.write(input)
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
-    const session = this.sessions.get(tabId);
+    const session = this.sessions.get(tabId)
     if (!session) {
-      return;
+      return
     }
 
-    session.emulator.scrollLines(deltaLines);
-    this.emitRenderIfChanged(session);
+    session.emulator.scrollLines(deltaLines)
+    this.emitRenderIfChanged(session)
   }
 
   scrollViewportToBottom(tabId: string): void {
-    const session = this.sessions.get(tabId);
+    const session = this.sessions.get(tabId)
     if (!session) {
-      return;
+      return
     }
 
-    session.emulator.scrollToBottom();
-    this.emitRenderIfChanged(session);
+    session.emulator.scrollToBottom()
+    this.emitRenderIfChanged(session)
   }
 
   resizeAll(cols: number, rows: number): void {
-    const safeCols = Math.max(20, cols);
-    const safeRows = Math.max(8, rows);
+    const safeCols = Math.max(20, cols)
+    const safeRows = Math.max(8, rows)
 
     for (const session of this.sessions.values()) {
-      session.pty.resize(safeCols, safeRows);
-      session.emulator.resize(safeCols, safeRows);
-      this.emitRenderIfChanged(session);
+      session.pty.resize(safeCols, safeRows)
+      session.emulator.resize(safeCols, safeRows)
+      this.emitRenderIfChanged(session)
     }
   }
 
   disposeSession(tabId: string): void {
-    const session = this.sessions.get(tabId);
+    const session = this.sessions.get(tabId)
     if (!session) {
-      return;
+      return
     }
 
-    this.sessions.delete(tabId);
-    session.pty.kill();
-    session.emulator.dispose();
+    this.sessions.delete(tabId)
+    session.pty.kill()
+    session.emulator.dispose()
   }
 
   disposeAll(): void {
     for (const session of this.sessions.values()) {
-      session.pty.kill();
-      session.emulator.dispose();
+      session.pty.kill()
+      session.emulator.dispose()
     }
 
-    this.sessions.clear();
+    this.sessions.clear()
   }
 }

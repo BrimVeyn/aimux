@@ -1,39 +1,39 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
-import type { WorkspaceSnapshotV1 } from "./state/types";
-import type { ThemeId } from "./ui/themes";
+import type { WorkspaceSnapshotV1 } from './state/types'
+import type { ThemeId } from './ui/themes'
 
-export const CONFIG_PATH = join(process.env.HOME ?? "~", ".config", "aimux.json");
+export const CONFIG_PATH = join(process.env.HOME ?? '~', '.config', 'aimux.json')
 
 export interface AimuxConfig {
-  version: 2;
-  customCommands: Record<string, string>;
-  themeId?: ThemeId;
-  workspaceSnapshot?: WorkspaceSnapshotV1;
+  version: 2
+  customCommands: Record<string, string>
+  themeId?: ThemeId
+  workspaceSnapshot?: WorkspaceSnapshotV1
 }
 
 const DEFAULT_CONFIG: AimuxConfig = {
   version: 2,
   customCommands: {},
-};
+}
 
 function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
   return (
-    typeof value === "object" && value !== null && (value as { version?: number }).version === 1
-  );
+    typeof value === 'object' && value !== null && (value as { version?: number }).version === 1
+  )
 }
 
 export function loadConfig(): AimuxConfig {
   try {
     if (existsSync(CONFIG_PATH)) {
-      const raw = readFileSync(CONFIG_PATH, "utf8");
+      const raw = readFileSync(CONFIG_PATH, 'utf8')
       const parsed = JSON.parse(raw) as {
-        version?: number;
-        customCommands?: Record<string, string>;
-        themeId?: string;
-        workspaceSnapshot?: unknown;
-      };
+        version?: number
+        customCommands?: Record<string, string>
+        themeId?: string
+        workspaceSnapshot?: unknown
+      }
       return {
         version: 2,
         customCommands: parsed.customCommands ?? {},
@@ -41,18 +41,18 @@ export function loadConfig(): AimuxConfig {
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot
           : undefined,
-      };
+      }
     }
   } catch {
     // ignore missing or malformed config
   }
-  return DEFAULT_CONFIG;
+  return DEFAULT_CONFIG
 }
 
 export function saveConfig(config: AimuxConfig): void {
   try {
-    mkdirSync(dirname(CONFIG_PATH), { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n");
+    mkdirSync(dirname(CONFIG_PATH), { recursive: true })
+    writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
   } catch {
     // ignore write errors silently
   }

@@ -1,30 +1,31 @@
-import type { AppState } from "../state/types";
+import type { MouseEvent } from '@opentui/core'
 
-import type { TerminalContentOrigin } from "../input/raw-input-handler";
-import type { MouseEvent } from "@opentui/core";
-import { CreateSessionModal } from "./components/create-session-modal";
-import { HelpModal } from "./components/help-modal";
-import { SnippetEditorModal } from "./components/snippet-editor-modal";
-import { SnippetPickerModal } from "./components/snippet-picker-modal";
-import { ThemePickerModal } from "./components/theme-picker-modal";
-import type { ThemeId } from "./themes";
-import { NewTabModal } from "./components/new-tab-modal";
-import { SessionNameModal } from "./components/session-name-modal";
-import { SessionPickerModal } from "./components/session-picker-modal";
-import { Sidebar } from "./components/sidebar";
-import { StatusBar } from "./components/status-bar";
-import { TerminalPane } from "./components/terminal-pane";
-import { theme } from "./theme";
+import type { TerminalContentOrigin } from '../input/raw-input-handler'
+import type { AppState } from '../state/types'
+import type { ThemeId } from './themes'
+
+import { CreateSessionModal } from './components/create-session-modal'
+import { HelpModal } from './components/help-modal'
+import { NewTabModal } from './components/new-tab-modal'
+import { SessionNameModal } from './components/session-name-modal'
+import { SessionPickerModal } from './components/session-picker-modal'
+import { Sidebar } from './components/sidebar'
+import { SnippetEditorModal } from './components/snippet-editor-modal'
+import { SnippetPickerModal } from './components/snippet-picker-modal'
+import { StatusBar } from './components/status-bar'
+import { TerminalPane } from './components/terminal-pane'
+import { ThemePickerModal } from './components/theme-picker-modal'
+import { theme } from './theme'
 
 interface RootViewProps {
-  state: AppState;
-  themeId: ThemeId;
-  contentOrigin: TerminalContentOrigin;
-  mouseForwardingEnabled: boolean;
-  localScrollbackEnabled: boolean;
-  onTerminalMouseEvent: (event: MouseEvent, origin: TerminalContentOrigin) => void;
-  onTerminalScrollEvent: (event: MouseEvent) => void;
-  onTerminalClick?: (event: MouseEvent, origin: TerminalContentOrigin) => void;
+  state: AppState
+  themeId: ThemeId
+  contentOrigin: TerminalContentOrigin
+  mouseForwardingEnabled: boolean
+  localScrollbackEnabled: boolean
+  onTerminalMouseEvent: (event: MouseEvent, origin: TerminalContentOrigin) => void
+  onTerminalScrollEvent: (event: MouseEvent) => void
+  onTerminalClick?: (event: MouseEvent, origin: TerminalContentOrigin) => void
 }
 
 export function RootView({
@@ -37,7 +38,7 @@ export function RootView({
   onTerminalScrollEvent,
   onTerminalClick,
 }: RootViewProps) {
-  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
@@ -55,14 +56,14 @@ export function RootView({
         />
       </box>
       <StatusBar state={state} activeTab={activeTab} />
-      {state.modal.type === "new-tab" ? (
+      {state.modal.type === 'new-tab' ? (
         <NewTabModal
           selectedIndex={state.modal.selectedIndex}
           customCommands={state.customCommands}
           editBuffer={state.modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === "session-picker" ? (
+      {state.modal.type === 'session-picker' ? (
         <SessionPickerModal
           sessions={state.sessions}
           selectedIndex={state.modal.selectedIndex}
@@ -71,60 +72,60 @@ export function RootView({
           filter={state.modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === "session-name" ? (
+      {state.modal.type === 'session-name' ? (
         <SessionNameModal
-          title={state.modal.sessionTargetId ? "Rename session" : "Create session"}
-          value={state.modal.editBuffer ?? ""}
+          title={state.modal.sessionTargetId ? 'Rename session' : 'Create session'}
+          value={state.modal.editBuffer ?? ''}
         />
       ) : null}
-      {state.modal.type === "rename-tab" ? (
-        <SessionNameModal title="Rename tab" value={state.modal.editBuffer ?? ""} />
+      {state.modal.type === 'rename-tab' ? (
+        <SessionNameModal title="Rename tab" value={state.modal.editBuffer ?? ''} />
       ) : null}
-      {state.modal.type === "create-session" ? (
+      {state.modal.type === 'create-session' ? (
         <CreateSessionModal
-          activeField={state.modal.activeField ?? "directory"}
+          activeField={state.modal.activeField}
           directoryQuery={
-            state.modal.activeField === "directory"
-              ? (state.modal.editBuffer ?? "")
-              : (state.modal.secondaryBuffer ?? "")
+            state.modal.activeField === 'directory'
+              ? (state.modal.editBuffer ?? '')
+              : state.modal.secondaryBuffer
           }
           sessionName={
-            state.modal.activeField === "name"
-              ? (state.modal.editBuffer ?? "")
-              : (state.modal.secondaryBuffer ?? "")
+            state.modal.activeField === 'name'
+              ? (state.modal.editBuffer ?? '')
+              : state.modal.secondaryBuffer
           }
-          results={state.modal.directoryResults ?? []}
+          results={state.modal.directoryResults}
           selectedIndex={state.modal.selectedIndex}
-          pendingProjectPath={state.modal.pendingProjectPath ?? null}
+          pendingProjectPath={state.modal.pendingProjectPath}
         />
       ) : null}
-      {state.modal.type === "snippet-picker" ? (
+      {state.modal.type === 'snippet-picker' ? (
         <SnippetPickerModal
           snippets={state.snippets}
           selectedIndex={state.modal.selectedIndex}
           filter={state.modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === "snippet-editor" ? (
+      {state.modal.type === 'snippet-editor' ? (
         <SnippetEditorModal
-          activeField={state.modal.activeField ?? "directory"}
+          activeField={state.modal.activeField}
           snippetName={
-            state.modal.activeField === "directory"
-              ? (state.modal.editBuffer ?? "")
-              : (state.modal.secondaryBuffer ?? "")
+            state.modal.activeField === 'directory'
+              ? (state.modal.editBuffer ?? '')
+              : state.modal.secondaryBuffer
           }
           snippetContent={
-            state.modal.activeField === "name"
-              ? (state.modal.editBuffer ?? "")
-              : (state.modal.secondaryBuffer ?? "")
+            state.modal.activeField === 'name'
+              ? (state.modal.editBuffer ?? '')
+              : state.modal.secondaryBuffer
           }
           isEditing={state.modal.sessionTargetId !== null}
         />
       ) : null}
-      {state.modal.type === "theme-picker" ? (
+      {state.modal.type === 'theme-picker' ? (
         <ThemePickerModal selectedIndex={state.modal.selectedIndex} currentThemeId={themeId} />
       ) : null}
-      {state.modal.type === "help" ? <HelpModal /> : null}
+      {state.modal.type === 'help' ? <HelpModal /> : null}
     </box>
-  );
+  )
 }

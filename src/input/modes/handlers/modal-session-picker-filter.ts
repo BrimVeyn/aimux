@@ -1,49 +1,26 @@
-import type { KeyInput, KeyResult, ModeContext, ModeHandler } from "../types";
+import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
-function handleTextInput(key: KeyInput): KeyResult | null {
-  if (key.name === "backspace") {
-    return { actions: [{ type: "update-command-edit", char: "\b" }], effects: [] };
-  }
-
-  if (key.name === "space") {
-    return { actions: [{ type: "update-command-edit", char: " " }], effects: [] };
-  }
-
-  if (key.name.length === 1) {
-    const char = key.shift ? key.name.toUpperCase() : key.name;
-    return { actions: [{ type: "update-command-edit", char }], effects: [] };
-  }
-
-  return null;
-}
+import { handleCtrlNavigation, handleTextInput } from './shared'
 
 export const modalSessionPickerFilterMode: ModeHandler = {
-  id: "modal.session-picker.filtering",
+  id: 'modal.session-picker.filtering',
 
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
-    if (key.name === "escape") {
+    if (key.name === 'escape') {
       return {
-        actions: [{ type: "cancel-command-edit" }],
+        actions: [{ type: 'cancel-command-edit' }],
         effects: [],
-        transition: "modal.session-picker",
-      };
+        transition: 'modal.session-picker',
+      }
     }
 
-    if (key.name === "return") {
+    if (key.name === 'return') {
       return {
         actions: [],
-        effects: [{ type: "confirm-selected-session" }],
-      };
+        effects: [{ type: 'confirm-selected-session' }],
+      }
     }
 
-    if (key.ctrl && key.name === "n") {
-      return { actions: [{ type: "move-modal-selection", delta: 1 }], effects: [] };
-    }
-
-    if (key.ctrl && key.name === "p") {
-      return { actions: [{ type: "move-modal-selection", delta: -1 }], effects: [] };
-    }
-
-    return handleTextInput(key);
+    return handleCtrlNavigation(key) ?? handleTextInput(key)
   },
-};
+}
