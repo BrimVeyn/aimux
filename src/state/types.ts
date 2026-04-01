@@ -1,4 +1,6 @@
-export type AssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
+export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
+
+export type AssistantId = BuiltinAssistantId | (string & {})
 
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
 

@@ -1,15 +1,15 @@
-import type { AssistantId } from '../../state/types'
-
-import { ASSISTANT_OPTIONS } from '../../pty/command-registry'
+import { getAllAssistantOptions } from '../../pty/command-registry'
 import { theme } from '../theme'
 
 interface NewTabModalProps {
   selectedIndex: number
-  customCommands: Record<AssistantId, string>
+  customCommands: Record<string, string>
   editBuffer: string | null
 }
 
 export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTabModalProps) {
+  const options = getAllAssistantOptions(customCommands)
+
   return (
     <box
       position="absolute"
@@ -33,8 +33,7 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
         {editBuffer !== null ? (
           <>
             <text fg={theme.textMuted}>
-              Editing command for {ASSISTANT_OPTIONS[selectedIndex]?.label}. Enter to confirm, Esc
-              to cancel.
+              Editing command for {options[selectedIndex]?.label}. Enter to confirm, Esc to cancel.
             </text>
             <box
               border
@@ -50,7 +49,7 @@ export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTa
             <text fg={theme.textMuted}>
               Use j/k or arrows, Enter to confirm, e to edit command, Esc to cancel.
             </text>
-            {ASSISTANT_OPTIONS.map((option, index) => {
+            {options.map((option, index) => {
               const active = index === selectedIndex
               const customCmd = customCommands[option.id]
 

@@ -39,8 +39,7 @@ function isCustomCommandsRecord(value: unknown): value is Record<string, string>
 
   return Object.entries(value).every(
     ([key, entryValue]) =>
-      (key === 'claude' || key === 'codex' || key === 'opencode' || key === 'terminal') &&
-      typeof entryValue === 'string'
+      typeof key === 'string' && key.length > 0 && typeof entryValue === 'string'
   )
 }
 

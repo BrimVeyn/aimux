@@ -35,6 +35,7 @@ import { getLineText, getWordAtColumn } from './input/terminal-text-extraction'
 import { copyToSystemClipboard } from './platform/clipboard'
 import {
   ASSISTANT_OPTIONS,
+  getAllAssistantOptions,
   getAssistantOption,
   isCommandAvailable,
   parseCommand,
@@ -63,9 +64,13 @@ function createTabId(): string {
   return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function createTabSession(assistant: AssistantId, customCommand?: string): TabSession {
-  const index = ASSISTANT_OPTIONS.findIndex((o) => o.id === assistant)
-  const option = getAssistantOption(index)
+function createTabSession(
+  assistant: AssistantId,
+  customCommand?: string,
+  customCommands?: Record<string, string>
+): TabSession {
+  const allOptions = getAllAssistantOptions(customCommands ?? {})
+  const option = allOptions.find((o) => o.id === assistant) ?? getAssistantOption(0)
 
   return {
     id: createTabId(),
@@ -423,7 +428,7 @@ export function App({ backend }: { backend: SessionBackend }) {
 
   function launchAssistant(assistant: AssistantId) {
     const customCommand = state.customCommands[assistant]
-    const tab = createTabSession(assistant, customCommand)
+    const tab = createTabSession(assistant, customCommand, state.customCommands)
     logInputDebug('app.launchAssistant', {
       assistant,
       tabId: tab.id,
@@ -465,7 +470,8 @@ export function App({ backend }: { backend: SessionBackend }) {
         return
       }
       case 'launch-selected-assistant': {
-        const option = getAssistantOption(state.modal.selectedIndex)
+        const allOptions = getAllAssistantOptions(state.customCommands)
+        const option = allOptions[state.modal.selectedIndex] ?? getAssistantOption(0)
         launchAssistant(option.id)
         return
       }
@@ -562,7 +568,8 @@ export function App({ backend }: { backend: SessionBackend }) {
         return
       }
       case 'save-custom-command': {
-        const option = ASSISTANT_OPTIONS[state.modal.selectedIndex]
+        const allOptions = getAllAssistantOptions(state.customCommands)
+        const option = allOptions[state.modal.selectedIndex]
         if (option && state.modal.editBuffer !== null) {
           const trimmed = state.modal.editBuffer.trim()
           const newCustomCommands = { ...state.customCommands }

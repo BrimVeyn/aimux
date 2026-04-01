@@ -10,6 +10,7 @@ import {
   type ServerEvent,
   type ServerResponse,
 } from '../ipc/protocol'
+import { findDaemonPid } from '../platform/daemon-control'
 import {
   getDaemonSocketPath,
   removeDaemonSocketIfExists,
@@ -36,6 +37,14 @@ function requireSession(socket: Socket, attachedSessions: Map<Socket, string>): 
 export async function runDaemon(): Promise<void> {
   const socketPath = getDaemonSocketPath()
   logDebug('daemon.start', { socketPath, pid: process.pid })
+
+  const existingPid = await findDaemonPid(socketPath)
+  if (existingPid !== null && existingPid !== process.pid) {
+    logDebug('daemon.alreadyRunning', { existingPid })
+    process.stderr.write(`aimux daemon already running (pid ${existingPid})\n`)
+    process.exit(1)
+  }
+
   logDebug('daemon.removeStaleSocket', { socketPath })
   removeDaemonSocketIfExists()
 
@@ -184,18 +193,30 @@ export async function runDaemon(): Promise<void> {
   tightenDaemonSocketPermissions(socketPath)
   logDebug('daemon.listening', { socketPath })
 
-  process.on('SIGTERM', () => {
-    logDebug('daemon.sigterm')
+  const gracefulShutdown = (signal: string) => {
+    logDebug(`daemon.${signal}`)
     sessionManager.disposeAll()
     server.close()
     process.exit(0)
+  }
+
+  process.on('SIGTERM', () => gracefulShutdown('sigterm'))
+  process.on('SIGINT', () => gracefulShutdown('sigint'))
+
+  process.on('uncaughtException', (error) => {
+    logDebug('daemon.uncaughtException', { error: error.message, stack: error.stack })
+    sessionManager.disposeAll()
+    server.close()
+    process.exit(1)
   })
 
-  process.on('SIGINT', () => {
-    logDebug('daemon.sigint')
+  process.on('unhandledRejection', (reason) => {
+    const message = reason instanceof Error ? reason.message : String(reason)
+    const stack = reason instanceof Error ? reason.stack : undefined
+    logDebug('daemon.unhandledRejection', { error: message, stack })
     sessionManager.disposeAll()
     server.close()
-    process.exit(0)
+    process.exit(1)
   })
 
   await new Promise<void>(() => {

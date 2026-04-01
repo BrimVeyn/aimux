@@ -7,6 +7,9 @@ export interface AssistantOption {
   description: string
 }
 
+const DEFAULT_SHELL = process.env.SHELL || 'sh'
+const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
+
 export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
     id: 'claude',
@@ -29,13 +32,26 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
     id: 'terminal',
     label: 'Terminal',
-    command: 'zsh',
-    description: 'Plain terminal (zsh)',
+    command: DEFAULT_SHELL,
+    description: `Plain terminal (${SHELL_NAME})`,
   },
 ]
 
 export function getAssistantOption(index: number): AssistantOption {
   return ASSISTANT_OPTIONS[index] ?? ASSISTANT_OPTIONS[0]!
+}
+
+export function getAllAssistantOptions(customCommands: Record<string, string>): AssistantOption[] {
+  const builtinIds = new Set(ASSISTANT_OPTIONS.map((o) => o.id))
+  const customOptions: AssistantOption[] = Object.entries(customCommands)
+    .filter(([id]) => !builtinIds.has(id))
+    .map(([id, command]) => ({
+      id,
+      label: id.charAt(0).toUpperCase() + id.slice(1),
+      command,
+      description: `Custom (${command})`,
+    }))
+  return [...ASSISTANT_OPTIONS, ...customOptions]
 }
 
 export function isCommandAvailable(command: string): boolean {

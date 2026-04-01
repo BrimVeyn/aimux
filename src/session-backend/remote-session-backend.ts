@@ -18,6 +18,8 @@ import {
   type ServerResponse,
 } from '../ipc/protocol'
 
+const IPC_REQUEST_TIMEOUT_MS = 10_000
+
 export class RemoteSessionBackend
   extends EventEmitter<SessionBackendEvents>
   implements SessionBackend
@@ -25,7 +27,11 @@ export class RemoteSessionBackend
   private socket: Socket | null = null
   private readonly pending = new Map<
     string,
-    { resolve: (message: ServerResponse) => void; reject: (error: Error) => void }
+    {
+      resolve: (message: ServerResponse) => void
+      reject: (error: Error) => void
+      timer: ReturnType<typeof setTimeout>
+    }
   >()
   private decoder = new MessageDecoder<ServerResponse | ServerEvent>(parseServerMessage)
   private attached = false
@@ -33,6 +39,7 @@ export class RemoteSessionBackend
 
   private rejectPendingRequests(error: Error): void {
     for (const [id, pending] of this.pending.entries()) {
+      clearTimeout(pending.timer)
       this.pending.delete(id)
       pending.reject(error)
     }
@@ -69,9 +76,17 @@ export class RemoteSessionBackend
     const socket = this.getConnectedSocket()
     logDebug('backend.remote.send', { type: request.type, id: request.id })
     return new Promise((resolve, reject) => {
-      this.pending.set(request.id, { resolve, reject })
+      const timer = setTimeout(() => {
+        this.pending.delete(request.id)
+        logDebug('backend.remote.timeout', { type: request.type, id: request.id })
+        reject(
+          new Error(`IPC request timed out after ${IPC_REQUEST_TIMEOUT_MS}ms: ${request.type}`)
+        )
+      }, IPC_REQUEST_TIMEOUT_MS)
+      this.pending.set(request.id, { resolve, reject, timer })
       socket.write(encodeMessage(request), (error) => {
         if (error) {
+          clearTimeout(timer)
           this.pending.delete(request.id)
           logDebug('backend.remote.sendError', {
             type: request.type,
@@ -178,6 +193,7 @@ export class RemoteSessionBackend
             logDebug('backend.remote.response', { type: message.type, id: message.id })
             const pending = this.pending.get(message.id)
             if (pending) {
+              clearTimeout(pending.timer)
               this.pending.delete(message.id)
               pending.resolve(message)
             }

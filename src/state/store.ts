@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 
-import { ASSISTANT_OPTIONS } from '../pty/command-registry'
+import { ASSISTANT_OPTIONS, getAllAssistantOptions } from '../pty/command-registry'
 import { THEME_IDS } from '../ui/themes'
 
 const THEME_COUNT = THEME_IDS.length
@@ -199,7 +199,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       }
       let optionCount: number
       if (state.modal.type === 'new-tab') {
-        optionCount = ASSISTANT_OPTIONS.length
+        optionCount = getAllAssistantOptions(state.customCommands).length
       } else if (state.modal.type === 'create-session') {
         optionCount = state.modal.directoryResults.length
       } else if (state.modal.type === 'snippet-picker') {
@@ -242,7 +242,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       if (state.modal.type === 'session-name') {
         return { ...state, focusMode: 'command-edit' }
       }
-      const option = ASSISTANT_OPTIONS[state.modal.selectedIndex]
+      const allOptions = getAllAssistantOptions(state.customCommands)
+      const option = allOptions[state.modal.selectedIndex]
       const assistantId = option?.id
       const currentCmd = (assistantId && state.customCommands[assistantId]) ?? option?.command ?? ''
       return {
@@ -291,7 +292,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       if (state.modal.type !== 'new-tab') {
         return state
       }
-      const option = ASSISTANT_OPTIONS[state.modal.selectedIndex]
+      const allOpts = getAllAssistantOptions(state.customCommands)
+      const option = allOpts[state.modal.selectedIndex]
       const assistantId = option?.id
       if (!assistantId) {
         return { ...state, focusMode: 'modal', modal: { ...state.modal, editBuffer: null } }
