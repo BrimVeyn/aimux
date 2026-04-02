@@ -107,14 +107,14 @@ All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigatio
 
 Enter with `Ctrl+W` from input mode. Manage split panes:
 
-| Key              | Action           |
-| ---------------- | ---------------- |
-| `\|`             | Split vertical   |
-| `-`              | Split horizontal |
-| `h` / `j` / `k` / `l` | Focus pane       |
-| `Shift+H/J/K/L` | Resize pane      |
-| `q`              | Close pane       |
-| `Esc`            | Back to navigation |
+| Key                   | Action             |
+| --------------------- | ------------------ |
+| `\|`                  | Split vertical     |
+| `-`                   | Split horizontal   |
+| `h` / `j` / `k` / `l` | Focus pane         |
+| `Shift+H/J/K/L`       | Resize pane        |
+| `q`                   | Close pane         |
+| `Esc`                 | Back to navigation |
 
 ### Session Picker
 
