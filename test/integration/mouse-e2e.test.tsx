@@ -224,6 +224,8 @@ function MouseHarness({
           ptyManager.write(TEST_TAB_ID, sequence)
         }
       }}
+      terminalCols={terminalSize.cols}
+      terminalRows={terminalSize.rows}
       onTerminalScrollEvent={(event) => {
         if (event.type !== 'scroll') {
           return
