@@ -18,6 +18,7 @@ export type ModeId =
   | 'modal.snippet-editor'
   | 'modal.theme-picker'
   | 'modal.help'
+  | 'modal.split-picker'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -39,6 +40,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
   | { type: 'rename-session'; sessionId: string; name: string }
   | { type: 'split-pane'; direction: import('../../state/layout-tree').SplitDirection }
+  | { type: 'confirm-split' }
 
 export interface KeyResult {
   actions: AppAction[]

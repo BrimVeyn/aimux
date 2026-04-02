@@ -89,21 +89,19 @@ export const layoutMode: ModeHandler = {
       }
     }
 
-    // Split: | vertical, - horizontal
+    // Split: | vertical, - horizontal → open picker modal
     if (key.sequence === '|') {
-      const exit = exitToInput()
       return {
-        actions: exit.exitActions,
-        effects: [{ type: 'split-pane', direction: 'vertical' }],
-        transition: exit.transition,
+        actions: [{ type: 'open-split-picker', direction: 'vertical' }],
+        effects: [],
+        transition: 'modal.split-picker',
       }
     }
     if (key.sequence === '-') {
-      const exit = exitToInput()
       return {
-        actions: exit.exitActions,
-        effects: [{ type: 'split-pane', direction: 'horizontal' }],
-        transition: exit.transition,
+        actions: [{ type: 'open-split-picker', direction: 'horizontal' }],
+        effects: [],
+        transition: 'modal.split-picker',
       }
     }
 

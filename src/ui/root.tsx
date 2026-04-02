@@ -4,6 +4,7 @@ import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { AppState } from '../state/types'
 import type { ThemeId } from './themes'
 
+import { findLeaf } from '../state/layout-tree'
 import { CreateSessionModal } from './components/create-session-modal'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
@@ -45,7 +46,9 @@ export function RootView({
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
       <box flexDirection="row" gap={1} padding={1} flexGrow={1}>
         <Sidebar state={state} />
-        {state.layoutTree && state.layoutTree.type === 'split' ? (
+        {state.layoutTree &&
+        state.layoutTree.type === 'split' &&
+        findLeaf(state.layoutTree, state.activeTabId ?? '') ? (
           <SplitLayout
             node={state.layoutTree}
             tabs={state.tabs}
@@ -72,7 +75,7 @@ export function RootView({
         )}
       </box>
       <StatusBar state={state} activeTab={activeTab} />
-      {state.modal.type === 'new-tab' ? (
+      {state.modal.type === 'new-tab' || state.modal.type === 'split-picker' ? (
         <NewTabModal
           selectedIndex={state.modal.selectedIndex}
           customCommands={state.customCommands}

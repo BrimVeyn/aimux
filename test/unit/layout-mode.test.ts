@@ -143,22 +143,25 @@ describe('layout mode handler', () => {
     expect(result!.transition).toBeUndefined()
   })
 
-  test('| triggers split-pane vertical and exits', () => {
+  test('| opens split picker for vertical split', () => {
     const state = stateWithSplit()
     const result = layoutMode.handleKey(key('|', { shift: true, sequence: '|' }), { state })
 
     expect(result).not.toBeNull()
-    expect(result!.effects).toContainEqual({ type: 'split-pane', direction: 'vertical' })
-    expect(result!.transition).toBe('terminal-input')
+    expect(result!.actions).toContainEqual({ type: 'open-split-picker', direction: 'vertical' })
+    expect(result!.transition).toBe('modal.split-picker')
   })
 
-  test('- triggers split-pane horizontal and exits', () => {
+  test('- opens split picker for horizontal split', () => {
     const state = stateWithSplit()
     const result = layoutMode.handleKey(key('-', { sequence: '-' }), { state })
 
     expect(result).not.toBeNull()
-    expect(result!.effects).toContainEqual({ type: 'split-pane', direction: 'horizontal' })
-    expect(result!.transition).toBe('terminal-input')
+    expect(result!.actions).toContainEqual({
+      type: 'open-split-picker',
+      direction: 'horizontal',
+    })
+    expect(result!.transition).toBe('modal.split-picker')
   })
 
   test('q closes pane and exits', () => {
@@ -422,7 +425,7 @@ describe('hydrate-workspace layout restoration', () => {
 })
 
 describe('full split flow simulation', () => {
-  test('Ctrl+W enters layout mode, | splits, state is correct', () => {
+  test('Ctrl+W enters layout mode, | opens split picker, confirm splits', () => {
     // Start: one tab in terminal-input mode
     const tab1 = createTab('tab-1')
     let state: AppState = {
@@ -433,33 +436,27 @@ describe('full split flow simulation', () => {
       focusMode: 'terminal-input',
     }
 
-    // Step 1: Ctrl+W → enter layout mode (done by raw-input-handler, simulate dispatch)
+    // Step 1: Ctrl+W → enter layout mode
     state = appReducer(state, { type: 'set-focus-mode', focusMode: 'layout' })
     expect(state.focusMode).toBe('layout')
     expect(deriveModeId(state)).toBe('layout')
 
-    // Step 2: Press | in layout mode
+    // Step 2: Press | in layout mode → opens split picker
     const handler = getHandler('layout')!
     const result = handler.handleKey(key('|', { shift: true, sequence: '|' }), { state })
     expect(result).not.toBeNull()
-    expect(result!.effects).toContainEqual({ type: 'split-pane', direction: 'vertical' })
-    expect(result!.transition).toBe('terminal-input')
+    expect(result!.actions).toContainEqual({ type: 'open-split-picker', direction: 'vertical' })
+    expect(result!.transition).toBe('modal.split-picker')
 
-    // Step 3: Apply actions from handler
+    // Step 3: Apply actions from handler (opens modal)
     for (const action of result!.actions) {
       state = appReducer(state, action)
     }
-    expect(state.focusMode).toBe('terminal-input')
+    expect(state.focusMode).toBe('modal')
+    expect(state.modal.type).toBe('split-picker')
 
-    // Step 4: Apply transition
-    if (result!.transition) {
-      const transResult = transitionTo('layout', result!.transition, { state })
-      for (const action of transResult.actions) {
-        state = appReducer(state, action)
-      }
-    }
-
-    // Step 5: Apply split-pane effect (simulated from executeSideEffect)
+    // Step 4: User confirms selection → split-pane effect (simulated)
+    state = appReducer(state, { type: 'close-modal' })
     const newTab = createTab('tab-2')
     state = appReducer(state, { type: 'split-pane', direction: 'vertical', newTab })
 

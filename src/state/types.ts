@@ -18,6 +18,7 @@ export type ModalType =
   | 'snippet-editor'
   | 'theme-picker'
   | 'help'
+  | 'split-picker'
   | null
 
 export interface TerminalSpan {
@@ -145,6 +146,11 @@ export interface ModalHelp extends ModalBase {
   type: 'help'
 }
 
+export interface ModalSplitPicker extends ModalBase {
+  type: 'split-picker'
+  splitDirection: import('./layout-tree').SplitDirection
+}
+
 export interface ModalCreateSession extends ModalBase {
   type: 'create-session'
   directoryResults: DirectoryResult[]
@@ -175,6 +181,7 @@ export type ModalState =
   | ModalSnippetPicker
   | ModalThemePicker
   | ModalHelp
+  | ModalSplitPicker
   | ModalCreateSession
   | ModalSnippetEditor
 
@@ -206,6 +213,7 @@ export interface AppState {
 export type AppAction =
   | { type: 'open-new-tab-modal' }
   | { type: 'open-help-modal' }
+  | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
   | { type: 'open-session-picker' }
   | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
   | { type: 'close-modal' }

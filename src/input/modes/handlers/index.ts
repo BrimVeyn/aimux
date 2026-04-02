@@ -11,6 +11,7 @@ import { modalSessionPickerFilterMode } from './modal-session-picker-filter'
 import { modalSnippetEditorMode } from './modal-snippet-editor'
 import { modalSnippetPickerMode } from './modal-snippet-picker'
 import { modalSnippetPickerFilterMode } from './modal-snippet-picker-filter'
+import { modalSplitPickerMode } from './modal-split-picker'
 import { modalThemePickerMode } from './modal-theme-picker'
 import { navigationMode } from './navigation'
 import { terminalInputMode } from './terminal-input'
@@ -31,4 +32,5 @@ export function registerAllModes(): void {
   registerMode(modalSnippetPickerMode)
   registerMode(modalSnippetPickerFilterMode)
   registerMode(modalSnippetEditorMode)
+  registerMode(modalSplitPickerMode)
 }

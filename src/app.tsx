@@ -470,6 +470,36 @@ export function App({ backend }: { backend: SessionBackend }) {
     )
   }
 
+  function executeSplitPane(
+    direction: import('./state/layout-tree').SplitDirection,
+    tab: TabSession
+  ): void {
+    const currentTree = state.layoutTree ?? createLeaf(state.activeTabId!)
+    const baseTree = findLeaf(currentTree, state.activeTabId!)
+      ? currentTree
+      : createLeaf(state.activeTabId!)
+    const newTree = splitNode(baseTree, state.activeTabId!, direction, tab.id)
+    const bounds = {
+      x: 0,
+      y: 0,
+      cols: state.layout.terminalCols,
+      rows: state.layout.terminalRows,
+    }
+    const paneRect = computePaneRects(newTree, bounds).get(tab.id)
+
+    dispatch({ type: 'split-pane', direction, newTab: tab })
+    startTabSession(
+      backend,
+      dispatch,
+      clearStartupGrace,
+      (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
+      tab,
+      paneRect?.cols ?? state.layout.terminalCols,
+      paneRect?.rows ?? state.layout.terminalRows,
+      getCurrentSessionProjectPath()
+    )
+  }
+
   function executeSideEffect(effect: SideEffect): void {
     switch (effect.type) {
       case 'quit': {
@@ -631,32 +661,18 @@ export function App({ backend }: { backend: SessionBackend }) {
       case 'split-pane': {
         const customCommand = state.customCommands.terminal
         const tab = createTabSession('terminal', customCommand, state.customCommands)
-
-        // Compute expected pane dimensions after the split
-        const currentTree = state.layoutTree ?? createLeaf(state.activeTabId!)
-        const baseTree = findLeaf(currentTree, state.activeTabId!)
-          ? currentTree
-          : createLeaf(state.activeTabId!)
-        const newTree = splitNode(baseTree, state.activeTabId!, effect.direction, tab.id)
-        const bounds = {
-          x: 0,
-          y: 0,
-          cols: state.layout.terminalCols,
-          rows: state.layout.terminalRows,
-        }
-        const paneRect = computePaneRects(newTree, bounds).get(tab.id)
-
-        dispatch({ type: 'split-pane', direction: effect.direction, newTab: tab })
-        startTabSession(
-          backend,
-          dispatch,
-          clearStartupGrace,
-          (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-          tab,
-          paneRect?.cols ?? state.layout.terminalCols,
-          paneRect?.rows ?? state.layout.terminalRows,
-          getCurrentSessionProjectPath()
-        )
+        executeSplitPane(effect.direction, tab)
+        return
+      }
+      case 'confirm-split': {
+        const allOptions = getAllAssistantOptions(state.customCommands)
+        const option = allOptions[state.modal.selectedIndex] ?? getAssistantOption(0)
+        const direction =
+          state.modal.type === 'split-picker' ? state.modal.splitDirection : 'vertical'
+        const customCommand = state.customCommands[option.id]
+        const tab = createTabSession(option.id, customCommand, state.customCommands)
+        dispatch({ type: 'close-modal' })
+        executeSplitPane(direction, tab)
         return
       }
     }

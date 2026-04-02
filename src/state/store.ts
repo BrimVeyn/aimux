@@ -74,6 +74,18 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         focusMode: 'modal',
         modal: { type: 'help', selectedIndex: 0, editBuffer: null, sessionTargetId: null },
       }
+    case 'open-split-picker':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          type: 'split-picker',
+          selectedIndex: 0,
+          editBuffer: null,
+          sessionTargetId: null,
+          splitDirection: action.direction,
+        },
+      }
     case 'open-session-picker':
       return {
         ...state,

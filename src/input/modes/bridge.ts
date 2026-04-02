@@ -39,6 +39,8 @@ export function deriveModeId(state: AppState): ModeId {
         return 'modal.help'
       case 'snippet-picker':
         return 'modal.snippet-picker'
+      case 'split-picker':
+        return 'modal.split-picker'
       default:
         return 'navigation'
     }
