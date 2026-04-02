@@ -71,7 +71,15 @@ function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocused
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
 }
 
-export function TabItem({ id, tab, active, focused, isFocusedInput, inLayout }: TabItemProps) {
+export function TabItem({
+  id,
+  tab,
+  active,
+  focused,
+  isFocusedInput,
+  inLayout,
+  onActivate,
+}: TabItemProps & { onActivate?: () => void }) {
   const label = tab.assistant.charAt(0).toUpperCase() + tab.assistant.slice(1).toLowerCase()
   const indicator = active ? (focused ? '▶' : '◆') : inLayout ? '┃' : '│'
   const indicatorColor = active
@@ -94,6 +102,7 @@ export function TabItem({ id, tab, active, focused, isFocusedInput, inLayout }: 
       backgroundColor={active ? theme.panelHighlight : theme.panelMuted}
       flexDirection="column"
       gap={0}
+      onMouseDown={onActivate}
     >
       <box flexDirection="row">
         <text fg={indicatorColor}>{indicator} </text>

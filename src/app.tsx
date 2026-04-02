@@ -53,10 +53,10 @@ import { type ThemeId, THEME_IDS } from './ui/themes'
 registerAllModes()
 
 const STARTUP_GRACE_MS = 5_000
-const MAIN_AREA_HORIZONTAL_CHROME = 4
-const MAIN_AREA_VERTICAL_PADDING = 2
+const MAIN_AREA_HORIZONTAL_CHROME = 2
+const MAIN_AREA_VERTICAL_PADDING = 0
 const STATUS_BAR_HEIGHT = 4
-const TERMINAL_PANE_VERTICAL_CHROME = 4
+const TERMINAL_PANE_VERTICAL_CHROME = 2
 const MIN_TERMINAL_ROWS = 1
 const MIN_TERMINAL_COLS = 20
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250
@@ -388,7 +388,7 @@ export function App({ backend }: { backend: SessionBackend }) {
   }
 
   const terminalSize = useMemo(() => {
-    const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 3 : 0
+    const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 1 : 0
     const reservedRows =
       MAIN_AREA_VERTICAL_PADDING + STATUS_BAR_HEIGHT + TERMINAL_PANE_VERTICAL_CHROME
     const cols = Math.max(
@@ -400,9 +400,11 @@ export function App({ backend }: { backend: SessionBackend }) {
     // Terminal content origin in 0-based screen cells.
     // X: root padding(1) + sidebar outer(sidebarWidth) + terminal border(1) + terminal padding(1)
     // Y: root padding(1) + terminal border(1) + terminal padding(1)
+    // X: sidebar outer(sidebarWidth) + terminal border(1)
+    // Y: terminal border(1)
     contentOriginRef.current = {
-      x: 1 + sidebarWidth + 1 + 1,
-      y: 1 + 1 + 1,
+      x: sidebarWidth + 1,
+      y: 1,
       cols,
       rows,
     }

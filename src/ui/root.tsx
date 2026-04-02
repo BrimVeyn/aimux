@@ -50,8 +50,8 @@ export function RootView({
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
-      <box flexDirection="row" gap={1} padding={1} flexGrow={1}>
-        <Sidebar state={state} />
+      <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
+        <Sidebar state={state} onTabActivate={onPaneActivate} />
         {state.layoutTree &&
         state.layoutTree.type === 'split' &&
         findLeaf(state.layoutTree, state.activeTabId ?? '') ? (

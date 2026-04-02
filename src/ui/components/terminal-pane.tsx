@@ -116,7 +116,7 @@ export function TerminalPane({
     onTerminalScrollEvent(event)
   }
   return (
-    <box flexDirection="column" flexGrow={1} gap={1}>
+    <box flexDirection="column" flexGrow={1} gap={0}>
       <box
         border
         borderColor={
@@ -125,7 +125,7 @@ export function TerminalPane({
             : theme.border
         }
         title={getTitle(tab)}
-        padding={1}
+        padding={0}
         flexDirection="column"
         flexGrow={1}
         backgroundColor={theme.background}

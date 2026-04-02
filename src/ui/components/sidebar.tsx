@@ -12,9 +12,10 @@ import { TabItem } from './tab-item'
 
 interface SidebarProps {
   state: AppState
+  onTabActivate?: (tabId: string) => void
 }
 
-export function Sidebar({ state }: SidebarProps) {
+export function Sidebar({ state, onTabActivate }: SidebarProps) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const previousActiveIndexRef = useRef(-1)
   const previousVisibilityRef = useRef(state.sidebar.visible)
@@ -86,10 +87,10 @@ export function Sidebar({ state }: SidebarProps) {
       width={state.sidebar.width}
       border
       borderColor={state.focusMode === 'navigation' ? theme.borderActive : theme.border}
-      padding={1}
+      padding={0}
       flexDirection="column"
       backgroundColor={theme.panelMuted}
-      gap={1}
+      gap={0}
     >
       <text fg={theme.accent}>
         <strong>aimux</strong>
@@ -103,9 +104,9 @@ export function Sidebar({ state }: SidebarProps) {
           <text fg={theme.textMuted}>{branch}</text>
         </box>
       ) : null}
-      <text fg={theme.dim}>{'─'.repeat(Math.max(0, state.sidebar.width - 4))}</text>
+      <text fg={theme.dim}>{'─'.repeat(Math.max(0, state.sidebar.width - 2))}</text>
       <scrollbox
-        paddingTop={1}
+        paddingTop={0}
         ref={scrollRef}
         flexGrow={1}
         scrollY
@@ -131,6 +132,7 @@ export function Sidebar({ state }: SidebarProps) {
                   tab.id === state.activeTabId && state.focusMode === 'terminal-input'
                 }
                 inLayout={isInLayout && layoutIds.length > 1}
+                onActivate={onTabActivate ? () => onTabActivate(tab.id) : undefined}
               />
             )
           })

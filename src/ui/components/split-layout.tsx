@@ -8,8 +8,8 @@ import { computePaneRects } from '../../state/layout-tree'
 import { theme } from '../theme'
 import { TerminalPane } from './terminal-pane'
 
-// Border(1) + padding(1) on each side of TerminalPane's content box
-const PANE_CHROME = 2
+// Border(1) on each side of TerminalPane's content box (no padding)
+const PANE_CHROME = 1
 
 interface SplitLayoutProps {
   node: LayoutNode
