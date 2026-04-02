@@ -40,7 +40,14 @@ import {
   isCommandAvailable,
   parseCommand,
 } from './pty/command-registry'
-import { allLeafIds, computePaneRects, createLeaf, findLeaf, splitNode } from './state/layout-tree'
+import {
+  PANE_BORDER,
+  allLeafIds,
+  computePaneRects,
+  createLeaf,
+  findLeaf,
+  splitNode,
+} from './state/layout-tree'
 import { filterSessions, filterSnippets } from './state/selectors'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
@@ -425,8 +432,9 @@ export function App({ backend }: { backend: SessionBackend }) {
     if (state.layoutTree && state.layoutTree.type === 'split') {
       const bounds = { x: 0, y: 0, cols: terminalSize.cols, rows: terminalSize.rows }
       const rects = computePaneRects(state.layoutTree, bounds)
+      const chrome = PANE_BORDER * 2
       for (const [tabId, rect] of rects) {
-        backend.resizeTab(tabId, rect.cols, rect.rows)
+        backend.resizeTab(tabId, Math.max(1, rect.cols - chrome), Math.max(1, rect.rows - chrome))
       }
     } else {
       backend.resizeAll(terminalSize.cols, terminalSize.rows)
@@ -510,8 +518,8 @@ export function App({ backend }: { backend: SessionBackend }) {
       clearStartupGrace,
       (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
       tab,
-      paneRect?.cols ?? state.layout.terminalCols,
-      paneRect?.rows ?? state.layout.terminalRows,
+      Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
+      Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
       getCurrentSessionProjectPath()
     )
   }

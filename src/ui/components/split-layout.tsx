@@ -4,12 +4,11 @@ import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { LayoutNode, PaneRect } from '../../state/layout-tree'
 import type { FocusMode, TabSession } from '../../state/types'
 
-import { computePaneRects } from '../../state/layout-tree'
+import { PANE_BORDER, computePaneRects } from '../../state/layout-tree'
 import { theme } from '../theme'
 import { TerminalPane } from './terminal-pane'
 
-// Border(1) on each side of TerminalPane's content box (no padding)
-const PANE_CHROME = 1
+const PANE_CHROME = PANE_BORDER
 
 interface SplitLayoutProps {
   node: LayoutNode

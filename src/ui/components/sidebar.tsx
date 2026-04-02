@@ -122,18 +122,21 @@ export function Sidebar({ state, onTabActivate }: SidebarProps) {
             const layoutIds = state.layoutTree ? allLeafIds(state.layoutTree) : []
             const isInLayout = layoutIds.includes(tab.id)
             return (
-              <TabItem
+              <box
                 key={tab.id}
-                id={`sidebar-tab-${tab.id}`}
-                tab={tab}
-                active={tab.id === state.activeTabId}
-                focused={state.focusMode === 'navigation'}
-                isFocusedInput={
-                  tab.id === state.activeTabId && state.focusMode === 'terminal-input'
-                }
-                inLayout={isInLayout && layoutIds.length > 1}
-                onActivate={onTabActivate ? () => onTabActivate(tab.id) : undefined}
-              />
+                onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
+              >
+                <TabItem
+                  id={`sidebar-tab-${tab.id}`}
+                  tab={tab}
+                  active={tab.id === state.activeTabId}
+                  focused={state.focusMode === 'navigation'}
+                  isFocusedInput={
+                    tab.id === state.activeTabId && state.focusMode === 'terminal-input'
+                  }
+                  inLayout={isInLayout && layoutIds.length > 1}
+                />
+              </box>
             )
           })
         )}

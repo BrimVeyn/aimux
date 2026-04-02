@@ -17,6 +17,9 @@ export interface PaneRect {
   rows: number
 }
 
+/** Border thickness on each side of a split pane (used to compute content size from outer bounds). */
+export const PANE_BORDER = 1
+
 const MIN_RATIO = 0.15
 const MAX_RATIO = 0.85
 const RATIO_STEP = 0.05

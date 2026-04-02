@@ -5,7 +5,7 @@ import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
 import { logDebug } from '../debug/input-log'
-import { computePaneRects } from '../state/layout-tree'
+import { PANE_BORDER, computePaneRects } from '../state/layout-tree'
 
 export class LocalSessionBackend
   extends EventEmitter<SessionBackendEvents>
@@ -55,7 +55,12 @@ export class LocalSessionBackend
         rows: options.rows,
       })
       for (const [tabId, rect] of rects) {
-        this.sessionManager.resizeTab(options.sessionId, tabId, rect.cols, rect.rows)
+        this.sessionManager.resizeTab(
+          options.sessionId,
+          tabId,
+          Math.max(1, rect.cols - PANE_BORDER * 2),
+          Math.max(1, rect.rows - PANE_BORDER * 2)
+        )
       }
     } else {
       this.sessionManager.resize(options.sessionId, options.cols, options.rows)

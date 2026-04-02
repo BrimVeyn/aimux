@@ -7,7 +7,7 @@ import type { AppAction, LayoutState, TerminalModeState } from '../state/types'
 import type { TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
-import { computePaneRects } from '../state/layout-tree'
+import { PANE_BORDER, computePaneRects } from '../state/layout-tree'
 
 interface BackendRuntimeOptions {
   backend: SessionBackend
@@ -123,7 +123,11 @@ export function useBackendRuntime({
               rows: layoutRef.current.terminalRows,
             }
             for (const [tabId, rect] of computePaneRects(layoutTree, bounds)) {
-              backend.resizeTab(tabId, rect.cols, rect.rows)
+              backend.resizeTab(
+                tabId,
+                Math.max(1, rect.cols - PANE_BORDER * 2),
+                Math.max(1, rect.rows - PANE_BORDER * 2)
+              )
             }
           }
         } else if (currentSessionWorkspaceSnapshot) {
@@ -141,7 +145,11 @@ export function useBackendRuntime({
               rows: layoutRef.current.terminalRows,
             }
             for (const [tabId, rect] of computePaneRects(layoutTree, bounds)) {
-              backend.resizeTab(tabId, rect.cols, rect.rows)
+              backend.resizeTab(
+                tabId,
+                Math.max(1, rect.cols - PANE_BORDER * 2),
+                Math.max(1, rect.rows - PANE_BORDER * 2)
+              )
             }
           }
         }
@@ -168,7 +176,11 @@ export function useBackendRuntime({
               rows: layoutRef.current.terminalRows,
             }
             for (const [tabId, rect] of computePaneRects(layoutTree, bounds)) {
-              backend.resizeTab(tabId, rect.cols, rect.rows)
+              backend.resizeTab(
+                tabId,
+                Math.max(1, rect.cols - PANE_BORDER * 2),
+                Math.max(1, rect.rows - PANE_BORDER * 2)
+              )
             }
           }
         }
