@@ -1,4 +1,4 @@
-Output assets/demo.gif
+Output assets/splits.gif
 
 Set Shell "bash"
 Set FontSize 14
@@ -13,17 +13,13 @@ Type "bun run start"
 Enter
 Sleep 3s
 
-# Create a new session
+# Create a session
 Type "n"
 Sleep 1s
-
-# Search for a project directory
 Type "aimux"
 Sleep 2s
 Enter
 Sleep 1s
-
-# Confirm session name
 Enter
 Sleep 2s
 
@@ -33,43 +29,41 @@ Sleep 1s
 Enter
 Sleep 4s
 
-# Enter input mode and chat
+# Enter input mode and type something
 Type "i"
 Sleep 500ms
-Type "Say hello in one sentence"
+Type "Say hello"
 Enter
 Sleep 5s
 
-# Back to navigation
-Ctrl+Z
+# Enter layout mode with Ctrl+W
+Ctrl+W
 Sleep 1s
 
-# Open a second tab
-Ctrl+N
+# Split vertically with |
+Type "|"
 Sleep 1s
+
+# Select assistant and confirm
 Enter
 Sleep 4s
 
-# Rename it
-Type "r"
-Sleep 500ms
-Type "refactor"
-Enter
-Sleep 1s
-
-# Navigate between tabs
-Type "k"
-Sleep 1s
-Type "j"
-Sleep 1s
-
-# Split vertically
+# Enter input mode in the new pane
 Type "i"
 Sleep 500ms
+Type "Say hi"
+Enter
+Sleep 5s
+
+# Enter layout mode again
 Ctrl+W
-Sleep 500ms
-Type "|"
 Sleep 1s
+
+# Split horizontally with -
+Type "-"
+Sleep 1s
+
+# Select assistant and confirm
 Enter
 Sleep 4s
 
@@ -80,18 +74,22 @@ Type "h"
 Sleep 1s
 Type "l"
 Sleep 1s
-Escape
+Type "k"
+Sleep 1s
+Type "j"
 Sleep 1s
 
-# Toggle sidebar
-Ctrl+B
-Sleep 1s
-Ctrl+B
-Sleep 1s
+# Resize panes
+Type "H"
+Sleep 500ms
+Type "H"
+Sleep 500ms
+Type "L"
+Sleep 500ms
+Type "L"
+Sleep 500ms
 
-# Show help
-Type "?"
-Sleep 2s
+# Back to navigation
 Escape
 Sleep 1s
 

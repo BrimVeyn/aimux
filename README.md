@@ -10,6 +10,9 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 ## Features
 
 - **Multi-tab sessions** -- Run Claude, Codex, and OpenCode in parallel with instant tab switching
+- **Split panes** -- Split vertically (`|`) or horizontally (`-`) to view multiple assistants at once
+- **Draggable separators** -- Resize split panes by dragging the separator with the mouse
+- **Click-to-focus** -- Click any pane or sidebar tab to focus it instantly
 - **Full terminal emulation** -- Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
 - **Vim-style navigation** -- `j`/`k` to switch tabs, `i` to enter input mode, familiar keybindings throughout
 - **Text selection** -- Double-click to select a word, triple-click to select a line, drag to select a region. Selections are copied to the system clipboard automatically
@@ -44,6 +47,12 @@ Run multiple AI assistants side by side, rename tabs, and navigate with vim keys
 Switch between 9 built-in themes on the fly:
 
 ![Themes](assets/themes.gif)
+
+### Split Panes
+
+Split your workspace into multiple panes and resize them by dragging:
+
+![Split panes](assets/splits.gif)
 
 ## Install
 
@@ -93,6 +102,19 @@ Press `?` in navigation mode to see the full keybinding reference.
 ### Input Mode
 
 All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigation mode.
+
+### Layout Mode
+
+Enter with `Ctrl+W` from input mode. Manage split panes:
+
+| Key              | Action           |
+| ---------------- | ---------------- |
+| `\|`             | Split vertical   |
+| `-`              | Split horizontal |
+| `h` / `j` / `k` / `l` | Focus pane       |
+| `Shift+H/J/K/L` | Resize pane      |
+| `q`              | Close pane       |
+| `Esc`            | Back to navigation |
 
 ### Session Picker
 
@@ -162,6 +184,7 @@ bun run check
 bun run demo
 bun run demo:sessions
 bun run demo:tabs
+bun run demo:splits
 bun run demo:themes
 ```
 
