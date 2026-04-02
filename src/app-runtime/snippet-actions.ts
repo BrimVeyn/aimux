@@ -15,13 +15,9 @@ export function getSnippetEditorValue(state: AppState): { name: string; content:
 
   const { modal } = state
   const name =
-    modal.activeField === 'directory'
-      ? (modal.editBuffer ?? '').trim()
-      : (modal.secondaryBuffer ?? '').trim()
+    modal.activeField === 'name' ? (modal.editBuffer ?? '').trim() : modal.contentBuffer.trim()
   const content =
-    modal.activeField === 'name'
-      ? (modal.editBuffer ?? '').trim()
-      : (modal.secondaryBuffer ?? '').trim()
+    modal.activeField === 'content' ? (modal.editBuffer ?? '').trim() : modal.contentBuffer.trim()
 
   return { name, content }
 }

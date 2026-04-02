@@ -156,13 +156,13 @@ export interface ModalCreateSession extends ModalBase {
   directoryResults: DirectoryResult[]
   pendingProjectPath: string | null
   activeField: 'directory' | 'name'
-  secondaryBuffer: string
+  nameBuffer: string
 }
 
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
-  activeField: 'directory' | 'name'
-  secondaryBuffer: string
+  activeField: 'name' | 'content'
+  contentBuffer: string
 }
 
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'

@@ -132,12 +132,12 @@ export function RootView({
           directoryQuery={
             state.modal.activeField === 'directory'
               ? (state.modal.editBuffer ?? '')
-              : state.modal.secondaryBuffer
+              : state.modal.nameBuffer
           }
           sessionName={
             state.modal.activeField === 'name'
               ? (state.modal.editBuffer ?? '')
-              : state.modal.secondaryBuffer
+              : state.modal.nameBuffer
           }
           results={state.modal.directoryResults}
           selectedIndex={state.modal.selectedIndex}
@@ -155,14 +155,14 @@ export function RootView({
         <SnippetEditorModal
           activeField={state.modal.activeField}
           snippetName={
-            state.modal.activeField === 'directory'
-              ? (state.modal.editBuffer ?? '')
-              : state.modal.secondaryBuffer
-          }
-          snippetContent={
             state.modal.activeField === 'name'
               ? (state.modal.editBuffer ?? '')
-              : state.modal.secondaryBuffer
+              : state.modal.contentBuffer
+          }
+          snippetContent={
+            state.modal.activeField === 'content'
+              ? (state.modal.editBuffer ?? '')
+              : state.modal.contentBuffer
           }
           isEditing={state.modal.sessionTargetId !== null}
         />

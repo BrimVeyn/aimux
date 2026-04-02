@@ -1,7 +1,7 @@
 import { theme } from '../theme'
 
 interface SnippetEditorModalProps {
-  activeField: 'directory' | 'name'
+  activeField: 'name' | 'content'
   snippetName: string
   snippetContent: string
   isEditing: boolean
@@ -13,8 +13,8 @@ export function SnippetEditorModal({
   snippetContent,
   isEditing,
 }: SnippetEditorModalProps) {
-  const nameActive = activeField === 'directory'
-  const contentActive = activeField === 'name'
+  const nameActive = activeField === 'name'
+  const contentActive = activeField === 'content'
 
   return (
     <box

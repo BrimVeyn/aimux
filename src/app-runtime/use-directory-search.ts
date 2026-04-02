@@ -13,7 +13,7 @@ export function useDirectorySearch(
     modal.type === 'create-session'
       ? modal.activeField === 'directory'
         ? (modal.editBuffer ?? '')
-        : (modal.secondaryBuffer ?? '')
+        : modal.nameBuffer
       : ''
 
   useEffect(() => {

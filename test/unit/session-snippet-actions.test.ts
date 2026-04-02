@@ -81,8 +81,8 @@ describe('session and snippet actions', () => {
         selectedIndex: 0,
         editBuffer: 'Review',
         sessionTargetId: null,
-        activeField: 'directory' as const,
-        secondaryBuffer: 'Check for bugs',
+        activeField: 'name' as const,
+        contentBuffer: 'Check for bugs',
       },
     }
 
@@ -98,8 +98,8 @@ describe('session and snippet actions', () => {
         selectedIndex: 0,
         editBuffer: 'New',
         sessionTargetId: 'n1',
-        activeField: 'directory' as const,
-        secondaryBuffer: 'New content',
+        activeField: 'name' as const,
+        contentBuffer: 'New content',
       },
     }
 

@@ -3,26 +3,15 @@ import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 
-import type { KeyResult, ModeContext, ModeId, SideEffect } from './input/modes/types'
+import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
-import type { AssistantId, SessionRecord, SnippetRecord, TabSession } from './state/types'
+import type { ThemeId } from './ui/themes'
 
-import {
-  handleCreateSessionEffect,
-  handleDeleteSessionEffect,
-  handleRenameSessionEffect,
-  handleSwitchSessionEffect,
-  restartTabSession,
-} from './app-runtime/session-actions'
-import {
-  handleDeleteSnippetEffect,
-  handleSaveSnippetEditorEffect,
-  pasteSnippetToTab,
-} from './app-runtime/snippet-actions'
+import { type SideEffectContext, executeSideEffect } from './app-runtime/side-effects'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
-import { loadConfig, saveConfig } from './config'
+import { loadConfig } from './config'
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from './debug/input-log'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
@@ -33,33 +22,15 @@ import { buildPtyPastePayload } from './input/paste'
 import { createRawInputHandler, type TerminalContentOrigin } from './input/raw-input-handler'
 import { getLineText, getWordAtColumn } from './input/terminal-text-extraction'
 import { copyToSystemClipboard } from './platform/clipboard'
-import {
-  ASSISTANT_OPTIONS,
-  getAllAssistantOptions,
-  getAssistantOption,
-  isCommandAvailable,
-  parseCommand,
-} from './pty/command-registry'
-import {
-  PANE_BORDER,
-  allLeafIds,
-  computePaneRects,
-  createLeaf,
-  findLeaf,
-  splitNode,
-} from './state/layout-tree'
-import { filterSessions, filterSnippets } from './state/selectors'
+import { PANE_BORDER, computePaneRects } from './state/layout-tree'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
-import { saveCurrentWorkspace } from './state/workspace-save'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
-import { type ThemeId, THEME_IDS } from './ui/themes'
 
 registerAllModes()
 
-const STARTUP_GRACE_MS = 5_000
 const MAIN_AREA_HORIZONTAL_CHROME = 2
 const MAIN_AREA_VERTICAL_PADDING = 0
 const STATUS_BAR_HEIGHT = 4
@@ -67,72 +38,6 @@ const TERMINAL_PANE_VERTICAL_CHROME = 2
 const MIN_TERMINAL_ROWS = 1
 const MIN_TERMINAL_COLS = 20
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250
-
-function createTabId(): string {
-  return `tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function createTabSession(
-  assistant: AssistantId,
-  customCommand?: string,
-  customCommands?: Record<string, string>
-): TabSession {
-  const allOptions = getAllAssistantOptions(customCommands ?? {})
-  const option = allOptions.find((o) => o.id === assistant) ?? getAssistantOption(0)
-
-  return {
-    id: createTabId(),
-    assistant,
-    title: option.label,
-    status: 'starting',
-    activity: 'idle',
-    buffer: '',
-    terminalModes: {
-      mouseTrackingMode: 'none',
-      sendFocusMode: false,
-      alternateScrollMode: false,
-      isAlternateBuffer: false,
-      bracketedPasteMode: false,
-    },
-    command: customCommand ?? option.command,
-  }
-}
-
-function startTabSession(
-  backend: SessionBackend,
-  dispatch: (action: Parameters<typeof appReducer>[1]) => void,
-  clearStartupGrace: (tabId: string) => void,
-  startStartupGrace: (tabId: string) => void,
-  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command'>,
-  cols: number,
-  rows: number,
-  cwd?: string
-): void {
-  startStartupGrace(tab.id)
-
-  const { executable, args } = parseCommand(tab.command)
-
-  if (!isCommandAvailable(executable)) {
-    clearStartupGrace(tab.id)
-    dispatch({
-      type: 'set-tab-error',
-      tabId: tab.id,
-      message: `[command not found] ${executable} is not available in PATH.`,
-    })
-    return
-  }
-
-  backend.createSession({
-    tabId: tab.id,
-    assistant: tab.assistant,
-    title: tab.title,
-    command: executable,
-    args,
-    cols,
-    rows,
-    cwd,
-  })
-}
 
 export function App({ backend }: { backend: SessionBackend }) {
   const renderer = useRenderer()
@@ -482,262 +387,21 @@ export function App({ backend }: { backend: SessionBackend }) {
     }, 500)
   }, [backend, terminalSize.cols, terminalSize.rows, state.layoutTree])
 
-  function getCurrentSessionProjectPath(): string | undefined {
-    if (!state.currentSessionId) return undefined
-    return state.sessions.find((s) => s.id === state.currentSessionId)?.projectPath
-  }
-
-  function getFilteredSessions(): SessionRecord[] {
-    const filter = state.modal.type === 'session-picker' ? state.modal.editBuffer : null
-    return filterSessions(state.sessions, filter)
-  }
-
-  function getFilteredSnippets(): SnippetRecord[] {
-    const filter = state.modal.type === 'snippet-picker' ? state.modal.editBuffer : null
-    return filterSnippets(state.snippets, filter)
-  }
-
-  function launchAssistant(assistant: AssistantId) {
-    const customCommand = state.customCommands[assistant]
-    const tab = createTabSession(assistant, customCommand, state.customCommands)
-    logInputDebug('app.launchAssistant', {
-      assistant,
-      tabId: tab.id,
-      command: tab.command,
-    })
-    dispatch({ type: 'add-tab', tab })
-    startTabSession(
-      backend,
-      dispatch,
-      clearStartupGrace,
-      (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-      tab,
-      state.layout.terminalCols,
-      state.layout.terminalRows,
-      getCurrentSessionProjectPath()
-    )
-  }
-
-  function startExistingTab(tab: TabSession): void {
-    startTabSession(
-      backend,
-      dispatch,
-      clearStartupGrace,
-      (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-      tab,
-      state.layout.terminalCols,
-      state.layout.terminalRows,
-      getCurrentSessionProjectPath()
-    )
-  }
-
-  function executeSplitPane(
-    direction: import('./state/layout-tree').SplitDirection,
-    tab: TabSession
-  ): void {
-    const currentTree = state.layoutTree ?? createLeaf(state.activeTabId!)
-    const baseTree = findLeaf(currentTree, state.activeTabId!)
-      ? currentTree
-      : createLeaf(state.activeTabId!)
-    const newTree = splitNode(baseTree, state.activeTabId!, direction, tab.id)
-    const bounds = {
-      x: 0,
-      y: 0,
-      cols: state.layout.terminalCols,
-      rows: state.layout.terminalRows,
-    }
-    const paneRect = computePaneRects(newTree, bounds).get(tab.id)
-
-    dispatch({ type: 'split-pane', direction, newTab: tab })
-    startTabSession(
-      backend,
-      dispatch,
-      clearStartupGrace,
-      (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-      tab,
-      Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
-      Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
-      getCurrentSessionProjectPath()
-    )
-  }
-
-  function executeSideEffect(effect: SideEffect): void {
-    switch (effect.type) {
-      case 'quit': {
-        saveCurrentWorkspace(effect.state)
-        void backend.destroy(true)
-        renderer.destroy()
-        process.exit(0)
-        return
-      }
-      case 'launch-selected-assistant': {
-        const allOptions = getAllAssistantOptions(state.customCommands)
-        const option = allOptions[state.modal.selectedIndex] ?? getAssistantOption(0)
-        launchAssistant(option.id)
-        return
-      }
-      case 'confirm-selected-session': {
-        const filtered = getFilteredSessions()
-        logInputDebug('app.sessionPicker.confirm', {
-          selectedIndex: state.modal.selectedIndex,
-          selectedSessionId: filtered[state.modal.selectedIndex]?.id ?? null,
-          creatingNew: state.modal.selectedIndex === filtered.length,
-        })
-        const selectedSession = filtered[state.modal.selectedIndex]
-        if (selectedSession) {
-          handleSwitchSessionEffect(state, backend, dispatch, selectedSession)
-        } else {
-          dispatch({ type: 'open-create-session-modal' })
-        }
-        return
-      }
-      case 'delete-selected-session': {
-        const filtered = getFilteredSessions()
-        const selectedSession = filtered[state.modal.selectedIndex]
-        logInputDebug('app.sessionPicker.deleteSelected', {
-          selectedIndex: state.modal.selectedIndex,
-          selectedSessionId: selectedSession?.id ?? null,
-        })
-        if (selectedSession) {
-          handleDeleteSessionEffect(state, backend, dispatch, selectedSession.id)
-        }
-        return
-      }
-      case 'open-rename-selected-session': {
-        const filtered = getFilteredSessions()
-        const selectedSession = filtered[state.modal.selectedIndex]
-        if (selectedSession) {
-          logInputDebug('app.sessionPicker.openRenameModal', {
-            selectedIndex: state.modal.selectedIndex,
-            selectedSessionId: selectedSession.id,
-          })
-          dispatch({
-            type: 'open-session-name-modal',
-            sessionTargetId: selectedSession.id,
-            initialName: selectedSession.name,
-          })
-        }
-        return
-      }
-      case 'create-session':
-        handleCreateSessionEffect(state, dispatch, effect.name, effect.projectPath)
-        return
-      case 'close-tab': {
-        clearIdleTimer(effect.tabId)
-        clearStartupGrace(effect.tabId)
-        backend.disposeSession(effect.tabId)
-        return
-      }
-      case 'restart-tab':
-        restartTabSession(
-          backend,
-          dispatch,
-          clearIdleTimer,
-          clearStartupGrace,
-          startExistingTab,
-          effect.tab
-        )
-        return
-      case 'paste-selected-snippet': {
-        const filtered = getFilteredSnippets()
-        pasteSnippetToTab(
-          backend,
-          state.activeTabId,
-          activeTab,
-          filtered[state.modal.selectedIndex]
-        )
-        return
-      }
-      case 'edit-selected-snippet': {
-        const filtered = getFilteredSnippets()
-        const snippet = filtered[state.modal.selectedIndex]
-        if (snippet) {
-          dispatch({ type: 'open-snippet-editor', snippetId: snippet.id })
-        }
-        return
-      }
-      case 'delete-selected-snippet': {
-        const filtered = getFilteredSnippets()
-        const snippet = filtered[state.modal.selectedIndex]
-        if (snippet) {
-          handleDeleteSnippetEffect(state.snippets, dispatch, snippet.id)
-        }
-        return
-      }
-      case 'save-snippet-editor': {
-        handleSaveSnippetEditorEffect(state, dispatch)
-        return
-      }
-      case 'save-custom-command': {
-        const allOptions = getAllAssistantOptions(state.customCommands)
-        const option = allOptions[state.modal.selectedIndex]
-        if (option && state.modal.editBuffer !== null) {
-          const trimmed = state.modal.editBuffer.trim()
-          const newCustomCommands = { ...state.customCommands }
-          if (trimmed) {
-            newCustomCommands[option.id] = trimmed
-          } else {
-            delete newCustomCommands[option.id]
-          }
-          saveConfig({
-            ...loadConfig(),
-            customCommands: newCustomCommands,
-          })
-        }
-        return
-      }
-      case 'apply-theme': {
-        switch (effect.action) {
-          case 'open':
-            applyTheme(THEME_IDS[0] ?? 'aimux')
-            break
-          case 'restore':
-            applyTheme(themeId)
-            break
-          case 'confirm': {
-            const selectedId = THEME_IDS[state.modal.selectedIndex]
-            if (selectedId) {
-              applyTheme(selectedId)
-              setThemeId(selectedId)
-              saveConfig({ ...loadConfig(), themeId: selectedId })
-            }
-            break
-          }
-          case 'preview': {
-            const count = THEME_IDS.length
-            const nextIndex = (state.modal.selectedIndex + effect.delta + count) % count
-            const previewId = THEME_IDS[nextIndex]
-            if (previewId) {
-              applyTheme(previewId)
-            }
-            break
-          }
-        }
-        return
-      }
-      case 'rename-session': {
-        handleRenameSessionEffect(state.sessions, dispatch, effect.sessionId, effect.name)
-        return
-      }
-      case 'split-pane': {
-        const customCommand = state.customCommands.terminal
-        const tab = createTabSession('terminal', customCommand, state.customCommands)
-        executeSplitPane(effect.direction, tab)
-        return
-      }
-      case 'confirm-split': {
-        const allOptions = getAllAssistantOptions(state.customCommands)
-        const option = allOptions[state.modal.selectedIndex] ?? getAssistantOption(0)
-        const direction =
-          state.modal.type === 'split-picker' ? state.modal.splitDirection : 'vertical'
-        const customCommand = state.customCommands[option.id]
-        const tab = createTabSession(option.id, customCommand, state.customCommands)
-        dispatch({ type: 'close-modal' })
-        executeSplitPane(direction, tab)
-        dispatch({ type: 'set-focus-mode', focusMode: 'terminal-input' })
-        return
-      }
-    }
+  const sideEffectCtx: SideEffectContext = {
+    state,
+    dispatch,
+    backend,
+    renderer,
+    themeId,
+    setThemeId,
+    activeTab,
+    clearIdleTimer,
+    clearStartupGrace,
+    startStartupGrace,
+    getCurrentSessionProjectPath: () => {
+      if (!state.currentSessionId) return undefined
+      return state.sessions.find((s) => s.id === state.currentSessionId)?.projectPath
+    },
   }
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
@@ -751,12 +415,12 @@ export function App({ backend }: { backend: SessionBackend }) {
         dispatch(action)
       }
       for (const effect of transResult.effects) {
-        executeSideEffect(effect)
+        executeSideEffect(effect, sideEffectCtx)
       }
     }
 
     for (const effect of result.effects) {
-      executeSideEffect(effect)
+      executeSideEffect(effect, sideEffectCtx)
     }
   }
 
@@ -764,7 +428,7 @@ export function App({ backend }: { backend: SessionBackend }) {
     // Global quit: Ctrl+C in any mode except terminal-input
     if (key.ctrl && key.name === 'c' && state.focusMode !== 'terminal-input') {
       key.preventDefault()
-      executeSideEffect({ type: 'quit', state })
+      executeSideEffect({ type: 'quit', state }, sideEffectCtx)
       return
     }
 
