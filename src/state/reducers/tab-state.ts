@@ -1,6 +1,7 @@
 import type { AppAction, AppState, TabSession } from '../types'
 
 import {
+  allLeafIds,
   createLeaf,
   findLeaf,
   getAdjacentLeaf,
@@ -122,6 +123,31 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       if (activeIndex === -1) {
         return state
       }
+
+      // Group-aware reordering: move entire layout group together
+      const layoutIds = state.layoutTree ? allLeafIds(state.layoutTree) : []
+      if (layoutIds.length > 1 && state.activeTabId && layoutIds.includes(state.activeTabId)) {
+        const layoutSet = new Set(layoutIds)
+        let groupStart = activeIndex
+        let groupEnd = activeIndex
+        while (groupStart > 0 && layoutSet.has(state.tabs[groupStart - 1]!.id)) groupStart--
+        while (groupEnd < state.tabs.length - 1 && layoutSet.has(state.tabs[groupEnd + 1]!.id))
+          groupEnd++
+
+        const tabs = [...state.tabs]
+        if (action.delta > 0 && groupEnd < tabs.length - 1) {
+          const [moved] = tabs.splice(groupEnd + 1, 1)
+          tabs.splice(groupStart, 0, moved!)
+        } else if (action.delta < 0 && groupStart > 0) {
+          const [moved] = tabs.splice(groupStart - 1, 1)
+          tabs.splice(groupEnd, 0, moved!)
+        } else {
+          return state
+        }
+        return { ...state, tabs }
+      }
+
+      // Standalone tab: single swap
       const nextIndex = activeIndex + action.delta
       if (nextIndex < 0 || nextIndex >= state.tabs.length) {
         return state
@@ -217,9 +243,21 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       const tree = findLeaf(currentTree, state.activeTabId)
         ? currentTree
         : createLeaf(state.activeTabId)
+
+      // Insert newTab right after the last layout group member
+      const layoutIdSet = new Set(allLeafIds(tree))
+      let insertIndex = state.tabs.length
+      for (let i = state.tabs.length - 1; i >= 0; i--) {
+        if (layoutIdSet.has(state.tabs[i]!.id)) {
+          insertIndex = i + 1
+          break
+        }
+      }
+      const tabs = [...state.tabs.slice(0, insertIndex), newTab, ...state.tabs.slice(insertIndex)]
+
       return {
         ...state,
-        tabs: [...state.tabs, newTab],
+        tabs,
         activeTabId: newTab.id,
         layoutTree: splitNode(tree, state.activeTabId, action.direction, newTab.id),
       }

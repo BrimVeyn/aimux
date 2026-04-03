@@ -13,6 +13,11 @@ interface SidebarProps {
   onTabActivate?: (tabId: string) => void
 }
 
+const GUTTER_START = '╭'
+const GUTTER_MIDDLE = '├'
+const GUTTER_END = '╰'
+const GUTTER_PAD = '│'
+
 export function Sidebar({ onTabActivate }: SidebarProps) {
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
@@ -124,25 +129,59 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
             <text fg={theme.textMuted}>No tabs yet. Press Ctrl+n.</text>
           </box>
         ) : (
-          tabs.map((tab) => {
+          (() => {
             const layoutIds = layoutTree ? allLeafIds(layoutTree) : []
-            const isInLayout = layoutIds.includes(tab.id)
-            return (
-              <box
-                key={tab.id}
-                onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
-              >
-                <TabItem
-                  id={`sidebar-tab-${tab.id}`}
-                  tab={tab}
-                  active={tab.id === activeTabId}
-                  focused={focusMode === 'navigation'}
-                  isFocusedInput={tab.id === activeTabId && focusMode === 'terminal-input'}
-                  inLayout={isInLayout && layoutIds.length > 1}
-                />
-              </box>
-            )
-          })
+            const layoutSet = layoutIds.length > 1 ? new Set(layoutIds) : new Set<string>()
+            const hasGroup = layoutSet.size > 0
+
+            let groupStart = -1
+            let groupEnd = -1
+            if (hasGroup) {
+              groupStart = tabs.findIndex((t) => layoutSet.has(t.id))
+              for (let i = tabs.length - 1; i >= 0; i--) {
+                if (layoutSet.has(tabs[i]!.id)) {
+                  groupEnd = i
+                  break
+                }
+              }
+            }
+
+            return tabs.map((tab, index) => {
+              const isActive = tab.id === activeTabId
+              const inLayout = layoutSet.has(tab.id)
+              const inGroup = hasGroup && index >= groupStart && index <= groupEnd
+              const isGroupStart = index === groupStart
+              const isGroupEnd = index === groupEnd
+              const isGroupMiddle = !isGroupStart && !isGroupEnd
+
+              return (
+                <box
+                  key={tab.id}
+                  flexDirection="row"
+                  onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
+                >
+                  {inGroup ? (
+                    <box flexDirection="column" width={1} overflow="hidden">
+                      <text fg={theme.accent}>{isGroupStart ? GUTTER_START : GUTTER_PAD}</text>
+                      <text fg={theme.accent}>{GUTTER_PAD}</text>
+                      <text fg={theme.accent}>{isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}</text>
+                      <text fg={theme.accent}>{isGroupEnd ? GUTTER_END : GUTTER_PAD}</text>
+                    </box>
+                  ) : null}
+                  <box flexGrow={1}>
+                    <TabItem
+                      id={`sidebar-tab-${tab.id}`}
+                      tab={tab}
+                      active={isActive}
+                      focused={focusMode === 'navigation'}
+                      isFocusedInput={isActive && focusMode === 'terminal-input'}
+                      inLayout={inLayout}
+                    />
+                  </box>
+                </box>
+              )
+            })
+          })()
         )}
       </scrollbox>
     </box>
