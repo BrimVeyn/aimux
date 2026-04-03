@@ -126,7 +126,7 @@ export function useMouseHandlers({
 
     const col = event.x - origin.x
     const row = event.y - origin.y
-    const clickCount = multiClickRef.current.track(col, row)
+    const clickCount = multiClickRef.current.track(event.x, event.y)
 
     if (clickCount < 2) {
       return
