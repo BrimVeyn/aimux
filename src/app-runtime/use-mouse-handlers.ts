@@ -7,6 +7,7 @@ import type { SessionBackend } from '../session-backend/types'
 import type { SplitDirection } from '../state/layout-tree'
 import type { AppAction, AppState, TabSession } from '../state/types'
 
+import { logInputDebug } from '../debug/input-log'
 import { encodeMouseEventForPty } from '../input/mouse-forwarding'
 import { MultiClickDetector } from '../input/multi-click-detector'
 import { getLineText, getWordAtColumn } from '../input/terminal-text-extraction'
@@ -128,6 +129,21 @@ export function useMouseHandlers({
     const row = event.y - origin.y
     const clickCount = multiClickRef.current.track(event.x, event.y)
 
+    logInputDebug('click.detect', {
+      eventX: event.x,
+      eventY: event.y,
+      originX: origin.x,
+      originY: origin.y,
+      col,
+      row,
+      clickCount,
+      targetId: event.target?.id,
+      targetX: (event.target as any)?.x,
+      targetY: (event.target as any)?.y,
+      targetW: (event.target as any)?.width,
+      targetCtor: event.target?.constructor?.name,
+    })
+
     if (clickCount < 2) {
       return
     }
@@ -140,9 +156,21 @@ export function useMouseHandlers({
     const line = tab.viewport.lines[row]
     const lineBox = event.target.parent
     if (!lineBox) {
+      logInputDebug('click.noLineBox', { targetId: event.target?.id })
       return
     }
     const baseX = lineBox.x
+
+    logInputDebug('click.lineBox', {
+      lineBoxId: lineBox?.id,
+      lineBoxX: (lineBox as any)?.x,
+      lineBoxY: (lineBox as any)?.y,
+      lineBoxW: (lineBox as any)?.width,
+      lineBoxCtor: lineBox?.constructor?.name,
+      grandParentId: (lineBox as any)?.parent?.id,
+      grandParentX: (lineBox as any)?.parent?.x,
+      grandParentCtor: (lineBox as any)?.parent?.constructor?.name,
+    })
 
     const lineText = getLineText(line)
     let selectedText: string
@@ -163,10 +191,44 @@ export function useMouseHandlers({
       endCol = lineText.length
     }
 
+    logInputDebug('click.selection', {
+      clickCount,
+      selectedText,
+      startCol,
+      endCol,
+      baseX,
+      startX: baseX + startCol,
+      endX: baseX + endCol,
+      y: event.y,
+      lineText,
+      spanCount: line.spans.length,
+      spanTexts: line.spans.map((s) => s.text),
+      spanStyles: line.spans.map((s) => ({
+        bold: s.bold,
+        italic: s.italic,
+        underline: s.underline,
+      })),
+    })
+
+    // Find the TextRenderables at start/end positions by walking the
+    // line box children.  This mimics native drag-selection where start
+    // and end can be different renderables, allowing multi-span selection.
+    const startScreenX = baseX + startCol
+    const endScreenX = baseX + endCol
+    const children = (lineBox as any).getChildren() as Array<{ x: number; width: number }>
+    const startTarget =
+      children.find((c: any) => c.x <= startScreenX && startScreenX < c.x + c.width) ??
+      children[0] ??
+      event.target
+    const endTarget =
+      children.find((c: any) => c.x < endScreenX && endScreenX <= c.x + c.width) ??
+      children[children.length - 1] ??
+      event.target
+
     event.preventDefault()
     renderer.clearSelection()
-    renderer.startSelection(event.target, baseX + startCol, event.y)
-    renderer.updateSelection(event.target, baseX + endCol, event.y, {
+    renderer.startSelection(startTarget, startScreenX, event.y)
+    renderer.updateSelection(endTarget, endScreenX, event.y, {
       finishDragging: true,
     })
     copyToSystemClipboard(selectedText)

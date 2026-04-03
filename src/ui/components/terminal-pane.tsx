@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { TabSession, TerminalSpan } from '../../state/types'
 
+import { logInputDebug } from '../../debug/input-log'
 import { theme } from '../theme'
 
 interface TerminalPaneProps {
@@ -90,6 +91,17 @@ export function TerminalPane({
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
+    if (event.type === 'down') {
+      logInputDebug('pane.mouseDown', {
+        eventType: event.type,
+        button: event.button,
+        x: event.x,
+        y: event.y,
+        canForward: canForwardMouse,
+        tabId,
+        willClick: !canForwardMouse && !!tab && event.button === 0 && !!onTerminalClick,
+      })
+    }
     if (event.type === 'drag' && onSeparatorDrag?.(event)) {
       event.preventDefault()
       return
