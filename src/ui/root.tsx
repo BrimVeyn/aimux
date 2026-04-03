@@ -2,9 +2,9 @@ import type { MouseEvent } from '@opentui/core'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SplitDirection } from '../state/layout-tree'
-import type { AppState } from '../state/types'
 import type { ThemeId } from './themes'
 
+import { useAppStore } from '../state/app-store'
 import { findLeaf } from '../state/layout-tree'
 import { CreateSessionModal } from './components/create-session-modal'
 import { HelpModal } from './components/help-modal'
@@ -21,7 +21,6 @@ import { ThemePickerModal } from './components/theme-picker-modal'
 import { theme } from './theme'
 
 interface RootViewProps {
-  state: AppState
   themeId: ThemeId
   contentOrigin: TerminalContentOrigin
   mouseForwardingEnabled: boolean
@@ -44,7 +43,6 @@ interface RootViewProps {
 }
 
 export function RootView({
-  state,
   themeId,
   contentOrigin,
   mouseForwardingEnabled,
@@ -60,20 +58,28 @@ export function RootView({
   terminalCols,
   terminalRows,
 }: RootViewProps) {
-  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
+  const tabs = useAppStore((s) => s.tabs)
+  const activeTabId = useAppStore((s) => s.activeTabId)
+  const layoutTree = useAppStore((s) => s.layoutTree)
+  const focusMode = useAppStore((s) => s.focusMode)
+  const modal = useAppStore((s) => s.modal)
+  const snippets = useAppStore((s) => s.snippets)
+  const customCommands = useAppStore((s) => s.customCommands)
+  const sessions = useAppStore((s) => s.sessions)
+  const currentSessionId = useAppStore((s) => s.currentSessionId)
+
+  const activeTab = tabs.find((tab) => tab.id === activeTabId)
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
-        <Sidebar state={state} onTabActivate={onPaneActivate} />
-        {state.layoutTree &&
-        state.layoutTree.type === 'split' &&
-        findLeaf(state.layoutTree, state.activeTabId ?? '') ? (
+        <Sidebar onTabActivate={onPaneActivate} />
+        {layoutTree && layoutTree.type === 'split' && findLeaf(layoutTree, activeTabId ?? '') ? (
           <SplitLayout
-            node={state.layoutTree}
-            tabs={state.tabs}
-            activeTabId={state.activeTabId}
-            focusMode={state.focusMode}
+            node={layoutTree}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            focusMode={focusMode}
             contentOrigin={contentOrigin}
             mouseForwardingEnabled={mouseForwardingEnabled}
             localScrollbackEnabled={localScrollbackEnabled}
@@ -90,7 +96,7 @@ export function RootView({
         ) : (
           <TerminalPane
             tab={activeTab}
-            focusMode={state.focusMode}
+            focusMode={focusMode}
             contentOrigin={contentOrigin}
             mouseForwardingEnabled={mouseForwardingEnabled}
             localScrollbackEnabled={localScrollbackEnabled}
@@ -100,77 +106,67 @@ export function RootView({
           />
         )}
       </box>
-      <StatusBar state={state} activeTab={activeTab} />
-      {state.modal.type === 'new-tab' || state.modal.type === 'split-picker' ? (
+      <StatusBar />
+      {modal.type === 'new-tab' || modal.type === 'split-picker' ? (
         <NewTabModal
-          selectedIndex={state.modal.selectedIndex}
-          customCommands={state.customCommands}
-          editBuffer={state.modal.editBuffer}
+          selectedIndex={modal.selectedIndex}
+          customCommands={customCommands}
+          editBuffer={modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === 'session-picker' ? (
+      {modal.type === 'session-picker' ? (
         <SessionPickerModal
-          sessions={state.sessions}
-          selectedIndex={state.modal.selectedIndex}
-          currentSessionId={state.currentSessionId}
-          currentTabCount={state.tabs.length}
-          filter={state.modal.editBuffer}
+          sessions={sessions}
+          selectedIndex={modal.selectedIndex}
+          currentSessionId={currentSessionId}
+          currentTabCount={tabs.length}
+          filter={modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === 'session-name' ? (
+      {modal.type === 'session-name' ? (
         <SessionNameModal
-          title={state.modal.sessionTargetId ? 'Rename session' : 'Create session'}
-          value={state.modal.editBuffer ?? ''}
+          title={modal.sessionTargetId ? 'Rename session' : 'Create session'}
+          value={modal.editBuffer ?? ''}
         />
       ) : null}
-      {state.modal.type === 'rename-tab' ? (
-        <SessionNameModal title="Rename tab" value={state.modal.editBuffer ?? ''} />
+      {modal.type === 'rename-tab' ? (
+        <SessionNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
       ) : null}
-      {state.modal.type === 'create-session' ? (
+      {modal.type === 'create-session' ? (
         <CreateSessionModal
-          activeField={state.modal.activeField}
+          activeField={modal.activeField}
           directoryQuery={
-            state.modal.activeField === 'directory'
-              ? (state.modal.editBuffer ?? '')
-              : state.modal.nameBuffer
+            modal.activeField === 'directory' ? (modal.editBuffer ?? '') : modal.nameBuffer
           }
-          sessionName={
-            state.modal.activeField === 'name'
-              ? (state.modal.editBuffer ?? '')
-              : state.modal.nameBuffer
-          }
-          results={state.modal.directoryResults}
-          selectedIndex={state.modal.selectedIndex}
-          pendingProjectPath={state.modal.pendingProjectPath}
+          sessionName={modal.activeField === 'name' ? (modal.editBuffer ?? '') : modal.nameBuffer}
+          results={modal.directoryResults}
+          selectedIndex={modal.selectedIndex}
+          pendingProjectPath={modal.pendingProjectPath}
         />
       ) : null}
-      {state.modal.type === 'snippet-picker' ? (
+      {modal.type === 'snippet-picker' ? (
         <SnippetPickerModal
-          snippets={state.snippets}
-          selectedIndex={state.modal.selectedIndex}
-          filter={state.modal.editBuffer}
+          snippets={snippets}
+          selectedIndex={modal.selectedIndex}
+          filter={modal.editBuffer}
         />
       ) : null}
-      {state.modal.type === 'snippet-editor' ? (
+      {modal.type === 'snippet-editor' ? (
         <SnippetEditorModal
-          activeField={state.modal.activeField}
+          activeField={modal.activeField}
           snippetName={
-            state.modal.activeField === 'name'
-              ? (state.modal.editBuffer ?? '')
-              : state.modal.contentBuffer
+            modal.activeField === 'name' ? (modal.editBuffer ?? '') : modal.contentBuffer
           }
           snippetContent={
-            state.modal.activeField === 'content'
-              ? (state.modal.editBuffer ?? '')
-              : state.modal.contentBuffer
+            modal.activeField === 'content' ? (modal.editBuffer ?? '') : modal.contentBuffer
           }
-          isEditing={state.modal.sessionTargetId !== null}
+          isEditing={modal.sessionTargetId !== null}
         />
       ) : null}
-      {state.modal.type === 'theme-picker' ? (
-        <ThemePickerModal selectedIndex={state.modal.selectedIndex} currentThemeId={themeId} />
+      {modal.type === 'theme-picker' ? (
+        <ThemePickerModal selectedIndex={modal.selectedIndex} currentThemeId={themeId} />
       ) : null}
-      {state.modal.type === 'help' ? <HelpModal /> : null}
+      {modal.type === 'help' ? <HelpModal /> : null}
     </box>
   )
 }

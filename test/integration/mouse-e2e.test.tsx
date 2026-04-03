@@ -12,6 +12,7 @@ import type { TabSession, TerminalModeState, TerminalSnapshot } from '../../src/
 import { encodeMouseEventForPty } from '../../src/input/mouse-forwarding'
 import { parseCommand } from '../../src/pty/command-registry'
 import { PtyManager } from '../../src/pty/pty-manager'
+import { appStore } from '../../src/state/app-store'
 import { RootView } from '../../src/ui/root'
 
 const TEST_WIDTH = 120
@@ -181,40 +182,41 @@ function MouseHarness({
     command,
   }
 
+  appStore.setState({
+    tabs: [tab],
+    activeTabId: TEST_TAB_ID,
+    layoutTree: { type: 'leaf', tabId: TEST_TAB_ID },
+    sessions: [],
+    currentSessionId: null,
+    snippets: [],
+    focusMode: 'terminal-input',
+    sidebar: {
+      visible: true,
+      width: SIDEBAR_WIDTH,
+      minWidth: 18,
+      maxWidth: 42,
+    },
+    modal: {
+      type: null,
+      selectedIndex: 0,
+      editBuffer: null,
+      sessionTargetId: null,
+    },
+    layout: {
+      terminalCols: terminalSize.cols,
+      terminalRows: terminalSize.rows,
+    },
+    customCommands: {
+      claude: command,
+      codex: 'codex',
+      opencode: 'opencode',
+      terminal: 'zsh',
+    },
+  })
+
   return (
     <RootView
       themeId="aimux"
-      state={{
-        tabs: [tab],
-        activeTabId: TEST_TAB_ID,
-        layoutTree: { type: 'leaf', tabId: TEST_TAB_ID },
-        sessions: [],
-        currentSessionId: null,
-        snippets: [],
-        focusMode: 'terminal-input',
-        sidebar: {
-          visible: true,
-          width: SIDEBAR_WIDTH,
-          minWidth: 18,
-          maxWidth: 42,
-        },
-        modal: {
-          type: null,
-          selectedIndex: 0,
-          editBuffer: null,
-          sessionTargetId: null,
-        },
-        layout: {
-          terminalCols: terminalSize.cols,
-          terminalRows: terminalSize.rows,
-        },
-        customCommands: {
-          claude: command,
-          codex: 'codex',
-          opencode: 'opencode',
-          terminal: 'zsh',
-        },
-      }}
       contentOrigin={contentOriginRef.current}
       mouseForwardingEnabled={mouseForwardingEnabled}
       localScrollbackEnabled={localScrollbackEnabled}

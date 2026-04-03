@@ -1,12 +1,8 @@
-import type { AppState, TabSession } from '../../state/types'
+import type { AppState } from '../../state/types'
 
+import { useAppStore } from '../../state/app-store'
 import { getStatusBarModel } from '../status-bar-model'
 import { theme } from '../theme'
-
-interface StatusBarProps {
-  state: AppState
-  activeTab?: TabSession
-}
 
 function getModeBorderColor(focusMode: AppState['focusMode']): string {
   switch (focusMode) {
@@ -22,7 +18,9 @@ function getModeBorderColor(focusMode: AppState['focusMode']): string {
   }
 }
 
-export function StatusBar({ state, activeTab }: StatusBarProps) {
+export function StatusBar() {
+  const state = useAppStore((s) => s)
+  const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
   const model = getStatusBarModel(state, activeTab)
 
   return (

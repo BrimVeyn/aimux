@@ -19,6 +19,7 @@ import { getHandler, transitionTo } from './input/modes/registry'
 import { buildPtyPastePayload } from './input/paste'
 import { createRawInputHandler, type TerminalContentOrigin } from './input/raw-input-handler'
 import { copyToSystemClipboard } from './platform/clipboard'
+import { appStore } from './state/app-store'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
@@ -43,6 +44,9 @@ export function App({ backend }: { backend: SessionBackend }) {
     const { customCommands } = loadConfig()
     return createInitialState(customCommands, loadSessionCatalog(), loadSnippetCatalog(), true)
   })
+  // Sync useReducer state into Zustand store (transition bridge)
+  appStore.setState(state)
+
   const resizingRef = useRef(false)
   const layoutRef = useRef(state.layout)
   layoutRef.current = state.layout
@@ -268,7 +272,6 @@ export function App({ backend }: { backend: SessionBackend }) {
 
   return (
     <RootView
-      state={state}
       themeId={themeId}
       contentOrigin={contentOriginRef.current}
       mouseForwardingEnabled={activeMouseForwardingEnabled}
