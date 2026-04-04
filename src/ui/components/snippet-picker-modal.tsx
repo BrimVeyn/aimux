@@ -12,8 +12,9 @@ interface SnippetPickerModalProps {
 const MAX_PREVIEW_LENGTH = 60
 
 function truncateContent(content: string): string {
-  if (content.length <= MAX_PREVIEW_LENGTH) return content
-  return `${content.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
+  const normalized = content.replaceAll(/\s+/g, ' ').trim()
+  if (normalized.length <= MAX_PREVIEW_LENGTH) return normalized
+  return `${normalized.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
 }
 
 export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
@@ -33,27 +34,23 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
         width="60%"
         border
         borderColor={theme.borderActive}
-        padding={1}
         backgroundColor={theme.panel}
         flexDirection="column"
-        gap={1}
+        gap={0}
       >
-        <text fg={theme.accent}>Snippets</text>
-        <text fg={theme.textMuted}>
-          j/k move, Enter send, n new, e edit, d delete, / filter, Esc cancel.
-        </text>
+        <box padding={1} flexDirection="column">
+          <text fg={theme.accent}>Snippets</text>
+          <text fg={theme.textMuted}>
+            j/k move, Enter send, n new, e edit, d delete, / filter, Esc cancel.
+          </text>
+        </box>
         {filter !== null ? (
-          <box
-            border
-            borderColor={theme.borderActive}
-            backgroundColor={theme.panelMuted}
-            padding={1}
-          >
+          <box border borderColor={theme.borderActive} backgroundColor={theme.panelMuted}>
             <text fg={theme.text}>/{filter}_</text>
           </box>
         ) : null}
         {filtered.length === 0 ? (
-          <box padding={1}>
+          <box>
             <text fg={theme.textMuted}>
               {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
             </text>
@@ -67,11 +64,11 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
               border
               borderColor={active ? theme.borderActive : theme.border}
               backgroundColor={active ? theme.panelMuted : theme.background}
-              padding={1}
               flexDirection="column"
             >
               <text fg={active ? theme.text : theme.textMuted}>
-                {active ? '>' : ' '} {snippet.name}
+                {active ? '> ' : '  '}
+                <strong>{snippet.name}</strong>
               </text>
               <text fg={theme.textMuted}> {truncateContent(snippet.content)}</text>
             </box>

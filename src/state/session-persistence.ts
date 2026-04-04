@@ -123,6 +123,40 @@ export function restoreLayoutTrees(
   return { layoutTrees, tabGroupMap }
 }
 
+function normalizeRestoredTabOrder(
+  tabs: TabSession[],
+  layoutTrees: Record<string, LayoutNode>,
+  tabGroupMap: Record<string, string>
+): TabSession[] {
+  const tabsById = new Map(tabs.map((tab) => [tab.id, tab]))
+  const emittedGroupIds = new Set<string>()
+  const orderedTabs: TabSession[] = []
+
+  for (const tab of tabs) {
+    const groupId = tabGroupMap[tab.id]
+    const groupTree = groupId ? layoutTrees[groupId] : undefined
+
+    if (!groupId || !groupTree || groupTree.type !== 'split') {
+      orderedTabs.push(tab)
+      continue
+    }
+
+    if (emittedGroupIds.has(groupId)) {
+      continue
+    }
+
+    emittedGroupIds.add(groupId)
+    for (const leafId of allLeafIds(groupTree)) {
+      const groupTab = tabsById.get(leafId)
+      if (groupTab) {
+        orderedTabs.push(groupTab)
+      }
+    }
+  }
+
+  return orderedTabs
+}
+
 export function restoreWorkspaceState(
   state: AppState,
   workspaceSnapshot: WorkspaceSnapshotV1 | undefined
@@ -137,6 +171,7 @@ export function restoreWorkspaceState(
       : (tabs[0]?.id ?? null)
 
   const { layoutTrees, tabGroupMap } = restoreLayoutTrees(workspaceSnapshot, tabs)
+  const orderedTabs = normalizeRestoredTabOrder(tabs, layoutTrees, tabGroupMap)
 
   return {
     activeTabId,
@@ -148,6 +183,6 @@ export function restoreWorkspaceState(
       width: workspaceSnapshot?.sidebar.width ?? state.sidebar.width,
     },
     tabGroupMap,
-    tabs,
+    tabs: orderedTabs,
   }
 }

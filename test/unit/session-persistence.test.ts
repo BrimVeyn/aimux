@@ -99,4 +99,91 @@ describe('session persistence', () => {
     expect(restored.sidebar.width).toBe(22)
     expect(restored.focusMode).toBe('navigation')
   })
+
+  test('restores grouped tabs as contiguous blocks', () => {
+    const baseState = createInitialState()
+    const restored = restoreWorkspaceState(baseState, {
+      activeTabId: 'tab-2',
+      layoutTrees: {
+        'group-1': {
+          direction: 'vertical',
+          first: { tabId: 'tab-2', type: 'leaf' },
+          ratio: 0.5,
+          second: { tabId: 'tab-3', type: 'leaf' },
+          type: 'split',
+        },
+      },
+      savedAt: new Date().toISOString(),
+      sidebar: { visible: true, width: 28 },
+      tabGroupMap: {
+        'tab-2': 'group-1',
+        'tab-3': 'group-1',
+      },
+      tabs: [
+        {
+          assistant: 'claude',
+          buffer: '',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'exited',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Standalone',
+        },
+        {
+          assistant: 'claude',
+          buffer: '',
+          command: 'claude',
+          id: 'tab-2',
+          status: 'running',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Grouped 1',
+        },
+        {
+          assistant: 'terminal',
+          buffer: '',
+          command: 'zsh',
+          id: 'tab-4',
+          status: 'exited',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Standalone 2',
+        },
+        {
+          assistant: 'codex',
+          buffer: '',
+          command: 'codex',
+          id: 'tab-3',
+          status: 'running',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Grouped 2',
+        },
+      ],
+      version: 1,
+    })
+
+    expect(restored.tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2', 'tab-3', 'tab-4'])
+  })
 })
