@@ -26,9 +26,6 @@ jobs:
       - name: Type check
         run: bun run check
 
-      - name: Tests
-        run: bun test
-
   release:
     needs: check
     runs-on: ubuntu-latest

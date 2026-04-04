@@ -328,6 +328,22 @@ describe('mouse passthrough integration', () => {
     )
   }, 15_000)
 
+  test('forwards scroll events to the PTY in terminal-input mode', async () => {
+    const app = await mountMouseHarness(createMouseFixtureCommand(), {
+      localScrollbackEnabled: false,
+      mouseForwardingEnabled: true,
+      readyText: 'READY',
+    })
+
+    await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, 'up')
+
+    await waitFor(
+      app.renderOnce,
+      () => app.captureCharFrame().includes(`[<64;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`),
+      app.captureCharFrame
+    )
+  }, 15_000)
+
   test('uses local scrollback when mouse forwarding is disabled', async () => {
     const app = await mountMouseHarness(createScrollbackFixtureCommand(), {
       localScrollbackEnabled: true,

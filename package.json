@@ -1,6 +1,6 @@
 {
   "name": "aimux",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "bin": {
     "aimux": "src/index.tsx"
   },
