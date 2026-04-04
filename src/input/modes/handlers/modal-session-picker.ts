@@ -1,8 +1,6 @@
 import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 export const modalSessionPickerMode: ModeHandler = {
-  id: 'modal.session-picker',
-
   handleKey(key: KeyInput, ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       if (!ctx.state.currentSessionId) return null
@@ -14,11 +12,11 @@ export const modalSessionPickerMode: ModeHandler = {
     }
 
     if (key.name === 'j' || key.name === 'down') {
-      return { actions: [{ type: 'move-modal-selection', delta: 1 }], effects: [] }
+      return { actions: [{ delta: 1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'k' || key.name === 'up') {
-      return { actions: [{ type: 'move-modal-selection', delta: -1 }], effects: [] }
+      return { actions: [{ delta: -1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'return') {
@@ -60,4 +58,6 @@ export const modalSessionPickerMode: ModeHandler = {
 
     return null
   },
+
+  id: 'modal.session-picker',
 }

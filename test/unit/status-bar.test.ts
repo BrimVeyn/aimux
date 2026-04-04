@@ -5,19 +5,19 @@ import { getStatusBarModel } from '../../src/ui/status-bar-model'
 
 function createTab(title: string) {
   return {
-    id: 'tab-1',
     assistant: 'claude' as const,
-    title,
-    status: 'running' as const,
     buffer: '',
+    command: 'claude',
+    id: 'tab-1',
+    status: 'running' as const,
     terminalModes: {
+      alternateScrollMode: false,
+      bracketedPasteMode: false,
+      isAlternateBuffer: false,
       mouseTrackingMode: 'none' as const,
       sendFocusMode: false,
-      alternateScrollMode: false,
-      isAlternateBuffer: false,
-      bracketedPasteMode: false,
     },
-    command: 'claude',
+    title,
   }
 }
 
@@ -76,11 +76,11 @@ describe('getStatusBarModel', () => {
     const state = {
       ...createInitialState({}, [
         {
-          id: 'session-1',
-          name: 'Main Session',
           createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+          id: 'session-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
+          name: 'Main Session',
+          updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       currentSessionId: 'session-1',

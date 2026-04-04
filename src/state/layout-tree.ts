@@ -47,7 +47,7 @@ export function getTreeForTab(
 }
 
 export function createLeaf(tabId: string): LayoutLeaf {
-  return { type: 'leaf', tabId }
+  return { tabId, type: 'leaf' }
 }
 
 export function splitNode(
@@ -59,11 +59,11 @@ export function splitNode(
   if (tree.type === 'leaf') {
     if (tree.tabId === targetTabId) {
       return {
-        type: 'split',
         direction,
-        ratio: 0.5,
         first: tree,
+        ratio: 0.5,
         second: createLeaf(newTabId),
+        type: 'split',
       }
     }
     return tree
@@ -226,12 +226,12 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
     const firstCols = Math.max(1, Math.floor(bounds.cols * tree.ratio))
     const secondCols = Math.max(1, bounds.cols - firstCols - 1) // -1 for separator
 
-    const firstBounds: PaneRect = { x: bounds.x, y: bounds.y, cols: firstCols, rows: bounds.rows }
+    const firstBounds: PaneRect = { cols: firstCols, rows: bounds.rows, x: bounds.x, y: bounds.y }
     const secondBounds: PaneRect = {
-      x: bounds.x + firstCols + 1,
-      y: bounds.y,
       cols: secondCols,
       rows: bounds.rows,
+      x: bounds.x + firstCols + 1,
+      y: bounds.y,
     }
 
     for (const [id, rect] of computePaneRects(tree.first, firstBounds)) {
@@ -245,12 +245,12 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
     const firstRows = Math.max(1, Math.floor(bounds.rows * tree.ratio))
     const secondRows = Math.max(1, bounds.rows - firstRows - 1) // -1 for separator
 
-    const firstBounds: PaneRect = { x: bounds.x, y: bounds.y, cols: bounds.cols, rows: firstRows }
+    const firstBounds: PaneRect = { cols: bounds.cols, rows: firstRows, x: bounds.x, y: bounds.y }
     const secondBounds: PaneRect = {
-      x: bounds.x,
-      y: bounds.y + firstRows + 1,
       cols: bounds.cols,
       rows: secondRows,
+      x: bounds.x,
+      y: bounds.y + firstRows + 1,
     }
 
     for (const [id, rect] of computePaneRects(tree.first, firstBounds)) {

@@ -20,18 +20,18 @@ function setup(overrides?: {
   const toggleSidebar = mock(() => {})
 
   const handler = createRawInputHandler({
-    getFocusMode: () => focusMode,
-    getActiveTabId: () => activeTabId,
-    getContentOrigin: () => ({ x: 0, y: 0, cols: 80, rows: 24 }),
-    getMousePassthroughEnabled: () => true,
-    getBracketedPasteModeEnabled: () => bracketedPasteModeEnabled,
-    writeToPty,
-    leaveTerminalInput,
     enterLayoutMode,
+    getActiveTabId: () => activeTabId,
+    getBracketedPasteModeEnabled: () => bracketedPasteModeEnabled,
+    getContentOrigin: () => ({ cols: 80, rows: 24, x: 0, y: 0 }),
+    getFocusMode: () => focusMode,
+    getMousePassthroughEnabled: () => true,
+    leaveTerminalInput,
     toggleSidebar,
+    writeToPty,
   })
 
-  return { handler, writeToPty, leaveTerminalInput, enterLayoutMode, toggleSidebar }
+  return { enterLayoutMode, handler, leaveTerminalInput, toggleSidebar, writeToPty }
 }
 
 describe('createRawInputHandler', () => {
@@ -118,7 +118,7 @@ describe('createRawInputHandler', () => {
   })
 
   test('forwards raw bracketed paste content without wrappers when inner mode is disabled', () => {
-    const { handler, writeToPty, toggleSidebar, leaveTerminalInput } = setup()
+    const { handler, leaveTerminalInput, toggleSidebar, writeToPty } = setup()
     expect(handler('\x1b[200~hello\nworld\x1b[201~')).toBe(true)
     expect(writeToPty).toHaveBeenCalledWith('tab-1', 'hello\nworld')
     expect(toggleSidebar).not.toHaveBeenCalled()
@@ -132,7 +132,7 @@ describe('createRawInputHandler', () => {
   })
 
   test('does not treat pasted Ctrl+B or Ctrl+Z as shortcuts', () => {
-    const { handler, writeToPty, toggleSidebar, leaveTerminalInput } = setup()
+    const { handler, leaveTerminalInput, toggleSidebar, writeToPty } = setup()
     expect(handler('\x1b[200~\x02\x1a\x1b[201~')).toBe(true)
     expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x02\x1a')
     expect(toggleSidebar).not.toHaveBeenCalled()

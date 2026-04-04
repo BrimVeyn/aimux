@@ -1,13 +1,11 @@
 import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 export const navigationMode: ModeHandler = {
-  id: 'navigation',
-
   handleKey(key: KeyInput, ctx: ModeContext): KeyResult | null {
     if (key.ctrl && key.name === 'c') {
       return {
         actions: [],
-        effects: [{ type: 'quit', state: ctx.state }],
+        effects: [{ state: ctx.state, type: 'quit' }],
       }
     }
 
@@ -32,7 +30,7 @@ export const navigationMode: ModeHandler = {
       if (tabId) {
         return {
           actions: [{ type: 'close-active-tab' }],
-          effects: [{ type: 'close-tab', tabId }],
+          effects: [{ tabId, type: 'close-tab' }],
         }
       }
       return null
@@ -47,7 +45,7 @@ export const navigationMode: ModeHandler = {
       if (activeTab) {
         return {
           actions: [],
-          effects: [{ type: 'restart-tab', tab: activeTab }],
+          effects: [{ tab: activeTab, type: 'restart-tab' }],
         }
       }
       return null
@@ -64,33 +62,33 @@ export const navigationMode: ModeHandler = {
     if (key.ctrl && key.name === 't') {
       return {
         actions: [{ type: 'open-theme-picker' }],
-        effects: [{ type: 'apply-theme', action: 'open' }],
+        effects: [{ action: 'open', type: 'apply-theme' }],
         transition: 'modal.theme-picker',
       }
     }
 
     if (key.ctrl && key.name === 'h') {
-      return { actions: [{ type: 'resize-sidebar', delta: -2 }], effects: [] }
+      return { actions: [{ delta: -2, type: 'resize-sidebar' }], effects: [] }
     }
 
     if (key.ctrl && key.name === 'l') {
-      return { actions: [{ type: 'resize-sidebar', delta: 2 }], effects: [] }
+      return { actions: [{ delta: 2, type: 'resize-sidebar' }], effects: [] }
     }
 
     if (key.shift && key.name === 'j') {
-      return { actions: [{ type: 'reorder-active-tab', delta: 1 }], effects: [] }
+      return { actions: [{ delta: 1, type: 'reorder-active-tab' }], effects: [] }
     }
 
     if (key.name === 'j') {
-      return { actions: [{ type: 'move-active-tab', delta: 1 }], effects: [] }
+      return { actions: [{ delta: 1, type: 'move-active-tab' }], effects: [] }
     }
 
     if (key.shift && key.name === 'k') {
-      return { actions: [{ type: 'reorder-active-tab', delta: -1 }], effects: [] }
+      return { actions: [{ delta: -1, type: 'reorder-active-tab' }], effects: [] }
     }
 
     if (key.name === 'k') {
-      return { actions: [{ type: 'move-active-tab', delta: -1 }], effects: [] }
+      return { actions: [{ delta: -1, type: 'move-active-tab' }], effects: [] }
     }
 
     if (key.name === 'r') {
@@ -104,7 +102,7 @@ export const navigationMode: ModeHandler = {
     if (key.name === 'i') {
       if (ctx.state.activeTabId) {
         return {
-          actions: [{ type: 'set-focus-mode', focusMode: 'terminal-input' }],
+          actions: [{ focusMode: 'terminal-input', type: 'set-focus-mode' }],
           effects: [],
           transition: 'terminal-input',
         }
@@ -122,4 +120,6 @@ export const navigationMode: ModeHandler = {
 
     return null
   },
+
+  id: 'navigation',
 }

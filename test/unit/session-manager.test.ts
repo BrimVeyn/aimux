@@ -7,51 +7,51 @@ describe('SessionManager', () => {
     const manager = new SessionManager()
 
     const alpha = manager.attachSession('alpha', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-a',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-a',
           assistant: 'claude',
-          title: 'Alpha',
-          command: 'claude',
-          status: 'running',
           buffer: 'alpha',
+          command: 'claude',
+          id: 'tab-a',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Alpha',
         },
       ],
+      version: 1,
     })
 
     const beta = manager.attachSession('beta', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-b',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-b',
           assistant: 'codex',
-          title: 'Beta',
-          command: 'codex',
-          status: 'running',
           buffer: 'beta',
+          command: 'codex',
+          id: 'tab-b',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Beta',
         },
       ],
+      version: 1,
     })
 
     expect(alpha.tabs[0]?.title).toBe('Alpha')
@@ -64,35 +64,35 @@ describe('SessionManager', () => {
     const manager = new SessionManager()
 
     manager.attachSession('alpha', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-a',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-a',
           assistant: 'claude',
-          title: 'Alpha',
-          command: 'claude',
-          status: 'running',
           buffer: 'alpha',
+          command: 'claude',
+          id: 'tab-a',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Alpha',
         },
       ],
+      version: 1,
     })
 
     const empty = manager.attachSession('beta', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: null,
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [],
+      version: 1,
     })
 
     expect(empty.tabs).toEqual([])
@@ -103,80 +103,80 @@ describe('SessionManager', () => {
     const manager = new SessionManager()
 
     manager.attachSession('alpha', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-a',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-a',
           assistant: 'claude',
-          title: 'Alpha',
-          command: 'claude',
-          status: 'running',
           buffer: 'alpha',
+          command: 'claude',
+          id: 'tab-a',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Alpha',
         },
         {
-          id: 'tab-a-2',
           assistant: 'claude',
-          title: 'Alpha 2',
-          command: 'claude',
-          status: 'running',
           buffer: 'alpha2',
+          command: 'claude',
+          id: 'tab-a-2',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Alpha 2',
         },
       ],
+      version: 1,
     })
     manager.attachSession('beta', {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-b',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-b',
           assistant: 'codex',
-          title: 'Beta',
-          command: 'codex',
-          status: 'running',
           buffer: 'beta',
+          command: 'codex',
+          id: 'tab-b',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Beta',
         },
         {
-          id: 'tab-b-2',
           assistant: 'codex',
-          title: 'Beta 2',
-          command: 'codex',
-          status: 'running',
           buffer: 'beta2',
+          command: 'codex',
+          id: 'tab-b-2',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Beta 2',
         },
       ],
+      version: 1,
     })
 
     manager.setActiveTab('alpha', 'tab-a-2')

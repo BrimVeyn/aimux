@@ -7,7 +7,7 @@ interface NewTabModalProps {
   editBuffer: string | null
 }
 
-export function NewTabModal({ selectedIndex, customCommands, editBuffer }: NewTabModalProps) {
+export function NewTabModal({ customCommands, editBuffer, selectedIndex }: NewTabModalProps) {
   const options = getAllAssistantOptions(customCommands)
 
   return (

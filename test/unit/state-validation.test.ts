@@ -6,27 +6,27 @@ describe('state validation', () => {
   test('accepts a valid workspace snapshot', () => {
     expect(
       isWorkspaceSnapshotV1({
-        version: 1,
-        savedAt: new Date().toISOString(),
         activeTabId: 'tab-1',
+        savedAt: new Date().toISOString(),
         sidebar: { visible: true, width: 28 },
         tabs: [
           {
-            id: 'tab-1',
             assistant: 'claude',
-            title: 'Claude',
-            command: 'claude',
-            status: 'running',
             buffer: '',
+            command: 'claude',
+            id: 'tab-1',
+            status: 'running',
             terminalModes: {
+              alternateScrollMode: false,
+              bracketedPasteMode: false,
+              isAlternateBuffer: false,
               mouseTrackingMode: 'none',
               sendFocusMode: false,
-              alternateScrollMode: false,
-              isAlternateBuffer: false,
-              bracketedPasteMode: false,
             },
+            title: 'Claude',
           },
         ],
+        version: 1,
       })
     ).toBe(true)
   })
@@ -34,27 +34,27 @@ describe('state validation', () => {
   test('rejects malformed workspace snapshots', () => {
     expect(
       isWorkspaceSnapshotV1({
-        version: 1,
-        savedAt: new Date().toISOString(),
         activeTabId: 'tab-1',
+        savedAt: new Date().toISOString(),
         sidebar: { visible: true, width: 28 },
         tabs: [
           {
-            id: 'tab-1',
             assistant: 'claude',
-            title: 'Claude',
-            command: 'claude',
-            status: 'running',
             buffer: '',
+            command: 'claude',
+            id: 'tab-1',
+            status: 'running',
             terminalModes: {
+              alternateScrollMode: false,
+              bracketedPasteMode: false,
+              isAlternateBuffer: false,
               mouseTrackingMode: 'invalid',
               sendFocusMode: false,
-              alternateScrollMode: false,
-              isAlternateBuffer: false,
-              bracketedPasteMode: false,
             },
+            title: 'Claude',
           },
         ],
+        version: 1,
       })
     ).toBe(false)
   })
@@ -62,11 +62,11 @@ describe('state validation', () => {
   test('rejects malformed session records', () => {
     expect(
       isSessionRecord({
-        id: 'session-1',
-        name: 'Main workspace',
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        id: 'session-1',
         lastOpenedAt: 123,
+        name: 'Main workspace',
+        updatedAt: new Date().toISOString(),
       })
     ).toBe(false)
   })
@@ -74,9 +74,9 @@ describe('state validation', () => {
   test('rejects malformed snippet records', () => {
     expect(
       isSnippetRecord({
+        content: 42,
         id: 'snippet-1',
         name: 'Review',
-        content: 42,
       })
     ).toBe(false)
   })

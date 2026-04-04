@@ -24,11 +24,11 @@ export interface TabRuntimeControls {
 }
 
 export function useBackendRuntime({
-  backend,
-  dispatch,
   activeTabId,
+  backend,
   currentSessionId,
   currentSessionWorkspaceSnapshot,
+  dispatch,
   layoutRef,
   resizingRef,
 }: BackendRuntimeOptions): TabRuntimeControls {
@@ -42,12 +42,12 @@ export function useBackendRuntime({
     }
 
     return attachCurrentSession({
+      attachRequestIdRef,
       backend,
-      dispatch,
       currentSessionId,
       currentSessionWorkspaceSnapshot,
+      dispatch,
       layoutRef,
-      attachRequestIdRef,
     })
   }, [backend, currentSessionId, currentSessionWorkspaceSnapshot, dispatch, layoutRef])
 

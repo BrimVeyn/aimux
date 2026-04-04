@@ -2,14 +2,12 @@ import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 function exitToInput(): Pick<KeyResult, 'transition'> & { exitActions: KeyResult['actions'] } {
   return {
-    exitActions: [{ type: 'set-focus-mode', focusMode: 'terminal-input' }],
+    exitActions: [{ focusMode: 'terminal-input', type: 'set-focus-mode' }],
     transition: 'terminal-input',
   }
 }
 
 export const layoutMode: ModeHandler = {
-  id: 'layout',
-
   handleKey(key: KeyInput, ctx: ModeContext): KeyResult | null {
     // Escape or Ctrl+W again → back to terminal-input
     if (key.name === 'escape' || (key.ctrl && key.name === 'w')) {
@@ -22,7 +20,7 @@ export const layoutMode: ModeHandler = {
       const tabId = ctx.state.activeTabId
       if (tabId) {
         return {
-          actions: [{ type: 'resize-pane', tabId, delta: -1, axis: 'vertical' }],
+          actions: [{ axis: 'vertical', delta: -1, tabId, type: 'resize-pane' }],
           effects: [],
         }
       }
@@ -31,7 +29,7 @@ export const layoutMode: ModeHandler = {
       const tabId = ctx.state.activeTabId
       if (tabId) {
         return {
-          actions: [{ type: 'resize-pane', tabId, delta: 1, axis: 'vertical' }],
+          actions: [{ axis: 'vertical', delta: 1, tabId, type: 'resize-pane' }],
           effects: [],
         }
       }
@@ -40,7 +38,7 @@ export const layoutMode: ModeHandler = {
       const tabId = ctx.state.activeTabId
       if (tabId) {
         return {
-          actions: [{ type: 'resize-pane', tabId, delta: -1, axis: 'horizontal' }],
+          actions: [{ axis: 'horizontal', delta: -1, tabId, type: 'resize-pane' }],
           effects: [],
         }
       }
@@ -49,7 +47,7 @@ export const layoutMode: ModeHandler = {
       const tabId = ctx.state.activeTabId
       if (tabId) {
         return {
-          actions: [{ type: 'resize-pane', tabId, delta: 1, axis: 'horizontal' }],
+          actions: [{ axis: 'horizontal', delta: 1, tabId, type: 'resize-pane' }],
           effects: [],
         }
       }
@@ -59,7 +57,7 @@ export const layoutMode: ModeHandler = {
     if (key.name === 'h') {
       const exit = exitToInput()
       return {
-        actions: [{ type: 'focus-pane-direction', direction: 'left' }, ...exit.exitActions],
+        actions: [{ direction: 'left', type: 'focus-pane-direction' }, ...exit.exitActions],
         effects: [],
         transition: exit.transition,
       }
@@ -67,7 +65,7 @@ export const layoutMode: ModeHandler = {
     if (key.name === 'j') {
       const exit = exitToInput()
       return {
-        actions: [{ type: 'focus-pane-direction', direction: 'down' }, ...exit.exitActions],
+        actions: [{ direction: 'down', type: 'focus-pane-direction' }, ...exit.exitActions],
         effects: [],
         transition: exit.transition,
       }
@@ -75,7 +73,7 @@ export const layoutMode: ModeHandler = {
     if (key.name === 'k') {
       const exit = exitToInput()
       return {
-        actions: [{ type: 'focus-pane-direction', direction: 'up' }, ...exit.exitActions],
+        actions: [{ direction: 'up', type: 'focus-pane-direction' }, ...exit.exitActions],
         effects: [],
         transition: exit.transition,
       }
@@ -83,7 +81,7 @@ export const layoutMode: ModeHandler = {
     if (key.name === 'l') {
       const exit = exitToInput()
       return {
-        actions: [{ type: 'focus-pane-direction', direction: 'right' }, ...exit.exitActions],
+        actions: [{ direction: 'right', type: 'focus-pane-direction' }, ...exit.exitActions],
         effects: [],
         transition: exit.transition,
       }
@@ -92,14 +90,14 @@ export const layoutMode: ModeHandler = {
     // Split: | vertical, - horizontal → open picker modal
     if (key.sequence === '|') {
       return {
-        actions: [{ type: 'open-split-picker', direction: 'vertical' }],
+        actions: [{ direction: 'vertical', type: 'open-split-picker' }],
         effects: [],
         transition: 'modal.split-picker',
       }
     }
     if (key.sequence === '-') {
       return {
-        actions: [{ type: 'open-split-picker', direction: 'horizontal' }],
+        actions: [{ direction: 'horizontal', type: 'open-split-picker' }],
         effects: [],
         transition: 'modal.split-picker',
       }
@@ -111,8 +109,8 @@ export const layoutMode: ModeHandler = {
       if (tabId) {
         const exit = exitToInput()
         return {
-          actions: [{ type: 'close-pane', tabId }, ...exit.exitActions],
-          effects: [{ type: 'close-tab', tabId }],
+          actions: [{ tabId, type: 'close-pane' }, ...exit.exitActions],
+          effects: [{ tabId, type: 'close-tab' }],
           transition: exit.transition,
         }
       }
@@ -120,4 +118,6 @@ export const layoutMode: ModeHandler = {
 
     return null
   },
+
+  id: 'layout',
 }

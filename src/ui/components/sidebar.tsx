@@ -49,11 +49,11 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const tabGroupInfo = useMemo(() => buildTabGroupInfo(layoutTrees, tabs), [layoutTrees, tabs])
 
   useSidebarAutoScroll({
-    scrollRef,
-    visible: sidebar.visible,
-    activeTabId,
     activeIndex,
+    activeTabId,
+    scrollRef,
     tabCount: tabs.length,
+    visible: sidebar.visible,
   })
 
   if (!sidebar.visible) {

@@ -24,7 +24,7 @@ function requireValue<T>(value: T | null | undefined, message: string): T {
 describe('createLeaf', () => {
   test('creates a leaf node', () => {
     const leaf = createLeaf('tab-1')
-    expect(leaf).toEqual({ type: 'leaf', tabId: 'tab-1' })
+    expect(leaf).toEqual({ tabId: 'tab-1', type: 'leaf' })
   })
 })
 
@@ -34,11 +34,11 @@ describe('splitNode', () => {
     const result = splitNode(tree, 'tab-1', 'vertical', 'tab-2')
 
     expect(result).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-1', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-1' },
-      second: { type: 'leaf', tabId: 'tab-2' },
+      second: { tabId: 'tab-2', type: 'leaf' },
+      type: 'split',
     })
   })
 
@@ -54,23 +54,23 @@ describe('splitNode', () => {
 
   test('splits a nested leaf', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = splitNode(tree, 'tab-2', 'horizontal', 'tab-3')
 
     expect(result.type).toBe('split')
     if (result.type === 'split') {
-      expect(result.first).toEqual({ type: 'leaf', tabId: 'tab-1' })
+      expect(result.first).toEqual({ tabId: 'tab-1', type: 'leaf' })
       expect(result.second.type).toBe('split')
       if (result.second.type === 'split') {
         expect(result.second.direction).toBe('horizontal')
-        expect(result.second.first).toEqual({ type: 'leaf', tabId: 'tab-2' })
-        expect(result.second.second).toEqual({ type: 'leaf', tabId: 'tab-3' })
+        expect(result.second.first).toEqual({ tabId: 'tab-2', type: 'leaf' })
+        expect(result.second.second).toEqual({ tabId: 'tab-3', type: 'leaf' })
       }
     }
   })
@@ -90,52 +90,52 @@ describe('removeNode', () => {
 
   test('removes first child of a split', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = removeNode(tree, 'tab-1')
-    expect(result).toEqual({ type: 'leaf', tabId: 'tab-2' })
+    expect(result).toEqual({ tabId: 'tab-2', type: 'leaf' })
   })
 
   test('removes second child of a split', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = removeNode(tree, 'tab-2')
-    expect(result).toEqual({ type: 'leaf', tabId: 'tab-1' })
+    expect(result).toEqual({ tabId: 'tab-1', type: 'leaf' })
   })
 
   test('removes a deeply nested leaf', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: {
-        type: 'split',
         direction: 'horizontal',
-        ratio: 0.5,
         first: createLeaf('tab-2'),
+        ratio: 0.5,
         second: createLeaf('tab-3'),
+        type: 'split',
       },
+      type: 'split',
     }
 
     const result = removeNode(tree, 'tab-2')
     expect(result).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-1', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-1' },
-      second: { type: 'leaf', tabId: 'tab-3' },
+      second: { tabId: 'tab-3', type: 'leaf' },
+      type: 'split',
     })
   })
 
@@ -153,11 +153,11 @@ describe('findLeaf', () => {
 
   test('finds a leaf in a nested tree', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
     expect(findLeaf(tree, 'tab-1')).toBe(true)
     expect(findLeaf(tree, 'tab-2')).toBe(true)
@@ -172,17 +172,17 @@ describe('allLeafIds', () => {
 
   test('returns all leaf ids in order', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: {
-        type: 'split',
         direction: 'horizontal',
-        ratio: 0.5,
         first: createLeaf('tab-2'),
+        ratio: 0.5,
         second: createLeaf('tab-3'),
+        type: 'split',
       },
+      type: 'split',
     }
 
     expect(allLeafIds(tree)).toEqual(['tab-1', 'tab-2', 'tab-3'])
@@ -192,11 +192,11 @@ describe('allLeafIds', () => {
 describe('resizeSplit', () => {
   test('grows a split containing the target', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = resizeSplit(tree, 'tab-1', 1)
@@ -208,11 +208,11 @@ describe('resizeSplit', () => {
 
   test('shrinks a split containing the target', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = resizeSplit(tree, 'tab-1', -1)
@@ -223,11 +223,11 @@ describe('resizeSplit', () => {
 
   test('clamps ratio at minimum', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.15,
       first: createLeaf('tab-1'),
+      ratio: 0.15,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = resizeSplit(tree, 'tab-1', -1)
@@ -236,11 +236,11 @@ describe('resizeSplit', () => {
 
   test('clamps ratio at maximum', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.85,
       first: createLeaf('tab-1'),
+      ratio: 0.85,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const result = resizeSplit(tree, 'tab-1', 1)
@@ -254,7 +254,7 @@ describe('resizeSplit', () => {
 })
 
 describe('computePaneRects', () => {
-  const fullBounds = { x: 0, y: 0, cols: 100, rows: 40 }
+  const fullBounds = { cols: 100, rows: 40, x: 0, y: 0 }
 
   test('single leaf takes full bounds', () => {
     const rects = computePaneRects(createLeaf('tab-1'), fullBounds)
@@ -263,11 +263,11 @@ describe('computePaneRects', () => {
 
   test('vertical split divides columns', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const rects = computePaneRects(tree, fullBounds)
@@ -285,11 +285,11 @@ describe('computePaneRects', () => {
 
   test('horizontal split divides rows', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'horizontal',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     const rects = computePaneRects(tree, fullBounds)
@@ -307,17 +307,17 @@ describe('computePaneRects', () => {
 
   test('nested splits produce correct rects', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: {
-        type: 'split',
         direction: 'horizontal',
-        ratio: 0.5,
         first: createLeaf('tab-2'),
+        ratio: 0.5,
         second: createLeaf('tab-3'),
+        type: 'split',
       },
+      type: 'split',
     }
 
     const rects = computePaneRects(tree, fullBounds)
@@ -342,11 +342,11 @@ describe('getAdjacentLeaf', () => {
 
   test('navigates right in a vertical split', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     expect(getAdjacentLeaf(tree, 'tab-1', 'right')).toBe('tab-2')
@@ -355,11 +355,11 @@ describe('getAdjacentLeaf', () => {
 
   test('returns null when no neighbor in direction', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     expect(getAdjacentLeaf(tree, 'tab-1', 'left')).toBeNull()
@@ -368,11 +368,11 @@ describe('getAdjacentLeaf', () => {
 
   test('navigates down in a horizontal split', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'horizontal',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     expect(getAdjacentLeaf(tree, 'tab-1', 'down')).toBe('tab-2')
@@ -382,17 +382,17 @@ describe('getAdjacentLeaf', () => {
   test('navigates across nested splits', () => {
     // Layout: [tab-1 | [tab-2 / tab-3]]
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: {
-        type: 'split',
         direction: 'horizontal',
-        ratio: 0.5,
         first: createLeaf('tab-2'),
+        ratio: 0.5,
         second: createLeaf('tab-3'),
+        type: 'split',
       },
+      type: 'split',
     }
 
     // From tab-1, going right should reach tab-2 (first leaf of second child)
@@ -413,11 +413,11 @@ describe('getAdjacentLeaf', () => {
 
   test('returns null for unknown tab', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
 
     expect(getAdjacentLeaf(tree, 'tab-999', 'right')).toBeNull()
@@ -437,59 +437,59 @@ describe('pruneLayoutTree', () => {
 
   test('keeps valid split unchanged', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
     expect(pruneLayoutTree(tree, new Set(['tab-1', 'tab-2']))).toBe(tree)
   })
 
   test('collapses split when one child is invalid', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
     expect(pruneLayoutTree(tree, new Set(['tab-1']))).toEqual(createLeaf('tab-1'))
   })
 
   test('returns null when all tabs are invalid', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-2'),
+      type: 'split',
     }
     expect(pruneLayoutTree(tree, new Set(['tab-99']))).toBeNull()
   })
 
   test('prunes nested split correctly', () => {
     const tree: LayoutNode = {
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: {
-        type: 'split',
         direction: 'horizontal',
-        ratio: 0.3,
         first: createLeaf('tab-1'),
+        ratio: 0.3,
         second: createLeaf('tab-2'),
+        type: 'split',
       },
+      ratio: 0.5,
       second: createLeaf('tab-3'),
+      type: 'split',
     }
     // Remove tab-2 → inner split collapses to tab-1
     const result = pruneLayoutTree(tree, new Set(['tab-1', 'tab-3']))
     expect(result).toEqual({
-      type: 'split',
       direction: 'vertical',
-      ratio: 0.5,
       first: createLeaf('tab-1'),
+      ratio: 0.5,
       second: createLeaf('tab-3'),
+      type: 'split',
     })
   })
 })

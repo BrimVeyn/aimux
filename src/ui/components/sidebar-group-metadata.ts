@@ -36,7 +36,7 @@ export function buildTabGroupInfo(
     }
 
     for (const id of ids) {
-      tabGroupInfo.set(id, { inLayout: true, groupStart, groupEnd })
+      tabGroupInfo.set(id, { groupEnd, groupStart, inLayout: true })
     }
   }
 

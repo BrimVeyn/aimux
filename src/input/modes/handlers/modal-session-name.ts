@@ -3,8 +3,6 @@ import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 import { handleTextInput } from './shared'
 
 export const modalSessionNameMode: ModeHandler = {
-  id: 'modal.session-name',
-
   handleKey(key: KeyInput, ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -20,7 +18,7 @@ export const modalSessionNameMode: ModeHandler = {
       if (trimmed && sessionId) {
         return {
           actions: [{ type: 'open-session-picker' }],
-          effects: [{ type: 'rename-session', sessionId, name: trimmed }],
+          effects: [{ name: trimmed, sessionId, type: 'rename-session' }],
           transition: 'modal.session-picker',
         }
       }
@@ -33,4 +31,6 @@ export const modalSessionNameMode: ModeHandler = {
 
     return handleTextInput(key)
   },
+
+  id: 'modal.session-name',
 }

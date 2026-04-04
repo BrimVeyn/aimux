@@ -10,10 +10,10 @@ const THEME_COUNT = THEME_IDS.length
 
 function emptyModal() {
   return {
-    type: null,
-    selectedIndex: 0,
     editBuffer: null,
+    selectedIndex: 0,
     sessionTargetId: null,
+    type: null,
   } as const
 }
 
@@ -25,24 +25,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         focusMode: 'modal',
-        modal: { type: 'new-tab', selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'new-tab' },
       }
     case 'open-help-modal':
       return {
         ...state,
         focusMode: 'modal',
-        modal: { type: 'help', selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'help' },
       }
     case 'open-split-picker':
       return {
         ...state,
         focusMode: 'modal',
         modal: {
-          type: 'split-picker',
-          selectedIndex: 0,
           editBuffer: null,
+          selectedIndex: 0,
           sessionTargetId: null,
           splitDirection: action.direction,
+          type: 'split-picker',
         },
       }
     case 'open-session-picker':
@@ -50,10 +50,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'modal',
         modal: {
-          type: 'session-picker',
-          selectedIndex: 0,
           editBuffer: null,
+          selectedIndex: 0,
           sessionTargetId: null,
+          type: 'session-picker',
         },
       }
     case 'open-session-name-modal':
@@ -61,10 +61,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
-          type: 'session-name',
-          selectedIndex: 0,
           editBuffer: action.initialName ?? '',
+          selectedIndex: 0,
           sessionTargetId: action.sessionTargetId ?? null,
+          type: 'session-name',
         },
       }
     case 'open-create-session-modal':
@@ -72,14 +72,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
-          type: 'create-session',
-          selectedIndex: 0,
-          editBuffer: '',
-          sessionTargetId: null,
-          directoryResults: [],
-          pendingProjectPath: null,
           activeField: 'directory',
+          directoryResults: [],
+          editBuffer: '',
           nameBuffer: '',
+          pendingProjectPath: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'create-session',
         },
       }
     case 'set-directory-results': {
@@ -100,10 +100,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'modal',
         modal: {
-          type: 'snippet-picker',
-          selectedIndex: 0,
           editBuffer: null,
+          selectedIndex: 0,
           sessionTargetId: null,
+          type: 'snippet-picker',
         },
       }
     case 'open-snippet-editor': {
@@ -114,12 +114,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
-          type: 'snippet-editor',
-          selectedIndex: 0,
-          editBuffer: snippet?.name ?? '',
-          sessionTargetId: snippet?.id ?? null,
           activeField: 'name',
           contentBuffer: snippet?.content ?? '',
+          editBuffer: snippet?.name ?? '',
+          selectedIndex: 0,
+          sessionTargetId: snippet?.id ?? null,
+          type: 'snippet-editor',
         },
       }
     }
@@ -127,7 +127,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         focusMode: 'modal',
-        modal: { type: 'theme-picker', selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'theme-picker' },
       }
     case 'begin-snippet-filter': {
       if (state.modal.type !== 'snippet-picker') {
@@ -252,8 +252,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       return {
         ...state,
-        focusMode: 'modal',
         customCommands: newCustomCommands,
+        focusMode: 'modal',
         modal: { ...state.modal, editBuffer: null },
       }
     }
@@ -290,8 +290,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           modal: {
             ...state.modal,
             activeField: nextField,
-            editBuffer: state.modal.contentBuffer,
             contentBuffer: state.modal.editBuffer ?? '',
+            editBuffer: state.modal.contentBuffer,
           },
         }
       }
@@ -314,13 +314,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         modal: {
           ...state.modal,
-          pendingProjectPath: selected.path,
           activeField: 'name',
           editBuffer: autoName,
           nameBuffer:
             state.modal.activeField === 'directory'
               ? (state.modal.editBuffer ?? '')
               : state.modal.nameBuffer,
+          pendingProjectPath: selected.path,
         },
       }
     }
@@ -345,10 +345,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
-          type: 'rename-tab',
-          selectedIndex: 0,
           editBuffer: activeTab.title,
+          selectedIndex: 0,
           sessionTargetId: activeTab.id,
+          type: 'rename-tab',
         },
       }
     }

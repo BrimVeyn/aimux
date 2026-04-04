@@ -20,7 +20,7 @@ export function getSnippetEditorValue(state: AppState): { name: string; content:
   const content =
     modal.activeField === 'content' ? (modal.editBuffer ?? '').trim() : modal.contentBuffer.trim()
 
-  return { name, content }
+  return { content, name }
 }
 
 export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null {
@@ -38,14 +38,14 @@ export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null 
   if (snippetId) {
     return state.snippets.map((snippet) =>
       snippet.id === snippetId
-        ? { ...snippet, name: editorValue.name, content: editorValue.content }
+        ? { ...snippet, content: editorValue.content, name: editorValue.name }
         : snippet
     )
   }
 
   return [
     ...state.snippets,
-    { id: createSnippetId(), name: editorValue.name, content: editorValue.content },
+    { content: editorValue.content, id: createSnippetId(), name: editorValue.name },
   ]
 }
 
@@ -74,7 +74,7 @@ export function handleDeleteSnippetEffect(
 ): void {
   const updated = deleteSnippetState(snippets, snippetId)
   saveSnippetCatalog(updated)
-  dispatch({ type: 'delete-snippet', snippetId })
+  dispatch({ snippetId, type: 'delete-snippet' })
 }
 
 export function handleSaveSnippetEditorEffect(
@@ -87,5 +87,5 @@ export function handleSaveSnippetEditorEffect(
   }
 
   saveSnippetCatalog(updated)
-  dispatch({ type: 'set-snippets', snippets: updated })
+  dispatch({ snippets: updated, type: 'set-snippets' })
 }

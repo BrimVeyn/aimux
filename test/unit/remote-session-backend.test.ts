@@ -49,7 +49,7 @@ describe('RemoteSessionBackend', () => {
     }
 
     if (tempRuntimeDir) {
-      rmSync(tempRuntimeDir, { recursive: true, force: true })
+      rmSync(tempRuntimeDir, { force: true, recursive: true })
       tempRuntimeDir = null
     }
   })
@@ -72,14 +72,14 @@ describe('RemoteSessionBackend', () => {
             message.type === 'attach'
               ? {
                   id: message.id,
-                  type: 'attachResult',
                   payload: {
+                    activeTabId: null,
                     protocolVersion: IPC_PROTOCOL_VERSION,
                     tabs: [],
-                    activeTabId: null,
                   },
+                  type: 'attachResult',
                 }
-              : { id: message.id, type: 'ok', payload: {} }
+              : { id: message.id, payload: {}, type: 'ok' }
           socket.write(encodeMessage(response))
         }
       })
@@ -97,13 +97,13 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      await backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })
+      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
       backend.write('tab-1', 'hello\nworld')
 
       await waitFor(() => requests.find((message) => message.type === 'write'))
 
       await backend.destroy(true)
-      await backend.attach({ sessionId: 'session-b', cols: 100, rows: 30 })
+      await backend.attach({ cols: 100, rows: 30, sessionId: 'session-b' })
 
       const attachRequests = requests.filter((message) => message.type === 'attach')
       const writeRequest = requests.find((message) => message.type === 'write')
@@ -148,17 +148,17 @@ describe('RemoteSessionBackend', () => {
           if (message.type === 'attach') {
             response = {
               id: message.id,
-              type: 'attachResult',
               payload: {
+                activeTabId: null,
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
-                activeTabId: null,
               },
+              type: 'attachResult',
             }
           } else if (message.type === 'write') {
-            response = { id: message.id, type: 'error', payload: { message: 'write rejected' } }
+            response = { id: message.id, payload: { message: 'write rejected' }, type: 'error' }
           } else {
-            response = { id: message.id, type: 'ok', payload: {} }
+            response = { id: message.id, payload: {}, type: 'ok' }
           }
           socket.write(encodeMessage(response))
         }
@@ -178,16 +178,16 @@ describe('RemoteSessionBackend', () => {
     let backendError: { tabId: string; message: string } | undefined
 
     backend.on('error', (tabId, message) => {
-      backendError = { tabId, message }
+      backendError = { message, tabId }
     })
 
     try {
-      await backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })
+      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
       backend.write('tab-1', 'hello')
 
       await waitFor(() => backendError)
 
-      expect(backendError).toEqual({ tabId: 'tab-1', message: 'write rejected' })
+      expect(backendError).toEqual({ message: 'write rejected', tabId: 'tab-1' })
       expect(requests.find((message) => message.type === 'write')).toBeDefined()
     } finally {
       await backend.destroy(true)
@@ -221,10 +221,10 @@ describe('RemoteSessionBackend', () => {
             message.type === 'attach'
               ? {
                   id: message.id,
+                  payload: { activeTabId: null, protocolVersion: 999, tabs: [] },
                   type: 'attachResult',
-                  payload: { protocolVersion: 999, tabs: [], activeTabId: null },
                 }
-              : { id: message.id, type: 'ok', payload: {} }
+              : { id: message.id, payload: {}, type: 'ok' }
           socket.write(encodeMessage(response))
         }
       })
@@ -242,7 +242,7 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      await expect(backend.attach({ sessionId: 'session-a', cols: 80, rows: 24 })).rejects.toThrow(
+      await expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
         'Protocol mismatch: client v1, daemon v999'
       )
     } finally {

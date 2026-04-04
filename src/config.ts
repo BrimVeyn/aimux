@@ -17,8 +17,8 @@ export interface AimuxConfig {
 }
 
 const DEFAULT_CONFIG: AimuxConfig = {
-  version: 2,
   customCommands: {},
+  version: 2,
 }
 
 export interface ConfigLoadResult {
@@ -45,7 +45,7 @@ function isCustomCommandsRecord(value: unknown): value is Record<string, string>
 export function loadConfigResult(): ConfigLoadResult {
   try {
     if (!existsSync(CONFIG_PATH)) {
-      return { config: DEFAULT_CONFIG, source: 'defaults', issues: [] }
+      return { config: DEFAULT_CONFIG, issues: [], source: 'defaults' }
     }
 
     const raw = readFileSync(CONFIG_PATH, 'utf8')
@@ -78,28 +78,28 @@ export function loadConfigResult(): ConfigLoadResult {
     }
 
     if (issues.length > 0) {
-      logDebug('config.load.validationIssue', { path: CONFIG_PATH, issues })
+      logDebug('config.load.validationIssue', { issues, path: CONFIG_PATH })
     }
 
     return {
       config: {
-        version: 2,
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         themeId: isThemeId(parsed.themeId) ? parsed.themeId : undefined,
+        version: 2,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot
           : undefined,
       },
-      source: 'file',
       issues,
+      source: 'file',
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logDebug('config.load.error', { path: CONFIG_PATH, error: message })
+    logDebug('config.load.error', { error: message, path: CONFIG_PATH })
     return {
       config: DEFAULT_CONFIG,
-      source: 'defaults',
       issues: [`failed to load config: ${message}`],
+      source: 'defaults',
     }
   }
 }
@@ -115,8 +115,8 @@ export function saveConfig(config: AimuxConfig): boolean {
     return true
   } catch (error) {
     logDebug('config.save.error', {
-      path: CONFIG_PATH,
       error: error instanceof Error ? error.message : String(error),
+      path: CONFIG_PATH,
     })
     return false
   }

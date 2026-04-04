@@ -62,7 +62,7 @@ export function useTabRuntimeTimeouts(dispatch: (action: AppAction) => void): Ta
     (tabId: string, timeoutMs: number): void => {
       clearIdleTimer(tabId)
       const timeout = setTimeout(() => {
-        dispatch({ type: 'set-tab-activity', tabId, activity: 'idle' })
+        dispatch({ activity: 'idle', tabId, type: 'set-tab-activity' })
         idleTimeoutsRef.current.delete(tabId)
       }, timeoutMs)
       idleTimeoutsRef.current.set(tabId, timeout)
@@ -76,11 +76,11 @@ export function useTabRuntimeTimeouts(dispatch: (action: AppAction) => void): Ta
   }, [])
 
   return {
+    clearAllTimers,
     clearIdleTimer,
     clearStartupGrace,
-    startStartupGrace,
     isStartupGraceActive,
     scheduleIdle,
-    clearAllTimers,
+    startStartupGrace,
   }
 }

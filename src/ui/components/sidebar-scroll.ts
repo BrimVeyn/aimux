@@ -7,8 +7,8 @@ interface SidebarScrollTargetOptions {
 }
 
 export function getSidebarScrollTarget({
-  previousActiveIndex,
   nextActiveIndex,
+  previousActiveIndex,
   tabCount,
 }: SidebarScrollTargetOptions): SidebarScrollTarget {
   if (tabCount === 0 || nextActiveIndex < 0) {

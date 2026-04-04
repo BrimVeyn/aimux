@@ -74,24 +74,24 @@ export class RemoteSessionBackend
 
   private send(request: ClientRequest): Promise<ServerResponse> {
     const socket = this.getConnectedSocket()
-    logDebug('backend.remote.send', { type: request.type, id: request.id })
+    logDebug('backend.remote.send', { id: request.id, type: request.type })
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(request.id)
-        logDebug('backend.remote.timeout', { type: request.type, id: request.id })
+        logDebug('backend.remote.timeout', { id: request.id, type: request.type })
         reject(
           new Error(`IPC request timed out after ${IPC_REQUEST_TIMEOUT_MS}ms: ${request.type}`)
         )
       }, IPC_REQUEST_TIMEOUT_MS)
-      this.pending.set(request.id, { resolve, reject, timer })
+      this.pending.set(request.id, { reject, resolve, timer })
       socket.write(encodeMessage(request), (error) => {
         if (error) {
           clearTimeout(timer)
           this.pending.delete(request.id)
           logDebug('backend.remote.sendError', {
-            type: request.type,
-            id: request.id,
             error: error.message,
+            id: request.id,
+            type: request.type,
           })
           reject(error)
         }
@@ -114,7 +114,7 @@ export class RemoteSessionBackend
 
   private reportCommandError(context: string, error: unknown, tabId?: string): void {
     const message = error instanceof Error ? error.message : String(error)
-    logDebug('backend.remote.commandError', { context, tabId, error: message })
+    logDebug('backend.remote.commandError', { context, error: message, tabId })
     if (tabId) {
       this.emit('error', tabId, message)
     }
@@ -148,11 +148,11 @@ export class RemoteSessionBackend
   }): Promise<AttachResult> {
     const socketPath = getDaemonSocketPath()
     logDebug('backend.remote.attach.start', {
-      socketPath,
-      sessionId: options.sessionId,
       cols: options.cols,
       rows: options.rows,
+      sessionId: options.sessionId,
       snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
+      socketPath,
     })
     this.resetConnection('Connection replaced during attach')
 
@@ -190,7 +190,7 @@ export class RemoteSessionBackend
       try {
         for (const message of this.decoder.push(chunk)) {
           if ('id' in message) {
-            logDebug('backend.remote.response', { type: message.type, id: message.id })
+            logDebug('backend.remote.response', { id: message.id, type: message.type })
             const pending = this.pending.get(message.id)
             if (pending) {
               clearTimeout(pending.timer)
@@ -210,8 +210,8 @@ export class RemoteSessionBackend
 
     const response = await this.send({
       id: crypto.randomUUID(),
-      type: 'attach',
       payload: { ...options, protocolVersion: IPC_PROTOCOL_VERSION },
+      type: 'attach',
     })
 
     if (response.type !== 'attachResult') {
@@ -232,9 +232,9 @@ export class RemoteSessionBackend
     this.attached = true
 
     logDebug('backend.remote.attach.success', {
+      activeTabId: response.payload.activeTabId,
       sessionId: options.sessionId,
       tabs: response.payload.tabs.length,
-      activeTabId: response.payload.activeTabId,
     })
 
     return response.payload
@@ -260,25 +260,25 @@ export class RemoteSessionBackend
       tabId: options.tabId,
       title: options.title,
     })
-    void this.sendExpectOk({ id: crypto.randomUUID(), type: 'createTab', payload: options }).catch(
+    void this.sendExpectOk({ id: crypto.randomUUID(), payload: options, type: 'createTab' }).catch(
       (error) => this.reportCommandError('createTab', error, options.tabId)
     )
   }
 
   write(tabId: string, input: string): void {
     if (!this.attached) {
-      logDebug('backend.remote.skipWriteBeforeAttach', { tabId, inputLength: input.length })
+      logDebug('backend.remote.skipWriteBeforeAttach', { inputLength: input.length, tabId })
       return
     }
     logDebug('backend.remote.write', {
+      inputLength: input.length,
       sessionId: this.currentSessionId,
       tabId,
-      inputLength: input.length,
     })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
+      payload: { data: input, tabId },
       type: 'write',
-      payload: { tabId, data: input },
     }).catch((error) => this.reportCommandError('write', error, tabId))
   }
 
@@ -286,11 +286,11 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return
     }
-    logDebug('backend.remote.scroll', { sessionId: this.currentSessionId, tabId, deltaLines })
+    logDebug('backend.remote.scroll', { deltaLines, sessionId: this.currentSessionId, tabId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
+      payload: { deltaLines, tabId },
       type: 'scroll',
-      payload: { tabId, deltaLines },
     }).catch((error) => this.reportCommandError('scroll', error, tabId))
   }
 
@@ -301,8 +301,8 @@ export class RemoteSessionBackend
     logDebug('backend.remote.scrollToBottom', { sessionId: this.currentSessionId, tabId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      type: 'scrollToBottom',
       payload: { tabId },
+      type: 'scrollToBottom',
     }).catch((error) => this.reportCommandError('scrollToBottom', error, tabId))
   }
 
@@ -313,8 +313,8 @@ export class RemoteSessionBackend
     logDebug('backend.remote.setActiveTab', { sessionId: this.currentSessionId, tabId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      type: 'setActiveTab',
       payload: { tabId },
+      type: 'setActiveTab',
     }).catch((error) => this.reportCommandError('setActiveTab', error))
   }
 
@@ -323,11 +323,11 @@ export class RemoteSessionBackend
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
     }
-    logDebug('backend.remote.resize', { sessionId: this.currentSessionId, cols, rows })
+    logDebug('backend.remote.resize', { cols, rows, sessionId: this.currentSessionId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      type: 'resizeClient',
       payload: { cols, rows },
+      type: 'resizeClient',
     }).catch((error) => this.reportCommandError('resizeClient', error))
   }
 
@@ -335,11 +335,11 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return
     }
-    logDebug('backend.remote.resizeTab', { sessionId: this.currentSessionId, tabId, cols, rows })
+    logDebug('backend.remote.resizeTab', { cols, rows, sessionId: this.currentSessionId, tabId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
+      payload: { cols, rows, tabId },
       type: 'resizeTab',
-      payload: { tabId, cols, rows },
     }).catch((error) => this.reportCommandError('resizeTab', error, tabId))
   }
 
@@ -348,7 +348,7 @@ export class RemoteSessionBackend
       return
     }
     logDebug('backend.remote.disposeSession', { sessionId: this.currentSessionId, tabId })
-    void this.sendExpectOk({ id: crypto.randomUUID(), type: 'closeTab', payload: { tabId } }).catch(
+    void this.sendExpectOk({ id: crypto.randomUUID(), payload: { tabId }, type: 'closeTab' }).catch(
       (error) => this.reportCommandError('closeTab', error, tabId)
     )
   }
@@ -358,7 +358,7 @@ export class RemoteSessionBackend
       return
     }
     logDebug('backend.remote.disposeAll', { sessionId: this.currentSessionId })
-    void this.sendExpectOk({ id: crypto.randomUUID(), type: 'disposeAll', payload: {} }).catch(
+    void this.sendExpectOk({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }).catch(
       (error) => this.reportCommandError('disposeAll', error)
     )
   }

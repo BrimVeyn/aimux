@@ -1,8 +1,6 @@
 import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 export const modalSplitPickerMode: ModeHandler = {
-  id: 'modal.split-picker',
-
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -13,11 +11,11 @@ export const modalSplitPickerMode: ModeHandler = {
     }
 
     if (key.name === 'j' || key.name === 'down') {
-      return { actions: [{ type: 'move-modal-selection', delta: 1 }], effects: [] }
+      return { actions: [{ delta: 1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'k' || key.name === 'up') {
-      return { actions: [{ type: 'move-modal-selection', delta: -1 }], effects: [] }
+      return { actions: [{ delta: -1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'return') {
@@ -29,4 +27,6 @@ export const modalSplitPickerMode: ModeHandler = {
 
     return null
   },
+
+  id: 'modal.split-picker',
 }

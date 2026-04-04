@@ -56,23 +56,23 @@ export function resolveClickSelection(
   const baseX = lineBox.x
 
   logInputDebug('click.detect', {
-    eventX: event.x,
-    eventY: event.y,
+    clickCount,
+    col,
     contentBoxX: contentBox.x,
     contentBoxY: contentBox.y,
-    col,
+    eventX: event.x,
+    eventY: event.y,
     row,
-    clickCount,
     targetId: event.target.id,
   })
 
   if (!tab?.viewport?.lines[row]) {
     logInputDebug('click.noViewportLine', {
-      targetTabId,
-      row,
-      tabFound: !!tab,
       hasViewport: !!tab?.viewport,
       lineCount: tab?.viewport?.lines.length ?? 0,
+      row,
+      tabFound: !!tab,
+      targetTabId,
     })
     return null
   }
@@ -88,10 +88,10 @@ export function resolveClickSelection(
     const word = getWordAtColumn(lineText, col)
     if (word.text.length === 0) {
       logInputDebug('click.emptyWord', {
-        col,
-        row,
-        lineText,
         charAtCol: lineText[col] ?? 'OOB',
+        col,
+        lineText,
+        row,
       })
       return null
     }
@@ -106,30 +106,30 @@ export function resolveClickSelection(
   }
 
   logInputDebug('click.selection', {
-    clickCount,
-    selectedText,
-    startCol,
-    endCol,
     baseX,
-    startX: baseX + startCol,
+    clickCount,
+    endCol,
     endX: baseX + endCol,
-    y: event.y,
     lineText,
+    selectedText,
     spanCount: line.spans.length,
-    spanTexts: line.spans.map((span) => span.text),
     spanStyles: line.spans.map((span) => ({
       bold: span.bold,
       italic: span.italic,
       underline: span.underline,
     })),
+    spanTexts: line.spans.map((span) => span.text),
+    startCol,
+    startX: baseX + startCol,
+    y: event.y,
   })
 
   return {
+    baseX,
+    endCol,
+    eventY: event.y,
     selectedText,
     startCol,
-    endCol,
-    baseX,
-    eventY: event.y,
     target: event.target,
   }
 }

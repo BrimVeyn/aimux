@@ -5,14 +5,14 @@ import type { KeyInput } from '../../src/input/modes/types'
 import { handleCtrlNavigation, handleTextInput } from '../../src/input/modes/handlers/shared'
 
 function key(overrides: Partial<KeyInput> & { name: string }): KeyInput {
-  return { ctrl: false, meta: false, shift: false, sequence: overrides.name, ...overrides }
+  return { ctrl: false, meta: false, sequence: overrides.name, shift: false, ...overrides }
 }
 
 describe('handleTextInput', () => {
   test('backspace emits delete char', () => {
     const result = handleTextInput(key({ name: 'backspace' }))
     expect(result).toEqual({
-      actions: [{ type: 'update-command-edit', char: '\b' }],
+      actions: [{ char: '\b', type: 'update-command-edit' }],
       effects: [],
     })
   })
@@ -20,7 +20,7 @@ describe('handleTextInput', () => {
   test('space emits space char', () => {
     const result = handleTextInput(key({ name: 'space' }))
     expect(result).toEqual({
-      actions: [{ type: 'update-command-edit', char: ' ' }],
+      actions: [{ char: ' ', type: 'update-command-edit' }],
       effects: [],
     })
   })
@@ -28,7 +28,7 @@ describe('handleTextInput', () => {
   test('single letter emits lowercase char', () => {
     const result = handleTextInput(key({ name: 'a' }))
     expect(result).toEqual({
-      actions: [{ type: 'update-command-edit', char: 'a' }],
+      actions: [{ char: 'a', type: 'update-command-edit' }],
       effects: [],
     })
   })
@@ -36,7 +36,7 @@ describe('handleTextInput', () => {
   test('shift + single letter emits uppercase char', () => {
     const result = handleTextInput(key({ name: 'a', shift: true }))
     expect(result).toEqual({
-      actions: [{ type: 'update-command-edit', char: 'A' }],
+      actions: [{ char: 'A', type: 'update-command-edit' }],
       effects: [],
     })
   })
@@ -51,17 +51,17 @@ describe('handleTextInput', () => {
 
 describe('handleCtrlNavigation', () => {
   test('ctrl+n moves selection down', () => {
-    const result = handleCtrlNavigation(key({ name: 'n', ctrl: true }))
+    const result = handleCtrlNavigation(key({ ctrl: true, name: 'n' }))
     expect(result).toEqual({
-      actions: [{ type: 'move-modal-selection', delta: 1 }],
+      actions: [{ delta: 1, type: 'move-modal-selection' }],
       effects: [],
     })
   })
 
   test('ctrl+p moves selection up', () => {
-    const result = handleCtrlNavigation(key({ name: 'p', ctrl: true }))
+    const result = handleCtrlNavigation(key({ ctrl: true, name: 'p' }))
     expect(result).toEqual({
-      actions: [{ type: 'move-modal-selection', delta: -1 }],
+      actions: [{ delta: -1, type: 'move-modal-selection' }],
       effects: [],
     })
   })
@@ -69,6 +69,6 @@ describe('handleCtrlNavigation', () => {
   test('non-ctrl keys return null', () => {
     expect(handleCtrlNavigation(key({ name: 'n' }))).toBeNull()
     expect(handleCtrlNavigation(key({ name: 'p' }))).toBeNull()
-    expect(handleCtrlNavigation(key({ name: 'j', ctrl: true }))).toBeNull()
+    expect(handleCtrlNavigation(key({ ctrl: true, name: 'j' }))).toBeNull()
   })
 })

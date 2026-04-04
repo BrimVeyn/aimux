@@ -18,8 +18,8 @@ describe('doctor', () => {
   test('formatDoctorReport renders readable output', () => {
     const output = formatDoctorReport({
       checks: [
-        { name: 'platform', ok: true, details: 'darwin arm64' },
-        { name: 'assistant:claude', ok: false, details: 'claude' },
+        { details: 'darwin arm64', name: 'platform', ok: true },
+        { details: 'claude', name: 'assistant:claude', ok: false },
       ],
     })
 

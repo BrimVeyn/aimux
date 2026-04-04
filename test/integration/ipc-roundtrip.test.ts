@@ -32,47 +32,47 @@ function startMockDaemon() {
         if (message.type === 'attach') {
           const response: ServerResponse = {
             id: message.id,
-            type: 'attachResult',
             payload: {
+              activeTabId: null,
               protocolVersion: IPC_PROTOCOL_VERSION,
               tabs: [],
-              activeTabId: null,
             },
+            type: 'attachResult',
           }
           socket.write(encodeMessage(response))
         } else if (message.type === 'createTab') {
-          socket.write(encodeMessage({ id: message.id, type: 'ok', payload: {} }))
+          socket.write(encodeMessage({ id: message.id, payload: {}, type: 'ok' }))
 
           const renderEvent: ServerEvent = {
-            type: 'tabRender',
             payload: {
               tabId: message.payload.tabId,
-              viewport: {
-                lines: [{ spans: [{ text: 'hello from daemon' }] }],
-                viewportY: 0,
-                baseY: 0,
-                cursorVisible: true,
-              },
               terminalModes: {
+                alternateScrollMode: false,
+                bracketedPasteMode: false,
+                isAlternateBuffer: false,
                 mouseTrackingMode: 'none',
                 sendFocusMode: false,
-                alternateScrollMode: false,
-                isAlternateBuffer: false,
-                bracketedPasteMode: false,
+              },
+              viewport: {
+                baseY: 0,
+                cursorVisible: true,
+                lines: [{ spans: [{ text: 'hello from daemon' }] }],
+                viewportY: 0,
               },
             },
+            type: 'tabRender',
           }
           socket.write(encodeMessage(renderEvent))
         } else if (message.type === 'write') {
-          socket.write(encodeMessage({ id: message.id, type: 'ok', payload: {} }))
+          socket.write(encodeMessage({ id: message.id, payload: {}, type: 'ok' }))
         } else {
-          socket.write(encodeMessage({ id: message.id, type: 'ok', payload: {} }))
+          socket.write(encodeMessage({ id: message.id, payload: {}, type: 'ok' }))
         }
       }
     })
   })
 
-  return { server, received }
+  return { received, server }
 }
 
 async function connectClient(socketPath: string): Promise<{
@@ -98,9 +98,9 @@ async function connectClient(socketPath: string): Promise<{
   })
 
   return {
-    socket,
     decoder,
     send: (request) => socket.write(encodeMessage(request)),
+    socket,
     waitForMessages: async (count, timeoutMs = 3_000) => {
       const deadline = Date.now() + timeoutMs
       while (all.length < count && Date.now() < deadline) {
@@ -122,7 +122,7 @@ describe('IPC round-trip integration', () => {
 
   test('attach -> createTab -> receive render event', async () => {
     const socketPath = createTempSocketPath()
-    const { server, received } = startMockDaemon()
+    const { received, server } = startMockDaemon()
 
     await new Promise<void>((resolve) => server.listen(socketPath, resolve))
     cleanups.push(() => {
@@ -138,34 +138,34 @@ describe('IPC round-trip integration', () => {
     // 1. Attach
     client.send({
       id: 'req-1',
-      type: 'attach',
       payload: {
-        protocolVersion: IPC_PROTOCOL_VERSION,
-        sessionId: 'session-test',
         cols: 80,
+        protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
+        sessionId: 'session-test',
       },
+      type: 'attach',
     })
 
     let messages = await client.waitForMessages(1)
     expect(messages[0]).toMatchObject({
       id: 'req-1',
+      payload: { activeTabId: null, protocolVersion: IPC_PROTOCOL_VERSION, tabs: [] },
       type: 'attachResult',
-      payload: { protocolVersion: IPC_PROTOCOL_VERSION, tabs: [], activeTabId: null },
     })
 
     // 2. Create tab
     client.send({
       id: 'req-2',
-      type: 'createTab',
       payload: {
-        tabId: 'tab-1',
         assistant: 'claude',
-        title: 'Claude',
-        command: 'echo',
         cols: 80,
+        command: 'echo',
         rows: 24,
+        tabId: 'tab-1',
+        title: 'Claude',
       },
+      type: 'createTab',
     })
 
     // Should get ok + render event
@@ -175,11 +175,11 @@ describe('IPC round-trip integration', () => {
 
     const renderEvent = messages.find((m) => m.type === 'tabRender')
     expect(renderEvent).toMatchObject({
-      type: 'tabRender',
       payload: {
         tabId: 'tab-1',
         viewport: { lines: [{ spans: [{ text: 'hello from daemon' }] }] },
       },
+      type: 'tabRender',
     })
 
     // 3. Verify daemon received all messages in order
@@ -204,21 +204,21 @@ describe('IPC round-trip integration', () => {
     // Attach first
     client.send({
       id: 'req-attach',
-      type: 'attach',
       payload: {
-        protocolVersion: IPC_PROTOCOL_VERSION,
-        sessionId: 'session-write',
         cols: 80,
+        protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
+        sessionId: 'session-write',
       },
+      type: 'attach',
     })
     await client.waitForMessages(1)
 
     // Write
     client.send({
       id: 'req-write',
+      payload: { data: 'hello world\n', tabId: 'tab-1' },
       type: 'write',
-      payload: { tabId: 'tab-1', data: 'hello world\n' },
     })
 
     const messages = await client.waitForMessages(2)
@@ -241,7 +241,7 @@ describe('IPC round-trip integration', () => {
     const client = await connectClient(socketPath)
     cleanups.push(() => client.socket.destroy())
 
-    client.send({ id: 'req-ping', type: 'ping', payload: {} })
+    client.send({ id: 'req-ping', payload: {}, type: 'ping' })
 
     const messages = await client.waitForMessages(1)
     expect(messages[0]).toMatchObject({ id: 'req-ping', type: 'ok' })
@@ -249,7 +249,7 @@ describe('IPC round-trip integration', () => {
 
   test('custom assistant id is accepted in createTab', async () => {
     const socketPath = createTempSocketPath()
-    const { server, received } = startMockDaemon()
+    const { received, server } = startMockDaemon()
 
     await new Promise<void>((resolve) => server.listen(socketPath, resolve))
     cleanups.push(() => {
@@ -264,27 +264,27 @@ describe('IPC round-trip integration', () => {
 
     client.send({
       id: 'req-1',
-      type: 'attach',
       payload: {
-        protocolVersion: IPC_PROTOCOL_VERSION,
-        sessionId: 'session-custom',
         cols: 80,
+        protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
+        sessionId: 'session-custom',
       },
+      type: 'attach',
     })
     await client.waitForMessages(1)
 
     client.send({
       id: 'req-2',
-      type: 'createTab',
       payload: {
-        tabId: 'tab-custom',
         assistant: 'my-custom-ai',
-        title: 'Custom AI',
-        command: 'my-ai-cli',
         cols: 80,
+        command: 'my-ai-cli',
         rows: 24,
+        tabId: 'tab-custom',
+        title: 'Custom AI',
       },
+      type: 'createTab',
     })
 
     const messages = await client.waitForMessages(3)

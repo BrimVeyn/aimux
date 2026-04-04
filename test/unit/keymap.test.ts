@@ -13,11 +13,11 @@ function key(
   opts: { ctrl?: boolean; shift?: boolean; sequence?: string } = {}
 ): KeyInput {
   return {
-    name,
     ctrl: opts.ctrl ?? false,
     meta: false,
-    shift: opts.shift ?? false,
+    name,
     sequence: opts.sequence ?? name,
+    shift: opts.shift ?? false,
   }
 }
 
@@ -38,7 +38,7 @@ describe('mode handlers', () => {
   test('navigation: maps j/k to move-active-tab', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(handler.handleKey(key('j'), ctx()), 'Expected navigation result')
-    expect(result.actions).toEqual([{ type: 'move-active-tab', delta: 1 }])
+    expect(result.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
   })
 
   test('navigation: Ctrl+W dispatches close-active-tab', () => {
@@ -48,24 +48,24 @@ describe('mode handlers', () => {
       'Expected close-active-tab result'
     )
     expect(result.actions).toEqual([{ type: 'close-active-tab' }])
-    expect(result.effects).toEqual([{ type: 'close-tab', tabId: 'tab-1' }])
+    expect(result.effects).toEqual([{ tabId: 'tab-1', type: 'close-tab' }])
   })
 
   test('navigation: Ctrl+R triggers restart-tab effect', () => {
     const tab = {
-      id: 'tab-1',
       assistant: 'claude' as const,
-      title: 'Claude',
-      status: 'running' as const,
       buffer: '',
+      command: 'claude',
+      id: 'tab-1',
+      status: 'running' as const,
       terminalModes: {
+        alternateScrollMode: false,
+        bracketedPasteMode: false,
+        isAlternateBuffer: false,
         mouseTrackingMode: 'none' as const,
         sendFocusMode: false,
-        alternateScrollMode: false,
-        isAlternateBuffer: false,
-        bracketedPasteMode: false,
       },
-      command: 'claude',
+      title: 'Claude',
     }
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
@@ -91,7 +91,7 @@ describe('mode handlers', () => {
       handler.handleKey(key('j', { shift: true }), ctx()),
       'Expected reorder result'
     )
-    expect(result.actions).toEqual([{ type: 'reorder-active-tab', delta: 1 }])
+    expect(result.actions).toEqual([{ delta: 1, type: 'reorder-active-tab' }])
   })
 
   test('navigation: Shift+K reorders tab up', () => {
@@ -100,7 +100,7 @@ describe('mode handlers', () => {
       handler.handleKey(key('k', { shift: true }), ctx()),
       'Expected reorder-up result'
     )
-    expect(result.actions).toEqual([{ type: 'reorder-active-tab', delta: -1 }])
+    expect(result.actions).toEqual([{ delta: -1, type: 'reorder-active-tab' }])
   })
 
   test('navigation: i transitions to terminal-input', () => {

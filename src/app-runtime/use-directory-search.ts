@@ -33,14 +33,14 @@ export function useDirectorySearch(
     let isCurrent = true
 
     if (!directoryQuery.trim()) {
-      dispatch({ type: 'set-directory-results', results: [] })
+      dispatch({ results: [], type: 'set-directory-results' })
       return
     }
 
     const timer = setTimeout(async () => {
       const results = await searchProjectDirectories(directoryQuery)
       if (isCurrent) {
-        dispatch({ type: 'set-directory-results', results })
+        dispatch({ results, type: 'set-directory-results' })
       }
     }, debounceMs)
 

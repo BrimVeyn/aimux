@@ -8,20 +8,20 @@ describe('state selectors', () => {
       filterSessions(
         [
           {
+            createdAt: '2024-01-01T00:00:00.000Z',
             id: 's1',
+            lastOpenedAt: '2024-01-01T00:00:00.000Z',
             name: 'Main project',
             projectPath: '/tmp/alpha',
-            createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
-            lastOpenedAt: '2024-01-01T00:00:00.000Z',
           },
           {
+            createdAt: '2024-01-01T00:00:00.000Z',
             id: 's2',
+            lastOpenedAt: '2024-01-01T00:00:00.000Z',
             name: 'Infra',
             projectPath: '/tmp/beta',
-            createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
-            lastOpenedAt: '2024-01-01T00:00:00.000Z',
           },
         ],
         'beta'
@@ -33,11 +33,11 @@ describe('state selectors', () => {
     expect(
       filterSnippets(
         [
-          { id: 'n1', name: 'Review', content: 'Check for bugs' },
-          { id: 'n2', name: 'Explain', content: 'Step by step' },
+          { content: 'Check for bugs', id: 'n1', name: 'Review' },
+          { content: 'Step by step', id: 'n2', name: 'Explain' },
         ],
         'bugs'
       )
-    ).toEqual([{ id: 'n1', name: 'Review', content: 'Check for bugs' }])
+    ).toEqual([{ content: 'Check for bugs', id: 'n1', name: 'Review' }])
   })
 })

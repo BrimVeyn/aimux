@@ -34,14 +34,14 @@ export async function runUpdate(): Promise<number> {
   process.stdout.write(`Updating aimux ${current} → ${latest}...\n`)
 
   const remove = Bun.spawn(['bun', 'remove', '-g', 'aimux'], {
-    stdout: 'inherit',
     stderr: 'inherit',
+    stdout: 'inherit',
   })
   await remove.exited
 
   const install = Bun.spawn(['bun', 'install', '-g', `github:${REPO}#${latest}`], {
-    stdout: 'inherit',
     stderr: 'inherit',
+    stdout: 'inherit',
   })
 
   const exitCode = await install.exited

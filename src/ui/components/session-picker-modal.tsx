@@ -33,11 +33,11 @@ function getEmptyStateMessage(hasFilter: boolean): string {
 }
 
 export function SessionPickerModal({
-  sessions,
-  selectedIndex,
   currentSessionId,
   currentTabCount,
   filter,
+  selectedIndex,
+  sessions,
 }: SessionPickerModalProps) {
   const filtered = filterSessions(sessions, filter)
   const hasFilter = !!filter

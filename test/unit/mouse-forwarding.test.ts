@@ -3,7 +3,7 @@ import { describe, expect, test } from 'bun:test'
 
 import { encodeMouseEventForPty } from '../../src/input/mouse-forwarding'
 
-const ORIGIN = { x: 34, y: 3, cols: 80, rows: 24 }
+const ORIGIN = { cols: 80, rows: 24, x: 34, y: 3 }
 
 function createMouseEvent(attributes: ConstructorParameters<typeof MouseEvent>[1]): MouseEvent {
   return new MouseEvent(null, attributes)
@@ -12,11 +12,11 @@ function createMouseEvent(attributes: ConstructorParameters<typeof MouseEvent>[1
 describe('encodeMouseEventForPty', () => {
   test('encodes click events', () => {
     const event = createMouseEvent({
-      type: 'down',
       button: MouseButton.LEFT,
+      modifiers: { alt: false, ctrl: false, shift: false },
+      type: 'down',
       x: 40,
       y: 10,
-      modifiers: { shift: false, alt: false, ctrl: false },
     })
 
     expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<0;7;8M')
@@ -24,11 +24,11 @@ describe('encodeMouseEventForPty', () => {
 
   test('encodes mouse release with SGR release code', () => {
     const event = createMouseEvent({
-      type: 'up',
       button: MouseButton.LEFT,
+      modifiers: { alt: false, ctrl: false, shift: false },
+      type: 'up',
       x: 40,
       y: 10,
-      modifiers: { shift: false, alt: false, ctrl: false },
     })
 
     expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<3;7;8m')
@@ -36,12 +36,12 @@ describe('encodeMouseEventForPty', () => {
 
   test('encodes scroll events from scroll direction', () => {
     const event = createMouseEvent({
-      type: 'scroll',
       button: MouseButton.LEFT,
+      modifiers: { alt: false, ctrl: false, shift: false },
+      scroll: { delta: 1, direction: 'up' },
+      type: 'scroll',
       x: 40,
       y: 10,
-      modifiers: { shift: false, alt: false, ctrl: false },
-      scroll: { direction: 'up', delta: 1 },
     })
 
     expect(encodeMouseEventForPty(event, ORIGIN)).toBe('\x1b[<64;7;8M')

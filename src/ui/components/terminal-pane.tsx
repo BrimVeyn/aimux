@@ -86,19 +86,19 @@ function renderViewport(tab: TabSession): ReactNode {
 }
 
 export function TerminalPane({
-  tab,
-  tabId,
+  contentOrigin,
   focusMode,
   isActive,
-  contentOrigin,
-  mouseForwardingEnabled,
   localScrollbackEnabled,
-  onTerminalMouseEvent,
-  onTerminalScrollEvent,
-  onTerminalClick,
+  mouseForwardingEnabled,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
+  onTerminalClick,
+  onTerminalMouseEvent,
+  onTerminalScrollEvent,
+  tab,
+  tabId,
 }: TerminalPaneProps) {
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
@@ -106,13 +106,13 @@ export function TerminalPane({
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
     if (event.type === 'down') {
       logInputDebug('pane.mouseDown', {
-        eventType: event.type,
         button: event.button,
-        x: event.x,
-        y: event.y,
         canForward: canForwardMouse,
+        eventType: event.type,
         tabId,
         willClick: !canForwardMouse && !!tab && event.button === 0 && !!onTerminalClick,
+        x: event.x,
+        y: event.y,
       })
     }
     if (event.type === 'drag' && onSeparatorDrag?.(event)) {

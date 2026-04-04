@@ -55,12 +55,12 @@ interface UseTerminalResizeOptions {
 }
 
 export function useTerminalResize({
-  state,
-  dispatch,
   backend,
-  dimensions,
   contentOriginRef,
+  dimensions,
+  dispatch,
   resizingRef,
+  state,
 }: UseTerminalResizeOptions) {
   const resizingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -75,10 +75,10 @@ export function useTerminalResize({
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows))
 
     contentOriginRef.current = {
-      x: sidebarWidth + 1,
-      y: 1,
       cols,
       rows,
+      x: sidebarWidth + 1,
+      y: 1,
     }
 
     return { cols, rows }
@@ -92,9 +92,9 @@ export function useTerminalResize({
 
   useEffect(() => {
     dispatch({
-      type: 'set-terminal-size',
       cols: terminalSize.cols,
       rows: terminalSize.rows,
+      type: 'set-terminal-size',
     })
     resizingRef.current = true
     if (resizingTimerRef.current) {

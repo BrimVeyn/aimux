@@ -7,7 +7,7 @@ import { buildSessionsWithCurrentSnapshot } from '../../src/state/workspace-save
 
 function makeSession(id: string, name: string): SessionRecord {
   const now = new Date().toISOString()
-  return { id, name, createdAt: now, updatedAt: now, lastOpenedAt: now }
+  return { createdAt: now, id, lastOpenedAt: now, name, updatedAt: now }
 }
 
 describe('buildSessionsWithCurrentSnapshot', () => {
@@ -15,23 +15,23 @@ describe('buildSessionsWithCurrentSnapshot', () => {
     const sessions = [makeSession('s1', 'one'), makeSession('s2', 'two')]
     const state = {
       ...createInitialState(),
-      sessions,
       currentSessionId: 's1',
+      sessions,
       tabs: [
         {
-          id: 'tab-1',
           assistant: 'claude' as const,
-          title: 'Claude',
-          status: 'running' as const,
           buffer: '',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running' as const,
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none' as const,
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
-          command: 'claude',
+          title: 'Claude',
         },
       ],
     }

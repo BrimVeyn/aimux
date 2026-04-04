@@ -45,9 +45,9 @@ export class LocalSessionBackend
     workspaceSnapshot?: WorkspaceSnapshotV1
   }) {
     logDebug('backend.local.attach', {
-      sessionId: options.sessionId,
       cols: options.cols,
       rows: options.rows,
+      sessionId: options.sessionId,
       snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
     })
     this.currentSessionId = options.sessionId
@@ -89,13 +89,13 @@ export class LocalSessionBackend
 
   write(tabId: string, input: string): void {
     if (!this.currentSessionId) {
-      logDebug('backend.local.skipWriteWithoutSession', { tabId, inputLength: input.length })
+      logDebug('backend.local.skipWriteWithoutSession', { inputLength: input.length, tabId })
       return
     }
     logDebug('backend.local.write', {
+      inputLength: input.length,
       sessionId: this.currentSessionId,
       tabId,
-      inputLength: input.length,
     })
     this.sessionManager.write(this.currentSessionId, tabId, input)
   }

@@ -67,8 +67,8 @@ export async function searchProjectDirectories(query: string): Promise<Directory
     )
   } catch (error) {
     logDebug('platform.projectSearch.error', {
-      query,
       error: error instanceof Error ? error.message : String(error),
+      query,
     })
     return []
   }

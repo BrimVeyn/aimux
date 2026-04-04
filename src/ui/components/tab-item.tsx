@@ -60,7 +60,7 @@ function BusyIndicator() {
   return <text fg={theme.accent}>{BUSY_FRAMES[frame]} busy</text>
 }
 
-function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocusedInput: boolean }) {
+function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocusedInput: boolean }) {
   if (tab.status === 'error') {
     return <text fg={theme.danger}>✗ error</text>
   }
@@ -88,7 +88,7 @@ function ActivityIndicator({ tab, isFocusedInput }: { tab: TabSession; isFocused
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
 }
 
-export function TabItem({ id, tab, active, focused, isFocusedInput, inLayout }: TabItemProps) {
+export function TabItem({ active, focused, id, inLayout, isFocusedInput, tab }: TabItemProps) {
   const label = tab.assistant.charAt(0).toUpperCase() + tab.assistant.slice(1).toLowerCase()
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)

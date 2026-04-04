@@ -13,8 +13,6 @@ function getDefaultSessionName(projectPath?: string): string {
 }
 
 export const modalCreateSessionMode: ModeHandler = {
-  id: 'modal.create-session',
-
   handleKey(key: KeyInput, ctx: ModeContext): KeyResult | null {
     const modal = ctx.state.modal as ModalCreateSession
 
@@ -40,7 +38,7 @@ export const modalCreateSessionMode: ModeHandler = {
       if (sessionName) {
         return {
           actions: [{ type: 'close-modal' }],
-          effects: [{ type: 'create-session', name: sessionName, projectPath }],
+          effects: [{ name: sessionName, projectPath, type: 'create-session' }],
           transition: 'navigation',
         }
       }
@@ -53,4 +51,6 @@ export const modalCreateSessionMode: ModeHandler = {
 
     return handleCtrlNavigation(key) ?? handleTextInput(key)
   },
+
+  id: 'modal.create-session',
 }

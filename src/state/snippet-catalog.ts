@@ -15,30 +15,30 @@ const SNIPPETS_PATH = join(dirname(CONFIG_PATH), 'aimux-snippets.json')
 
 const DEFAULT_SNIPPETS: SnippetRecord[] = [
   {
+    content: 'Review this code for bugs, security issues, and suggest improvements.',
     id: 'default-review',
     name: 'Code review',
-    content: 'Review this code for bugs, security issues, and suggest improvements.',
   },
   {
+    content: 'Explain how this code works step by step.',
     id: 'default-explain',
     name: 'Explain',
-    content: 'Explain how this code works step by step.',
   },
   {
+    content: 'Write comprehensive unit tests for this code with edge cases.',
     id: 'default-tests',
     name: 'Write tests',
-    content: 'Write comprehensive unit tests for this code with edge cases.',
   },
   {
-    id: 'default-refactor',
-    name: 'Refactor',
     content:
       'Refactor this code to improve readability and maintainability without changing behavior.',
+    id: 'default-refactor',
+    name: 'Refactor',
   },
   {
+    content: 'Analyze this error and provide a fix with explanation.',
     id: 'default-fix',
     name: 'Fix error',
-    content: 'Analyze this error and provide a fix with explanation.',
   },
 ]
 
@@ -54,23 +54,23 @@ export function loadSnippetCatalog(): SnippetRecord[] {
     }
     if (parsed.version !== 1 || !Array.isArray(parsed.snippets)) {
       logDebug('snippets.catalog.loadIssue', {
-        path: SNIPPETS_PATH,
         issue: 'invalid snippet catalog header',
+        path: SNIPPETS_PATH,
       })
       return []
     }
     if (!parsed.snippets.every(isSnippetRecord)) {
       logDebug('snippets.catalog.loadIssue', {
-        path: SNIPPETS_PATH,
         issue: 'invalid snippet catalog entries',
+        path: SNIPPETS_PATH,
       })
       return []
     }
     return parsed.snippets
   } catch (error) {
     logDebug('snippets.catalog.loadIssue', {
-      path: SNIPPETS_PATH,
       issue: error instanceof Error ? error.message : String(error),
+      path: SNIPPETS_PATH,
     })
     return []
   }
@@ -79,11 +79,11 @@ export function loadSnippetCatalog(): SnippetRecord[] {
 export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
   try {
     mkdirSync(dirname(SNIPPETS_PATH), { recursive: true })
-    writeFileSync(SNIPPETS_PATH, `${JSON.stringify({ version: 1, snippets }, null, 2)}\n`)
+    writeFileSync(SNIPPETS_PATH, `${JSON.stringify({ snippets, version: 1 }, null, 2)}\n`)
   } catch (error) {
     logDebug('snippets.catalog.saveError', {
-      path: SNIPPETS_PATH,
       error: error instanceof Error ? error.message : String(error),
+      path: SNIPPETS_PATH,
       snippetCount: snippets.length,
     })
   }

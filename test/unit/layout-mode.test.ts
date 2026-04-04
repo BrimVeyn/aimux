@@ -50,13 +50,13 @@ function requireValue<T>(value: T | null | undefined, message: string): T {
 
 function createTab(id: string): TabSession {
   return {
-    id,
     assistant: 'terminal',
-    title: 'Terminal',
-    status: 'running',
     buffer: '',
-    terminalModes: createDefaultTerminalModes(),
     command: 'zsh',
+    id,
+    status: 'running',
+    terminalModes: createDefaultTerminalModes(),
+    title: 'Terminal',
   }
 }
 
@@ -64,16 +64,16 @@ function stateWithSplit(): AppState {
   const tab1 = createTab('tab-1')
   const tab2 = createTab('tab-2')
   const splitTree: LayoutNode = {
-    type: 'split',
     direction: 'vertical',
-    ratio: 0.5,
     first: createLeaf('tab-1'),
+    ratio: 0.5,
     second: createLeaf('tab-2'),
+    type: 'split',
   }
   return {
     ...createInitialState(),
-    tabs: [tab1, tab2],
     activeTabId: 'tab-1',
+    tabs: [tab1, tab2],
     ...makeLayoutGroup(splitTree),
     focusMode: 'layout',
   }
@@ -81,11 +81,11 @@ function stateWithSplit(): AppState {
 
 function key(name: string, opts?: { shift?: boolean; ctrl?: boolean; sequence?: string }) {
   return {
-    name,
-    shift: opts?.shift ?? false,
     ctrl: opts?.ctrl ?? false,
     meta: false,
+    name,
     sequence: opts?.sequence ?? name,
+    shift: opts?.shift ?? false,
   }
 }
 
@@ -97,7 +97,7 @@ describe('layout mode handler', () => {
       'Expected escape result'
     )
 
-    expect(result.actions).toContainEqual({ type: 'set-focus-mode', focusMode: 'terminal-input' })
+    expect(result.actions).toContainEqual({ focusMode: 'terminal-input', type: 'set-focus-mode' })
     expect(result.transition).toBe('terminal-input')
   })
 
@@ -105,8 +105,8 @@ describe('layout mode handler', () => {
     const state = stateWithSplit()
     const result = requireValue(layoutMode.handleKey(key('h'), { state }), 'Expected h result')
 
-    expect(result.actions).toContainEqual({ type: 'focus-pane-direction', direction: 'left' })
-    expect(result.actions).toContainEqual({ type: 'set-focus-mode', focusMode: 'terminal-input' })
+    expect(result.actions).toContainEqual({ direction: 'left', type: 'focus-pane-direction' })
+    expect(result.actions).toContainEqual({ focusMode: 'terminal-input', type: 'set-focus-mode' })
     expect(result.transition).toBe('terminal-input')
   })
 
@@ -114,7 +114,7 @@ describe('layout mode handler', () => {
     const state = stateWithSplit()
     const result = requireValue(layoutMode.handleKey(key('l'), { state }), 'Expected l result')
 
-    expect(result.actions).toContainEqual({ type: 'focus-pane-direction', direction: 'right' })
+    expect(result.actions).toContainEqual({ direction: 'right', type: 'focus-pane-direction' })
     expect(result.transition).toBe('terminal-input')
   })
 
@@ -126,10 +126,10 @@ describe('layout mode handler', () => {
     )
 
     expect(result.actions).toContainEqual({
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: -1,
       axis: 'vertical',
+      delta: -1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
     expect(result.transition).toBeUndefined()
   })
@@ -142,10 +142,10 @@ describe('layout mode handler', () => {
     )
 
     expect(result.actions).toContainEqual({
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: 1,
       axis: 'vertical',
+      delta: 1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
     expect(result.transition).toBeUndefined()
   })
@@ -158,10 +158,10 @@ describe('layout mode handler', () => {
     )
 
     expect(result.actions).toContainEqual({
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: 1,
       axis: 'horizontal',
+      delta: 1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
     expect(result.transition).toBeUndefined()
   })
@@ -174,10 +174,10 @@ describe('layout mode handler', () => {
     )
 
     expect(result.actions).toContainEqual({
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: -1,
       axis: 'horizontal',
+      delta: -1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
     expect(result.transition).toBeUndefined()
   })
@@ -185,11 +185,11 @@ describe('layout mode handler', () => {
   test('| opens split picker for vertical split', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('|', { shift: true, sequence: '|' }), { state }),
+      layoutMode.handleKey(key('|', { sequence: '|', shift: true }), { state }),
       'Expected vertical split result'
     )
 
-    expect(result.actions).toContainEqual({ type: 'open-split-picker', direction: 'vertical' })
+    expect(result.actions).toContainEqual({ direction: 'vertical', type: 'open-split-picker' })
     expect(result.transition).toBe('modal.split-picker')
   })
 
@@ -201,8 +201,8 @@ describe('layout mode handler', () => {
     )
 
     expect(result.actions).toContainEqual({
-      type: 'open-split-picker',
       direction: 'horizontal',
+      type: 'open-split-picker',
     })
     expect(result.transition).toBe('modal.split-picker')
   })
@@ -214,8 +214,8 @@ describe('layout mode handler', () => {
       'Expected close-pane result'
     )
 
-    expect(result.actions).toContainEqual({ type: 'close-pane', tabId: 'tab-1' })
-    expect(result.effects).toContainEqual({ type: 'close-tab', tabId: 'tab-1' })
+    expect(result.actions).toContainEqual({ tabId: 'tab-1', type: 'close-pane' })
+    expect(result.effects).toContainEqual({ tabId: 'tab-1', type: 'close-tab' })
     expect(result.transition).toBe('terminal-input')
   })
 })
@@ -225,32 +225,32 @@ describe('layout mode reducer integration', () => {
     const tab1 = createTab('tab-1')
     const state: AppState = {
       ...createInitialState(),
-      tabs: [tab1],
       activeTabId: 'tab-1',
       focusMode: 'layout',
+      tabs: [tab1],
     }
 
     const newTab = createTab('tab-2')
     const next = appReducer(state, {
-      type: 'split-pane',
       direction: 'vertical',
       newTab,
+      type: 'split-pane',
     })
 
     expect(next.tabs).toHaveLength(2)
     expect(next.activeTabId).toBe('tab-2')
     expect(getFirstTree(next)).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-1', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-1' },
-      second: { type: 'leaf', tabId: 'tab-2' },
+      second: { tabId: 'tab-2', type: 'leaf' },
+      type: 'split',
     })
   })
 
   test('close-pane removes tab from tree and collapses split', () => {
     const state = stateWithSplit()
-    const next = appReducer(state, { type: 'close-pane', tabId: 'tab-1' })
+    const next = appReducer(state, { tabId: 'tab-1', type: 'close-pane' })
 
     expect(next.tabs).toHaveLength(1)
     expect(next.tabs[0]?.id).toBe('tab-2')
@@ -261,7 +261,7 @@ describe('layout mode reducer integration', () => {
 
   test('focus-pane-direction changes activeTabId', () => {
     const state = stateWithSplit()
-    const next = appReducer(state, { type: 'focus-pane-direction', direction: 'right' })
+    const next = appReducer(state, { direction: 'right', type: 'focus-pane-direction' })
 
     expect(next.activeTabId).toBe('tab-2')
   })
@@ -269,10 +269,10 @@ describe('layout mode reducer integration', () => {
   test('resize-pane changes ratio with axis', () => {
     const state = stateWithSplit()
     const next = appReducer(state, {
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: 1,
       axis: 'vertical',
+      delta: 1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
 
     const tree = getActiveTree(next)
@@ -286,10 +286,10 @@ describe('layout mode reducer integration', () => {
     // vertical split, trying to resize on horizontal axis → no change
     const state = stateWithSplit()
     const next = appReducer(state, {
-      type: 'resize-pane',
-      tabId: 'tab-1',
-      delta: 1,
       axis: 'horizontal',
+      delta: 1,
+      tabId: 'tab-1',
+      type: 'resize-pane',
     })
 
     expect(next).toBe(state)
@@ -298,7 +298,7 @@ describe('layout mode reducer integration', () => {
   test('add-tab does not create layout group', () => {
     const state = createInitialState()
     const tab = createTab('tab-new')
-    const next = appReducer(state, { type: 'add-tab', tab })
+    const next = appReducer(state, { tab, type: 'add-tab' })
 
     // Standalone tabs have no layout group
     expect(Object.keys(next.layoutTrees)).toHaveLength(0)
@@ -307,12 +307,12 @@ describe('layout mode reducer integration', () => {
   test('add-tab preserves existing layout groups', () => {
     const state: AppState = {
       ...createInitialState(),
-      tabs: [createTab('tab-1')],
       activeTabId: 'tab-1',
+      tabs: [createTab('tab-1')],
     }
 
     const tab = createTab('tab-extra')
-    const next = appReducer(state, { type: 'add-tab', tab })
+    const next = appReducer(state, { tab, type: 'add-tab' })
 
     // No layout groups should exist
     expect(Object.keys(next.layoutTrees)).toHaveLength(0)
@@ -324,26 +324,26 @@ describe('layout mode reducer integration', () => {
     const tab2 = createTab('tab-2')
     const state: AppState = {
       ...createInitialState(),
-      tabs: [tab1, tab2],
       activeTabId: 'tab-2',
       focusMode: 'layout',
+      tabs: [tab1, tab2],
     }
 
     const newTab = createTab('tab-3')
     const next = appReducer(state, {
-      type: 'split-pane',
       direction: 'vertical',
       newTab,
+      type: 'split-pane',
     })
 
     expect(next.tabs).toHaveLength(3)
     expect(next.activeTabId).toBe('tab-3')
     expect(getActiveTree(next)).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-2', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-2' },
-      second: { type: 'leaf', tabId: 'tab-3' },
+      second: { tabId: 'tab-3', type: 'leaf' },
+      type: 'split',
     })
   })
 
@@ -351,52 +351,52 @@ describe('layout mode reducer integration', () => {
     const tab1 = createTab('tab-1')
     const state: AppState = {
       ...createInitialState(),
-      tabs: [tab1],
       activeTabId: 'tab-1',
       focusMode: 'layout',
+      tabs: [tab1],
     }
 
     const newTab = createTab('tab-2')
     const next = appReducer(state, {
-      type: 'split-pane',
       direction: 'horizontal',
       newTab,
+      type: 'split-pane',
     })
 
     expect(next.tabs).toHaveLength(2)
     expect(next.activeTabId).toBe('tab-2')
     expect(getActiveTree(next)).toEqual({
-      type: 'split',
       direction: 'horizontal',
+      first: { tabId: 'tab-1', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-1' },
-      second: { type: 'leaf', tabId: 'tab-2' },
+      second: { tabId: 'tab-2', type: 'leaf' },
+      type: 'split',
     })
   })
 
   test('split works after adding a second tab via add-tab', () => {
     let state = createInitialState()
     const tab1 = createTab('tab-1')
-    state = appReducer(state, { type: 'add-tab', tab: tab1 })
+    state = appReducer(state, { tab: tab1, type: 'add-tab' })
 
     const tab2 = createTab('tab-2')
-    state = appReducer(state, { type: 'add-tab', tab: tab2 })
+    state = appReducer(state, { tab: tab2, type: 'add-tab' })
 
     expect(state.activeTabId).toBe('tab-2')
     // No layout groups for standalone tabs
     expect(Object.keys(state.layoutTrees)).toHaveLength(0)
 
     const tab3 = createTab('tab-3')
-    state = appReducer(state, { type: 'split-pane', direction: 'vertical', newTab: tab3 })
+    state = appReducer(state, { direction: 'vertical', newTab: tab3, type: 'split-pane' })
 
     expect(state.tabs).toHaveLength(3)
     expect(state.activeTabId).toBe('tab-3')
     expect(getActiveTree(state)).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-2', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-2' },
-      second: { type: 'leaf', tabId: 'tab-3' },
+      second: { tabId: 'tab-3', type: 'leaf' },
+      type: 'split',
     })
   })
 })
@@ -406,19 +406,19 @@ describe('hydrate-workspace layout restoration', () => {
     const tab1 = createTab('tab-1')
     const tab2 = createTab('tab-2')
     const savedTree = {
-      type: 'split' as const,
       direction: 'vertical' as const,
+      first: { tabId: 'tab-1', type: 'leaf' as const },
       ratio: 0.35,
-      first: { type: 'leaf' as const, tabId: 'tab-1' },
-      second: { type: 'leaf' as const, tabId: 'tab-2' },
+      second: { tabId: 'tab-2', type: 'leaf' as const },
+      type: 'split' as const,
     }
 
     let state = createInitialState()
     state = appReducer(state, {
-      type: 'hydrate-workspace',
-      tabs: [tab1, tab2],
       activeTabId: 'tab-1',
       layoutTree: savedTree,
+      tabs: [tab1, tab2],
+      type: 'hydrate-workspace',
     })
 
     expect(getActiveTree(state)).toEqual(savedTree)
@@ -429,19 +429,19 @@ describe('hydrate-workspace layout restoration', () => {
   test('hydrate-workspace prunes missing tabs from layout tree', () => {
     const tab1 = createTab('tab-1')
     const savedTree = {
-      type: 'split' as const,
       direction: 'vertical' as const,
+      first: { tabId: 'tab-1', type: 'leaf' as const },
       ratio: 0.5,
-      first: { type: 'leaf' as const, tabId: 'tab-1' },
-      second: { type: 'leaf' as const, tabId: 'tab-gone' },
+      second: { tabId: 'tab-gone', type: 'leaf' as const },
+      type: 'split' as const,
     }
 
     let state = createInitialState()
     state = appReducer(state, {
-      type: 'hydrate-workspace',
-      tabs: [tab1],
       activeTabId: 'tab-1',
       layoutTree: savedTree,
+      tabs: [tab1],
+      type: 'hydrate-workspace',
     })
 
     // tab-gone pruned → split collapsed to leaf → group removed
@@ -453,16 +453,16 @@ describe('hydrate-workspace layout restoration', () => {
 
     let state = createInitialState()
     state = appReducer(state, {
-      type: 'hydrate-workspace',
-      tabs: [tab1],
       activeTabId: 'tab-new',
       layoutTree: {
-        type: 'split',
         direction: 'vertical',
+        first: { tabId: 'tab-gone-1', type: 'leaf' },
         ratio: 0.5,
-        first: { type: 'leaf', tabId: 'tab-gone-1' },
-        second: { type: 'leaf', tabId: 'tab-gone-2' },
+        second: { tabId: 'tab-gone-2', type: 'leaf' },
+        type: 'split',
       },
+      tabs: [tab1],
+      type: 'hydrate-workspace',
     })
 
     // All tabs gone → no layout groups
@@ -476,23 +476,23 @@ describe('full split flow simulation', () => {
     const tab1 = createTab('tab-1')
     let state: AppState = {
       ...createInitialState(),
-      tabs: [tab1],
       activeTabId: 'tab-1',
       focusMode: 'terminal-input',
+      tabs: [tab1],
     }
 
     // Step 1: Ctrl+W → enter layout mode
-    state = appReducer(state, { type: 'set-focus-mode', focusMode: 'layout' })
+    state = appReducer(state, { focusMode: 'layout', type: 'set-focus-mode' })
     expect(state.focusMode).toBe('layout')
     expect(deriveModeId(state)).toBe('layout')
 
     // Step 2: Press | in layout mode → opens split picker
     const handler = requireValue(getHandler('layout'), 'Missing layout handler')
     const result = requireValue(
-      handler.handleKey(key('|', { shift: true, sequence: '|' }), { state }),
+      handler.handleKey(key('|', { sequence: '|', shift: true }), { state }),
       'Expected split-picker result'
     )
-    expect(result.actions).toContainEqual({ type: 'open-split-picker', direction: 'vertical' })
+    expect(result.actions).toContainEqual({ direction: 'vertical', type: 'open-split-picker' })
     expect(result.transition).toBe('modal.split-picker')
 
     // Step 3: Apply actions from handler (opens modal)
@@ -505,17 +505,17 @@ describe('full split flow simulation', () => {
     // Step 4: User confirms selection → split-pane effect (simulated)
     state = appReducer(state, { type: 'close-modal' })
     const newTab = createTab('tab-2')
-    state = appReducer(state, { type: 'split-pane', direction: 'vertical', newTab })
+    state = appReducer(state, { direction: 'vertical', newTab, type: 'split-pane' })
 
     // Verify final state
     expect(state.tabs).toHaveLength(2)
     expect(state.activeTabId).toBe('tab-2')
     expect(getActiveTree(state)).toEqual({
-      type: 'split',
       direction: 'vertical',
+      first: { tabId: 'tab-1', type: 'leaf' },
       ratio: 0.5,
-      first: { type: 'leaf', tabId: 'tab-1' },
-      second: { type: 'leaf', tabId: 'tab-2' },
+      second: { tabId: 'tab-2', type: 'leaf' },
+      type: 'split',
     })
   })
 
@@ -523,7 +523,7 @@ describe('full split flow simulation', () => {
     let state = stateWithSplit()
 
     // Step 1: Ctrl+W → layout mode
-    state = appReducer(state, { type: 'set-focus-mode', focusMode: 'layout' })
+    state = appReducer(state, { focusMode: 'layout', type: 'set-focus-mode' })
 
     // Step 2: Press q
     const handler = requireValue(getHandler('layout'), 'Missing layout handler')
@@ -531,8 +531,8 @@ describe('full split flow simulation', () => {
       handler.handleKey(key('q'), { state }),
       'Expected close-pane result'
     )
-    expect(result.actions).toContainEqual({ type: 'close-pane', tabId: 'tab-1' })
-    expect(result.effects).toContainEqual({ type: 'close-tab', tabId: 'tab-1' })
+    expect(result.actions).toContainEqual({ tabId: 'tab-1', type: 'close-pane' })
+    expect(result.effects).toContainEqual({ tabId: 'tab-1', type: 'close-tab' })
 
     // Step 3: Apply all actions
     for (const action of result.actions) {
@@ -548,7 +548,7 @@ describe('full split flow simulation', () => {
 
   test('repeated Shift+H resize stays in layout mode and changes ratio', () => {
     let state = stateWithSplit()
-    state = appReducer(state, { type: 'set-focus-mode', focusMode: 'layout' })
+    state = appReducer(state, { focusMode: 'layout', type: 'set-focus-mode' })
 
     const handler = requireValue(getHandler('layout'), 'Missing layout handler')
 
@@ -582,7 +582,7 @@ describe('full split flow simulation', () => {
 
   test('h navigates to adjacent pane and exits layout', () => {
     let state = stateWithSplit()
-    state = appReducer(state, { type: 'set-focus-mode', focusMode: 'layout' })
+    state = appReducer(state, { focusMode: 'layout', type: 'set-focus-mode' })
     expect(state.activeTabId).toBe('tab-1')
 
     const handler = requireValue(getHandler('layout'), 'Missing layout handler')

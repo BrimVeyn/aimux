@@ -31,15 +31,15 @@ function decodeBytes(bytes: Uint8Array): string {
 }
 
 export function useRendererBindings({
-  backend,
-  renderer,
-  dispatch,
-  focusMode,
   activeTabId,
-  focusModeRef,
   activeTabIdRef,
   activeTabRef,
+  backend,
   contentOriginRef,
+  dispatch,
+  focusMode,
+  focusModeRef,
+  renderer,
 }: UseRendererBindingsOptions): void {
   useEffect(() => {
     renderer.useMouse = true
@@ -48,12 +48,15 @@ export function useRendererBindings({
     renderer.console.show = () => {}
 
     const handler = createRawInputHandler({
-      getFocusMode: () => focusModeRef.current,
+      enterLayoutMode: () => dispatch({ focusMode: 'layout', type: 'set-focus-mode' }),
       getActiveTabId: () => activeTabIdRef.current,
-      getContentOrigin: () => contentOriginRef.current,
-      getMousePassthroughEnabled: () => activeTabRef.current !== undefined,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
+      getContentOrigin: () => contentOriginRef.current,
+      getFocusMode: () => focusModeRef.current,
+      getMousePassthroughEnabled: () => activeTabRef.current !== undefined,
+      leaveTerminalInput: () => dispatch({ focusMode: 'navigation', type: 'set-focus-mode' }),
+      toggleSidebar: () => dispatch({ type: 'toggle-sidebar' }),
       writeToPty: (tabId, data) => {
         const viewport = activeTabRef.current?.viewport
         if (viewport && viewport.viewportY < viewport.baseY) {
@@ -61,15 +64,12 @@ export function useRendererBindings({
         }
         backend.write(tabId, data)
       },
-      leaveTerminalInput: () => dispatch({ type: 'set-focus-mode', focusMode: 'navigation' }),
-      enterLayoutMode: () => dispatch({ type: 'set-focus-mode', focusMode: 'layout' }),
-      toggleSidebar: () => dispatch({ type: 'toggle-sidebar' }),
     })
 
     const handlePasteEvent = (event: { bytes: Uint8Array; defaultPrevented?: boolean }) => {
       logInputDebug('app.rendererPaste', {
-        defaultPrevented: event.defaultPrevented ?? false,
         byteLength: event.bytes.length,
+        defaultPrevented: event.defaultPrevented ?? false,
       })
 
       if (event.defaultPrevented) {
@@ -83,10 +83,10 @@ export function useRendererBindings({
 
       logInputDebug('app.onTerminalPaste', {
         activeTabId: tabId,
-        focusMode: currentFocusMode,
+        bracketedPasteMode: tab?.terminalModes.bracketedPasteMode ?? false,
         byteLength: event.bytes.length,
         decodedPreview: payload.slice(0, PASTE_DEBUG_PREVIEW_LENGTH),
-        bracketedPasteMode: tab?.terminalModes.bracketedPasteMode ?? false,
+        focusMode: currentFocusMode,
       })
 
       if (currentFocusMode !== 'terminal-input' || !tabId || !tab) {
@@ -104,8 +104,8 @@ export function useRendererBindings({
       const selectedText = selection.getSelectedText()
       logInputDebug('app.selection', {
         isDragging: selection.isDragging ?? false,
-        textLength: selectedText.length,
         osc52Supported: renderer.isOsc52Supported(),
+        textLength: selectedText.length,
       })
 
       if (selection.isDragging || selectedText.length === 0) {
@@ -130,8 +130,8 @@ export function useRendererBindings({
   useEffect(() => {
     const shouldEnableBracketedPaste = focusMode === 'terminal-input' && activeTabId !== null
     logInputDebug('app.bracketedPasteMode', {
-      enabled: shouldEnableBracketedPaste,
       activeTabId,
+      enabled: shouldEnableBracketedPaste,
       focusMode,
       logPath: INPUT_DEBUG_LOG_PATH,
     })

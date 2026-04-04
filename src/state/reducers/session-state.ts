@@ -4,10 +4,10 @@ import { filterSessions } from '../selectors'
 import { restoreWorkspaceState } from '../session-persistence'
 
 const CLOSED_MODAL = {
-  type: null,
-  selectedIndex: 0,
   editBuffer: null,
+  selectedIndex: 0,
   sessionTargetId: null,
+  type: null,
 } as const
 
 export function reduceSessionState(state: AppState, action: AppAction): AppState | null {
@@ -20,6 +20,8 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         ...state,
         ...restoreWorkspaceState(state, snapshot),
         currentSessionId: action.sessionId,
+        focusMode: 'navigation',
+        modal: CLOSED_MODAL,
         sessions: state.sessions.map((entry) =>
           entry.id === action.sessionId
             ? {
@@ -29,8 +31,6 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
               }
             : entry
         ),
-        focusMode: 'navigation',
-        modal: CLOSED_MODAL,
       }
     }
     case 'set-sessions':
@@ -38,26 +38,26 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
     case 'create-session-record':
       return {
         ...state,
-        sessions: [...state.sessions, action.session],
         currentSessionId: action.session.id,
         focusMode: 'navigation',
         modal: CLOSED_MODAL,
+        sessions: [...state.sessions, action.session],
       }
     case 'rename-session-record':
       return {
         ...state,
+        focusMode: 'modal',
+        modal: {
+          editBuffer: null,
+          selectedIndex: state.modal.selectedIndex,
+          sessionTargetId: null,
+          type: 'session-picker',
+        },
         sessions: state.sessions.map((session) =>
           session.id === action.sessionId
             ? { ...session, name: action.name, updatedAt: new Date().toISOString() }
             : session
         ),
-        focusMode: 'modal',
-        modal: {
-          type: 'session-picker',
-          selectedIndex: state.modal.selectedIndex,
-          editBuffer: null,
-          sessionTargetId: null,
-        },
       }
     case 'delete-session-record': {
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId)
@@ -66,18 +66,18 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
       return {
         ...state,
-        sessions: newSessions,
+        activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
         currentSessionId:
           action.sessionId === state.currentSessionId ? null : state.currentSessionId,
-        tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
-        activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
         focusMode: 'modal',
         modal: {
-          type: 'session-picker',
-          selectedIndex: clampedIndex,
           editBuffer: null,
+          selectedIndex: clampedIndex,
           sessionTargetId: null,
+          type: 'session-picker',
         },
+        sessions: newSessions,
+        tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
       }
     }
     default:

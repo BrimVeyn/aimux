@@ -12,6 +12,7 @@
   },
   "rules": {
     "perfectionist/sort-imports": "error",
+    "perfectionist/sort-objects": "error",
     "perfectionist/sort-named-imports": "error",
     "perfectionist/sort-named-exports": "error",
     "default-case-last": "error",

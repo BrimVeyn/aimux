@@ -8,27 +8,27 @@ import { isWorkspaceSnapshotV1 } from '../../src/state/validation'
 describe('config edge cases', () => {
   test('workspace snapshot accepts custom assistant ids', () => {
     const snapshot = {
-      version: 1,
-      savedAt: '2024-01-01T00:00:00.000Z',
       activeTabId: 'tab-1',
+      savedAt: '2024-01-01T00:00:00.000Z',
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: 'my-custom-assistant',
-          title: 'Custom',
-          command: 'my-cli',
-          status: 'running',
           buffer: '',
+          command: 'my-cli',
+          id: 'tab-1',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Custom',
         },
       ],
+      version: 1,
     }
 
     expect(isWorkspaceSnapshotV1(snapshot)).toBe(true)
@@ -36,27 +36,27 @@ describe('config edge cases', () => {
 
   test('workspace snapshot rejects empty assistant id', () => {
     const snapshot = {
-      version: 1,
-      savedAt: '2024-01-01T00:00:00.000Z',
       activeTabId: 'tab-1',
+      savedAt: '2024-01-01T00:00:00.000Z',
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: '',
-          title: 'Bad',
-          command: 'test',
-          status: 'running',
           buffer: '',
+          command: 'test',
+          id: 'tab-1',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Bad',
         },
       ],
+      version: 1,
     }
 
     expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
@@ -64,27 +64,27 @@ describe('config edge cases', () => {
 
   test('workspace snapshot rejects non-string assistant id', () => {
     const snapshot = {
-      version: 1,
-      savedAt: '2024-01-01T00:00:00.000Z',
       activeTabId: null,
+      savedAt: '2024-01-01T00:00:00.000Z',
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: 42,
-          title: 'Bad',
-          command: 'test',
-          status: 'running',
           buffer: '',
+          command: 'test',
+          id: 'tab-1',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Bad',
         },
       ],
+      version: 1,
     }
 
     expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
@@ -100,27 +100,27 @@ describe('config edge cases', () => {
 
   test('workspace snapshot rejects tabs with invalid status', () => {
     const snapshot = {
-      version: 1,
-      savedAt: '2024-01-01T00:00:00.000Z',
       activeTabId: null,
+      savedAt: '2024-01-01T00:00:00.000Z',
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: 'claude',
-          title: 'Claude',
-          command: 'claude',
-          status: 'banana',
           buffer: '',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'banana',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Claude',
         },
       ],
+      version: 1,
     }
 
     expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
@@ -135,11 +135,11 @@ describe('custom commands config validation', () => {
     writeFileSync(
       configPath,
       JSON.stringify({
-        version: 2,
         customCommands: {
           'claude': 'claude --model opus',
           'my-custom-ai': '/usr/local/bin/my-ai',
         },
+        version: 2,
       })
     )
 

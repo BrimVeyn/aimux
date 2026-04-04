@@ -29,11 +29,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-1',
-        command: 'pwd',
         cols: 80,
-        rows: 24,
+        command: 'pwd',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-1',
       })
     })
 
@@ -66,11 +66,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-2',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-2',
       })
 
       setTimeout(() => {
@@ -114,11 +114,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-3',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-3',
       })
 
       setTimeout(() => {
@@ -128,18 +128,18 @@ describe('PtyManager', () => {
 
     expect(exitCode).toBe(0)
     expect(seenModes).toContainEqual({
+      alternateScrollMode: false,
+      bracketedPasteMode: false,
+      isAlternateBuffer: false,
       mouseTrackingMode: 'none',
       sendFocusMode: false,
-      alternateScrollMode: false,
-      isAlternateBuffer: false,
-      bracketedPasteMode: false,
     })
     expect(seenModes).toContainEqual({
+      alternateScrollMode: true,
+      bracketedPasteMode: false,
+      isAlternateBuffer: false,
       mouseTrackingMode: 'drag',
       sendFocusMode: true,
-      alternateScrollMode: true,
-      isAlternateBuffer: false,
-      bracketedPasteMode: false,
     })
     manager.disposeAll()
   })
@@ -168,11 +168,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-4',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-4',
       })
 
       setTimeout(() => {
@@ -213,11 +213,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-5',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-5',
       })
 
       setTimeout(() => {
@@ -262,11 +262,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-cursor',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-cursor',
       })
 
       setTimeout(() => {
@@ -309,11 +309,11 @@ describe('PtyManager', () => {
       })
 
       manager.createSession({
-        tabId: 'tab-paste',
-        command: '/bin/sh',
         cols: 80,
-        rows: 24,
+        command: '/bin/sh',
         cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-paste',
       })
 
       setTimeout(() => {
@@ -347,11 +347,11 @@ describe('PtyManager', () => {
     })
 
     manager.createSession({
-      tabId: 'tab-6',
-      command: '/bin/sh',
       cols: 80,
-      rows: 8,
+      command: '/bin/sh',
       cwd: process.cwd(),
+      rows: 8,
+      tabId: 'tab-6',
     })
 
     await new Promise<void>((resolve) => setTimeout(resolve, 50))

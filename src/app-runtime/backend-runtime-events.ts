@@ -44,24 +44,24 @@ export function bindBackendRuntimeEvents({
       return
     }
 
-    dispatch({ type: 'replace-tab-viewport', tabId, viewport, terminalModes })
+    dispatch({ tabId, terminalModes, type: 'replace-tab-viewport', viewport })
     if (timeouts.isStartupGraceActive(tabId) || resizingRef.current) {
       return
     }
 
-    dispatch({ type: 'set-tab-activity', tabId, activity: 'busy' })
+    dispatch({ activity: 'busy', tabId, type: 'set-tab-activity' })
     timeouts.scheduleIdle(tabId, IDLE_ACTIVITY_TIMEOUT_MS)
   }
 
   const handleExit = (tabId: string, exitCode: number) => {
     clearTabRuntimeState(timeouts, tabId)
-    dispatch({ type: 'set-tab-status', tabId, status: 'exited', exitCode })
-    dispatch({ type: 'set-tab-activity', tabId, activity: undefined })
+    dispatch({ exitCode, status: 'exited', tabId, type: 'set-tab-status' })
+    dispatch({ activity: undefined, tabId, type: 'set-tab-activity' })
   }
 
   const handleError = (tabId: string, message: string) => {
     clearTabRuntimeState(timeouts, tabId)
-    dispatch({ type: 'set-tab-error', tabId, message })
+    dispatch({ message, tabId, type: 'set-tab-error' })
   }
 
   backend.on('render', handleRender)

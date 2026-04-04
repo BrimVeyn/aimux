@@ -62,12 +62,12 @@ function getSelectedAssistantOption(state: AppState) {
 }
 
 function handleSessionSelection(ctx: SideEffectContext): void {
-  const { state, dispatch, backend } = ctx
+  const { backend, dispatch, state } = ctx
   const selectedSession = getSelectedSession(state)
   logInputDebug('app.sessionPicker.confirm', {
+    creatingNew: !selectedSession,
     selectedIndex: state.modal.selectedIndex,
     selectedSessionId: selectedSession?.id ?? null,
-    creatingNew: !selectedSession,
   })
 
   if (selectedSession) {
@@ -79,7 +79,7 @@ function handleSessionSelection(ctx: SideEffectContext): void {
 }
 
 function handleSelectedSessionDelete(ctx: SideEffectContext): void {
-  const { state, dispatch, backend } = ctx
+  const { backend, dispatch, state } = ctx
   const selectedSession = getSelectedSession(state)
   logInputDebug('app.sessionPicker.deleteSelected', {
     selectedIndex: state.modal.selectedIndex,
@@ -92,7 +92,7 @@ function handleSelectedSessionDelete(ctx: SideEffectContext): void {
 }
 
 function openSelectedSessionRename(ctx: SideEffectContext): void {
-  const { state, dispatch } = ctx
+  const { dispatch, state } = ctx
   const selectedSession = getSelectedSession(state)
   if (!selectedSession) {
     return
@@ -103,14 +103,14 @@ function openSelectedSessionRename(ctx: SideEffectContext): void {
     selectedSessionId: selectedSession.id,
   })
   dispatch({
-    type: 'open-session-name-modal',
-    sessionTargetId: selectedSession.id,
     initialName: selectedSession.name,
+    sessionTargetId: selectedSession.id,
+    type: 'open-session-name-modal',
   })
 }
 
 function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
-  const { state, backend, activeTab } = ctx
+  const { activeTab, backend, state } = ctx
   const snippet = getSelectedSnippet(state)
   if (!snippet || !state.activeTabId) {
     return
@@ -186,14 +186,14 @@ function applyThemeEffect(
 }
 
 function confirmSplitSelection(ctx: SideEffectContext): void {
-  const { state, dispatch } = ctx
+  const { dispatch, state } = ctx
   const option = getSelectedAssistantOption(state)
   const direction = state.modal.type === 'split-picker' ? state.modal.splitDirection : 'vertical'
   const customCommand = state.customCommands[option.id]
   const tab = createTabSession(option.id, customCommand, state.customCommands)
   dispatch({ type: 'close-modal' })
   executeSplitPane(ctx, direction, tab)
-  dispatch({ type: 'set-focus-mode', focusMode: 'terminal-input' })
+  dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
 }
 
 function createTabId(): string {
@@ -219,14 +219,14 @@ export function createTabSession(
   const option = allOptions.find((o) => o.id === assistant) ?? getAssistantOption(0)
 
   return {
-    id: createTabId(),
-    assistant,
-    title: option.label,
-    status: 'starting',
     activity: 'idle',
+    assistant,
     buffer: '',
-    terminalModes: createDefaultTerminalModes(),
     command: customCommand ?? option.command,
+    id: createTabId(),
+    status: 'starting',
+    terminalModes: createDefaultTerminalModes(),
+    title: option.label,
   }
 }
 
@@ -242,40 +242,40 @@ export function startTabSession(
 ): void {
   startStartupGrace(tab.id)
 
-  const { executable, args } = parseCommand(tab.command)
+  const { args, executable } = parseCommand(tab.command)
 
   if (!isCommandAvailable(executable)) {
     clearStartupGrace(tab.id)
     dispatch({
-      type: 'set-tab-error',
-      tabId: tab.id,
       message: `[command not found] ${executable} is not available in PATH.`,
+      tabId: tab.id,
+      type: 'set-tab-error',
     })
     return
   }
 
   backend.createSession({
-    tabId: tab.id,
-    assistant: tab.assistant,
-    title: tab.title,
-    command: executable,
     args,
+    assistant: tab.assistant,
     cols,
-    rows,
+    command: executable,
     cwd,
+    rows,
+    tabId: tab.id,
+    title: tab.title,
   })
 }
 
 function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
-  const { state, dispatch, backend, clearStartupGrace, startStartupGrace } = ctx
+  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const customCommand = state.customCommands[assistant]
   const tab = createTabSession(assistant, customCommand, state.customCommands)
   logInputDebug('app.launchAssistant', {
     assistant,
-    tabId: tab.id,
     command: tab.command,
+    tabId: tab.id,
   })
-  dispatch({ type: 'add-tab', tab })
+  dispatch({ tab, type: 'add-tab' })
   startTabSession(
     backend,
     dispatch,
@@ -289,7 +289,7 @@ function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
 }
 
 function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
-  const { backend, dispatch, clearStartupGrace, startStartupGrace, state } = ctx
+  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   startTabSession(
     backend,
     dispatch,
@@ -307,7 +307,7 @@ function executeSplitPane(
   direction: SplitDirection,
   tab: TabSession
 ): void {
-  const { state, dispatch, backend, clearStartupGrace, startStartupGrace } = ctx
+  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const activeTabId = state.activeTabId
   if (!activeTabId) {
     return
@@ -317,14 +317,14 @@ function executeSplitPane(
   const baseTree = existingTree ?? createLeaf(activeTabId)
   const newTree = splitNode(baseTree, activeTabId, direction, tab.id)
   const bounds = {
-    x: 0,
-    y: 0,
     cols: state.layout.terminalCols,
     rows: state.layout.terminalRows,
+    x: 0,
+    y: 0,
   }
   const paneRect = computePaneRects(newTree, bounds).get(tab.id)
 
-  dispatch({ type: 'split-pane', direction, newTab: tab })
+  dispatch({ direction, newTab: tab, type: 'split-pane' })
   startTabSession(
     backend,
     dispatch,
@@ -338,7 +338,7 @@ function executeSplitPane(
 }
 
 export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): void {
-  const { state, dispatch, backend } = ctx
+  const { backend, dispatch, state } = ctx
 
   switch (effect.type) {
     case 'quit': {
@@ -395,7 +395,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'edit-selected-snippet': {
       const snippet = getSelectedSnippet(state)
       if (snippet) {
-        dispatch({ type: 'open-snippet-editor', snippetId: snippet.id })
+        dispatch({ snippetId: snippet.id, type: 'open-snippet-editor' })
       }
       return
     }

@@ -3,8 +3,6 @@ import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 import { handleCtrlNavigation, handleTextInput } from './shared'
 
 export const modalSnippetPickerFilterMode: ModeHandler = {
-  id: 'modal.snippet-picker.filtering',
-
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -32,4 +30,6 @@ export const modalSnippetPickerFilterMode: ModeHandler = {
 
     return handleCtrlNavigation(key) ?? handleTextInput(key)
   },
+
+  id: 'modal.snippet-picker.filtering',
 }

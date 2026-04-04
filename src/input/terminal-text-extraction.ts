@@ -9,12 +9,12 @@ export function getWordAtColumn(
   column: number
 ): { text: string; startCol: number; endCol: number } {
   if (column < 0 || column >= lineText.length) {
-    return { text: '', startCol: column, endCol: column }
+    return { endCol: column, startCol: column, text: '' }
   }
 
   const ch = lineText[column]
   if (!ch || !/\S/.test(ch)) {
-    return { text: '', startCol: column, endCol: column }
+    return { endCol: column, startCol: column, text: '' }
   }
 
   let startCol = column
@@ -27,5 +27,5 @@ export function getWordAtColumn(
     endCol++
   }
 
-  return { text: lineText.slice(startCol, endCol), startCol, endCol }
+  return { endCol, startCol, text: lineText.slice(startCol, endCol) }
 }

@@ -43,7 +43,7 @@ function findContiguousGroupRange(
     groupEnd++
   }
 
-  return { groupStart, groupEnd }
+  return { groupEnd, groupStart }
 }
 
 function moveStandaloneTab(
@@ -107,7 +107,7 @@ function moveLayoutGroup(
   delta: number
 ): TabSession[] | null {
   const layoutSet = new Set(layoutIds)
-  const { groupStart, groupEnd } = findContiguousGroupRange(state.tabs, layoutSet, activeIndex)
+  const { groupEnd, groupStart } = findContiguousGroupRange(state.tabs, layoutSet, activeIndex)
   const tabs = [...state.tabs]
 
   if (delta > 0 && groupEnd < tabs.length - 1) {
@@ -235,11 +235,11 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
 
   return {
     ...state,
-    tabs,
     activeTabId: nextActiveTabId,
+    focusMode: tabs.length === 0 ? 'navigation' : state.focusMode,
     layoutTrees: newLayoutTrees,
     tabGroupMap: newTabGroupMap,
-    focusMode: tabs.length === 0 ? 'navigation' : state.focusMode,
+    tabs,
   }
 }
 
@@ -249,10 +249,10 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       const newTab = { ...action.tab, activity: action.tab.activity ?? 'idle' }
       return {
         ...state,
-        tabs: [...state.tabs, newTab],
         activeTabId: newTab.id,
         focusMode: 'navigation',
-        modal: { type: null, selectedIndex: 0, editBuffer: null, sessionTargetId: null },
+        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: null },
+        tabs: [...state.tabs, newTab],
       }
     }
     case 'hydrate-workspace': {
@@ -292,11 +292,11 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
 
       return {
         ...state,
-        tabs: action.tabs,
         activeTabId: hydratedActiveTabId,
+        focusMode: 'navigation',
         layoutTrees: hydratedTrees,
         tabGroupMap: hydratedGroupMap,
-        focusMode: 'navigation',
+        tabs: action.tabs,
       }
     }
     case 'close-tab':
@@ -380,13 +380,13 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         focusMode: 'navigation',
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          status: 'starting',
           activity: 'idle',
           buffer: '',
-          viewport: undefined,
           errorMessage: undefined,
           exitCode: undefined,
+          status: 'starting',
           terminalModes: createDefaultTerminalModes(),
+          viewport: undefined,
         })),
       }
     case 'append-tab-buffer':
@@ -403,9 +403,9 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          viewport: action.viewport,
-          terminalModes: action.terminalModes,
           status: tab.status === 'starting' ? 'running' : tab.status,
+          terminalModes: action.terminalModes,
+          viewport: action.viewport,
         })),
       }
     case 'set-tab-activity':
@@ -418,9 +418,9 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          status: action.status,
-          exitCode: action.exitCode,
           activity: action.status === 'running' ? tab.activity : undefined,
+          exitCode: action.exitCode,
+          status: action.status,
         })),
       }
     case 'set-tab-error':
@@ -428,10 +428,10 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          status: 'error',
           activity: undefined,
-          errorMessage: action.message,
           buffer: clampBuffer(`${tab.buffer}${action.message}\n`),
+          errorMessage: action.message,
+          status: 'error',
         })),
       }
     case 'rename-tab':
@@ -472,14 +472,14 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
 
       return {
         ...state,
-        tabs,
         activeTabId: newTab.id,
         layoutTrees: { ...state.layoutTrees, [groupId]: newTree },
         tabGroupMap: {
           ...state.tabGroupMap,
-          [state.activeTabId]: groupId,
           [newTab.id]: groupId,
+          [state.activeTabId]: groupId,
         },
+        tabs,
       }
     }
     case 'close-pane': {

@@ -16,7 +16,7 @@ function truncateContent(content: string): string {
   return `${content.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
 }
 
-export function SnippetPickerModal({ snippets, selectedIndex, filter }: SnippetPickerModalProps) {
+export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
   const filtered = filterSnippets(snippets, filter)
 
   return (

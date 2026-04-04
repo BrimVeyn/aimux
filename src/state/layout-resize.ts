@@ -22,7 +22,7 @@ export function getSnapshotTrees(snapshot: WorkspaceSnapshotV1 | undefined): Lay
 }
 
 export function createTerminalBounds(cols: number, rows: number): TerminalBounds {
-  return { x: 0, y: 0, cols, rows }
+  return { cols, rows, x: 0, y: 0 }
 }
 
 export function toTerminalContentSize(rect: PaneRect): { cols: number; rows: number } {

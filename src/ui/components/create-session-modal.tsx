@@ -41,10 +41,10 @@ interface CreateSessionModalProps {
 export function CreateSessionModal({
   activeField,
   directoryQuery,
-  sessionName,
+  pendingProjectPath,
   results,
   selectedIndex,
-  pendingProjectPath,
+  sessionName,
 }: CreateSessionModalProps) {
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'

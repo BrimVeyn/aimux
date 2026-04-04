@@ -6,8 +6,8 @@ import { appReducer, createInitialState } from '../../src/state/store'
 describe('custom assistants', () => {
   test('getAllAssistantOptions includes built-in + custom assistants', () => {
     const options = getAllAssistantOptions({
-      'my-ai': '/usr/local/bin/my-ai',
       'another-cli': 'another-cli --flag',
+      'my-ai': '/usr/local/bin/my-ai',
     })
 
     expect(options.length).toBe(ASSISTANT_OPTIONS.length + 2)
@@ -41,14 +41,14 @@ describe('custom assistants', () => {
 
     // Navigate past built-in options to custom one
     for (let i = 0; i < ASSISTANT_OPTIONS.length; i++) {
-      next = appReducer(next, { type: 'move-modal-selection', delta: 1 })
+      next = appReducer(next, { delta: 1, type: 'move-modal-selection' })
     }
 
     // Should be on the custom assistant (index = ASSISTANT_OPTIONS.length)
     expect(next.modal.selectedIndex).toBe(ASSISTANT_OPTIONS.length)
 
     // Moving one more should wrap to 0
-    next = appReducer(next, { type: 'move-modal-selection', delta: 1 })
+    next = appReducer(next, { delta: 1, type: 'move-modal-selection' })
     expect(next.modal.selectedIndex).toBe(0)
   })
 
@@ -57,10 +57,10 @@ describe('custom assistants', () => {
       ...createInitialState({ 'my-ai': '/usr/local/bin/my-ai' }, [], [], false),
       focusMode: 'modal' as const,
       modal: {
-        type: 'new-tab' as const,
-        selectedIndex: ASSISTANT_OPTIONS.length, // custom assistant index
         editBuffer: null,
+        selectedIndex: ASSISTANT_OPTIONS.length, // custom assistant index
         sessionTargetId: null,
+        type: 'new-tab' as const,
       },
     }
 
@@ -74,10 +74,10 @@ describe('custom assistants', () => {
       ...createInitialState({ 'my-ai': '/usr/local/bin/my-ai' }, [], [], false),
       focusMode: 'command-edit' as const,
       modal: {
-        type: 'new-tab' as const,
-        selectedIndex: ASSISTANT_OPTIONS.length,
         editBuffer: '/new/path/my-ai --verbose',
+        selectedIndex: ASSISTANT_OPTIONS.length,
         sessionTargetId: null,
+        type: 'new-tab' as const,
       },
     }
 

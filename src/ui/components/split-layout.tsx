@@ -41,43 +41,43 @@ interface SplitLayoutProps {
 }
 
 export function SplitLayout({
-  node,
-  tabs,
   activeTabId,
+  bounds,
+  contentOrigin,
   focusMode,
-  mouseForwardingEnabled,
   localScrollbackEnabled,
-  onTerminalMouseEvent,
-  onTerminalScrollEvent,
-  onTerminalClick,
+  mouseForwardingEnabled,
+  node,
   onPaneActivate,
-  onSplitResize,
-  onSeparatorDragStart,
   onSeparatorDrag,
   onSeparatorDragEnd,
-  contentOrigin,
-  bounds,
+  onSeparatorDragStart,
+  onSplitResize,
+  onTerminalClick,
+  onTerminalMouseEvent,
+  onTerminalScrollEvent,
+  tabs,
 }: SplitLayoutProps) {
   if (node.type === 'leaf') {
     const tab = tabs.find((t) => t.id === node.tabId)
     const isActive = node.tabId === activeTabId
     const paneOrigin: TerminalContentOrigin = {
-      x: contentOrigin.x + bounds.x + PANE_CHROME,
-      y: contentOrigin.y + bounds.y + PANE_CHROME,
       cols: Math.max(1, bounds.cols - PANE_CHROME * 2),
       rows: Math.max(1, bounds.rows - PANE_CHROME * 2),
+      x: contentOrigin.x + bounds.x + PANE_CHROME,
+      y: contentOrigin.y + bounds.y + PANE_CHROME,
     }
     logInputDebug('split.paneOrigin', {
-      tabId: node.tabId,
-      contentOriginX: contentOrigin.x,
-      contentOriginY: contentOrigin.y,
-      boundsX: bounds.x,
-      boundsY: bounds.y,
       boundsCols: bounds.cols,
       boundsRows: bounds.rows,
+      boundsX: bounds.x,
+      boundsY: bounds.y,
+      contentOriginX: contentOrigin.x,
+      contentOriginY: contentOrigin.y,
       paneChrome: PANE_CHROME,
       paneOriginX: paneOrigin.x,
       paneOriginY: paneOrigin.y,
+      tabId: node.tabId,
     })
     return (
       <TerminalPane
@@ -141,12 +141,12 @@ export function SplitLayout({
           const leafId = getFirstLeafId(node.first)
           if (!leafId) return
           onSeparatorDragStart({
-            tabId: leafId,
             direction: node.direction,
             screenStart:
               node.direction === 'vertical'
                 ? contentOrigin.x + bounds.x
                 : contentOrigin.y + bounds.y,
+            tabId: leafId,
             totalSize: node.direction === 'vertical' ? bounds.cols : bounds.rows,
           })
         }}
@@ -193,9 +193,9 @@ function subtreeBounds(
   const x = Math.min(firstBounds.x, lastBounds.x)
   const y = Math.min(firstBounds.y, lastBounds.y)
   return {
-    x,
-    y,
     cols: Math.max(firstBounds.x + firstBounds.cols, lastBounds.x + lastBounds.cols) - x,
     rows: Math.max(firstBounds.y + firstBounds.rows, lastBounds.y + lastBounds.rows) - y,
+    x,
+    y,
   }
 }

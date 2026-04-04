@@ -3,8 +3,6 @@ import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 import { handleCtrlNavigation, handleTextInput } from './shared'
 
 export const modalNewTabCommandEditMode: ModeHandler = {
-  id: 'modal.new-tab.command-edit',
-
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -24,4 +22,6 @@ export const modalNewTabCommandEditMode: ModeHandler = {
 
     return handleCtrlNavigation(key) ?? handleTextInput(key)
   },
+
+  id: 'modal.new-tab.command-edit',
 }

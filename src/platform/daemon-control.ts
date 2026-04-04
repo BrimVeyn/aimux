@@ -8,14 +8,14 @@ const ENTRY_POINT = resolve(import.meta.dir, '..', 'index.tsx')
 
 export async function findDaemonPid(socketPath: string): Promise<number | null> {
   try {
-    const proc = Bun.spawn(['lsof', '-t', socketPath], { stdout: 'pipe', stderr: 'ignore' })
+    const proc = Bun.spawn(['lsof', '-t', socketPath], { stderr: 'ignore', stdout: 'pipe' })
     const text = await new Response(proc.stdout).text()
     const pid = parseInt(text.trim(), 10)
     return Number.isFinite(pid) ? pid : null
   } catch (error) {
     logDebug('platform.daemon.findPidError', {
-      socketPath,
       error: error instanceof Error ? error.message : String(error),
+      socketPath,
     })
     return null
   }
@@ -43,10 +43,10 @@ export async function killDaemon(pid: number): Promise<void> {
 
 export async function spawnDetachedDaemon(): Promise<boolean> {
   Bun.spawn([process.execPath, 'run', ENTRY_POINT, 'daemon'], {
-    stdout: 'ignore',
+    detached: true,
     stderr: 'ignore',
     stdin: 'ignore',
-    detached: true,
+    stdout: 'ignore',
   }).unref()
 
   const deadline = Date.now() + 2_000

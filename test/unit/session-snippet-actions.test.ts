@@ -13,20 +13,20 @@ describe('session and snippet actions', () => {
       ...createInitialState(),
       tabs: [
         {
-          id: 'tab-1',
-          assistant: 'claude' as const,
-          title: 'Claude',
-          status: 'running' as const,
           activity: 'idle' as const,
+          assistant: 'claude' as const,
           buffer: 'hello',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running' as const,
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none' as const,
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
-          command: 'claude',
+          title: 'Claude',
         },
       ],
     }
@@ -43,18 +43,18 @@ describe('session and snippet actions', () => {
       deleteSessionRecords(
         [
           {
-            id: 's1',
-            name: 'one',
             createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z',
+            id: 's1',
             lastOpenedAt: '2024-01-01T00:00:00.000Z',
+            name: 'one',
+            updatedAt: '2024-01-01T00:00:00.000Z',
           },
           {
-            id: 's2',
-            name: 'two',
             createdAt: '2024-01-01T00:00:00.000Z',
-            updatedAt: '2024-01-01T00:00:00.000Z',
+            id: 's2',
             lastOpenedAt: '2024-01-01T00:00:00.000Z',
+            name: 'two',
+            updatedAt: '2024-01-01T00:00:00.000Z',
           },
         ],
         's1'
@@ -64,26 +64,26 @@ describe('session and snippet actions', () => {
     expect(
       deleteSnippetState(
         [
-          { id: 'n1', name: 'Review', content: 'A' },
-          { id: 'n2', name: 'Explain', content: 'B' },
+          { content: 'A', id: 'n1', name: 'Review' },
+          { content: 'B', id: 'n2', name: 'Explain' },
         ],
         'n1'
       )
-    ).toEqual([{ id: 'n2', name: 'Explain', content: 'B' }])
+    ).toEqual([{ content: 'B', id: 'n2', name: 'Explain' }])
   })
 
   test('saves snippet editor state for create and update', () => {
     const createState = {
       ...createInitialState(),
-      snippets: [],
       modal: {
-        type: 'snippet-editor' as const,
-        selectedIndex: 0,
-        editBuffer: 'Review',
-        sessionTargetId: null,
         activeField: 'name' as const,
         contentBuffer: 'Check for bugs',
+        editBuffer: 'Review',
+        selectedIndex: 0,
+        sessionTargetId: null,
+        type: 'snippet-editor' as const,
       },
+      snippets: [],
     }
 
     const created = saveSnippetEditorState(createState)
@@ -92,18 +92,18 @@ describe('session and snippet actions', () => {
 
     const updateState = {
       ...createInitialState(),
-      snippets: [{ id: 'n1', name: 'Old', content: 'Old content' }],
       modal: {
-        type: 'snippet-editor' as const,
-        selectedIndex: 0,
-        editBuffer: 'New',
-        sessionTargetId: 'n1',
         activeField: 'name' as const,
         contentBuffer: 'New content',
+        editBuffer: 'New',
+        selectedIndex: 0,
+        sessionTargetId: 'n1',
+        type: 'snippet-editor' as const,
       },
+      snippets: [{ content: 'Old content', id: 'n1', name: 'Old' }],
     }
 
     const updated = saveSnippetEditorState(updateState)
-    expect(updated).toEqual([{ id: 'n1', name: 'New', content: 'New content' }])
+    expect(updated).toEqual([{ content: 'New content', id: 'n1', name: 'New' }])
   })
 })

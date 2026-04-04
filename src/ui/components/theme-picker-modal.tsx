@@ -6,7 +6,7 @@ interface ThemePickerModalProps {
   currentThemeId: ThemeId
 }
 
-export function ThemePickerModal({ selectedIndex, currentThemeId }: ThemePickerModalProps) {
+export function ThemePickerModal({ currentThemeId, selectedIndex }: ThemePickerModalProps) {
   return (
     <box
       position="absolute"

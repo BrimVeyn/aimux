@@ -41,12 +41,12 @@ function hydrateAttachedSession(
 ): void {
   if (result) {
     dispatch({
-      type: 'hydrate-workspace',
-      tabs: result.tabs,
       activeTabId: result.activeTabId,
       layoutTree: workspaceSnapshot?.layoutTree,
       layoutTrees: workspaceSnapshot?.layoutTrees,
       tabGroupMap: workspaceSnapshot?.tabGroupMap,
+      tabs: result.tabs,
+      type: 'hydrate-workspace',
     })
     resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
     return
@@ -57,8 +57,8 @@ function hydrateAttachedSession(
   }
 
   dispatch({
-    type: 'load-session',
     sessionId,
+    type: 'load-session',
     workspaceSnapshot,
   })
   resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
@@ -74,12 +74,12 @@ interface AttachCurrentSessionOptions {
 }
 
 export function attachCurrentSession({
+  attachRequestIdRef,
   backend,
-  dispatch,
   currentSessionId,
   currentSessionWorkspaceSnapshot,
+  dispatch,
   layoutRef,
-  attachRequestIdRef,
 }: AttachCurrentSessionOptions): () => void {
   const attachRequestId = attachRequestIdRef.current + 1
   attachRequestIdRef.current = attachRequestId
@@ -87,9 +87,9 @@ export function attachCurrentSession({
 
   void backend
     .attach({
-      sessionId: currentSessionId,
       cols: layoutRef.current.terminalCols,
       rows: layoutRef.current.terminalRows,
+      sessionId: currentSessionId,
       workspaceSnapshot: currentSessionWorkspaceSnapshot,
     })
     .then((result) => {
@@ -98,9 +98,9 @@ export function attachCurrentSession({
       }
 
       logInputDebug('app.backend.attachResult', {
+        activeTabId: result?.activeTabId ?? null,
         hasResult: !!result,
         tabs: result?.tabs.length ?? 0,
-        activeTabId: result?.activeTabId ?? null,
       })
       hydrateAttachedSession(
         dispatch,

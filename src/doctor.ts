@@ -55,30 +55,30 @@ export function buildDoctorReport(): DoctorReport {
   const checks: DoctorCheck[] = []
 
   checks.push({
+    details: `${process.platform} ${process.arch}`,
     name: 'platform',
     ok: process.platform === 'darwin' || process.platform === 'linux',
-    details: `${process.platform} ${process.arch}`,
   })
 
   checks.push({
+    details: Bun.version,
     name: 'bun',
     ok: typeof Bun.version === 'string' && Bun.version.length > 0,
-    details: Bun.version,
   })
 
   checks.push({
+    details: getConfigDetails(configResult),
     name: 'config',
     ok: configResult.issues.length === 0,
-    details: getConfigDetails(configResult),
   })
 
   for (const option of ASSISTANT_OPTIONS) {
     const configuredCommand = config.customCommands[option.id] ?? option.command
-    const { executable, args } = parseCommand(configuredCommand)
+    const { args, executable } = parseCommand(configuredCommand)
     checks.push({
+      details: getAssistantDetails(configuredCommand, args, executable),
       name: `assistant:${option.id}`,
       ok: executable.length > 0 && isCommandAvailable(executable),
-      details: getAssistantDetails(configuredCommand, args, executable),
     })
   }
 

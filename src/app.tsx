@@ -70,15 +70,15 @@ export function App({ backend }: { backend: SessionBackend }) {
   const activeTabRef = useRef(activeTab)
   activeTabRef.current = activeTab
 
-  const contentOriginRef = useRef<TerminalContentOrigin>({ x: 0, y: 0, cols: 0, rows: 0 })
+  const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
 
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
-    backend,
-    dispatch,
     activeTabId: state.activeTabId,
+    backend,
     currentSessionId: state.currentSessionId,
     currentSessionWorkspaceSnapshot,
+    dispatch,
     layoutRef,
     resizingRef,
   })
@@ -87,59 +87,59 @@ export function App({ backend }: { backend: SessionBackend }) {
   useDirectorySearch(state.modal, dispatch)
 
   const terminalSize = useTerminalResize({
-    state,
-    dispatch,
     backend,
-    dimensions,
     contentOriginRef,
+    dimensions,
+    dispatch,
     resizingRef,
+    state,
   })
 
   const {
-    handleTerminalMouseEvent,
-    handleTerminalScrollEvent,
-    handleTerminalClick,
     handlePaneActivate,
-    handleSplitResize,
-    handleSeparatorDragStart,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
+    handleSeparatorDragStart,
+    handleSplitResize,
+    handleTerminalClick,
+    handleTerminalMouseEvent,
+    handleTerminalScrollEvent,
   } = useMouseHandlers({
-    state,
-    dispatch,
-    backend,
-    renderer,
-    activeMouseForwardingEnabled,
     activeLocalScrollbackEnabled,
+    activeMouseForwardingEnabled,
+    backend,
+    dispatch,
+    renderer,
+    state,
   })
 
   useRendererBindings({
-    backend,
-    renderer,
-    dispatch,
-    focusMode: state.focusMode,
     activeTabId: state.activeTabId,
-    focusModeRef,
     activeTabIdRef,
     activeTabRef,
+    backend,
     contentOriginRef,
+    dispatch,
+    focusMode: state.focusMode,
+    focusModeRef,
+    renderer,
   })
 
   const sideEffectCtx: SideEffectContext = {
-    state,
-    dispatch,
-    backend,
-    renderer,
-    themeId,
-    setThemeId,
     activeTab,
+    backend,
     clearIdleTimer,
     clearStartupGrace,
-    startStartupGrace,
+    dispatch,
     getCurrentSessionProjectPath: () => {
       if (!state.currentSessionId) return undefined
       return state.sessions.find((s) => s.id === state.currentSessionId)?.projectPath
     },
+    renderer,
+    setThemeId,
+    startStartupGrace,
+    state,
+    themeId,
   }
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
@@ -166,7 +166,7 @@ export function App({ backend }: { backend: SessionBackend }) {
     // Global quit: Ctrl+C in any mode except terminal-input
     if (key.ctrl && key.name === 'c' && state.focusMode !== 'terminal-input') {
       key.preventDefault()
-      executeSideEffect({ type: 'quit', state }, sideEffectCtx)
+      executeSideEffect({ state, type: 'quit' }, sideEffectCtx)
       return
     }
 

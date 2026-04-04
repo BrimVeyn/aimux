@@ -10,14 +10,14 @@ import {
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   return {
-    version: 1,
-    savedAt: new Date().toISOString(),
     activeTabId: null,
+    savedAt: new Date().toISOString(),
     sidebar: {
       visible: true,
       width: 28,
     },
     tabs: [],
+    version: 1,
   }
 }
 
@@ -31,28 +31,28 @@ function getDisconnectedStatus(status: WorkspaceSnapshotV1['tabs'][number]['stat
 
 export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
   return {
-    version: 1,
-    savedAt: new Date().toISOString(),
     activeTabId: state.activeTabId,
+    layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
+    layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
+    savedAt: new Date().toISOString(),
     sidebar: {
       visible: state.sidebar.visible,
       width: state.sidebar.width,
     },
+    tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
     tabs: state.tabs.map((tab) => ({
-      id: tab.id,
       assistant: tab.assistant,
-      title: tab.title,
-      command: tab.command,
-      status: tab.status === 'disconnected' ? 'running' : tab.status,
       buffer: tab.buffer,
-      viewport: tab.viewport,
-      terminalModes: tab.terminalModes,
+      command: tab.command,
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
+      id: tab.id,
+      status: tab.status === 'disconnected' ? 'running' : tab.status,
+      terminalModes: tab.terminalModes,
+      title: tab.title,
+      viewport: tab.viewport,
     })),
-    layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
-    layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
-    tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
+    version: 1,
   }
 }
 
@@ -62,17 +62,17 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
   }
 
   return snapshot.tabs.map((tab) => ({
-    id: tab.id,
-    assistant: tab.assistant,
-    title: tab.title,
-    status: getDisconnectedStatus(tab.status),
     activity: 'idle',
+    assistant: tab.assistant,
     buffer: tab.buffer,
-    viewport: tab.viewport,
-    terminalModes: tab.terminalModes,
     command: tab.command,
     errorMessage: tab.errorMessage,
     exitCode: tab.exitCode,
+    id: tab.id,
+    status: getDisconnectedStatus(tab.status),
+    terminalModes: tab.terminalModes,
+    title: tab.title,
+    viewport: tab.viewport,
   }))
 }
 
@@ -139,15 +139,15 @@ export function restoreWorkspaceState(
   const { layoutTrees, tabGroupMap } = restoreLayoutTrees(workspaceSnapshot, tabs)
 
   return {
-    tabs,
     activeTabId,
-    layoutTrees,
-    tabGroupMap,
     focusMode: 'navigation',
+    layoutTrees,
     sidebar: {
       ...state.sidebar,
       visible: workspaceSnapshot?.sidebar.visible ?? state.sidebar.visible,
       width: workspaceSnapshot?.sidebar.width ?? state.sidebar.width,
     },
+    tabGroupMap,
+    tabs,
   }
 }

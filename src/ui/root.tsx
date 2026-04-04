@@ -40,19 +40,19 @@ function getCreateSessionFields(modal: ModalState) {
 
 function getSnippetEditorFields(modal: ModalState) {
   if (modal.type !== 'snippet-editor') {
-    return { snippetName: '', snippetContent: '' }
+    return { snippetContent: '', snippetName: '' }
   }
 
   if (modal.activeField === 'name') {
     return {
-      snippetName: modal.editBuffer ?? '',
       snippetContent: modal.contentBuffer,
+      snippetName: modal.editBuffer ?? '',
     }
   }
 
   return {
-    snippetName: modal.contentBuffer,
     snippetContent: modal.editBuffer ?? '',
+    snippetName: modal.contentBuffer,
   }
 }
 
@@ -162,20 +162,20 @@ interface RootViewProps {
 }
 
 export function RootView({
-  themeId,
   contentOrigin,
-  mouseForwardingEnabled,
   localScrollbackEnabled,
-  onTerminalMouseEvent,
-  onTerminalScrollEvent,
-  onTerminalClick,
+  mouseForwardingEnabled,
   onPaneActivate,
-  onSplitResize,
-  onSeparatorDragStart,
   onSeparatorDrag,
   onSeparatorDragEnd,
+  onSeparatorDragStart,
+  onSplitResize,
+  onTerminalClick,
+  onTerminalMouseEvent,
+  onTerminalScrollEvent,
   terminalCols,
   terminalRows,
+  themeId,
 }: RootViewProps) {
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
@@ -214,7 +214,7 @@ export function RootView({
             onSeparatorDragStart={onSeparatorDragStart}
             onSeparatorDrag={onSeparatorDrag}
             onSeparatorDragEnd={onSeparatorDragEnd}
-            bounds={{ x: 0, y: 0, cols: terminalCols, rows: terminalRows }}
+            bounds={{ cols: terminalCols, rows: terminalRows, x: 0, y: 0 }}
           />
         ) : (
           <TerminalPane
@@ -231,14 +231,14 @@ export function RootView({
       </box>
       <StatusBar />
       {renderModal(modal, {
-        customCommands,
-        sessions,
+        createSessionFields,
         currentSessionId,
         currentTabCount: tabs.length,
+        customCommands,
+        sessions,
+        snippetEditorFields,
         snippets,
         themeId,
-        createSessionFields,
-        snippetEditorFields,
       })}
     </box>
   )

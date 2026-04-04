@@ -12,28 +12,28 @@ const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
 
 export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
-    id: 'claude',
-    label: 'Claude',
     command: 'claude',
     description: 'Anthropic Claude CLI',
+    id: 'claude',
+    label: 'Claude',
   },
   {
-    id: 'codex',
-    label: 'Codex',
     command: 'codex',
     description: 'OpenAI Codex CLI',
+    id: 'codex',
+    label: 'Codex',
   },
   {
-    id: 'opencode',
-    label: 'OpenCode',
     command: 'opencode',
     description: 'OpenCode CLI',
+    id: 'opencode',
+    label: 'OpenCode',
   },
   {
-    id: 'terminal',
-    label: 'Terminal',
     command: DEFAULT_SHELL,
     description: `Plain terminal (${SHELL_NAME})`,
+    id: 'terminal',
+    label: 'Terminal',
   },
 ]
 
@@ -51,10 +51,10 @@ export function getAllAssistantOptions(customCommands: Record<string, string>): 
   const customOptions: AssistantOption[] = Object.entries(customCommands)
     .filter(([id]) => !builtinIds.has(id))
     .map(([id, command]) => ({
-      id,
-      label: id.charAt(0).toUpperCase() + id.slice(1),
       command,
       description: `Custom (${command})`,
+      id,
+      label: id.charAt(0).toUpperCase() + id.slice(1),
     }))
   return [...ASSISTANT_OPTIONS, ...customOptions]
 }
@@ -65,5 +65,5 @@ export function isCommandAvailable(command: string): boolean {
 
 export function parseCommand(commandString: string): { executable: string; args: string[] } {
   const parts = commandString.trim().split(/\s+/).filter(Boolean)
-  return { executable: parts[0] ?? '', args: parts.slice(1) }
+  return { args: parts.slice(1), executable: parts[0] ?? '' }
 }

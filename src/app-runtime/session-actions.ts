@@ -18,12 +18,12 @@ export function createSessionFromCurrentState(
       ? createEmptyWorkspaceSnapshot()
       : serializeWorkspace(state)
   const session: SessionRecord = {
+    createdAt: now,
     id: createPrefixedId('session'),
+    lastOpenedAt: now,
     name,
     projectPath,
-    createdAt: now,
     updatedAt: now,
-    lastOpenedAt: now,
     workspaceSnapshot,
   }
 
@@ -79,16 +79,16 @@ export function handleCreateSessionEffect(
 ): void {
   const { session, sessions } = createSessionFromCurrentState(state, name, projectPath)
   logInputDebug('app.session.create', {
-    sessionId: session.id,
-    name,
     fromCurrentWorkspace: !state.currentSessionId && state.tabs.length > 0,
+    name,
+    sessionId: session.id,
     tabCount: session.workspaceSnapshot?.tabs.length ?? 0,
   })
   saveSessionCatalog(sessions)
-  dispatch({ type: 'set-sessions', sessions })
+  dispatch({ sessions, type: 'set-sessions' })
   dispatch({
-    type: 'load-session',
     sessionId: session.id,
+    type: 'load-session',
     workspaceSnapshot: session.workspaceSnapshot,
   })
 }
@@ -99,10 +99,10 @@ export function handleRenameSessionEffect(
   sessionId: string,
   name: string
 ): void {
-  logInputDebug('app.session.rename', { sessionId, name })
+  logInputDebug('app.session.rename', { name, sessionId })
   const renamed = renameSessionRecords(sessions, sessionId, name)
   saveSessionCatalog(renamed)
-  dispatch({ type: 'rename-session-record', sessionId, name })
+  dispatch({ name, sessionId, type: 'rename-session-record' })
 }
 
 export function handleSwitchSessionEffect(
@@ -112,19 +112,19 @@ export function handleSwitchSessionEffect(
   session: SessionRecord
 ): void {
   logInputDebug('app.session.switch.start', {
-    fromSessionId: state.currentSessionId,
-    toSessionId: session.id,
-    toName: session.name,
     currentTabCount: state.tabs.length,
+    fromSessionId: state.currentSessionId,
     restoredTabCount: session.workspaceSnapshot?.tabs.length ?? 0,
+    toName: session.name,
+    toSessionId: session.id,
   })
   const sessions = switchSessionRecords(state, session)
   saveSessionCatalog(sessions)
   void backend.destroy(true)
-  dispatch({ type: 'set-sessions', sessions })
+  dispatch({ sessions, type: 'set-sessions' })
   dispatch({
-    type: 'load-session',
     sessionId: session.id,
+    type: 'load-session',
     workspaceSnapshot: session.workspaceSnapshot,
   })
   logInputDebug('app.session.switch.dispatched', { toSessionId: session.id })
@@ -138,15 +138,15 @@ export function handleDeleteSessionEffect(
 ): void {
   const remaining = deleteSessionRecords(state.sessions, sessionId)
   logInputDebug('app.session.delete', {
+    remainingCount: remaining.length,
     sessionId,
     wasCurrent: sessionId === state.currentSessionId,
-    remainingCount: remaining.length,
   })
   saveSessionCatalog(remaining)
   if (sessionId === state.currentSessionId) {
     void backend.destroy(true)
   }
-  dispatch({ type: 'delete-session-record', sessionId })
+  dispatch({ sessionId, type: 'delete-session-record' })
 }
 
 export function restartTabSession(
@@ -158,13 +158,13 @@ export function restartTabSession(
   tab: TabSession
 ): void {
   logInputDebug('app.restartTab', {
-    tabId: tab.id,
     command: tab.command,
     status: tab.status,
+    tabId: tab.id,
   })
   clearIdleTimer(tab.id)
   clearStartupGrace(tab.id)
   backend.disposeSession(tab.id)
-  dispatch({ type: 'reset-tab-session', tabId: tab.id })
+  dispatch({ tabId: tab.id, type: 'reset-tab-session' })
   startTabSession(tab)
 }

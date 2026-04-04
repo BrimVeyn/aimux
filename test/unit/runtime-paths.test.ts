@@ -18,7 +18,7 @@ describe('daemon runtime paths', () => {
     }
 
     if (tempRuntimeDir) {
-      rmSync(tempRuntimeDir, { recursive: true, force: true })
+      rmSync(tempRuntimeDir, { force: true, recursive: true })
       tempRuntimeDir = null
     }
   })

@@ -70,11 +70,11 @@ function trackPrivateModes(
 
 function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): TerminalModeState {
   return {
+    alternateScrollMode,
+    bracketedPasteMode: emulator.modes.bracketedPasteMode,
+    isAlternateBuffer: emulator.buffer.active === emulator.buffer.alternate,
     mouseTrackingMode: emulator.modes.mouseTrackingMode,
     sendFocusMode: emulator.modes.sendFocusMode,
-    alternateScrollMode,
-    isAlternateBuffer: emulator.buffer.active === emulator.buffer.alternate,
-    bracketedPasteMode: emulator.modes.bracketedPasteMode,
   }
 }
 
@@ -133,27 +133,27 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       })
 
       const pty = spawn(options.command, options.args ?? [], {
-        name: 'xterm-256color',
         cols: options.cols,
-        rows: options.rows,
         cwd: options.cwd ?? process.cwd(),
         env: {
           ...process.env,
           TERM: 'xterm-256color',
         },
+        name: 'xterm-256color',
+        rows: options.rows,
       })
 
       const session: SessionHandle = {
-        tabId: options.tabId,
-        pty,
+        alternateScrollMode: false,
+        cursorVisible: true,
         emulator,
         lastSnapshot: undefined,
         lastTerminalModes: undefined,
-        alternateScrollMode: false,
-        cursorVisible: true,
+        pendingExitCode: null,
         pendingModeSequence: '',
         pendingWrites: 0,
-        pendingExitCode: null,
+        pty,
+        tabId: options.tabId,
       }
 
       pty.onData((data) => {

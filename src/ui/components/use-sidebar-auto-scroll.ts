@@ -13,11 +13,11 @@ interface UseSidebarAutoScrollOptions {
 }
 
 export function useSidebarAutoScroll({
-  scrollRef,
-  visible,
-  activeTabId,
   activeIndex,
+  activeTabId,
+  scrollRef,
   tabCount,
+  visible,
 }: UseSidebarAutoScrollOptions): void {
   const previousActiveIndexRef = useRef(-1)
   const previousVisibilityRef = useRef(visible)
@@ -44,8 +44,8 @@ export function useSidebarAutoScroll({
     }
 
     const scrollTarget = getSidebarScrollTarget({
-      previousActiveIndex: previousActiveIndexRef.current,
       nextActiveIndex: activeIndex,
+      previousActiveIndex: previousActiveIndexRef.current,
       tabCount,
     })
 

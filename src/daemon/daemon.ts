@@ -23,7 +23,7 @@ function send(socket: Socket, message: ServerResponse | ServerEvent): void {
 }
 
 function sendOk(socket: Socket, id: string): void {
-  send(socket, { id, type: 'ok', payload: {} })
+  send(socket, { id, payload: {}, type: 'ok' })
 }
 
 function requireSession(socket: Socket, attachedSessions: Map<Socket, string>): string {
@@ -36,7 +36,7 @@ function requireSession(socket: Socket, attachedSessions: Map<Socket, string>): 
 
 export async function runDaemon(): Promise<void> {
   const socketPath = getDaemonSocketPath()
-  logDebug('daemon.start', { socketPath, pid: process.pid })
+  logDebug('daemon.start', { pid: process.pid, socketPath })
 
   const existingPid = await findDaemonPid(socketPath)
   if (existingPid !== null && existingPid !== process.pid) {
@@ -53,7 +53,7 @@ export async function runDaemon(): Promise<void> {
   const attachedSessions = new Map<Socket, string>()
 
   sessionManager.on('render', (sessionId, tabId, viewport, terminalModes) => {
-    const event: ServerEvent = { type: 'tabRender', payload: { tabId, viewport, terminalModes } }
+    const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
     for (const socket of sockets) {
       if (attachedSessions.get(socket) === sessionId) {
         send(socket, event)
@@ -61,7 +61,7 @@ export async function runDaemon(): Promise<void> {
     }
   })
   sessionManager.on('exit', (sessionId, tabId, exitCode) => {
-    const event: ServerEvent = { type: 'tabExit', payload: { tabId, exitCode } }
+    const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
     for (const socket of sockets) {
       if (attachedSessions.get(socket) === sessionId) {
         send(socket, event)
@@ -69,7 +69,7 @@ export async function runDaemon(): Promise<void> {
     }
   })
   sessionManager.on('error', (sessionId, tabId, message) => {
-    const event: ServerEvent = { type: 'tabError', payload: { tabId, message } }
+    const event: ServerEvent = { payload: { message, tabId }, type: 'tabError' }
     for (const socket of sockets) {
       if (attachedSessions.get(socket) === sessionId) {
         send(socket, event)
@@ -86,7 +86,7 @@ export async function runDaemon(): Promise<void> {
       try {
         for (const message of decoder.push(chunk)) {
           try {
-            logDebug('daemon.request', { type: message.type, id: message.id })
+            logDebug('daemon.request', { id: message.id, type: message.type })
             switch (message.type) {
               case 'attach': {
                 attachedSessions.set(socket, message.payload.sessionId)
@@ -101,8 +101,8 @@ export async function runDaemon(): Promise<void> {
                 )
                 send(socket, {
                   id: message.id,
-                  type: 'attachResult',
                   payload: { protocolVersion: IPC_PROTOCOL_VERSION, ...attachResult },
+                  type: 'attachResult',
                 })
                 break
               }
@@ -174,14 +174,14 @@ export async function runDaemon(): Promise<void> {
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
             logDebug('daemon.request.error', { error: errorMessage, requestId: message.id })
-            send(socket, { id: message.id, type: 'error', payload: { message: errorMessage } })
+            send(socket, { id: message.id, payload: { message: errorMessage }, type: 'error' })
           }
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         logDebug('daemon.request.error', { error: message })
         decoder.reset()
-        send(socket, { id: crypto.randomUUID(), type: 'error', payload: { message } })
+        send(socket, { id: crypto.randomUUID(), payload: { message }, type: 'error' })
       }
     })
 

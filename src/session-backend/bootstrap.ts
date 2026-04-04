@@ -15,8 +15,8 @@ import { RemoteSessionBackend } from './remote-session-backend'
 
 async function spawnDaemon(): Promise<void> {
   logDebug('backend.spawnDaemon.start', {
-    socketPath: getDaemonSocketPath(),
     execPath: process.execPath,
+    socketPath: getDaemonSocketPath(),
   })
   const ok = await spawnDetachedDaemon()
   if (ok) {
@@ -30,7 +30,7 @@ async function spawnDaemon(): Promise<void> {
 async function canConnectToDaemon(socketPath: string): Promise<boolean> {
   const securityIssue = getDaemonSocketSecurityIssue(socketPath)
   if (securityIssue) {
-    logDebug('backend.healthcheck.socketIssue', { socketPath, issue: securityIssue })
+    logDebug('backend.healthcheck.socketIssue', { issue: securityIssue, socketPath })
     return false
   }
 
@@ -45,9 +45,9 @@ async function canConnectToDaemon(socketPath: string): Promise<boolean> {
     socket.once('connect', () => finish(true))
     socket.once('error', (error: NodeJS.ErrnoException) => {
       logDebug('backend.healthcheck.error', {
-        socketPath,
         code: error.code ?? 'unknown',
         error: error.message,
+        socketPath,
       })
       finish(false)
     })
@@ -68,7 +68,7 @@ export async function createSessionBackend(): Promise<SessionBackend> {
   try {
     const socketPath = getDaemonSocketPath()
     const initialReachable = await canConnectToDaemon(socketPath)
-    logDebug('backend.create.start', { socketPath, initialReachable })
+    logDebug('backend.create.start', { initialReachable, socketPath })
 
     if (!initialReachable) {
       removeDaemonSocketIfExists()

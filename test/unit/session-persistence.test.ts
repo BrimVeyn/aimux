@@ -11,26 +11,26 @@ describe('session persistence', () => {
   test('serializes workspace snapshot', () => {
     const state = {
       ...createInitialState({ claude: 'claude' }),
+      activeTabId: 'tab-1',
       tabs: [
         {
-          id: 'tab-1',
-          assistant: 'claude' as const,
-          title: 'Claude',
-          status: 'running' as const,
           activity: 'busy' as const,
+          assistant: 'claude' as const,
           buffer: 'hello',
-          viewport: { lines: [], viewportY: 0, baseY: 0, cursorVisible: true },
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running' as const,
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: true,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'drag' as const,
             sendFocusMode: true,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: true,
           },
-          command: 'claude',
+          title: 'Claude',
+          viewport: { baseY: 0, cursorVisible: true, lines: [], viewportY: 0 },
         },
       ],
-      activeTabId: 'tab-1',
     }
 
     const snapshot = serializeWorkspace(state)
@@ -41,27 +41,27 @@ describe('session persistence', () => {
 
   test('restores running tabs as disconnected', () => {
     const tabs = restoreTabsFromWorkspace({
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-1',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: 'claude',
-          title: 'Claude',
-          command: 'claude',
-          status: 'running',
           buffer: 'hello',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Claude',
         },
       ],
+      version: 1,
     })
 
     expect(tabs[0]?.status).toBe('disconnected')
@@ -71,27 +71,27 @@ describe('session persistence', () => {
   test('restores sidebar and active tab safely', () => {
     const baseState = createInitialState()
     const restored = restoreWorkspaceState(baseState, {
-      version: 1,
-      savedAt: new Date().toISOString(),
       activeTabId: 'tab-1',
+      savedAt: new Date().toISOString(),
       sidebar: { visible: false, width: 22 },
       tabs: [
         {
-          id: 'tab-1',
           assistant: 'claude',
-          title: 'Claude',
-          command: 'claude',
-          status: 'exited',
           buffer: 'hello',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'exited',
           terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
             mouseTrackingMode: 'none',
             sendFocusMode: false,
-            alternateScrollMode: false,
-            isAlternateBuffer: false,
-            bracketedPasteMode: false,
           },
+          title: 'Claude',
         },
       ],
+      version: 1,
     })
 
     expect(restored.activeTabId).toBe('tab-1')

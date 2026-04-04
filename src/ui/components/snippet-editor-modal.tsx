@@ -9,9 +9,9 @@ interface SnippetEditorModalProps {
 
 export function SnippetEditorModal({
   activeField,
-  snippetName,
-  snippetContent,
   isEditing,
+  snippetContent,
+  snippetName,
 }: SnippetEditorModalProps) {
   const nameActive = activeField === 'name'
   const contentActive = activeField === 'content'

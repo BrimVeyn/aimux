@@ -4,42 +4,42 @@ import { SessionRegistry } from '../../src/daemon/session-registry'
 
 function createSnapshot() {
   return {
-    version: 1 as const,
-    savedAt: new Date().toISOString(),
     activeTabId: 'tab-a',
+    savedAt: new Date().toISOString(),
     sidebar: { visible: true, width: 28 },
     tabs: [
       {
-        id: 'tab-a',
         assistant: 'claude' as const,
-        title: 'Alpha',
-        command: 'claude',
-        status: 'running' as const,
         buffer: 'alpha',
+        command: 'claude',
+        id: 'tab-a',
+        status: 'running' as const,
         terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
           mouseTrackingMode: 'none' as const,
           sendFocusMode: false,
-          alternateScrollMode: false,
-          isAlternateBuffer: false,
-          bracketedPasteMode: false,
         },
+        title: 'Alpha',
       },
       {
-        id: 'tab-b',
         assistant: 'codex' as const,
-        title: 'Beta',
-        command: 'codex',
-        status: 'running' as const,
         buffer: 'beta',
+        command: 'codex',
+        id: 'tab-b',
+        status: 'running' as const,
         terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
           mouseTrackingMode: 'none' as const,
           sendFocusMode: false,
-          alternateScrollMode: false,
-          isAlternateBuffer: false,
-          bracketedPasteMode: false,
         },
+        title: 'Beta',
       },
     ],
+    version: 1 as const,
   }
 }
 

@@ -35,7 +35,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       if (tab.status === 'starting') {
         tab.status = 'running'
       }
-      logDebug('daemon.registry.render', { tabId, status: tab.status })
+      logDebug('daemon.registry.render', { status: tab.status, tabId })
       this.emit('render', tabId, viewport, terminalModes)
     })
     this.ptyManager.on('exit', (tabId, exitCode) => {
@@ -46,7 +46,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       tab.status = 'exited'
       tab.exitCode = exitCode
       tab.activity = undefined
-      logDebug('daemon.registry.exit', { tabId, exitCode })
+      logDebug('daemon.registry.exit', { exitCode, tabId })
       this.emit('exit', tabId, exitCode)
     })
     this.ptyManager.on('error', (tabId, message) => {
@@ -56,7 +56,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         tab.errorMessage = message
         tab.activity = undefined
       }
-      logDebug('daemon.registry.error', { tabId, message })
+      logDebug('daemon.registry.error', { message, tabId })
       this.emit('error', tabId, message)
     })
   }
@@ -66,8 +66,8 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     activeTabId: string | null
   } {
     logDebug('daemon.registry.attach', {
-      hasSnapshot: !!snapshot,
       existingTabs: this.tabs.size,
+      hasSnapshot: !!snapshot,
       snapshotTabs: snapshot?.tabs.length ?? 0,
     })
     if (this.tabs.size === 0 && snapshot) {
@@ -91,7 +91,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       }
     }
 
-    return { tabs: this.listTabs(), activeTabId: this.activeTabId }
+    return { activeTabId: this.activeTabId, tabs: this.listTabs() }
   }
 
   listTabs(): TabSession[] {
@@ -109,23 +109,23 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cwd?: string
   }): void {
     logDebug('daemon.registry.createSession', {
-      tabId: options.tabId,
-      assistant: options.assistant,
-      title: options.title,
-      command: options.command,
       args: options.args ?? [],
+      assistant: options.assistant,
+      command: options.command,
+      tabId: options.tabId,
+      title: options.title,
     })
     const existing = this.tabs.get(options.tabId)
     if (!existing) {
       this.tabs.set(options.tabId, {
-        id: options.tabId,
-        assistant: options.assistant,
-        title: options.title,
-        status: 'starting',
         activity: 'idle',
+        assistant: options.assistant,
         buffer: '',
-        terminalModes: createDefaultTerminalModes(),
         command: [options.command, ...(options.args ?? [])].join(' '),
+        id: options.tabId,
+        status: 'starting',
+        terminalModes: createDefaultTerminalModes(),
+        title: options.title,
       })
     } else {
       existing.status = 'starting'

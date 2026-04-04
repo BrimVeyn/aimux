@@ -6,8 +6,8 @@ describe('getSidebarScrollTarget', () => {
   test('does nothing when there is no active tab', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: -1,
         nextActiveIndex: -1,
+        previousActiveIndex: -1,
         tabCount: 0,
       })
     ).toBe('none')
@@ -16,8 +16,8 @@ describe('getSidebarScrollTarget', () => {
   test('scrolls active item into view on initial selection', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: -1,
         nextActiveIndex: 2,
+        previousActiveIndex: -1,
         tabCount: 5,
       })
     ).toBe('active-item')
@@ -26,8 +26,8 @@ describe('getSidebarScrollTarget', () => {
   test('jumps to top when wrapping from last to first', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: 4,
         nextActiveIndex: 0,
+        previousActiveIndex: 4,
         tabCount: 5,
       })
     ).toBe('top')
@@ -36,8 +36,8 @@ describe('getSidebarScrollTarget', () => {
   test('jumps to bottom when wrapping from first to last', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: 0,
         nextActiveIndex: 4,
+        previousActiveIndex: 0,
         tabCount: 5,
       })
     ).toBe('bottom')
@@ -46,8 +46,8 @@ describe('getSidebarScrollTarget', () => {
   test('keeps active item visible on ordinary movement', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: 1,
         nextActiveIndex: 2,
+        previousActiveIndex: 1,
         tabCount: 5,
       })
     ).toBe('active-item')
@@ -56,8 +56,8 @@ describe('getSidebarScrollTarget', () => {
   test('does nothing when active item does not change', () => {
     expect(
       getSidebarScrollTarget({
-        previousActiveIndex: 2,
         nextActiveIndex: 2,
+        previousActiveIndex: 2,
         tabCount: 5,
       })
     ).toBe('none')

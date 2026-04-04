@@ -2,7 +2,6 @@ import { theme } from '../theme'
 
 const SECTIONS = [
   {
-    title: 'Navigation',
     bindings: [
       ['j / k', 'Move between tabs'],
       ['Shift+J / K', 'Reorder tabs'],
@@ -10,9 +9,9 @@ const SECTIONS = [
       ['r', 'Rename tab'],
       ['?', 'Show this help'],
     ],
+    title: 'Navigation',
   },
   {
-    title: 'Tabs & Sessions',
     bindings: [
       ['Ctrl+n', 'New tab'],
       ['Ctrl+w', 'Close tab'],
@@ -21,24 +20,24 @@ const SECTIONS = [
       ['Ctrl+s', 'Snippet picker'],
       ['Ctrl+t', 'Theme picker'],
     ],
+    title: 'Tabs & Sessions',
   },
   {
-    title: 'Sidebar',
     bindings: [
       ['Ctrl+b', 'Toggle sidebar'],
       ['Ctrl+h / l', 'Resize sidebar'],
     ],
+    title: 'Sidebar',
   },
   {
-    title: 'Terminal Input',
     bindings: [
       ['Ctrl+z', 'Back to navigation'],
       ['Ctrl+w', 'Enter layout mode'],
       ['Ctrl+b', 'Toggle sidebar'],
     ],
+    title: 'Terminal Input',
   },
   {
-    title: 'Layout Mode (Ctrl+w)',
     bindings: [
       ['|', 'Split vertical'],
       ['-', 'Split horizontal'],
@@ -47,10 +46,11 @@ const SECTIONS = [
       ['q', 'Close pane'],
       ['Esc', 'Cancel'],
     ],
+    title: 'Layout Mode (Ctrl+w)',
   },
   {
-    title: 'General',
     bindings: [['Ctrl+c', 'Quit']],
+    title: 'General',
   },
 ] as const
 

@@ -61,12 +61,12 @@ function applyResolvedSelection(
 }
 
 export function useMouseHandlers({
-  state,
-  dispatch,
-  backend,
-  renderer,
-  activeMouseForwardingEnabled,
   activeLocalScrollbackEnabled,
+  activeMouseForwardingEnabled,
+  backend,
+  dispatch,
+  renderer,
+  state,
 }: UseMouseHandlersOptions) {
   const separatorDragRef = useRef<SplitDragState | null>(null)
   const multiClickRef = useRef(new MultiClickDetector())
@@ -104,7 +104,7 @@ export function useMouseHandlers({
   }
 
   const handleSplitResize = (tabId: string, ratio: number, axis: SplitDirection) => {
-    dispatch({ type: 'set-split-ratio', tabId, ratio, axis })
+    dispatch({ axis, ratio, tabId, type: 'set-split-ratio' })
   }
 
   const handleSeparatorDragStart = (info: {
@@ -123,7 +123,7 @@ export function useMouseHandlers({
     }
 
     const newRatio = getSplitRatioFromDrag(event, drag)
-    dispatch({ type: 'set-split-ratio', tabId: drag.tabId, ratio: newRatio, axis: drag.direction })
+    dispatch({ axis: drag.direction, ratio: newRatio, tabId: drag.tabId, type: 'set-split-ratio' })
     return true
   }
 
@@ -133,10 +133,10 @@ export function useMouseHandlers({
 
   const handlePaneActivate = (tabId: string) => {
     if (tabId !== state.activeTabId) {
-      dispatch({ type: 'set-active-tab', tabId })
+      dispatch({ tabId, type: 'set-active-tab' })
     }
     if (state.focusMode !== 'terminal-input') {
-      dispatch({ type: 'set-focus-mode', focusMode: 'terminal-input' })
+      dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
     }
   }
 
@@ -171,13 +171,13 @@ export function useMouseHandlers({
   }
 
   return {
-    handleTerminalMouseEvent,
-    handleTerminalScrollEvent,
-    handleTerminalClick,
     handlePaneActivate,
-    handleSplitResize,
-    handleSeparatorDragStart,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
+    handleSeparatorDragStart,
+    handleSplitResize,
+    handleTerminalClick,
+    handleTerminalMouseEvent,
+    handleTerminalScrollEvent,
   }
 }

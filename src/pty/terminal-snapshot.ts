@@ -126,13 +126,13 @@ function buildLine(
     }
 
     pushSpan(spans, {
-      text,
-      fg,
       bg,
       bold: current.isBold() ? true : undefined,
-      italic: current.isItalic() ? true : undefined,
-      underline: current.isUnderline() ? true : undefined,
       cursor: isCursorCell ? true : undefined,
+      fg,
+      italic: current.isItalic() ? true : undefined,
+      text,
+      underline: current.isUnderline() ? true : undefined,
     })
   }
 
@@ -153,10 +153,10 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
   }
 
   return {
-    lines,
-    viewportY: buffer.viewportY,
     baseY: buffer.baseY,
     cursorVisible,
+    lines,
+    viewportY: buffer.viewportY,
   }
 }
 

@@ -34,11 +34,11 @@ const EXPECTED_PTY_X = TERMINAL_CLICK_X + 1 - CONTENT_ORIGIN_X
 const EXPECTED_PTY_Y = TERMINAL_CLICK_Y + 1 - CONTENT_ORIGIN_Y
 
 const INITIAL_TERMINAL_MODES: TerminalModeState = {
+  alternateScrollMode: false,
+  bracketedPasteMode: false,
+  isAlternateBuffer: false,
   mouseTrackingMode: 'none',
   sendFocusMode: false,
-  alternateScrollMode: false,
-  isAlternateBuffer: false,
-  bracketedPasteMode: false,
 }
 
 const cleanups: Array<() => void> = []
@@ -106,8 +106,8 @@ async function waitFor(
 
 function MouseHarness({
   command,
-  mouseForwardingEnabled,
   localScrollbackEnabled,
+  mouseForwardingEnabled,
 }: {
   command: string
   mouseForwardingEnabled: boolean
@@ -136,16 +136,16 @@ function MouseHarness({
   }, [dimensions.height, dimensions.width])
 
   const contentOriginRef = useRef<TerminalContentOrigin>({
-    x: CONTENT_ORIGIN_X,
-    y: CONTENT_ORIGIN_Y,
     cols: terminalSize.cols,
     rows: terminalSize.rows,
+    x: CONTENT_ORIGIN_X,
+    y: CONTENT_ORIGIN_Y,
   })
   contentOriginRef.current = {
-    x: CONTENT_ORIGIN_X,
-    y: CONTENT_ORIGIN_Y,
     cols: terminalSize.cols,
     rows: terminalSize.rows,
+    x: CONTENT_ORIGIN_X,
+    y: CONTENT_ORIGIN_Y,
   }
 
   useEffect(() => {
@@ -168,14 +168,14 @@ function MouseHarness({
   }, [ptyManager])
 
   useEffect(() => {
-    const { executable, args } = parseCommand(command)
+    const { args, executable } = parseCommand(command)
     ptyManager.createSession({
-      tabId: TEST_TAB_ID,
-      command: executable,
       args,
       cols: terminalSize.cols,
-      rows: terminalSize.rows,
+      command: executable,
       cwd: process.cwd(),
+      rows: terminalSize.rows,
+      tabId: TEST_TAB_ID,
     })
 
     return () => {
@@ -185,48 +185,48 @@ function MouseHarness({
 
   const storeState = useMemo(
     () => ({
-      tabs: [
-        {
-          id: TEST_TAB_ID,
-          assistant: 'claude',
-          title: 'Fixture',
-          status: 'running',
-          activity: 'idle',
-          buffer: '',
-          viewport,
-          terminalModes,
-          command,
-        } satisfies TabSession,
-      ],
       activeTabId: TEST_TAB_ID,
-      layoutTrees: {},
-      tabGroupMap: {},
-      sessions: [],
       currentSessionId: null,
-      snippets: [],
-      focusMode: 'terminal-input' as const,
-      sidebar: {
-        visible: true,
-        width: SIDEBAR_WIDTH,
-        minWidth: SIDEBAR_MIN_WIDTH,
-        maxWidth: SIDEBAR_MAX_WIDTH,
-      },
-      modal: {
-        type: null,
-        selectedIndex: 0,
-        editBuffer: null,
-        sessionTargetId: null,
-      },
-      layout: {
-        terminalCols: terminalSize.cols,
-        terminalRows: terminalSize.rows,
-      },
       customCommands: {
         claude: command,
         codex: 'codex',
         opencode: 'opencode',
         terminal: 'zsh',
       },
+      focusMode: 'terminal-input' as const,
+      layout: {
+        terminalCols: terminalSize.cols,
+        terminalRows: terminalSize.rows,
+      },
+      layoutTrees: {},
+      modal: {
+        editBuffer: null,
+        selectedIndex: 0,
+        sessionTargetId: null,
+        type: null,
+      },
+      sessions: [],
+      sidebar: {
+        maxWidth: SIDEBAR_MAX_WIDTH,
+        minWidth: SIDEBAR_MIN_WIDTH,
+        visible: true,
+        width: SIDEBAR_WIDTH,
+      },
+      snippets: [],
+      tabGroupMap: {},
+      tabs: [
+        {
+          activity: 'idle',
+          assistant: 'claude',
+          buffer: '',
+          command,
+          id: TEST_TAB_ID,
+          status: 'running',
+          terminalModes,
+          title: 'Fixture',
+          viewport,
+        } satisfies TabSession,
+      ],
     }),
     [command, terminalModes, terminalSize.cols, terminalSize.rows, viewport]
   )
@@ -273,10 +273,10 @@ async function mountMouseHarness(
     readyText?: string
   }
 ) {
-  const { renderer, mockMouse, renderOnce, captureCharFrame } = await createTestRenderer({
-    width: TEST_WIDTH,
+  const { captureCharFrame, mockMouse, renderer, renderOnce } = await createTestRenderer({
     height: TEST_HEIGHT,
     useMouse: true,
+    width: TEST_WIDTH,
   })
   const root = createRoot(renderer)
   root.render(
@@ -306,8 +306,8 @@ async function mountMouseHarness(
 describe('mouse passthrough integration', () => {
   test('forwards click events to the PTY in terminal-input mode', async () => {
     const app = await mountMouseHarness(createMouseFixtureCommand(), {
-      mouseForwardingEnabled: true,
       localScrollbackEnabled: false,
+      mouseForwardingEnabled: true,
       readyText: 'READY',
     })
 
@@ -328,8 +328,8 @@ describe('mouse passthrough integration', () => {
 
   test('forwards scroll events to the PTY in terminal-input mode', async () => {
     const app = await mountMouseHarness(createMouseFixtureCommand(), {
-      mouseForwardingEnabled: true,
       localScrollbackEnabled: false,
+      mouseForwardingEnabled: true,
       readyText: 'READY',
     })
 
@@ -344,8 +344,8 @@ describe('mouse passthrough integration', () => {
 
   test('uses local scrollback when mouse forwarding is disabled', async () => {
     const app = await mountMouseHarness(createScrollbackFixtureCommand(), {
-      mouseForwardingEnabled: false,
       localScrollbackEnabled: true,
+      mouseForwardingEnabled: false,
       readyText: 'line-40',
     })
     await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, 'up')

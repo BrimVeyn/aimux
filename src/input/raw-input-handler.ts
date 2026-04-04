@@ -86,10 +86,10 @@ export function createRawInputHandler(deps: {
 
   function flushPaste(tabId: string, payload: string): void {
     logInputDebug('raw.flushPaste', {
-      tabId,
       bracketedPasteModeEnabled: deps.getBracketedPasteModeEnabled(),
       payloadLength: payload.length,
       payloadPreview: payload.slice(0, 120),
+      tabId,
     })
     deps.writeToPty(tabId, buildPtyPastePayload(payload, deps.getBracketedPasteModeEnabled()))
   }
@@ -101,9 +101,9 @@ export function createRawInputHandler(deps: {
 
     if (bracketedPasteBuffer !== null) {
       logInputDebug('raw.collectPasteChunk', {
-        tabId,
         chunkLength: sequence.length,
         chunkPreview: sequence.slice(0, 120),
+        tabId,
       })
       const endIndex = sequence.indexOf(BRACKETED_PASTE_END)
       if (endIndex === -1) {
@@ -120,9 +120,9 @@ export function createRawInputHandler(deps: {
     const startIndex = sequence.indexOf(BRACKETED_PASTE_START)
     if (startIndex !== -1) {
       logInputDebug('raw.detectBracketedPasteStart', {
-        tabId,
         sequenceLength: sequence.length,
         sequencePreview: sequence.slice(0, 120),
+        tabId,
       })
       if (!handleSequence(tabId, sequence.slice(0, startIndex))) {
         return false

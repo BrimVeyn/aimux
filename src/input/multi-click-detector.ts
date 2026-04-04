@@ -31,16 +31,16 @@ export class MultiClickDetector {
     this.lastY = y
 
     logInputDebug('multiclick.track', {
-      x,
-      y,
-      prevX,
-      prevY,
+      count: this.clickCount,
+      dt: now - prevTime,
       dX: Math.abs(x - prevX),
       dY: Math.abs(y - prevY),
-      samePos: samePosition,
-      dt: now - prevTime,
       inTime: withinTimeout,
-      count: this.clickCount,
+      prevX,
+      prevY,
+      samePos: samePosition,
+      x,
+      y,
     })
 
     return this.clickCount

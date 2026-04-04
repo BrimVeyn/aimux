@@ -19,28 +19,28 @@ export function createInitialState(
   showSessionPicker = false
 ): AppState {
   return {
-    tabs: [],
     activeTabId: null,
-    layoutTrees: {},
-    tabGroupMap: {},
-    sessions,
     currentSessionId: null,
-    snippets,
+    customCommands,
     focusMode: showSessionPicker ? 'modal' : 'navigation',
-    sidebar: {
-      visible: true,
-      width: DEFAULT_SIDEBAR_WIDTH,
-      minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,
-      maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
-    },
-    modal: showSessionPicker
-      ? { type: 'session-picker', selectedIndex: 0, editBuffer: null, sessionTargetId: null }
-      : emptyModal(),
     layout: {
       terminalCols: DEFAULT_TERMINAL_COLS,
       terminalRows: DEFAULT_TERMINAL_ROWS,
     },
-    customCommands,
+    layoutTrees: {},
+    modal: showSessionPicker
+      ? { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'session-picker' }
+      : emptyModal(),
+    sessions,
+    sidebar: {
+      maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
+      minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,
+      visible: true,
+      width: DEFAULT_SIDEBAR_WIDTH,
+    },
+    snippets,
+    tabGroupMap: {},
+    tabs: [],
   }
 }
 
@@ -66,11 +66,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       const maxIndex = Math.max(0, filteredNew.length - 1)
       return {
         ...state,
-        snippets: newSnippets,
         modal: {
           ...state.modal,
           selectedIndex: Math.min(state.modal.selectedIndex, maxIndex),
         },
+        snippets: newSnippets,
       }
     }
     default:

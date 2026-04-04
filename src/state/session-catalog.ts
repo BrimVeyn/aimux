@@ -32,7 +32,7 @@ function readCatalogFile(): { file: SessionCatalogFile | null; issue?: string } 
       return { file: null, issue: 'invalid session catalog entries' }
     }
 
-    return { file: { version: 1, sessions: parsed.sessions } }
+    return { file: { sessions: parsed.sessions, version: 1 } }
   } catch (error) {
     return {
       file: null,
@@ -49,7 +49,7 @@ export function loadSessionCatalog(): SessionRecord[] {
   }
 
   if (issue) {
-    logDebug('sessions.catalog.loadIssue', { path: SESSIONS_PATH, issue })
+    logDebug('sessions.catalog.loadIssue', { issue, path: SESSIONS_PATH })
   }
 
   const config = loadConfig()
@@ -60,11 +60,11 @@ export function loadSessionCatalog(): SessionRecord[] {
 
   const now = new Date().toISOString()
   const migrated: SessionRecord = {
-    id: `session-${Date.now()}`,
-    name: 'Last workspace',
     createdAt: now,
-    updatedAt: now,
+    id: `session-${Date.now()}`,
     lastOpenedAt: now,
+    name: 'Last workspace',
+    updatedAt: now,
     workspaceSnapshot: config.workspaceSnapshot,
   }
 
@@ -80,12 +80,12 @@ export function loadSessionCatalog(): SessionRecord[] {
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
   try {
     mkdirSync(dirname(SESSIONS_PATH), { recursive: true })
-    writeFileSync(SESSIONS_PATH, `${JSON.stringify({ version: 1, sessions }, null, 2)}\n`)
+    writeFileSync(SESSIONS_PATH, `${JSON.stringify({ sessions, version: 1 }, null, 2)}\n`)
     logDebug('sessions.catalog.save', { sessionCount: sessions.length })
   } catch (error) {
     logDebug('sessions.catalog.saveError', {
-      path: SESSIONS_PATH,
       error: error instanceof Error ? error.message : String(error),
+      path: SESSIONS_PATH,
       sessionCount: sessions.length,
     })
   }

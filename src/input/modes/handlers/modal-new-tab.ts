@@ -1,8 +1,6 @@
 import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 
 export const modalNewTabMode: ModeHandler = {
-  id: 'modal.new-tab',
-
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -13,11 +11,11 @@ export const modalNewTabMode: ModeHandler = {
     }
 
     if (key.name === 'j' || key.name === 'down') {
-      return { actions: [{ type: 'move-modal-selection', delta: 1 }], effects: [] }
+      return { actions: [{ delta: 1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'k' || key.name === 'up') {
-      return { actions: [{ type: 'move-modal-selection', delta: -1 }], effects: [] }
+      return { actions: [{ delta: -1, type: 'move-modal-selection' }], effects: [] }
     }
 
     if (key.name === 'return') {
@@ -37,4 +35,6 @@ export const modalNewTabMode: ModeHandler = {
 
     return null
   },
+
+  id: 'modal.new-tab',
 }

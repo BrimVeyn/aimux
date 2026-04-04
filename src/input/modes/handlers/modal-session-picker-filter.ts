@@ -3,8 +3,6 @@ import type { KeyInput, KeyResult, ModeContext, ModeHandler } from '../types'
 import { handleCtrlNavigation, handleTextInput } from './shared'
 
 export const modalSessionPickerFilterMode: ModeHandler = {
-  id: 'modal.session-picker.filtering',
-
   handleKey(key: KeyInput, _ctx: ModeContext): KeyResult | null {
     if (key.name === 'escape') {
       return {
@@ -23,4 +21,6 @@ export const modalSessionPickerFilterMode: ModeHandler = {
 
     return handleCtrlNavigation(key) ?? handleTextInput(key)
   },
+
+  id: 'modal.session-picker.filtering',
 }

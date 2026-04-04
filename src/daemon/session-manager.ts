@@ -41,8 +41,8 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   attachSession(sessionId: string, snapshot?: WorkspaceSnapshotV1) {
     logDebug('daemon.sessionManager.attachSession', {
-      sessionId,
       hasSnapshot: !!snapshot,
+      sessionId,
       snapshotTabs: snapshot?.tabs.length ?? 0,
     })
     return this.getOrCreateRegistry(sessionId).attachFromSnapshot(snapshot)
@@ -50,10 +50,10 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   createTab(sessionId: string, options: Parameters<SessionRegistry['createSession']>[0]): void {
     logDebug('daemon.sessionManager.createTab', {
+      command: options.command,
       sessionId,
       tabId: options.tabId,
       title: options.title,
-      command: options.command,
     })
     this.getOrCreateRegistry(sessionId).createSession(options)
   }
@@ -88,8 +88,8 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   disposeSession(sessionId: string): void {
     logDebug('daemon.sessionManager.disposeSession', {
-      sessionId,
       hadRegistry: this.registries.has(sessionId),
+      sessionId,
     })
     const registry = this.registries.get(sessionId)
     if (!registry) {
