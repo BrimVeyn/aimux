@@ -23,8 +23,10 @@ const SIDEBAR_MIN_WIDTH = 18
 const SIDEBAR_MAX_WIDTH = 42
 const CONTENT_ORIGIN_X = 34
 const CONTENT_ORIGIN_Y = 3
-const TERMINAL_CLICK_X = 40
-const TERMINAL_CLICK_Y = 10
+// Keep the mouse target comfortably inside terminal content so renderer hit-testing
+// does not depend on how empty space inside a row is assigned across platforms.
+const TERMINAL_CLICK_X = CONTENT_ORIGIN_X + 2
+const TERMINAL_CLICK_Y = CONTENT_ORIGIN_Y + 2
 const MIN_TERMINAL_COLS = 20
 const MIN_TERMINAL_ROWS = 1
 const TERMINAL_HORIZONTAL_CHROME = 4

@@ -80,7 +80,7 @@ function renderSpan(span: TerminalSpan, index: number): ReactNode {
 function renderViewport(tab: TabSession): ReactNode {
   if (tab.viewport && tab.viewport.lines.length > 0) {
     return tab.viewport.lines.map((line, lineIndex) => (
-      <box key={`line-${lineIndex}`} flexDirection="row" minHeight={1}>
+      <box key={`line-${lineIndex}`} flexDirection="row" minHeight={1} width="100%">
         {line.spans.length > 0 ? (
           line.spans.map((span, spanIndex) => renderSpan(span, spanIndex))
         ) : (
@@ -191,6 +191,7 @@ export function TerminalPane({
           <box
             flexDirection="column"
             flexGrow={1}
+            width="100%"
             onMouseDown={forwardMouseEvent}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
