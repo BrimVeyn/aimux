@@ -4,8 +4,8 @@ import {
   allLeafIds,
   createGroupId,
   createLeaf,
-  pruneLayoutTree,
   type LayoutNode,
+  pruneLayoutTree,
 } from './layout-tree'
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {

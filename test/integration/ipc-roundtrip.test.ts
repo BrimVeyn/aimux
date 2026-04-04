@@ -5,12 +5,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  type ClientRequest,
   encodeMessage,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseClientRequest,
   parseServerMessage,
-  type ClientRequest,
   type ServerEvent,
   type ServerResponse,
 } from '../../src/ipc/protocol'

@@ -6,10 +6,10 @@ import { join } from 'node:path'
 
 import { getDaemonSocketPath } from '../../src/daemon/runtime-paths'
 import {
+  type ClientRequest,
   encodeMessage,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
-  type ClientRequest,
   type ServerResponse,
 } from '../../src/ipc/protocol'
 import { RemoteSessionBackend } from '../../src/session-backend/remote-session-backend'

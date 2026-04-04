@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  serializeWorkspace,
   restoreTabsFromWorkspace,
   restoreWorkspaceState,
+  serializeWorkspace,
 } from '../../src/state/session-persistence'
 import { createInitialState } from '../../src/state/store'
 

@@ -1,5 +1,5 @@
 import { Terminal as XTerm } from '@xterm/headless'
-import { spawn, type IPty } from 'bun-pty'
+import { type IPty, spawn } from 'bun-pty'
 import { EventEmitter } from 'node:events'
 
 import type { TerminalModeState, TerminalSnapshot } from '../state/types'

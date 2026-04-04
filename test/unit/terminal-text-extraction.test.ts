@@ -1,4 +1,4 @@
-import { test, expect } from 'bun:test'
+import { expect, test } from 'bun:test'
 
 import type { TerminalLine } from '../../src/state/types'
 

@@ -4,12 +4,16 @@
   "categories": {
     "correctness": "error"
   },
+  "jsPlugins": ["eslint-plugin-perfectionist"],
   "env": {
     "browser": true,
     "node": true,
     "es6": true
   },
   "rules": {
+    "perfectionist/sort-imports": "error",
+    "perfectionist/sort-named-imports": "error",
+    "perfectionist/sort-named-exports": "error",
     "no-console": "error",
     "no-duplicate-imports": "error",
     "no-nested-ternary": "error",
@@ -33,6 +37,8 @@
       }
     ],
     "react/rules-of-hooks": "error",
+    "unicorn/no-array-for-each": "error",
+    "unicorn/no-array-reduce": "error",
     "unicorn/prefer-module": "error",
     "react/no-unescaped-entities": "error"
   },

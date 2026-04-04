@@ -5,9 +5,9 @@ import type { FocusMode, TabSession } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
 import {
-  PANE_BORDER,
   computePaneRects,
   type LayoutNode,
+  PANE_BORDER,
   type PaneRect,
   type SplitDirection,
 } from '../../state/layout-tree'

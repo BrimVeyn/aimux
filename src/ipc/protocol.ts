@@ -42,8 +42,8 @@ export type ClientRequest =
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
   | { id: string; type: 'resizeClient'; payload: { cols: number; rows: number } }
   | { id: string; type: 'resizeTab'; payload: { tabId: string; cols: number; rows: number } }
-  | { id: string; type: 'scroll'; payload: { tabId: string; deltaLines: number } }
   | { id: string; type: 'scrollToBottom'; payload: { tabId: string } }
+  | { id: string; type: 'scroll'; payload: { tabId: string; deltaLines: number } }
   | { id: string; type: 'setActiveTab'; payload: { tabId: string | null } }
   | { id: string; type: 'closeTab'; payload: { tabId: string } }
   | { id: string; type: 'disposeAll'; payload: Record<string, never> }

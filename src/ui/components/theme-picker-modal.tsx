@@ -1,5 +1,5 @@
 import { theme } from '../theme'
-import { type ThemeId, THEMES, THEME_IDS } from '../themes'
+import { THEME_IDS, type ThemeId, THEMES } from '../themes'
 
 interface ThemePickerModalProps {
   selectedIndex: number

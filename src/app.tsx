@@ -5,7 +5,7 @@ import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
 import type { ThemeId } from './ui/themes'
 
-import { type SideEffectContext, executeSideEffect } from './app-runtime/side-effects'
+import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'

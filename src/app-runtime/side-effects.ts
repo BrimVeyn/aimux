@@ -12,14 +12,14 @@ import {
   parseCommand,
 } from '../pty/command-registry'
 import {
-  PANE_BORDER,
   allLeafIds,
   computePaneRects,
   createLeaf,
   getGroupIdForTab,
   getTreeForTab,
-  splitNode,
+  PANE_BORDER,
   type SplitDirection,
+  splitNode,
 } from '../state/layout-tree'
 import { filterSessions, filterSnippets } from '../state/selectors'
 import { createDefaultTerminalModes } from '../state/terminal-modes'

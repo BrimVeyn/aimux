@@ -1,5 +1,5 @@
 import { useRenderer } from '@opentui/react'
-import { useEffect, type MutableRefObject } from 'react'
+import { type MutableRefObject, useEffect } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, FocusMode, TabSession } from '../state/types'

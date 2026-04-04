@@ -2,11 +2,11 @@ import { createServer, type Socket } from 'node:net'
 
 import { logDebug } from '../debug/input-log'
 import {
+  type ClientRequest,
   encodeMessage,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseClientRequest,
-  type ClientRequest,
   type ServerEvent,
   type ServerResponse,
 } from '../ipc/protocol'

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
+import { type MutableRefObject, useCallback, useEffect, useRef } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
 import type {

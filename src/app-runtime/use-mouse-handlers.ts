@@ -11,9 +11,9 @@ import { logInputDebug } from '../debug/input-log'
 import { MultiClickDetector } from '../input/multi-click-detector'
 import { copyToSystemClipboard } from '../platform/clipboard'
 import {
-  resolveClickSelection,
   type ClickSelectionResult,
   isPositionedNode,
+  resolveClickSelection,
 } from './click-selection-resolver'
 import { requestRenderUpTree } from './render-invalidation'
 import { getSplitRatioFromDrag, type SplitDragState } from './split-drag-controller'

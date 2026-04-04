@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  type ClientRequest,
   encodeMessage,
   IPC_PROTOCOL_VERSION,
+  type IpcMessage,
   MessageDecoder,
   parseClientRequest,
   parseServerMessage,
-  type ClientRequest,
-  type IpcMessage,
 } from '../../src/ipc/protocol'
 
 describe('ipc protocol framing', () => {

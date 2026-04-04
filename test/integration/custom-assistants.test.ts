@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { getAllAssistantOptions, ASSISTANT_OPTIONS } from '../../src/pty/command-registry'
+import { ASSISTANT_OPTIONS, getAllAssistantOptions } from '../../src/pty/command-registry'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 describe('custom assistants', () => {

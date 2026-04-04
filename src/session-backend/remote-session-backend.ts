@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { Socket, connect } from 'node:net'
+import { connect, Socket } from 'node:net'
 
 import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
@@ -7,13 +7,13 @@ import type { SessionBackend, SessionBackendEvents } from './types'
 import { getDaemonSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
+  type AttachResult,
+  type ClientRequest,
   encodeMessage,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
   parseServerMessage,
   ProtocolMismatchError,
-  type AttachResult,
-  type ClientRequest,
   type ServerEvent,
   type ServerResponse,
 } from '../ipc/protocol'
