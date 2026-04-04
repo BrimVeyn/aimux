@@ -3,6 +3,7 @@ import type { SessionRecord } from '../../state/types'
 import { filterSessions } from '../../state/selectors'
 import { abbreviatePath } from '../path-format'
 import { theme } from '../theme'
+import { ModalFilterBar } from './modal-filter-bar'
 
 interface SessionPickerModalProps {
   sessions: SessionRecord[]
@@ -58,25 +59,22 @@ export function SessionPickerModal({
         width={56}
         border
         borderColor={theme.borderActive}
-        padding={1}
         backgroundColor={theme.panel}
         flexDirection="column"
-        gap={1}
+        gap={0}
       >
-        <text fg={theme.accentAlt}>Sessions</text>
-        <text fg={theme.textMuted}>
-          j/k move, Enter resume, n new, r rename, d delete, / filter, Esc cancel.
-        </text>
-        {filter !== null ? (
-          <box
-            border
-            borderColor={theme.borderActive}
-            backgroundColor={theme.panelMuted}
-            padding={1}
-          >
-            <text fg={theme.text}>/{filter}_</text>
-          </box>
-        ) : null}
+        <box
+          paddingLeft={1}
+          paddingRight={1}
+          paddingTop={1}
+          paddingBottom={1}
+          flexDirection="column"
+        >
+          <text fg={theme.accentAlt}>Sessions</text>
+          <text fg={theme.textMuted}>
+            j/k move, Enter resume, n new, r rename, d delete, / filter, Esc cancel.
+          </text>
+        </box>
         {showFilteredEmptyState ? (
           <box padding={1}>
             <text fg={theme.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
@@ -117,6 +115,7 @@ export function SessionPickerModal({
             {selectedIndex === filtered.length ? '>' : ' '} Create new session
           </text>
         </box>
+        <ModalFilterBar filter={filter} />
       </box>
     </box>
   )

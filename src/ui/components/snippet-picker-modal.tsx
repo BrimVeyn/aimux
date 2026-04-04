@@ -2,6 +2,7 @@ import type { SnippetRecord } from '../../state/types'
 
 import { filterSnippets } from '../../state/selectors'
 import { theme } from '../theme'
+import { ModalFilterBar } from './modal-filter-bar'
 
 interface SnippetPickerModalProps {
   snippets: SnippetRecord[]
@@ -75,9 +76,7 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
             </box>
           )
         })}
-        <box paddingLeft={1} paddingRight={1} paddingTop={1}>
-          {filter !== null ? <text fg={theme.text}>/{filter}_</text> : null}
-        </box>
+        <ModalFilterBar filter={filter} />
       </box>
     </box>
   )
