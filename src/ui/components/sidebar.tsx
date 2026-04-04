@@ -63,8 +63,6 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   return (
     <box
       width={sidebar.width}
-      border
-      borderColor={focusMode === 'navigation' ? theme.borderActive : theme.border}
       padding={0}
       flexDirection="column"
       backgroundColor={theme.panelMuted}
