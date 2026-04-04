@@ -174,6 +174,7 @@ export function TerminalPane({
         flexGrow={1}
         backgroundColor={theme.background}
         onMouseDrag={forwardMouseEvent}
+        onMouseScroll={forwardScrollEvent}
         onMouseUp={forwardMouseEvent}
       >
         {!tab ? (
