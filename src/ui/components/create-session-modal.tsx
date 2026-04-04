@@ -61,7 +61,9 @@ export function CreateSessionModal({
         <text fg={dirActive ? theme.text : theme.textMuted}>Search projects</text>
         <InputField
           active={dirActive}
-          value={pendingProjectPath && !dirActive ? abbreviatePath(pendingProjectPath) : directoryQuery}
+          value={
+            pendingProjectPath && !dirActive ? abbreviatePath(pendingProjectPath) : directoryQuery
+          }
         />
       </box>
 
@@ -76,9 +78,13 @@ export function CreateSessionModal({
               <ListItem
                 key={result.path}
                 active={active}
-                leading={<text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>}
+                leading={
+                  <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>
+                }
                 title={
-                  <text fg={active ? theme.text : theme.textMuted}>{abbreviatePath(result.path)}</text>
+                  <text fg={active ? theme.text : theme.textMuted}>
+                    {abbreviatePath(result.path)}
+                  </text>
                 }
               />
             )

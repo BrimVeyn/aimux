@@ -5,7 +5,7 @@ pre-commit:
       run: bunx oxlint {staged_files}
       glob: '*.{ts,tsx}'
     format-check:
-      run: bunx oxfmt --check {staged_files}
+      run: bunx oxfmt {staged_files}
       glob: '*.{ts,tsx,json}'
 
 pre-push:

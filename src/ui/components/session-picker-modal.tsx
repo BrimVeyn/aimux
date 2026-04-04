@@ -55,8 +55,12 @@ export function SessionPickerModal({
       width={uiTokens.modalWidth.lg}
       footer={<ModalFilterBar filter={filter} />}
     >
-      {showFilteredEmptyState ? <text fg={theme.textMuted}>{getEmptyStateMessage(hasFilter)}</text> : null}
-      {showInitialEmptyState ? <text fg={theme.textMuted}>{getEmptyStateMessage(false)}</text> : null}
+      {showFilteredEmptyState ? (
+        <text fg={theme.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
+      ) : null}
+      {showInitialEmptyState ? (
+        <text fg={theme.textMuted}>{getEmptyStateMessage(false)}</text>
+      ) : null}
       {filtered.map((session, index) => {
         const active = index === selectedIndex
         return (
