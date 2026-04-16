@@ -12,6 +12,7 @@ export type ModeId =
   | 'navigation'
   | 'terminal-input'
   | 'layout'
+  | 'git-mode'
   | 'modal.new-tab'
   | 'modal.new-tab.command-edit'
   | 'modal.session-picker'
@@ -25,6 +26,7 @@ export type ModeId =
   | 'modal.theme-picker'
   | 'modal.help'
   | 'modal.split-picker'
+  | 'modal.git-commit'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -32,7 +34,13 @@ export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
 export type TabActivity = 'busy' | 'idle'
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'layout'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'layout'
+  | 'git'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────
@@ -179,10 +187,31 @@ export interface GitPanelState {
   error: GitPanelError | null
 }
 
+export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed'
+
+export interface DiffData {
+  path: string
+  status: DiffFileStatus
+  oldPath?: string
+  rawDiff: string
+  binarySizeBefore?: number
+  binarySizeAfter?: number
+  errorMessage?: string
+}
+
+export interface GitModeState {
+  selectedFileIndex: number
+  diffs: Record<string, DiffData>
+  loading: Record<string, boolean>
+  pendingDeletePath: string | null
+  actionMessage: string | null
+}
+
 interface ModalBase {
   selectedIndex: number
   editBuffer: string | null
   sessionTargetId: string | null
+  cursorPos?: number
 }
 
 export interface ModalClosed extends ModalBase {
@@ -223,6 +252,11 @@ export interface ModalCreateSession extends ModalBase {
   activeField: 'directory' | 'name'
   nameBuffer: string
 }
+export interface ModalGitCommit extends ModalBase {
+  type: 'git-commit'
+  activeField: 'title' | 'body'
+  contentBuffer: string
+}
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
   activeField: 'name' | 'content'
@@ -241,6 +275,7 @@ export type ModalState =
   | ModalSplitPicker
   | ModalCreateSession
   | ModalSnippetEditor
+  | ModalGitCommit
 
 export interface LayoutState {
   terminalCols: number
@@ -261,6 +296,7 @@ export interface AppState {
   layout: LayoutState
   customCommands: Record<AssistantId, string>
   gitPanel: GitPanelState
+  gitMode: GitModeState
   pendingChords: string[] | null
 }
 
@@ -369,6 +405,23 @@ export type GitPanelAction =
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
 
+export type GitModeAction =
+  | { type: 'enter-git-mode' }
+  | { type: 'exit-git-mode' }
+  | { type: 'git-mode-select-file'; delta: -1 | 1 }
+  | { type: 'git-mode-set-diff'; path: string; diff: DiffData }
+  | { type: 'git-mode-set-loading'; path: string; loading: boolean }
+  | { type: 'git-mode-set-pending-delete'; path: string | null }
+  | { type: 'git-mode-clear-diff-cache'; path: string }
+  | { type: 'git-mode-set-message'; message: string | null }
+  | {
+      type: 'git-mode-optimistic-move'
+      path: string
+      fromSection: GitFileSection
+      toSection: GitFileSection | null
+    }
+  | { type: 'open-git-commit-modal' }
+
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
   | { type: 'delete-snippet'; snippetId: string }
@@ -381,6 +434,7 @@ export type AppAction =
   | UIAction
   | DataAction
   | GitPanelAction
+  | GitModeAction
 
 // ─── Side effects ─────────────────────────────────────────────────────────────
 
@@ -406,6 +460,13 @@ export type SideEffect =
   | { type: 'rename-session'; sessionId: string; name: string }
   | { type: 'split-pane'; direction: SplitDirection }
   | { type: 'confirm-split' }
+  | { type: 'scroll-git-diff'; delta: number }
+  | { type: 'git-stage'; path: string }
+  | { type: 'git-unstage'; path: string }
+  | { type: 'git-restore'; path: string }
+  | { type: 'git-rm'; path: string }
+  | { type: 'git-commit'; title: string; body: string }
+  | { type: 'git-push' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

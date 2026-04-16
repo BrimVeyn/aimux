@@ -4,6 +4,7 @@ import type { ModeId } from './types'
 type SupportedModalType = Exclude<ModalType, null>
 
 const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
+  'git': 'git-mode',
   'layout': 'layout',
   'navigation': 'navigation',
   'terminal-input': 'terminal-input',
@@ -11,6 +12,7 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'create-session': 'modal.create-session',
+  'git-commit': 'modal.git-commit',
   'new-tab': 'modal.new-tab.command-edit',
   'rename-tab': 'modal.rename-tab',
   'session-name': 'modal.session-name',

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-import { appStore } from '../state/app-store'
+import { dispatchGlobal } from '../state/dispatch-ref'
 import { collectGitStatus } from './git-status'
 
 const BASE_INTERVAL_MS = 1000
@@ -15,7 +15,7 @@ export function useGitPanelPolling({ enabled, projectPath }: Options): void {
   useEffect(() => {
     if (!enabled || !projectPath) return undefined
 
-    appStore.getState().dispatch({ type: 'git-panel-reset' })
+    dispatchGlobal({ type: 'git-panel-reset' })
 
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -30,10 +30,10 @@ export function useGitPanelPolling({ enabled, projectPath }: Options): void {
       const result = await collectGitStatus(projectPath)
       if (cancelled) return
       if (result.kind === 'ok') {
-        appStore.getState().dispatch({ payload: result.payload, type: 'git-refresh-success' })
+        dispatchGlobal({ payload: result.payload, type: 'git-refresh-success' })
         delay = BASE_INTERVAL_MS
       } else {
-        appStore.getState().dispatch({ kind: result.error, type: 'git-refresh-error' })
+        dispatchGlobal({ kind: result.error, type: 'git-refresh-error' })
         delay = Math.min(delay * 2, MAX_INTERVAL_MS)
       }
       schedule()

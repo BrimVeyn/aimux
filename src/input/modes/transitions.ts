@@ -1,8 +1,10 @@
 import type { ModeId } from './types'
 
 const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
+  'git-mode': ['navigation', 'modal.git-commit'],
   'layout': ['terminal-input', 'navigation', 'modal.split-picker'],
   'modal.create-session': ['navigation', 'modal.session-picker'],
+  'modal.git-commit': ['git-mode'],
   'modal.help': ['navigation'],
   'modal.new-tab': ['navigation', 'modal.new-tab.command-edit'],
   'modal.new-tab.command-edit': ['modal.new-tab'],
@@ -28,6 +30,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.snippet-picker',
     'modal.theme-picker',
     'modal.rename-tab',
+    'git-mode',
   ],
   'terminal-input': ['navigation', 'layout'],
 }

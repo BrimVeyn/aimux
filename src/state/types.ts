@@ -6,7 +6,13 @@ export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'er
 
 export type TabActivity = 'busy' | 'idle'
 
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'layout'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'layout'
+  | 'git'
 
 export type ModalType =
   | 'new-tab'
@@ -19,6 +25,7 @@ export type ModalType =
   | 'theme-picker'
   | 'help'
   | 'split-picker'
+  | 'git-commit'
   | null
 
 export interface TerminalSpan {
@@ -135,10 +142,31 @@ export interface GitPanelState {
   error: GitPanelError | null
 }
 
+export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed'
+
+export interface DiffData {
+  path: string
+  status: DiffFileStatus
+  oldPath?: string
+  rawDiff: string
+  binarySizeBefore?: number
+  binarySizeAfter?: number
+  errorMessage?: string
+}
+
+export interface GitModeState {
+  selectedFileIndex: number
+  diffs: Record<string, DiffData>
+  loading: Record<string, boolean>
+  pendingDeletePath: string | null
+  actionMessage: string | null
+}
+
 interface ModalBase {
   selectedIndex: number
   editBuffer: string | null
   sessionTargetId: string | null
+  cursorPos?: number
 }
 
 export interface ModalClosed extends ModalBase {
@@ -180,6 +208,12 @@ export interface ModalSplitPicker extends ModalBase {
   splitDirection: import('./layout-tree').SplitDirection
 }
 
+export interface ModalGitCommit extends ModalBase {
+  type: 'git-commit'
+  activeField: 'title' | 'body'
+  contentBuffer: string
+}
+
 export interface ModalCreateSession extends ModalBase {
   type: 'create-session'
   directoryResults: DirectoryResult[]
@@ -213,6 +247,7 @@ export type ModalState =
   | ModalSplitPicker
   | ModalCreateSession
   | ModalSnippetEditor
+  | ModalGitCommit
 
 export interface LayoutState {
   terminalCols: number
@@ -239,12 +274,14 @@ export interface AppState {
   layout: LayoutState
   customCommands: Record<AssistantId, string>
   gitPanel: GitPanelState
+  gitMode: GitModeState
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
 
 // -- Modal actions --
 export type ModalAction =
+  | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
   | { type: 'open-help-modal' }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
@@ -352,6 +389,23 @@ export type GitPanelAction =
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
 
+export type GitModeAction =
+  | { type: 'enter-git-mode' }
+  | { type: 'exit-git-mode' }
+  | { type: 'git-mode-select-file'; delta: -1 | 1 }
+  | { type: 'git-mode-set-diff'; path: string; diff: DiffData }
+  | { type: 'git-mode-set-loading'; path: string; loading: boolean }
+  | { type: 'git-mode-set-pending-delete'; path: string | null }
+  | { type: 'git-mode-clear-diff-cache'; path: string }
+  | { type: 'git-mode-set-message'; message: string | null }
+  | {
+      type: 'git-mode-optimistic-move'
+      path: string
+      fromSection: GitFileSection
+      toSection: GitFileSection | null
+    }
+  | { type: 'open-git-commit-modal' }
+
 // -- Data actions --
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
@@ -365,3 +419,4 @@ export type AppAction =
   | UIAction
   | DataAction
   | GitPanelAction
+  | GitModeAction
