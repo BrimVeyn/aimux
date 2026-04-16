@@ -49,6 +49,14 @@ function getInputHint(activeTab?: TabSession): string {
   return 'Ctrl+z unfocus  Ctrl+w layout  typing goes to active tab'
 }
 
+function getGitHint(modalType: AppState['modal']['type']): string {
+  if (modalType === 'git-commit') {
+    return 'Tab switch field  Enter newline  Ctrl+Enter commit  Esc cancel'
+  }
+
+  return 'j/k file  Ctrl+d/u page  a stage  d unstage/delete  c commit  p push  Esc exit'
+}
+
 export function getStatusBarModel(state: AppState, activeTab?: TabSession): StatusBarModel {
   const currentSession = state.currentSessionId
     ? state.sessions.find((session) => session.id === state.currentSessionId)
@@ -76,6 +84,16 @@ export function getStatusBarModel(state: AppState, activeTab?: TabSession): Stat
       return {
         left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
         right: 'h/j/k/l focus  |/- split  H/L resize  q close  Esc cancel',
+      }
+    case 'git':
+      return {
+        left: `${sessionIcon}  ${sessionLabel}`,
+        right: getGitHint(state.modal.type),
+      }
+    case 'command-edit':
+      return {
+        left: `${sessionIcon}  ${sessionLabel}`,
+        right: state.modal.type === 'git-commit' ? getGitHint('git-commit') : 'Esc cancel',
       }
     case 'navigation':
     default:

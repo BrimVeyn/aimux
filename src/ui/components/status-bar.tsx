@@ -12,6 +12,10 @@ function getModeColor(focusMode: AppState['focusMode']): string {
       return theme.warning
     case 'modal':
       return theme.warning
+    case 'command-edit':
+      return theme.warning
+    case 'git':
+      return theme.success
     case 'navigation':
     default:
       return theme.accentAlt
@@ -26,6 +30,10 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
       return 'layout'
     case 'modal':
       return 'modal'
+    case 'command-edit':
+      return 'edit'
+    case 'git':
+      return 'git'
     case 'navigation':
     default:
       return 'nav'
