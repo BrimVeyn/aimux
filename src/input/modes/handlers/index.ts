@@ -4,8 +4,6 @@ import type { KeymapModeHandler } from '../../keymap/keymap-mode-handler'
 
 import { buildKeymapHandlers } from '../../keymap/build-handlers'
 import { registerMode } from '../registry'
-import { gitMode } from './git-mode'
-import { modalGitCommitMode } from './modal-git-commit'
 
 /**
  * Build and register all mode handlers from a resolved keymap config.
@@ -16,7 +14,5 @@ export function registerAllModes(config: ResolvedKeymapConfig): KeymapModeHandle
   for (const handler of handlers) {
     registerMode(handler)
   }
-  registerMode(gitMode)
-  registerMode(modalGitCommitMode)
   return handlers
 }
