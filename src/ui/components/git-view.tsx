@@ -172,8 +172,6 @@ export const GitView = memo(function GitView() {
       .catch(() => dispatchGlobal({ loading: false, path, type: 'git-mode-set-loading' }))
   }, [focusMode, projectPath, selectedFile, diff, loading])
 
-  const baseFooter =
-    'j/k file · ↓/↑ scroll · Ctrl+d/u page · a stage · d unstage/delete · c commit · p push · Esc exit'
   const pendingPath = gitMode.pendingDeletePath
   const pendingIsUntracked =
     pendingPath !== null &&
@@ -186,7 +184,7 @@ export const GitView = memo(function GitView() {
       : 'press d again to discard changes'
   }
   const actionMessage = gitMode.actionMessage
-  let footerNode: React.ReactNode
+  let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
       <text fg={theme.warning}>
@@ -194,9 +192,11 @@ export const GitView = memo(function GitView() {
       </text>
     )
   } else if (actionMessage) {
-    footerNode = <text fg={theme.accent}>{actionMessage}</text>
-  } else {
-    footerNode = <text fg={theme.textMuted}>{baseFooter}</text>
+    footerNode = actionMessage.split('\n').map((line, idx) => (
+      <text key={idx} fg={theme.accent}>
+        {line}
+      </text>
+    ))
   }
 
   return (
@@ -227,9 +227,11 @@ export const GitView = memo(function GitView() {
         </box>
         <DiffStage diff={diff} diffRef={diffRef} loading={loading} />
       </box>
-      <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} flexDirection="column">
-        {footerNode}
-      </box>
+      {footerNode ? (
+        <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} flexDirection="column">
+          {footerNode}
+        </box>
+      ) : null}
     </box>
   )
 })

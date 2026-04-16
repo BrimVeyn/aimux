@@ -520,7 +520,7 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString().trim()
     ctx.dispatch({
-      message: stderr.split('\n')[0] || 'commit failed',
+      message: stderr || 'commit failed',
       type: 'git-mode-set-message',
     })
     return
@@ -545,7 +545,7 @@ async function runGitPush(ctx: SideEffectContext): Promise<void> {
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString().trim()
     ctx.dispatch({
-      message: stderr.split('\n').slice(-1)[0] || 'push failed',
+      message: stderr || 'push failed',
       type: 'git-mode-set-message',
     })
     return
