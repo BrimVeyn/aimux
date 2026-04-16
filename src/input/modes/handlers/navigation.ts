@@ -87,6 +87,10 @@ export const navigationMode: ModeHandler = {
       return result([{ type: 'toggle-git-panel' }])
     }
 
+    if (key.ctrl && key.name === 'd') {
+      return result([{ type: 'enter-git-mode' }], [], 'git-mode')
+    }
+
     if (key.ctrl && key.name === 'j') {
       return result([{ delta: -0.05, type: 'resize-git-panel' }])
     }

@@ -98,18 +98,9 @@ test('git-refresh-error clears files and stores kind', () => {
   expect(s1.gitPanel.files).toHaveLength(0)
 })
 
-test('git-refresh-success produces new state when file order changes', () => {
+test('git-refresh-success sorts files deterministically by section then path', () => {
   const s0 = seedState()
   const s1 = appReducer(s0, {
-    payload: {
-      ahead: 0,
-      behind: 0,
-      branch: 'main',
-      files: [entry({ path: 'a.ts' }), entry({ path: 'b.ts' })],
-    },
-    type: 'git-refresh-success',
-  })
-  const s2 = appReducer(s1, {
     payload: {
       ahead: 0,
       behind: 0,
@@ -118,8 +109,17 @@ test('git-refresh-success produces new state when file order changes', () => {
     },
     type: 'git-refresh-success',
   })
-  expect(s2).not.toBe(s1)
-  expect(s2.gitPanel.files.map((f) => f.path)).toEqual(['b.ts', 'a.ts'])
+  expect(s1.gitPanel.files.map((f) => f.path)).toEqual(['a.ts', 'b.ts'])
+  const s2 = appReducer(s1, {
+    payload: {
+      ahead: 0,
+      behind: 0,
+      branch: 'main',
+      files: [entry({ path: 'a.ts' }), entry({ path: 'b.ts' })],
+    },
+    type: 'git-refresh-success',
+  })
+  expect(s2).toBe(s1)
 })
 
 test('git-panel-reset wipes gitPanel state', () => {

@@ -18,6 +18,7 @@ import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
 import { appStore } from './state/app-store'
+import { setActiveDispatch } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
@@ -49,6 +50,11 @@ export function App({ backend }: { backend: SessionBackend }) {
   useLayoutEffect(() => {
     appStore.setState(state)
   }, [state])
+
+  useLayoutEffect(() => {
+    setActiveDispatch(dispatch)
+    return () => setActiveDispatch(null)
+  }, [dispatch])
 
   const resizingRef = useRef(false)
   const layoutRef = useRef(state.layout)

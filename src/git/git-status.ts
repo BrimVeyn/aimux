@@ -158,6 +158,37 @@ export function parsePorcelainEntries(
   return files
 }
 
+async function countUntrackedLines(cwd: string, path: string): Promise<number | null> {
+  try {
+    const file = Bun.file(`${cwd}/${path}`)
+    if (!(await file.exists())) return null
+    const text = await file.text()
+    if (text.length === 0) return 0
+    let count = 0
+    for (let i = 0; i < text.length; i++) {
+      if (text.charCodeAt(i) === 10) count++
+    }
+    if (text.charCodeAt(text.length - 1) !== 10) count++
+    return count
+  } catch {
+    return null
+  }
+}
+
+async function annotateUntrackedCounts(cwd: string, files: GitFileEntry[]): Promise<void> {
+  const untracked = files.filter((f) => f.section === 'untracked')
+  if (untracked.length === 0) return
+  const counts = await Promise.all(untracked.map((f) => countUntrackedLines(cwd, f.path)))
+  for (let i = 0; i < untracked.length; i++) {
+    const file = untracked[i]
+    const count = counts[i]
+    if (file && count !== null && count !== undefined) {
+      file.added = count
+      file.removed = 0
+    }
+  }
+}
+
 export async function collectGitStatus(cwd: string): Promise<GitCollectResult> {
   try {
     const [statusResult, unstagedDiff, stagedDiff] = await Promise.all([
@@ -175,6 +206,7 @@ export async function collectGitStatus(cwd: string): Promise<GitCollectResult> {
     const unstagedNumstat = parseNumstat(unstagedDiff.text())
     const stagedNumstat = parseNumstat(stagedDiff.text())
     const files = parsePorcelainEntries(statusText, stagedNumstat, unstagedNumstat)
+    await annotateUntrackedCounts(cwd, files)
 
     return { kind: 'ok', payload: { ahead, behind, branch, files } }
   } catch {

@@ -6,6 +6,7 @@ export type ModeId =
   | 'navigation'
   | 'terminal-input'
   | 'layout'
+  | 'git-mode'
   | 'modal.new-tab'
   | 'modal.new-tab.command-edit'
   | 'modal.session-picker'
@@ -19,6 +20,7 @@ export type ModeId =
   | 'modal.theme-picker'
   | 'modal.help'
   | 'modal.split-picker'
+  | 'modal.git-commit'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -42,6 +44,13 @@ export type SideEffect =
   | { type: 'rename-session'; sessionId: string; name: string }
   | { type: 'split-pane'; direction: import('../../state/layout-tree').SplitDirection }
   | { type: 'confirm-split' }
+  | { type: 'scroll-git-diff'; delta: number }
+  | { type: 'git-stage'; path: string }
+  | { type: 'git-unstage'; path: string }
+  | { type: 'git-restore'; path: string }
+  | { type: 'git-rm'; path: string }
+  | { type: 'git-commit'; title: string; body: string }
+  | { type: 'git-push' }
 
 export interface KeyResult {
   actions: AppAction[]

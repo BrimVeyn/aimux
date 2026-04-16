@@ -68,3 +68,19 @@ export function handleCtrlNavigation(key: KeyInput): KeyResult | null {
 
   return null
 }
+
+export function handleCursorNavigation(key: KeyInput): KeyResult | null {
+  if (key.name === 'left' && !key.ctrl && !key.meta) {
+    return result([{ delta: -1, type: 'move-modal-cursor' }])
+  }
+  if (key.name === 'right' && !key.ctrl && !key.meta) {
+    return result([{ delta: 1, type: 'move-modal-cursor' }])
+  }
+  if (key.name === 'home' || (key.ctrl && key.name === 'a')) {
+    return result([{ to: 'home', type: 'move-modal-cursor' }])
+  }
+  if (key.name === 'end' || (key.ctrl && key.name === 'e')) {
+    return result([{ to: 'end', type: 'move-modal-cursor' }])
+  }
+  return null
+}

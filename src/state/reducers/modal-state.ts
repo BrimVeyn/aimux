@@ -10,6 +10,7 @@ const THEME_COUNT = THEME_IDS.length
 
 function emptyModal() {
   return {
+    cursorPos: 0,
     editBuffer: null,
     selectedIndex: 0,
     sessionTargetId: null,
@@ -19,25 +20,42 @@ function emptyModal() {
 
 export { emptyModal }
 
+function clampCursor(value: number, max: number): number {
+  return Math.max(0, Math.min(max, value))
+}
+
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
     case 'open-new-tab-modal':
       return {
         ...state,
         focusMode: 'modal',
-        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'new-tab' },
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'new-tab',
+        },
       }
     case 'open-help-modal':
       return {
         ...state,
         focusMode: 'modal',
-        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'help' },
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'help',
+        },
       }
     case 'open-split-picker':
       return {
         ...state,
         focusMode: 'modal',
         modal: {
+          cursorPos: 0,
           editBuffer: null,
           selectedIndex: 0,
           sessionTargetId: null,
@@ -50,29 +68,34 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'modal',
         modal: {
+          cursorPos: 0,
           editBuffer: null,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'session-picker',
         },
       }
-    case 'open-session-name-modal':
+    case 'open-session-name-modal': {
+      const initialName = action.initialName ?? ''
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
-          editBuffer: action.initialName ?? '',
+          cursorPos: initialName.length,
+          editBuffer: initialName,
           selectedIndex: 0,
           sessionTargetId: action.sessionTargetId ?? null,
           type: 'session-name',
         },
       }
+    }
     case 'open-create-session-modal':
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           activeField: 'directory',
+          cursorPos: 0,
           directoryResults: [],
           editBuffer: '',
           nameBuffer: '',
@@ -100,6 +123,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'modal',
         modal: {
+          cursorPos: 0,
           editBuffer: null,
           selectedIndex: 0,
           sessionTargetId: null,
@@ -110,13 +134,15 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const snippet = action.snippetId
         ? state.snippets.find((s) => s.id === action.snippetId)
         : undefined
+      const initialName = snippet?.name ?? ''
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           activeField: 'name',
           contentBuffer: snippet?.content ?? '',
-          editBuffer: snippet?.name ?? '',
+          cursorPos: initialName.length,
+          editBuffer: initialName,
           selectedIndex: 0,
           sessionTargetId: snippet?.id ?? null,
           type: 'snippet-editor',
@@ -127,20 +153,44 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         focusMode: 'modal',
-        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'theme-picker' },
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'theme-picker',
+        },
+      }
+    case 'open-git-commit-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          activeField: 'title',
+          contentBuffer: '',
+          cursorPos: 0,
+          editBuffer: '',
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'git-commit',
+        },
       }
     case 'begin-snippet-filter': {
       if (state.modal.type !== 'snippet-picker') {
         return state
       }
+      const buf = state.modal.editBuffer ?? ''
       return {
         ...state,
         focusMode: 'command-edit',
-        modal: { ...state.modal, editBuffer: state.modal.editBuffer ?? '' },
+        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
-    case 'close-modal':
-      return { ...state, focusMode: 'navigation', modal: emptyModal() }
+    case 'close-modal': {
+      const nextFocus: AppState['focusMode'] =
+        state.modal.type === 'git-commit' ? 'git' : 'navigation'
+      return { ...state, focusMode: nextFocus, modal: emptyModal() }
+    }
     case 'move-modal-selection': {
       if (
         state.modal.type !== 'new-tab' &&
@@ -180,6 +230,18 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'move-modal-cursor': {
+      if (state.modal.editBuffer === null) return state
+      const len = state.modal.editBuffer.length
+      const current = state.modal.cursorPos ?? len
+      let next = current
+      if (action.to === 'home') next = 0
+      else if (action.to === 'end') next = len
+      else if (typeof action.delta === 'number') next = current + action.delta
+      next = clampCursor(next, len)
+      if (next === current) return state
+      return { ...state, modal: { ...state.modal, cursorPos: next } }
+    }
     case 'begin-command-edit': {
       if (state.modal.type !== 'new-tab' && state.modal.type !== 'session-name') {
         return state
@@ -194,22 +256,38 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         focusMode: 'command-edit',
-        modal: { ...state.modal, editBuffer: currentCmd },
+        modal: { ...state.modal, cursorPos: currentCmd.length, editBuffer: currentCmd },
       }
     }
     case 'update-command-edit': {
       if (state.modal.editBuffer === null) {
         return state
       }
-      const buf =
-        action.char === '\b'
-          ? state.modal.editBuffer.slice(0, -1)
-          : state.modal.editBuffer + action.char
+      const buffer = state.modal.editBuffer
+      const cursor = clampCursor(state.modal.cursorPos ?? buffer.length, buffer.length)
+      let nextBuffer: string
+      let nextCursor: number
+      if (action.char === '\b') {
+        if (cursor === 0) return state
+        nextBuffer = buffer.slice(0, cursor - 1) + buffer.slice(cursor)
+        nextCursor = cursor - 1
+      } else {
+        nextBuffer = buffer.slice(0, cursor) + action.char + buffer.slice(cursor)
+        nextCursor = cursor + action.char.length
+      }
       const resetIndex =
         state.modal.type === 'session-picker' || state.modal.type === 'snippet-picker'
           ? 0
           : state.modal.selectedIndex
-      return { ...state, modal: { ...state.modal, editBuffer: buf, selectedIndex: resetIndex } }
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          cursorPos: nextCursor,
+          editBuffer: nextBuffer,
+          selectedIndex: resetIndex,
+        },
+      }
     }
     case 'commit-command-edit': {
       if (state.modal.editBuffer === null) {
@@ -241,7 +319,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const option = allOpts[state.modal.selectedIndex]
       const assistantId = option?.id
       if (!assistantId) {
-        return { ...state, focusMode: 'modal', modal: { ...state.modal, editBuffer: null } }
+        return {
+          ...state,
+          focusMode: 'modal',
+          modal: { ...state.modal, cursorPos: 0, editBuffer: null },
+        }
       }
       const trimmed = state.modal.editBuffer.trim()
       const newCustomCommands = { ...state.customCommands }
@@ -254,7 +336,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         customCommands: newCustomCommands,
         focusMode: 'modal',
-        modal: { ...state.modal, editBuffer: null },
+        modal: { ...state.modal, cursorPos: 0, editBuffer: null },
       }
     }
     case 'cancel-command-edit': {
@@ -265,33 +347,55 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return {
           ...state,
           focusMode: 'modal',
-          modal: { ...state.modal, editBuffer: null, selectedIndex: 0 },
+          modal: { ...state.modal, cursorPos: 0, editBuffer: null, selectedIndex: 0 },
         }
       }
-      return { ...state, focusMode: 'modal', modal: { ...state.modal, editBuffer: null } }
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: { ...state.modal, cursorPos: 0, editBuffer: null },
+      }
     }
     case 'switch-create-session-field': {
       if (state.modal.type === 'create-session') {
         const nextField = state.modal.activeField === 'directory' ? 'name' : 'directory'
+        const nextEdit = state.modal.nameBuffer
         return {
           ...state,
           modal: {
             ...state.modal,
             activeField: nextField,
-            editBuffer: state.modal.nameBuffer,
+            cursorPos: nextEdit.length,
+            editBuffer: nextEdit,
             nameBuffer: state.modal.editBuffer ?? '',
           },
         }
       }
       if (state.modal.type === 'snippet-editor') {
         const nextField = state.modal.activeField === 'name' ? 'content' : 'name'
+        const nextEdit = state.modal.contentBuffer
         return {
           ...state,
           modal: {
             ...state.modal,
             activeField: nextField,
             contentBuffer: state.modal.editBuffer ?? '',
-            editBuffer: state.modal.contentBuffer,
+            cursorPos: nextEdit.length,
+            editBuffer: nextEdit,
+          },
+        }
+      }
+      if (state.modal.type === 'git-commit') {
+        const nextField = state.modal.activeField === 'title' ? 'body' : 'title'
+        const nextEdit = state.modal.contentBuffer
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            activeField: nextField,
+            contentBuffer: state.modal.editBuffer ?? '',
+            cursorPos: nextEdit.length,
+            editBuffer: nextEdit,
           },
         }
       }
@@ -315,6 +419,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           ...state.modal,
           activeField: 'name',
+          cursorPos: autoName.length,
           editBuffer: autoName,
           nameBuffer:
             state.modal.activeField === 'directory'
@@ -328,10 +433,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type !== 'session-picker') {
         return state
       }
+      const buf = state.modal.editBuffer ?? ''
       return {
         ...state,
         focusMode: 'command-edit',
-        modal: { ...state.modal, editBuffer: state.modal.editBuffer ?? '' },
+        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
     case 'open-rename-tab-modal': {
@@ -345,6 +451,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
+          cursorPos: activeTab.title.length,
           editBuffer: activeTab.title,
           selectedIndex: 0,
           sessionTargetId: activeTab.id,

@@ -85,6 +85,12 @@ export function useRendererBindings({
         focusMode: currentFocusMode,
       })
 
+      if (currentFocusMode === 'command-edit') {
+        const sanitized = payload.replace(/\r\n?/g, '\n')
+        dispatch({ char: sanitized, type: 'update-command-edit' })
+        return
+      }
+
       if (currentFocusMode !== 'terminal-input' || !tabId || !tab) {
         return
       }
