@@ -1,4 +1,4 @@
-import type { ActionFn, KeyResult, ModeContext } from './types'
+import type { ActionFn, AppAction, KeyResult, ModeContext } from './types'
 
 function r(
   actions: KeyResult['actions'] = [],
@@ -367,3 +367,113 @@ export const snippetFilterPasteToGroup: KeyResult = r(
   [{ type: 'paste-snippet-to-group' }],
   'navigation'
 )
+
+// ---------------------------------------------------------------------------
+// Git mode (src/input/modes/handlers/git-mode.ts replacement)
+// ---------------------------------------------------------------------------
+
+function clearPendingDelete(ctx: ModeContext): AppAction[] {
+  if (ctx.state.gitMode.pendingDeletePath === null) return []
+  return [{ path: null, type: 'git-mode-set-pending-delete' }]
+}
+
+export const exitGitMode: KeyResult = r([{ type: 'exit-git-mode' }], [], 'navigation')
+
+export function selectGitFile(delta: -1 | 1): ActionFn {
+  return (ctx: ModeContext) => {
+    const total = ctx.state.gitPanel.files.length
+    if (total === 0) return r([])
+    const current = ctx.state.gitMode.selectedFileIndex
+    const next = (current + delta + total) % total
+    if (next === current) return r([])
+    return r([{ delta, type: 'git-mode-select-file' }])
+  }
+}
+
+export function scrollGitDiff(delta: number): KeyResult {
+  return r([], [{ delta, type: 'scroll-git-diff' }])
+}
+
+export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
+  const file = ctx.state.gitPanel.files[ctx.state.gitMode.selectedFileIndex]
+  if (!file) return r(clearPendingDelete(ctx))
+  const actions = clearPendingDelete(ctx)
+  if (file.section === 'staged') return r(actions)
+  actions.push({
+    fromSection: file.section,
+    path: file.path,
+    toSection: 'staged',
+    type: 'git-mode-optimistic-move',
+  })
+  return r(actions, [{ path: file.path, type: 'git-stage' }])
+}
+
+export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
+  const file = ctx.state.gitPanel.files[ctx.state.gitMode.selectedFileIndex]
+  if (!file) return r(clearPendingDelete(ctx))
+
+  if (file.section === 'staged') {
+    const actions = clearPendingDelete(ctx)
+    const toSection = file.status === 'A' ? 'untracked' : 'unstaged'
+    actions.push({
+      fromSection: 'staged',
+      path: file.path,
+      toSection,
+      type: 'git-mode-optimistic-move',
+    })
+    return r(actions, [{ path: file.path, type: 'git-unstage' }])
+  }
+
+  const isUntracked = file.section === 'untracked'
+  const pending = ctx.state.gitMode.pendingDeletePath
+
+  if (pending === file.path) {
+    const actions: AppAction[] = [
+      { path: null, type: 'git-mode-set-pending-delete' },
+      {
+        fromSection: file.section,
+        path: file.path,
+        toSection: null,
+        type: 'git-mode-optimistic-move',
+      },
+    ]
+    const effectType = isUntracked ? 'git-rm' : 'git-restore'
+    return r(actions, [{ path: file.path, type: effectType }])
+  }
+
+  return r([{ path: file.path, type: 'git-mode-set-pending-delete' }])
+}
+
+export const gitCommitOpen: ActionFn = (ctx: ModeContext) => {
+  return r([...clearPendingDelete(ctx), { type: 'open-git-commit-modal' }], [], 'modal.git-commit')
+}
+
+export const gitPush: ActionFn = (ctx: ModeContext) => {
+  return r(clearPendingDelete(ctx), [{ type: 'git-push' }])
+}
+
+// ---------------------------------------------------------------------------
+// Modal: git-commit
+// ---------------------------------------------------------------------------
+
+export const gitCommitCancel: KeyResult = r([{ type: 'close-modal' }], [], 'git-mode')
+
+export const gitCommitSubmit: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'git-commit') {
+    return r([{ type: 'close-modal' }], [], 'git-mode')
+  }
+  const editBuffer = modal.editBuffer ?? ''
+  const activeIsTitle = modal.activeField === 'title'
+  const title = (activeIsTitle ? editBuffer : modal.contentBuffer).trim()
+  const body = (activeIsTitle ? modal.contentBuffer : editBuffer).trim()
+  return r([{ type: 'close-modal' }], [{ body, title, type: 'git-commit' }], 'git-mode')
+}
+
+export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type === 'git-commit' && modal.activeField === 'body') {
+    return r([{ char: '\n', type: 'update-command-edit' }])
+  }
+  return r([{ type: 'switch-create-session-field' }])
+}

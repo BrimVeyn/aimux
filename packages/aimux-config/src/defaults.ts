@@ -74,6 +74,24 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Git mode (src/input/modes/handlers/git-mode.ts)
+    // -----------------------------------------------------------------------
+    .mode('git-mode', (m) =>
+      m
+        .map('<Esc>', actions.exitGitMode)
+        .map('j', actions.selectGitFile(1))
+        .map('k', actions.selectGitFile(-1))
+        .map('<C-d>', actions.scrollGitDiff(20))
+        .map('<C-u>', actions.scrollGitDiff(-20))
+        .map('<Down>', actions.scrollGitDiff(1))
+        .map('<Up>', actions.scrollGitDiff(-1))
+        .map('a', actions.gitStageSelected)
+        .map('d', actions.gitDestructiveSelected)
+        .map('c', actions.gitCommitOpen)
+        .map('p', actions.gitPush)
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: help (src/input/modes/handlers/modal-help.ts)
     // -----------------------------------------------------------------------
     .mode('modal.help', (m) => m.map('<Esc>', actions.closeModal))
