@@ -9,6 +9,7 @@ import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout
 import { CreateSessionModal } from './components/create-session-modal'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
+import { PendingChordIndicator } from './components/pending-chord-indicator'
 import { SessionNameModal } from './components/session-name-modal'
 import { SessionPickerModal } from './components/session-picker-modal'
 import { Sidebar } from './components/sidebar'
@@ -254,6 +255,7 @@ export function RootView({
         snippets,
         themeId,
       })}
+      <PendingChordIndicator />
     </box>
   )
 }

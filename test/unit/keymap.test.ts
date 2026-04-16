@@ -1,3 +1,4 @@
+import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
 import type { KeyInput, ModeContext } from '../../src/input/modes/types'
@@ -6,7 +7,7 @@ import { registerAllModes } from '../../src/input/modes/handlers'
 import { getHandler } from '../../src/input/modes/registry'
 import { createInitialState } from '../../src/state/store'
 
-registerAllModes()
+registerAllModes(getDefaultKeymapConfig())
 
 function key(
   name: string,
@@ -188,11 +189,38 @@ describe('mode handlers', () => {
     expect(result).toBeNull()
   })
 
-  test('terminal-input: all keys return null', () => {
+  test('terminal-input: Ctrl+Z resolves to leave-terminal-input', () => {
     const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
-    expect(handler.handleKey(key('z', { ctrl: true }), ctx())).toBeNull()
+    const result = requireValue(
+      handler.handleKey(key('z', { ctrl: true }), ctx()),
+      'Expected Ctrl+Z result'
+    )
+    expect(result.transition).toBe('navigation')
+    expect(result.actions).toContainEqual({ focusMode: 'navigation', type: 'set-focus-mode' })
+  })
+
+  test('terminal-input: <leader> (Ctrl+W) resolves to enter-layout', () => {
+    const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
+    const result = requireValue(
+      handler.handleKey(key('w', { ctrl: true }), ctx()),
+      'Expected Ctrl+W result'
+    )
+    expect(result.transition).toBe('layout')
+    expect(result.actions).toContainEqual({ focusMode: 'layout', type: 'set-focus-mode' })
+  })
+
+  test('terminal-input: Ctrl+B resolves to toggle-sidebar', () => {
+    const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
+    const result = requireValue(
+      handler.handleKey(key('b', { ctrl: true }), ctx()),
+      'Expected Ctrl+B result'
+    )
+    expect(result.actions).toContainEqual({ type: 'toggle-sidebar' })
+  })
+
+  test('terminal-input: unbound keys (Ctrl+L) return null', () => {
+    const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
     expect(handler.handleKey(key('l', { ctrl: true }), ctx())).toBeNull()
-    expect(handler.handleKey(key('w', { ctrl: true }), ctx())).toBeNull()
   })
 
   test('modal.session-picker: escape blocked without currentSessionId', () => {

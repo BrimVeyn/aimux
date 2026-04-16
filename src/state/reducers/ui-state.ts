@@ -15,6 +15,14 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
       return { ...state, focusMode: action.focusMode }
     case 'set-terminal-size':
       return { ...state, layout: { terminalCols: action.cols, terminalRows: action.rows } }
+    case 'set-pending-chords':
+      if (
+        state.pendingChords === action.chords ||
+        (state.pendingChords === null && action.chords === null)
+      ) {
+        return state
+      }
+      return { ...state, pendingChords: action.chords }
     default:
       return null
   }

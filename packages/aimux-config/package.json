@@ -1,0 +1,40 @@
+{
+  "name": "@brimveyn/aimux-config",
+  "version": "0.1.0",
+  "description": "TypeScript configuration API for aimux — keymaps, themes, and backends with a fluent builder.",
+  "keywords": [
+    "aimux",
+    "config",
+    "keybindings",
+    "keymap",
+    "leader-key",
+    "multiplexer",
+    "terminal",
+    "trie",
+    "tui"
+  ],
+  "homepage": "https://github.com/BrimVeyn/aimux#readme",
+  "bugs": {
+    "url": "https://github.com/BrimVeyn/aimux/issues"
+  },
+  "license": "MIT",
+  "author": "BrimVeyn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BrimVeyn/aimux.git",
+    "directory": "packages/aimux-config"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./backends": "./src/backends.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

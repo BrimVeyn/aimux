@@ -1,6 +1,7 @@
 import { useRenderer } from '@opentui/react'
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
+import type { KeyChord } from '../input/keymap/key-chord'
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, FocusMode, TabSession } from '../state/types'
 
@@ -26,6 +27,7 @@ interface UseRendererBindingsOptions {
   focusModeRef: MutableRefObject<FocusMode>
   activeTabIdRef: MutableRefObject<string | null>
   activeTabRef: MutableRefObject<TabSession | undefined>
+  handleTerminalShortcut: (chord: KeyChord) => boolean
 }
 
 function decodeBytes(bytes: Uint8Array): string {
@@ -41,6 +43,7 @@ export function useRendererBindings({
   dispatch,
   focusMode,
   focusModeRef,
+  handleTerminalShortcut,
   renderer,
 }: UseRendererBindingsOptions): void {
   const lastViewportRef = useRef<ViewportObservation | null>(null)
@@ -52,13 +55,11 @@ export function useRendererBindings({
     renderer.console.show = () => {}
 
     const handler = createRawInputHandler({
-      enterLayoutMode: () => dispatch({ focusMode: 'layout', type: 'set-focus-mode' }),
       getActiveTabId: () => activeTabIdRef.current,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       getFocusMode: () => focusModeRef.current,
-      leaveTerminalInput: () => dispatch({ focusMode: 'navigation', type: 'set-focus-mode' }),
-      toggleSidebar: () => dispatch({ type: 'toggle-sidebar' }),
+      handleTerminalShortcut,
       writeToPty: (tabId, data) => writeToTab(backend, tabId, activeTabRef.current, data),
     })
 
@@ -123,7 +124,15 @@ export function useRendererBindings({
       renderer.keyInput.off('paste', handlePasteEvent)
       renderer.off('selection', handleSelection)
     }
-  }, [activeTabIdRef, activeTabRef, backend, dispatch, focusModeRef, renderer])
+  }, [
+    activeTabIdRef,
+    activeTabRef,
+    backend,
+    dispatch,
+    focusModeRef,
+    handleTerminalShortcut,
+    renderer,
+  ])
 
   useEffect(() => {
     const next: ViewportObservation | null =

@@ -1,10 +1,10 @@
+import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
 import type { AppState, TabSession } from '../../src/state/types'
 
 import { deriveModeId } from '../../src/input/modes/bridge'
 import { registerAllModes } from '../../src/input/modes/handlers'
-import { layoutMode } from '../../src/input/modes/handlers/layout'
 import { getHandler } from '../../src/input/modes/registry'
 import { allLeafIds, createLeaf, getTreeForTab, type LayoutNode } from '../../src/state/layout-tree'
 import { appReducer, createInitialState } from '../../src/state/store'
@@ -38,7 +38,7 @@ function getFirstTree(state: AppState): LayoutNode | null {
   return trees[0] ?? null
 }
 
-registerAllModes()
+registerAllModes(getDefaultKeymapConfig())
 
 function requireValue<T>(value: T | null | undefined, message: string): T {
   if (value === null || value === undefined) {
@@ -93,7 +93,7 @@ describe('layout mode handler', () => {
   test('Escape exits to terminal-input', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('escape'), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('escape'), { state }),
       'Expected escape result'
     )
 
@@ -103,7 +103,10 @@ describe('layout mode handler', () => {
 
   test('h navigates left and exits to terminal-input', () => {
     const state = stateWithSplit()
-    const result = requireValue(layoutMode.handleKey(key('h'), { state }), 'Expected h result')
+    const result = requireValue(
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('h'), { state }),
+      'Expected h result'
+    )
 
     expect(result.actions).toContainEqual({ direction: 'left', type: 'focus-pane-direction' })
     expect(result.actions).toContainEqual({ focusMode: 'terminal-input', type: 'set-focus-mode' })
@@ -112,7 +115,10 @@ describe('layout mode handler', () => {
 
   test('l navigates right and exits to terminal-input', () => {
     const state = stateWithSplit()
-    const result = requireValue(layoutMode.handleKey(key('l'), { state }), 'Expected l result')
+    const result = requireValue(
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('l'), { state }),
+      'Expected l result'
+    )
 
     expect(result.actions).toContainEqual({ direction: 'right', type: 'focus-pane-direction' })
     expect(result.transition).toBe('terminal-input')
@@ -121,7 +127,7 @@ describe('layout mode handler', () => {
   test('Shift+H resizes and stays in layout mode', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('h', { shift: true }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('h', { shift: true }), { state }),
       'Expected Shift+H result'
     )
 
@@ -137,7 +143,7 @@ describe('layout mode handler', () => {
   test('Shift+L resizes and stays in layout mode', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('l', { shift: true }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('l', { shift: true }), { state }),
       'Expected Shift+L result'
     )
 
@@ -153,7 +159,7 @@ describe('layout mode handler', () => {
   test('Shift+J resizes vertical and stays in layout mode', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('j', { shift: true }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('j', { shift: true }), { state }),
       'Expected Shift+J result'
     )
 
@@ -169,7 +175,7 @@ describe('layout mode handler', () => {
   test('Shift+K resizes vertical and stays in layout mode', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('k', { shift: true }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('k', { shift: true }), { state }),
       'Expected Shift+K result'
     )
 
@@ -185,7 +191,7 @@ describe('layout mode handler', () => {
   test('| opens split picker for vertical split', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('|', { sequence: '|', shift: true }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('|', { sequence: '|', shift: true }), { state }),
       'Expected vertical split result'
     )
 
@@ -196,7 +202,7 @@ describe('layout mode handler', () => {
   test('- opens split picker for horizontal split', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('-', { sequence: '-' }), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('-', { sequence: '-' }), { state }),
       'Expected horizontal split result'
     )
 
@@ -210,7 +216,7 @@ describe('layout mode handler', () => {
   test('q closes pane and exits', () => {
     const state = stateWithSplit()
     const result = requireValue(
-      layoutMode.handleKey(key('q'), { state }),
+      requireValue(getHandler('layout'), 'layout handler').handleKey(key('q'), { state }),
       'Expected close-pane result'
     )
 

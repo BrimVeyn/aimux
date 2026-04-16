@@ -19,13 +19,27 @@ function setup(overrides?: {
   const enterLayoutMode = mock(() => {})
   const toggleSidebar = mock(() => {})
 
+  const handleTerminalShortcut = (chord: string): boolean => {
+    if (chord === 'C-z') {
+      leaveTerminalInput()
+      return true
+    }
+    if (chord === 'C-w') {
+      enterLayoutMode()
+      return true
+    }
+    if (chord === 'C-b') {
+      toggleSidebar()
+      return true
+    }
+    return false
+  }
+
   const handler = createRawInputHandler({
-    enterLayoutMode,
     getActiveTabId: () => activeTabId,
     getBracketedPasteModeEnabled: () => bracketedPasteModeEnabled,
     getFocusMode: () => focusMode,
-    leaveTerminalInput,
-    toggleSidebar,
+    handleTerminalShortcut,
     writeToPty,
   })
 

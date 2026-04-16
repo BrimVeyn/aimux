@@ -1,36 +1,18 @@
-import { registerMode } from '../registry'
-import { layoutMode } from './layout'
-import { modalCreateSessionMode } from './modal-create-session'
-import { modalHelpMode } from './modal-help'
-import { modalNewTabMode } from './modal-new-tab'
-import { modalNewTabCommandEditMode } from './modal-new-tab-command-edit'
-import { modalRenameTabMode } from './modal-rename-tab'
-import { modalSessionNameMode } from './modal-session-name'
-import { modalSessionPickerMode } from './modal-session-picker'
-import { modalSessionPickerFilterMode } from './modal-session-picker-filter'
-import { modalSnippetEditorMode } from './modal-snippet-editor'
-import { modalSnippetPickerMode } from './modal-snippet-picker'
-import { modalSnippetPickerFilterMode } from './modal-snippet-picker-filter'
-import { modalSplitPickerMode } from './modal-split-picker'
-import { modalThemePickerMode } from './modal-theme-picker'
-import { navigationMode } from './navigation'
-import { terminalInputMode } from './terminal-input'
+import type { ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 
-export function registerAllModes(): void {
-  registerMode(navigationMode)
-  registerMode(terminalInputMode)
-  registerMode(layoutMode)
-  registerMode(modalHelpMode)
-  registerMode(modalThemePickerMode)
-  registerMode(modalRenameTabMode)
-  registerMode(modalNewTabMode)
-  registerMode(modalNewTabCommandEditMode)
-  registerMode(modalSessionPickerMode)
-  registerMode(modalSessionPickerFilterMode)
-  registerMode(modalSessionNameMode)
-  registerMode(modalCreateSessionMode)
-  registerMode(modalSnippetPickerMode)
-  registerMode(modalSnippetPickerFilterMode)
-  registerMode(modalSnippetEditorMode)
-  registerMode(modalSplitPickerMode)
+import type { KeymapModeHandler } from '../../keymap/keymap-mode-handler'
+
+import { buildKeymapHandlers } from '../../keymap/build-handlers'
+import { registerMode } from '../registry'
+
+/**
+ * Build and register all mode handlers from a resolved keymap config.
+ * Returns the handlers array so app.tsx can wire timeout callbacks.
+ */
+export function registerAllModes(config: ResolvedKeymapConfig): KeymapModeHandler[] {
+  const handlers = buildKeymapHandlers(config)
+  for (const handler of handlers) {
+    registerMode(handler)
+  }
+  return handlers
 }

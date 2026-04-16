@@ -1,86 +1,119 @@
 # aimux
 
-A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claude, Codex, OpenCode) side by side in a single terminal with tabbed navigation and persistent state.
+A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claude, Codex, OpenCode) side by side in a single terminal with tabbed navigation, split panes, persistent sessions, and fully configurable keybindings.
 
 ![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 ![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6)
+![MIT License](https://img.shields.io/badge/license-MIT-blue)
 
 ![aimux demo](assets/demo.gif)
 
 ## Features
 
-- **Multi-tab sessions** -- Run Claude, Codex, and OpenCode in parallel with instant tab switching
-- **Split panes** -- Split vertically (`|`) or horizontally (`-`) to view multiple assistants at once
-- **Draggable separators** -- Resize split panes by dragging the separator with the mouse
-- **Click-to-focus** -- Click any pane or sidebar tab to focus it instantly
-- **Full terminal emulation** -- Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
-- **Vim-style navigation** -- `j`/`k` to switch tabs, `i` to enter input mode, familiar keybindings throughout
-- **Text selection** -- Double-click to select a word, triple-click to select a line, drag to select a region. Selections are copied to the system clipboard automatically
-- **Project-scoped sessions** -- Associate a git repository with each session; all tabs spawn in that directory
-- **Directory picker** -- Fuzzy-search git repos and worktrees from `$HOME` using `fzf` when creating sessions
-- **Session management** -- Create, rename, delete, filter, and switch between sessions with `Ctrl+G`
-- **Session search** -- Press `/` in the session picker to filter sessions by name or project path
-- **Tab renaming** -- Press `r` to rename tabs for easy identification across multiple assistant instances
-- **Session persistence** -- Workspace state (tabs, titles, layout) saved to `~/.config/aimux/` and restored on restart
-- **Git branch display** -- Current branch shown in the sidebar for project-scoped sessions
-- **Git status panel** -- Toggle with `G` to see staged, unstaged, and untracked files with diff counts
-- **Daemon mode** -- Background daemon keeps sessions alive across terminal restarts
-- **Live activity indicators** -- Animated spinner for busy tabs, colored indicators for idle/focused states
-- **Snippets** -- Save and reuse prompt snippets across sessions with `Ctrl+S`
-- **Theme picker** -- Switch between themes on the fly with `Ctrl+T`
-- **Focused modal overlays** -- Modal dialogs dim the background so prompts and pickers stay visually clear without losing context
-- **Built-in help** -- Press `?` to see all keybindings at a glance
-- **Rich TUI** -- Sidebar with git info, status bar with session context, and modal dialogs built with OpenTUI + React
+- **Multi-tab sessions** — Run Claude, Codex, and OpenCode in parallel with instant tab switching
+- **Split panes** — Split vertically (`|`) or horizontally (`-`) to view multiple assistants at once
+- **Draggable separators** — Resize split panes by dragging with the mouse
+- **Click-to-focus** — Click any pane or sidebar tab to focus it instantly
+- **Full terminal emulation** — Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
+- **Configurable nvim-style keymaps** — Define keybinds in a typed `aimux.config.ts` with leader keys, multi-key sequences, and a prefix-trie resolver
+- **Text selection** — Double-click for a word, triple-click for a line, drag for a region. Selections copy to system clipboard automatically
+- **Project-scoped sessions** — Associate a git repository with each session; all tabs spawn in that directory
+- **Directory picker** — Fuzzy-search git repos and worktrees from `$HOME` using `fzf`
+- **Session persistence** — Workspace state (tabs, titles, layout) saved and restored on restart
+- **Git status panel** — Branch + diff summary in the sidebar
+- **Daemon mode** — Background daemon keeps sessions alive across terminal restarts
+- **Snippets** — Save and reuse prompt snippets across sessions
+- **Theme picker** — Switch between 11 built-in themes on the fly
+- **Pending-chord indicator** — Bottom-right overlay shows mid-sequence key state (like nvim's `which-key`)
+- **Built-in help** — Press `?` to see all keybindings
 
 ### Session Management
-
-Create project-scoped sessions, switch between them, and filter by name:
 
 ![Session management](assets/sessions.gif)
 
 ### Multi-Tab Workflow
 
-Run multiple AI assistants side by side, rename tabs, and navigate with vim keys:
-
 ![Multi-tab workflow](assets/tabs.gif)
 
 ### Themes
 
-Switch between 9 built-in themes on the fly:
-
 ![Themes](assets/themes.gif)
 
 ### Split Panes
-
-Split your workspace into multiple panes and resize them by dragging:
 
 ![Split panes](assets/splits.gif)
 
 ## Install
 
 ```bash
-bun install -g github:BrimVeyn/aimux
+bun install -g @brimveyn/aimux
 ```
+
+Requires [Bun](https://bun.sh).
 
 ## Usage
 
 ```bash
-# Start aimux
-aimux
-
-# Update to latest version
-aimux update
-
-# Diagnose setup issues
-aimux doctor
-
-# Restart the background daemon
-aimux restart-daemon
+aimux                  # start the TUI
+aimux version          # print version
+aimux doctor           # check setup
+aimux update           # self-update
+aimux restart-daemon   # restart background daemon
 ```
 
-## Keyboard Shortcuts
+## Configuration
 
-Press `?` in navigation mode to see the full keybinding reference.
+aimux reads `~/.config/aimux/aimux.config.ts` at startup. Set it up with:
+
+```bash
+mkdir -p ~/.config/aimux && cd ~/.config/aimux
+bun init -y
+bun add -d @brimveyn/aimux-config
+```
+
+Then create `~/.config/aimux/aimux.config.ts`:
+
+```ts
+import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  theme: themes.extend('tokyo-night', { accent: '#ff9e64' }),
+
+  keymaps: (k) => k
+    .leader('<Space>')
+    .timeout(300)
+    .mode('navigation', (m) => m
+      .map('j', actions.nextTab)
+      .map('k', actions.prevTab)
+      .map('<leader>g', actions.sessionPicker)
+      .group('<leader>t', 'tabs', (g) => g
+        .map('n', actions.newTab)
+        .map('r', actions.renameTab)
+        .map('x', actions.closeTab)))
+    .mode('layout', (m) => m
+      .map('|', actions.splitVertical)
+      .map('-', actions.splitHorizontal)),
+})
+```
+
+User bindings override defaults. Use `.unmap(keys)` to remove a default. See [`@brimveyn/aimux-config`](packages/aimux-config/README.md) for the full builder API.
+
+### Key notation
+
+| Notation        | Meaning                        |
+| --------------- | ------------------------------ |
+| `j`             | Bare character                 |
+| `J`             | Shift+J (uppercase letter)     |
+| `<C-n>`         | Ctrl+N                         |
+| `<M-x>`         | Meta/Alt+X                     |
+| `<CR>` `<Esc>`  | Return / Escape                |
+| `<leader>`      | Configured leader chord        |
+| `dd`            | Multi-key sequence             |
+| `<leader>tn`    | Leader, then t, then n         |
+
+## Default Keymaps
+
+Press `?` in navigation mode for the full, live keybinding list (reflects your config).
 
 ### Navigation Mode
 
@@ -88,26 +121,31 @@ Press `?` in navigation mode to see the full keybinding reference.
 | --------------------- | ------------------------- |
 | `j` / `k`             | Next / previous tab       |
 | `Shift+J` / `Shift+K` | Reorder tabs              |
-| `i`                   | Enter terminal input mode |
+| `i`                   | Enter terminal input      |
 | `r`                   | Rename active tab         |
+| `dd`                  | Close active tab          |
 | `Ctrl+N`              | New tab                   |
-| `Ctrl+W`              | Close tab                 |
 | `Ctrl+R`              | Restart tab               |
 | `Ctrl+G`              | Session picker            |
 | `Ctrl+B`              | Toggle sidebar            |
 | `Ctrl+H` / `Ctrl+L`   | Resize sidebar            |
 | `Ctrl+S`              | Snippet picker            |
 | `Ctrl+T`              | Theme picker              |
+| `G`                   | Toggle git panel          |
 | `?`                   | Show help                 |
 | `Ctrl+C`              | Quit                      |
 
-### Input Mode
+### Terminal Input Mode
 
-All keystrokes pass through to the AI CLI. Press `Ctrl+Z` to return to navigation mode.
+Keystrokes pass through to the active tab's PTY. Configured shortcuts:
+
+| Key              | Action                       |
+| ---------------- | ---------------------------- |
+| `Ctrl+Z`         | Leave to navigation          |
+| `<leader>`       | Enter layout mode            |
+| `Ctrl+B`         | Toggle sidebar               |
 
 ### Layout Mode
-
-Enter with `Ctrl+W` from input mode. Manage split panes:
 
 | Key                   | Action             |
 | --------------------- | ------------------ |
@@ -116,80 +154,53 @@ Enter with `Ctrl+W` from input mode. Manage split panes:
 | `h` / `j` / `k` / `l` | Focus pane         |
 | `Shift+H/J/K/L`       | Resize pane        |
 | `q`                   | Close pane         |
-| `Esc`                 | Back to navigation |
-
-### Session Picker
-
-| Key       | Action            |
-| --------- | ----------------- |
-| `j` / `k` | Navigate sessions |
-| `Enter`   | Resume session    |
-| `n`       | New session       |
-| `r`       | Rename session    |
-| `d`       | Delete session    |
-| `/`       | Filter sessions   |
-| `Esc`     | Cancel            |
-
-### Create Session Modal
-
-| Key        | Action                          |
-| ---------- | ------------------------------- |
-| `Tab`      | Switch between directory / name |
-| `Ctrl+N/P` | Navigate search results         |
-| `Enter`    | Select directory / confirm      |
-| `Esc`      | Back to session picker          |
+| `Esc`                 | Back to input      |
 
 ## Architecture
 
 ```
-src/
-  index.tsx          # Entry point and CLI mode selection
-  app.tsx            # Core React app with state management
-  config.ts          # Persistent configuration
-  ui/                # OpenTUI React components
-  state/             # Redux-style state management
-  pty/               # PTY and terminal emulation
-  session-backend/   # Local and daemon session backends
-  daemon/            # Background session daemon
-  ipc/               # Inter-process communication protocol
-  input/             # Keyboard and mouse input handling
-    modes/           # State-machine mode handlers (one per interaction context)
+aimux/
+├── packages/
+│   └── aimux-config/          # published as @brimveyn/aimux-config
+│       └── src/               # types, builder, actions, themes, defaults
+└── src/                       # the CLI (published as @brimveyn/aimux)
+    ├── index.tsx              # entry point + CLI dispatcher
+    ├── app.tsx                # main React app + state wiring
+    ├── config/
+    │   └── loader.ts          # loads aimux.config.ts
+    ├── ui/                    # OpenTUI React components
+    ├── state/                 # reducers + app store
+    ├── pty/                   # PTY and terminal emulation
+    ├── session-backend/       # local and daemon backends
+    ├── daemon/                # background session daemon
+    ├── ipc/                   # daemon protocol
+    └── input/
+        ├── modes/             # mode registry + transitions
+        ├── keymap/            # prefix trie + sequence resolver
+        └── raw-input-handler.ts
 ```
 
 ## Tech Stack
 
-- [Bun](https://bun.sh) -- Runtime and toolchain
-- [React](https://react.dev) + [OpenTUI](https://github.com/anthropics/opentui) -- Terminal UI framework
-- [xterm.js](https://xtermjs.org) (headless) -- Terminal emulation
-- [bun-pty](https://github.com/nicolo-ribaudo/bun-pty) -- Native PTY spawning
+- [Bun](https://bun.sh) — Runtime and toolchain
+- [React](https://react.dev) + [OpenTUI](https://github.com/sst/opentui) — Terminal UI framework
+- [xterm.js](https://xtermjs.org) (headless) — Terminal emulation
+- [bun-pty](https://github.com/nicolo-ribaudo/bun-pty) — Native PTY spawning
+- [Zustand](https://zustand-demo.pmnd.rs/) — State store
 
 ## Development
 
 ```bash
-# Clone and install dependencies
 git clone https://github.com/BrimVeyn/aimux && cd aimux
 bun install
 
-# Development mode (auto-reload)
-bun run dev
-
-# Run from source
-bun run start
-
-# Run tests
-bun test
-
-# Type check
-bun run check
-
-# Record demo GIFs (requires vhs)
-bun run demo
-bun run demo:sessions
-bun run demo:tabs
-bun run demo:splits
-bun run demo:themes
+bun run dev              # auto-reload dev mode
+bun run start            # run from source
+bun test                 # run test suite
+bun run check            # typecheck
+bun run lint             # oxlint
 ```
 
 ## License
 
-Private
+MIT © BrimVeyn

@@ -1,11 +1,46 @@
 {
-  "name": "aimux",
-  "version": "1.0.15",
+  "name": "@brimveyn/aimux",
+  "version": "1.1.0",
+  "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode side-by-side with tabbed navigation, split panes, and persistent sessions.",
+  "keywords": [
+    "ai",
+    "aimux",
+    "bun",
+    "claude",
+    "cli",
+    "codex",
+    "multiplexer",
+    "opencode",
+    "pty",
+    "terminal",
+    "tui"
+  ],
+  "homepage": "https://github.com/BrimVeyn/aimux#readme",
+  "bugs": {
+    "url": "https://github.com/BrimVeyn/aimux/issues"
+  },
+  "license": "MIT",
+  "author": "BrimVeyn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BrimVeyn/aimux.git"
+  },
   "bin": {
     "aimux": "src/index.tsx"
   },
+  "workspaces": [
+    "packages/*"
+  ],
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "module": "src/index.tsx",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "bun --watch src/index.tsx",
     "start": "bun run src/index.tsx",
@@ -23,6 +58,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
+    "@brimveyn/aimux-config": "workspace:*",
     "@opentui/core": "^0.1.90",
     "@opentui/react": "^0.1.90",
     "@xterm/headless": "^6.0.0",

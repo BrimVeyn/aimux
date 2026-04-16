@@ -1,9 +1,11 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "aimux",
       "dependencies": {
+        "@brimveyn/aimux-config": "workspace:*",
         "@opentui/core": "^0.1.90",
         "@opentui/react": "^0.1.90",
         "@xterm/headless": "^6.0.0",
@@ -22,8 +24,14 @@
         "typescript": "^6.0.2",
       },
     },
+    "packages/aimux-config": {
+      "name": "@brimveyn/aimux-config",
+      "version": "0.1.0",
+    },
   },
   "packages": {
+    "@brimveyn/aimux-config": ["@brimveyn/aimux-config@workspace:packages/aimux-config"],
+
     "@dimforge/rapier2d-simd-compat": ["@dimforge/rapier2d-simd-compat@0.17.3", "", {}, "sha512-bijvwWz6NHsNj5e5i1vtd3dU2pDhthSaTUZSh14DUGGKJfw8eMnlWZsxwHBxB/a3AXVNDjL9abuHw1k9FGR+jg=="],
 
     "@eslint-community/eslint-utils": ["@eslint-community/eslint-utils@4.9.1", "", { "dependencies": { "eslint-visitor-keys": "^3.4.3" }, "peerDependencies": { "eslint": "^6.0.0 || ^7.0.0 || >=8.0.0" } }, "sha512-phrYmNiYppR7znFEdqgfWHXR6NCkZEK7hwWDHZUjit/2/U0r6XvkDl0SYnoM51Hq7FhCGdLDT6zxCCOY1hexsQ=="],

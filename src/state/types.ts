@@ -239,6 +239,8 @@ export interface AppState {
   layout: LayoutState
   customCommands: Record<AssistantId, string>
   gitPanel: GitPanelState
+  /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
+  pendingChords: string[] | null
 }
 
 // -- Modal actions --
@@ -335,6 +337,7 @@ export type UIAction =
   | { type: 'set-terminal-size'; cols: number; rows: number }
   | { type: 'toggle-git-panel' }
   | { type: 'resize-git-panel'; delta: number }
+  | { type: 'set-pending-chords'; chords: string[] | null }
 
 // -- Git panel actions --
 export interface GitRefreshPayload {

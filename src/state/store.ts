@@ -39,6 +39,7 @@ export function createInitialState(
     modal: showSessionPicker
       ? { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'session-picker' }
       : emptyModal(),
+    pendingChords: null,
     sessions,
     sidebar: {
       gitPanelRatio: overrides.gitPanelRatio ?? 0.5,

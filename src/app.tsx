@@ -1,6 +1,9 @@
+import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
-import { useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 
+import type { KeyChord } from './input/keymap/key-chord'
+import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
 import type { ThemeId } from './ui/themes'
@@ -24,7 +27,7 @@ import { appReducer, createInitialState } from './state/store'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
 
-registerAllModes()
+const keymapHandlers = registerAllModes(getDefaultKeymapConfig())
 
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250
 
@@ -73,6 +76,9 @@ export function App({ backend }: { backend: SessionBackend }) {
   const activeTabRef = useRef(activeTab)
   activeTabRef.current = activeTab
 
+  const stateRef = useRef(state)
+  stateRef.current = state
+
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
 
@@ -116,6 +122,20 @@ export function App({ backend }: { backend: SessionBackend }) {
     state,
   })
 
+  // Stable ref to processKeyResult — populated after it is defined below.
+  // Allows handleTerminalShortcut (a stable callback) to reach the latest closure.
+  const processKeyResultRef = useRef<(result: KeyResult, modeId: ModeId) => void>(() => {})
+
+  const handleTerminalShortcut = useCallback((chord: KeyChord): boolean => {
+    const terminalHandler = keymapHandlers.find((h) => h.id === 'terminal-input')
+    if (!terminalHandler) return false
+    const ctx: ModeContext = { state: stateRef.current }
+    const result = terminalHandler.handleChord(chord, ctx)
+    if (!result) return false
+    processKeyResultRef.current(result, 'terminal-input')
+    return true
+  }, [])
+
   useRendererBindings({
     activeTabId: state.activeTabId,
     activeTabIdRef,
@@ -125,6 +145,7 @@ export function App({ backend }: { backend: SessionBackend }) {
     dispatch,
     focusMode: state.focusMode,
     focusModeRef,
+    handleTerminalShortcut,
     renderer,
   })
 
@@ -164,6 +185,26 @@ export function App({ backend }: { backend: SessionBackend }) {
       executeSideEffect(effect, sideEffectCtx)
     }
   }
+
+  // Keep the ref pointing at the latest closure so stable callbacks can invoke it
+  processKeyResultRef.current = processKeyResult
+
+  useLayoutEffect(() => {
+    for (const handler of keymapHandlers) {
+      handler.setTimeoutCallback((binding: TrieBinding) => {
+        const currentState = stateRef.current
+        const modeId = deriveModeId(currentState)
+        if (modeId !== handler.id) return // mode changed during timeout
+        const ctx: ModeContext = { state: currentState }
+        const result = typeof binding.result === 'function' ? binding.result(ctx) : binding.result
+        if (result) processKeyResultRef.current(result, modeId)
+      })
+
+      handler.setPendingChangeCallback((chords) => {
+        dispatch({ chords, type: 'set-pending-chords' })
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useKeyboard((key) => {
     // Global quit: Ctrl+C in any mode except terminal-input

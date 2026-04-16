@@ -1,15 +1,10 @@
 import type { FocusMode } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
+import { type KeyChord, rawSequenceToChord } from './keymap/key-chord'
 import { BRACKETED_PASTE_END, BRACKETED_PASTE_START, buildPtyPastePayload } from './paste'
 
 const ESC = '\x1b'
-const CTRL_Z_RAW = '\x1a'
-const CTRL_Z_KITTY = `${ESC}[122;5u`
-const CTRL_W_RAW = '\x17'
-const CTRL_W_KITTY = `${ESC}[119;5u`
-const CTRL_B_RAW = '\x02'
-const CTRL_B_KITTY = `${ESC}[98;5u`
 const KITTY_CTRL_RE = new RegExp(`^${ESC}\\[(\\d+);(\\d+)u$`)
 const KITTY_MOD_SUPER = 8
 const KITTY_MOD_HYPER = 16
@@ -85,9 +80,11 @@ export function createRawInputHandler(deps: {
   getActiveTabId: () => string | null
   getBracketedPasteModeEnabled: () => boolean
   writeToPty: (tabId: string, data: string) => void
-  leaveTerminalInput: () => void
-  enterLayoutMode: () => void
-  toggleSidebar: () => void
+  /**
+   * Dispatch a configured terminal-input shortcut.
+   * Returns true if the chord was consumed by the keymap, false otherwise.
+   */
+  handleTerminalShortcut: (chord: KeyChord) => boolean
 }): (sequence: string) => boolean {
   let bracketedPasteBuffer: string | null = null
 
@@ -102,22 +99,9 @@ export function createRawInputHandler(deps: {
   }
 
   function handleTerminalShortcut(sequence: string): boolean {
-    if (sequence === CTRL_Z_RAW || sequence === CTRL_Z_KITTY) {
-      deps.leaveTerminalInput()
-      return true
-    }
-
-    if (sequence === CTRL_W_RAW || sequence === CTRL_W_KITTY) {
-      deps.enterLayoutMode()
-      return true
-    }
-
-    if (sequence === CTRL_B_RAW || sequence === CTRL_B_KITTY) {
-      deps.toggleSidebar()
-      return true
-    }
-
-    return false
+    const chord = rawSequenceToChord(sequence)
+    if (chord === null) return false
+    return deps.handleTerminalShortcut(chord)
   }
 
   function handleSequence(tabId: string, sequence: string): boolean {
