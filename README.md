@@ -79,20 +79,20 @@ import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
 export default defineConfig({
   theme: themes.extend('tokyo-night', { accent: '#ff9e64' }),
 
-  keymaps: (k) => k
-    .leader('<Space>')
-    .timeout(300)
-    .mode('navigation', (m) => m
-      .map('j', actions.nextTab)
-      .map('k', actions.prevTab)
-      .map('<leader>g', actions.sessionPicker)
-      .group('<leader>t', 'tabs', (g) => g
-        .map('n', actions.newTab)
-        .map('r', actions.renameTab)
-        .map('x', actions.closeTab)))
-    .mode('layout', (m) => m
-      .map('|', actions.splitVertical)
-      .map('-', actions.splitHorizontal)),
+  keymaps: (k) =>
+    k
+      .leader('<Space>')
+      .timeout(300)
+      .mode('navigation', (m) =>
+        m
+          .map('j', actions.nextTab)
+          .map('k', actions.prevTab)
+          .map('<leader>g', actions.sessionPicker)
+          .group('<leader>t', 'tabs', (g) =>
+            g.map('n', actions.newTab).map('r', actions.renameTab).map('x', actions.closeTab)
+          )
+      )
+      .mode('layout', (m) => m.map('|', actions.splitVertical).map('-', actions.splitHorizontal)),
 })
 ```
 
@@ -100,16 +100,16 @@ User bindings override defaults. Use `.unmap(keys)` to remove a default. See [`@
 
 ### Key notation
 
-| Notation        | Meaning                        |
-| --------------- | ------------------------------ |
-| `j`             | Bare character                 |
-| `J`             | Shift+J (uppercase letter)     |
-| `<C-n>`         | Ctrl+N                         |
-| `<M-x>`         | Meta/Alt+X                     |
-| `<CR>` `<Esc>`  | Return / Escape                |
-| `<leader>`      | Configured leader chord        |
-| `dd`            | Multi-key sequence             |
-| `<leader>tn`    | Leader, then t, then n         |
+| Notation       | Meaning                    |
+| -------------- | -------------------------- |
+| `j`            | Bare character             |
+| `J`            | Shift+J (uppercase letter) |
+| `<C-n>`        | Ctrl+N                     |
+| `<M-x>`        | Meta/Alt+X                 |
+| `<CR>` `<Esc>` | Return / Escape            |
+| `<leader>`     | Configured leader chord    |
+| `dd`           | Multi-key sequence         |
+| `<leader>tn`   | Leader, then t, then n     |
 
 ## Default Keymaps
 
@@ -117,44 +117,44 @@ Press `?` in navigation mode for the full, live keybinding list (reflects your c
 
 ### Navigation Mode
 
-| Key                   | Action                    |
-| --------------------- | ------------------------- |
-| `j` / `k`             | Next / previous tab       |
-| `Shift+J` / `Shift+K` | Reorder tabs              |
-| `i`                   | Enter terminal input      |
-| `r`                   | Rename active tab         |
-| `dd`                  | Close active tab          |
-| `Ctrl+N`              | New tab                   |
-| `Ctrl+R`              | Restart tab               |
-| `Ctrl+G`              | Session picker            |
-| `Ctrl+B`              | Toggle sidebar            |
-| `Ctrl+H` / `Ctrl+L`   | Resize sidebar            |
-| `Ctrl+S`              | Snippet picker            |
-| `Ctrl+T`              | Theme picker              |
-| `G`                   | Toggle git panel          |
-| `?`                   | Show help                 |
-| `Ctrl+C`              | Quit                      |
+| Key                   | Action               |
+| --------------------- | -------------------- |
+| `j` / `k`             | Next / previous tab  |
+| `Shift+J` / `Shift+K` | Reorder tabs         |
+| `i`                   | Enter terminal input |
+| `r`                   | Rename active tab    |
+| `dd`                  | Close active tab     |
+| `Ctrl+N`              | New tab              |
+| `Ctrl+R`              | Restart tab          |
+| `Ctrl+G`              | Session picker       |
+| `Ctrl+B`              | Toggle sidebar       |
+| `Ctrl+H` / `Ctrl+L`   | Resize sidebar       |
+| `Ctrl+S`              | Snippet picker       |
+| `Ctrl+T`              | Theme picker         |
+| `G`                   | Toggle git panel     |
+| `?`                   | Show help            |
+| `Ctrl+C`              | Quit                 |
 
 ### Terminal Input Mode
 
 Keystrokes pass through to the active tab's PTY. Configured shortcuts:
 
-| Key              | Action                       |
-| ---------------- | ---------------------------- |
-| `Ctrl+Z`         | Leave to navigation          |
-| `<leader>`       | Enter layout mode            |
-| `Ctrl+B`         | Toggle sidebar               |
+| Key        | Action              |
+| ---------- | ------------------- |
+| `Ctrl+Z`   | Leave to navigation |
+| `<leader>` | Enter layout mode   |
+| `Ctrl+B`   | Toggle sidebar      |
 
 ### Layout Mode
 
-| Key                   | Action             |
-| --------------------- | ------------------ |
-| `\|`                  | Split vertical     |
-| `-`                   | Split horizontal   |
-| `h` / `j` / `k` / `l` | Focus pane         |
-| `Shift+H/J/K/L`       | Resize pane        |
-| `q`                   | Close pane         |
-| `Esc`                 | Back to input      |
+| Key                   | Action           |
+| --------------------- | ---------------- |
+| `\|`                  | Split vertical   |
+| `-`                   | Split horizontal |
+| `h` / `j` / `k` / `l` | Focus pane       |
+| `Shift+H/J/K/L`       | Resize pane      |
+| `q`                   | Close pane       |
+| `Esc`                 | Back to input    |
 
 ## Architecture
 

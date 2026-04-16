@@ -58,7 +58,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@brimveyn/aimux-config": "workspace:*",
+    "@brimveyn/aimux-config": "^0.1.0",
     "@opentui/core": "^0.1.90",
     "@opentui/react": "^0.1.90",
     "@xterm/headless": "^6.0.0",

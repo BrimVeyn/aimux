@@ -20,38 +20,40 @@ import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
 export default defineConfig({
   theme: themes.extend('tokyo-night', { accent: '#ff9e64' }),
 
-  keymaps: (k) => k
-    .leader('<Space>')
-    .timeout(300)
-    .mode('navigation', (m) => m
-      .map('j', actions.nextTab)
-      .map('k', actions.prevTab)
-      .map('<leader>g', actions.sessionPicker)
-      .group('<leader>t', 'tabs', (g) => g
-        .map('n', actions.newTab)
-        .map('r', actions.renameTab)
-        .map('x', actions.closeTab))),
+  keymaps: (k) =>
+    k
+      .leader('<Space>')
+      .timeout(300)
+      .mode('navigation', (m) =>
+        m
+          .map('j', actions.nextTab)
+          .map('k', actions.prevTab)
+          .map('<leader>g', actions.sessionPicker)
+          .group('<leader>t', 'tabs', (g) =>
+            g.map('n', actions.newTab).map('r', actions.renameTab).map('x', actions.closeTab)
+          )
+      ),
 })
 ```
 
 ## Key notation
 
-| Notation          | Matches                          |
-| ----------------- | -------------------------------- |
-| `j`               | Bare character `j`               |
-| `J`               | Shift+J (uppercase letter)       |
-| `<C-n>`           | Ctrl+N                           |
-| `<M-x>` / `<A-x>` | Meta/Alt+X                       |
-| `<C-M-a>`         | Ctrl+Alt+A                       |
-| `<CR>`            | Return/Enter                     |
-| `<Esc>`           | Escape                           |
-| `<Space>`         | Spacebar                         |
-| `<Tab>`           | Tab                              |
-| `<BS>`            | Backspace                        |
-| `<Up>` `<Down>`   | Arrow keys                       |
-| `<leader>`        | Configured leader chord          |
-| `dd`              | Multi-key sequence (d, then d)   |
-| `<leader>tn`      | Leader, then t, then n           |
+| Notation          | Matches                        |
+| ----------------- | ------------------------------ |
+| `j`               | Bare character `j`             |
+| `J`               | Shift+J (uppercase letter)     |
+| `<C-n>`           | Ctrl+N                         |
+| `<M-x>` / `<A-x>` | Meta/Alt+X                     |
+| `<C-M-a>`         | Ctrl+Alt+A                     |
+| `<CR>`            | Return/Enter                   |
+| `<Esc>`           | Escape                         |
+| `<Space>`         | Spacebar                       |
+| `<Tab>`           | Tab                            |
+| `<BS>`            | Backspace                      |
+| `<Up>` `<Down>`   | Arrow keys                     |
+| `<leader>`        | Configured leader chord        |
+| `dd`              | Multi-key sequence (d, then d) |
+| `<leader>tn`      | Leader, then t, then n         |
 
 Ambiguous prefixes (e.g., `d` is bound AND `dd` is bound) are resolved after a configurable timeout (default 300ms).
 
@@ -73,20 +75,18 @@ defineConfig({
 ### Keymap builder
 
 ```ts
-k
-  .leader(keys)           // default: '<Space>'
-  .timeout(ms)            // default: 300
-  .mode(id, configure)    // define bindings for a mode
+k.leader(keys) // default: '<Space>'
+  .timeout(ms) // default: 300
+  .mode(id, configure) // define bindings for a mode
 ```
 
 ### Mode builder
 
 ```ts
-m
-  .map(keys, action)       // bind a key/sequence to an action
-  .unmap(keys)             // remove a default binding
-  .group(prefix, name, g)  // sugar for leader-prefixed sub-trees
-  .passthrough()           // for text-input modes: unmatched keys route to text input
+m.map(keys, action) // bind a key/sequence to an action
+  .unmap(keys) // remove a default binding
+  .group(prefix, name, g) // sugar for leader-prefixed sub-trees
+  .passthrough() // for text-input modes: unmatched keys route to text input
 ```
 
 ### Groups
