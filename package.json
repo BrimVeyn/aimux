@@ -1,6 +1,6 @@
 {
   "name": "@brimveyn/aimux",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode side-by-side with tabbed navigation, split panes, and persistent sessions.",
   "keywords": [
     "ai",
@@ -58,7 +58,7 @@
     "prepare": "lefthook install"
   },
   "dependencies": {
-    "@brimveyn/aimux-config": "^0.1.0",
+    "@brimveyn/aimux-config": "^0.2.0",
     "@opentui/core": "^0.1.90",
     "@opentui/react": "^0.1.90",
     "@xterm/headless": "^6.0.0",
