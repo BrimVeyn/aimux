@@ -23,6 +23,22 @@
     "no-nested-ternary": "error",
     "no-unused-vars": "error",
     "prefer-template": "error",
+    "max-lines": [
+      "warn",
+      {
+        "max": 500,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ], // Warn if a file exceeds 500 lines (excluding blanks/comments)
+    "max-lines-per-function": [
+      "warn",
+      {
+        "max": 120,
+        "skipBlankLines": true,
+        "skipComments": true
+      }
+    ], // Warn if a function exceeds 120 lines (excluding blanks/comments)
     "typescript/no-empty-object-type": "off",
     "typescript/no-explicit-any": "error",
     "typescript/no-misused-promises": "error",
