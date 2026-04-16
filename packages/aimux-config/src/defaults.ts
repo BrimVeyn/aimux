@@ -28,6 +28,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-h>', actions.resizeSidebar(-2))
         .map('<C-l>', actions.resizeSidebar(2))
         .map('G', actions.toggleGitPanel)
+        .map('<C-d>', actions.enterGitMode)
         .map('<C-j>', actions.resizeGitPanel(-0.05))
         .map('<C-k>', actions.resizeGitPanel(0.05))
         .map('J', actions.reorderTab(1))

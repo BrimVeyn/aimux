@@ -36,6 +36,7 @@ export const helpModal: KeyResult = r([{ type: 'open-help-modal' }], [], 'modal.
 
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
 export const toggleGitPanel: KeyResult = r([{ type: 'toggle-git-panel' }])
+export const enterGitMode: KeyResult = r([{ type: 'enter-git-mode' }], [], 'git-mode')
 
 export const splitVertical: KeyResult = r(
   [{ direction: 'vertical', type: 'open-split-picker' }],
