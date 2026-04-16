@@ -2,10 +2,10 @@ pre-commit:
   parallel: true
   commands:
     lint:
-      run: bunx oxlint --fix {staged_files}
+      run: bunx oxlint --fix {staged_files} && git add {staged_files}
       glob: '*.{ts,tsx}'
     format-check:
-      run: bunx oxfmt --write {staged_files}
+      run: bunx oxfmt --write {staged_files} && git add {staged_files}
       glob: '*.{ts,tsx,json}'
 
 pre-push:

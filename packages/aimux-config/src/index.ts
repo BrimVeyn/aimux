@@ -17,11 +17,9 @@ export type {
   AppAction,
   AppState,
   BackendConfig,
-
   BindingDef,
   FocusMode,
   GroupBuilderApi,
-
   HooksConfig,
   KeyInput,
   // Keymap builder API (type surface)
@@ -29,7 +27,6 @@ export type {
   KeyResult,
   // Layout
   LayoutNode,
-
   ModalState,
   ModeBindingBuilderApi,
   ModeContext,
@@ -41,13 +38,10 @@ export type {
   ResolvedKeymapConfig,
   SessionRecord,
   SidebarConfig,
-
   SideEffect,
   SnippetDef,
-
   SnippetRecord,
   SplitDirection,
-
   TabSession,
   // Themes
   ThemeColors,
