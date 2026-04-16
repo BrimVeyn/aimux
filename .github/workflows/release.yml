@@ -52,7 +52,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ -z "$(npm view @brimveyn/aimux-config@$VERSION version 2>/dev/null)" ]; then
-            npm publish --provenance --access public
+            npm publish --provenance --access public --ignore-scripts
           else
             echo "@brimveyn/aimux-config@$VERSION already published, skipping"
           fi
@@ -63,7 +63,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ -z "$(npm view @brimveyn/aimux@$VERSION version 2>/dev/null)" ]; then
-            npm publish --provenance --access public
+            npm publish --provenance --access public --ignore-scripts
           else
             echo "@brimveyn/aimux@$VERSION already published, skipping"
           fi
