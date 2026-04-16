@@ -11,7 +11,6 @@ import { GitCommitModal } from './components/git-commit-modal'
 import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
-import { PendingChordIndicator } from './components/pending-chord-indicator'
 import { SessionNameModal } from './components/session-name-modal'
 import { SessionPickerModal } from './components/session-picker-modal'
 import { Sidebar } from './components/sidebar'
@@ -291,7 +290,6 @@ export function RootView({
         snippets,
         themeId,
       })}
-      <PendingChordIndicator />
     </box>
   )
 }
