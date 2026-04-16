@@ -259,5 +259,17 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<CR>', actions.confirmSplit)
     )
 
+    // -----------------------------------------------------------------------
+    // Modal: git-commit (src/input/modes/handlers/modal-git-commit.ts)
+    // -----------------------------------------------------------------------
+    .mode('modal.git-commit', (m) =>
+      m
+        .map('<Esc>', actions.gitCommitCancel)
+        .map('<C-CR>', actions.gitCommitSubmit)
+        .map('<Tab>', actions.switchField)
+        .map('<CR>', actions.gitCommitReturnKey)
+        .passthrough()
+    )
+
   return kb._build()
 }
