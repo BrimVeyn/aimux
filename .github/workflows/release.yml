@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -38,3 +39,31 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish @brimveyn/aimux-config
+        working-directory: packages/aimux-config
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ -z "$(npm view @brimveyn/aimux-config@$VERSION version 2>/dev/null)" ]; then
+            npm publish --provenance --access public
+          else
+            echo "@brimveyn/aimux-config@$VERSION already published, skipping"
+          fi
+
+      - name: Publish @brimveyn/aimux
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ -z "$(npm view @brimveyn/aimux@$VERSION version 2>/dev/null)" ]; then
+            npm publish --provenance --access public
+          else
+            echo "@brimveyn/aimux@$VERSION already published, skipping"
+          fi
