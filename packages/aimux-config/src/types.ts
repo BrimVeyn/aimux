@@ -610,7 +610,10 @@ export interface ModeBindingBuilderApi {
 export interface KeymapBuilderApi {
   leader(key: string): KeymapBuilderApi
   timeout(ms: number): KeymapBuilderApi
-  mode(id: ModeId, configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi): KeymapBuilderApi
+  mode(
+    id: ModeId | readonly ModeId[],
+    configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi
+  ): KeymapBuilderApi
 }
 
 // ─── Top-level user config ────────────────────────────────────────────────────

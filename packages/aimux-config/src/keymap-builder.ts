@@ -99,10 +99,17 @@ export class KeymapBuilder implements KeymapBuilderApi {
     return this
   }
 
-  mode(id: ModeId, configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi): this {
+  mode(
+    id: ModeId | readonly ModeId[],
+    configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi
+  ): this {
     const builder = new ModeBindingBuilder()
     configure(builder)
-    this.modes.set(id, builder._build())
+    const def = builder._build()
+    const ids = Array.isArray(id) ? id : [id]
+    for (const modeId of ids) {
+      this.modes.set(modeId, def)
+    }
     return this
   }
 
