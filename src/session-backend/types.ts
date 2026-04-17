@@ -12,6 +12,7 @@ export type SessionBackendEvents = {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
+  sessionActivity: [sessionId: string, busy: boolean]
 }
 
 export interface BackendAttachResult {

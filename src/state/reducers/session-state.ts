@@ -64,6 +64,8 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
       const maxIndex = filteredNew.length
       const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
+      const nextBusy = { ...state.sessionsBusy }
+      delete nextBusy[action.sessionId]
       return {
         ...state,
         activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
@@ -77,7 +79,33 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           type: 'session-picker',
         },
         sessions: newSessions,
+        sessionsBusy: nextBusy,
         tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
+      }
+    }
+    case 'reorder-sessions': {
+      const byId = new Map(state.sessions.map((s) => [s.id, s]))
+      const ordered: typeof state.sessions = []
+      let idx = 0
+      for (const id of action.orderedIds) {
+        const s = byId.get(id)
+        if (s) {
+          ordered.push({ ...s, order: idx })
+          byId.delete(id)
+        }
+        idx++
+      }
+      let nextOrder = ordered.length
+      for (const s of byId.values()) {
+        ordered.push({ ...s, order: nextOrder++ })
+      }
+      return { ...state, sessions: ordered }
+    }
+    case 'set-session-busy': {
+      if ((state.sessionsBusy[action.sessionId] ?? false) === action.busy) return state
+      return {
+        ...state,
+        sessionsBusy: { ...state.sessionsBusy, [action.sessionId]: action.busy },
       }
     }
     default:

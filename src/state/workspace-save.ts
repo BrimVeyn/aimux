@@ -26,6 +26,8 @@ export function saveCurrentWorkspace(state: AppState): void {
     customCommands: state.customCommands,
     gitPanelRatio: state.sidebar.gitPanelRatio,
     gitPanelVisible: state.sidebar.gitPanelVisible,
+    sessionBarPosition: state.sessionBar.position,
+    sessionBarVisible: state.sessionBar.visible,
   })
   saveSessionCatalog(
     buildSessionsWithCurrentSnapshot(state.sessions, state.currentSessionId, state)

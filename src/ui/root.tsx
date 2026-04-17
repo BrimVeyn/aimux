@@ -12,6 +12,7 @@ import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
 import { PendingChordOverlay } from './components/pending-chord-overlay'
+import { SessionBar } from './components/session-bar'
 import { SessionNameModal } from './components/session-name-modal'
 import { SessionPickerModal } from './components/session-picker-modal'
 import { Sidebar } from './components/sidebar'
@@ -213,6 +214,7 @@ export function RootView({
   const customCommands = useAppStore((s) => s.customCommands)
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const sessionBarPosition = useAppStore((s) => s.sessionBar.position)
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
   const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
@@ -243,6 +245,7 @@ export function RootView({
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
+      {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar onTabActivate={onPaneActivate} />
         {activeTree && activeTree.type === 'split' ? (
@@ -290,6 +293,7 @@ export function RootView({
           />
         )}
       </box>
+      {sessionBarPosition === 'bottom' && <SessionBar />}
       <StatusBar />
       <PendingChordOverlay />
       {renderModal(modal, {

@@ -23,6 +23,14 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
         return state
       }
       return { ...state, pendingChords: action.chords }
+    case 'toggle-session-bar':
+      return {
+        ...state,
+        sessionBar: { ...state.sessionBar, visible: !state.sessionBar.visible },
+      }
+    case 'set-session-bar-position':
+      if (state.sessionBar.position === action.position) return state
+      return { ...state, sessionBar: { ...state.sessionBar, position: action.position } }
     default:
       return null
   }

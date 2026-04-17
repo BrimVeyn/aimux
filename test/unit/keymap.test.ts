@@ -42,10 +42,12 @@ describe('mode handlers', () => {
     expect(result.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
   })
 
-  test('navigation: Ctrl+W is no longer bound (avoids accidental tab close)', () => {
+  test('navigation: Ctrl+W is a leader prefix (no immediate action)', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = handler.handleKey(key('w', { ctrl: true }), ctx({ activeTabId: 'tab-1' }))
-    expect(result).toBeNull()
+    // Leader waits for the next chord, so actions/effects are empty.
+    expect(result?.actions).toEqual([])
+    expect(result?.effects).toEqual([])
   })
 
   test('navigation: dd chord dispatches close-active-tab', () => {

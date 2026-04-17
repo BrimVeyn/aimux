@@ -105,7 +105,15 @@ export interface SessionRecord {
   createdAt: string
   updatedAt: string
   lastOpenedAt: string
+  order?: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+}
+
+export type SessionBarPosition = 'top' | 'bottom'
+
+export interface SessionBarState {
+  visible: boolean
+  position: SessionBarPosition
 }
 
 export interface TabSession {
@@ -287,6 +295,8 @@ export interface AppState {
   tabGroupMap: Record<string, string>
   sessions: SessionRecord[]
   currentSessionId: string | null
+  sessionsBusy: Record<string, boolean>
+  sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
   sidebar: SidebarState
@@ -332,6 +342,8 @@ export type SessionAction =
   | { type: 'create-session-record'; session: SessionRecord }
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string }
+  | { type: 'reorder-sessions'; orderedIds: string[] }
+  | { type: 'set-session-busy'; sessionId: string; busy: boolean }
 
 // -- Tab actions --
 export type TabAction =
@@ -398,6 +410,8 @@ export type UIAction =
   | { type: 'toggle-git-panel' }
   | { type: 'resize-git-panel'; delta: number }
   | { type: 'set-pending-chords'; chords: string[] | null }
+  | { type: 'toggle-session-bar' }
+  | { type: 'set-session-bar-position'; position: SessionBarPosition }
 
 // -- Git panel actions --
 export interface GitRefreshPayload {
