@@ -1,8 +1,9 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
-import type { ReactNode } from 'react'
+
+import { memo, type ReactNode } from 'react'
 
 import type { TerminalContentOrigin } from '../../input/raw-input-handler'
-import type { TabSession, TerminalSpan } from '../../state/types'
+import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
 import { theme } from '../theme'
@@ -77,9 +78,17 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
   )
 }
 
-function renderViewport(tab: TabSession): ReactNode {
-  if (tab.viewport && tab.viewport.lines.length > 0) {
-    const lines = tab.viewport.lines
+interface TerminalViewportProps {
+  viewport: TerminalSnapshot | undefined
+  buffer: string
+}
+
+const TerminalViewport = memo(function TerminalViewport({
+  buffer,
+  viewport,
+}: TerminalViewportProps) {
+  if (viewport && viewport.lines.length > 0) {
+    const lines = viewport.lines
     return (
       <text fg={theme.text}>
         {lines.map((line, lineIndex) => (
@@ -92,12 +101,8 @@ function renderViewport(tab: TabSession): ReactNode {
     )
   }
 
-  return (
-    <text fg={theme.text}>
-      {tab.buffer.length > 0 ? tab.buffer : 'Waiting for session output...'}
-    </text>
-  )
-}
+  return <text fg={theme.text}>{buffer.length > 0 ? buffer : 'Waiting for session output...'}</text>
+})
 
 export function TerminalPane({
   contentOrigin,
@@ -199,7 +204,7 @@ export function TerminalPane({
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
           >
-            {renderViewport(tab)}
+            <TerminalViewport viewport={tab.viewport} buffer={tab.buffer} />
           </box>
         )}
       </box>
