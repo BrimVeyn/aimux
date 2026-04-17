@@ -41,8 +41,19 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
   scrollViewportToBottom(tabId: string): void
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void
   setActiveTab(tabId: string | null): void
-  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void
-  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void
+  resizeAll(
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    options?: { sync?: boolean }
+  ): void
+  resizeTab(
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent,
+    options?: { sync?: boolean }
+  ): void
   disposeSession(tabId: string): void
   disposeAll(): void
   destroy(keepSessions?: boolean): Promise<void> | void

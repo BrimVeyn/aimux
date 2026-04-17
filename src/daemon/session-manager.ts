@@ -67,8 +67,14 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     this.getOrCreateRegistry(sessionId).write(tabId, data)
   }
 
-  resize(sessionId: string, cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
-    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, intents)
+  resize(
+    sessionId: string,
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    options?: { sync?: boolean }
+  ): void {
+    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, intents, options)
   }
 
   resizeTab(
@@ -76,9 +82,10 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     tabId: string,
     cols: number,
     rows: number,
-    intent?: ScrollIntent
+    intent?: ScrollIntent,
+    options?: { sync?: boolean }
   ): void {
-    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, intent)
+    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, intent, options)
   }
 
   scroll(sessionId: string, tabId: string, deltaLines: number): void {

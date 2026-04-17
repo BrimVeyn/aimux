@@ -355,7 +355,12 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     session.emulator.scrollToLine(Math.max(0, intent.absoluteLine))
   }
 
-  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
+  resizeAll(
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    options?: { sync?: boolean }
+  ): void {
     const safeCols = Math.max(20, cols)
     const safeRows = Math.max(8, rows)
 
@@ -363,11 +368,21 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       session.pty.resize(safeCols, safeRows)
       session.emulator.resize(safeCols, safeRows)
       this.applyScrollIntent(session, intents?.get(session.tabId))
-      this.scheduleRender(session)
+      if (options?.sync) {
+        this.flushRenderNow(session)
+      } else {
+        this.scheduleRender(session)
+      }
     }
   }
 
-  resizeSession(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
+  resizeSession(
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent,
+    options?: { sync?: boolean }
+  ): void {
     const session = this.sessions.get(tabId)
     if (!session) {
       return
@@ -377,7 +392,11 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     session.pty.resize(safeCols, safeRows)
     session.emulator.resize(safeCols, safeRows)
     this.applyScrollIntent(session, intent)
-    this.scheduleRender(session)
+    if (options?.sync) {
+      this.flushRenderNow(session)
+    } else {
+      this.scheduleRender(session)
+    }
   }
 
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
