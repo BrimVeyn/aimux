@@ -29,7 +29,19 @@ function startMockDaemon() {
       for (const message of decoder.push(chunk)) {
         received.push(message)
 
-        if (message.type === 'attach') {
+        if (message.type === 'hello') {
+          const response: ServerResponse = {
+            id: message.id,
+            payload: {
+              maxVersion: IPC_PROTOCOL_VERSION,
+              minVersion: IPC_PROTOCOL_VERSION,
+              processVersion: 'test-daemon',
+              selectedVersion: IPC_PROTOCOL_VERSION,
+            },
+            type: 'helloResult',
+          }
+          socket.write(encodeMessage(response))
+        } else if (message.type === 'attach') {
           const response: ServerResponse = {
             id: message.id,
             payload: {
@@ -73,6 +85,17 @@ function startMockDaemon() {
   })
 
   return { received, server }
+}
+
+function sendHello(send: (request: ClientRequest) => void): void {
+  send({
+    id: 'req-hello',
+    payload: {
+      maxVersion: IPC_PROTOCOL_VERSION,
+      minVersion: IPC_PROTOCOL_VERSION,
+    },
+    type: 'hello',
+  })
 }
 
 async function connectClient(socketPath: string): Promise<{
@@ -135,6 +158,14 @@ describe('IPC round-trip integration', () => {
     const client = await connectClient(socketPath)
     cleanups.push(() => client.socket.destroy())
 
+    sendHello(client.send)
+    let messages = await client.waitForMessages(1)
+    expect(messages[0]).toMatchObject({
+      id: 'req-hello',
+      payload: { selectedVersion: IPC_PROTOCOL_VERSION },
+      type: 'helloResult',
+    })
+
     // 1. Attach
     client.send({
       id: 'req-1',
@@ -147,8 +178,8 @@ describe('IPC round-trip integration', () => {
       type: 'attach',
     })
 
-    let messages = await client.waitForMessages(1)
-    expect(messages[0]).toMatchObject({
+    messages = await client.waitForMessages(2)
+    expect(messages[1]).toMatchObject({
       id: 'req-1',
       payload: { activeTabId: null, protocolVersion: IPC_PROTOCOL_VERSION, tabs: [] },
       type: 'attachResult',
@@ -183,7 +214,7 @@ describe('IPC round-trip integration', () => {
     })
 
     // 3. Verify daemon received all messages in order
-    expect(received.map((m) => m.type)).toEqual(['attach', 'createTab'])
+    expect(received.map((m) => m.type)).toEqual(['hello', 'attach', 'createTab'])
   }, 10_000)
 
   test('write command is acknowledged', async () => {
@@ -201,6 +232,9 @@ describe('IPC round-trip integration', () => {
     const client = await connectClient(socketPath)
     cleanups.push(() => client.socket.destroy())
 
+    sendHello(client.send)
+    await client.waitForMessages(1)
+
     // Attach first
     client.send({
       id: 'req-attach',
@@ -212,7 +246,7 @@ describe('IPC round-trip integration', () => {
       },
       type: 'attach',
     })
-    await client.waitForMessages(1)
+    await client.waitForMessages(2)
 
     // Write
     client.send({
@@ -221,7 +255,7 @@ describe('IPC round-trip integration', () => {
       type: 'write',
     })
 
-    const messages = await client.waitForMessages(2)
+    const messages = await client.waitForMessages(3)
     const writeOk = messages.find((m) => 'id' in m && m.id === 'req-write')
     expect(writeOk).toMatchObject({ type: 'ok' })
   }, 10_000)
@@ -241,10 +275,13 @@ describe('IPC round-trip integration', () => {
     const client = await connectClient(socketPath)
     cleanups.push(() => client.socket.destroy())
 
+    sendHello(client.send)
+    await client.waitForMessages(1)
+
     client.send({ id: 'req-ping', payload: {}, type: 'ping' })
 
-    const messages = await client.waitForMessages(1)
-    expect(messages[0]).toMatchObject({ id: 'req-ping', type: 'ok' })
+    const messages = await client.waitForMessages(2)
+    expect(messages[1]).toMatchObject({ id: 'req-ping', type: 'ok' })
   }, 10_000)
 
   test('custom assistant id is accepted in createTab', async () => {
@@ -262,6 +299,9 @@ describe('IPC round-trip integration', () => {
     const client = await connectClient(socketPath)
     cleanups.push(() => client.socket.destroy())
 
+    sendHello(client.send)
+    await client.waitForMessages(1)
+
     client.send({
       id: 'req-1',
       payload: {
@@ -272,7 +312,7 @@ describe('IPC round-trip integration', () => {
       },
       type: 'attach',
     })
-    await client.waitForMessages(1)
+    await client.waitForMessages(2)
 
     client.send({
       id: 'req-2',

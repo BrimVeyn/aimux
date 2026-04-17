@@ -24,6 +24,14 @@ export function getDaemonSocketPath(): string {
   return join(ensureRuntimeDir(), 'daemon.sock')
 }
 
+export function getIpcDaemonSocketPath(): string {
+  return getDaemonSocketPath()
+}
+
+export function getTerminalManagerSocketPath(): string {
+  return join(ensureRuntimeDir(), 'terminal-manager.sock')
+}
+
 export function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true })
 }
@@ -34,6 +42,10 @@ export function tightenDaemonSocketPermissions(socketPath: string): void {
   } catch {
     // best-effort permission tightening
   }
+}
+
+export function tightenSocketPermissions(socketPath: string): void {
+  tightenDaemonSocketPermissions(socketPath)
 }
 
 export function getDaemonSocketSecurityIssue(socketPath: string): string | null {
@@ -61,9 +73,23 @@ export function getDaemonSocketSecurityIssue(socketPath: string): string | null 
   }
 }
 
+export function getSocketSecurityIssue(socketPath: string): string | null {
+  return getDaemonSocketSecurityIssue(socketPath)
+}
+
 export function removeDaemonSocketIfExists(): void {
   const socketPath = getDaemonSocketPath()
   if (existsSync(socketPath)) {
     unlinkSync(socketPath)
   }
+}
+
+export function removeSocketIfExists(socketPath: string): void {
+  if (existsSync(socketPath)) {
+    unlinkSync(socketPath)
+  }
+}
+
+export function removeTerminalManagerSocketIfExists(): void {
+  removeSocketIfExists(getTerminalManagerSocketPath())
 }

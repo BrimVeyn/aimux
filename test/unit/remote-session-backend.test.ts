@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync } from 'node:fs'
-import { createServer, type Socket } from 'node:net'
+import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { getDaemonSocketPath } from '../../src/daemon/runtime-paths'
+import { getIpcDaemonSocketPath } from '../../src/daemon/runtime-paths'
 import {
   type ClientRequest,
   encodeMessage,
@@ -14,7 +14,7 @@ import {
 } from '../../src/ipc/protocol'
 import { RemoteSessionBackend } from '../../src/session-backend/remote-session-backend'
 
-function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_000): Promise<T> {
+function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_500): Promise<T> {
   const start = Date.now()
 
   return new Promise((resolve, reject) => {
@@ -54,70 +54,69 @@ describe('RemoteSessionBackend', () => {
     }
   })
 
-  test('reconnects cleanly and preserves multiline payload framing', async () => {
+  test('reconnects after IPC daemon restart and preserves multiline payload framing', async () => {
     tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-'))
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const requests: ClientRequest[] = []
-    const sockets = new Set<Socket>()
-    const server = createServer((socket) => {
-      sockets.add(socket)
-      const decoder = new MessageDecoder<ClientRequest>()
+    let sockets = new Set<Socket>()
 
-      socket.on('data', (chunk) => {
-        for (const message of decoder.push(chunk)) {
-          requests.push(message)
+    const startServer = async (): Promise<Server> => {
+      const server = createServer((socket) => {
+        sockets.add(socket)
+        const decoder = new MessageDecoder<ClientRequest>()
 
-          const response: ServerResponse =
-            message.type === 'attach'
-              ? {
-                  id: message.id,
-                  payload: {
-                    activeTabId: null,
-                    protocolVersion: IPC_PROTOCOL_VERSION,
-                    tabs: [],
-                  },
-                  type: 'attachResult',
-                }
-              : { id: message.id, payload: {}, type: 'ok' }
-          socket.write(encodeMessage(response))
-        }
+        socket.on('data', (chunk) => {
+          for (const message of decoder.push(chunk)) {
+            requests.push(message)
+
+            let response: ServerResponse
+            if (message.type === 'hello') {
+              response = {
+                id: message.id,
+                payload: {
+                  maxVersion: IPC_PROTOCOL_VERSION,
+                  minVersion: IPC_PROTOCOL_VERSION,
+                  processVersion: 'test-daemon',
+                  selectedVersion: IPC_PROTOCOL_VERSION,
+                },
+                type: 'helloResult',
+              }
+            } else if (message.type === 'attach') {
+              response = {
+                id: message.id,
+                payload: {
+                  activeTabId: null,
+                  protocolVersion: IPC_PROTOCOL_VERSION,
+                  tabs: [],
+                },
+                type: 'attachResult',
+              }
+            } else {
+              response = { id: message.id, payload: {}, type: 'ok' }
+            }
+            socket.write(encodeMessage(response))
+          }
+        })
+
+        socket.on('close', () => {
+          sockets.delete(socket)
+        })
       })
 
-      socket.on('close', () => {
-        sockets.delete(socket)
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject)
+        server.listen(getIpcDaemonSocketPath(), () => resolve())
       })
-    })
 
-    await new Promise<void>((resolve, reject) => {
-      server.once('error', reject)
-      server.listen(getDaemonSocketPath(), () => resolve())
-    })
+      return server
+    }
 
-    const backend = new RemoteSessionBackend()
-
-    try {
-      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
-      backend.write('tab-1', 'hello\nworld')
-
-      await waitFor(() => requests.find((message) => message.type === 'write'))
-
-      await backend.destroy(true)
-      await backend.attach({ cols: 100, rows: 30, sessionId: 'session-b' })
-
-      const attachRequests = requests.filter((message) => message.type === 'attach')
-      const writeRequest = requests.find((message) => message.type === 'write')
-
-      expect(attachRequests).toHaveLength(2)
-      expect(attachRequests[0]?.payload.protocolVersion).toBe(IPC_PROTOCOL_VERSION)
-      expect(attachRequests[0]?.payload.sessionId).toBe('session-a')
-      expect(attachRequests[1]?.payload.sessionId).toBe('session-b')
-      expect(writeRequest?.payload.data).toBe('hello\nworld')
-    } finally {
-      await backend.destroy(true)
+    const closeServer = async (server: Server) => {
       for (const socket of sockets) {
         socket.destroy()
       }
+      sockets = new Set<Socket>()
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error) {
@@ -127,6 +126,48 @@ describe('RemoteSessionBackend', () => {
           resolve()
         })
       })
+    }
+
+    let server = await startServer()
+    const backend = new RemoteSessionBackend()
+
+    try {
+      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
+      backend.write('tab-1', 'hello\nworld')
+
+      await waitFor(() => requests.find((message) => message.type === 'write'))
+
+      await closeServer(server)
+      server = await startServer()
+
+      await waitFor(() => {
+        const attachRequests = requests.filter((message) => message.type === 'attach')
+        return attachRequests.length >= 2 ? attachRequests : undefined
+      })
+
+      backend.write('tab-1', 'after\nrestart')
+      await waitFor(() =>
+        requests.find(
+          (message) => message.type === 'write' && message.payload.data === 'after\nrestart'
+        )
+      )
+
+      const helloRequests = requests.filter((message) => message.type === 'hello')
+      const attachRequests = requests.filter((message) => message.type === 'attach')
+
+      expect(helloRequests.length).toBeGreaterThanOrEqual(2)
+      expect(attachRequests).toHaveLength(2)
+      expect(attachRequests[0]?.payload.protocolVersion).toBe(IPC_PROTOCOL_VERSION)
+      expect(attachRequests[0]?.payload.sessionId).toBe('session-a')
+      expect(attachRequests[1]?.payload.sessionId).toBe('session-a')
+      expect(
+        requests.find(
+          (message) => message.type === 'write' && message.payload.data === 'hello\nworld'
+        )
+      ).toBeDefined()
+    } finally {
+      await backend.destroy(true)
+      await closeServer(server)
     }
   })
 
@@ -145,7 +186,18 @@ describe('RemoteSessionBackend', () => {
           requests.push(message)
 
           let response: ServerResponse
-          if (message.type === 'attach') {
+          if (message.type === 'hello') {
+            response = {
+              id: message.id,
+              payload: {
+                maxVersion: IPC_PROTOCOL_VERSION,
+                minVersion: IPC_PROTOCOL_VERSION,
+                processVersion: 'test-daemon',
+                selectedVersion: IPC_PROTOCOL_VERSION,
+              },
+              type: 'helloResult',
+            }
+          } else if (message.type === 'attach') {
             response = {
               id: message.id,
               payload: {
@@ -171,7 +223,7 @@ describe('RemoteSessionBackend', () => {
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject)
-      server.listen(getDaemonSocketPath(), () => resolve())
+      server.listen(getIpcDaemonSocketPath(), () => resolve())
     })
 
     const backend = new RemoteSessionBackend()
@@ -188,6 +240,7 @@ describe('RemoteSessionBackend', () => {
       await waitFor(() => backendError)
 
       expect(backendError).toEqual({ message: 'write rejected', tabId: 'tab-1' })
+      expect(requests.find((message) => message.type === 'hello')).toBeDefined()
       expect(requests.find((message) => message.type === 'write')).toBeDefined()
     } finally {
       await backend.destroy(true)
@@ -217,14 +270,27 @@ describe('RemoteSessionBackend', () => {
 
       socket.on('data', (chunk) => {
         for (const message of decoder.push(chunk)) {
-          const response: ServerResponse =
-            message.type === 'attach'
-              ? {
-                  id: message.id,
-                  payload: { activeTabId: null, protocolVersion: 999, tabs: [] },
-                  type: 'attachResult',
-                }
-              : { id: message.id, payload: {}, type: 'ok' }
+          let response: ServerResponse
+          if (message.type === 'hello') {
+            response = {
+              id: message.id,
+              payload: {
+                maxVersion: IPC_PROTOCOL_VERSION,
+                minVersion: IPC_PROTOCOL_VERSION,
+                processVersion: 'test-daemon',
+                selectedVersion: IPC_PROTOCOL_VERSION,
+              },
+              type: 'helloResult',
+            }
+          } else if (message.type === 'attach') {
+            response = {
+              id: message.id,
+              payload: { activeTabId: null, protocolVersion: 999, tabs: [] },
+              type: 'attachResult',
+            }
+          } else {
+            response = { id: message.id, payload: {}, type: 'ok' }
+          }
           socket.write(encodeMessage(response))
         }
       })
@@ -236,14 +302,14 @@ describe('RemoteSessionBackend', () => {
 
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject)
-      server.listen(getDaemonSocketPath(), () => resolve())
+      server.listen(getIpcDaemonSocketPath(), () => resolve())
     })
 
     const backend = new RemoteSessionBackend()
 
     try {
       await expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
-        'Protocol mismatch: client v1, daemon v999'
+        `Protocol mismatch: client v${IPC_PROTOCOL_VERSION}, daemon v999`
       )
     } finally {
       await backend.destroy(true)

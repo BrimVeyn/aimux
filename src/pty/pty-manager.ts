@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events'
 
 import type { TerminalModeState, TerminalSnapshot } from '../state/types'
 
+import { logDebug } from '../debug/input-log'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
 
 type PtyManagerEvents = {
@@ -99,6 +100,12 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
     session.lastSnapshot = nextSnapshot
     session.lastTerminalModes = nextTerminalModes
+    logDebug('ptyManager.render', {
+      isAlternateBuffer: nextTerminalModes.isAlternateBuffer,
+      lines: nextSnapshot.lines.length,
+      tabId: session.tabId,
+      viewportY: nextSnapshot.viewportY,
+    })
     this.emit('render', session.tabId, nextSnapshot, nextTerminalModes)
   }
 
@@ -111,6 +118,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     this.sessions.delete(session.tabId)
     this.emitRenderIfChanged(session)
     session.emulator.dispose()
+    logDebug('ptyManager.finalize', { exitCode, tabId: session.tabId })
     this.emit('exit', session.tabId, exitCode)
   }
 
@@ -123,6 +131,14 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     cwd?: string
   }): void {
     this.disposeSession(options.tabId)
+    logDebug('ptyManager.create.start', {
+      args: options.args ?? [],
+      cols: options.cols,
+      command: options.command,
+      cwd: options.cwd ?? process.cwd(),
+      rows: options.rows,
+      tabId: options.tabId,
+    })
 
     try {
       const emulator = new XTerm({
@@ -157,6 +173,11 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       }
 
       pty.onData((data) => {
+        logDebug('ptyManager.data', {
+          byteLength: Buffer.byteLength(data, 'utf8'),
+          pendingWrites: session.pendingWrites,
+          tabId: options.tabId,
+        })
         const trackedModes = trackPrivateModes(
           session.alternateScrollMode,
           session.cursorVisible,
@@ -178,6 +199,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       })
 
       pty.onExit(({ exitCode }) => {
+        logDebug('ptyManager.exit', { exitCode, tabId: options.tabId })
         const current = this.sessions.get(options.tabId)
         if (!current || current.pty !== pty) {
           return
@@ -192,9 +214,11 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       })
 
       this.sessions.set(options.tabId, session)
+      logDebug('ptyManager.create.success', { tabId: options.tabId })
       this.emitRenderIfChanged(session)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      logDebug('ptyManager.create.error', { error: message, tabId: options.tabId })
       this.emit('error', options.tabId, `Failed to start session: ${message}`)
     }
   }

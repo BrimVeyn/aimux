@@ -245,6 +245,14 @@ export function startTabSession(
   rows: number,
   cwd?: string
 ): void {
+  logInputDebug('app.tab.start.request', {
+    cols,
+    command: tab.command,
+    cwd: cwd ?? null,
+    rows,
+    tabId: tab.id,
+    title: tab.title,
+  })
   startStartupGrace(tab.id)
 
   const { args, executable } = parseCommand(tab.command)

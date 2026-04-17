@@ -8,6 +8,7 @@ import { logDebug } from './debug/input-log'
 import { runDoctor } from './doctor'
 import { runRestartDaemon } from './restart-daemon'
 import { createSessionBackend } from './session-backend/bootstrap'
+import { runTerminalManager } from './terminal-manager/terminal-manager'
 import { runUpdate } from './update'
 
 const command = process.argv[2]
@@ -35,9 +36,14 @@ if (command === 'daemon') {
   await runDaemon()
 }
 
+if (command === 'terminal-manager') {
+  logDebug('index.terminalManagerMode')
+  await runTerminalManager()
+}
+
 if (command === '--help' || command === '-h') {
   process.stdout.write(
-    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                  Start aimux\n  aimux update           Update to latest version\n  aimux doctor           Diagnose setup issues\n  aimux restart-daemon   Restart background daemon\n\n'
+    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                  Start aimux\n  aimux update           Update to latest version\n  aimux doctor           Diagnose setup issues\n  aimux restart-daemon   Restart IPC daemon\n\n'
   )
   process.exit(0)
 }

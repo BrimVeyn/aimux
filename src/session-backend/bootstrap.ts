@@ -3,32 +3,45 @@ import { connect } from 'node:net'
 import type { SessionBackend } from './types'
 
 import {
-  getDaemonSocketPath,
-  getDaemonSocketSecurityIssue,
+  getIpcDaemonSocketPath,
+  getSocketSecurityIssue,
   removeDaemonSocketIfExists,
 } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
-import { ProtocolMismatchError } from '../ipc/protocol'
-import { findDaemonPid, killDaemon, spawnDetachedDaemon } from '../platform/daemon-control'
+import {
+  encodeMessage,
+  IPC_PROTOCOL_MIN_VERSION,
+  IPC_PROTOCOL_VERSION,
+  MessageDecoder,
+  parseServerMessage,
+} from '../ipc/protocol'
+import { findIpcDaemonPid, killProcess, spawnDetachedIpcDaemon } from '../platform/daemon-control'
 import { LocalSessionBackend } from './local-session-backend'
 import { RemoteSessionBackend } from './remote-session-backend'
+
+interface DaemonHandshakeProbeResult {
+  compatible: boolean
+  error?: string
+  processVersion?: string
+  selectedVersion?: number
+}
 
 async function spawnDaemon(): Promise<void> {
   logDebug('backend.spawnDaemon.start', {
     execPath: process.execPath,
-    socketPath: getDaemonSocketPath(),
+    socketPath: getIpcDaemonSocketPath(),
   })
-  const ok = await spawnDetachedDaemon()
+  const ok = await spawnDetachedIpcDaemon()
   if (ok) {
-    logDebug('backend.spawnDaemon.ready', { socketPath: getDaemonSocketPath() })
+    logDebug('backend.spawnDaemon.ready', { socketPath: getIpcDaemonSocketPath() })
     return
   }
 
-  logDebug('backend.spawnDaemon.timeout', { socketPath: getDaemonSocketPath() })
+  throw new Error(`IPC daemon unavailable at ${getIpcDaemonSocketPath()}`)
 }
 
 async function canConnectToDaemon(socketPath: string): Promise<boolean> {
-  const securityIssue = getDaemonSocketSecurityIssue(socketPath)
+  const securityIssue = getSocketSecurityIssue(socketPath)
   if (securityIssue) {
     logDebug('backend.healthcheck.socketIssue', { issue: securityIssue, socketPath })
     return false
@@ -54,54 +67,192 @@ async function canConnectToDaemon(socketPath: string): Promise<boolean> {
   })
 }
 
+export async function probeDaemonProtocolCompatibility(
+  socketPath: string
+): Promise<DaemonHandshakeProbeResult> {
+  const securityIssue = getSocketSecurityIssue(socketPath)
+  if (securityIssue) {
+    return { compatible: false, error: securityIssue }
+  }
+
+  return await new Promise<DaemonHandshakeProbeResult>((resolve) => {
+    const socket = connect(socketPath)
+    const decoder = new MessageDecoder(parseServerMessage)
+    const helloRequestId = crypto.randomUUID()
+    const attachRequestId = crypto.randomUUID()
+    const disposeRequestId = crypto.randomUUID()
+    const probeSessionId = `probe-${crypto.randomUUID()}`
+    let daemonProcessVersion: string | undefined
+    let settled = false
+    const timer = setTimeout(() => {
+      finish({ compatible: false, error: 'handshake timed out' })
+    }, 2_000)
+
+    const finish = (result: DaemonHandshakeProbeResult) => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timer)
+      socket.removeAllListeners()
+      socket.destroy()
+      resolve(result)
+    }
+
+    socket.once('connect', () => {
+      socket.write(
+        encodeMessage({
+          id: helloRequestId,
+          payload: {
+            maxVersion: IPC_PROTOCOL_VERSION,
+            minVersion: IPC_PROTOCOL_MIN_VERSION,
+          },
+          type: 'hello',
+        })
+      )
+    })
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      finish({ compatible: false, error: error.message })
+    })
+    socket.on('data', (chunk) => {
+      try {
+        for (const message of decoder.push(chunk)) {
+          if (!('id' in message)) {
+            continue
+          }
+
+          if (message.id === helloRequestId) {
+            if (message.type !== 'helloResult') {
+              finish({
+                compatible: false,
+                error:
+                  message.type === 'error' ? message.payload.message : `unexpected ${message.type}`,
+              })
+              return
+            }
+
+            daemonProcessVersion = message.payload.processVersion
+
+            socket.write(
+              encodeMessage({
+                id: attachRequestId,
+                payload: {
+                  cols: 80,
+                  protocolVersion: message.payload.selectedVersion,
+                  rows: 24,
+                  sessionId: probeSessionId,
+                },
+                type: 'attach',
+              })
+            )
+            return
+          }
+
+          if (message.id === attachRequestId) {
+            if (message.type !== 'attachResult') {
+              finish({
+                compatible: false,
+                error:
+                  message.type === 'error' ? message.payload.message : `unexpected ${message.type}`,
+              })
+              return
+            }
+
+            const compatible =
+              message.payload.protocolVersion >= IPC_PROTOCOL_MIN_VERSION &&
+              message.payload.protocolVersion <= IPC_PROTOCOL_VERSION
+
+            socket.write(
+              encodeMessage({
+                id: disposeRequestId,
+                payload: {},
+                type: 'disposeAll',
+              })
+            )
+            finish({
+              compatible,
+              error: compatible
+                ? undefined
+                : `attach returned protocol v${message.payload.protocolVersion}`,
+              processVersion: daemonProcessVersion,
+              selectedVersion: message.payload.protocolVersion,
+            })
+            return
+          }
+
+          if (message.id === disposeRequestId) {
+            continue
+          }
+        }
+      } catch (error) {
+        finish({
+          compatible: false,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })
+  })
+}
+
 async function restartDaemon(socketPath: string): Promise<void> {
-  const pid = await findDaemonPid(socketPath)
+  const pid = await findIpcDaemonPid()
   if (pid !== null) {
-    logDebug('backend.restartDaemon.killing', { pid })
-    await killDaemon(pid)
+    logDebug('backend.restartDaemon.killing', { pid, socketPath })
+    await killProcess(pid)
   }
   removeDaemonSocketIfExists()
   await spawnDaemon()
 }
 
 export async function createSessionBackend(): Promise<SessionBackend> {
-  try {
-    const socketPath = getDaemonSocketPath()
-    const initialReachable = await canConnectToDaemon(socketPath)
-    logDebug('backend.create.start', { initialReachable, socketPath })
-
-    if (!initialReachable) {
-      removeDaemonSocketIfExists()
-      await spawnDaemon()
-    }
-
-    const reachable = await canConnectToDaemon(socketPath)
-    if (!reachable) {
-      throw new Error(`Daemon unavailable at ${socketPath}`)
-    }
-
-    logDebug('backend.create.remote', { socketPath })
-    return new RemoteSessionBackend()
-  } catch (error) {
-    if (error instanceof ProtocolMismatchError) {
-      logDebug('backend.create.protocolMismatch', {
-        clientVersion: error.clientVersion,
-        daemonVersion: error.daemonVersion,
-      })
-      try {
-        await restartDaemon(getDaemonSocketPath())
-        logDebug('backend.create.remoteAfterRestart')
-        return new RemoteSessionBackend()
-      } catch (retryError) {
-        logDebug('backend.create.retryFailed', {
-          error: retryError instanceof Error ? retryError.message : String(retryError),
-        })
-      }
-    }
-
-    logDebug('backend.create.localFallback', {
-      error: error instanceof Error ? error.message : String(error),
-    })
+  if (process.env.AIMUX_LOCAL_BACKEND === '1') {
+    logDebug('backend.create.localExplicit')
     return new LocalSessionBackend()
   }
+
+  const socketPath = getIpcDaemonSocketPath()
+  const initialReachable = await canConnectToDaemon(socketPath)
+  logDebug('backend.create.start', { initialReachable, socketPath })
+
+  if (!initialReachable) {
+    removeDaemonSocketIfExists()
+    await spawnDaemon()
+  }
+
+  const reachable = await canConnectToDaemon(socketPath)
+  if (!reachable) {
+    throw new Error(`IPC daemon unavailable at ${socketPath}`)
+  }
+
+  const handshake = await probeDaemonProtocolCompatibility(socketPath)
+  logDebug('backend.create.handshake', {
+    compatible: handshake.compatible,
+    error: handshake.error ?? null,
+    processVersion: handshake.processVersion ?? null,
+    selectedVersion: handshake.selectedVersion ?? null,
+    socketPath,
+  })
+  if (!handshake.compatible) {
+    logDebug('backend.create.restartForHandshake', {
+      error: handshake.error ?? 'incompatible daemon handshake',
+      socketPath,
+    })
+    await restartDaemon(socketPath)
+    const retriedHandshake = await probeDaemonProtocolCompatibility(socketPath)
+    logDebug('backend.create.handshakeAfterRestart', {
+      compatible: retriedHandshake.compatible,
+      error: retriedHandshake.error ?? null,
+      processVersion: retriedHandshake.processVersion ?? null,
+      selectedVersion: retriedHandshake.selectedVersion ?? null,
+      socketPath,
+    })
+    if (!retriedHandshake.compatible) {
+      throw new Error(
+        `IPC daemon handshake failed after restart: ${retriedHandshake.error ?? 'incompatible protocol'}`
+      )
+    }
+  }
+
+  logDebug('backend.create.remote', { socketPath })
+  return new RemoteSessionBackend()
 }
