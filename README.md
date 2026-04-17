@@ -11,6 +11,7 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 ## Features
 
 - **Multi-tab sessions** — Run Claude, Codex, and OpenCode in parallel with instant tab switching
+- **Session bar** — Numbered session chips at the top (or bottom) of the screen. Click to switch, drag to reorder, busy spinner for non-focused sessions with live PTY output. Toggle with `<leader>b`; jump with `<leader>1..9`. Position persists via `aimux.config.ts` or `aimux.json`.
 - **Split panes** — Split vertically (`|`) or horizontally (`-`) to view multiple assistants at once
 - **Draggable separators** — Resize split panes by dragging with the mouse
 - **Click-to-focus** — Click any pane or sidebar tab to focus it instantly
@@ -134,6 +135,8 @@ Press `?` in navigation mode for the full, live keybinding list (reflects your c
 | `Ctrl+S`              | Snippet picker       |
 | `Ctrl+T`              | Theme picker         |
 | `G`                   | Toggle git panel     |
+| `<leader>b`           | Toggle session bar   |
+| `<leader>1..9`        | Switch to session N  |
 | `?`                   | Show help            |
 | `Ctrl+C`              | Quit                 |
 
