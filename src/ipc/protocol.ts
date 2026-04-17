@@ -1,4 +1,5 @@
 import type {
+  ScrollIntent,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -54,10 +55,23 @@ export type ClientRequest =
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
-  | { id: string; type: 'resizeClient'; payload: { cols: number; rows: number } }
-  | { id: string; type: 'resizeTab'; payload: { tabId: string; cols: number; rows: number } }
+  | {
+      id: string
+      type: 'resizeClient'
+      payload: { cols: number; rows: number; intents?: Record<string, ScrollIntent> }
+    }
+  | {
+      id: string
+      type: 'resizeTab'
+      payload: { tabId: string; cols: number; rows: number; intent?: ScrollIntent }
+    }
   | { id: string; type: 'scrollToBottom'; payload: { tabId: string } }
   | { id: string; type: 'scroll'; payload: { tabId: string; deltaLines: number } }
+  | {
+      id: string
+      type: 'reapplyScrollIntent'
+      payload: { tabId: string; intent: ScrollIntent }
+    }
   | { id: string; type: 'setActiveTab'; payload: { tabId: string | null } }
   | { id: string; type: 'closeTab'; payload: { tabId: string } }
   | { id: string; type: 'disposeAll'; payload: Record<string, never> }
@@ -141,6 +155,18 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
     isFiniteNumber(value.baseY) &&
     typeof value.cursorVisible === 'boolean'
   )
+}
+
+function isScrollIntent(value: unknown): value is ScrollIntent {
+  if (!isObjectRecord(value)) return false
+  if (value.kind === 'bottom') return true
+  if (value.kind === 'anchor') return isFiniteNumber(value.absoluteLine)
+  return false
+}
+
+function isScrollIntentRecord(value: unknown): value is Record<string, ScrollIntent> {
+  if (!isObjectRecord(value)) return false
+  return Object.values(value).every(isScrollIntent)
 }
 
 function isTerminalModeState(value: unknown): value is TerminalModeState {
@@ -273,11 +299,19 @@ export function parseClientRequest(value: unknown): ClientRequest {
     case 'resizeClient':
       assert(isFiniteNumber(value.payload.cols), 'resizeClient.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeClient.rows must be a number')
+      assert(
+        value.payload.intents === undefined || isScrollIntentRecord(value.payload.intents),
+        'resizeClient.intents must be a scroll-intent record'
+      )
       return value as ClientRequest
     case 'resizeTab':
       assert(isString(value.payload.tabId), 'resizeTab.tabId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeTab.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeTab.rows must be a number')
+      assert(
+        value.payload.intent === undefined || isScrollIntent(value.payload.intent),
+        'resizeTab.intent must be a scroll intent'
+      )
       return value as ClientRequest
     case 'scroll':
       assert(isString(value.payload.tabId), 'scroll.tabId must be a string')
@@ -285,6 +319,13 @@ export function parseClientRequest(value: unknown): ClientRequest {
       return value as ClientRequest
     case 'scrollToBottom':
       assert(isString(value.payload.tabId), 'scrollToBottom.tabId must be a string')
+      return value as ClientRequest
+    case 'reapplyScrollIntent':
+      assert(isString(value.payload.tabId), 'reapplyScrollIntent.tabId must be a string')
+      assert(
+        isScrollIntent(value.payload.intent),
+        'reapplyScrollIntent.intent must be a scroll intent'
+      )
       return value as ClientRequest
     case 'setActiveTab':
       assert(isNullableString(value.payload.tabId), 'setActiveTab.tabId must be a string or null')

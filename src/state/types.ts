@@ -49,6 +49,16 @@ export interface TerminalSnapshot {
   cursorVisible: boolean
 }
 
+export type ScrollIntent = { kind: 'bottom' } | { absoluteLine: number; kind: 'anchor' }
+
+export const DEFAULT_SCROLL_INTENT: ScrollIntent = { kind: 'bottom' }
+
+export function deriveScrollIntent(viewport: TerminalSnapshot): ScrollIntent {
+  return viewport.viewportY >= viewport.baseY
+    ? { kind: 'bottom' }
+    : { absoluteLine: viewport.viewportY, kind: 'anchor' }
+}
+
 export interface TerminalModeState {
   mouseTrackingMode: 'none' | 'x10' | 'vt200' | 'drag' | 'any'
   sendFocusMode: boolean
@@ -66,6 +76,7 @@ export interface PersistedTabSnapshot {
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
+  scrollIntent?: ScrollIntent
   errorMessage?: string
   exitCode?: number
 }
@@ -105,6 +116,7 @@ export interface TabSession {
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
+  scrollIntent?: ScrollIntent
   command: string
   errorMessage?: string
   exitCode?: number
@@ -336,7 +348,9 @@ export type TabAction =
       tabId: string
       viewport: TerminalSnapshot
       terminalModes: TerminalModeState
+      source?: 'resize' | 'scroll' | 'data' | 'switch'
     }
+  | { type: 'set-scroll-intent'; tabId: string; intent: ScrollIntent }
   | { type: 'set-tab-activity'; tabId: string; activity?: TabActivity }
   | { type: 'set-tab-status'; tabId: string; status: TabStatus; exitCode?: number }
   | { type: 'set-tab-error'; tabId: string; message: string }

@@ -2,7 +2,6 @@ import { $ } from 'bun'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, AssistantId, TabSession } from '../state/types'
 
 import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
@@ -27,6 +26,13 @@ import {
 } from '../state/layout-tree'
 import { filterSessions, filterSnippets } from '../state/selectors'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
+import {
+  type AppAction,
+  type AppState,
+  type AssistantId,
+  DEFAULT_SCROLL_INTENT,
+  type TabSession,
+} from '../state/types'
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme } from '../ui/theme'
@@ -124,14 +130,14 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
   const groupId = getGroupIdForTab(state.tabGroupMap, state.activeTabId)
   const groupTree = groupId ? state.layoutTrees[groupId] : null
   if (!groupTree) {
-    pasteSnippetToTab(backend, state.activeTabId, activeTab, snippet)
+    pasteSnippetToTab(backend, state.activeTabId, activeTab, snippet, ctx.dispatch)
     return
   }
 
   for (const tabId of allLeafIds(groupTree)) {
     const tab = state.tabs.find((entry) => entry.id === tabId)
     if (tab) {
-      pasteSnippetToTab(backend, tabId, tab, snippet)
+      pasteSnippetToTab(backend, tabId, tab, snippet, ctx.dispatch)
     }
   }
 }
@@ -229,6 +235,7 @@ export function createTabSession(
     buffer: '',
     command: customCommand ?? option.command,
     id: createTabId(),
+    scrollIntent: DEFAULT_SCROLL_INTENT,
     status: 'starting',
     terminalModes: createDefaultTerminalModes(),
     title: option.label,
@@ -393,7 +400,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       )
       return
     case 'paste-selected-snippet': {
-      pasteSnippetToTab(backend, state.activeTabId, ctx.activeTab, getSelectedSnippet(state))
+      pasteSnippetToTab(
+        backend,
+        state.activeTabId,
+        ctx.activeTab,
+        getSelectedSnippet(state),
+        dispatch
+      )
       return
     }
     case 'paste-snippet-to-group': {

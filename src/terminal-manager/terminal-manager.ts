@@ -166,22 +166,29 @@ export async function runTerminalManager(): Promise<void> {
                 )
                 sendOk(socket, message.id)
                 break
-              case 'resizeClient':
+              case 'resizeClient': {
                 requireNegotiatedVersion(socket, negotiatedVersions)
+                const intentsRecord = message.payload.intents
+                const intentsMap = intentsRecord
+                  ? new Map(Object.entries(intentsRecord))
+                  : undefined
                 sessionManager.resize(
                   message.payload.sessionId,
                   message.payload.cols,
-                  message.payload.rows
+                  message.payload.rows,
+                  intentsMap
                 )
                 sendOk(socket, message.id)
                 break
+              }
               case 'resizeTab':
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.resizeTab(
                   message.payload.sessionId,
                   message.payload.tabId,
                   message.payload.cols,
-                  message.payload.rows
+                  message.payload.rows,
+                  message.payload.intent
                 )
                 sendOk(socket, message.id)
                 break
@@ -197,6 +204,15 @@ export async function runTerminalManager(): Promise<void> {
               case 'scrollToBottom':
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.scrollToBottom(message.payload.sessionId, message.payload.tabId)
+                sendOk(socket, message.id)
+                break
+              case 'reapplyScrollIntent':
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                sessionManager.reapplyScrollIntent(
+                  message.payload.sessionId,
+                  message.payload.tabId,
+                  message.payload.intent
+                )
                 sendOk(socket, message.id)
                 break
               case 'setActiveTab':

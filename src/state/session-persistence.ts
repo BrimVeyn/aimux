@@ -1,5 +1,3 @@
-import type { AppState, TabSession, TabStatus, WorkspaceSnapshotV1 } from './types'
-
 import {
   allLeafIds,
   createGroupId,
@@ -7,6 +5,13 @@ import {
   type LayoutNode,
   pruneLayoutTree,
 } from './layout-tree'
+import {
+  type AppState,
+  DEFAULT_SCROLL_INTENT,
+  type TabSession,
+  type TabStatus,
+  type WorkspaceSnapshotV1,
+} from './types'
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   return {
@@ -47,6 +52,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
       id: tab.id,
+      scrollIntent: tab.scrollIntent,
       status: tab.status === 'disconnected' ? 'running' : tab.status,
       terminalModes: tab.terminalModes,
       title: tab.title,
@@ -69,6 +75,7 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
     errorMessage: tab.errorMessage,
     exitCode: tab.exitCode,
     id: tab.id,
+    scrollIntent: tab.scrollIntent ?? DEFAULT_SCROLL_INTENT,
     status: getDisconnectedStatus(tab.status),
     terminalModes: tab.terminalModes,
     title: tab.title,

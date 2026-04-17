@@ -1,6 +1,7 @@
 import type { EventEmitter } from 'node:events'
 
 import type {
+  ScrollIntent,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -38,9 +39,10 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
   write(tabId: string, input: string): void
   scrollViewport(tabId: string, deltaLines: number): void
   scrollViewportToBottom(tabId: string): void
+  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void
   setActiveTab(tabId: string | null): void
-  resizeAll(cols: number, rows: number): void
-  resizeTab(tabId: string, cols: number, rows: number): void
+  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void
+  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void
   disposeSession(tabId: string): void
   disposeAll(): void
   destroy(keepSessions?: boolean): Promise<void> | void

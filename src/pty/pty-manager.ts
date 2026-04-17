@@ -2,7 +2,7 @@ import { Terminal as XTerm } from '@xterm/headless'
 import { type IPty, spawn } from 'bun-pty'
 import { EventEmitter } from 'node:events'
 
-import type { TerminalModeState, TerminalSnapshot } from '../state/types'
+import type { ScrollIntent, TerminalModeState, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
@@ -247,18 +247,34 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     this.emitRenderIfChanged(session)
   }
 
-  resizeAll(cols: number, rows: number): void {
+  private applyScrollIntent(session: SessionHandle, intent: ScrollIntent | undefined): void {
+    if (!intent || intent.kind === 'bottom') {
+      session.emulator.scrollToBottom()
+      return
+    }
+
+    const baseY = session.emulator.buffer.active.baseY
+    if (intent.absoluteLine >= baseY) {
+      session.emulator.scrollToBottom()
+      return
+    }
+
+    session.emulator.scrollToLine(Math.max(0, intent.absoluteLine))
+  }
+
+  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
     const safeCols = Math.max(20, cols)
     const safeRows = Math.max(8, rows)
 
     for (const session of this.sessions.values()) {
       session.pty.resize(safeCols, safeRows)
       session.emulator.resize(safeCols, safeRows)
+      this.applyScrollIntent(session, intents?.get(session.tabId))
       this.emitRenderIfChanged(session)
     }
   }
 
-  resizeSession(tabId: string, cols: number, rows: number): void {
+  resizeSession(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
     const session = this.sessions.get(tabId)
     if (!session) {
       return
@@ -267,6 +283,16 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     const safeRows = Math.max(8, rows)
     session.pty.resize(safeCols, safeRows)
     session.emulator.resize(safeCols, safeRows)
+    this.applyScrollIntent(session, intent)
+    this.emitRenderIfChanged(session)
+  }
+
+  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
+    const session = this.sessions.get(tabId)
+    if (!session) {
+      return
+    }
+    this.applyScrollIntent(session, intent)
     this.emitRenderIfChanged(session)
   }
 

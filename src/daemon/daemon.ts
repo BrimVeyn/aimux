@@ -256,7 +256,12 @@ export async function runDaemon(): Promise<void> {
                 case 'resizeClient': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  await manager.resize(sessionId, message.payload.cols, message.payload.rows)
+                  await manager.resize(
+                    sessionId,
+                    message.payload.cols,
+                    message.payload.rows,
+                    message.payload.intents
+                  )
                   sendOk(socket, message.id)
                   break
                 }
@@ -267,7 +272,8 @@ export async function runDaemon(): Promise<void> {
                     sessionId,
                     message.payload.tabId,
                     message.payload.cols,
-                    message.payload.rows
+                    message.payload.rows,
+                    message.payload.intent
                   )
                   sendOk(socket, message.id)
                   break
@@ -283,6 +289,17 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   await manager.scrollToBottom(sessionId, message.payload.tabId)
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'reapplyScrollIntent': {
+                  const sessionId = requireSession(socket, attachedSessions)
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  await manager.reapplyScrollIntent(
+                    sessionId,
+                    message.payload.tabId,
+                    message.payload.intent
+                  )
                   sendOk(socket, message.id)
                   break
                 }

@@ -1,4 +1,5 @@
 import type {
+  ScrollIntent,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -61,11 +62,26 @@ export type ManagerRequest =
       }
     }
   | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
-  | { id: string; type: 'resizeClient'; payload: { sessionId: string; cols: number; rows: number } }
+  | {
+      id: string
+      type: 'resizeClient'
+      payload: {
+        sessionId: string
+        cols: number
+        rows: number
+        intents?: Record<string, ScrollIntent>
+      }
+    }
   | {
       id: string
       type: 'resizeTab'
-      payload: { sessionId: string; tabId: string; cols: number; rows: number }
+      payload: {
+        sessionId: string
+        tabId: string
+        cols: number
+        rows: number
+        intent?: ScrollIntent
+      }
     }
   | {
       id: string
@@ -76,6 +92,11 @@ export type ManagerRequest =
       id: string
       type: 'scroll'
       payload: { sessionId: string; tabId: string; deltaLines: number }
+    }
+  | {
+      id: string
+      type: 'reapplyScrollIntent'
+      payload: { sessionId: string; tabId: string; intent: ScrollIntent }
     }
   | { id: string; type: 'setActiveTab'; payload: { sessionId: string; tabId: string | null } }
   | { id: string; type: 'closeTab'; payload: { sessionId: string; tabId: string } }
@@ -148,6 +169,18 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
     isFiniteNumber(value.baseY) &&
     typeof value.cursorVisible === 'boolean'
   )
+}
+
+function isScrollIntent(value: unknown): value is ScrollIntent {
+  if (!isObjectRecord(value)) return false
+  if (value.kind === 'bottom') return true
+  if (value.kind === 'anchor') return isFiniteNumber(value.absoluteLine)
+  return false
+}
+
+function isScrollIntentRecord(value: unknown): value is Record<string, ScrollIntent> {
+  if (!isObjectRecord(value)) return false
+  return Object.values(value).every(isScrollIntent)
 }
 
 function isTerminalModeState(value: unknown): value is TerminalModeState {
@@ -263,12 +296,20 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(isString(value.payload.sessionId), 'resizeClient.sessionId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeClient.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeClient.rows must be a number')
+      assert(
+        value.payload.intents === undefined || isScrollIntentRecord(value.payload.intents),
+        'resizeClient.intents must be a scroll-intent record'
+      )
       return value as ManagerRequest
     case 'resizeTab':
       assert(isString(value.payload.sessionId), 'resizeTab.sessionId must be a string')
       assert(isString(value.payload.tabId), 'resizeTab.tabId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeTab.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeTab.rows must be a number')
+      assert(
+        value.payload.intent === undefined || isScrollIntent(value.payload.intent),
+        'resizeTab.intent must be a scroll intent'
+      )
       return value as ManagerRequest
     case 'scroll':
       assert(isString(value.payload.sessionId), 'scroll.sessionId must be a string')
@@ -278,6 +319,14 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
     case 'scrollToBottom':
       assert(isString(value.payload.sessionId), 'scrollToBottom.sessionId must be a string')
       assert(isString(value.payload.tabId), 'scrollToBottom.tabId must be a string')
+      return value as ManagerRequest
+    case 'reapplyScrollIntent':
+      assert(isString(value.payload.sessionId), 'reapplyScrollIntent.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'reapplyScrollIntent.tabId must be a string')
+      assert(
+        isScrollIntent(value.payload.intent),
+        'reapplyScrollIntent.intent must be a scroll intent'
+      )
       return value as ManagerRequest
     case 'setActiveTab':
       assert(isString(value.payload.sessionId), 'setActiveTab.sessionId must be a string')

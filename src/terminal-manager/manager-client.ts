@@ -1,7 +1,12 @@
 import { EventEmitter } from 'node:events'
 import { connect, Socket } from 'node:net'
 
-import type { TerminalModeState, TerminalSnapshot, WorkspaceSnapshotV1 } from '../state/types'
+import type {
+  ScrollIntent,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from '../state/types'
 
 import { getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
@@ -298,18 +303,29 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  resize(sessionId: string, cols: number, rows: number): Promise<void> {
+  resize(
+    sessionId: string,
+    cols: number,
+    rows: number,
+    intents?: Record<string, ScrollIntent>
+  ): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows, sessionId },
+      payload: { cols, intents, rows, sessionId },
       type: 'resizeClient',
     })
   }
 
-  resizeTab(sessionId: string, tabId: string, cols: number, rows: number): Promise<void> {
+  resizeTab(
+    sessionId: string,
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent
+  ): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows, sessionId, tabId },
+      payload: { cols, intent, rows, sessionId, tabId },
       type: 'resizeTab',
     })
   }
@@ -327,6 +343,14 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       id: crypto.randomUUID(),
       payload: { sessionId, tabId },
       type: 'scrollToBottom',
+    })
+  }
+
+  reapplyScrollIntent(sessionId: string, tabId: string, intent: ScrollIntent): Promise<void> {
+    return this.sendExpectOk({
+      id: crypto.randomUUID(),
+      payload: { intent, sessionId, tabId },
+      type: 'reapplyScrollIntent',
     })
   }
 
