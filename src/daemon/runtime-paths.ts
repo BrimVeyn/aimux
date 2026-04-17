@@ -1,12 +1,18 @@
 import { chmodSync, constants, existsSync, lstatSync, mkdirSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { getProfileName } from '../profile-paths'
+
+export function getRuntimeProfile(): string {
+  return getProfileName()
+}
+
 function getRuntimeBaseDir(): string {
   if (process.env.XDG_RUNTIME_DIR) {
-    return join(process.env.XDG_RUNTIME_DIR, 'aimux')
+    return join(process.env.XDG_RUNTIME_DIR, `aimux-${getRuntimeProfile()}`)
   }
 
-  return join(process.env.HOME ?? '.', '.local', 'state', 'aimux')
+  return join(process.env.HOME ?? '.', '.local', 'state', `aimux-${getRuntimeProfile()}`)
 }
 
 export function ensureRuntimeDir(): string {

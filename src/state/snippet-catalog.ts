@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
-import { CONFIG_PATH } from '../config'
 import { logDebug } from '../debug/input-log'
+import { getProfileConfigDir } from '../profile-paths'
 import { isSnippetRecord } from './validation'
 
 export interface SnippetRecord {
@@ -11,7 +11,7 @@ export interface SnippetRecord {
   content: string
 }
 
-const SNIPPETS_PATH = join(dirname(CONFIG_PATH), 'aimux-snippets.json')
+const SNIPPETS_PATH = join(getProfileConfigDir(), 'aimux-snippets.json')
 
 const DEFAULT_SNIPPETS: SnippetRecord[] = [
   {
@@ -78,7 +78,7 @@ export function loadSnippetCatalog(): SnippetRecord[] {
 
 export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
   try {
-    mkdirSync(dirname(SNIPPETS_PATH), { recursive: true })
+    mkdirSync(getProfileConfigDir(), { recursive: true })
     writeFileSync(SNIPPETS_PATH, `${JSON.stringify({ snippets, version: 1 }, null, 2)}\n`)
   } catch (error) {
     logDebug('snippets.catalog.saveError', {

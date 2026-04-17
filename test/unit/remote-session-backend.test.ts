@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname } from 'node:path'
 
 import { getIpcDaemonSocketPath } from '../../src/daemon/runtime-paths'
 import {
@@ -55,7 +54,7 @@ describe('RemoteSessionBackend', () => {
   })
 
   test('reconnects after IPC daemon restart and preserves multiline payload framing', async () => {
-    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-'))
+    tempRuntimeDir = mkdtempSync('/tmp/aimux-remote-backend-')
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const requests: ClientRequest[] = []
@@ -105,6 +104,7 @@ describe('RemoteSessionBackend', () => {
       })
 
       await new Promise<void>((resolve, reject) => {
+        mkdirSync(dirname(getIpcDaemonSocketPath()), { recursive: true })
         server.once('error', reject)
         server.listen(getIpcDaemonSocketPath(), () => resolve())
       })
@@ -143,7 +143,7 @@ describe('RemoteSessionBackend', () => {
       await waitFor(() => {
         const attachRequests = requests.filter((message) => message.type === 'attach')
         return attachRequests.length >= 2 ? attachRequests : undefined
-      })
+      }, 3_000)
 
       backend.write('tab-1', 'after\nrestart')
       await waitFor(() =>
@@ -172,7 +172,7 @@ describe('RemoteSessionBackend', () => {
   })
 
   test('surfaces server command errors for tab-scoped mutations', async () => {
-    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-error-'))
+    tempRuntimeDir = mkdtempSync('/tmp/aimux-remote-backend-error-')
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const requests: ClientRequest[] = []
@@ -222,6 +222,7 @@ describe('RemoteSessionBackend', () => {
     })
 
     await new Promise<void>((resolve, reject) => {
+      mkdirSync(dirname(getIpcDaemonSocketPath()), { recursive: true })
       server.once('error', reject)
       server.listen(getIpcDaemonSocketPath(), () => resolve())
     })
@@ -260,7 +261,7 @@ describe('RemoteSessionBackend', () => {
   })
 
   test('rejects mismatched attach protocol versions', async () => {
-    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-remote-backend-protocol-'))
+    tempRuntimeDir = mkdtempSync('/tmp/aimux-remote-backend-protocol-')
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const sockets = new Set<Socket>()
@@ -301,6 +302,7 @@ describe('RemoteSessionBackend', () => {
     })
 
     await new Promise<void>((resolve, reject) => {
+      mkdirSync(dirname(getIpcDaemonSocketPath()), { recursive: true })
       server.once('error', reject)
       server.listen(getIpcDaemonSocketPath(), () => resolve())
     })

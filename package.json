@@ -1,6 +1,6 @@
 {
   "name": "@brimveyn/aimux",
-  "version": "1.2.5",
+  "version": "1.3.0",
   "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode side-by-side with tabbed navigation, split panes, and persistent sessions.",
   "keywords": [
     "ai",
@@ -42,8 +42,8 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "bun --watch src/index.tsx",
-    "start": "bun run src/index.tsx",
+    "dev": "AIMUX_PROFILE=dev bun --watch src/index.tsx",
+    "start": "AIMUX_PROFILE=dev bun run src/index.tsx",
     "test": "bun test",
     "check": "tsc --noEmit",
     "demo": "vhs assets/demo.tape",
@@ -51,7 +51,7 @@
     "demo:tabs": "vhs assets/tabs.tape",
     "demo:splits": "vhs assets/splits.tape",
     "demo:themes": "vhs assets/themes.tape",
-    "restart-daemon": "bun run src/index.tsx restart-daemon",
+    "restart-daemon": "AIMUX_PROFILE=dev bun run src/index.tsx restart-daemon",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."

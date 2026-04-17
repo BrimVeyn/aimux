@@ -4,6 +4,7 @@ import { createRoot } from '@opentui/react'
 
 import { App } from './app'
 import { runDaemon } from './daemon/daemon'
+import { getRuntimeProfile } from './daemon/runtime-paths'
 import { logDebug } from './debug/input-log'
 import { runDoctor } from './doctor'
 import { runRestartDaemon } from './restart-daemon'
@@ -12,6 +13,7 @@ import { runTerminalManager } from './terminal-manager/terminal-manager'
 import { runUpdate } from './update'
 
 const command = process.argv[2]
+const runtimeProfile = getRuntimeProfile()
 
 if (command === '--version' || command === '-v' || command === 'version') {
   const { version } = await import('../package.json')
@@ -32,12 +34,12 @@ if (command === 'update') {
 }
 
 if (command === 'daemon') {
-  logDebug('index.daemonMode')
+  logDebug('index.daemonMode', { runtimeProfile })
   await runDaemon()
 }
 
 if (command === 'terminal-manager') {
-  logDebug('index.terminalManagerMode')
+  logDebug('index.terminalManagerMode', { runtimeProfile })
   await runTerminalManager()
 }
 
@@ -57,6 +59,6 @@ const renderer = await createCliRenderer({
 })
 
 const backend = await createSessionBackend()
-logDebug('index.backendReady', { backend: backend.constructor.name })
+logDebug('index.backendReady', { backend: backend.constructor.name, runtimeProfile })
 
 createRoot(renderer).render(<App backend={backend} />)

@@ -1,8 +1,8 @@
 import { type AimuxUserConfig, resolveConfig, type ResolvedConfig } from '@brimveyn/aimux-config'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { logDebug } from '../debug/input-log'
+import { getProfileConfigDir } from '../profile-paths'
 
 const CONFIG_FILENAMES = ['aimux.config.ts', 'aimux.config.js']
 
@@ -11,7 +11,7 @@ const CONFIG_FILENAMES = ['aimux.config.ts', 'aimux.config.js']
  * a resolved config. Falls back to pure defaults if no config file exists.
  */
 export async function loadUserConfig(): Promise<ResolvedConfig> {
-  const configDir = join(homedir(), '.config', 'aimux')
+  const configDir = getProfileConfigDir()
 
   for (const filename of CONFIG_FILENAMES) {
     const configPath = join(configDir, filename)

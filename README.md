@@ -65,15 +65,15 @@ aimux restart-daemon   # restart IPC daemon only
 
 ## Configuration
 
-aimux reads `~/.config/aimux/aimux.config.ts` at startup. Set it up with:
+aimux reads `~/.config/aimux/<profile>/aimux.config.ts` at startup. The default installed profile is `default`, while the repository dev scripts use `dev`. Set up the default profile with:
 
 ```bash
-mkdir -p ~/.config/aimux && cd ~/.config/aimux
+mkdir -p ~/.config/aimux/default && cd ~/.config/aimux/default
 bun init -y
 bun add -d @brimveyn/aimux-config
 ```
 
-Then create `~/.config/aimux/aimux.config.ts`:
+Then create `~/.config/aimux/default/aimux.config.ts`:
 
 ```ts
 import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
@@ -213,6 +213,14 @@ bun run lint             # oxlint
 ```
 
 By default the app talks to the background IPC daemon. For explicit single-process debugging only, set `AIMUX_LOCAL_BACKEND=1` before starting aimux.
+
+Profiles live under `~/.config/aimux/<profile>/`. Each profile gets its own config, session catalog, snippet catalog, and matching runtime namespace.
+
+The repository `bun run dev`, `bun run start`, and `bun run restart-daemon` scripts set `AIMUX_PROFILE=dev`, so source builds use `~/.config/aimux/dev/` and their own IPC daemon / terminal-manager sockets instead of interfering with a globally installed `aimux` instance.
+
+You can override the active profile manually with `AIMUX_PROFILE=<name>` when you need multiple isolated environments on the same machine. `AIMUX_RUNTIME_PROFILE` is still accepted as a fallback alias for runtime compatibility.
+
+This profile move is intentionally breaking: aimux no longer reads legacy flat config or catalog files once profile directories are enabled.
 
 ## License
 

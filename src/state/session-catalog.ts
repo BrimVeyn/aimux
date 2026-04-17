@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 
 import type { SessionRecord } from './types'
 
-import { CONFIG_PATH, loadConfig, saveConfig } from '../config'
+import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
+import { getProfileConfigDir } from '../profile-paths'
 import { isSessionRecord } from './validation'
 
 interface SessionCatalogFile {
@@ -12,7 +13,7 @@ interface SessionCatalogFile {
   sessions: SessionRecord[]
 }
 
-const SESSIONS_PATH = join(dirname(CONFIG_PATH), 'aimux-sessions.json')
+const SESSIONS_PATH = join(getProfileConfigDir(), 'aimux-sessions.json')
 
 function readCatalogFile(): { file: SessionCatalogFile | null; issue?: string } {
   try {
@@ -79,7 +80,7 @@ export function loadSessionCatalog(): SessionRecord[] {
 
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
   try {
-    mkdirSync(dirname(SESSIONS_PATH), { recursive: true })
+    mkdirSync(getProfileConfigDir(), { recursive: true })
     writeFileSync(SESSIONS_PATH, `${JSON.stringify({ sessions, version: 1 }, null, 2)}\n`)
     logDebug('sessions.catalog.save', { sessionCount: sessions.length })
   } catch (error) {

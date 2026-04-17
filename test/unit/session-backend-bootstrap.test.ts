@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { createServer, type Socket } from 'node:net'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname } from 'node:path'
 
 import { getIpcDaemonSocketPath } from '../../src/daemon/runtime-paths'
 import {
@@ -32,7 +31,7 @@ describe('session backend bootstrap handshake', () => {
   })
 
   test('accepts a compatible daemon hello handshake', async () => {
-    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-bootstrap-compatible-'))
+    tempRuntimeDir = mkdtempSync('/tmp/aimux-bootstrap-compatible-')
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const sockets = new Set<Socket>()
@@ -73,6 +72,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     await new Promise<void>((resolve, reject) => {
+      mkdirSync(dirname(getIpcDaemonSocketPath()), { recursive: true })
       server.once('error', reject)
       server.listen(getIpcDaemonSocketPath(), () => resolve())
     })
@@ -100,7 +100,7 @@ describe('session backend bootstrap handshake', () => {
   })
 
   test('rejects an incompatible daemon hello handshake', async () => {
-    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-bootstrap-incompatible-'))
+    tempRuntimeDir = mkdtempSync('/tmp/aimux-bootstrap-incompatible-')
     process.env.XDG_RUNTIME_DIR = tempRuntimeDir
 
     const sockets = new Set<Socket>()
@@ -137,6 +137,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     await new Promise<void>((resolve, reject) => {
+      mkdirSync(dirname(getIpcDaemonSocketPath()), { recursive: true })
       server.once('error', reject)
       server.listen(getIpcDaemonSocketPath(), () => resolve())
     })
