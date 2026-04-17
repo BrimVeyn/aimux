@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
+import type { ScrollIntent } from '../../src/state/types'
+
 import { PtyManager } from '../../src/pty/pty-manager'
 
 describe('PtyManager', () => {
@@ -368,6 +370,56 @@ describe('PtyManager', () => {
     manager.scrollViewportToBottom('tab-6')
     await new Promise<void>((resolve) => setTimeout(resolve, 20))
     expect(latestViewportY).toBeGreaterThanOrEqual(atBottomViewportY)
+
+    manager.disposeAll()
+  })
+
+  test('resizeAll preserves anchor scrollIntent after reflow', async () => {
+    const manager = new PtyManager()
+    let latestViewportY = 0
+    let latestBaseY = 0
+    let latestText = ''
+
+    manager.on('render', (tabId, viewport) => {
+      if (tabId !== 'tab-intent') {
+        return
+      }
+      latestViewportY = viewport.viewportY
+      latestBaseY = viewport.baseY
+      latestText = viewport.lines
+        .map((line) => line.spans.map((span) => span.text).join(''))
+        .join('\n')
+    })
+
+    manager.createSession({
+      cols: 80,
+      command: '/bin/sh',
+      cwd: process.cwd(),
+      rows: 8,
+      tabId: 'tab-intent',
+    })
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    manager.write('tab-intent', 'for i in $(seq 1 40); do printf "line-$i\\r\\n"; done\r')
+    await new Promise<void>((resolve) => setTimeout(resolve, 200))
+
+    manager.scrollViewport('tab-intent', -10)
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+    const anchorLine = latestViewportY
+    const firstLineBeforeResize = (latestText.split('\n')[0] ?? '').trim()
+
+    const intents = new Map<string, ScrollIntent>([
+      ['tab-intent', { absoluteLine: anchorLine, kind: 'anchor' }],
+    ])
+    manager.resizeAll(60, 8, intents)
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+
+    expect(latestViewportY).toBeLessThan(latestBaseY)
+    expect(latestText).toContain(firstLineBeforeResize)
+
+    manager.resizeAll(80, 8, new Map([['tab-intent', { kind: 'bottom' }]]))
+    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    expect(latestViewportY).toBe(latestBaseY)
 
     manager.disposeAll()
   })

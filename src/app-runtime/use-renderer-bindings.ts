@@ -60,7 +60,7 @@ export function useRendererBindings({
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       getFocusMode: () => focusModeRef.current,
       handleTerminalShortcut,
-      writeToPty: (tabId, data) => writeToTab(backend, tabId, activeTabRef.current, data),
+      writeToPty: (tabId, data) => writeToTab(backend, tabId, activeTabRef.current, data, dispatch),
     })
 
     const handlePasteEvent = (event: { bytes: Uint8Array; defaultPrevented?: boolean }) => {
@@ -96,7 +96,7 @@ export function useRendererBindings({
         return
       }
 
-      writePasteToTab(backend, tabId, tab, payload)
+      writePasteToTab(backend, tabId, tab, payload, dispatch)
     }
 
     const handleSelection = (selection: OtuiSelection) => {

@@ -81,6 +81,8 @@ export function App({ backend }: { backend: SessionBackend }) {
   activeTabIdRef.current = state.activeTabId
   const activeTabRef = useRef(activeTab)
   activeTabRef.current = activeTab
+  const activeTabScrollIntentRef = useRef(activeTab?.scrollIntent ?? null)
+  activeTabScrollIntentRef.current = activeTab?.scrollIntent ?? null
 
   const stateRef = useRef(state)
   stateRef.current = state
@@ -90,6 +92,7 @@ export function App({ backend }: { backend: SessionBackend }) {
 
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
     activeTabId: state.activeTabId,
+    activeTabScrollIntentRef,
     backend,
     currentSessionId: state.currentSessionId,
     currentSessionWorkspaceSnapshot,

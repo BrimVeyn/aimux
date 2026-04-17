@@ -44,7 +44,13 @@ export function bindBackendRuntimeEvents({
       return
     }
 
-    dispatch({ tabId, terminalModes, type: 'replace-tab-viewport', viewport })
+    dispatch({
+      source: resizingRef.current ? 'resize' : 'data',
+      tabId,
+      terminalModes,
+      type: 'replace-tab-viewport',
+      viewport,
+    })
     if (timeouts.isStartupGraceActive(tabId) || resizingRef.current) {
       return
     }

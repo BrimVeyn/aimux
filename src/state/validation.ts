@@ -55,6 +55,13 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
   )
 }
 
+function isScrollIntent(value: unknown): boolean {
+  if (!isObjectRecord(value)) return false
+  if (value.kind === 'bottom') return true
+  if (value.kind === 'anchor') return isFiniteNumber(value.absoluteLine)
+  return false
+}
+
 function isTerminalModeState(value: unknown): value is TerminalModeState {
   return (
     isObjectRecord(value) &&
@@ -125,6 +132,7 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
         isString(tab.buffer) &&
         isTerminalModeState(tab.terminalModes) &&
         (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
+        (tab.scrollIntent === undefined || isScrollIntent(tab.scrollIntent)) &&
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
     ) &&

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { connect, Socket } from 'node:net'
 
-import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, ScrollIntent, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { getDaemonSocketPath } from '../daemon/runtime-paths'
@@ -306,6 +306,17 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('scrollToBottom', error, tabId))
   }
 
+  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
+    if (!this.attached) {
+      return
+    }
+    void this.sendExpectOk({
+      id: crypto.randomUUID(),
+      payload: { intent, tabId },
+      type: 'reapplyScrollIntent',
+    }).catch((error) => this.reportCommandError('reapplyScrollIntent', error, tabId))
+  }
+
   setActiveTab(tabId: string | null): void {
     if (!this.attached) {
       return
@@ -318,27 +329,28 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('setActiveTab', error))
   }
 
-  resizeAll(cols: number, rows: number): void {
+  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
     if (!this.attached) {
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
     }
     logDebug('backend.remote.resize', { cols, rows, sessionId: this.currentSessionId })
+    const intentsRecord = intents ? Object.fromEntries(intents.entries()) : undefined
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows },
+      payload: { cols, intents: intentsRecord, rows },
       type: 'resizeClient',
     }).catch((error) => this.reportCommandError('resizeClient', error))
   }
 
-  resizeTab(tabId: string, cols: number, rows: number): void {
+  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
     if (!this.attached) {
       return
     }
     logDebug('backend.remote.resizeTab', { cols, rows, sessionId: this.currentSessionId, tabId })
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows, tabId },
+      payload: { cols, intent, rows, tabId },
       type: 'resizeTab',
     }).catch((error) => this.reportCommandError('resizeTab', error, tabId))
   }

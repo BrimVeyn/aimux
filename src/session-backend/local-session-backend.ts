@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 
-import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, ScrollIntent, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
@@ -114,6 +114,13 @@ export class LocalSessionBackend
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
   }
 
+  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
+    if (!this.currentSessionId) {
+      return
+    }
+    this.sessionManager.reapplyScrollIntent(this.currentSessionId, tabId, intent)
+  }
+
   setActiveTab(tabId: string | null): void {
     if (!this.currentSessionId) {
       return
@@ -122,18 +129,18 @@ export class LocalSessionBackend
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
 
-  resizeAll(cols: number, rows: number): void {
+  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
     if (!this.currentSessionId) {
       return
     }
-    this.sessionManager.resize(this.currentSessionId, cols, rows)
+    this.sessionManager.resize(this.currentSessionId, cols, rows, intents)
   }
 
-  resizeTab(tabId: string, cols: number, rows: number): void {
+  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
     if (!this.currentSessionId) {
       return
     }
-    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows)
+    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, intent)
   }
 
   disposeSession(tabId: string): void {

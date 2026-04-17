@@ -1,6 +1,11 @@
 import { EventEmitter } from 'node:events'
 
-import type { TerminalModeState, TerminalSnapshot, WorkspaceSnapshotV1 } from '../state/types'
+import type {
+  ScrollIntent,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { SessionRegistry } from './session-registry'
@@ -62,12 +67,18 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     this.getOrCreateRegistry(sessionId).write(tabId, data)
   }
 
-  resize(sessionId: string, cols: number, rows: number): void {
-    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows)
+  resize(sessionId: string, cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
+    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, intents)
   }
 
-  resizeTab(sessionId: string, tabId: string, cols: number, rows: number): void {
-    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows)
+  resizeTab(
+    sessionId: string,
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent
+  ): void {
+    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, intent)
   }
 
   scroll(sessionId: string, tabId: string, deltaLines: number): void {
@@ -76,6 +87,10 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   scrollToBottom(sessionId: string, tabId: string): void {
     this.getOrCreateRegistry(sessionId).scrollViewportToBottom(tabId)
+  }
+
+  reapplyScrollIntent(sessionId: string, tabId: string, intent: ScrollIntent): void {
+    this.getOrCreateRegistry(sessionId).reapplyScrollIntent(tabId, intent)
   }
 
   setActiveTab(sessionId: string, tabId: string | null): void {

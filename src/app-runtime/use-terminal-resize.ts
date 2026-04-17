@@ -2,7 +2,7 @@ import { type MutableRefObject, useEffect, useMemo, useRef } from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState } from '../state/types'
+import type { AppAction, AppState, ScrollIntent } from '../state/types'
 
 import {
   createTerminalBounds,
@@ -27,20 +27,21 @@ function resizeSplitTabs(
   layoutTrees: AppState['layoutTrees'],
   tabIds: string[],
   cols: number,
-  rows: number
+  rows: number,
+  intents: Map<string, ScrollIntent>
 ): void {
   const bounds = getTerminalBounds(cols, rows)
   const resizedTabIds = new Set<string>()
 
   forEachSplitPaneRect(Object.values(layoutTrees), bounds, (tabId, rect) => {
     const size = toTerminalContentSize(rect)
-    backend.resizeTab(tabId, size.cols, size.rows)
+    backend.resizeTab(tabId, size.cols, size.rows, intents.get(tabId))
     resizedTabIds.add(tabId)
   })
 
   for (const id of tabIds) {
     if (!resizedTabIds.has(id)) {
-      backend.resizeTab(id, cols, rows)
+      backend.resizeTab(id, cols, rows, intents.get(id))
     }
   }
 }
@@ -64,6 +65,7 @@ export function useTerminalResize({
 }: UseTerminalResizeOptions) {
   const resizingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tabIdsRef = useRef<string[]>([])
+  const intentsRef = useRef<Map<string, ScrollIntent>>(new Map())
 
   const currentTabIds = state.tabs.map((t) => t.id)
   const tabIdsChanged =
@@ -73,6 +75,12 @@ export function useTerminalResize({
     tabIdsRef.current = currentTabIds
   }
   const stableTabIds = tabIdsRef.current
+
+  intentsRef.current = new Map(
+    state.tabs
+      .filter((t): t is typeof t & { scrollIntent: ScrollIntent } => t.scrollIntent !== undefined)
+      .map((t) => [t.id, t.scrollIntent])
+  )
 
   const terminalSize = useMemo(() => {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 1 : 0
@@ -118,10 +126,11 @@ export function useTerminalResize({
         state.layoutTrees,
         stableTabIds,
         terminalSize.cols,
-        terminalSize.rows
+        terminalSize.rows,
+        intentsRef.current
       )
     } else {
-      backend.resizeAll(terminalSize.cols, terminalSize.rows)
+      backend.resizeAll(terminalSize.cols, terminalSize.rows, intentsRef.current)
     }
     resizingTimerRef.current = setTimeout(() => {
       resizingRef.current = false
