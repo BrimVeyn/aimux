@@ -30,13 +30,16 @@ describe('KeymapBuilder.mode with array of modes', () => {
     expect(built.modes.size).toBe(0)
   })
 
-  test('last write wins across overlapping mode calls', () => {
+  test('repeated mode calls merge bindings; same-keys entries let the later one win', () => {
     const kb = new KeymapBuilder()
-    kb.mode('navigation', (m) => m.map('Q', actions.helpModal, 'first'))
-    kb.mode(['navigation', 'layout'], (m) => m.map('R', actions.helpModal, 'second'))
+    kb.mode('navigation', (m) => m.map('Q', actions.helpModal, 'first').map('Z', actions.helpModal))
+    kb.mode(['navigation', 'layout'], (m) => m.map('Q', actions.helpModal, 'override'))
     const built = kb._build()
-    expect(built.modes.get('navigation')?.bindings.map((b) => b.keys)).toEqual(['R'])
-    expect(built.modes.get('layout')?.bindings.map((b) => b.keys)).toEqual(['R'])
+    const nav = built.modes.get('navigation')
+    expect(nav?.bindings.map((b) => b.keys).sort()).toEqual(['Q', 'Z'])
+    const q = nav?.bindings.find((b) => b.keys === 'Q')
+    expect(q?.description).toBe('override')
+    expect(built.modes.get('layout')?.bindings.map((b) => b.keys)).toEqual(['Q'])
   })
 })
 
