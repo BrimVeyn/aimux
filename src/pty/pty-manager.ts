@@ -79,8 +79,98 @@ function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): Termin
   }
 }
 
+function envInt(name: string, fallback: number): number {
+  const raw = process.env[name]
+  if (raw === undefined) return fallback
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback
+}
+
+const RENDER_COALESCE_MS = 16
+const DATA_DEBOUNCE_MS = envInt('AIMUX_RENDER_DEBOUNCE_MS', 32)
+const BURST_MAX_MS = envInt('AIMUX_RENDER_BURST_MS', 500)
+
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
   private sessions = new Map<string, SessionHandle>()
+  private pendingFlushes = new Map<string, ReturnType<typeof setTimeout>>()
+  private pendingBurstCaps = new Map<string, ReturnType<typeof setTimeout>>()
+
+  private clearTimers(tabId: string): void {
+    const flush = this.pendingFlushes.get(tabId)
+    if (flush) {
+      clearTimeout(flush)
+      this.pendingFlushes.delete(tabId)
+    }
+    const burst = this.pendingBurstCaps.get(tabId)
+    if (burst) {
+      clearTimeout(burst)
+      this.pendingBurstCaps.delete(tabId)
+    }
+  }
+
+  private scheduleRender(session: SessionHandle): void {
+    if (this.pendingFlushes.has(session.tabId)) {
+      return
+    }
+    const timer = setTimeout(() => {
+      this.pendingFlushes.delete(session.tabId)
+      if (this.sessions.get(session.tabId) !== session) {
+        return
+      }
+      const burst = this.pendingBurstCaps.get(session.tabId)
+      if (burst) {
+        clearTimeout(burst)
+        this.pendingBurstCaps.delete(session.tabId)
+      }
+      this.emitRenderIfChanged(session)
+    }, RENDER_COALESCE_MS)
+    this.pendingFlushes.set(session.tabId, timer)
+  }
+
+  private scheduleDataRender(session: SessionHandle): void {
+    const existingFlush = this.pendingFlushes.get(session.tabId)
+    if (existingFlush) {
+      clearTimeout(existingFlush)
+    }
+    const flushTimer = setTimeout(() => {
+      this.pendingFlushes.delete(session.tabId)
+      if (this.sessions.get(session.tabId) !== session) {
+        return
+      }
+      if (session.pendingWrites > 0) {
+        this.scheduleDataRender(session)
+        return
+      }
+      const burst = this.pendingBurstCaps.get(session.tabId)
+      if (burst) {
+        clearTimeout(burst)
+        this.pendingBurstCaps.delete(session.tabId)
+      }
+      this.emitRenderIfChanged(session)
+    }, DATA_DEBOUNCE_MS)
+    this.pendingFlushes.set(session.tabId, flushTimer)
+
+    if (!this.pendingBurstCaps.has(session.tabId)) {
+      const burstTimer = setTimeout(() => {
+        this.pendingBurstCaps.delete(session.tabId)
+        if (this.sessions.get(session.tabId) !== session) {
+          return
+        }
+        const flush = this.pendingFlushes.get(session.tabId)
+        if (flush) {
+          clearTimeout(flush)
+          this.pendingFlushes.delete(session.tabId)
+        }
+        this.emitRenderIfChanged(session)
+      }, BURST_MAX_MS)
+      this.pendingBurstCaps.set(session.tabId, burstTimer)
+    }
+  }
+
+  private flushRenderNow(session: SessionHandle): void {
+    this.clearTimers(session.tabId)
+    this.emitRenderIfChanged(session)
+  }
 
   private emitRenderIfChanged(session: SessionHandle): void {
     const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible)
@@ -116,7 +206,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
 
     this.sessions.delete(session.tabId)
-    this.emitRenderIfChanged(session)
+    this.flushRenderNow(session)
     session.emulator.dispose()
     logDebug('ptyManager.finalize', { exitCode, tabId: session.tabId })
     this.emit('exit', session.tabId, exitCode)
@@ -188,9 +278,10 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         session.cursorVisible = trackedModes.cursorVisible
         session.pendingModeSequence = trackedModes.pendingSequence
         session.pendingWrites += 1
+        this.scheduleDataRender(session)
         emulator.write(data, () => {
           session.pendingWrites -= 1
-          this.emitRenderIfChanged(session)
+          this.scheduleDataRender(session)
 
           if (session.pendingWrites === 0 && session.pendingExitCode !== null) {
             this.finalizeSession(session, session.pendingExitCode)
@@ -215,7 +306,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
       this.sessions.set(options.tabId, session)
       logDebug('ptyManager.create.success', { tabId: options.tabId })
-      this.emitRenderIfChanged(session)
+      this.scheduleRender(session)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       logDebug('ptyManager.create.error', { error: message, tabId: options.tabId })
@@ -224,7 +315,9 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
   }
 
   write(tabId: string, input: string): void {
-    this.sessions.get(tabId)?.pty.write(input)
+    const session = this.sessions.get(tabId)
+    if (!session) return
+    session.pty.write(input)
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
@@ -234,7 +327,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
 
     session.emulator.scrollLines(deltaLines)
-    this.emitRenderIfChanged(session)
+    this.scheduleRender(session)
   }
 
   scrollViewportToBottom(tabId: string): void {
@@ -244,7 +337,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
 
     session.emulator.scrollToBottom()
-    this.emitRenderIfChanged(session)
+    this.scheduleRender(session)
   }
 
   private applyScrollIntent(session: SessionHandle, intent: ScrollIntent | undefined): void {
@@ -270,7 +363,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       session.pty.resize(safeCols, safeRows)
       session.emulator.resize(safeCols, safeRows)
       this.applyScrollIntent(session, intents?.get(session.tabId))
-      this.emitRenderIfChanged(session)
+      this.scheduleRender(session)
     }
   }
 
@@ -284,7 +377,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     session.pty.resize(safeCols, safeRows)
     session.emulator.resize(safeCols, safeRows)
     this.applyScrollIntent(session, intent)
-    this.emitRenderIfChanged(session)
+    this.scheduleRender(session)
   }
 
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
@@ -293,7 +386,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       return
     }
     this.applyScrollIntent(session, intent)
-    this.emitRenderIfChanged(session)
+    this.scheduleRender(session)
   }
 
   disposeSession(tabId: string): void {
@@ -302,12 +395,16 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       return
     }
 
+    this.clearTimers(tabId)
     this.sessions.delete(tabId)
     session.pty.kill()
     session.emulator.dispose()
   }
 
   disposeAll(): void {
+    for (const tabId of this.sessions.keys()) {
+      this.clearTimers(tabId)
+    }
     for (const session of this.sessions.values()) {
       session.pty.kill()
       session.emulator.dispose()
