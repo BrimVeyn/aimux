@@ -161,6 +161,20 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'theme-picker',
         },
       }
+    case 'open-update-available-modal':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          currentVersion: action.currentVersion,
+          cursorPos: 0,
+          editBuffer: null,
+          latestVersion: action.latestVersion,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'update-available',
+        },
+      }
     case 'open-git-commit-modal':
       return {
         ...state,
@@ -198,7 +212,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
-        state.modal.type !== 'split-picker'
+        state.modal.type !== 'split-picker' &&
+        state.modal.type !== 'update-available'
       ) {
         return state
       }
@@ -215,6 +230,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         optionCount = filtered.length
       } else if (state.modal.type === 'theme-picker') {
         optionCount = THEME_COUNT
+      } else if (state.modal.type === 'update-available') {
+        optionCount = 2
       } else {
         const filtered = filterSessions(state.sessions, state.modal.editBuffer)
         optionCount = Math.max(1, filtered.length + 1)

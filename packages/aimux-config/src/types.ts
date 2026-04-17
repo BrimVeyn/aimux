@@ -27,6 +27,7 @@ export type ModeId =
   | 'modal.help'
   | 'modal.split-picker'
   | 'modal.git-commit'
+  | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -263,6 +264,12 @@ export interface ModalSnippetEditor extends ModalBase {
   contentBuffer: string
 }
 
+export interface ModalUpdateAvailable extends ModalBase {
+  type: 'update-available'
+  currentVersion: string
+  latestVersion: string
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -276,6 +283,7 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
+  | ModalUpdateAvailable
 
 export interface LayoutState {
   terminalCols: number
@@ -324,6 +332,7 @@ export type ModalAction =
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
   | { type: 'open-theme-picker' }
+  | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
@@ -467,6 +476,7 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
+  | { type: 'confirm-update-selection' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 
@@ -563,7 +573,7 @@ export type Action = KeyResult | ActionFn
 // ─── Keymap builder API types ─────────────────────────────────────────────────
 
 export interface GroupBuilderApi {
-  map(keys: string, action: Action): GroupBuilderApi
+  map(keys: string, action: Action, description?: string): GroupBuilderApi
   group(
     prefix: string,
     name: string,
@@ -572,7 +582,7 @@ export interface GroupBuilderApi {
 }
 
 export interface ModeBindingBuilderApi {
-  map(keys: string, action: Action): ModeBindingBuilderApi
+  map(keys: string, action: Action, description?: string): ModeBindingBuilderApi
   unmap(keys: string): ModeBindingBuilderApi
   group(
     prefix: string,
@@ -605,6 +615,7 @@ export interface BindingDef {
   keys: string
   result: Action
   group?: string
+  description?: string
 }
 
 export interface ModeKeymapDef {

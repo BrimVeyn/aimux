@@ -26,6 +26,7 @@ export type ModalType =
   | 'help'
   | 'split-picker'
   | 'git-commit'
+  | 'update-available'
   | null
 
 export interface TerminalSpan {
@@ -240,6 +241,12 @@ export interface ModalSnippetEditor extends ModalBase {
   contentBuffer: string
 }
 
+export interface ModalUpdateAvailable extends ModalBase {
+  type: 'update-available'
+  currentVersion: string
+  latestVersion: string
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -260,6 +267,7 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
+  | ModalUpdateAvailable
 
 export interface LayoutState {
   terminalCols: number
@@ -315,6 +323,7 @@ export type ModalAction =
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
   | { type: 'open-theme-picker' }
+  | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
 // -- Session actions --
 export type SessionAction =

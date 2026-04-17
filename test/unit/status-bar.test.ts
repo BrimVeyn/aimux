@@ -1,7 +1,10 @@
+import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
 import { createInitialState } from '../../src/state/store'
 import { getStatusBarModel } from '../../src/ui/status-bar-model'
+
+const CONFIG = getDefaultKeymapConfig()
 
 function createTab(title: string) {
   return {
@@ -24,27 +27,21 @@ function createTab(title: string) {
 describe('getStatusBarModel', () => {
   test('shows navigation hints when browsing tabs', () => {
     const state = createInitialState()
-    const model = getStatusBarModel(state)
+    const model = getStatusBarModel(state, undefined, CONFIG)
 
     expect(model.left).toContain('no session')
     expect(model.left).toContain('no tab')
-    expect(model.right).toContain('Ctrl+g sessions')
-    expect(model.right).toContain('Ctrl+n new')
-  })
-
-  test('shows close and reorder hints when an active tab exists', () => {
-    const state = createInitialState()
-    const model = getStatusBarModel(state, createTab('Claude'))
-
-    expect(model.right).toContain('Ctrl+w close')
-    expect(model.right).toContain('Shift+J/K reorder')
+    // Hints derive from default keymap descriptions.
+    expect(model.right).toContain('Quit')
+    expect(model.right).toContain('New tab')
   })
 
   test('truncates long active tab labels in footer model', () => {
     const state = createInitialState()
     const model = getStatusBarModel(
       state,
-      createTab('Claude session with a very long descriptive title')
+      createTab('Claude session with a very long descriptive title'),
+      CONFIG
     )
 
     expect(model.left).toContain('...')
@@ -56,21 +53,28 @@ describe('getStatusBarModel', () => {
       ...createInitialState(),
       focusMode: 'terminal-input' as const,
     }
-    const model = getStatusBarModel(state, createTab('Claude'))
+    const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
 
     expect(model.left).toContain('Claude')
-    expect(model.right).toContain('Ctrl+z unfocus')
+    expect(model.right).toContain('Leave insert')
   })
 
-  test('shows modal-specific hints', () => {
+  test('shows modal-specific hints for session picker', () => {
     const state = {
       ...createInitialState(),
       focusMode: 'modal' as const,
+      modal: {
+        cursorPos: 0,
+        editBuffer: null,
+        selectedIndex: 0,
+        sessionTargetId: null,
+        type: 'session-picker' as const,
+      },
     }
-    const model = getStatusBarModel(state)
+    const model = getStatusBarModel(state, undefined, CONFIG)
 
     expect(model.left).toContain('no session')
-    expect(model.right).toContain('Enter confirm')
+    expect(model.right).toContain('Open')
   })
 
   test('shows current session name when active', () => {
@@ -87,17 +91,17 @@ describe('getStatusBarModel', () => {
       currentSessionId: 'session-1',
     }
 
-    const model = getStatusBarModel(state, createTab('Claude'))
+    const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
     expect(model.left).toContain('Main Session')
   })
 
-  test('shows restored tab restart hint', () => {
-    const state = createInitialState()
-    const model = getStatusBarModel(state, {
-      ...createTab('Claude'),
-      status: 'disconnected' as const,
-    })
+  test('shows git-mode hints when in git focus', () => {
+    const state = {
+      ...createInitialState(),
+      focusMode: 'git' as const,
+    }
+    const model = getStatusBarModel(state, undefined, CONFIG)
 
-    expect(model.right).toContain('Ctrl+r restart restored tab')
+    expect(model.right).toContain('Exit git')
   })
 })

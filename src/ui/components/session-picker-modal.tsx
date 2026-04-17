@@ -1,6 +1,7 @@
 import type { SessionRecord } from '../../state/types'
 
 import { filterSessions } from '../../state/selectors'
+import { useModalHelp } from '../keymap-context'
 import { abbreviatePath } from '../path-format'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
@@ -47,11 +48,12 @@ export function SessionPickerModal({
   const hasFilter = !!filter
   const showFilteredEmptyState = filtered.length === 0 && sessions.length > 0
   const showInitialEmptyState = filtered.length === 0 && sessions.length === 0
+  const help = useModalHelp('modal.session-picker')
 
   return (
     <ModalShell
       title="Sessions"
-      help="j/k move, Enter resume, n new, r rename, d delete, / filter, Esc cancel."
+      help={help}
       width={uiTokens.modalWidth.lg}
       footer={<ModalFilterBar filter={filter} />}
     >

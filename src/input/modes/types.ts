@@ -21,6 +21,7 @@ export type ModeId =
   | 'modal.help'
   | 'modal.split-picker'
   | 'modal.git-commit'
+  | 'modal.update-available'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -51,6 +52,7 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
+  | { type: 'confirm-update-selection' }
 
 export interface KeyResult {
   actions: AppAction[]

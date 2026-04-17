@@ -1,5 +1,6 @@
 import type { DirectoryResult } from '../../state/types'
 
+import { useModalHelp } from '../keymap-context'
 import { abbreviatePath } from '../path-format'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
@@ -50,13 +51,10 @@ export function CreateSessionModal({
 }: CreateSessionModalProps) {
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
+  const help = useModalHelp('modal.create-session')
 
   return (
-    <ModalShell
-      title="Create session"
-      help="Tab switch field. Ctrl+n/p nav. Esc cancel."
-      width={uiTokens.modalWidth.xl}
-    >
+    <ModalShell title="Create session" help={help} width={uiTokens.modalWidth.xl}>
       <box flexDirection="column">
         <text fg={dirActive ? theme.text : theme.textMuted}>Search projects</text>
         <InputField

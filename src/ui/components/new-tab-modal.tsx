@@ -1,4 +1,5 @@
 import { getAllAssistantOptions } from '../../pty/command-registry'
+import { useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
@@ -14,17 +15,15 @@ interface NewTabModalProps {
 export function NewTabModal({ customCommands, editBuffer, selectedIndex }: NewTabModalProps) {
   const options = getAllAssistantOptions(customCommands)
   const selectedOption = options[selectedIndex]
+  const editingHelp = useModalHelp('modal.new-tab.command-edit')
+  const browsingHelp = useModalHelp('modal.new-tab')
+  const help =
+    editBuffer !== null
+      ? `Editing command for ${selectedOption?.label}. ${editingHelp}`
+      : browsingHelp
 
   return (
-    <ModalShell
-      title="New assistant tab"
-      help={
-        editBuffer !== null
-          ? `Editing command for ${selectedOption?.label}. Enter to confirm, Esc to cancel.`
-          : 'Use j/k or arrows, Enter to confirm, e to edit command, Esc to cancel.'
-      }
-      width={uiTokens.modalWidth.md}
-    >
+    <ModalShell title="New assistant tab" help={help} width={uiTokens.modalWidth.md}>
       {editBuffer !== null ? (
         <InputField active value={editBuffer} />
       ) : (

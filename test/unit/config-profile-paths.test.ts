@@ -48,4 +48,23 @@ describe('config profile paths', () => {
       join(tempHome, '.config', 'aimux', 'dev', 'aimux-sessions.json')
     )
   })
+
+  test('persists skippedUpdateVersion through saveConfig/loadConfig', async () => {
+    tempHome = mkdtempSync(join(tmpdir(), 'aimux-config-skip-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'skip-update'
+    delete process.env.AIMUX_RUNTIME_PROFILE
+
+    const config = await import(`../../src/config.ts?skip=${Date.now()}`)
+
+    const ok = config.saveConfig({
+      customCommands: {},
+      skippedUpdateVersion: '9.9.9',
+      version: 2,
+    })
+    expect(ok).toBe(true)
+
+    const loaded = config.loadConfig()
+    expect(loaded.skippedUpdateVersion).toBe('9.9.9')
+  })
 })

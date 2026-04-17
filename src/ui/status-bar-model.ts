@@ -1,5 +1,8 @@
+import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
+
 import type { AppState, TabSession } from '../state/types'
 
+import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
 export interface StatusBarModel {
@@ -8,6 +11,7 @@ export interface StatusBarModel {
 }
 
 const MAX_TAB_LABEL_LENGTH = 24
+const HINT_LIMIT = 6
 
 function truncateLabel(label: string): string {
   if (label.length <= MAX_TAB_LABEL_LENGTH) {
@@ -25,39 +29,15 @@ function getActiveTabLabel(tab?: TabSession): string {
   return `${truncateLabel(tab.title)} (${tab.status})`
 }
 
-function getNavigationHint(activeTab?: TabSession): string {
-  if (!activeTab) {
-    return 'Ctrl+g sessions  Ctrl+n new  Ctrl+b toggle  Ctrl+h/l resize  ? help'
-  }
-
-  if (activeTab.status === 'disconnected') {
-    return 'Ctrl+r restart restored tab  Ctrl+w close  i focus'
-  }
-
-  return 'Ctrl+g sessions  j/k move  Shift+J/K reorder  Ctrl+r restart  Ctrl+w close  i focus  ? help'
+function hintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
+  return buildHintText(config, modeId, HINT_LIMIT)
 }
 
-function getInputHint(activeTab?: TabSession): string {
-  if (!activeTab) {
-    return 'Ctrl+n new  no active tab to focus'
-  }
-
-  if (activeTab.status === 'disconnected') {
-    return 'Ctrl+z unfocus  Ctrl+w layout  Ctrl+r restart'
-  }
-
-  return 'Ctrl+z unfocus  Ctrl+w layout  typing goes to active tab'
-}
-
-function getGitHint(modalType: AppState['modal']['type']): string {
-  if (modalType === 'git-commit') {
-    return 'Tab switch field  Enter newline  Ctrl+Enter commit  Esc cancel'
-  }
-
-  return 'j/k file  Ctrl+d/u page  a stage  d unstage/delete  c commit  p push  Esc exit'
-}
-
-export function getStatusBarModel(state: AppState, activeTab?: TabSession): StatusBarModel {
+export function getStatusBarModel(
+  state: AppState,
+  activeTab: TabSession | undefined,
+  config: ResolvedKeymapConfig
+): StatusBarModel {
   const currentSession = state.currentSessionId
     ? state.sessions.find((session) => session.id === state.currentSessionId)
     : undefined
@@ -73,33 +53,81 @@ export function getStatusBarModel(state: AppState, activeTab?: TabSession): Stat
     case 'terminal-input':
       return {
         left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
-        right: getInputHint(activeTab),
+        right: hintForMode(config, 'terminal-input'),
       }
-    case 'modal':
+    case 'modal': {
+      const modalMode = deriveModalModeId(state.modal.type)
       return {
         left: `${sessionIcon}  ${sessionLabel}`,
-        right: 'j/k move  Enter confirm  n/r/d actions  Esc cancel',
+        right: modalMode ? hintForMode(config, modalMode) : '',
       }
+    }
     case 'layout':
       return {
         left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
-        right: 'h/j/k/l focus  |/- split  H/L resize  q close  Esc cancel',
+        right: hintForMode(config, 'layout'),
       }
     case 'git':
       return {
         left: `${sessionIcon}  ${sessionLabel}`,
-        right: getGitHint(state.modal.type),
+        right: hintForMode(config, 'git-mode'),
       }
-    case 'command-edit':
+    case 'command-edit': {
+      const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {
         left: `${sessionIcon}  ${sessionLabel}`,
-        right: state.modal.type === 'git-commit' ? getGitHint('git-commit') : 'Esc cancel',
+        right: commandEditMode ? hintForMode(config, commandEditMode) : '',
       }
+    }
     case 'navigation':
     default:
       return {
         left: `${sessionIcon}  ${sessionLabel}  ${getActiveTabLabel(activeTab)}`,
-        right: getNavigationHint(activeTab),
+        right: hintForMode(config, 'navigation'),
       }
+  }
+}
+
+function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null {
+  switch (modalType) {
+    case 'help':
+      return 'modal.help'
+    case 'new-tab':
+      return 'modal.new-tab'
+    case 'session-picker':
+      return 'modal.session-picker'
+    case 'snippet-picker':
+      return 'modal.snippet-picker'
+    case 'split-picker':
+      return 'modal.split-picker'
+    case 'theme-picker':
+      return 'modal.theme-picker'
+    case 'update-available':
+      return 'modal.update-available'
+    default:
+      return null
+  }
+}
+
+function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId | null {
+  switch (modalType) {
+    case 'create-session':
+      return 'modal.create-session'
+    case 'git-commit':
+      return 'modal.git-commit'
+    case 'new-tab':
+      return 'modal.new-tab.command-edit'
+    case 'rename-tab':
+      return 'modal.rename-tab'
+    case 'session-name':
+      return 'modal.session-name'
+    case 'session-picker':
+      return 'modal.session-picker.filtering'
+    case 'snippet-editor':
+      return 'modal.snippet-editor'
+    case 'snippet-picker':
+      return 'modal.snippet-picker.filtering'
+    default:
+      return null
   }
 }

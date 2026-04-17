@@ -22,6 +22,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.snippet-picker.filtering': ['modal.snippet-picker'],
   'modal.split-picker': ['navigation'],
   'modal.theme-picker': ['navigation'],
+  'modal.update-available': ['navigation'],
   'navigation': [
     'terminal-input',
     'modal.new-tab',
@@ -30,6 +31,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.snippet-picker',
     'modal.theme-picker',
     'modal.rename-tab',
+    'modal.update-available',
     'git-mode',
   ],
   'terminal-input': ['navigation', 'layout'],

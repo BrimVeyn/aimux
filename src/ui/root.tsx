@@ -11,6 +11,7 @@ import { GitCommitModal } from './components/git-commit-modal'
 import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
+import { PendingChordOverlay } from './components/pending-chord-overlay'
 import { SessionNameModal } from './components/session-name-modal'
 import { SessionPickerModal } from './components/session-picker-modal'
 import { Sidebar } from './components/sidebar'
@@ -20,6 +21,7 @@ import { SplitLayout } from './components/split-layout'
 import { StatusBar } from './components/status-bar'
 import { TerminalPane } from './components/terminal-pane'
 import { ThemePickerModal } from './components/theme-picker-modal'
+import { UpdateAvailableModal } from './components/update-available-modal'
 import { theme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
@@ -132,6 +134,14 @@ function renderModal(
       return (
         <ThemePickerModal selectedIndex={modal.selectedIndex} currentThemeId={options.themeId} />
       )
+    case 'update-available':
+      return (
+        <UpdateAvailableModal
+          selectedIndex={modal.selectedIndex}
+          currentVersion={modal.currentVersion}
+          latestVersion={modal.latestVersion}
+        />
+      )
     case 'help':
       return <HelpModal />
     case 'git-commit': {
@@ -216,6 +226,7 @@ export function RootView({
       <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
         <GitView />
         <StatusBar />
+        <PendingChordOverlay />
         {renderModal(modal, {
           createSessionFields,
           currentSessionId,
@@ -280,6 +291,7 @@ export function RootView({
         )}
       </box>
       <StatusBar />
+      <PendingChordOverlay />
       {renderModal(modal, {
         createSessionFields,
         currentSessionId,
