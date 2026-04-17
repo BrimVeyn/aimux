@@ -46,13 +46,10 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - name: Configure npm auth
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
-
       - name: Publish @brimveyn/aimux-config
         working-directory: packages/aimux-config
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ -z "$(npm view @brimveyn/aimux-config@$VERSION version 2>/dev/null)" ]; then
@@ -62,6 +59,8 @@ jobs:
           fi
 
       - name: Publish @brimveyn/aimux
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if [ -z "$(npm view @brimveyn/aimux@$VERSION version 2>/dev/null)" ]; then
