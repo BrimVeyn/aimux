@@ -1,6 +1,6 @@
 {
   "name": "@brimveyn/aimux",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode side-by-side with tabbed navigation, split panes, and persistent sessions.",
   "keywords": [
     "ai",
@@ -54,8 +54,7 @@
     "restart-daemon": "bun run src/index.tsx restart-daemon",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
-    "prepare": "lefthook install"
+    "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",
