@@ -58,6 +58,21 @@ jobs:
             echo "@brimveyn/aimux-config@$VERSION already published, skipping"
           fi
 
+      - name: Verify aimux-config workspace dep resolves correctly
+        run: |
+          EXPECTED=$(node -p "require('./packages/aimux-config/package.json').version")
+          mkdir -p /tmp/aimux-verify
+          bun pm pack --destination /tmp/aimux-verify
+          cd /tmp/aimux-verify
+          tar xzf *.tgz
+          ACTUAL=$(node -p "require('./package/package.json').dependencies['@brimveyn/aimux-config']")
+          echo "expected aimux-config dep = $EXPECTED"
+          echo "actual   aimux-config dep = $ACTUAL"
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "ERROR: bun resolved workspace:* to $ACTUAL, but packages/aimux-config is at $EXPECTED. Refusing to publish a stale dependency. Regenerate bun.lock or pin the dep explicitly." >&2
+            exit 1
+          fi
+
       - name: Publish @brimveyn/aimux
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
