@@ -20,6 +20,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     backends: userConfig.backends ?? {},
     hooks: userConfig.hooks ?? {},
     keymaps,
+    sessionBar: userConfig.sessionBar ?? {},
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     theme: userConfig.theme,

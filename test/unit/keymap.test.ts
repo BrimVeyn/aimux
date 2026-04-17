@@ -42,10 +42,12 @@ describe('mode handlers', () => {
     expect(result.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
   })
 
-  test('navigation: Ctrl+W is no longer bound (avoids accidental tab close)', () => {
+  test('navigation: Ctrl+W is a leader prefix (no immediate action)', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = handler.handleKey(key('w', { ctrl: true }), ctx({ activeTabId: 'tab-1' }))
-    expect(result).toBeNull()
+    // Leader waits for the next chord, so actions/effects are empty.
+    expect(result?.actions).toEqual([])
+    expect(result?.effects).toEqual([])
   })
 
   test('navigation: dd chord dispatches close-active-tab', () => {
@@ -199,14 +201,17 @@ describe('mode handlers', () => {
     expect(result.actions).toContainEqual({ focusMode: 'navigation', type: 'set-focus-mode' })
   })
 
-  test('terminal-input: <leader> (Ctrl+W) resolves to enter-layout', () => {
+  test('terminal-input: <leader> (Ctrl+W) is now a prefix (enter-layout on timeout)', () => {
+    // Ctrl+W is both bound alone (→ enter-layout) and as a prefix for
+    // <leader>b / <leader>1..9 session-bar shortcuts. The trie therefore
+    // waits for a continuation; handleKey returns an empty pending result.
+    // The exact binding fires via the handler's timeout callback, which is
+    // covered by sequence-resolver tests.
     const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
-    const result = requireValue(
-      handler.handleKey(key('w', { ctrl: true }), ctx()),
-      'Expected Ctrl+W result'
-    )
-    expect(result.transition).toBe('layout')
-    expect(result.actions).toContainEqual({ focusMode: 'layout', type: 'set-focus-mode' })
+    const result = handler.handleKey(key('w', { ctrl: true }), ctx())
+    expect(result?.actions).toEqual([])
+    expect(result?.effects).toEqual([])
+    expect(result?.transition).toBeUndefined()
   })
 
   test('terminal-input: Ctrl+B resolves to toggle-sidebar', () => {

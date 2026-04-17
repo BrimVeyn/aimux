@@ -31,7 +31,7 @@ import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
 import { getProfileName } from './profile-paths'
 import { appStore } from './state/app-store'
-import { setActiveDispatch } from './state/dispatch-ref'
+import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
@@ -69,11 +69,22 @@ export function App({
     return config.themeId ?? 'aimux'
   })
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
-    const { customCommands, gitPanelRatio, gitPanelVisible } = loadConfig()
-    return createInitialState(customCommands, loadSessionCatalog(), loadSnippetCatalog(), true, {
-      gitPanelRatio,
-      gitPanelVisible,
-    })
+    const json = loadConfig()
+    const sessionBarVisible = resolvedConfig.sessionBar?.visible ?? json.sessionBarVisible ?? true
+    const sessionBarPosition =
+      resolvedConfig.sessionBar?.position ?? json.sessionBarPosition ?? 'top'
+    return createInitialState(
+      json.customCommands,
+      loadSessionCatalog(),
+      loadSnippetCatalog(),
+      true,
+      {
+        gitPanelRatio: json.gitPanelRatio,
+        gitPanelVisible: json.gitPanelVisible,
+        sessionBarPosition,
+        sessionBarVisible,
+      }
+    )
   })
 
   useLayoutEffect(() => {
@@ -82,7 +93,10 @@ export function App({
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
-    return () => setActiveDispatch(null)
+    return () => {
+      setActiveDispatch(null)
+      setActiveSideEffectRunner(null)
+    }
   }, [dispatch])
 
   useEffect(() => {
@@ -251,6 +265,9 @@ export function App({
 
   // Keep the ref pointing at the latest closure so stable callbacks can invoke it
   processKeyResultRef.current = processKeyResult
+  // Expose the side-effect runner so non-keyboard call sites (mouse, IPC) can
+  // invoke the same effect pipeline with the current context.
+  setActiveSideEffectRunner((effect) => executeSideEffect(effect, sideEffectCtx))
 
   useLayoutEffect(() => {
     for (const handler of keymapHandlers) {

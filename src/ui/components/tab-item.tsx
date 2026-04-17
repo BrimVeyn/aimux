@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react'
-
 import type { TabSession } from '../../state/types'
 
+import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { theme } from '../theme'
 
 interface TabItemProps {
@@ -28,9 +27,6 @@ function getStatusColor(status: TabSession['status']): string {
   }
 }
 
-const BUSY_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-const BUSY_FRAME_INTERVAL_MS = 80
-
 function getIndicator(active: boolean, focused: boolean, inLayout: boolean): string {
   if (active) {
     return focused ? '›' : '•'
@@ -48,16 +44,8 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
 }
 
 function BusyIndicator() {
-  const [frame, setFrame] = useState(0)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFrame((prev) => (prev + 1) % BUSY_FRAMES.length)
-    }, BUSY_FRAME_INTERVAL_MS)
-    return () => clearInterval(interval)
-  }, [])
-
-  return <text fg={theme.accent}>{BUSY_FRAMES[frame]} busy</text>
+  const frame = useBusySpinner()
+  return <text fg={theme.accent}>{frame} busy</text>
 }
 
 function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocusedInput: boolean }) {

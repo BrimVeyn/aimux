@@ -488,9 +488,27 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleConfirmUpdateSelection(ctx)
       return
     }
+    case 'switch-session-by-index': {
+      handleSwitchSessionByIndex(ctx, effect.index)
+      return
+    }
     default:
       effect satisfies never
   }
+}
+
+function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void {
+  const { backend, dispatch, state } = ctx
+  const ordered = state.sessions
+    .slice()
+    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+  const target = ordered[index - 1]
+  if (!target) {
+    logInputDebug('app.sessionBar.switchOutOfRange', { index, total: ordered.length })
+    return
+  }
+  if (target.id === state.currentSessionId) return
+  handleSwitchSessionEffect(state, backend, dispatch, target)
 }
 
 function handleConfirmUpdateSelection(ctx: SideEffectContext): void {

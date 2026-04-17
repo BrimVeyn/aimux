@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-import type { WorkspaceSnapshotV1 } from './state/types'
+import type { SessionBarPosition, WorkspaceSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
@@ -15,6 +15,8 @@ export interface AimuxConfig {
   themeId?: ThemeId
   gitPanelVisible?: boolean
   gitPanelRatio?: number
+  sessionBarVisible?: boolean
+  sessionBarPosition?: SessionBarPosition
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
 }
@@ -58,6 +60,8 @@ export function loadConfigResult(): ConfigLoadResult {
       themeId?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
+      sessionBarVisible?: unknown
+      sessionBarPosition?: unknown
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
     }
@@ -93,6 +97,20 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid gitPanelRatio')
     }
 
+    const validSessionBarVisible =
+      typeof parsed.sessionBarVisible === 'boolean' ? parsed.sessionBarVisible : undefined
+    if (parsed.sessionBarVisible !== undefined && validSessionBarVisible === undefined) {
+      issues.push('ignored invalid sessionBarVisible')
+    }
+
+    const validSessionBarPosition =
+      parsed.sessionBarPosition === 'top' || parsed.sessionBarPosition === 'bottom'
+        ? parsed.sessionBarPosition
+        : undefined
+    if (parsed.sessionBarPosition !== undefined && validSessionBarPosition === undefined) {
+      issues.push('ignored invalid sessionBarPosition')
+    }
+
     if (
       parsed.workspaceSnapshot !== undefined &&
       !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
@@ -117,6 +135,8 @@ export function loadConfigResult(): ConfigLoadResult {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPanelRatio: validGitPanelRatio,
         gitPanelVisible: validGitPanelVisible,
+        sessionBarPosition: validSessionBarPosition,
+        sessionBarVisible: validSessionBarVisible,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: isThemeId(parsed.themeId) ? parsed.themeId : undefined,
         version: 2,

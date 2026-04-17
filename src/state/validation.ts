@@ -151,6 +151,8 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
     isString(value.createdAt) &&
     isString(value.updatedAt) &&
     isString(value.lastOpenedAt) &&
+    (value.order === undefined ||
+      (typeof value.order === 'number' && Number.isFinite(value.order))) &&
     (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot))
   )
 }

@@ -46,7 +46,7 @@ export function loadSessionCatalog(): SessionRecord[] {
   const { file, issue } = readCatalogFile()
   if (file) {
     logDebug('sessions.catalog.load', { sessionCount: file.sessions.length })
-    return file.sessions
+    return normalizeOrder(file.sessions)
   }
 
   if (issue) {
@@ -94,4 +94,25 @@ export function saveSessionCatalog(sessions: SessionRecord[]): void {
 
 export function getSessionCatalogPath(): string {
   return SESSIONS_PATH
+}
+
+/**
+ * Assign a stable `order` to every session. Records with an existing numeric
+ * `order` keep their slot (sorted ascending); the rest are appended by
+ * createdAt ascending so older sessions come first.
+ */
+function normalizeOrder(sessions: SessionRecord[]): SessionRecord[] {
+  const withOrder: SessionRecord[] = []
+  const withoutOrder: SessionRecord[] = []
+  for (const s of sessions) {
+    if (typeof s.order === 'number' && Number.isFinite(s.order)) {
+      withOrder.push(s)
+    } else {
+      withoutOrder.push(s)
+    }
+  }
+  withOrder.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+  withoutOrder.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  const merged = [...withOrder, ...withoutOrder]
+  return merged.map((s, i) => (s.order === i ? s : { ...s, order: i }))
 }

@@ -99,10 +99,36 @@ export class KeymapBuilder implements KeymapBuilderApi {
     return this
   }
 
-  mode(id: ModeId, configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi): this {
+  mode(
+    id: ModeId | readonly ModeId[],
+    configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi
+  ): this {
     const builder = new ModeBindingBuilder()
     configure(builder)
-    this.modes.set(id, builder._build())
+    const incoming = builder._build()
+    const ids = Array.isArray(id) ? id : [id]
+    for (const modeId of ids) {
+      const existing = this.modes.get(modeId)
+      if (!existing) {
+        // Fresh mode: clone so later merges don't mutate a shared array.
+        this.modes.set(modeId, {
+          bindings: [...incoming.bindings],
+          isPassthrough: incoming.isPassthrough,
+          removals: [...incoming.removals],
+        })
+        continue
+      }
+      // Merge: later bindings win over earlier ones sharing the same keys.
+      const incomingKeys = new Set(incoming.bindings.map((b) => b.keys))
+      this.modes.set(modeId, {
+        bindings: [
+          ...existing.bindings.filter((b) => !incomingKeys.has(b.keys)),
+          ...incoming.bindings,
+        ],
+        isPassthrough: existing.isPassthrough || incoming.isPassthrough,
+        removals: [...existing.removals, ...incoming.removals],
+      })
+    }
     return this
   }
 

@@ -12,12 +12,16 @@ import {
   toTerminalContentSize,
 } from '../state/layout-resize'
 
+const SESSION_IDLE_TIMEOUT_MS = 2_000
+
 export class LocalSessionBackend
   extends EventEmitter<SessionBackendEvents>
   implements SessionBackend
 {
   private readonly sessionManager = new SessionManager()
   private currentSessionId: string | null = null
+  private readonly sessionIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly sessionBusy = new Map<string, boolean>()
 
   constructor() {
     super()
@@ -25,6 +29,7 @@ export class LocalSessionBackend
       if (sessionId === this.currentSessionId) {
         this.emit('render', tabId, viewport, terminalModes)
       }
+      this.markSessionBusy(sessionId)
     })
     this.sessionManager.on('exit', (sessionId, tabId, exitCode) => {
       if (sessionId === this.currentSessionId) {
@@ -36,6 +41,23 @@ export class LocalSessionBackend
         this.emit('error', tabId, message)
       }
     })
+  }
+
+  private markSessionBusy(sessionId: string): void {
+    if (this.sessionBusy.get(sessionId) !== true) {
+      this.sessionBusy.set(sessionId, true)
+      this.emit('sessionActivity', sessionId, true)
+    }
+    const existing = this.sessionIdleTimers.get(sessionId)
+    if (existing) clearTimeout(existing)
+    const timer = setTimeout(() => {
+      this.sessionIdleTimers.delete(sessionId)
+      if (this.sessionBusy.get(sessionId) === true) {
+        this.sessionBusy.set(sessionId, false)
+        this.emit('sessionActivity', sessionId, false)
+      }
+    }, SESSION_IDLE_TIMEOUT_MS)
+    this.sessionIdleTimers.set(sessionId, timer)
   }
 
   async attach(options: {
@@ -166,6 +188,11 @@ export class LocalSessionBackend
         this.sessionManager.disposeSession(this.currentSessionId)
       }
     }
+    for (const timer of this.sessionIdleTimers.values()) {
+      clearTimeout(timer)
+    }
+    this.sessionIdleTimers.clear()
+    this.sessionBusy.clear()
     this.currentSessionId = null
   }
 }

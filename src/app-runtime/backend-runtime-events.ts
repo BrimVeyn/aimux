@@ -79,15 +79,21 @@ export function bindBackendRuntimeEvents({
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 
+  const handleSessionActivity = (sessionId: string, busy: boolean) => {
+    dispatch({ busy, sessionId, type: 'set-session-busy' })
+  }
+
   backend.on('render', handleRender)
   backend.on('exit', handleExit)
   backend.on('error', handleError)
+  backend.on('sessionActivity', handleSessionActivity)
 
   return () => {
     timeouts.clearAllTimers()
     backend.off('render', handleRender)
     backend.off('exit', handleExit)
     backend.off('error', handleError)
+    backend.off('sessionActivity', handleSessionActivity)
     void backend.destroy(true)
   }
 }

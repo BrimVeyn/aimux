@@ -77,7 +77,13 @@ defineConfig({
 ```ts
 k.leader(keys) // default: '<Space>'
   .timeout(ms) // default: 300
-  .mode(id, configure) // define bindings for a mode
+  .mode(id | ids[], configure) // define bindings for a mode (or several at once)
+```
+
+Pass an array of `ModeId`s to register the same bindings in every listed mode — handy for actions that should fire in both `navigation` and `terminal-input`, for example:
+
+```ts
+k.mode(['navigation', 'terminal-input'], (m) => m.map('<C-s>', actions.snippetPicker))
 ```
 
 ### Mode builder

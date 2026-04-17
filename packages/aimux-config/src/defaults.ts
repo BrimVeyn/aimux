@@ -51,6 +51,23 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Session bar: same chords from nav and while typing in the terminal
+    // -----------------------------------------------------------------------
+    .mode(['navigation', 'terminal-input'], (m) =>
+      m
+        .map('<Leader>b', actions.toggleSessionBar, 'Toggle session bar')
+        .map('<Leader>1', actions.switchSessionByIndex(1), 'Session 1')
+        .map('<Leader>2', actions.switchSessionByIndex(2), 'Session 2')
+        .map('<Leader>3', actions.switchSessionByIndex(3), 'Session 3')
+        .map('<Leader>4', actions.switchSessionByIndex(4), 'Session 4')
+        .map('<Leader>5', actions.switchSessionByIndex(5), 'Session 5')
+        .map('<Leader>6', actions.switchSessionByIndex(6), 'Session 6')
+        .map('<Leader>7', actions.switchSessionByIndex(7), 'Session 7')
+        .map('<Leader>8', actions.switchSessionByIndex(8), 'Session 8')
+        .map('<Leader>9', actions.switchSessionByIndex(9), 'Session 9')
+    )
+
+    // -----------------------------------------------------------------------
     // Layout mode
     // -----------------------------------------------------------------------
     .mode('layout', (m) =>

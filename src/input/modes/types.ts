@@ -53,6 +53,7 @@ export type SideEffect =
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
+  | { type: 'switch-session-by-index'; index: number }
 
 export interface KeyResult {
   actions: AppAction[]

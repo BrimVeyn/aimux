@@ -1,4 +1,4 @@
-import type { AppAction, AppState, SessionRecord, SnippetRecord } from './types'
+import type { AppAction, AppState, SessionBarPosition, SessionRecord, SnippetRecord } from './types'
 
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
@@ -17,6 +17,8 @@ const DEFAULT_TERMINAL_ROWS = 24
 export interface InitialStateOverrides {
   gitPanelVisible?: boolean
   gitPanelRatio?: number
+  sessionBarVisible?: boolean
+  sessionBarPosition?: SessionBarPosition
 }
 
 export function createInitialState(
@@ -42,7 +44,12 @@ export function createInitialState(
       ? { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'session-picker' }
       : emptyModal(),
     pendingChords: null,
+    sessionBar: {
+      position: overrides.sessionBarPosition ?? 'top',
+      visible: overrides.sessionBarVisible ?? true,
+    },
     sessions,
+    sessionsBusy: {},
     sidebar: {
       gitPanelRatio: overrides.gitPanelRatio ?? 0.5,
       gitPanelVisible: overrides.gitPanelVisible ?? true,

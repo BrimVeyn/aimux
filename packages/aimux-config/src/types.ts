@@ -125,6 +125,7 @@ export interface SessionRecord {
   createdAt: string
   updatedAt: string
   lastOpenedAt: string
+  order?: number
   workspaceSnapshot?: WorkspaceSnapshotV1
 }
 
@@ -290,6 +291,13 @@ export interface LayoutState {
   terminalRows: number
 }
 
+export type SessionBarPosition = 'top' | 'bottom'
+
+export interface SessionBarState {
+  visible: boolean
+  position: SessionBarPosition
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -297,6 +305,8 @@ export interface AppState {
   tabGroupMap: Record<string, string>
   sessions: SessionRecord[]
   currentSessionId: string | null
+  sessionsBusy: Record<string, boolean>
+  sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
   sidebar: SidebarState
@@ -340,6 +350,8 @@ export type SessionAction =
   | { type: 'create-session-record'; session: SessionRecord }
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string }
+  | { type: 'reorder-sessions'; orderedIds: string[] }
+  | { type: 'set-session-busy'; sessionId: string; busy: boolean }
 
 export type TabAction =
   | { type: 'add-tab'; tab: TabSession }
@@ -401,6 +413,8 @@ export type UIAction =
   | { type: 'toggle-git-panel' }
   | { type: 'resize-git-panel'; delta: number }
   | { type: 'set-pending-chords'; chords: string[] | null }
+  | { type: 'toggle-session-bar' }
+  | { type: 'set-session-bar-position'; position: SessionBarPosition }
 
 export interface GitRefreshPayload {
   branch: string | null
@@ -477,6 +491,7 @@ export type SideEffect =
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
+  | { type: 'switch-session-by-index'; index: number }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 
@@ -595,16 +610,25 @@ export interface ModeBindingBuilderApi {
 export interface KeymapBuilderApi {
   leader(key: string): KeymapBuilderApi
   timeout(ms: number): KeymapBuilderApi
-  mode(id: ModeId, configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi): KeymapBuilderApi
+  mode(
+    id: ModeId | readonly ModeId[],
+    configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi
+  ): KeymapBuilderApi
 }
 
 // ─── Top-level user config ────────────────────────────────────────────────────
+
+export interface SessionBarConfig {
+  visible?: boolean
+  position?: SessionBarPosition
+}
 
 export interface AimuxUserConfig {
   theme?: ThemeId | ThemeDefinition
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
+  sessionBar?: SessionBarConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
 }
@@ -635,6 +659,7 @@ export interface ResolvedConfig {
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig
+  sessionBar: SessionBarConfig
   hooks: HooksConfig
   snippets: SnippetDef[]
 }
