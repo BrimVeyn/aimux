@@ -16,6 +16,7 @@ export interface AimuxConfig {
   gitPanelVisible?: boolean
   gitPanelRatio?: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+  skippedUpdateVersion?: string
 }
 
 const DEFAULT_CONFIG: AimuxConfig = {
@@ -58,6 +59,7 @@ export function loadConfigResult(): ConfigLoadResult {
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       workspaceSnapshot?: unknown
+      skippedUpdateVersion?: unknown
     }
 
     const issues: string[] = []
@@ -98,6 +100,14 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid workspaceSnapshot')
     }
 
+    const validSkippedUpdateVersion =
+      typeof parsed.skippedUpdateVersion === 'string' && parsed.skippedUpdateVersion.length > 0
+        ? parsed.skippedUpdateVersion
+        : undefined
+    if (parsed.skippedUpdateVersion !== undefined && validSkippedUpdateVersion === undefined) {
+      issues.push('ignored invalid skippedUpdateVersion')
+    }
+
     if (issues.length > 0) {
       logDebug('config.load.validationIssue', { issues, path: CONFIG_PATH })
     }
@@ -107,6 +117,7 @@ export function loadConfigResult(): ConfigLoadResult {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPanelRatio: validGitPanelRatio,
         gitPanelVisible: validGitPanelVisible,
+        skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: isThemeId(parsed.themeId) ? parsed.themeId : undefined,
         version: 2,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)

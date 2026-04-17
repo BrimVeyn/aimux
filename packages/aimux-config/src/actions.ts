@@ -237,6 +237,16 @@ export const saveSnippetEditor: KeyResult = r(
   'navigation'
 )
 
+// ---------------------------------------------------------------------------
+// Update-available modal
+// ---------------------------------------------------------------------------
+
+export const confirmUpdateSelection: KeyResult = r(
+  [{ type: 'close-modal' }],
+  [{ type: 'confirm-update-selection' }],
+  'navigation'
+)
+
 // Layout-specific
 export const exitLayoutToInput: KeyResult = r(
   [{ focusMode: 'terminal-input', type: 'set-focus-mode' }],

@@ -110,6 +110,23 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: update-available
+    // -----------------------------------------------------------------------
+    .mode('modal.update-available', (m) =>
+      m
+        .map('<Esc>', actions.closeModal)
+        .map('l', actions.moveModalSelection(1))
+        .map('h', actions.moveModalSelection(-1))
+        .map('j', actions.moveModalSelection(1))
+        .map('k', actions.moveModalSelection(-1))
+        .map('<Right>', actions.moveModalSelection(1))
+        .map('<Left>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<CR>', actions.confirmUpdateSelection)
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: rename-tab (src/input/modes/handlers/modal-rename-tab.ts)
     // -----------------------------------------------------------------------
     .mode('modal.rename-tab', (m) =>

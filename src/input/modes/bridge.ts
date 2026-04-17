@@ -28,6 +28,7 @@ const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'snippet-picker': 'modal.snippet-picker',
   'split-picker': 'modal.split-picker',
   'theme-picker': 'modal.theme-picker',
+  'update-available': 'modal.update-available',
 }
 
 export function deriveModeId(state: AppState): ModeId {

@@ -27,6 +27,7 @@ export type ModeId =
   | 'modal.help'
   | 'modal.split-picker'
   | 'modal.git-commit'
+  | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -263,6 +264,12 @@ export interface ModalSnippetEditor extends ModalBase {
   contentBuffer: string
 }
 
+export interface ModalUpdateAvailable extends ModalBase {
+  type: 'update-available'
+  currentVersion: string
+  latestVersion: string
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -276,6 +283,7 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
+  | ModalUpdateAvailable
 
 export interface LayoutState {
   terminalCols: number
@@ -324,6 +332,7 @@ export type ModalAction =
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
   | { type: 'open-theme-picker' }
+  | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
@@ -467,6 +476,7 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
+  | { type: 'confirm-update-selection' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

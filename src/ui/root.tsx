@@ -20,6 +20,7 @@ import { SplitLayout } from './components/split-layout'
 import { StatusBar } from './components/status-bar'
 import { TerminalPane } from './components/terminal-pane'
 import { ThemePickerModal } from './components/theme-picker-modal'
+import { UpdateAvailableModal } from './components/update-available-modal'
 import { theme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
@@ -131,6 +132,14 @@ function renderModal(
     case 'theme-picker':
       return (
         <ThemePickerModal selectedIndex={modal.selectedIndex} currentThemeId={options.themeId} />
+      )
+    case 'update-available':
+      return (
+        <UpdateAvailableModal
+          selectedIndex={modal.selectedIndex}
+          currentVersion={modal.currentVersion}
+          latestVersion={modal.latestVersion}
+        />
       )
     case 'help':
       return <HelpModal />

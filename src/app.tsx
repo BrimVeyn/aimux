@@ -1,6 +1,14 @@
 import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
-import { useCallback, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
@@ -20,6 +28,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
+import { getProfileName } from './profile-paths'
 import { appStore } from './state/app-store'
 import { setActiveDispatch } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
@@ -27,6 +36,11 @@ import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
+import {
+  fetchLatestNpmVersion,
+  getCurrentPackageVersion,
+  isNewerVersion,
+} from './update/version-check'
 
 const keymapHandlers = registerAllModes(getDefaultKeymapConfig())
 
@@ -58,6 +72,31 @@ export function App({ backend }: { backend: SessionBackend }) {
     setActiveDispatch(dispatch)
     return () => setActiveDispatch(null)
   }, [dispatch])
+
+  useEffect(() => {
+    if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return
+    if (getProfileName() === 'dev') return
+
+    let cancelled = false
+    void (async () => {
+      const [current, latest] = await Promise.all([
+        getCurrentPackageVersion(),
+        fetchLatestNpmVersion('@brimveyn/aimux'),
+      ])
+      if (cancelled || !latest) return
+      if (!isNewerVersion(latest, current)) return
+      if (loadConfig().skippedUpdateVersion === latest) return
+      dispatch({
+        currentVersion: current,
+        latestVersion: latest,
+        type: 'open-update-available-modal',
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const resizingRef = useRef(false)
   const layoutRef = useRef(state.layout)

@@ -471,9 +471,46 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void enqueueGitOp(() => runGitPush(ctx))
       return
     }
+    case 'confirm-update-selection': {
+      handleConfirmUpdateSelection(ctx)
+      return
+    }
     default:
       effect satisfies never
   }
+}
+
+function handleConfirmUpdateSelection(ctx: SideEffectContext): void {
+  const { state } = ctx
+  if (state.modal.type !== 'update-available') {
+    return
+  }
+  const latest = state.modal.latestVersion
+  if (state.modal.selectedIndex === 0) {
+    runUpdateFromTui(ctx, latest)
+    return
+  }
+  saveConfig({ ...loadConfig(), skippedUpdateVersion: latest })
+}
+
+function runUpdateFromTui(ctx: SideEffectContext, latestVersion: string): void {
+  saveCurrentWorkspace(ctx.state)
+  void ctx.backend.destroy(true)
+  ctx.renderer.destroy()
+  process.stdout.write(`\nUpdating aimux to ${latestVersion}...\n`)
+  const proc = Bun.spawn(['bun', 'update', '-g', '@brimveyn/aimux', '@brimveyn/aimux-config'], {
+    stderr: 'inherit',
+    stdin: 'inherit',
+    stdout: 'inherit',
+  })
+  void proc.exited.then((code) => {
+    if (code === 0) {
+      process.stdout.write(`\nUpdated. Run \`aimux\` to start the new version.\n`)
+    } else {
+      process.stderr.write(`\nUpdate failed (exit code ${code}).\n`)
+    }
+    process.exit(code ?? 1)
+  })
 }
 
 async function runGitAction(
