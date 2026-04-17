@@ -8,6 +8,7 @@ import { getRuntimeProfile } from './daemon/runtime-paths'
 import { logDebug } from './debug/input-log'
 import { runDoctor } from './doctor'
 import { runRestartDaemon } from './restart-daemon'
+import { runRestartTerminalManager } from './restart-terminal-manager'
 import { createSessionBackend } from './session-backend/bootstrap'
 import { runTerminalManager } from './terminal-manager/terminal-manager'
 import { runUpdate } from './update'
@@ -29,6 +30,10 @@ if (command === 'restart-daemon') {
   process.exit(await runRestartDaemon())
 }
 
+if (command === 'restart-terminal-manager') {
+  process.exit(await runRestartTerminalManager())
+}
+
 if (command === 'update') {
   process.exit(await runUpdate())
 }
@@ -45,7 +50,7 @@ if (command === 'terminal-manager') {
 
 if (command === '--help' || command === '-h') {
   process.stdout.write(
-    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                  Start aimux\n  aimux update           Update to latest version\n  aimux doctor           Diagnose setup issues\n  aimux restart-daemon   Restart IPC daemon\n\n'
+    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                           Start aimux\n  aimux update                    Update to latest version\n  aimux doctor                    Diagnose setup issues\n  aimux restart-daemon            Restart IPC daemon\n  aimux restart-terminal-manager  Restart terminal-manager (kills live sessions)\n\n'
   )
   process.exit(0)
 }

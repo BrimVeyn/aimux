@@ -52,6 +52,7 @@
     "demo:splits": "vhs assets/splits.tape",
     "demo:themes": "vhs assets/themes.tape",
     "restart-daemon": "AIMUX_PROFILE=dev bun run src/index.tsx restart-daemon",
+    "restart-terminal-manager": "AIMUX_PROFILE=dev bun run src/index.tsx restart-terminal-manager",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
