@@ -1,6 +1,6 @@
-import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import type { SessionRecord } from '../../state/types'
 
@@ -18,12 +18,16 @@ export function SessionBar() {
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
+  // Hysteresis: the id of the chip we most recently swapped with. While the
+  // cursor remains over that chip we refuse to swap back (prevents oscillation
+  // when a long chip's new bounds still cover the cursor after a swap).
+  const lastSwapWithRef = useRef<string | null>(null)
+  // Live bounds of each chip after render, keyed by session id.
+  const chipRefs = useRef(new Map<string, BoxRenderable>())
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
   if (!bar.visible || ordered.length === 0) return null
 
-  // When dragging, render from dragOrder so the list updates live; otherwise
-  // render the canonical catalog order.
   const visibleSessions =
     dragOrder !== null
       ? dragOrder
@@ -33,14 +37,41 @@ export function SessionBar() {
 
   const baselineOrder = ordered.map((s) => s.id)
 
+  function setChipRef(id: string, ref: BoxRenderable | null): void {
+    if (ref) chipRefs.current.set(id, ref)
+    else chipRefs.current.delete(id)
+  }
+
+  function findChipAtX(x: number): string | null {
+    for (const [id, ref] of chipRefs.current) {
+      if (x >= ref.x && x < ref.x + ref.width) return id
+    }
+    return null
+  }
+
   const handleMouseDown = (id: string) => {
     setDraggingId(id)
     setDragOrder(baselineOrder)
+    lastSwapWithRef.current = null
   }
 
-  const handleMouseOver = (hoveredId: string) => {
-    if (!draggingId || hoveredId === draggingId) return
-    setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hoveredId) : prev))
+  const handleMouseDrag = (event: OtuiMouseEvent) => {
+    if (!draggingId) return
+    const hit = findChipAtX(event.x)
+    if (hit === null) {
+      // Cursor left the bar entirely — allow the next hit to re-trigger a swap.
+      lastSwapWithRef.current = null
+      return
+    }
+    if (hit === draggingId) {
+      // Over the dragged chip itself — reset hysteresis so re-entering a
+      // neighbour can swap again.
+      lastSwapWithRef.current = null
+      return
+    }
+    if (hit === lastSwapWithRef.current) return
+    setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hit) : prev))
+    lastSwapWithRef.current = hit
   }
 
   const commitDrop = () => {
@@ -48,6 +79,7 @@ export function SessionBar() {
     const finalOrder = dragOrder
     setDraggingId(null)
     setDragOrder(null)
+    lastSwapWithRef.current = null
 
     if (!source || !finalOrder) return
 
@@ -57,7 +89,7 @@ export function SessionBar() {
       return
     }
 
-    // No change → click-to-switch on the originating chip.
+    // Drag did not change anything → treat as click, switch to that session.
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
       runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
@@ -67,6 +99,7 @@ export function SessionBar() {
   const cancelDrag = () => {
     setDraggingId(null)
     setDragOrder(null)
+    lastSwapWithRef.current = null
   }
 
   return (
@@ -87,8 +120,9 @@ export function SessionBar() {
             active={session.id === currentId}
             busy={busyMap[session.id] ?? false}
             dragging={draggingId === session.id}
+            onRef={(r) => setChipRef(session.id, r)}
             onMouseDown={() => handleMouseDown(session.id)}
-            onMouseOver={() => handleMouseOver(session.id)}
+            onMouseDrag={handleMouseDrag}
             onMouseUp={commitDrop}
             onMouseDragEnd={cancelDrag}
           />
@@ -112,8 +146,9 @@ interface SessionChipProps {
   active: boolean
   busy: boolean
   dragging: boolean
+  onRef: (ref: BoxRenderable | null) => void
   onMouseDown: (event: OtuiMouseEvent) => void
-  onMouseOver: (event: OtuiMouseEvent) => void
+  onMouseDrag: (event: OtuiMouseEvent) => void
   onMouseUp: (event: OtuiMouseEvent) => void
   onMouseDragEnd: (event: OtuiMouseEvent) => void
 }
@@ -124,9 +159,10 @@ function SessionChip({
   dragging,
   index,
   onMouseDown,
+  onMouseDrag,
   onMouseDragEnd,
-  onMouseOver,
   onMouseUp,
+  onRef,
   session,
 }: SessionChipProps) {
   const showSpinner = busy && !active
@@ -138,6 +174,7 @@ function SessionChip({
 
   return (
     <box
+      ref={onRef}
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
@@ -146,8 +183,8 @@ function SessionChip({
         e.preventDefault()
         onMouseDown(e)
       }}
-      onMouseOver={(e) => {
-        onMouseOver(e)
+      onMouseDrag={(e) => {
+        onMouseDrag(e)
       }}
       onMouseUp={(e) => {
         e.preventDefault()
