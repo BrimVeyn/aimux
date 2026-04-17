@@ -1,4 +1,5 @@
-import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
+import type { ResolvedConfig } from '@brimveyn/aimux-config'
+
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import {
   useCallback,
@@ -34,6 +35,7 @@ import { setActiveDispatch } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
+import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
 import {
@@ -42,11 +44,21 @@ import {
   isNewerVersion,
 } from './update/version-check'
 
-const keymapHandlers = registerAllModes(getDefaultKeymapConfig())
-
 const WORKSPACE_SAVE_DEBOUNCE_MS = 250
 
-export function App({ backend }: { backend: SessionBackend }) {
+export function App({
+  backend,
+  resolvedConfig,
+}: {
+  backend: SessionBackend
+  resolvedConfig: ResolvedConfig
+}) {
+  const keymapHandlers = useMemo(
+    () => registerAllModes(resolvedConfig.keymaps),
+    // Registration has side effects in a global mode registry — run once per app instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
@@ -171,15 +183,18 @@ export function App({ backend }: { backend: SessionBackend }) {
   // Allows handleTerminalShortcut (a stable callback) to reach the latest closure.
   const processKeyResultRef = useRef<(result: KeyResult, modeId: ModeId) => void>(() => {})
 
-  const handleTerminalShortcut = useCallback((chord: KeyChord): boolean => {
-    const terminalHandler = keymapHandlers.find((h) => h.id === 'terminal-input')
-    if (!terminalHandler) return false
-    const ctx: ModeContext = { state: stateRef.current }
-    const result = terminalHandler.handleChord(chord, ctx)
-    if (!result) return false
-    processKeyResultRef.current(result, 'terminal-input')
-    return true
-  }, [])
+  const handleTerminalShortcut = useCallback(
+    (chord: KeyChord): boolean => {
+      const terminalHandler = keymapHandlers.find((h) => h.id === 'terminal-input')
+      if (!terminalHandler) return false
+      const ctx: ModeContext = { state: stateRef.current }
+      const result = terminalHandler.handleChord(chord, ctx)
+      if (!result) return false
+      processKeyResultRef.current(result, 'terminal-input')
+      return true
+    },
+    [keymapHandlers]
+  )
 
   useRendererBindings({
     activeTabId: state.activeTabId,
@@ -272,21 +287,23 @@ export function App({ backend }: { backend: SessionBackend }) {
   })
 
   return (
-    <RootView
-      themeId={themeId}
-      contentOrigin={contentOriginRef.current}
-      mouseForwardingEnabled={activeMouseForwardingEnabled}
-      localScrollbackEnabled={activeLocalScrollbackEnabled}
-      onTerminalMouseEvent={handleTerminalMouseEvent}
-      onTerminalScrollEvent={handleTerminalScrollEvent}
-      onTerminalClick={handleTerminalClick}
-      onPaneActivate={handlePaneActivate}
-      onSplitResize={handleSplitResize}
-      onSeparatorDragStart={handleSeparatorDragStart}
-      onSeparatorDrag={handleSeparatorDrag}
-      onSeparatorDragEnd={handleSeparatorDragEnd}
-      terminalCols={terminalSize.cols}
-      terminalRows={terminalSize.rows}
-    />
+    <KeymapContext.Provider value={resolvedConfig.keymaps}>
+      <RootView
+        themeId={themeId}
+        contentOrigin={contentOriginRef.current}
+        mouseForwardingEnabled={activeMouseForwardingEnabled}
+        localScrollbackEnabled={activeLocalScrollbackEnabled}
+        onTerminalMouseEvent={handleTerminalMouseEvent}
+        onTerminalScrollEvent={handleTerminalScrollEvent}
+        onTerminalClick={handleTerminalClick}
+        onPaneActivate={handlePaneActivate}
+        onSplitResize={handleSplitResize}
+        onSeparatorDragStart={handleSeparatorDragStart}
+        onSeparatorDrag={handleSeparatorDrag}
+        onSeparatorDragEnd={handleSeparatorDragEnd}
+        terminalCols={terminalSize.cols}
+        terminalRows={terminalSize.rows}
+      />
+    </KeymapContext.Provider>
   )
 }

@@ -1,6 +1,8 @@
 import type { AppState } from '../../state/types'
 
+import { version as APP_VERSION } from '../../../package.json'
 import { useAppStore } from '../../state/app-store'
+import { useKeymap } from '../keymap-context'
 import { getStatusBarModel } from '../status-bar-model'
 import { theme } from '../theme'
 
@@ -43,7 +45,8 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
 export function StatusBar() {
   const state = useAppStore((s) => s)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
-  const model = getStatusBarModel(state, activeTab)
+  const config = useKeymap()
+  const model = getStatusBarModel(state, activeTab, config)
 
   return (
     <box
@@ -60,8 +63,9 @@ export function StatusBar() {
         <text> </text>
         <text fg={theme.text}>{model.left}</text>
       </box>
-      <box width="100%">
+      <box width="100%" flexDirection="row" justifyContent="space-between">
         <text fg={theme.textMuted}>{model.right}</text>
+        <text fg={theme.dim}>v{APP_VERSION}</text>
       </box>
     </box>
   )

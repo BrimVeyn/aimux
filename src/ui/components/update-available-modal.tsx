@@ -1,3 +1,4 @@
+import { useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
@@ -19,13 +20,10 @@ export function UpdateAvailableModal({
   latestVersion,
   selectedIndex,
 }: UpdateAvailableModalProps) {
+  const modalHelp = useModalHelp('modal.update-available')
+  const help = `${currentVersion} → ${latestVersion}  ${modalHelp}`
   return (
-    <ModalShell
-      title="Update available"
-      help={`${currentVersion} → ${latestVersion}. h/l move, Enter confirm, Esc cancel.`}
-      width={uiTokens.modalWidth.md}
-      listGap={1}
-    >
+    <ModalShell title="Update available" help={help} width={uiTokens.modalWidth.md} listGap={1}>
       <box flexDirection="row" gap={1} marginTop={1}>
         {OPTIONS.map((option, index) => {
           const active = index === selectedIndex

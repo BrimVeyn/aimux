@@ -11,6 +11,7 @@ import { GitCommitModal } from './components/git-commit-modal'
 import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
+import { PendingChordOverlay } from './components/pending-chord-overlay'
 import { SessionNameModal } from './components/session-name-modal'
 import { SessionPickerModal } from './components/session-picker-modal'
 import { Sidebar } from './components/sidebar'
@@ -225,6 +226,7 @@ export function RootView({
       <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
         <GitView />
         <StatusBar />
+        <PendingChordOverlay />
         {renderModal(modal, {
           createSessionFields,
           currentSessionId,
@@ -289,6 +291,7 @@ export function RootView({
         )}
       </box>
       <StatusBar />
+      <PendingChordOverlay />
       {renderModal(modal, {
         createSessionFields,
         currentSessionId,

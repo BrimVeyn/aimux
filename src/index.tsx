@@ -3,6 +3,7 @@ import { createCliRenderer } from '@opentui/core'
 import { createRoot } from '@opentui/react'
 
 import { App } from './app'
+import { loadUserConfig } from './config/loader'
 import { runDaemon } from './daemon/daemon'
 import { getRuntimeProfile } from './daemon/runtime-paths'
 import { logDebug } from './debug/input-log'
@@ -61,4 +62,10 @@ const renderer = await createCliRenderer({
 const backend = await createSessionBackend()
 logDebug('index.backendReady', { backend: backend.constructor.name, runtimeProfile })
 
-createRoot(renderer).render(<App backend={backend} />)
+const resolvedConfig = await loadUserConfig()
+logDebug('index.userConfigLoaded', {
+  leader: resolvedConfig.keymaps.leader,
+  modeCount: resolvedConfig.keymaps.modes.size,
+})
+
+createRoot(renderer).render(<App backend={backend} resolvedConfig={resolvedConfig} />)

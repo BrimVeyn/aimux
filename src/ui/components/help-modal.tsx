@@ -1,79 +1,60 @@
+import type { ModeId } from '@brimveyn/aimux-config'
+
+import { describeBindings, groupDescribedBindings } from '../../input/keymap/describe-bindings'
+import { useKeymap, useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ModalShell } from './modal-shell'
 
-const SECTIONS = [
-  {
-    bindings: [
-      ['j / k', 'Move between tabs'],
-      ['Shift+J / K', 'Reorder tabs'],
-      ['i', 'Focus terminal input'],
-      ['r', 'Rename tab'],
-      ['?', 'Show this help'],
-    ],
-    title: 'Navigation',
-  },
-  {
-    bindings: [
-      ['Ctrl+n', 'New tab'],
-      ['Ctrl+w', 'Close tab'],
-      ['Ctrl+r', 'Restart tab'],
-      ['Ctrl+g', 'Session picker'],
-      ['Ctrl+s', 'Snippet picker'],
-      ['Ctrl+t', 'Theme picker'],
-    ],
-    title: 'Tabs & Sessions',
-  },
-  {
-    bindings: [
-      ['Ctrl+b', 'Toggle sidebar'],
-      ['Ctrl+h / l', 'Resize sidebar'],
-      ['Shift+G', 'Toggle git panel'],
-      ['Ctrl+j / k', 'Resize git panel'],
-    ],
-    title: 'Sidebar',
-  },
-  {
-    bindings: [
-      ['Ctrl+z', 'Back to navigation'],
-      ['Ctrl+w', 'Enter layout mode'],
-      ['Ctrl+b', 'Toggle sidebar'],
-    ],
-    title: 'Terminal Input',
-  },
-  {
-    bindings: [
-      ['|', 'Split vertical'],
-      ['-', 'Split horizontal'],
-      ['h / j / k / l', 'Focus pane'],
-      ['Shift+H/J/K/L', 'Resize pane'],
-      ['q', 'Close pane'],
-      ['Esc', 'Cancel'],
-    ],
-    title: 'Layout Mode (Ctrl+w)',
-  },
-  {
-    bindings: [['Ctrl+c', 'Quit']],
-    title: 'General',
-  },
-] as const
+interface ModeSection {
+  modeId: ModeId
+  title: string
+}
+
+const SECTIONS: ModeSection[] = [
+  { modeId: 'navigation', title: 'Navigation' },
+  { modeId: 'terminal-input', title: 'Terminal input' },
+  { modeId: 'layout', title: 'Layout' },
+  { modeId: 'git-mode', title: 'Git mode' },
+]
+
+const KEYS_COLUMN_WIDTH = 22
 
 export function HelpModal() {
+  const config = useKeymap()
+  const help = useModalHelp('modal.help', 1)
+
   return (
-    <ModalShell title="Keybindings" help="Press Esc to close." width={uiTokens.modalWidth.lg}>
-      {SECTIONS.map((section) => (
-        <box key={section.title} flexDirection="column">
-          <text fg={theme.text}>{section.title}</text>
-          {section.bindings.map(([key, desc]) => (
-            <box key={key} flexDirection="row">
-              <box width={18}>
-                <text fg={theme.accentAlt}> {key}</text>
+    <ModalShell title="Keybindings" help={help} width={uiTokens.modalWidth.lg}>
+      {SECTIONS.map((section) => {
+        const bindings = describeBindings(config, section.modeId, {
+          dedupeByDescription: true,
+          withDescriptionOnly: true,
+        })
+        if (bindings.length === 0) return null
+        const groups = groupDescribedBindings(bindings)
+        return (
+          <box key={section.modeId} flexDirection="column">
+            <text fg={theme.text}>{section.title}</text>
+            {groups.map((group, groupIdx) => (
+              <box
+                key={`${section.modeId}-${group.group ?? 'root'}-${groupIdx}`}
+                flexDirection="column"
+              >
+                {group.group ? <text fg={theme.textMuted}> {group.group}</text> : null}
+                {group.bindings.map((binding) => (
+                  <box key={`${binding.keys}-${binding.description}`} flexDirection="row">
+                    <box width={KEYS_COLUMN_WIDTH}>
+                      <text fg={theme.accentAlt}> {binding.keysDisplay}</text>
+                    </box>
+                    <text fg={theme.textMuted}>{binding.description ?? ''}</text>
+                  </box>
+                ))}
               </box>
-              <text fg={theme.textMuted}>{desc}</text>
-            </box>
-          ))}
-        </box>
-      ))}
+            ))}
+          </box>
+        )
+      })}
     </ModalShell>
   )
 }

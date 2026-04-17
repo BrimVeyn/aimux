@@ -573,7 +573,7 @@ export type Action = KeyResult | ActionFn
 // ─── Keymap builder API types ─────────────────────────────────────────────────
 
 export interface GroupBuilderApi {
-  map(keys: string, action: Action): GroupBuilderApi
+  map(keys: string, action: Action, description?: string): GroupBuilderApi
   group(
     prefix: string,
     name: string,
@@ -582,7 +582,7 @@ export interface GroupBuilderApi {
 }
 
 export interface ModeBindingBuilderApi {
-  map(keys: string, action: Action): ModeBindingBuilderApi
+  map(keys: string, action: Action, description?: string): ModeBindingBuilderApi
   unmap(keys: string): ModeBindingBuilderApi
   group(
     prefix: string,
@@ -615,6 +615,7 @@ export interface BindingDef {
   keys: string
   result: Action
   group?: string
+  description?: string
 }
 
 export interface ModeKeymapDef {
