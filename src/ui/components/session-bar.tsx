@@ -1,53 +1,72 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { useMemo, useRef } from 'react'
+import { useMemo, useState } from 'react'
 
 import type { SessionRecord } from '../../state/types'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
-import { orderSessionsForDisplay } from '../session-ordering'
+import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
 import { theme } from '../theme'
-
-interface DragState {
-  sourceId: string | null
-}
 
 export function SessionBar() {
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
   const busyMap = useAppStore((s) => s.sessionsBusy)
-  const dragRef = useRef<DragState>({ sourceId: null })
+
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
   if (!bar.visible || ordered.length === 0) return null
 
+  // When dragging, render from dragOrder so the list updates live; otherwise
+  // render the canonical catalog order.
+  const visibleSessions =
+    dragOrder !== null
+      ? dragOrder
+          .map((id) => ordered.find((s) => s.id === id))
+          .filter((s): s is SessionRecord => !!s)
+      : ordered
+
+  const baselineOrder = ordered.map((s) => s.id)
+
   const handleMouseDown = (id: string) => {
-    dragRef.current.sourceId = id
+    setDraggingId(id)
+    setDragOrder(baselineOrder)
   }
 
-  const handleMouseUp = (targetId: string, targetIndex: number) => {
-    const sourceId = dragRef.current.sourceId
-    dragRef.current.sourceId = null
+  const handleMouseOver = (hoveredId: string) => {
+    if (!draggingId || hoveredId === draggingId) return
+    setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hoveredId) : prev))
+  }
 
-    if (!sourceId) return
-    if (sourceId === targetId) {
-      // Click — switch to this session
-      runSideEffectGlobal({ index: targetIndex + 1, type: 'switch-session-by-index' })
+  const commitDrop = () => {
+    const source = draggingId
+    const finalOrder = dragOrder
+    setDraggingId(null)
+    setDragOrder(null)
+
+    if (!source || !finalOrder) return
+
+    const changed = !arraysEqual(finalOrder, baselineOrder)
+    if (changed) {
+      dispatchGlobal({ orderedIds: finalOrder, type: 'reorder-sessions' })
       return
     }
 
-    // Drag → reorder: move sourceId into targetIndex slot
-    const ids = ordered.map((s) => s.id)
-    const srcIdx = ids.indexOf(sourceId)
-    if (srcIdx < 0) return
-    ids.splice(srcIdx, 1)
-    const insertAt = ids.indexOf(targetId)
-    const adjusted = insertAt < 0 ? ids.length : insertAt
-    ids.splice(adjusted, 0, sourceId)
-    dispatchGlobal({ orderedIds: ids, type: 'reorder-sessions' })
+    // No change → click-to-switch on the originating chip.
+    const idx = baselineOrder.indexOf(source)
+    if (idx >= 0) {
+      runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
+    }
+  }
+
+  const cancelDrag = () => {
+    setDraggingId(null)
+    setDragOrder(null)
   }
 
   return (
@@ -58,19 +77,33 @@ export function SessionBar() {
       paddingRight={1}
       backgroundColor={theme.panelMuted}
     >
-      {ordered.map((session, i) => (
-        <SessionChip
-          key={session.id}
-          session={session}
-          index={i + 1}
-          active={session.id === currentId}
-          busy={busyMap[session.id] ?? false}
-          onMouseDown={() => handleMouseDown(session.id)}
-          onMouseUp={() => handleMouseUp(session.id, i)}
-        />
-      ))}
+      {visibleSessions.map((session) => {
+        const displayIndex = baselineOrder.indexOf(session.id) + 1
+        return (
+          <SessionChip
+            key={session.id}
+            session={session}
+            index={displayIndex}
+            active={session.id === currentId}
+            busy={busyMap[session.id] ?? false}
+            dragging={draggingId === session.id}
+            onMouseDown={() => handleMouseDown(session.id)}
+            onMouseOver={() => handleMouseOver(session.id)}
+            onMouseUp={commitDrop}
+            onMouseDragEnd={cancelDrag}
+          />
+        )
+      })}
     </box>
   )
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
 }
 
 interface SessionChipProps {
@@ -78,17 +111,30 @@ interface SessionChipProps {
   index: number
   active: boolean
   busy: boolean
+  dragging: boolean
   onMouseDown: (event: OtuiMouseEvent) => void
+  onMouseOver: (event: OtuiMouseEvent) => void
   onMouseUp: (event: OtuiMouseEvent) => void
+  onMouseDragEnd: (event: OtuiMouseEvent) => void
 }
 
-function SessionChip({ active, busy, index, onMouseDown, onMouseUp, session }: SessionChipProps) {
+function SessionChip({
+  active,
+  busy,
+  dragging,
+  index,
+  onMouseDown,
+  onMouseDragEnd,
+  onMouseOver,
+  onMouseUp,
+  session,
+}: SessionChipProps) {
   const showSpinner = busy && !active
   const spinner = useBusySpinner(showSpinner)
   const indicator = showSpinner ? spinner : '●'
   const indicatorColor = active || showSpinner ? theme.accent : theme.success
   const labelColor = active ? theme.text : theme.textMuted
-  const bgColor = active ? theme.panelHighlight : undefined
+  const bgColor = dragging || active ? theme.panelHighlight : undefined
 
   return (
     <box
@@ -100,16 +146,26 @@ function SessionChip({ active, busy, index, onMouseDown, onMouseUp, session }: S
         e.preventDefault()
         onMouseDown(e)
       }}
+      onMouseOver={(e) => {
+        onMouseOver(e)
+      }}
       onMouseUp={(e) => {
         e.preventDefault()
         onMouseUp(e)
       }}
+      onMouseDragEnd={(e) => {
+        onMouseDragEnd(e)
+      }}
     >
-      <text fg={indicatorColor}>{indicator} </text>
-      <text fg={labelColor}>
+      <text fg={indicatorColor} selectable={false}>
+        {indicator}{' '}
+      </text>
+      <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>
-      <text fg={theme.dim}> </text>
+      <text fg={theme.dim} selectable={false}>
+        {' '}
+      </text>
     </box>
   )
 }
