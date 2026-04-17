@@ -6,6 +6,7 @@ import {
   IPC_PROTOCOL_VERSION,
   type IpcMessage,
   MessageDecoder,
+  negotiateProtocolVersion,
   parseClientRequest,
   parseServerMessage,
 } from '../../src/ipc/protocol'
@@ -73,14 +74,24 @@ describe('ipc protocol framing', () => {
     ).toThrow('attach.cols must be a number')
   })
 
-  test('rejects mismatched attach protocol versions', () => {
-    expect(() =>
-      parseClientRequest({
+  test('negotiates the highest compatible protocol version', () => {
+    expect(negotiateProtocolVersion(1, IPC_PROTOCOL_VERSION, 2, 4)).toBe(IPC_PROTOCOL_VERSION)
+    expect(negotiateProtocolVersion(3, 4, 1, 2)).toBeNull()
+  })
+
+  test('accepts hello responses with negotiated protocol metadata', () => {
+    expect(
+      parseServerMessage({
         id: '6',
-        payload: { cols: 80, protocolVersion: 999, rows: 24, sessionId: 'session-a' },
-        type: 'attach',
+        payload: {
+          maxVersion: IPC_PROTOCOL_VERSION,
+          minVersion: 2,
+          processVersion: '1.2.3',
+          selectedVersion: IPC_PROTOCOL_VERSION,
+        },
+        type: 'helloResult',
       })
-    ).toThrow(`attach.protocolVersion must be ${IPC_PROTOCOL_VERSION}`)
+    ).toMatchObject({ type: 'helloResult' })
   })
 
   test('rejects malformed server event payloads', () => {

@@ -1,12 +1,18 @@
 import { chmodSync, constants, existsSync, lstatSync, mkdirSync, unlinkSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { getProfileName } from '../profile-paths'
+
+export function getRuntimeProfile(): string {
+  return getProfileName()
+}
+
 function getRuntimeBaseDir(): string {
   if (process.env.XDG_RUNTIME_DIR) {
-    return join(process.env.XDG_RUNTIME_DIR, 'aimux')
+    return join(process.env.XDG_RUNTIME_DIR, `aimux-${getRuntimeProfile()}`)
   }
 
-  return join(process.env.HOME ?? '.', '.local', 'state', 'aimux')
+  return join(process.env.HOME ?? '.', '.local', 'state', `aimux-${getRuntimeProfile()}`)
 }
 
 export function ensureRuntimeDir(): string {
@@ -24,6 +30,14 @@ export function getDaemonSocketPath(): string {
   return join(ensureRuntimeDir(), 'daemon.sock')
 }
 
+export function getIpcDaemonSocketPath(): string {
+  return getDaemonSocketPath()
+}
+
+export function getTerminalManagerSocketPath(): string {
+  return join(ensureRuntimeDir(), 'terminal-manager.sock')
+}
+
 export function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true })
 }
@@ -34,6 +48,10 @@ export function tightenDaemonSocketPermissions(socketPath: string): void {
   } catch {
     // best-effort permission tightening
   }
+}
+
+export function tightenSocketPermissions(socketPath: string): void {
+  tightenDaemonSocketPermissions(socketPath)
 }
 
 export function getDaemonSocketSecurityIssue(socketPath: string): string | null {
@@ -61,9 +79,23 @@ export function getDaemonSocketSecurityIssue(socketPath: string): string | null 
   }
 }
 
+export function getSocketSecurityIssue(socketPath: string): string | null {
+  return getDaemonSocketSecurityIssue(socketPath)
+}
+
 export function removeDaemonSocketIfExists(): void {
   const socketPath = getDaemonSocketPath()
   if (existsSync(socketPath)) {
     unlinkSync(socketPath)
   }
+}
+
+export function removeSocketIfExists(socketPath: string): void {
+  if (existsSync(socketPath)) {
+    unlinkSync(socketPath)
+  }
+}
+
+export function removeTerminalManagerSocketIfExists(): void {
+  removeSocketIfExists(getTerminalManagerSocketPath())
 }

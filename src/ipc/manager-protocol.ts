@@ -7,23 +7,29 @@ import type {
 } from '../state/types'
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
+import {
+  getProcessVersion,
+  IpcProtocolError,
+  MessageDecoder,
+  negotiateProtocolVersion,
+} from './protocol'
 
-export const IPC_PROTOCOL_MIN_VERSION = 2
-export const IPC_PROTOCOL_VERSION = 2
+export const MANAGER_PROTOCOL_MIN_VERSION = 1
+export const MANAGER_PROTOCOL_VERSION = 1
 
-export interface ProtocolHelloRequest {
+export interface ManagerHelloRequest {
   minVersion: number
   maxVersion: number
 }
 
-export interface ProtocolHelloResult {
+export interface ManagerHelloResult {
   minVersion: number
   maxVersion: number
   processVersion: string
   selectedVersion: number
 }
 
-export interface AttachRequest {
+export interface ManagerAttachRequest {
   protocolVersion: number
   sessionId: string
   cols: number
@@ -31,19 +37,20 @@ export interface AttachRequest {
   workspaceSnapshot?: WorkspaceSnapshotV1
 }
 
-export interface AttachResult {
+export interface ManagerAttachResult {
   protocolVersion: number
   tabs: TabSession[]
   activeTabId: string | null
 }
 
-export type ClientRequest =
-  | { id: string; type: 'hello'; payload: ProtocolHelloRequest }
-  | { id: string; type: 'attach'; payload: AttachRequest }
+export type ManagerRequest =
+  | { id: string; type: 'hello'; payload: ManagerHelloRequest }
+  | { id: string; type: 'attachSession'; payload: ManagerAttachRequest }
   | {
       id: string
       type: 'createTab'
       payload: {
+        sessionId: string
         tabId: string
         assistant: TabSession['assistant']
         title: string
@@ -54,61 +61,68 @@ export type ClientRequest =
         cwd?: string
       }
     }
-  | { id: string; type: 'write'; payload: { tabId: string; data: string } }
+  | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
   | {
       id: string
       type: 'resizeClient'
-      payload: { cols: number; rows: number; intents?: Record<string, ScrollIntent> }
+      payload: {
+        sessionId: string
+        cols: number
+        rows: number
+        intents?: Record<string, ScrollIntent>
+      }
     }
   | {
       id: string
       type: 'resizeTab'
-      payload: { tabId: string; cols: number; rows: number; intent?: ScrollIntent }
+      payload: {
+        sessionId: string
+        tabId: string
+        cols: number
+        rows: number
+        intent?: ScrollIntent
+      }
     }
-  | { id: string; type: 'scrollToBottom'; payload: { tabId: string } }
-  | { id: string; type: 'scroll'; payload: { tabId: string; deltaLines: number } }
+  | {
+      id: string
+      type: 'scrollToBottom'
+      payload: { sessionId: string; tabId: string }
+    }
+  | {
+      id: string
+      type: 'scroll'
+      payload: { sessionId: string; tabId: string; deltaLines: number }
+    }
   | {
       id: string
       type: 'reapplyScrollIntent'
-      payload: { tabId: string; intent: ScrollIntent }
+      payload: { sessionId: string; tabId: string; intent: ScrollIntent }
     }
-  | { id: string; type: 'setActiveTab'; payload: { tabId: string | null } }
-  | { id: string; type: 'closeTab'; payload: { tabId: string } }
-  | { id: string; type: 'disposeAll'; payload: Record<string, never> }
+  | { id: string; type: 'setActiveTab'; payload: { sessionId: string; tabId: string | null } }
+  | { id: string; type: 'closeTab'; payload: { sessionId: string; tabId: string } }
+  | { id: string; type: 'disposeSession'; payload: { sessionId: string } }
   | { id: string; type: 'ping'; payload: Record<string, never> }
 
-export type ServerResponse =
-  | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
+export type ManagerResponse =
+  | { id: string; type: 'helloResult'; payload: ManagerHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
-  | { id: string; type: 'attachResult'; payload: AttachResult }
+  | { id: string; type: 'attachResult'; payload: ManagerAttachResult }
   | { id: string; type: 'error'; payload: { message: string } }
 
-export type ServerEvent =
+export type ManagerEvent =
   | {
       type: 'tabRender'
-      payload: { tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState }
+      payload: {
+        sessionId: string
+        tabId: string
+        viewport: TerminalSnapshot
+        terminalModes: TerminalModeState
+      }
     }
-  | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
-  | { type: 'tabError'; payload: { tabId: string; message: string } }
+  | { type: 'tabExit'; payload: { sessionId: string; tabId: string; exitCode: number } }
+  | { type: 'tabError'; payload: { sessionId: string; tabId: string; message: string } }
 
-export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
-
-export class IpcProtocolError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'IpcProtocolError'
-  }
-}
-
-export class ProtocolMismatchError extends Error {
-  constructor(
-    public readonly clientVersion: number,
-    public readonly daemonVersion: number
-  ) {
-    super(`Protocol mismatch: client v${clientVersion}, daemon v${daemonVersion}`)
-    this.name = 'ProtocolMismatchError'
-  }
-}
+export type ManagerMessage = ManagerRequest | ManagerResponse | ManagerEvent
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -184,7 +198,17 @@ function isTerminalModeState(value: unknown): value is TerminalModeState {
   )
 }
 
-function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
+function isAttachResult(value: unknown): value is ManagerAttachResult {
+  return (
+    isObjectRecord(value) &&
+    isFiniteNumber(value.protocolVersion) &&
+    Array.isArray(value.tabs) &&
+    value.tabs.every((tab) => isObjectRecord(tab) && isString(tab.id)) &&
+    isNullableString(value.activeTabId)
+  )
+}
+
+function isHelloResult(value: unknown): value is ManagerHelloResult {
   return (
     isObjectRecord(value) &&
     isFiniteNumber(value.minVersion) &&
@@ -194,61 +218,31 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
   )
 }
 
-function isAttachResult(value: unknown): value is AttachResult {
-  return (
-    isObjectRecord(value) &&
-    isFiniteNumber(value.protocolVersion) &&
-    Array.isArray(value.tabs) &&
-    value.tabs.every(
-      (tab) =>
-        isObjectRecord(tab) &&
-        isString(tab.id) &&
-        isString(tab.assistant) &&
-        tab.assistant.length > 0 &&
-        isString(tab.title) &&
-        (tab.status === 'starting' ||
-          tab.status === 'running' ||
-          tab.status === 'disconnected' ||
-          tab.status === 'exited' ||
-          tab.status === 'error') &&
-        (tab.activity === undefined || tab.activity === 'busy' || tab.activity === 'idle') &&
-        isString(tab.buffer) &&
-        isTerminalModeState(tab.terminalModes) &&
-        isString(tab.command) &&
-        (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
-        (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
-        (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
-    ) &&
-    isNullableString(value.activeTabId)
-  )
-}
-
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new IpcProtocolError(message)
   }
 }
 
-export function negotiateProtocolVersion(
-  clientMinVersion: number,
-  clientMaxVersion: number,
-  serverMinVersion: number,
-  serverMaxVersion: number
-): number | null {
-  const minVersion = Math.max(clientMinVersion, serverMinVersion)
-  const maxVersion = Math.min(clientMaxVersion, serverMaxVersion)
-  if (minVersion > maxVersion) {
-    return null
+export function selectManagerProtocolVersion(payload: ManagerHelloRequest): number | null {
+  return negotiateProtocolVersion(
+    payload.minVersion,
+    payload.maxVersion,
+    MANAGER_PROTOCOL_MIN_VERSION,
+    MANAGER_PROTOCOL_VERSION
+  )
+}
+
+export function createManagerHelloResult(selectedVersion: number): ManagerHelloResult {
+  return {
+    maxVersion: MANAGER_PROTOCOL_VERSION,
+    minVersion: MANAGER_PROTOCOL_MIN_VERSION,
+    processVersion: getProcessVersion(),
+    selectedVersion,
   }
-
-  return maxVersion
 }
 
-export function getProcessVersion(): string {
-  return Bun.version
-}
-
-export function parseClientRequest(value: unknown): ClientRequest {
+export function parseManagerRequest(value: unknown): ManagerRequest {
   assert(isObjectRecord(value), 'IPC message must be an object')
   assert(isString(value.id), 'IPC request id must be a string')
   assert(isString(value.type), 'IPC request type must be a string')
@@ -258,22 +252,23 @@ export function parseClientRequest(value: unknown): ClientRequest {
     case 'hello':
       assert(isFiniteNumber(value.payload.minVersion), 'hello.minVersion must be a number')
       assert(isFiniteNumber(value.payload.maxVersion), 'hello.maxVersion must be a number')
-      return value as ClientRequest
-    case 'attach':
+      return value as ManagerRequest
+    case 'attachSession':
       assert(
         isFiniteNumber(value.payload.protocolVersion),
-        'attach.protocolVersion must be a number'
+        'attachSession.protocolVersion must be a number'
       )
-      assert(isString(value.payload.sessionId), 'attach.sessionId must be a string')
-      assert(isFiniteNumber(value.payload.cols), 'attach.cols must be a number')
-      assert(isFiniteNumber(value.payload.rows), 'attach.rows must be a number')
+      assert(isString(value.payload.sessionId), 'attachSession.sessionId must be a string')
+      assert(isFiniteNumber(value.payload.cols), 'attachSession.cols must be a number')
+      assert(isFiniteNumber(value.payload.rows), 'attachSession.rows must be a number')
       assert(
         value.payload.workspaceSnapshot === undefined ||
           isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
-        'attach.workspaceSnapshot must be a valid workspace snapshot'
+        'attachSession.workspaceSnapshot must be a valid workspace snapshot'
       )
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'createTab':
+      assert(isString(value.payload.sessionId), 'createTab.sessionId must be a string')
       assert(isString(value.payload.tabId), 'createTab.tabId must be a string')
       assert(
         isString(value.payload.assistant) && value.payload.assistant.length > 0,
@@ -291,20 +286,23 @@ export function parseClientRequest(value: unknown): ClientRequest {
         value.payload.cwd === undefined || isString(value.payload.cwd),
         'createTab.cwd must be a string'
       )
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'write':
+      assert(isString(value.payload.sessionId), 'write.sessionId must be a string')
       assert(isString(value.payload.tabId), 'write.tabId must be a string')
       assert(isString(value.payload.data), 'write.data must be a string')
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'resizeClient':
+      assert(isString(value.payload.sessionId), 'resizeClient.sessionId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeClient.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeClient.rows must be a number')
       assert(
         value.payload.intents === undefined || isScrollIntentRecord(value.payload.intents),
         'resizeClient.intents must be a scroll-intent record'
       )
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'resizeTab':
+      assert(isString(value.payload.sessionId), 'resizeTab.sessionId must be a string')
       assert(isString(value.payload.tabId), 'resizeTab.tabId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeTab.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeTab.rows must be a number')
@@ -312,36 +310,43 @@ export function parseClientRequest(value: unknown): ClientRequest {
         value.payload.intent === undefined || isScrollIntent(value.payload.intent),
         'resizeTab.intent must be a scroll intent'
       )
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'scroll':
+      assert(isString(value.payload.sessionId), 'scroll.sessionId must be a string')
       assert(isString(value.payload.tabId), 'scroll.tabId must be a string')
       assert(isFiniteNumber(value.payload.deltaLines), 'scroll.deltaLines must be a number')
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'scrollToBottom':
+      assert(isString(value.payload.sessionId), 'scrollToBottom.sessionId must be a string')
       assert(isString(value.payload.tabId), 'scrollToBottom.tabId must be a string')
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'reapplyScrollIntent':
+      assert(isString(value.payload.sessionId), 'reapplyScrollIntent.sessionId must be a string')
       assert(isString(value.payload.tabId), 'reapplyScrollIntent.tabId must be a string')
       assert(
         isScrollIntent(value.payload.intent),
         'reapplyScrollIntent.intent must be a scroll intent'
       )
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'setActiveTab':
+      assert(isString(value.payload.sessionId), 'setActiveTab.sessionId must be a string')
       assert(isNullableString(value.payload.tabId), 'setActiveTab.tabId must be a string or null')
-      return value as ClientRequest
+      return value as ManagerRequest
     case 'closeTab':
+      assert(isString(value.payload.sessionId), 'closeTab.sessionId must be a string')
       assert(isString(value.payload.tabId), 'closeTab.tabId must be a string')
-      return value as ClientRequest
-    case 'disposeAll':
+      return value as ManagerRequest
+    case 'disposeSession':
+      assert(isString(value.payload.sessionId), 'disposeSession.sessionId must be a string')
+      return value as ManagerRequest
     case 'ping':
-      return value as ClientRequest
+      return value as ManagerRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
 }
 
-export function parseServerMessage(value: unknown): ServerResponse | ServerEvent {
+export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEvent {
   assert(isObjectRecord(value), 'IPC message must be an object')
   assert(isString(value.type), 'IPC response type must be a string')
   assert(isObjectRecord(value.payload), 'IPC response payload must be an object')
@@ -349,86 +354,43 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
   switch (value.type) {
     case 'helloResult':
       assert(isString(value.id), 'helloResult.id must be a string')
-      assert(isProtocolHelloResult(value.payload), 'helloResult.payload is invalid')
-      return value as ServerResponse
+      assert(isHelloResult(value.payload), 'helloResult.payload is invalid')
+      return value as ManagerResponse
     case 'ok':
       assert(isString(value.id), 'ok.id must be a string')
-      return value as ServerResponse
+      return value as ManagerResponse
     case 'attachResult':
       assert(isString(value.id), 'attachResult.id must be a string')
       assert(isAttachResult(value.payload), 'attachResult.payload is invalid')
-      return value as ServerResponse
+      return value as ManagerResponse
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')
-      return value as ServerResponse
+      return value as ManagerResponse
     case 'tabRender':
+      assert(isString(value.payload.sessionId), 'tabRender.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')
       assert(isTerminalSnapshot(value.payload.viewport), 'tabRender.viewport is invalid')
       assert(isTerminalModeState(value.payload.terminalModes), 'tabRender.terminalModes is invalid')
-      return value as ServerEvent
+      return value as ManagerEvent
     case 'tabExit':
+      assert(isString(value.payload.sessionId), 'tabExit.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabExit.tabId must be a string')
       assert(isFiniteNumber(value.payload.exitCode), 'tabExit.exitCode must be a number')
-      return value as ServerEvent
+      return value as ManagerEvent
     case 'tabError':
+      assert(isString(value.payload.sessionId), 'tabError.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabError.tabId must be a string')
       assert(isString(value.payload.message), 'tabError.message must be a string')
-      return value as ServerEvent
+      return value as ManagerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)
   }
 }
 
-export function encodeMessage(message: IpcMessage): Buffer {
+export function encodeManagerMessage(message: ManagerMessage): Buffer {
   const payload = JSON.stringify(message)
   return Buffer.from(`${Buffer.byteLength(payload, 'utf8')}\n${payload}`, 'utf8')
 }
 
-export class MessageDecoder<TMessage = IpcMessage> {
-  private buffer = Buffer.alloc(0)
-  private expectedPayloadBytes: number | null = null
-
-  constructor(
-    private readonly parseMessage: (value: unknown) => TMessage = (value) => value as TMessage
-  ) {}
-
-  push(chunk: string | Uint8Array): TMessage[] {
-    const nextChunk = typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : Buffer.from(chunk)
-    this.buffer = this.buffer.length === 0 ? nextChunk : Buffer.concat([this.buffer, nextChunk])
-
-    const messages: TMessage[] = []
-    while (true) {
-      if (this.expectedPayloadBytes === null) {
-        const separatorIndex = this.buffer.indexOf(0x0a)
-        if (separatorIndex === -1) {
-          break
-        }
-
-        const header = this.buffer.subarray(0, separatorIndex).toString('utf8')
-        if (!/^\d+$/.test(header)) {
-          throw new Error(`Invalid IPC frame header: ${JSON.stringify(header)}`)
-        }
-
-        this.expectedPayloadBytes = Number.parseInt(header, 10)
-        this.buffer = this.buffer.subarray(separatorIndex + 1)
-      }
-
-      if (this.buffer.length < this.expectedPayloadBytes) {
-        break
-      }
-
-      const payload = this.buffer.subarray(0, this.expectedPayloadBytes).toString('utf8')
-      this.buffer = this.buffer.subarray(this.expectedPayloadBytes)
-      this.expectedPayloadBytes = null
-      messages.push(this.parseMessage(JSON.parse(payload)))
-    }
-
-    return messages
-  }
-
-  reset(): void {
-    this.buffer = Buffer.alloc(0)
-    this.expectedPayloadBytes = null
-  }
-}
+export { MessageDecoder }

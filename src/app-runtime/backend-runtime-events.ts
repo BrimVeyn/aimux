@@ -3,6 +3,7 @@ import type { MutableRefObject } from 'react'
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, TabSession, TerminalModeState } from '../state/types'
 
+import { logInputDebug } from '../debug/input-log'
 import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 const IDLE_ACTIVITY_TIMEOUT_MS = 2_000
@@ -44,6 +45,12 @@ export function bindBackendRuntimeEvents({
       return
     }
 
+    logInputDebug('app.backend.event.render', {
+      lines: viewport.lines.length,
+      tabId,
+      viewportY: viewport.viewportY,
+    })
+
     dispatch({
       source: resizingRef.current ? 'resize' : 'data',
       tabId,
@@ -60,12 +67,14 @@ export function bindBackendRuntimeEvents({
   }
 
   const handleExit = (tabId: string, exitCode: number) => {
+    logInputDebug('app.backend.event.exit', { exitCode, tabId })
     clearTabRuntimeState(timeouts, tabId)
     dispatch({ exitCode, status: 'exited', tabId, type: 'set-tab-status' })
     dispatch({ activity: undefined, tabId, type: 'set-tab-activity' })
   }
 
   const handleError = (tabId: string, message: string) => {
+    logInputDebug('app.backend.event.error', { message, tabId })
     clearTabRuntimeState(timeouts, tabId)
     dispatch({ message, tabId, type: 'set-tab-error' })
   }

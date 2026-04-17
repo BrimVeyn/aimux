@@ -1,5 +1,5 @@
 import { getDaemonSocketPath } from './daemon/runtime-paths'
-import { findDaemonPid } from './platform/daemon-control'
+import { findIpcDaemonPid } from './platform/daemon-control'
 import { runRestartDaemon } from './restart-daemon'
 
 const REPO = 'BrimVeyn/aimux'
@@ -52,9 +52,9 @@ export async function runUpdate(): Promise<number> {
 
   process.stdout.write(`Updated to ${latest}.\n`)
 
-  const pid = await findDaemonPid(getDaemonSocketPath())
+  const pid = await findIpcDaemonPid()
   if (pid !== null) {
-    process.stdout.write('Restarting daemon...\n')
+    process.stdout.write(`Restarting IPC daemon at ${getDaemonSocketPath()}...\n`)
     await runRestartDaemon()
   }
 

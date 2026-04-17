@@ -1,13 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
 
 import type { WorkspaceSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
+import { getProfileConfigDir } from './profile-paths'
 import { isWorkspaceSnapshotV1 } from './state/validation'
 import { THEME_IDS, type ThemeId } from './ui/themes'
 
-export const CONFIG_PATH = join(process.env.HOME ?? '~', '.config', 'aimux.json')
+export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
 
 export interface AimuxConfig {
   version: 2
@@ -133,7 +133,7 @@ export function loadConfig(): AimuxConfig {
 
 export function saveConfig(config: AimuxConfig): boolean {
   try {
-    mkdirSync(dirname(CONFIG_PATH), { recursive: true })
+    mkdirSync(getProfileConfigDir(), { recursive: true })
     writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
     return true
   } catch (error) {

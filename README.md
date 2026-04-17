@@ -21,7 +21,7 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 - **Directory picker** — Fuzzy-search git repos and worktrees from `$HOME` using `fzf`
 - **Session persistence** — Workspace state (tabs, titles, layout) saved and restored on restart
 - **Git status panel** — Branch + diff summary in the sidebar
-- **Daemon mode** — Background daemon keeps sessions alive across terminal restarts
+- **Seamless daemon updates** — A restartable IPC daemon now reconnects to a long-lived terminal manager, so updates and IPC changes do not kill live tabs
 - **Snippets** — Save and reuse prompt snippets across sessions
 - **Theme picker** — Switch between 11 built-in themes on the fly
 - **Pending-chord indicator** — Bottom-right overlay shows mid-sequence key state (like nvim's `which-key`)
@@ -58,20 +58,22 @@ aimux                  # start the TUI
 aimux version          # print version
 aimux doctor           # check setup
 aimux update           # self-update
-aimux restart-daemon   # restart background daemon
+aimux restart-daemon   # restart IPC daemon only
 ```
+
+`aimux update` and `aimux restart-daemon` restart only the IPC daemon. Live PTYs and headless terminal state stay in the long-lived terminal-manager process, so active tabs can be reattached instead of being restarted.
 
 ## Configuration
 
-aimux reads `~/.config/aimux/aimux.config.ts` at startup. Set it up with:
+aimux reads `~/.config/aimux/<profile>/aimux.config.ts` at startup. The default installed profile is `default`, while the repository dev scripts use `dev`. Set up the default profile with:
 
 ```bash
-mkdir -p ~/.config/aimux && cd ~/.config/aimux
+mkdir -p ~/.config/aimux/default && cd ~/.config/aimux/default
 bun init -y
 bun add -d @brimveyn/aimux-config
 ```
 
-Then create `~/.config/aimux/aimux.config.ts`:
+Then create `~/.config/aimux/default/aimux.config.ts`:
 
 ```ts
 import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
@@ -158,6 +160,14 @@ Keystrokes pass through to the active tab's PTY. Configured shortcuts:
 
 ## Architecture
 
+Runtime split:
+
+- `aimux` UI connects to the IPC daemon over the app protocol.
+- The IPC daemon owns the app-facing socket, protocol negotiation, and reconnect behavior.
+- The terminal manager owns PTYs, xterm headless emulators, and live session state.
+
+This split lets the app or IPC daemon change protocols without dropping live shells.
+
 ```
 aimux/
 ├── packages/
@@ -171,9 +181,10 @@ aimux/
     ├── ui/                    # OpenTUI React components
     ├── state/                 # reducers + app store
     ├── pty/                   # PTY and terminal emulation
-    ├── session-backend/       # local and daemon backends
-    ├── daemon/                # background session daemon
-    ├── ipc/                   # daemon protocol
+    ├── session-backend/       # local and remote backends
+    ├── daemon/                # IPC daemon / broker
+    ├── terminal-manager/      # long-lived PTY/session owner
+    ├── ipc/                   # app and manager protocols
     └── input/
         ├── modes/             # mode registry + transitions
         ├── keymap/            # prefix trie + sequence resolver
@@ -200,6 +211,16 @@ bun test                 # run test suite
 bun run check            # typecheck
 bun run lint             # oxlint
 ```
+
+By default the app talks to the background IPC daemon. For explicit single-process debugging only, set `AIMUX_LOCAL_BACKEND=1` before starting aimux.
+
+Profiles live under `~/.config/aimux/<profile>/`. Each profile gets its own config, session catalog, snippet catalog, and matching runtime namespace.
+
+The repository `bun run dev`, `bun run start`, and `bun run restart-daemon` scripts set `AIMUX_PROFILE=dev`, so source builds use `~/.config/aimux/dev/` and their own IPC daemon / terminal-manager sockets instead of interfering with a globally installed `aimux` instance.
+
+You can override the active profile manually with `AIMUX_PROFILE=<name>` when you need multiple isolated environments on the same machine. `AIMUX_RUNTIME_PROFILE` is still accepted as a fallback alias for runtime compatibility.
+
+This profile move is intentionally breaking: aimux no longer reads legacy flat config or catalog files once profile directories are enabled.
 
 ## License
 

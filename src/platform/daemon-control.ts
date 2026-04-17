@@ -1,12 +1,12 @@
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-import { getDaemonSocketPath } from '../daemon/runtime-paths'
+import { getIpcDaemonSocketPath, getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 
 const ENTRY_POINT = resolve(import.meta.dir, '..', 'index.tsx')
 
-export async function findDaemonPid(socketPath: string): Promise<number | null> {
+export async function findSocketProcessPid(socketPath: string): Promise<number | null> {
   try {
     const proc = Bun.spawn(['lsof', '-t', socketPath], { stderr: 'ignore', stdout: 'pipe' })
     const text = await new Response(proc.stdout).text()
@@ -21,7 +21,19 @@ export async function findDaemonPid(socketPath: string): Promise<number | null> 
   }
 }
 
-export async function killDaemon(pid: number): Promise<void> {
+export async function findDaemonPid(socketPath: string): Promise<number | null> {
+  return findSocketProcessPid(socketPath)
+}
+
+export async function findIpcDaemonPid(): Promise<number | null> {
+  return findSocketProcessPid(getIpcDaemonSocketPath())
+}
+
+export async function findTerminalManagerPid(): Promise<number | null> {
+  return findSocketProcessPid(getTerminalManagerSocketPath())
+}
+
+export async function killProcess(pid: number): Promise<void> {
   process.kill(pid, 'SIGTERM')
 
   const deadline = Date.now() + 3_000
@@ -41,16 +53,12 @@ export async function killDaemon(pid: number): Promise<void> {
   }
 }
 
-export async function spawnDetachedDaemon(): Promise<boolean> {
-  Bun.spawn([process.execPath, 'run', ENTRY_POINT, 'daemon'], {
-    detached: true,
-    stderr: 'ignore',
-    stdin: 'ignore',
-    stdout: 'ignore',
-  }).unref()
+export async function killDaemon(pid: number): Promise<void> {
+  await killProcess(pid)
+}
 
+async function waitForSocket(socketPath: string): Promise<boolean> {
   const deadline = Date.now() + 2_000
-  const socketPath = getDaemonSocketPath()
   while (Date.now() < deadline) {
     if (existsSync(socketPath)) {
       return true
@@ -59,4 +67,27 @@ export async function spawnDetachedDaemon(): Promise<boolean> {
   }
 
   return false
+}
+
+async function spawnDetachedProcess(command: 'daemon' | 'terminal-manager', socketPath: string) {
+  Bun.spawn([process.execPath, 'run', ENTRY_POINT, command], {
+    detached: true,
+    stderr: 'ignore',
+    stdin: 'ignore',
+    stdout: 'ignore',
+  }).unref()
+
+  return waitForSocket(socketPath)
+}
+
+export async function spawnDetachedDaemon(): Promise<boolean> {
+  return spawnDetachedProcess('daemon', getIpcDaemonSocketPath())
+}
+
+export async function spawnDetachedIpcDaemon(): Promise<boolean> {
+  return spawnDetachedDaemon()
+}
+
+export async function spawnDetachedTerminalManager(): Promise<boolean> {
+  return spawnDetachedProcess('terminal-manager', getTerminalManagerSocketPath())
 }
