@@ -151,18 +151,29 @@ export class LocalSessionBackend
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
 
-  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
+  resizeAll(
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    options?: { sync?: boolean }
+  ): void {
     if (!this.currentSessionId) {
       return
     }
-    this.sessionManager.resize(this.currentSessionId, cols, rows, intents)
+    this.sessionManager.resize(this.currentSessionId, cols, rows, intents, options)
   }
 
-  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
+  resizeTab(
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent,
+    options?: { sync?: boolean }
+  ): void {
     if (!this.currentSessionId) {
       return
     }
-    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, intent)
+    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, intent, options)
   }
 
   disposeSession(tabId: string): void {

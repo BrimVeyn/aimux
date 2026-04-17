@@ -398,7 +398,12 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('setActiveTab', error))
   }
 
-  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
+  resizeAll(
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    _options?: { sync?: boolean }
+  ): void {
     if (!this.attached) {
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
@@ -412,7 +417,13 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('resizeClient', error))
   }
 
-  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
+  resizeTab(
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent,
+    _options?: { sync?: boolean }
+  ): void {
     if (!this.attached) {
       return
     }

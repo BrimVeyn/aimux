@@ -1,4 +1,4 @@
-import { type MutableRefObject, useEffect, useMemo, useRef } from 'react'
+import { type MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
@@ -28,20 +28,21 @@ function resizeSplitTabs(
   tabIds: string[],
   cols: number,
   rows: number,
-  intents: Map<string, ScrollIntent>
+  intents: Map<string, ScrollIntent>,
+  options?: { sync?: boolean }
 ): void {
   const bounds = getTerminalBounds(cols, rows)
   const resizedTabIds = new Set<string>()
 
   forEachSplitPaneRect(Object.values(layoutTrees), bounds, (tabId, rect) => {
     const size = toTerminalContentSize(rect)
-    backend.resizeTab(tabId, size.cols, size.rows, intents.get(tabId))
+    backend.resizeTab(tabId, size.cols, size.rows, intents.get(tabId), options)
     resizedTabIds.add(tabId)
   })
 
   for (const id of tabIds) {
     if (!resizedTabIds.has(id)) {
-      backend.resizeTab(id, cols, rows, intents.get(id))
+      backend.resizeTab(id, cols, rows, intents.get(id), options)
     }
   }
 }
@@ -55,6 +56,50 @@ interface UseTerminalResizeOptions {
   resizingRef: MutableRefObject<boolean>
 }
 
+interface RunResizeCascadeArgs {
+  backend: SessionBackend
+  dispatch: (action: AppAction) => void
+  resizingRef: MutableRefObject<boolean>
+  resizingTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
+  cols: number
+  rows: number
+  layoutTrees: AppState['layoutTrees']
+  stableTabIds: string[]
+  intents: Map<string, ScrollIntent>
+  sync: boolean
+}
+
+function runResizeCascade({
+  backend,
+  cols,
+  dispatch,
+  intents,
+  layoutTrees,
+  resizingRef,
+  resizingTimerRef,
+  rows,
+  stableTabIds,
+  sync,
+}: RunResizeCascadeArgs): void {
+  dispatch({ cols, rows, type: 'set-terminal-size' })
+  resizingRef.current = true
+  if (resizingTimerRef.current) {
+    clearTimeout(resizingTimerRef.current)
+  }
+  const trees = Object.values(layoutTrees)
+  const hasSplits = trees.some((t) => t.type === 'split')
+  const options = sync ? { sync: true } : undefined
+  if (hasSplits) {
+    resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, intents, options)
+  } else {
+    backend.resizeAll(cols, rows, intents, options)
+  }
+  resizingTimerRef.current = setTimeout(() => {
+    resizingRef.current = false
+    resizingTimerRef.current = null
+  }, RESIZE_ACTIVITY_SETTLE_MS)
+}
+
 export function useTerminalResize({
   backend,
   contentOriginRef,
@@ -66,6 +111,8 @@ export function useTerminalResize({
   const resizingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tabIdsRef = useRef<string[]>([])
   const intentsRef = useRef<Map<string, ScrollIntent>>(new Map())
+  const handledBySyncRef = useRef(false)
+  const sidebarMountedRef = useRef(false)
 
   const currentTabIds = state.tabs.map((t) => t.id)
   const tabIdsChanged =
@@ -108,34 +155,44 @@ export function useTerminalResize({
     state.sidebar.width,
   ])
 
-  useEffect(() => {
-    dispatch({
+  useLayoutEffect(() => {
+    if (!sidebarMountedRef.current) {
+      sidebarMountedRef.current = true
+      return
+    }
+    runResizeCascade({
+      backend,
       cols: terminalSize.cols,
+      dispatch,
+      intents: intentsRef.current,
+      layoutTrees: state.layoutTrees,
+      resizingRef,
+      resizingTimerRef,
       rows: terminalSize.rows,
-      type: 'set-terminal-size',
+      stableTabIds,
+      sync: true,
     })
-    resizingRef.current = true
-    if (resizingTimerRef.current) {
-      clearTimeout(resizingTimerRef.current)
+    handledBySyncRef.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.sidebar.visible, state.sidebar.width])
+
+  useEffect(() => {
+    if (handledBySyncRef.current) {
+      handledBySyncRef.current = false
+      return
     }
-    const trees = Object.values(state.layoutTrees)
-    const hasSplits = trees.some((t) => t.type === 'split')
-    if (hasSplits) {
-      resizeSplitTabs(
-        backend,
-        state.layoutTrees,
-        stableTabIds,
-        terminalSize.cols,
-        terminalSize.rows,
-        intentsRef.current
-      )
-    } else {
-      backend.resizeAll(terminalSize.cols, terminalSize.rows, intentsRef.current)
-    }
-    resizingTimerRef.current = setTimeout(() => {
-      resizingRef.current = false
-      resizingTimerRef.current = null
-    }, RESIZE_ACTIVITY_SETTLE_MS)
+    runResizeCascade({
+      backend,
+      cols: terminalSize.cols,
+      dispatch,
+      intents: intentsRef.current,
+      layoutTrees: state.layoutTrees,
+      resizingRef,
+      resizingTimerRef,
+      rows: terminalSize.rows,
+      stableTabIds,
+      sync: false,
+    })
   }, [
     backend,
     dispatch,

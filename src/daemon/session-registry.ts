@@ -165,12 +165,23 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     this.ptyManager.write(tabId, data)
   }
 
-  resizeAll(cols: number, rows: number, intents?: Map<string, ScrollIntent>): void {
-    this.ptyManager.resizeAll(cols, rows, intents)
+  resizeAll(
+    cols: number,
+    rows: number,
+    intents?: Map<string, ScrollIntent>,
+    options?: { sync?: boolean }
+  ): void {
+    this.ptyManager.resizeAll(cols, rows, intents, options)
   }
 
-  resizeTab(tabId: string, cols: number, rows: number, intent?: ScrollIntent): void {
-    this.ptyManager.resizeSession(tabId, cols, rows, intent)
+  resizeTab(
+    tabId: string,
+    cols: number,
+    rows: number,
+    intent?: ScrollIntent,
+    options?: { sync?: boolean }
+  ): void {
+    this.ptyManager.resizeSession(tabId, cols, rows, intent, options)
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
