@@ -1,18 +1,29 @@
+import type { ModeId } from '@brimveyn/aimux-config'
 import type { ReactNode } from 'react'
 
 import { theme } from '../theme'
+import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 import { Surface } from './surface'
 
 interface ModalShellProps {
   children: ReactNode
   footer?: ReactNode
   listGap?: number
-  help?: string
+  subtitle?: string
+  keybindsModeId?: ModeId
   title: string
   width: number | `${number}%`
 }
 
-export function ModalShell({ children, footer, help, listGap = 1, title, width }: ModalShellProps) {
+export function ModalShell({
+  children,
+  footer,
+  keybindsModeId,
+  listGap = 1,
+  subtitle,
+  title,
+  width,
+}: ModalShellProps) {
   return (
     <box
       position="absolute"
@@ -36,12 +47,13 @@ export function ModalShell({ children, footer, help, listGap = 1, title, width }
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
             <text fg={theme.accentAlt}>{title}</text>
-            {help ? <text fg={theme.textMuted}>{help}</text> : null}
+            {subtitle ? <text fg={theme.textMuted}>{subtitle}</text> : null}
           </box>
           {children}
           {footer ? <box>{footer}</box> : null}
         </box>
       </Surface>
+      {keybindsModeId ? <ModalKeybindsOverlay modeId={keybindsModeId} /> : null}
     </box>
   )
 }
