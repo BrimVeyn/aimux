@@ -11,7 +11,6 @@
 export type ModeId =
   | 'navigation'
   | 'terminal-input'
-  | 'layout'
   | 'git-mode'
   | 'modal.new-tab'
   | 'modal.new-tab.command-edit'
@@ -35,13 +34,7 @@ export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
 export type TabActivity = 'busy' | 'idle'
-export type FocusMode =
-  | 'navigation'
-  | 'terminal-input'
-  | 'modal'
-  | 'command-edit'
-  | 'layout'
-  | 'git'
+export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────

@@ -5,7 +5,6 @@ import type { AppAction, AppState, TabSession } from '../../state/types'
 export type ModeId =
   | 'navigation'
   | 'terminal-input'
-  | 'layout'
   | 'git-mode'
   | 'modal.new-tab'
   | 'modal.new-tab.command-edit'

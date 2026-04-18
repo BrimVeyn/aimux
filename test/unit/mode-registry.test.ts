@@ -19,7 +19,7 @@ describe('deriveModeId', () => {
   test('maps direct focus modes without modal inspection', () => {
     expect(deriveModeId(makeState({ focusMode: 'navigation' }))).toBe('navigation')
     expect(deriveModeId(makeState({ focusMode: 'terminal-input' }))).toBe('terminal-input')
-    expect(deriveModeId(makeState({ focusMode: 'layout' }))).toBe('layout')
+    expect(deriveModeId(makeState({ focusMode: 'git' }))).toBe('git-mode')
   })
 
   test('maps command-edit modal states', () => {
@@ -82,7 +82,7 @@ describe('transitionTo', () => {
   })
 
   test('returns empty result for invalid transitions', () => {
-    expect(transitionTo('modal.help', 'layout', ctx)).toEqual({
+    expect(transitionTo('modal.help', 'git-mode', ctx)).toEqual({
       actions: [],
       effects: [],
     })

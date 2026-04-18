@@ -252,21 +252,6 @@ export const confirmUpdateSelection: KeyResult = r(
   'navigation'
 )
 
-// Layout-specific
-export const exitLayoutToInput: KeyResult = r(
-  [{ focusMode: 'terminal-input', type: 'set-focus-mode' }],
-  [],
-  'terminal-input'
-)
-
-export const exitLayoutToNavigation: ActionFn = (ctx: ModeContext) => {
-  const actions: KeyResult['actions'] = [{ focusMode: 'navigation', type: 'set-focus-mode' }]
-  if (!ctx.state.sidebar.visible) {
-    actions.push({ type: 'toggle-sidebar' })
-  }
-  return r(actions, [], 'navigation')
-}
-
 export const closePane: ActionFn = (ctx: ModeContext) => {
   const tabId = ctx.state.activeTabId
   if (!tabId) return null
@@ -297,12 +282,6 @@ export const leaveTerminalInput: KeyResult = r(
   [{ focusMode: 'navigation', type: 'set-focus-mode' }],
   [],
   'navigation'
-)
-
-export const enterLayoutMode: KeyResult = r(
-  [{ focusMode: 'layout', type: 'set-focus-mode' }],
-  [],
-  'layout'
 )
 
 export const toggleSidebarFromInput: KeyResult = r([{ type: 'toggle-sidebar' }])

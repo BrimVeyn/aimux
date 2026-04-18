@@ -16,7 +16,7 @@ function setup(overrides?: {
   const bracketedPasteModeEnabled = overrides?.bracketedPasteModeEnabled ?? false
   const writeToPty = mock((_tabId: string, _data: string) => {})
   const leaveTerminalInput = mock(() => {})
-  const enterLayoutMode = mock(() => {})
+  const consumeLeaderPrefix = mock(() => {})
   const toggleSidebar = mock(() => {})
 
   const handleTerminalShortcut = (chord: string): boolean => {
@@ -25,7 +25,7 @@ function setup(overrides?: {
       return true
     }
     if (chord === 'C-w') {
-      enterLayoutMode()
+      consumeLeaderPrefix()
       return true
     }
     if (chord === 'C-b') {
@@ -43,7 +43,7 @@ function setup(overrides?: {
     writeToPty,
   })
 
-  return { enterLayoutMode, handler, leaveTerminalInput, toggleSidebar, writeToPty }
+  return { consumeLeaderPrefix, handler, leaveTerminalInput, toggleSidebar, writeToPty }
 }
 
 describe('createRawInputHandler', () => {
@@ -105,17 +105,17 @@ describe('createRawInputHandler', () => {
     expect(writeToPty).not.toHaveBeenCalled()
   })
 
-  test('enters layout mode on raw Ctrl+W in terminal-input', () => {
-    const { enterLayoutMode, handler, writeToPty } = setup()
+  test('consumes raw Ctrl+W as leader prefix in terminal-input', () => {
+    const { consumeLeaderPrefix, handler, writeToPty } = setup()
     expect(handler('\x17')).toBe(true)
-    expect(enterLayoutMode).toHaveBeenCalled()
+    expect(consumeLeaderPrefix).toHaveBeenCalled()
     expect(writeToPty).not.toHaveBeenCalled()
   })
 
-  test('enters layout mode on Kitty Ctrl+W in terminal-input', () => {
-    const { enterLayoutMode, handler, writeToPty } = setup()
+  test('consumes Kitty Ctrl+W as leader prefix in terminal-input', () => {
+    const { consumeLeaderPrefix, handler, writeToPty } = setup()
     expect(handler('\x1b[119;5u')).toBe(true)
-    expect(enterLayoutMode).toHaveBeenCalled()
+    expect(consumeLeaderPrefix).toHaveBeenCalled()
     expect(writeToPty).not.toHaveBeenCalled()
   })
 
@@ -196,10 +196,10 @@ describe('createRawInputHandler', () => {
   })
 
   test('does not treat pasted Ctrl+W as a shortcut', () => {
-    const { enterLayoutMode, handler, writeToPty } = setup()
+    const { consumeLeaderPrefix, handler, writeToPty } = setup()
     expect(handler('\x1b[200~\x17\x1b[201~')).toBe(true)
     expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x17')
-    expect(enterLayoutMode).not.toHaveBeenCalled()
+    expect(consumeLeaderPrefix).not.toHaveBeenCalled()
   })
 
   test('collects split bracketed paste sequences across calls', () => {

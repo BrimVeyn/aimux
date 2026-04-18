@@ -10,8 +10,6 @@ function getModeColor(focusMode: AppState['focusMode']): string {
   switch (focusMode) {
     case 'terminal-input':
       return theme.accent
-    case 'layout':
-      return theme.warning
     case 'modal':
       return theme.warning
     case 'command-edit':
@@ -28,8 +26,6 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
   switch (focusMode) {
     case 'terminal-input':
       return 'input'
-    case 'layout':
-      return 'layout'
     case 'modal':
       return 'modal'
     case 'command-edit':
