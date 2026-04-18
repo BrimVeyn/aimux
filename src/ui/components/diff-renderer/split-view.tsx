@@ -1,11 +1,14 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { ThemedToken } from 'shiki'
 
+import { type ScrollBoxRenderable, TextAttributes } from '@opentui/core'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
+import type { DiffHighlights } from './pierre-diff'
 
 import { theme } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
+import { tokenToSpan } from './highlight'
 
 export interface SplitViewHandle {
   leftScroll: ScrollBoxRenderable | null
@@ -14,9 +17,13 @@ export interface SplitViewHandle {
 
 interface Props {
   file: FileDiffMetadata
+  highlights: DiffHighlights
 }
 
-export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView({ file }, ref) {
+export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
+  { file, highlights },
+  ref
+) {
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
 
@@ -49,7 +56,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView({
           row.type === 'hunk-header' ? (
             <HunkHeaderRow key={i} row={row} />
           ) : (
-            <HalfRow key={i} cell={row.left} gw={gw} />
+            <HalfRow key={i} cell={row.left} gw={gw} tokens={highlights.del} />
           )
         )}
       </scrollbox>
@@ -65,7 +72,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView({
           row.type === 'hunk-header' ? (
             <HunkHeaderRow key={i} row={row} />
           ) : (
-            <HalfRow key={i} cell={row.right} gw={gw} />
+            <HalfRow key={i} cell={row.right} gw={gw} tokens={highlights.add} />
           )
         )}
       </scrollbox>
@@ -82,7 +89,7 @@ function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-h
   )
 }
 
-function HalfRow({ cell, gw }: { cell: SplitCell; gw: number }) {
+function HalfRow({ cell, gw, tokens }: { cell: SplitCell; gw: number; tokens: ThemedToken[][] }) {
   if (cell.type === 'filler') {
     return <box backgroundColor={theme.panelMuted} height={1} />
   }
@@ -99,11 +106,34 @@ function HalfRow({ cell, gw }: { cell: SplitCell; gw: number }) {
     signColor = theme.danger
   }
   const num = String(cell.lineNumber).padStart(gw, ' ')
+  const lineTokens = tokens[cell.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={bg}>
       <text fg={theme.textMuted}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
-      <text fg={theme.text}>{cell.content}</text>
+      <LineContent content={cell.content} tokens={lineTokens} />
     </box>
+  )
+}
+
+function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
+  if (!tokens || tokens.length === 0) {
+    return <text fg={theme.text}>{content}</text>
+  }
+  return (
+    <text wrapMode="none">
+      {tokens.map((t, i) => {
+        const s = tokenToSpan(t)
+        let attributes = 0
+        if (s.bold) attributes |= TextAttributes.BOLD
+        if (s.italic) attributes |= TextAttributes.ITALIC
+        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        return (
+          <span key={i} fg={s.fg ?? theme.text} attributes={attributes}>
+            {s.text}
+          </span>
+        )
+      })}
+    </text>
   )
 }

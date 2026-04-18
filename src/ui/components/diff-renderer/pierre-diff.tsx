@@ -1,9 +1,14 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
+import type { ThemedToken } from 'shiki'
 
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+
+import type { ThemeId } from '../../themes'
 
 import { parsePatchFiles } from '../../../diff-parser'
 import { theme } from '../../theme'
+import { filetypeFromPath } from './filetype'
+import { tokenizeSide } from './highlight'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
 
@@ -14,19 +19,48 @@ export interface PierreDiffHandle {
   rightScroll: ScrollBoxRenderable | null
 }
 
+export interface DiffHighlights {
+  add: ThemedToken[][]
+  del: ThemedToken[][]
+}
+
 interface Props {
   diff: string
+  path: string
+  themeId: ThemeId
   view: DiffView
 }
 
+const EMPTY_HIGHLIGHTS: DiffHighlights = { add: [], del: [] }
+
 export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDiff(
-  { diff, view },
+  { diff, path, themeId, view },
   ref
 ) {
   const file = useMemo(() => {
     const patches = parsePatchFiles(diff)
     return patches[0]?.files[0]
   }, [diff])
+
+  const filetype = useMemo(() => filetypeFromPath(path), [path])
+
+  const [highlights, setHighlights] = useState<DiffHighlights>(EMPTY_HIGHLIGHTS)
+
+  useEffect(() => {
+    setHighlights(EMPTY_HIGHLIGHTS)
+    if (!file || !filetype) return
+    let cancelled = false
+    void Promise.all([
+      tokenizeSide(file.additionLines, filetype, themeId),
+      tokenizeSide(file.deletionLines, filetype, themeId),
+    ]).then(([add, del]) => {
+      if (cancelled) return
+      setHighlights({ add, del })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [file, filetype, themeId])
 
   const splitRef = useRef<SplitViewHandle | null>(null)
   const stackedRef = useRef<StackedViewHandle | null>(null)
@@ -55,7 +89,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   }
 
   if (view === 'stacked') {
-    return <StackedView ref={stackedRef} file={file} />
+    return <StackedView ref={stackedRef} file={file} highlights={highlights} />
   }
-  return <SplitView ref={splitRef} file={file} />
+  return <SplitView ref={splitRef} file={file} highlights={highlights} />
 })

@@ -1,11 +1,14 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { ThemedToken } from 'shiki'
 
+import { type ScrollBoxRenderable, TextAttributes } from '@opentui/core'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
+import type { DiffHighlights } from './pierre-diff'
 
 import { theme } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
+import { tokenToSpan } from './highlight'
 
 export interface StackedViewHandle {
   scroll: ScrollBoxRenderable | null
@@ -13,10 +16,11 @@ export interface StackedViewHandle {
 
 interface Props {
   file: FileDiffMetadata
+  highlights: DiffHighlights
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { file },
+  { file, highlights },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -43,13 +47,21 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
       contentOptions={{ flexDirection: 'column', gap: 0 }}
     >
       {rows.map((row, i) => (
-        <UnifiedRowRender key={i} gw={gw} row={row} />
+        <UnifiedRowRender key={i} gw={gw} highlights={highlights} row={row} />
       ))}
     </scrollbox>
   )
 })
 
-function UnifiedRowRender({ gw, row }: { gw: number; row: UnifiedRowOrHeader }) {
+function UnifiedRowRender({
+  gw,
+  highlights,
+  row,
+}: {
+  gw: number
+  highlights: DiffHighlights
+  row: UnifiedRowOrHeader
+}) {
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
@@ -61,10 +73,12 @@ function UnifiedRowRender({ gw, row }: { gw: number; row: UnifiedRowOrHeader }) 
   const pad = (n: number | undefined): string =>
     n === undefined ? ' '.repeat(gw) : String(n).padStart(gw, ' ')
   if (row.type === 'context') {
+    const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row">
         <text fg={theme.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={theme.text}> {row.content}</text>
+        <text fg={theme.text}> </text>
+        <LineContent content={row.content} tokens={tokens} />
       </box>
     )
   }
@@ -73,11 +87,34 @@ function UnifiedRowRender({ gw, row }: { gw: number; row: UnifiedRowOrHeader }) 
   const signColor = row.type === 'addition' ? theme.success : theme.danger
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
+  const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={bg}>
       <text fg={theme.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
-      <text fg={theme.text}>{row.content}</text>
+      <LineContent content={row.content} tokens={tokens} />
     </box>
+  )
+}
+
+function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
+  if (!tokens || tokens.length === 0) {
+    return <text fg={theme.text}>{content}</text>
+  }
+  return (
+    <text wrapMode="none">
+      {tokens.map((t, i) => {
+        const s = tokenToSpan(t)
+        let attributes = 0
+        if (s.bold) attributes |= TextAttributes.BOLD
+        if (s.italic) attributes |= TextAttributes.ITALIC
+        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        return (
+          <span key={i} fg={s.fg ?? theme.text} attributes={attributes}>
+            {s.text}
+          </span>
+        )
+      })}
+    </text>
   )
 }

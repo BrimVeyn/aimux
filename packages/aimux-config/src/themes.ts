@@ -1,42 +1,31 @@
 import type { ThemeColors, ThemeDefinition, ThemeId } from './types'
 
+export const THEME_IDS: ThemeId[] = [
+  'catppuccin-mocha',
+  'dracula',
+  'nord',
+  'one-dark-pro',
+  'solarized-dark',
+  'tokyo-night',
+]
+
 export const THEMES: Record<ThemeId, { name: string; colors: ThemeColors }> = {
-  'aimux': {
-    colors: {
-      accent: '#7cd1b8',
-      accentAlt: '#c4a7e7',
-      background: '#11151b',
-      border: '#2d3f52',
-      borderActive: '#7cd1b8',
-      danger: '#f38ba8',
-      dim: '#243242',
-      overlay: '#0b1016',
-      panel: '#16202b',
-      panelHighlight: '#1f3344',
-      panelMuted: '#1c2734',
-      success: '#8bd5ca',
-      text: '#edf4ff',
-      textMuted: '#6b829a',
-      warning: '#f6c177',
-    },
-    name: 'Aimux',
-  },
   'catppuccin-mocha': {
     colors: {
-      accent: '#cba6f7',
-      accentAlt: '#f5c2e7',
+      accent: '#89b4fa',
+      accentAlt: '#cba6f7',
       background: '#1e1e2e',
       border: '#45475a',
-      borderActive: '#cba6f7',
+      borderActive: '#89b4fa',
       danger: '#f38ba8',
       dim: '#313244',
-      overlay: '#181825',
-      panel: '#232334',
+      overlay: '#11111b',
+      panel: '#181825',
       panelHighlight: '#313244',
-      panelMuted: '#2a2a3c',
+      panelMuted: '#1e1e2e',
       success: '#a6e3a1',
       text: '#cdd6f4',
-      textMuted: '#6c7086',
+      textMuted: '#7f849c',
       warning: '#f9e2af',
     },
     name: 'Catppuccin Mocha',
@@ -49,97 +38,17 @@ export const THEMES: Record<ThemeId, { name: string; colors: ThemeColors }> = {
       border: '#44475a',
       borderActive: '#bd93f9',
       danger: '#ff5555',
-      dim: '#383a4a',
+      dim: '#343746',
       overlay: '#1f2029',
-      panel: '#2d2f3d',
-      panelHighlight: '#3d4056',
-      panelMuted: '#343746',
+      panel: '#21222c',
+      panelHighlight: '#44475a',
+      panelMuted: '#282a36',
       success: '#50fa7b',
       text: '#f8f8f2',
       textMuted: '#6272a4',
       warning: '#f1fa8c',
     },
     name: 'Dracula',
-  },
-  'dracula-at-night': {
-    colors: {
-      accent: '#bd93f9',
-      accentAlt: '#ff79c6',
-      background: '#0e1419',
-      border: '#2a3440',
-      borderActive: '#bd93f9',
-      danger: '#ff5555',
-      dim: '#1e2630',
-      overlay: '#090d11',
-      panel: '#131920',
-      panelHighlight: '#222a33',
-      panelMuted: '#1a2129',
-      success: '#50fa7b',
-      text: '#f8f8f2',
-      textMuted: '#6272a4',
-      warning: '#f1fa8c',
-    },
-    name: 'Dracula At Night',
-  },
-  'everforest': {
-    colors: {
-      accent: '#a7c080',
-      accentAlt: '#d699b6',
-      background: '#2d353b',
-      border: '#4f585e',
-      borderActive: '#a7c080',
-      danger: '#e67e80',
-      dim: '#3d484d',
-      overlay: '#232a2e',
-      panel: '#343f44',
-      panelHighlight: '#475258',
-      panelMuted: '#3d484d',
-      success: '#a7c080',
-      text: '#d3c6aa',
-      textMuted: '#859289',
-      warning: '#dbbc7f',
-    },
-    name: 'Everforest',
-  },
-  'gruvbox-dark': {
-    colors: {
-      accent: '#b8bb26',
-      accentAlt: '#d3869b',
-      background: '#282828',
-      border: '#504945',
-      borderActive: '#b8bb26',
-      danger: '#fb4934',
-      dim: '#3c3836',
-      overlay: '#1f1d1b',
-      panel: '#2e2e2e',
-      panelHighlight: '#504945',
-      panelMuted: '#3c3836',
-      success: '#b8bb26',
-      text: '#ebdbb2',
-      textMuted: '#928374',
-      warning: '#fabd2f',
-    },
-    name: 'Gruvbox Dark',
-  },
-  'kanagawa': {
-    colors: {
-      accent: '#7e9cd8',
-      accentAlt: '#957fb8',
-      background: '#1f1f28',
-      border: '#363646',
-      borderActive: '#7e9cd8',
-      danger: '#e82424',
-      dim: '#2a2a37',
-      overlay: '#171720',
-      panel: '#24242e',
-      panelHighlight: '#363646',
-      panelMuted: '#2a2a37',
-      success: '#76946a',
-      text: '#dcd7ba',
-      textMuted: '#727169',
-      warning: '#e6c384',
-    },
-    name: 'Kanagawa',
   },
   'nord': {
     colors: {
@@ -150,53 +59,53 @@ export const THEMES: Record<ThemeId, { name: string; colors: ThemeColors }> = {
       borderActive: '#88c0d0',
       danger: '#bf616a',
       dim: '#3b4252',
-      overlay: '#252a33',
-      panel: '#333a47',
+      overlay: '#242933',
+      panel: '#3b4252',
       panelHighlight: '#434c5e',
-      panelMuted: '#3b4252',
+      panelMuted: '#2e3440',
       success: '#a3be8c',
       text: '#eceff4',
-      textMuted: '#7b88a1',
+      textMuted: '#6c7a96',
       warning: '#ebcb8b',
     },
     name: 'Nord',
   },
-  'one-dark': {
+  'one-dark-pro': {
     colors: {
       accent: '#61afef',
       accentAlt: '#c678dd',
       background: '#282c34',
-      border: '#3e4452',
+      border: '#3e4451',
       borderActive: '#61afef',
       danger: '#e06c75',
-      dim: '#3b4048',
-      overlay: '#1f2329',
-      panel: '#2c313a',
-      panelHighlight: '#3b4048',
-      panelMuted: '#333842',
+      dim: '#3a3f4b',
+      overlay: '#21252b',
+      panel: '#21252b',
+      panelHighlight: '#2c313c',
+      panelMuted: '#282c34',
       success: '#98c379',
       text: '#abb2bf',
-      textMuted: '#636d83',
+      textMuted: '#5c6370',
       warning: '#e5c07b',
     },
-    name: 'One Dark',
+    name: 'One Dark Pro',
   },
   'solarized-dark': {
     colors: {
       accent: '#268bd2',
-      accentAlt: '#d33682',
+      accentAlt: '#6c71c4',
       background: '#002b36',
-      border: '#2e5560',
+      border: '#073642',
       borderActive: '#268bd2',
       danger: '#dc322f',
-      dim: '#073642',
-      overlay: '#00242c',
-      panel: '#003340',
-      panelHighlight: '#0a4050',
-      panelMuted: '#073642',
+      dim: '#0a3e4a',
+      overlay: '#001e26',
+      panel: '#073642',
+      panelHighlight: '#0a4553',
+      panelMuted: '#002b36',
       success: '#859900',
-      text: '#fdf6e3',
-      textMuted: '#657b83',
+      text: '#93a1a1',
+      textMuted: '#586e75',
       warning: '#b58900',
     },
     name: 'Solarized Dark',
@@ -206,14 +115,14 @@ export const THEMES: Record<ThemeId, { name: string; colors: ThemeColors }> = {
       accent: '#7aa2f7',
       accentAlt: '#bb9af7',
       background: '#1a1b26',
-      border: '#3b4261',
+      border: '#292e42',
       borderActive: '#7aa2f7',
       danger: '#f7768e',
-      dim: '#292e42',
-      overlay: '#141722',
-      panel: '#1f2335',
+      dim: '#24283b',
+      overlay: '#16161e',
+      panel: '#16161e',
       panelHighlight: '#292e42',
-      panelMuted: '#24283b',
+      panelMuted: '#1a1b26',
       success: '#9ece6a',
       text: '#c0caf5',
       textMuted: '#565f89',
@@ -223,22 +132,25 @@ export const THEMES: Record<ThemeId, { name: string; colors: ThemeColors }> = {
   },
 }
 
-export const THEME_IDS = Object.keys(THEMES) as ThemeId[]
+const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
+  'aimux': 'catppuccin-mocha',
+  'dracula-at-night': 'dracula',
+  'everforest': 'catppuccin-mocha',
+  'gruvbox-dark': 'catppuccin-mocha',
+  'kanagawa': 'tokyo-night',
+  'one-dark': 'one-dark-pro',
+}
 
-/**
- * Theme helpers for user configs.
- */
+export function migrateThemeId(id: string | undefined): ThemeId {
+  if (id !== undefined && id in THEMES) return id as ThemeId
+  if (id !== undefined) {
+    const alias = LEGACY_THEME_ALIASES[id]
+    if (alias !== undefined) return alias
+  }
+  return 'catppuccin-mocha'
+}
+
 export const themes = {
-  /**
-   * Create a fully custom theme from scratch.
-   */
-  create(colors: ThemeColors): ThemeDefinition {
-    return { colors }
-  },
-
-  /**
-   * Create a new theme by extending an existing built-in theme with overrides.
-   */
   extend(base: ThemeId, overrides: Partial<ThemeColors>): ThemeDefinition {
     const baseTheme = THEMES[base]
     if (!baseTheme) {

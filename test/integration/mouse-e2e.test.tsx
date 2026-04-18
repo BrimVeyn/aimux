@@ -247,7 +247,7 @@ function MouseHarness({
 
   return (
     <RootView
-      themeId="aimux"
+      themeId="catppuccin-mocha"
       contentOrigin={contentOriginRef.current}
       mouseForwardingEnabled={mouseForwardingEnabled}
       localScrollbackEnabled={localScrollbackEnabled}

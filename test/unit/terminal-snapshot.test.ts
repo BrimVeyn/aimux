@@ -34,8 +34,8 @@ describe('snapshotTerminal', () => {
     const firstLine = snapshot.lines[0]
 
     expect(firstLine?.spans[0]?.text.trim()).toBe('rev')
-    expect(firstLine?.spans[0]?.fg).toBe('#11151b')
-    expect(firstLine?.spans[0]?.bg).toBe('#edf4ff')
+    expect(firstLine?.spans[0]?.fg).toBe('#1e1e2e')
+    expect(firstLine?.spans[0]?.bg).toBe('#cdd6f4')
 
     terminal.dispose()
   })

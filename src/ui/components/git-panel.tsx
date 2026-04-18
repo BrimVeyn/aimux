@@ -8,6 +8,7 @@ import type {
   GitPanePathConfig,
 } from '../../state/types'
 
+import { dispatchGlobal } from '../../state/dispatch-ref'
 import { theme } from '../theme'
 
 interface GitPanelProps {
@@ -143,8 +144,18 @@ function renderFileRow(
 ): ReactNode {
   const hasNumstat = file.added !== null || file.removed !== null
   const bg = isSelected ? theme.panelHighlight : undefined
+  const onSelect = (): void => {
+    dispatchGlobal({ path: file.path, section: file.section, type: 'git-mode-select-file-by-key' })
+  }
   return (
-    <box key={key} flexDirection="row" gap={1} paddingLeft={1} backgroundColor={bg}>
+    <box
+      key={key}
+      flexDirection="row"
+      gap={1}
+      paddingLeft={1}
+      backgroundColor={bg}
+      onMouseDown={onSelect}
+    >
       <text fg={STATUS_COLORS[file.status]} bg={bg}>
         <strong>{displayStatus(file)}</strong>
       </text>

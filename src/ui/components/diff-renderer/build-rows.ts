@@ -1,8 +1,8 @@
 import type { FileDiffMetadata, Hunk } from '../../../diff-parser'
 
 export type SplitCell =
-  | { content: string; lineNumber: number; type: 'context' }
-  | { content: string; lineNumber: number; type: 'addition' | 'deletion' }
+  | { content: string; lineIdx: number; lineNumber: number; type: 'context' }
+  | { content: string; lineIdx: number; lineNumber: number; type: 'addition' | 'deletion' }
   | { type: 'filler' }
 
 export interface SplitRow {
@@ -15,11 +15,13 @@ export type UnifiedRow =
   | {
       addLineNumber: number
       content: string
+      lineIdx: number
       delLineNumber: number
       type: 'context'
     }
   | {
       content: string
+      lineIdx: number
       lineNumber: number
       type: 'addition' | 'deletion'
     }
@@ -42,20 +44,25 @@ export function buildSplitRows(file: FileDiffMetadata): SplitRowOrHeader[] {
     for (const content of hunk.hunkContent) {
       if (content.type === 'context') {
         for (let i = 0; i < content.lines; i++) {
-          const text = file.additionLines[content.additionLineIndex + i] ?? ''
+          const addIdx = content.additionLineIndex + i
+          const delIdx = content.deletionLineIndex + i
+          const text = stripNewline(file.additionLines[addIdx] ?? '')
           rows.push({
-            left: { content: stripNewline(text), lineNumber: delLine++, type: 'context' },
-            right: { content: stripNewline(text), lineNumber: addLine++, type: 'context' },
+            left: { content: text, lineIdx: delIdx, lineNumber: delLine++, type: 'context' },
+            right: { content: text, lineIdx: addIdx, lineNumber: addLine++, type: 'context' },
             type: 'row',
           })
         }
       } else {
         const max = Math.max(content.additions, content.deletions)
         for (let i = 0; i < max; i++) {
+          const delIdx = content.deletionLineIndex + i
+          const addIdx = content.additionLineIndex + i
           const left: SplitCell =
             i < content.deletions
               ? {
-                  content: stripNewline(file.deletionLines[content.deletionLineIndex + i] ?? ''),
+                  content: stripNewline(file.deletionLines[delIdx] ?? ''),
+                  lineIdx: delIdx,
                   lineNumber: delLine++,
                   type: 'deletion',
                 }
@@ -63,7 +70,8 @@ export function buildSplitRows(file: FileDiffMetadata): SplitRowOrHeader[] {
           const right: SplitCell =
             i < content.additions
               ? {
-                  content: stripNewline(file.additionLines[content.additionLineIndex + i] ?? ''),
+                  content: stripNewline(file.additionLines[addIdx] ?? ''),
+                  lineIdx: addIdx,
                   lineNumber: addLine++,
                   type: 'addition',
                 }
@@ -85,25 +93,31 @@ export function buildUnifiedRows(file: FileDiffMetadata): UnifiedRowOrHeader[] {
     for (const content of hunk.hunkContent) {
       if (content.type === 'context') {
         for (let i = 0; i < content.lines; i++) {
-          const text = file.additionLines[content.additionLineIndex + i] ?? ''
+          const addIdx = content.additionLineIndex + i
+          const text = stripNewline(file.additionLines[addIdx] ?? '')
           rows.push({
             addLineNumber: addLine++,
-            content: stripNewline(text),
+            content: text,
             delLineNumber: delLine++,
+            lineIdx: addIdx,
             type: 'context',
           })
         }
       } else {
         for (let i = 0; i < content.deletions; i++) {
+          const delIdx = content.deletionLineIndex + i
           rows.push({
-            content: stripNewline(file.deletionLines[content.deletionLineIndex + i] ?? ''),
+            content: stripNewline(file.deletionLines[delIdx] ?? ''),
+            lineIdx: delIdx,
             lineNumber: delLine++,
             type: 'deletion',
           })
         }
         for (let i = 0; i < content.additions; i++) {
+          const addIdx = content.additionLineIndex + i
           rows.push({
-            content: stripNewline(file.additionLines[content.additionLineIndex + i] ?? ''),
+            content: stripNewline(file.additionLines[addIdx] ?? ''),
+            lineIdx: addIdx,
             lineNumber: addLine++,
             type: 'addition',
           })

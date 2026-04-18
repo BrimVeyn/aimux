@@ -231,7 +231,7 @@ export function RootView({
   if (inGitMode) {
     return (
       <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
-        <GitView />
+        <GitView themeId={themeId} />
         <StatusBar />
         <PendingChordOverlay />
         {renderModal(modal, {

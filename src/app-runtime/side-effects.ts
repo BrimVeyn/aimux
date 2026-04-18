@@ -170,7 +170,7 @@ function applyThemeEffect(
 
   switch (effect.action) {
     case 'open':
-      applyTheme(THEME_IDS[0] ?? 'aimux')
+      applyTheme(THEME_IDS[0] ?? 'catppuccin-mocha')
       return
     case 'restore':
       applyTheme(ctx.themeId)

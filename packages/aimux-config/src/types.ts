@@ -440,6 +440,7 @@ export type GitModeAction =
   | { type: 'enter-git-mode' }
   | { type: 'exit-git-mode' }
   | { type: 'git-mode-select-file'; delta: -1 | 1 }
+  | { type: 'git-mode-select-file-by-key'; section: GitFileSection; path: string }
   | { type: 'git-mode-set-diff'; path: string; diff: DiffData }
   | { type: 'git-mode-set-loading'; path: string; loading: boolean }
   | { type: 'git-mode-set-pending-delete'; path: string | null }
@@ -544,17 +545,12 @@ export interface ThemeColors {
 }
 
 export type ThemeId =
-  | 'aimux'
-  | 'dracula'
-  | 'dracula-at-night'
-  | 'everforest'
-  | 'tokyo-night'
-  | 'gruvbox-dark'
   | 'catppuccin-mocha'
+  | 'dracula'
   | 'nord'
+  | 'one-dark-pro'
   | 'solarized-dark'
-  | 'one-dark'
-  | 'kanagawa'
+  | 'tokyo-night'
 
 export interface ThemeDefinition {
   base?: ThemeId

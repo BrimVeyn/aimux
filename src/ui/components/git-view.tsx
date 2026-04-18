@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef } from 'react'
 
 import type { DiffData, GitDiffView } from '../../state/types'
+import type { ThemeId } from '../themes'
 
 import { fetchDiff } from '../../git/git-diff'
 import { useGitPanelPolling } from '../../git/git-poller'
@@ -15,6 +16,7 @@ interface DiffStageProps {
   diff: DiffData | undefined
   loading: boolean
   diffRef: React.RefObject<PierreDiffHandle | null>
+  themeId: ThemeId
   view: GitDiffView
 }
 
@@ -32,7 +34,13 @@ function placeholderText(diff: DiffData): string | null {
   return null
 }
 
-const DiffStage = memo(function DiffStage({ diff, diffRef, loading, view }: DiffStageProps) {
+const DiffStage = memo(function DiffStage({
+  diff,
+  diffRef,
+  loading,
+  themeId,
+  view,
+}: DiffStageProps) {
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
@@ -73,12 +81,22 @@ const DiffStage = memo(function DiffStage({ diff, diffRef, loading, view }: Diff
           </text>
         </box>
       ) : null}
-      <PierreDiff ref={diffRef} diff={diff.rawDiff} view={view} />
+      <PierreDiff
+        ref={diffRef}
+        diff={diff.rawDiff}
+        path={diff.path}
+        themeId={themeId}
+        view={view}
+      />
     </box>
   )
 })
 
-export const GitView = memo(function GitView() {
+interface GitViewProps {
+  themeId: ThemeId
+}
+
+export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPanel = useAppStore((s) => s.gitPanel)
   const gitMode = useAppStore((s) => s.gitMode)
@@ -178,7 +196,13 @@ export const GitView = memo(function GitView() {
             selectedFileKey={selectedFile ? fileKey(selectedFile) : null}
           />
         </box>
-        <DiffStage diff={diff} diffRef={diffRef} loading={loading} view={gitMode.diffView} />
+        <DiffStage
+          diff={diff}
+          diffRef={diffRef}
+          loading={loading}
+          themeId={themeId}
+          view={gitMode.diffView}
+        />
       </box>
       {footerNode ? (
         <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} flexDirection="column">

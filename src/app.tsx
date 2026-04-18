@@ -70,7 +70,7 @@ export function App({
     if (config.themeId) {
       applyTheme(config.themeId)
     }
-    return config.themeId ?? 'aimux'
+    return config.themeId ?? 'catppuccin-mocha'
   })
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
     const json = loadConfig()

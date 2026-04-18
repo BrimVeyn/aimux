@@ -7,6 +7,21 @@ import { getProfileConfigDir } from './profile-paths'
 import { isWorkspaceSnapshotV1 } from './state/validation'
 import { THEME_IDS, type ThemeId } from './ui/themes'
 
+const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
+  'aimux': 'catppuccin-mocha',
+  'dracula-at-night': 'dracula',
+  'everforest': 'catppuccin-mocha',
+  'gruvbox-dark': 'catppuccin-mocha',
+  'kanagawa': 'tokyo-night',
+  'one-dark': 'one-dark-pro',
+}
+
+function migrateThemeId(value: unknown): ThemeId | undefined {
+  if (typeof value !== 'string') return undefined
+  if (THEME_IDS.includes(value as ThemeId)) return value as ThemeId
+  return LEGACY_THEME_ALIASES[value]
+}
+
 export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
 
 export interface PersistedGitPane {
@@ -58,7 +73,7 @@ export interface ConfigLoadResult {
 }
 
 function isThemeId(value: unknown): value is ThemeId {
-  return typeof value === 'string' && THEME_IDS.includes(value as ThemeId)
+  return migrateThemeId(value) !== undefined
 }
 
 function isCustomCommandsRecord(value: unknown): value is Record<string, string> {
@@ -174,7 +189,7 @@ export function loadConfigResult(): ConfigLoadResult {
         sessionBarPosition: validSessionBarPosition,
         sessionBarVisible: validSessionBarVisible,
         skippedUpdateVersion: validSkippedUpdateVersion,
-        themeId: isThemeId(parsed.themeId) ? parsed.themeId : undefined,
+        themeId: migrateThemeId(parsed.themeId),
         version: 2,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot

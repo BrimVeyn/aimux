@@ -46,6 +46,20 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         },
       }
     }
+    case 'git-mode-select-file-by-key': {
+      const index = state.gitPanel.files.findIndex(
+        (f) => f.section === action.section && f.path === action.path
+      )
+      if (index < 0 || index === state.gitMode.selectedFileIndex) return state
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          pendingDeletePath: null,
+          selectedFileIndex: index,
+        },
+      }
+    }
     case 'git-mode-set-diff': {
       const nextLoading = { ...state.gitMode.loading }
       delete nextLoading[action.path]
