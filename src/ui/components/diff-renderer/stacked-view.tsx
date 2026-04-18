@@ -27,6 +27,7 @@ interface Props {
   highlights: DiffHighlights
   folds: Record<string, FoldState>
   foldDispatch: FoldDispatch
+  contentWidth: number
 }
 
 function handleScroll(e: OtuiMouseEvent): void {
@@ -38,7 +39,7 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { file, foldDispatch, folds, highlights },
+  { contentWidth, file, foldDispatch, folds, highlights },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -53,7 +54,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     []
   )
 
-  const rows = buildUnifiedRows(file, folds)
+  const rows = buildUnifiedRows(file, folds, contentWidth)
   const gw = gutterWidth(file)
 
   return (
@@ -105,7 +106,7 @@ function UnifiedRowRender({
   if (row.type === 'context') {
     const tokens = highlights.add[row.lineIdx]
     return (
-      <box flexDirection="row">
+      <box flexDirection="row" height={row.height}>
         <text fg={theme.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
         <text fg={theme.text}> </text>
         <LineContent content={row.content} tokens={tokens} />
@@ -119,7 +120,7 @@ function UnifiedRowRender({
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={bg}>
+    <box flexDirection="row" backgroundColor={bg} height={row.height}>
       <text fg={theme.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
@@ -132,7 +133,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
     return <text fg={theme.text}>{content}</text>
   }
   return (
-    <text wrapMode="none">
+    <text>
       {tokens.map((t, i) => {
         const s = tokenToSpan(t)
         let attributes = 0

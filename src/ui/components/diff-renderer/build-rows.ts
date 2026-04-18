@@ -23,6 +23,7 @@ export interface SplitRow {
   type: 'row'
   left: SplitCell
   right: SplitCell
+  height: number
 }
 
 export type UnifiedRow =
@@ -32,12 +33,14 @@ export type UnifiedRow =
       lineIdx: number
       delLineNumber: number
       type: 'context'
+      height: number
     }
   | {
       content: string
       lineIdx: number
       lineNumber: number
       type: 'addition' | 'deletion'
+      height: number
     }
   | { fold: FoldInfo; type: 'fold' }
 
@@ -51,6 +54,15 @@ export type SplitRowOrHeader = HunkHeader | SplitRow
 export type UnifiedRowOrHeader = HunkHeader | UnifiedRow
 
 export type FoldMap = Record<string, FoldState>
+
+function wrapCount(content: string, width: number): number {
+  if (width <= 0) return 1
+  return Math.max(1, Math.ceil(content.length / width))
+}
+
+function cellWraps(content: string, width: number): number {
+  return wrapCount(content, width)
+}
 
 interface ContextSlice {
   // which file-line indices (relative to content start) to show, and which to fold
@@ -113,8 +125,23 @@ function contextNeighbors(
   return { hasChangeAfter, hasChangeBefore }
 }
 
-export function buildSplitRows(file: FileDiffMetadata, folds: FoldMap = {}): SplitRowOrHeader[] {
+export function buildSplitRows(
+  file: FileDiffMetadata,
+  folds: FoldMap = {},
+  contentWidth = 0
+): SplitRowOrHeader[] {
   const rows: SplitRowOrHeader[] = []
+  const pairHeight = (l: SplitCell, r: SplitCell): number => {
+    const lh =
+      l.type === 'context' || l.type === 'addition' || l.type === 'deletion'
+        ? cellWraps(l.content, contentWidth)
+        : 1
+    const rh =
+      r.type === 'context' || r.type === 'addition' || r.type === 'deletion'
+        ? cellWraps(r.content, contentWidth)
+        : 1
+    return Math.max(lh, rh)
+  }
   for (const [hIdx, hunk] of file.hunks.entries()) {
     rows.push(makeHeader(hunk))
     let delLine = hunk.deletionStart
@@ -132,11 +159,19 @@ export function buildSplitRows(file: FileDiffMetadata, folds: FoldMap = {}): Spl
             const addIdx = content.additionLineIndex + offset
             const delIdx = content.deletionLineIndex + offset
             const text = stripNewline(file.additionLines[addIdx] ?? '')
-            rows.push({
-              left: { content: text, lineIdx: delIdx, lineNumber: delLine++, type: 'context' },
-              right: { content: text, lineIdx: addIdx, lineNumber: addLine++, type: 'context' },
-              type: 'row',
-            })
+            const left: SplitCell = {
+              content: text,
+              lineIdx: delIdx,
+              lineNumber: delLine++,
+              type: 'context',
+            }
+            const right: SplitCell = {
+              content: text,
+              lineIdx: addIdx,
+              lineNumber: addLine++,
+              type: 'context',
+            }
+            rows.push({ height: pairHeight(left, right), left, right, type: 'row' })
           }
         }
 
@@ -147,6 +182,7 @@ export function buildSplitRows(file: FileDiffMetadata, folds: FoldMap = {}): Spl
           const middle = content.lines - preKeep - postKeep
           const info = makeFoldInfo(foldId, middle, foldState, slice.fold.length)
           rows.push({
+            height: 1,
             left: { fold: info, type: 'fold' },
             right: { fold: info, type: 'fold' },
             type: 'row',
@@ -178,7 +214,7 @@ export function buildSplitRows(file: FileDiffMetadata, folds: FoldMap = {}): Spl
                   type: 'addition',
                 }
               : { type: 'filler' }
-          rows.push({ left, right, type: 'row' })
+          rows.push({ height: pairHeight(left, right), left, right, type: 'row' })
         }
       }
     }
@@ -188,7 +224,8 @@ export function buildSplitRows(file: FileDiffMetadata, folds: FoldMap = {}): Spl
 
 export function buildUnifiedRows(
   file: FileDiffMetadata,
-  folds: FoldMap = {}
+  folds: FoldMap = {},
+  contentWidth = 0
 ): UnifiedRowOrHeader[] {
   const rows: UnifiedRowOrHeader[] = []
   for (const [hIdx, hunk] of file.hunks.entries()) {
@@ -211,6 +248,7 @@ export function buildUnifiedRows(
               addLineNumber: addLine++,
               content: text,
               delLineNumber: delLine++,
+              height: cellWraps(text, contentWidth),
               lineIdx: addIdx,
               type: 'context',
             })
@@ -231,8 +269,10 @@ export function buildUnifiedRows(
       } else {
         for (let i = 0; i < content.deletions; i++) {
           const delIdx = content.deletionLineIndex + i
+          const text = stripNewline(file.deletionLines[delIdx] ?? '')
           rows.push({
-            content: stripNewline(file.deletionLines[delIdx] ?? ''),
+            content: text,
+            height: cellWraps(text, contentWidth),
             lineIdx: delIdx,
             lineNumber: delLine++,
             type: 'deletion',
@@ -240,8 +280,10 @@ export function buildUnifiedRows(
         }
         for (let i = 0; i < content.additions; i++) {
           const addIdx = content.additionLineIndex + i
+          const text = stripNewline(file.additionLines[addIdx] ?? '')
           rows.push({
-            content: stripNewline(file.additionLines[addIdx] ?? ''),
+            content: text,
+            height: cellWraps(text, contentWidth),
             lineIdx: addIdx,
             lineNumber: addLine++,
             type: 'addition',
@@ -253,16 +295,32 @@ export function buildUnifiedRows(
   return rows
 }
 
-export function firstChangeRowIndex(
+function rowHeight(row: SplitRowOrHeader | UnifiedRowOrHeader): number {
+  if (row.type === 'hunk-header') return 1
+  if (row.type === 'row') return row.height
+  if (row.type === 'fold') return 1
+  return row.height
+}
+
+function isChangeRow(row: SplitRowOrHeader | UnifiedRowOrHeader): boolean {
+  if (row.type === 'row') {
+    return (
+      row.left.type === 'addition' ||
+      row.left.type === 'deletion' ||
+      row.right.type === 'addition' ||
+      row.right.type === 'deletion'
+    )
+  }
+  return row.type === 'addition' || row.type === 'deletion'
+}
+
+export function firstChangeRowOffset(
   rows: readonly (SplitRowOrHeader | UnifiedRowOrHeader)[]
 ): number {
-  for (const [i, row] of rows.entries()) {
-    if (row.type === 'row') {
-      if (row.left.type === 'addition' || row.left.type === 'deletion') return i
-      if (row.right.type === 'addition' || row.right.type === 'deletion') return i
-      continue
-    }
-    if (row.type === 'addition' || row.type === 'deletion') return i
+  let offset = 0
+  for (const row of rows) {
+    if (isChangeRow(row)) return offset
+    offset += rowHeight(row)
   }
   return -1
 }

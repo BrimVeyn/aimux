@@ -10,7 +10,7 @@ import { parsePatchFiles } from '../../../diff-parser'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { theme } from '../../theme'
-import { buildSplitRows, buildUnifiedRows, firstChangeRowIndex } from './build-rows'
+import { buildSplitRows, buildUnifiedRows, firstChangeRowOffset, gutterWidth } from './build-rows'
 import { filetypeFromPath } from './filetype'
 import { tokenizeSide } from './highlight'
 import { SplitView, type SplitViewHandle } from './split-view'
@@ -53,6 +53,17 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   }, [diff])
 
   const filetype = useMemo(() => filetypeFromPath(path), [path])
+
+  const terminalCols = useAppStore((s) => s.layout.terminalCols)
+  const sidebarWidth = useAppStore((s) => s.sidebar.width)
+  const contentWidth = useMemo(() => {
+    if (!file) return 0
+    const gw = gutterWidth(file)
+    const usable = Math.max(0, terminalCols - sidebarWidth - 1)
+    const paneCols = view === 'split' ? Math.max(0, Math.floor(usable / 2) - 1) : usable
+    const prefix = view === 'split' ? gw + 4 : gw * 2 + 5
+    return Math.max(1, paneCols - prefix)
+  }, [file, view, terminalCols, sidebarWidth])
 
   const folds = useAppStore((s) => s.gitMode.folds[path]) ?? EMPTY_FOLDS
   const foldDispatch = useMemo<FoldDispatch>(
@@ -104,10 +115,12 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   useEffect(() => {
     if (!file) return
     const rows =
-      view === 'split' ? buildSplitRows(file, EMPTY_FOLDS) : buildUnifiedRows(file, EMPTY_FOLDS)
-    const idx = firstChangeRowIndex(rows)
-    if (idx < 0) return
-    const target = Math.max(0, idx - 2)
+      view === 'split'
+        ? buildSplitRows(file, EMPTY_FOLDS, contentWidth)
+        : buildUnifiedRows(file, EMPTY_FOLDS, contentWidth)
+    const offset = firstChangeRowOffset(rows)
+    if (offset < 0) return
+    const target = Math.max(0, offset - 2)
     const apply = (): void => {
       if (view === 'split') {
         const left = splitRef.current?.leftScroll
@@ -121,7 +134,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     }
     const raf = requestAnimationFrame(apply)
     return () => cancelAnimationFrame(raf)
-  }, [path, file, view])
+  }, [path, file, view, contentWidth])
 
   if (!file) {
     return (
@@ -135,6 +148,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     return (
       <StackedView
         ref={stackedRef}
+        contentWidth={contentWidth}
         file={file}
         foldDispatch={foldDispatch}
         folds={folds}
@@ -145,6 +159,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   return (
     <SplitView
       ref={splitRef}
+      contentWidth={contentWidth}
       file={file}
       foldDispatch={foldDispatch}
       folds={folds}

@@ -28,6 +28,7 @@ interface Props {
   highlights: DiffHighlights
   folds: Record<string, FoldState>
   foldDispatch: FoldDispatch
+  contentWidth: number
 }
 
 function handleScroll(e: OtuiMouseEvent): void {
@@ -39,7 +40,7 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
-  { file, foldDispatch, folds, highlights },
+  { contentWidth, file, foldDispatch, folds, highlights },
   ref
 ) {
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
@@ -58,7 +59,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     []
   )
 
-  const rows = buildSplitRows(file, folds)
+  const rows = buildSplitRows(file, folds, contentWidth)
   const gw = gutterWidth(file)
 
   return (
@@ -79,6 +80,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
             foldDispatch={foldDispatch}
             gw={gw}
             header={row.type === 'hunk-header' ? row : null}
+            rowHeight={row.type === 'row' ? row.height : 1}
             tokens={highlights.del}
           />
         ))}
@@ -99,6 +101,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
             foldDispatch={foldDispatch}
             gw={gw}
             header={row.type === 'hunk-header' ? row : null}
+            rowHeight={row.type === 'row' ? row.height : 1}
             tokens={highlights.add}
           />
         ))}
@@ -112,18 +115,20 @@ function SideRow({
   foldDispatch,
   gw,
   header,
+  rowHeight,
   tokens,
 }: {
   cell: SplitCell | null
   foldDispatch: FoldDispatch
   gw: number
   header: Extract<SplitRowOrHeader, { type: 'hunk-header' }> | null
+  rowHeight: number
   tokens: ThemedToken[][]
 }) {
   if (header) return <HunkHeaderRow row={header} />
   if (!cell) return null
   if (cell.type === 'fold') return <FoldStrip dispatch={foldDispatch} fold={cell.fold} />
-  return <HalfRow cell={cell} gw={gw} tokens={tokens} />
+  return <HalfRow cell={cell} gw={gw} height={rowHeight} tokens={tokens} />
 }
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
@@ -138,14 +143,16 @@ function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-h
 function HalfRow({
   cell,
   gw,
+  height,
   tokens,
 }: {
   cell: Exclude<SplitCell, { type: 'fold' }>
   gw: number
+  height: number
   tokens: ThemedToken[][]
 }) {
   if (cell.type === 'filler') {
-    return <box backgroundColor={theme.panelMuted} height={1} />
+    return <box backgroundColor={theme.panelMuted} height={height} />
   }
   let bg: string | undefined
   let sign = ' '
@@ -162,7 +169,7 @@ function HalfRow({
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={bg}>
+    <box flexDirection="row" backgroundColor={bg} height={height}>
       <text fg={theme.textMuted}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />
@@ -175,7 +182,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
     return <text fg={theme.text}>{content}</text>
   }
   return (
-    <text wrapMode="none">
+    <text>
       {tokens.map((t, i) => {
         const s = tokenToSpan(t)
         let attributes = 0
