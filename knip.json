@@ -1,0 +1,34 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignoreBinaries": [
+    "vhs",
+    "commit",
+    "rev-parse",
+    "push",
+    "diff",
+    "show",
+    "status",
+    "printf",
+    "branch"
+  ],
+  "ignoreDependencies": ["bun-types"],
+  "rules": {
+    "duplicates": "off"
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/restart-daemon.ts",
+        "src/restart-terminal-manager.ts",
+        "src/daemon/**/*.{ts,tsx}",
+        "src/terminal-manager/**/*.{ts,tsx}",
+        "test/**/*.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+    },
+    "packages/aimux-config": {
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

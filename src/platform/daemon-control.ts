@@ -21,10 +21,6 @@ export async function findSocketProcessPid(socketPath: string): Promise<number |
   }
 }
 
-export async function findDaemonPid(socketPath: string): Promise<number | null> {
-  return findSocketProcessPid(socketPath)
-}
-
 export async function findIpcDaemonPid(): Promise<number | null> {
   return findSocketProcessPid(getIpcDaemonSocketPath())
 }
@@ -51,10 +47,6 @@ export async function killProcess(pid: number): Promise<void> {
   } catch {
     // already gone
   }
-}
-
-export async function killDaemon(pid: number): Promise<void> {
-  await killProcess(pid)
 }
 
 async function waitForSocket(socketPath: string): Promise<boolean> {

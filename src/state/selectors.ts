@@ -1,4 +1,4 @@
-import type { AppState, SessionRecord, SnippetRecord, TabSession } from './types'
+import type { SessionRecord, SnippetRecord } from './types'
 
 export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
   if (!filter) {
@@ -23,8 +23,4 @@ export function filterSnippets(snippets: SnippetRecord[], filter: string | null)
     (snippet) =>
       snippet.name.toLowerCase().includes(lower) || snippet.content.toLowerCase().includes(lower)
   )
-}
-
-export function getActiveTab(state: AppState): TabSession | undefined {
-  return state.activeTabId ? state.tabs.find((tab) => tab.id === state.activeTabId) : undefined
 }

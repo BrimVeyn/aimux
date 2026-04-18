@@ -7,6 +7,9 @@ pre-commit:
     format-check:
       run: bunx oxfmt --write {staged_files} && git add {staged_files}
       glob: '*.{ts,tsx,json}'
+    knip:
+      run: bun run knip
+      glob: '*.{ts,tsx}'
 
 pre-push:
   parallel: true

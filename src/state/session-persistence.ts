@@ -1,10 +1,4 @@
-import {
-  allLeafIds,
-  createGroupId,
-  createLeaf,
-  type LayoutNode,
-  pruneLayoutTree,
-} from './layout-tree'
+import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
 import {
   type AppState,
   DEFAULT_SCROLL_INTENT,
@@ -81,19 +75,6 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
     title: tab.title,
     viewport: tab.viewport,
   }))
-}
-
-export function restoreLayoutTree(
-  snapshot: WorkspaceSnapshotV1 | undefined,
-  tabs: TabSession[]
-): LayoutNode | null {
-  if (snapshot?.layoutTree) {
-    const validTabIds = new Set(tabs.map((t) => t.id))
-    const pruned = pruneLayoutTree(snapshot.layoutTree, validTabIds)
-    if (pruned) return pruned
-  }
-  // Fallback: single leaf for the first tab
-  return tabs[0] ? createLeaf(tabs[0].id) : null
 }
 
 export function restoreLayoutTrees(
