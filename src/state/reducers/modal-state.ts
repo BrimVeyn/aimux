@@ -2,6 +2,8 @@ import { basename } from 'node:path'
 
 import type { AppAction, AppState } from '../types'
 
+import { collectHelpEntries } from '../../input/keymap/help-entries'
+import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { THEME_IDS } from '../../ui/themes'
 import { filterSessions, filterSnippets } from '../selectors'
@@ -38,18 +40,22 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'new-tab',
         },
       }
-    case 'open-help-modal':
+    case 'open-help-modal': {
+      const keymap = getActiveKeymap()
+      const entryCount = keymap ? collectHelpEntries(keymap).length : 0
       return {
         ...state,
         focusMode: 'modal',
         modal: {
           cursorPos: 0,
           editBuffer: null,
+          entryCount,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'help',
         },
       }
+    }
     case 'open-split-picker':
       return {
         ...state,
@@ -200,12 +206,45 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
+    case 'set-help-entry-count': {
+      if (state.modal.type !== 'help') return state
+      if (state.modal.entryCount === action.count) {
+        // Still clamp selectedIndex in case the count shrank below it.
+        const clamped = Math.min(state.modal.selectedIndex, Math.max(0, action.count - 1))
+        if (clamped === state.modal.selectedIndex) return state
+        return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
+      }
+      const clamped = Math.min(state.modal.selectedIndex, Math.max(0, action.count - 1))
+      return {
+        ...state,
+        modal: { ...state.modal, entryCount: action.count, selectedIndex: clamped },
+      }
+    }
+    case 'begin-help-filter': {
+      if (state.modal.type !== 'help') {
+        return state
+      }
+      const buf = state.modal.editBuffer ?? ''
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
+      }
+    }
     case 'close-modal': {
       const nextFocus: AppState['focusMode'] =
         state.modal.type === 'git-commit' ? 'git' : 'navigation'
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {
+      if (state.modal.type === 'help') {
+        const count = state.modal.entryCount
+        if (count <= 0) return state
+        const raw = state.modal.selectedIndex + action.delta
+        const nextIndex = ((raw % count) + count) % count
+        if (nextIndex === state.modal.selectedIndex) return state
+        return { ...state, modal: { ...state.modal, selectedIndex: nextIndex } }
+      }
       if (
         state.modal.type !== 'new-tab' &&
         state.modal.type !== 'session-picker' &&
@@ -293,7 +332,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         nextCursor = cursor + action.char.length
       }
       const resetIndex =
-        state.modal.type === 'session-picker' || state.modal.type === 'snippet-picker'
+        state.modal.type === 'session-picker' ||
+        state.modal.type === 'snippet-picker' ||
+        state.modal.type === 'help'
           ? 0
           : state.modal.selectedIndex
       return {
@@ -360,7 +401,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
-      if (state.modal.type === 'session-picker' || state.modal.type === 'snippet-picker') {
+      if (
+        state.modal.type === 'session-picker' ||
+        state.modal.type === 'snippet-picker' ||
+        state.modal.type === 'help'
+      ) {
         return {
           ...state,
           focusMode: 'modal',

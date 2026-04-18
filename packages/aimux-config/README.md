@@ -140,7 +140,8 @@ Pre-built actions include:
 - snippets: `snippetPicker`, snippet editor and filter actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `toggleSessionBar`, `toggleGitPanel`
+- UI: `toggleSidebar`, `toggleSessionBar`, `toggleGitPane`,
+  `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: enter git mode, stage, delete or unstage, commit, push
 
@@ -177,6 +178,7 @@ Typed theme config is currently only `Partially supported` by the runtime.
 | ------------ | ------------------- | --------------------------------------------------------------------- |
 | `keymaps`    | Supported           | Fully registered by the runtime                                       |
 | `sessionBar` | Supported           | Used during app initialization                                        |
+| `gitPane`    | Supported           | Placement and rendering of the git file list (see docs reference)     |
 | `theme`      | Partially supported | Package surface exists, but runtime startup uses `aimux.json.themeId` |
 | `backends`   | Typed surface only  | Runtime wiring deferred                                               |
 | `sidebar`    | Typed surface only  | Type exists, runtime not currently driven by this field               |

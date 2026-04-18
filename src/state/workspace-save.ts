@@ -24,8 +24,12 @@ export function saveCurrentWorkspace(state: AppState): void {
   saveConfig({
     ...loadConfig(),
     customCommands: state.customCommands,
-    gitPanelRatio: state.sidebar.gitPanelRatio,
-    gitPanelVisible: state.sidebar.gitPanelVisible,
+    gitPane: {
+      mode: state.gitPane.mode,
+      position: state.gitPane.position,
+      ratio: state.gitPane.ratio,
+      visible: state.gitPane.visible,
+    },
     sessionBarPosition: state.sessionBar.position,
     sessionBarVisible: state.sessionBar.visible,
   })

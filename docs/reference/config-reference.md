@@ -36,6 +36,7 @@ defineConfig({
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
   sessionBar?: SessionBarConfig
+  gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
 })
@@ -47,6 +48,7 @@ defineConfig({
 | ------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
 | `keymaps`    | Supported           | Fully resolved and registered by the app                                                          |
 | `sessionBar` | Supported           | Used during app initialization; can override `aimux.json` values                                  |
+| `gitPane`    | Supported           | Controls placement and rendering of the git file list (see below)                                 |
 | `theme`      | Partially supported | Typed surface exists, but app startup currently initializes theme state from `aimux.json.themeId` |
 | `backends`   | Typed surface only  | Resolved by the config package, but current runtime wiring is deferred                            |
 | `sidebar`    | Typed surface only  | Type exists, but current runtime sidebar state comes from app-managed state and snapshots         |
@@ -129,6 +131,76 @@ export default defineConfig({
   },
 })
 ```
+
+## `gitPane`
+
+Status: `Supported`
+
+Type (discriminated union on `mode`):
+
+```ts
+type GitPaneConfig =
+  | {
+      mode?: 'embedded' // default
+      position?: 'top' | 'bottom' // default 'bottom'
+      visible?: boolean
+      ratio?: number // 0..1, clamped to [0.2, 0.8]
+      path?: GitPanePathConfig
+      diffCount?: GitPaneDiffCountConfig
+    }
+  | {
+      mode: 'pane'
+      position?: 'left' | 'right' // default 'left'
+      visible?: boolean
+      ratio?: number
+      path?: GitPanePathConfig
+      diffCount?: GitPaneDiffCountConfig
+    }
+
+type GitPanePathConfig = { enabled: false } | { enabled: true; pathFn?: (path: string) => string }
+
+type GitPaneDiffCountConfig = { enabled: boolean }
+```
+
+Runtime behavior:
+
+- `mode: 'embedded'` renders the git file list inside the sidebar, above or
+  below the tab list depending on `position`.
+- `mode: 'pane'` renders the git file list as a standalone pane next to the
+  sidebar (`left`) or on the far right of the main area (`right`).
+- `position` allowed values are constrained per `mode` at the type level —
+  `{ mode: 'embedded', position: 'left' }` is a type error.
+- `ratio` controls size: in `embedded` mode it's the vertical split ratio
+  against the tab list; in `pane` mode it maps to a column count in `[20, 80]`.
+- `path.enabled: false` hides the directory part of each file path, showing
+  only the basename. When `enabled: true`, an optional `pathFn` rewrites the
+  path before rendering (e.g. stripping a prefix).
+- `diffCount.enabled: false` hides the `+added / −removed` column.
+- `visible` and `ratio` are persisted across sessions in `aimux.json`. The
+  programmatic config values take precedence over the persisted values when
+  both are present.
+
+Example:
+
+```ts
+export default defineConfig({
+  gitPane: {
+    mode: 'pane',
+    position: 'right',
+    ratio: 0.35,
+    path: {
+      enabled: true,
+      pathFn: (p) => p.replace(/^src\//, ''),
+    },
+    diffCount: { enabled: false },
+  },
+})
+```
+
+Legacy migration: config files written before `gitPane` existed stored
+`gitPanelVisible` / `gitPanelRatio` at the root of `aimux.json`. Those keys
+are read once on load and converted to `{ mode: 'embedded', position: 'bottom',
+ratio, visible }`, then persisted under `gitPane` on the next save.
 
 ## `theme`
 
@@ -241,7 +313,8 @@ Common groups:
 - snippets: `snippetPicker`, snippet filter and editor actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `resizeSidebar`, `toggleSessionBar`, `toggleGitPanel`
+- UI: `toggleSidebar`, `resizeSidebar`, `toggleSessionBar`, `toggleGitPane`,
+  `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: `enterGitMode`, `exitGitMode`, stage/unstage/delete, commit, push
 

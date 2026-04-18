@@ -196,6 +196,14 @@ function MouseHarness({
         terminal: 'zsh',
       },
       focusMode: 'terminal-input' as const,
+      gitPane: {
+        diffCount: { enabled: true },
+        mode: 'embedded' as const,
+        path: { enabled: true },
+        position: 'bottom' as const,
+        ratio: 0.5,
+        visible: true,
+      },
       layout: {
         terminalCols: terminalSize.cols,
         terminalRows: terminalSize.rows,
@@ -209,8 +217,6 @@ function MouseHarness({
       },
       sessions: [],
       sidebar: {
-        gitPanelRatio: 0.5,
-        gitPanelVisible: true,
         maxWidth: SIDEBAR_MAX_WIDTH,
         minWidth: SIDEBAR_MIN_WIDTH,
         visible: true,

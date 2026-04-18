@@ -129,6 +129,7 @@ export function useTerminalResize({
       .map((t) => [t.id, t.scrollIntent])
   )
 
+  const gitPaneInPaneMode = state.gitPane.mode === 'pane' && state.gitPane.visible
   const terminalSize = useMemo(() => {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 1 : 0
     const sessionBarRows = state.sessionBar.visible ? 1 : 0
@@ -139,16 +140,19 @@ export function useTerminalResize({
       STATUS_BAR_HEIGHT +
       TERMINAL_PANE_VERTICAL_CHROME +
       sessionBarRows
+    const gitPaneRaw = gitPaneInPaneMode ? Math.round(state.gitPane.ratio * 80) : 0
+    const gitPaneWidth = gitPaneInPaneMode ? Math.max(20, Math.min(80, gitPaneRaw)) : 0
+    const gitOnLeft = gitPaneInPaneMode && state.gitPane.position === 'left'
     const cols = Math.max(
       MIN_TERMINAL_COLS,
-      Math.floor(dimensions.width - sidebarWidth - MAIN_AREA_HORIZONTAL_CHROME)
+      Math.floor(dimensions.width - sidebarWidth - gitPaneWidth - MAIN_AREA_HORIZONTAL_CHROME)
     )
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows))
 
     contentOriginRef.current = {
       cols,
       rows,
-      x: sidebarWidth + 1,
+      x: sidebarWidth + (gitOnLeft ? gitPaneWidth : 0) + 1,
       y: 1 + sessionBarTopOffset,
     }
 
@@ -161,6 +165,9 @@ export function useTerminalResize({
     state.sidebar.width,
     state.sessionBar.visible,
     state.sessionBar.position,
+    gitPaneInPaneMode,
+    state.gitPane.position,
+    state.gitPane.ratio,
   ])
 
   useLayoutEffect(() => {
@@ -187,6 +194,9 @@ export function useTerminalResize({
     state.sidebar.width,
     state.sessionBar.visible,
     state.sessionBar.position,
+    gitPaneInPaneMode,
+    state.gitPane.position,
+    state.gitPane.ratio,
   ])
 
   useEffect(() => {

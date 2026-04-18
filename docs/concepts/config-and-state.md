@@ -53,12 +53,14 @@ Today it is used for values such as:
 
 - `customCommands`
 - `themeId`
-- `gitPanelVisible`
-- `gitPanelRatio`
+- `gitPane` (`{ visible, mode, position, ratio }`)
 - `sessionBarVisible`
 - `sessionBarPosition`
 - `workspaceSnapshot` for legacy migration
 - `skippedUpdateVersion`
+
+Legacy top-level keys `gitPanelVisible` / `gitPanelRatio` are still read on
+load for backward compatibility and migrated into `gitPane` on the next save.
 
 This file is created and updated by the app.
 
@@ -109,6 +111,18 @@ At startup, the app resolves session bar state like this:
 3. runtime defaults
 
 That means your typed config can override app-managed session bar preferences.
+
+### Git Pane
+
+`gitPane` follows the same precedence pattern as `sessionBar`:
+
+1. `resolvedConfig.gitPane` (typed config)
+2. `aimux.json.gitPane` (persisted state)
+3. built-in defaults (`{ mode: 'embedded', position: 'bottom', ratio: 0.5, ... }`)
+
+Fields you do not set in your typed config fall through to the persisted or
+default values, so users can still toggle and resize at runtime without losing
+their programmatic preferences.
 
 ### Theme
 

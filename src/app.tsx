@@ -25,6 +25,7 @@ import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
 import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
 import { loadConfig } from './config'
+import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
@@ -54,7 +55,10 @@ export function App({
   resolvedConfig: ResolvedConfig
 }) {
   const keymapHandlers = useMemo(
-    () => registerAllModes(resolvedConfig.keymaps),
+    () => {
+      setActiveKeymap(resolvedConfig.keymaps)
+      return registerAllModes(resolvedConfig.keymaps)
+    },
     // Registration has side effects in a global mode registry — run once per app instance.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
@@ -73,14 +77,27 @@ export function App({
     const sessionBarVisible = resolvedConfig.sessionBar?.visible ?? json.sessionBarVisible ?? true
     const sessionBarPosition =
       resolvedConfig.sessionBar?.position ?? json.sessionBarPosition ?? 'top'
+
+    // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
+    // (programmatic config). User config wins; file provides persisted prior state.
+    const userGitPane = resolvedConfig.gitPane
+    const gitPaneOverrides = {
+      ...json.gitPane,
+      ...(userGitPane?.visible !== undefined ? { visible: userGitPane.visible } : {}),
+      ...(userGitPane?.mode !== undefined ? { mode: userGitPane.mode } : {}),
+      ...(userGitPane?.position !== undefined ? { position: userGitPane.position } : {}),
+      ...(userGitPane?.ratio !== undefined ? { ratio: userGitPane.ratio } : {}),
+      ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
+      ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
+    }
+
     return createInitialState(
       json.customCommands,
       loadSessionCatalog(),
       loadSnippetCatalog(),
       true,
       {
-        gitPanelRatio: json.gitPanelRatio,
-        gitPanelVisible: json.gitPanelVisible,
+        gitPane: gitPaneOverrides,
         sessionBarPosition,
         sessionBarVisible,
       }

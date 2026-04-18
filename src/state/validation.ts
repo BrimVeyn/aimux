@@ -114,8 +114,6 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
     isObjectRecord(value.sidebar) &&
     isBoolean(value.sidebar.visible) &&
     isFiniteNumber(value.sidebar.width) &&
-    (value.sidebar.gitPanelVisible === undefined || isBoolean(value.sidebar.gitPanelVisible)) &&
-    (value.sidebar.gitPanelRatio === undefined || isFiniteNumber(value.sidebar.gitPanelRatio)) &&
     Array.isArray(value.tabs) &&
     value.tabs.every(
       (tab) =>

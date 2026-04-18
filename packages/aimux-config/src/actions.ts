@@ -35,8 +35,16 @@ export const themePicker: KeyResult = r(
 export const helpModal: KeyResult = r([{ type: 'open-help-modal' }], [], 'modal.help')
 
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
-export const toggleGitPanel: KeyResult = r([{ type: 'toggle-git-panel' }])
+export const toggleGitPane: KeyResult = r([{ type: 'toggle-git-pane' }])
 export const toggleSessionBar: KeyResult = r([{ type: 'toggle-session-bar' }])
+
+export function setGitPaneMode(mode: 'embedded' | 'pane'): KeyResult {
+  return r([{ mode, type: 'set-git-pane-mode' }])
+}
+
+export function setGitPanePosition(position: 'top' | 'bottom' | 'left' | 'right'): KeyResult {
+  return r([{ position, type: 'set-git-pane-position' }])
+}
 export const enterGitMode: KeyResult = r([{ type: 'enter-git-mode' }], [], 'git-mode')
 
 export function switchSessionByIndex(index: number): KeyResult {
@@ -97,8 +105,8 @@ export function resizeSidebar(delta: number): KeyResult {
   return r([{ delta, type: 'resize-sidebar' }])
 }
 
-export function resizeGitPanel(delta: number): KeyResult {
-  return r([{ delta, type: 'resize-git-panel' }])
+export function resizeGitPane(delta: number): KeyResult {
+  return r([{ delta, type: 'resize-git-pane' }])
 }
 
 export function focusPane(direction: 'left' | 'right' | 'up' | 'down'): KeyResult {
@@ -198,6 +206,12 @@ export const beginSnippetFilter: KeyResult = r(
   [{ type: 'begin-snippet-filter' }],
   [],
   'modal.snippet-picker.filtering'
+)
+
+export const beginHelpFilter: KeyResult = r(
+  [{ type: 'begin-help-filter' }],
+  [],
+  'modal.help.filtering'
 )
 
 export const confirmSplit: KeyResult = r([], [{ type: 'confirm-split' }])

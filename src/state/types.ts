@@ -83,8 +83,6 @@ export interface WorkspaceSnapshotV1 {
   sidebar: {
     visible: boolean
     width: number
-    gitPanelVisible?: boolean
-    gitPanelRatio?: number
   }
   tabs: PersistedTabSnapshot[]
   layoutTree?: import('./layout-tree').LayoutNode
@@ -130,8 +128,24 @@ export interface SidebarState {
   width: number
   minWidth: number
   maxWidth: number
-  gitPanelVisible: boolean
-  gitPanelRatio: number
+}
+
+export type GitPaneMode = 'embedded' | 'pane'
+export type GitPanePosition = 'top' | 'bottom' | 'left' | 'right'
+
+export type GitPanePathConfig =
+  | { enabled: false }
+  | { enabled: true; pathFn?: (path: string) => string }
+
+export type GitPaneDiffCountConfig = { enabled: boolean }
+
+export interface GitPaneState {
+  visible: boolean
+  mode: GitPaneMode
+  position: GitPanePosition
+  ratio: number
+  path: GitPanePathConfig
+  diffCount: GitPaneDiffCountConfig
 }
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
@@ -216,6 +230,7 @@ export interface ModalThemePicker extends ModalBase {
 
 export interface ModalHelp extends ModalBase {
   type: 'help'
+  entryCount: number
 }
 
 export interface ModalSplitPicker extends ModalBase {
@@ -294,6 +309,7 @@ export interface AppState {
   snippets: SnippetRecord[]
   focusMode: FocusMode
   sidebar: SidebarState
+  gitPane: GitPaneState
   modal: ModalState
   layout: LayoutState
   customCommands: Record<AssistantId, string>
@@ -326,6 +342,8 @@ export type ModalAction =
   | { type: 'open-snippet-picker' }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
+  | { type: 'begin-help-filter' }
+  | { type: 'set-help-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
@@ -401,8 +419,10 @@ export type UIAction =
   | { type: 'resize-sidebar'; delta: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
-  | { type: 'toggle-git-panel' }
-  | { type: 'resize-git-panel'; delta: number }
+  | { type: 'toggle-git-pane' }
+  | { type: 'resize-git-pane'; delta: number }
+  | { type: 'set-git-pane-mode'; mode: GitPaneMode }
+  | { type: 'set-git-pane-position'; position: GitPanePosition }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
   | { type: 'set-session-bar-position'; position: SessionBarPosition }

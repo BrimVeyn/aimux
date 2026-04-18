@@ -9,16 +9,41 @@ import { THEME_IDS, type ThemeId } from './ui/themes'
 
 export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
 
+export interface PersistedGitPane {
+  visible: boolean
+  mode: 'embedded' | 'pane'
+  position: 'top' | 'bottom' | 'left' | 'right'
+  ratio: number
+}
+
 export interface AimuxConfig {
   version: 2
   customCommands: Record<string, string>
   themeId?: ThemeId
-  gitPanelVisible?: boolean
-  gitPanelRatio?: number
+  gitPane?: PersistedGitPane
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
+}
+
+function isPersistedGitPane(value: unknown): value is PersistedGitPane {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  const modeOk = v.mode === 'embedded' || v.mode === 'pane'
+  const positionOk =
+    v.position === 'top' ||
+    v.position === 'bottom' ||
+    v.position === 'left' ||
+    v.position === 'right'
+  const ratioOk =
+    typeof v.ratio === 'number' && Number.isFinite(v.ratio) && v.ratio > 0 && v.ratio < 1
+  const visibleOk = typeof v.visible === 'boolean'
+  if (!modeOk || !positionOk || !ratioOk || !visibleOk) return false
+  // cross-field coherence: embedded => top|bottom; pane => left|right
+  if (v.mode === 'embedded' && v.position !== 'top' && v.position !== 'bottom') return false
+  if (v.mode === 'pane' && v.position !== 'left' && v.position !== 'right') return false
+  return true
 }
 
 const DEFAULT_CONFIG: AimuxConfig = {
@@ -58,6 +83,7 @@ export function loadConfigResult(): ConfigLoadResult {
       version?: number
       customCommands?: unknown
       themeId?: unknown
+      gitPane?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       sessionBarVisible?: unknown
@@ -80,21 +106,32 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid themeId')
     }
 
-    const validGitPanelVisible =
-      typeof parsed.gitPanelVisible === 'boolean' ? parsed.gitPanelVisible : undefined
-    if (parsed.gitPanelVisible !== undefined && validGitPanelVisible === undefined) {
-      issues.push('ignored invalid gitPanelVisible')
+    let validGitPane = isPersistedGitPane(parsed.gitPane) ? parsed.gitPane : undefined
+    if (parsed.gitPane !== undefined && validGitPane === undefined) {
+      issues.push('ignored invalid gitPane')
     }
 
-    const validGitPanelRatio =
-      typeof parsed.gitPanelRatio === 'number' &&
-      Number.isFinite(parsed.gitPanelRatio) &&
-      parsed.gitPanelRatio > 0 &&
-      parsed.gitPanelRatio < 1
-        ? parsed.gitPanelRatio
-        : undefined
-    if (parsed.gitPanelRatio !== undefined && validGitPanelRatio === undefined) {
-      issues.push('ignored invalid gitPanelRatio')
+    // Legacy migration: previous schema stored gitPanelVisible/gitPanelRatio at
+    // top level. If the new `gitPane` field is absent, synthesize it from legacy
+    // keys so users don't lose their toggle/ratio on upgrade.
+    if (validGitPane === undefined) {
+      const legacyVisible =
+        typeof parsed.gitPanelVisible === 'boolean' ? parsed.gitPanelVisible : undefined
+      const legacyRatio =
+        typeof parsed.gitPanelRatio === 'number' &&
+        Number.isFinite(parsed.gitPanelRatio) &&
+        parsed.gitPanelRatio > 0 &&
+        parsed.gitPanelRatio < 1
+          ? parsed.gitPanelRatio
+          : undefined
+      if (legacyVisible !== undefined || legacyRatio !== undefined) {
+        validGitPane = {
+          mode: 'embedded',
+          position: 'bottom',
+          ratio: legacyRatio ?? 0.5,
+          visible: legacyVisible ?? true,
+        }
+      }
     }
 
     const validSessionBarVisible =
@@ -133,8 +170,7 @@ export function loadConfigResult(): ConfigLoadResult {
     return {
       config: {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
-        gitPanelRatio: validGitPanelRatio,
-        gitPanelVisible: validGitPanelVisible,
+        gitPane: validGitPane,
         sessionBarPosition: validSessionBarPosition,
         sessionBarVisible: validSessionBarVisible,
         skippedUpdateVersion: validSkippedUpdateVersion,

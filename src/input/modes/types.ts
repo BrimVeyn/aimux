@@ -18,6 +18,7 @@ export type ModeId =
   | 'modal.snippet-editor'
   | 'modal.theme-picker'
   | 'modal.help'
+  | 'modal.help.filtering'
   | 'modal.split-picker'
   | 'modal.git-commit'
   | 'modal.update-available'

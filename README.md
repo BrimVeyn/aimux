@@ -19,7 +19,7 @@ snippets, themes, and fully configurable keymaps.
 - profile-isolated config, catalogs, daemon sockets, and runtime state
 - typed keymap customization through `@brimveyn/aimux-config`
 - snippets catalog and snippet picker
-- git panel and git mode
+- configurable git pane (embedded in the sidebar or as a standalone pane) and git mode
 - built-in help generated from the resolved keymap
 - theme picker with 11 built-in themes
 
