@@ -158,6 +158,9 @@ async function main() {
     console.log('aimux-config: not bumped')
   }
   console.log(`branch: ${branch}`)
+  const commitMsg = configPlan
+    ? `chore(release): ${tag} (aimux-config v${configPlan.next})`
+    : `chore(release): ${tag}`
   console.log('will:')
   let step = 1
   console.log(`  ${step++}. rewrite package.json version → ${rootNext}`)
@@ -165,7 +168,7 @@ async function main() {
     console.log(`  ${step++}. rewrite packages/aimux-config/package.json → ${configPlan.next}`)
   }
   console.log(`  ${step++}. bun install (sync lockfile)`)
-  console.log(`  ${step++}. commit "chore(release): ${tag}"`)
+  console.log(`  ${step++}. commit "${commitMsg}"`)
   console.log(`  ${step++}. create annotated tag ${tag}`)
   console.log(`  ${step++}. push ${branch} and ${tag} to origin`)
 
@@ -186,10 +189,6 @@ async function main() {
   const stageFiles = ['package.json', 'bun.lock']
   if (configPlan) stageFiles.push('packages/aimux-config/package.json')
   sh('git', ['add', ...stageFiles])
-
-  const commitMsg = configPlan
-    ? `chore(release): ${tag} (aimux-config v${configPlan.next})`
-    : `chore(release): ${tag}`
   sh('git', ['commit', '-m', commitMsg])
   sh('git', ['tag', '-a', tag, '-m', `Release ${tag}`])
 
