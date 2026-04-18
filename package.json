@@ -55,7 +55,8 @@
     "restart-terminal-manager": "AIMUX_PROFILE=dev bun run src/index.tsx restart-terminal-manager",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "knip": "knip-bun"
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",
@@ -71,6 +72,7 @@
     "@types/node": "^25.5.0",
     "@types/react": "^19.2.14",
     "eslint-plugin-perfectionist": "^5.8.0",
+    "knip": "^6.4.1",
     "lefthook": "^2.1.4",
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",

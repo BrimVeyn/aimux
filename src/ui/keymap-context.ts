@@ -3,7 +3,7 @@ import {
   type ModeId,
   type ResolvedKeymapConfig,
 } from '@brimveyn/aimux-config'
-import { createContext, useContext, useMemo } from 'react'
+import { createContext, useContext } from 'react'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
 
@@ -31,9 +31,4 @@ export function buildHintText(
   if (bindings.length === 0) return ''
   const trimmed = bindings.slice(0, limit)
   return trimmed.map((b) => `${b.keysDisplay} ${b.description ?? ''}`.trim()).join(HELP_JOINER)
-}
-
-export function useModalHelp(modeId: ModeId, limit?: number): string {
-  const config = useKeymap()
-  return useMemo(() => buildHintText(config, modeId, limit), [config, modeId, limit])
 }
