@@ -1,6 +1,8 @@
 # aimux
 
-A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claude, Codex, OpenCode) side by side in a single terminal with tabbed navigation, split panes, persistent sessions, and fully configurable keybindings.
+A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode, and normal
+shell tabs side by side in one TUI with persistent sessions, split panes,
+snippets, themes, and fully configurable keymaps.
 
 ![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 ![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6)
@@ -10,39 +12,16 @@ A terminal multiplexer for AI CLIs. Manage multiple AI assistant sessions (Claud
 
 ## Features
 
-- **Multi-tab sessions** — Run Claude, Codex, and OpenCode in parallel with instant tab switching
-- **Session bar** — Numbered session chips at the top (or bottom) of the screen. Click to switch, drag to reorder, busy spinner for non-focused sessions with live PTY output. Toggle with `<leader>b`; jump with `<leader>1..9`. Position persists via `aimux.config.ts` or `aimux.json`.
-- **Split panes** — Split vertically (`|`) or horizontally (`-`) to view multiple assistants at once
-- **Draggable separators** — Resize split panes by dragging with the mouse
-- **Click-to-focus** — Click any pane or sidebar tab to focus it instantly
-- **Full terminal emulation** — Powered by xterm.js with mouse tracking, alternate buffer, and scrollback
-- **Configurable nvim-style keymaps** — Define keybinds in a typed `aimux.config.ts` with leader keys, multi-key sequences, and a prefix-trie resolver
-- **Text selection** — Double-click for a word, triple-click for a line, drag for a region. Selections copy to system clipboard automatically
-- **Project-scoped sessions** — Associate a git repository with each session; all tabs spawn in that directory
-- **Directory picker** — Fuzzy-search git repos and worktrees from `$HOME` using `fzf`
-- **Session persistence** — Workspace state (tabs, titles, layout) saved and restored on restart
-- **Git status panel** — Branch + diff summary in the sidebar
-- **Seamless daemon updates** — A restartable IPC daemon now reconnects to a long-lived terminal manager, so updates and IPC changes do not kill live tabs
-- **Snippets** — Save and reuse prompt snippets across sessions
-- **Theme picker** — Switch between 11 built-in themes on the fly
-- **Pending-chord indicator** — Bottom-right overlay shows mid-sequence key state (like nvim's `which-key`)
-- **Built-in help** — Press `?` to see all keybindings
-
-### Session Management
-
-![Session management](assets/sessions.gif)
-
-### Multi-Tab Workflow
-
-![Multi-tab workflow](assets/tabs.gif)
-
-### Themes
-
-![Themes](assets/themes.gif)
-
-### Split Panes
-
-![Split panes](assets/splits.gif)
+- multi-session workflow with a dedicated session picker
+- tabs for `claude`, `codex`, `opencode`, and `terminal`
+- split panes with pane focus and resize shortcuts
+- persistent sessions with saved layout and tab state
+- profile-isolated config, catalogs, daemon sockets, and runtime state
+- typed keymap customization through `@brimveyn/aimux-config`
+- snippets catalog and snippet picker
+- git panel and git mode
+- built-in help generated from the resolved keymap
+- theme picker with 11 built-in themes
 
 ## Install
 
@@ -52,157 +31,149 @@ bun install -g @brimveyn/aimux
 
 Requires [Bun](https://bun.sh).
 
-## Usage
+## Quick Start
+
+Create the default profile and install the typed config package into it:
 
 ```bash
-aimux                  # start the TUI
-aimux version          # print version
-aimux doctor           # check setup
-aimux update           # self-update
-aimux restart-daemon   # restart IPC daemon only
-```
-
-`aimux update` and `aimux restart-daemon` restart only the IPC daemon. Live PTYs and headless terminal state stay in the long-lived terminal-manager process, so active tabs can be reattached instead of being restarted.
-
-## Configuration
-
-aimux reads `~/.config/aimux/<profile>/aimux.config.ts` at startup. The default installed profile is `default`, while the repository dev scripts use `dev`. Set up the default profile with:
-
-```bash
-mkdir -p ~/.config/aimux/default && cd ~/.config/aimux/default
+mkdir -p ~/.config/aimux/default
+cd ~/.config/aimux/default
 bun init -y
 bun add -d @brimveyn/aimux-config
 ```
 
-Then create `~/.config/aimux/default/aimux.config.ts`:
+Create `~/.config/aimux/default/aimux.config.ts`:
 
 ```ts
-import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
+import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: themes.extend('tokyo-night', { accent: '#ff9e64' }),
+  sessionBar: {
+    position: 'top',
+    visible: true,
+  },
 
   keymaps: (k) =>
-    k
-      .leader('<Space>')
-      .timeout(300)
-      .mode('navigation', (m) =>
-        m
-          .map('j', actions.nextTab)
-          .map('k', actions.prevTab)
-          .map('<leader>g', actions.sessionPicker)
-          .group('<leader>t', 'tabs', (g) =>
-            g.map('n', actions.newTab).map('r', actions.renameTab).map('x', actions.closeTab)
-          )
-      )
-      .mode('terminal-input', (m) =>
-        m.map('<leader>|', actions.splitVertical).map('<leader>-', actions.splitHorizontal)
-      ),
+    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
 })
 ```
 
-User bindings override defaults. Use `.unmap(keys)` to remove a default. See [`@brimveyn/aimux-config`](packages/aimux-config/README.md) for the full builder API.
+Then start the app:
 
-### Key notation
-
-| Notation       | Meaning                    |
-| -------------- | -------------------------- |
-| `j`            | Bare character             |
-| `J`            | Shift+J (uppercase letter) |
-| `<C-n>`        | Ctrl+N                     |
-| `<M-x>`        | Meta/Alt+X                 |
-| `<CR>` `<Esc>` | Return / Escape            |
-| `<leader>`     | Configured leader chord    |
-| `dd`           | Multi-key sequence         |
-| `<leader>tn`   | Leader, then t, then n     |
-
-## Default Keymaps
-
-Press `?` in navigation mode for the full, live keybinding list (reflects your config).
-
-### Navigation Mode
-
-| Key                   | Action               |
-| --------------------- | -------------------- |
-| `j` / `k`             | Next / previous tab  |
-| `Shift+J` / `Shift+K` | Reorder tabs         |
-| `i`                   | Enter terminal input |
-| `r`                   | Rename active tab    |
-| `dd`                  | Close active tab     |
-| `Ctrl+N`              | New tab              |
-| `Ctrl+R`              | Restart tab          |
-| `Ctrl+G`              | Session picker       |
-| `Ctrl+B`              | Toggle sidebar       |
-| `Ctrl+H` / `Ctrl+L`   | Resize sidebar       |
-| `Ctrl+S`              | Snippet picker       |
-| `Ctrl+T`              | Theme picker         |
-| `G`                   | Toggle git panel     |
-| `<leader>b`           | Toggle session bar   |
-| `<leader>1..9`        | Switch to session N  |
-| `?`                   | Show help            |
-| `Ctrl+C`              | Quit                 |
-
-### Terminal Input Mode
-
-Keystrokes pass through to the active tab's PTY. Configured shortcuts:
-
-| Key        | Action              |
-| ---------- | ------------------- |
-| `Ctrl+Z`   | Leave to navigation |
-| `<leader>` | Enter layout mode   |
-| `Ctrl+B`   | Toggle sidebar      |
-
-### Layout Mode
-
-| Key                   | Action           |
-| --------------------- | ---------------- |
-| `\|`                  | Split vertical   |
-| `-`                   | Split horizontal |
-| `h` / `j` / `k` / `l` | Focus pane       |
-| `Shift+H/J/K/L`       | Resize pane      |
-| `q`                   | Close pane       |
-| `Esc`                 | Back to input    |
-
-## Architecture
-
-Runtime split:
-
-- `aimux` UI connects to the IPC daemon over the app protocol.
-- The IPC daemon owns the app-facing socket, protocol negotiation, and reconnect behavior.
-- The terminal manager owns PTYs, xterm headless emulators, and live session state.
-
-This split lets the app or IPC daemon change protocols without dropping live shells.
-
-```
-aimux/
-├── packages/
-│   └── aimux-config/          # published as @brimveyn/aimux-config
-│       └── src/               # types, builder, actions, themes, defaults
-└── src/                       # the CLI (published as @brimveyn/aimux)
-    ├── index.tsx              # entry point + CLI dispatcher
-    ├── app.tsx                # main React app + state wiring
-    ├── config/
-    │   └── loader.ts          # loads aimux.config.ts
-    ├── ui/                    # OpenTUI React components
-    ├── state/                 # reducers + app store
-    ├── pty/                   # PTY and terminal emulation
-    ├── session-backend/       # local and remote backends
-    ├── daemon/                # IPC daemon / broker
-    ├── terminal-manager/      # long-lived PTY/session owner
-    ├── ipc/                   # app and manager protocols
-    └── input/
-        ├── modes/             # mode registry + transitions
-        ├── keymap/            # prefix trie + sequence resolver
-        └── raw-input-handler.ts
+```bash
+aimux
 ```
 
-## Tech Stack
+On first launch, use the session picker flow to create your first session.
 
-- [Bun](https://bun.sh) — Runtime and toolchain
-- [React](https://react.dev) + [OpenTUI](https://github.com/sst/opentui) — Terminal UI framework
-- [xterm.js](https://xtermjs.org) (headless) — Terminal emulation
-- [bun-pty](https://github.com/nicolo-ribaudo/bun-pty) — Native PTY spawning
-- [Zustand](https://zustand-demo.pmnd.rs/) — State store
+For the full setup path, see [`docs/getting-started.md`](docs/getting-started.md).
+
+## Core Concepts
+
+### Profiles
+
+Profile-managed config and catalogs live under:
+
+```text
+~/.config/aimux/<profile>/
+```
+
+The active profile is chosen from:
+
+1. `AIMUX_PROFILE`
+2. `AIMUX_RUNTIME_PROFILE`
+3. `default`
+
+Runtime sockets live in a separate runtime directory that depends on the active
+profile. See [`docs/concepts/profiles.md`](docs/concepts/profiles.md).
+
+### Config vs Runtime State
+
+`aimux` uses multiple files per profile:
+
+- `aimux.config.ts` or `aimux.config.js` - typed user config
+- `aimux.json` - app-managed preferences and runtime state
+- `aimux-sessions.json` - session catalog and workspace snapshots
+- `aimux-snippets.json` - snippet catalog
+
+See [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md).
+
+### Sessions
+
+Sessions are named workspaces. A session can have:
+
+- a name
+- an optional project directory
+- a persisted workspace snapshot
+- an order in the session bar and session picker
+
+See [`docs/guide/sessions.md`](docs/guide/sessions.md).
+
+### Keymaps
+
+Keymaps are defined through `@brimveyn/aimux-config` and merged with shipped
+defaults at startup.
+
+Important runtime fact:
+
+- the shipped leader key is `Ctrl+W`
+
+See [`docs/guide/keymaps.md`](docs/guide/keymaps.md).
+
+## Default Everyday Shortcuts
+
+- `?` - open help
+- `i` - focus terminal
+- `Ctrl+Z` - leave terminal-input mode
+- `Ctrl+N` - open new-tab modal
+- `Ctrl+G` - open session picker
+- `Ctrl+S` - open snippet picker
+- `Ctrl+T` - open theme picker
+- `Ctrl+B` - toggle sidebar
+- `Ctrl+W b` - toggle session bar
+- `Ctrl+W 1` through `Ctrl+W 9` - switch sessions by index
+
+The help modal reflects the resolved keymap, so it includes your overrides.
+
+## CLI
+
+```bash
+aimux
+aimux version
+aimux doctor
+aimux update
+aimux restart-daemon
+aimux restart-terminal-manager
+```
+
+See [`docs/reference/cli.md`](docs/reference/cli.md) for behavior details.
+
+## Runtime Model
+
+`aimux` is split into:
+
+- the UI app
+- an IPC daemon
+- a long-lived terminal manager
+
+This split is what allows daemon restarts and some update paths without dropping
+every live PTY immediately.
+
+See [`docs/developer/architecture.md`](docs/developer/architecture.md).
+
+## Documentation Map
+
+- [`docs/getting-started.md`](docs/getting-started.md)
+- [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md)
+- [`docs/concepts/profiles.md`](docs/concepts/profiles.md)
+- [`docs/guide/sessions.md`](docs/guide/sessions.md)
+- [`docs/guide/keymaps.md`](docs/guide/keymaps.md)
+- [`docs/guide/themes.md`](docs/guide/themes.md)
+- [`docs/reference/cli.md`](docs/reference/cli.md)
+- [`docs/reference/config-reference.md`](docs/reference/config-reference.md)
+- [`docs/reference/runtime-paths.md`](docs/reference/runtime-paths.md)
+- [`docs/developer/architecture.md`](docs/developer/architecture.md)
+- [`docs/developer/aimux-config-internals.md`](docs/developer/aimux-config-internals.md)
 
 ## Development
 
@@ -210,22 +181,15 @@ aimux/
 git clone https://github.com/BrimVeyn/aimux && cd aimux
 bun install
 
-bun run dev              # auto-reload dev mode
-bun run start            # run from source
-bun test                 # run test suite
-bun run check            # typecheck
-bun run lint             # oxlint
+bun run dev
+bun run start
+bun test
+bun run check
+bun run lint
 ```
 
-By default the app talks to the background IPC daemon. For explicit single-process debugging only, set `AIMUX_LOCAL_BACKEND=1` before starting aimux.
-
-Profiles live under `~/.config/aimux/<profile>/`. Each profile gets its own config, session catalog, snippet catalog, and matching runtime namespace.
-
-The repository `bun run dev`, `bun run start`, and `bun run restart-daemon` scripts set `AIMUX_PROFILE=dev`, so source builds use `~/.config/aimux/dev/` and their own IPC daemon / terminal-manager sockets instead of interfering with a globally installed `aimux` instance.
-
-You can override the active profile manually with `AIMUX_PROFILE=<name>` when you need multiple isolated environments on the same machine. `AIMUX_RUNTIME_PROFILE` is still accepted as a fallback alias for runtime compatibility.
-
-This profile move is intentionally breaking: aimux no longer reads legacy flat config or catalog files once profile directories are enabled.
+The repository dev scripts use `AIMUX_PROFILE=dev`, so local development does
+not collide with a globally installed `aimux` instance.
 
 ## License
 
