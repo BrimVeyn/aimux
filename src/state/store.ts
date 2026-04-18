@@ -1,4 +1,13 @@
-import type { AppAction, AppState, SessionBarPosition, SessionRecord, SnippetRecord } from './types'
+import type {
+  AppAction,
+  AppState,
+  GitPaneMode,
+  GitPanePosition,
+  GitPaneState,
+  SessionBarPosition,
+  SessionRecord,
+  SnippetRecord,
+} from './types'
 
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
@@ -15,10 +24,25 @@ const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 
 export interface InitialStateOverrides {
-  gitPanelVisible?: boolean
-  gitPanelRatio?: number
+  gitPane?: Partial<GitPaneState>
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
+}
+
+const DEFAULT_GIT_PANE: GitPaneState = {
+  diffCount: { enabled: true },
+  mode: 'embedded',
+  path: { enabled: true },
+  position: 'bottom',
+  ratio: 0.5,
+  visible: true,
+}
+
+function resolveGitPanePosition(mode: GitPaneMode, position: GitPanePosition): GitPanePosition {
+  if (mode === 'embedded') {
+    return position === 'top' || position === 'bottom' ? position : 'bottom'
+  }
+  return position === 'left' || position === 'right' ? position : 'left'
 }
 
 export function createInitialState(
@@ -28,12 +52,23 @@ export function createInitialState(
   showSessionPicker = false,
   overrides: InitialStateOverrides = {}
 ): AppState {
+  const gitPaneMode = overrides.gitPane?.mode ?? DEFAULT_GIT_PANE.mode
+  const gitPanePosition = resolveGitPanePosition(
+    gitPaneMode,
+    overrides.gitPane?.position ?? DEFAULT_GIT_PANE.position
+  )
   return {
     activeTabId: null,
     currentSessionId: null,
     customCommands,
     focusMode: showSessionPicker ? 'modal' : 'navigation',
     gitMode: emptyGitMode(),
+    gitPane: {
+      ...DEFAULT_GIT_PANE,
+      ...overrides.gitPane,
+      mode: gitPaneMode,
+      position: gitPanePosition,
+    },
     gitPanel: emptyGitPanel(),
     layout: {
       terminalCols: DEFAULT_TERMINAL_COLS,
@@ -51,8 +86,6 @@ export function createInitialState(
     sessions,
     sessionsBusy: {},
     sidebar: {
-      gitPanelRatio: overrides.gitPanelRatio ?? 0.5,
-      gitPanelVisible: overrides.gitPanelVisible ?? true,
       maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
       minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,
       visible: true,

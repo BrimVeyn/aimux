@@ -20,45 +20,64 @@ function entry(overrides: Partial<GitFileEntry> = {}): GitFileEntry {
   }
 }
 
-test('toggle-git-panel flips visibility', () => {
+test('toggle-git-pane flips visibility', () => {
   const s0 = seedState()
-  const s1 = appReducer(s0, { type: 'toggle-git-panel' })
-  expect(s1.sidebar.gitPanelVisible).toBe(false)
-  const s2 = appReducer(s1, { type: 'toggle-git-panel' })
-  expect(s2.sidebar.gitPanelVisible).toBe(true)
+  const s1 = appReducer(s0, { type: 'toggle-git-pane' })
+  expect(s1.gitPane.visible).toBe(false)
+  const s2 = appReducer(s1, { type: 'toggle-git-pane' })
+  expect(s2.gitPane.visible).toBe(true)
 })
 
-test('toggle-git-panel reveals hidden sidebar when enabling', () => {
+test('toggle-git-pane reveals hidden sidebar when enabling in embedded mode', () => {
   const s0 = seedState()
   const hidden = {
     ...s0,
-    sidebar: { ...s0.sidebar, gitPanelVisible: false, visible: false },
+    gitPane: { ...s0.gitPane, visible: false },
+    sidebar: { ...s0.sidebar, visible: false },
   }
-  const s1 = appReducer(hidden, { type: 'toggle-git-panel' })
+  const s1 = appReducer(hidden, { type: 'toggle-git-pane' })
   expect(s1.sidebar.visible).toBe(true)
-  expect(s1.sidebar.gitPanelVisible).toBe(true)
+  expect(s1.gitPane.visible).toBe(true)
 })
 
-test('resize-git-panel adjusts ratio', () => {
+test('resize-git-pane adjusts ratio', () => {
   const s0 = seedState()
-  expect(s0.sidebar.gitPanelRatio).toBe(0.5)
-  const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-panel' })
-  expect(s1.sidebar.gitPanelRatio).toBeCloseTo(0.6)
+  expect(s0.gitPane.ratio).toBe(0.5)
+  const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-pane' })
+  expect(s1.gitPane.ratio).toBeCloseTo(0.6)
 })
 
-test('resize-git-panel clamps at bounds', () => {
+test('resize-git-pane clamps at bounds', () => {
   const s0 = seedState()
-  const up = appReducer(s0, { delta: 2, type: 'resize-git-panel' })
-  expect(up.sidebar.gitPanelRatio).toBe(0.8)
-  const down = appReducer(s0, { delta: -2, type: 'resize-git-panel' })
-  expect(down.sidebar.gitPanelRatio).toBe(0.2)
+  const up = appReducer(s0, { delta: 2, type: 'resize-git-pane' })
+  expect(up.gitPane.ratio).toBe(0.8)
+  const down = appReducer(s0, { delta: -2, type: 'resize-git-pane' })
+  expect(down.gitPane.ratio).toBe(0.2)
 })
 
-test('resize-git-panel returns same state at bound', () => {
+test('resize-git-pane returns same state at bound', () => {
   const s0 = seedState()
-  const maxed = appReducer(s0, { delta: 2, type: 'resize-git-panel' })
-  const again = appReducer(maxed, { delta: 1, type: 'resize-git-panel' })
+  const maxed = appReducer(s0, { delta: 2, type: 'resize-git-pane' })
+  const again = appReducer(maxed, { delta: 1, type: 'resize-git-pane' })
   expect(again).toBe(maxed)
+})
+
+test('set-git-pane-mode normalizes invalid position', () => {
+  const s0 = seedState()
+  const paneMode = appReducer(s0, { mode: 'pane', type: 'set-git-pane-mode' })
+  expect(paneMode.gitPane.mode).toBe('pane')
+  expect(paneMode.gitPane.position).toBe('left')
+  const back = appReducer(paneMode, { mode: 'embedded', type: 'set-git-pane-mode' })
+  expect(back.gitPane.mode).toBe('embedded')
+  expect(back.gitPane.position).toBe('bottom')
+})
+
+test('set-git-pane-position rejects invalid position for current mode', () => {
+  const s0 = seedState()
+  const unchanged = appReducer(s0, { position: 'left', type: 'set-git-pane-position' })
+  expect(unchanged).toBe(s0)
+  const top = appReducer(s0, { position: 'top', type: 'set-git-pane-position' })
+  expect(top.gitPane.position).toBe('top')
 })
 
 test('git-refresh-success replaces files + branch state', () => {

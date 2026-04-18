@@ -2,12 +2,9 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { memo, useMemo, useRef } from 'react'
 
-import type { GitPanelState } from '../../state/types'
-
-import { useGitPanelPolling } from '../../git/git-poller'
 import { useAppStore } from '../../state/app-store'
 import { theme } from '../theme'
-import { GitPanel } from './git-panel'
+import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
@@ -143,50 +140,29 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
   )
 })
 
-const GitBody = memo(function GitBody() {
-  const gitPanel = useAppStore((s) => s.gitPanel)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
-  const sidebarVisible = useAppStore((s) => s.sidebar.visible)
-  const gitPanelVisible = useAppStore((s) => s.sidebar.gitPanelVisible)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
-  const projectPath = currentSession?.projectPath
-
-  useGitPanelPolling({
-    enabled: sidebarVisible && gitPanelVisible,
-    projectPath,
-  })
-
-  const lastGoodRef = useRef<GitPanelState | null>(null)
-  const prevProjectPathRef = useRef(projectPath)
-  if (prevProjectPathRef.current !== projectPath) {
-    prevProjectPathRef.current = projectPath
-    lastGoodRef.current = null
-  }
-  const isGood = gitPanel.error === null && gitPanel.branch !== null
-  if (isGood) {
-    lastGoodRef.current = gitPanel
-  }
-  const display = lastGoodRef.current ?? gitPanel
-
-  return <GitPanel gitPanel={display} projectPath={projectPath} />
-})
-
 export function Sidebar({ onTabActivate }: SidebarProps) {
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
-  const gitPanelVisible = useAppStore((s) => s.sidebar.gitPanelVisible)
-  const gitPanelRatio = useAppStore((s) => s.sidebar.gitPanelRatio)
+  const gitPane = useAppStore((s) => s.gitPane)
 
   if (!sidebarVisible) {
     return null
   }
 
+  const gitEmbedded = gitPane.mode === 'embedded' && gitPane.visible
+  const gitOnTop = gitEmbedded && gitPane.position === 'top'
+  const gitOnBottom = gitEmbedded && gitPane.position === 'bottom'
+
   // flex-grow scaled by 100 (integer preferred); tabs gets (1-ratio), git gets ratio.
-  const tabsGrow = Math.max(1, Math.round((1 - gitPanelRatio) * 100))
-  const gitGrow = Math.max(1, Math.round(gitPanelRatio * 100))
+  const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.ratio) * 100)) : 1
+  const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.ratio * 100)) : 0
+
+  const separator = <text fg={theme.dim}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+  const gitBody = gitEmbedded ? (
+    <box flexDirection="column" flexGrow={gitGrow} flexShrink={1} flexBasis={0} overflow="hidden">
+      <GitPaneWidget pollingEnabled={gitPane.visible} />
+    </box>
+  ) : null
 
   return (
     <box
@@ -197,6 +173,12 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       gap={0}
     >
       <SidebarTop />
+      {gitOnTop ? (
+        <>
+          {gitBody}
+          {separator}
+        </>
+      ) : null}
       <box
         flexDirection="column"
         flexGrow={tabsGrow}
@@ -206,18 +188,10 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       >
         <TabsBody onTabActivate={onTabActivate} />
       </box>
-      {gitPanelVisible ? (
+      {gitOnBottom ? (
         <>
-          <text fg={theme.dim}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
-          <box
-            flexDirection="column"
-            flexGrow={gitGrow}
-            flexShrink={1}
-            flexBasis={0}
-            overflow="hidden"
-          >
-            <GitBody />
-          </box>
+          {separator}
+          {gitBody}
         </>
       ) : null}
     </box>

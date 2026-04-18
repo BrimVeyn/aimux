@@ -18,6 +18,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 
   return {
     backends: userConfig.backends ?? {},
+    gitPane: userConfig.gitPane ?? {},
     hooks: userConfig.hooks ?? {},
     keymaps,
     sessionBar: userConfig.sessionBar ?? {},

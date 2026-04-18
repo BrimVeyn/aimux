@@ -1,58 +1,174 @@
-import type { ModeId } from '@brimveyn/aimux-config'
+import { useTerminalDimensions } from '@opentui/react'
+import { useLayoutEffect, useMemo, useRef } from 'react'
 
-import { describeBindings, groupDescribedBindings } from '../../input/keymap/describe-bindings'
+import { collectHelpEntries, type HelpEntry } from '../../input/keymap/help-entries'
+import { dispatchGlobal } from '../../state/dispatch-ref'
 import { useKeymap } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
+import { ModalFilterBar } from './modal-filter-bar'
 import { ModalShell } from './modal-shell'
 
-interface ModeSection {
-  modeId: ModeId
-  title: string
+interface HelpModalProps {
+  filter: string | null
+  selectedIndex: number
 }
 
-const SECTIONS: ModeSection[] = [
-  { modeId: 'navigation', title: 'Navigation' },
-  { modeId: 'terminal-input', title: 'Terminal input' },
-  { modeId: 'git-mode', title: 'Git mode' },
-]
+function matchesFilter(entry: HelpEntry, needle: string): boolean {
+  if (!needle) return true
+  const lower = needle.toLowerCase()
+  return (
+    (entry.description?.toLowerCase().includes(lower) ?? false) ||
+    entry.modeLabel.toLowerCase().includes(lower) ||
+    entry.keysDisplay.toLowerCase().includes(lower) ||
+    (entry.group?.toLowerCase().includes(lower) ?? false)
+  )
+}
 
-const KEYS_COLUMN_WIDTH = 22
+type Row =
+  | { kind: 'header'; label: string }
+  | { kind: 'entry'; entry: HelpEntry; entryIndex: number }
 
-export function HelpModal() {
+function buildRows(entries: HelpEntry[]): Row[] {
+  const rows: Row[] = []
+  let lastLabel: string | null = null
+  for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+    const entry = entries[entryIndex]
+    if (!entry) continue
+    if (entry.modeLabel !== lastLabel) {
+      rows.push({ kind: 'header', label: entry.modeLabel })
+      lastLabel = entry.modeLabel
+    }
+    rows.push({ entry, entryIndex, kind: 'entry' })
+  }
+  return rows
+}
+
+const KEYS_COLUMN_WIDTH = 24
+const VIEWPORT_HEIGHT_RATIO = 0.6
+const MODAL_CHROME_ROWS = 6
+
+function clampSelection(index: number, count: number): number {
+  if (count === 0) return 0
+  return Math.max(0, Math.min(count - 1, index))
+}
+
+/**
+ * Pick a window start that (a) keeps the selected row on screen and
+ * (b) only scrolls when the selection leaves the margin — avoids jumpy
+ * recentering on every keypress.
+ */
+function computeWindowStart(
+  prevStart: number,
+  selectedRowIndex: number,
+  total: number,
+  windowSize: number
+): number {
+  if (total <= windowSize) return 0
+  const margin = 1
+  const maxStart = total - windowSize
+  let start = Math.max(0, Math.min(maxStart, prevStart))
+  const topThreshold = start + margin
+  const bottomThreshold = start + windowSize - 1 - margin
+  if (selectedRowIndex < topThreshold) {
+    start = Math.max(0, selectedRowIndex - margin)
+  } else if (selectedRowIndex > bottomThreshold) {
+    start = Math.min(maxStart, selectedRowIndex - windowSize + 1 + margin)
+  }
+  return start
+}
+
+export function HelpModal({ filter, selectedIndex }: HelpModalProps) {
   const config = useKeymap()
+  const dimensions = useTerminalDimensions()
+  const allEntries = useMemo(() => collectHelpEntries(config), [config])
+  const filtered = useMemo(
+    () => allEntries.filter((e) => matchesFilter(e, filter ?? '')),
+    [allEntries, filter]
+  )
+  const rows = useMemo(() => buildRows(filtered), [filtered])
+
+  useLayoutEffect(() => {
+    dispatchGlobal({ count: filtered.length, type: 'set-help-entry-count' })
+  }, [filtered.length])
+
+  const effectiveIndex = clampSelection(selectedIndex, filtered.length)
+  const selectedRowIndex = Math.max(
+    0,
+    rows.findIndex((r) => r.kind === 'entry' && r.entryIndex === effectiveIndex)
+  )
+  const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
+  const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
+
+  const prevStartRef = useRef(0)
+  const prevFilterRef = useRef<string | null>(filter)
+  // Reset scroll when filter changes; selection goes back to index 0.
+  if (prevFilterRef.current !== filter) {
+    prevFilterRef.current = filter
+    prevStartRef.current = 0
+  }
+  const start = computeWindowStart(prevStartRef.current, selectedRowIndex, rows.length, listHeight)
+  prevStartRef.current = start
+  const visible = rows.slice(start, start + listHeight)
 
   return (
-    <ModalShell title="Keybindings" keybindsModeId="modal.help" width={uiTokens.modalWidth.lg}>
-      {SECTIONS.map((section) => {
-        const bindings = describeBindings(config, section.modeId, {
-          dedupeByDescription: true,
-          withDescriptionOnly: true,
-        })
-        if (bindings.length === 0) return null
-        const groups = groupDescribedBindings(bindings)
-        return (
-          <box key={section.modeId} flexDirection="column">
-            <text fg={theme.text}>{section.title}</text>
-            {groups.map((group, groupIdx) => (
+    <ModalShell
+      title="Keybindings"
+      keybindsModeId="modal.help"
+      width={uiTokens.modalWidth.lg}
+      footer={
+        <box flexDirection="column" gap={0}>
+          <text fg={theme.dim}>
+            {filtered.length === 0
+              ? ''
+              : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
+          </text>
+          <ModalFilterBar filter={filter} />
+        </box>
+      }
+    >
+      {filtered.length === 0 ? (
+        <text fg={theme.textMuted}>
+          {filter ? 'No matching bindings.' : 'No bindings registered.'}
+        </text>
+      ) : (
+        <box height={listHeight} flexDirection="column" overflow="hidden">
+          {visible.map((row, i) => {
+            const rowIndex = start + i
+            if (row.kind === 'header') {
+              return (
+                <box key={`h-${rowIndex}`} paddingLeft={1} paddingTop={i === 0 ? 0 : 1}>
+                  <text fg={theme.warning} wrapMode="none">
+                    <strong>{row.label}</strong>
+                  </text>
+                </box>
+              )
+            }
+            const active = row.entryIndex === effectiveIndex
+            const bg = active ? theme.panelHighlight : undefined
+            return (
               <box
-                key={`${section.modeId}-${group.group ?? 'root'}-${groupIdx}`}
-                flexDirection="column"
+                key={`e-${rowIndex}`}
+                flexDirection="row"
+                paddingLeft={2}
+                paddingRight={1}
+                backgroundColor={bg}
               >
-                {group.group ? <text fg={theme.textMuted}> {group.group}</text> : null}
-                {group.bindings.map((binding) => (
-                  <box key={`${binding.keys}-${binding.description}`} flexDirection="row">
-                    <box width={KEYS_COLUMN_WIDTH}>
-                      <text fg={theme.accentAlt}> {binding.keysDisplay}</text>
-                    </box>
-                    <text fg={theme.textMuted}>{binding.description ?? ''}</text>
-                  </box>
-                ))}
+                <box width={KEYS_COLUMN_WIDTH} flexShrink={0}>
+                  <text fg={active ? theme.accent : theme.accentAlt} bg={bg} wrapMode="none">
+                    {row.entry.keysDisplay}
+                  </text>
+                </box>
+                <box flexGrow={1} overflow="hidden">
+                  <text fg={active ? theme.text : theme.textMuted} bg={bg} wrapMode="none">
+                    {row.entry.description ?? ''}
+                  </text>
+                </box>
               </box>
-            ))}
-          </box>
-        )
-      })}
+            )
+          })}
+        </box>
+      )}
     </ModalShell>
   )
 }

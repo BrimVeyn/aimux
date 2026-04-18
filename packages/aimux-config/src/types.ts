@@ -24,6 +24,7 @@ export type ModeId =
   | 'modal.snippet-editor'
   | 'modal.theme-picker'
   | 'modal.help'
+  | 'modal.help.filtering'
   | 'modal.split-picker'
   | 'modal.git-commit'
   | 'modal.update-available'
@@ -102,8 +103,6 @@ export interface WorkspaceSnapshotV1 {
   sidebar: {
     visible: boolean
     width: number
-    gitPanelVisible?: boolean
-    gitPanelRatio?: number
   }
   tabs: PersistedTabSnapshot[]
   layoutTree?: LayoutNode
@@ -156,8 +155,15 @@ export interface SidebarState {
   width: number
   minWidth: number
   maxWidth: number
-  gitPanelVisible: boolean
-  gitPanelRatio: number
+}
+
+export interface GitPaneState {
+  visible: boolean
+  mode: 'embedded' | 'pane'
+  position: 'top' | 'bottom' | 'left' | 'right'
+  ratio: number
+  path: GitPanePathConfig
+  diffCount: GitPaneDiffCountConfig
 }
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
@@ -235,6 +241,7 @@ export interface ModalThemePicker extends ModalBase {
 }
 export interface ModalHelp extends ModalBase {
   type: 'help'
+  entryCount: number
 }
 export interface ModalSplitPicker extends ModalBase {
   type: 'split-picker'
@@ -303,6 +310,7 @@ export interface AppState {
   snippets: SnippetRecord[]
   focusMode: FocusMode
   sidebar: SidebarState
+  gitPane: GitPaneState
   modal: ModalState
   layout: LayoutState
   customCommands: Record<AssistantId, string>
@@ -334,6 +342,8 @@ export type ModalAction =
   | { type: 'open-snippet-picker' }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
+  | { type: 'begin-help-filter' }
+  | { type: 'set-help-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
@@ -403,8 +413,10 @@ export type UIAction =
   | { type: 'resize-sidebar'; delta: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
-  | { type: 'toggle-git-panel' }
-  | { type: 'resize-git-panel'; delta: number }
+  | { type: 'toggle-git-pane' }
+  | { type: 'resize-git-pane'; delta: number }
+  | { type: 'set-git-pane-mode'; mode: 'embedded' | 'pane' }
+  | { type: 'set-git-pane-position'; position: 'top' | 'bottom' | 'left' | 'right' }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
   | { type: 'set-session-bar-position'; position: SessionBarPosition }
@@ -625,12 +637,40 @@ export interface SessionBarConfig {
   position?: SessionBarPosition
 }
 
+// ─── Git pane config (discriminated union) ────────────────────────────────────
+
+export type GitPanePathConfig =
+  | { enabled: false }
+  | { enabled: true; pathFn?: (path: string) => string }
+
+export type GitPaneDiffCountConfig = { enabled: boolean }
+
+interface GitPaneBaseConfig {
+  visible?: boolean
+  ratio?: number
+  path?: GitPanePathConfig
+  diffCount?: GitPaneDiffCountConfig
+}
+
+export interface GitPaneEmbeddedConfig extends GitPaneBaseConfig {
+  mode?: 'embedded'
+  position?: 'top' | 'bottom'
+}
+
+export interface GitPanePaneConfig extends GitPaneBaseConfig {
+  mode: 'pane'
+  position?: 'left' | 'right'
+}
+
+export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
+
 export interface AimuxUserConfig {
   theme?: ThemeId | ThemeDefinition
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
   sessionBar?: SessionBarConfig
+  gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
 }
@@ -663,6 +703,7 @@ export interface ResolvedConfig {
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig
   sessionBar: SessionBarConfig
+  gitPane: GitPaneConfig
   hooks: HooksConfig
   snippets: SnippetDef[]
 }

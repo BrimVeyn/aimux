@@ -8,6 +8,7 @@ import { useAppStore } from '../state/app-store'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
+import { GitPaneWidget } from './components/git-pane-widget'
 import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
 import { NewTabModal } from './components/new-tab-modal'
@@ -144,7 +145,7 @@ function renderModal(
         />
       )
     case 'help':
-      return <HelpModal />
+      return <HelpModal filter={modal.editBuffer} selectedIndex={modal.selectedIndex} />
     case 'git-commit': {
       const titleText =
         modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
@@ -215,6 +216,10 @@ export function RootView({
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessionBarPosition = useAppStore((s) => s.sessionBar.position)
+  const gitPaneMode = useAppStore((s) => s.gitPane.mode)
+  const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
+  const gitPanePosition = useAppStore((s) => s.gitPane.position)
+  const gitPaneRatio = useAppStore((s) => s.gitPane.ratio)
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
   const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
@@ -248,6 +253,9 @@ export function RootView({
       {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar onTabActivate={onPaneActivate} />
+        {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
+          <GitPaneInPaneMode ratio={gitPaneRatio} />
+        ) : null}
         {activeTree && activeTree.type === 'split' ? (
           <SplitLayout
             node={activeTree}
@@ -292,6 +300,9 @@ export function RootView({
             onPaneActivate={onPaneActivate}
           />
         )}
+        {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (
+          <GitPaneInPaneMode ratio={gitPaneRatio} />
+        ) : null}
       </box>
       {sessionBarPosition === 'bottom' && <SessionBar />}
       <StatusBar />
@@ -306,6 +317,23 @@ export function RootView({
         snippets,
         themeId,
       })}
+    </box>
+  )
+}
+
+function GitPaneInPaneMode({ ratio }: { ratio: number }) {
+  // Ratio maps to a fixed column count (20..80), mirroring the reservation in
+  // use-terminal-resize so the terminal-content area stays in sync.
+  const width = Math.max(20, Math.min(80, Math.round(ratio * 80)))
+  return (
+    <box
+      flexDirection="column"
+      width={width}
+      flexShrink={0}
+      backgroundColor={theme.panel}
+      overflow="hidden"
+    >
+      <GitPaneWidget pollingEnabled />
     </box>
   )
 }

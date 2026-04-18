@@ -1,6 +1,12 @@
 import { memo, type ReactNode, useMemo } from 'react'
 
-import type { GitFileEntry, GitFileSection, GitPanelState } from '../../state/types'
+import type {
+  GitFileEntry,
+  GitFileSection,
+  GitPaneDiffCountConfig,
+  GitPanelState,
+  GitPanePathConfig,
+} from '../../state/types'
 
 import { theme } from '../theme'
 
@@ -8,6 +14,8 @@ interface GitPanelProps {
   gitPanel: GitPanelState
   projectPath: string | undefined
   selectedFileKey?: string | null
+  pathConfig?: GitPanePathConfig
+  diffCountConfig?: GitPaneDiffCountConfig
 }
 
 export function fileKey(file: Pick<GitFileEntry, 'path' | 'section'>): string {
@@ -69,27 +77,58 @@ function stripTrailingSlash(prefix: string): string {
   return prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
 }
 
-function renderPath(file: GitFileEntry): ReactNode {
-  const { basename, prefix } = splitPath(file.path)
+function renderPath(file: GitFileEntry, pathConfig: GitPanePathConfig): ReactNode {
+  const showDir = pathConfig.enabled
+  const transform = pathConfig.enabled ? pathConfig.pathFn : undefined
+  const displayPath = transform ? transform(file.path) : file.path
+  const { basename, prefix } = splitPath(displayPath)
   const dir = stripTrailingSlash(prefix)
   if (file.renamedFrom) {
-    const renamed = splitPath(file.renamedFrom)
+    const renamedDisplay = transform ? transform(file.renamedFrom) : file.renamedFrom
+    const renamed = splitPath(renamedDisplay)
     const renamedDir = stripTrailingSlash(renamed.prefix)
     return (
       <text wrapMode="none">
         <span fg={theme.text}>{renamed.basename}</span>
-        {renamedDir ? <span fg={theme.textMuted}> {renamedDir}</span> : null}
+        {showDir && renamedDir ? <span fg={theme.textMuted}> {renamedDir}</span> : null}
         <span fg={theme.textMuted}> → </span>
         <span fg={theme.text}>{basename}</span>
-        {dir ? <span fg={theme.textMuted}> {dir}</span> : null}
+        {showDir && dir ? <span fg={theme.textMuted}> {dir}</span> : null}
       </text>
     )
   }
   return (
     <text wrapMode="none">
       <span fg={theme.text}>{basename}</span>
-      {dir ? <span fg={theme.textMuted}> {dir}</span> : null}
+      {showDir && dir ? <span fg={theme.textMuted}> {dir}</span> : null}
     </text>
+  )
+}
+
+function renderDiffCount(
+  file: GitFileEntry,
+  addedW: number,
+  removedW: number,
+  bg: string | undefined,
+  diffCountConfig: GitPaneDiffCountConfig,
+  hasNumstat: boolean
+): ReactNode {
+  if (!diffCountConfig.enabled) return null
+  if (!hasNumstat) {
+    return (
+      <text fg={theme.textMuted} bg={bg} flexShrink={0}>
+        —
+      </text>
+    )
+  }
+  return (
+    <box flexDirection="row" flexShrink={0}>
+      <text fg={theme.success} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
+      <text fg={theme.dim} bg={bg}>
+        {' '}
+      </text>
+      <text fg={theme.danger} bg={bg}>{`−${padRight(file.removed, removedW)}`}</text>
+    </box>
   )
 }
 
@@ -98,7 +137,9 @@ function renderFileRow(
   key: string,
   addedW: number,
   removedW: number,
-  isSelected: boolean
+  isSelected: boolean,
+  pathConfig: GitPanePathConfig,
+  diffCountConfig: GitPaneDiffCountConfig
 ): ReactNode {
   const hasNumstat = file.added !== null || file.removed !== null
   const bg = isSelected ? theme.panelHighlight : undefined
@@ -108,21 +149,9 @@ function renderFileRow(
         <strong>{displayStatus(file)}</strong>
       </text>
       <box flexGrow={1} overflow="hidden">
-        {renderPath(file)}
+        {renderPath(file, pathConfig)}
       </box>
-      {hasNumstat ? (
-        <box flexDirection="row" flexShrink={0}>
-          <text fg={theme.success} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
-          <text fg={theme.dim} bg={bg}>
-            {' '}
-          </text>
-          <text fg={theme.danger} bg={bg}>{`−${padRight(file.removed, removedW)}`}</text>
-        </box>
-      ) : (
-        <text fg={theme.textMuted} bg={bg} flexShrink={0}>
-          —
-        </text>
-      )}
+      {renderDiffCount(file, addedW, removedW, bg, diffCountConfig, hasNumstat)}
     </box>
   )
 }
@@ -133,7 +162,9 @@ function renderSection(
   files: GitFileEntry[],
   addedW: number,
   removedW: number,
-  selectedFileKey: string | null | undefined
+  selectedFileKey: string | null | undefined,
+  pathConfig: GitPanePathConfig,
+  diffCountConfig: GitPaneDiffCountConfig
 ): ReactNode {
   if (files.length === 0) return null
   return (
@@ -149,7 +180,9 @@ function renderSection(
           `${section}-${i}`,
           addedW,
           removedW,
-          !!selectedFileKey && fileKey(file) === selectedFileKey
+          !!selectedFileKey && fileKey(file) === selectedFileKey,
+          pathConfig,
+          diffCountConfig
         )
       )}
     </box>
@@ -190,8 +223,13 @@ function computeStatusPlaceholder(
   return null
 }
 
+const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
+const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
+
 export const GitPanel = memo(function GitPanel({
+  diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
   gitPanel,
+  pathConfig = DEFAULT_PATH_CONFIG,
   projectPath,
   selectedFileKey,
 }: GitPanelProps) {
@@ -220,7 +258,16 @@ export const GitPanel = memo(function GitPanel({
           contentOptions={{ flexDirection: 'column', gap: 0 }}
         >
           {SECTION_ORDER.map((s) =>
-            renderSection(s.key, s.title, groups[s.key], addedW, removedW, selectedFileKey)
+            renderSection(
+              s.key,
+              s.title,
+              groups[s.key],
+              addedW,
+              removedW,
+              selectedFileKey,
+              pathConfig,
+              diffCountConfig
+            )
           )}
         </scrollbox>
       )}
