@@ -111,6 +111,7 @@ Important defaults:
 - `Ctrl+N` opens the new-tab modal
 - `Ctrl+S` opens the snippet picker
 - `Ctrl+T` opens the theme picker
+- `Ctrl+D` enters git mode — see [`guide/git-mode.md`](guide/git-mode.md)
 - the shipped leader key is `Ctrl+W`
 
 See `guide/keymaps.md` for the full notation and merge rules.

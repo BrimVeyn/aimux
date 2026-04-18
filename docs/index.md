@@ -23,6 +23,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 - `guide/keymaps.md` - key notation, modes, leader keys, multi-key sequences,
   help metadata, and override rules
 - `guide/themes.md` - built-in themes, the theme picker, and typed theme helpers
+- `guide/git-mode.md` - git-mode workflow: panel, diff view, keybindings,
+  help overlay, and commit flow
 
 ## Reference
 

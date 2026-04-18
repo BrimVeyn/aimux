@@ -19,10 +19,11 @@ snippets, themes, and fully configurable keymaps.
 - profile-isolated config, catalogs, daemon sockets, and runtime state
 - typed keymap customization through `@brimveyn/aimux-config`
 - snippets catalog and snippet picker
-- configurable git pane (embedded in the sidebar or as a standalone pane) and git mode
+- configurable git pane (embedded in the sidebar or as a standalone pane) and a
+  dedicated [git mode](docs/guide/git-mode.md) for review / stage / commit /
+  push with a split or stacked diff view and shiki-powered highlighting
 - built-in help generated from the resolved keymap
 - theme picker with 67 built-in themes (shiki catalog + aimux house themes) and a `/` filter
-- shiki-powered syntax highlighting in the git diff view
 
 ## Install
 
@@ -131,6 +132,7 @@ See [`docs/guide/keymaps.md`](docs/guide/keymaps.md).
 - `Ctrl+S` - open snippet picker
 - `Ctrl+T` - open theme picker
 - `Ctrl+B` - toggle sidebar
+- `Ctrl+D` - enter git mode
 - `Ctrl+W b` - toggle session bar
 - `Ctrl+W 1` through `Ctrl+W 9` - switch sessions by index
 
@@ -173,6 +175,7 @@ See [`docs/developer/architecture.md`](docs/developer/architecture.md).
 - [`docs/reference/cli.md`](docs/reference/cli.md)
 - [`docs/reference/config-reference.md`](docs/reference/config-reference.md)
 - [`docs/reference/runtime-paths.md`](docs/reference/runtime-paths.md)
+- [`docs/guide/git-mode.md`](docs/guide/git-mode.md)
 - [`docs/developer/architecture.md`](docs/developer/architecture.md)
 - [`docs/developer/aimux-config-internals.md`](docs/developer/aimux-config-internals.md)
 
@@ -191,6 +194,14 @@ bun run lint
 
 The repository dev scripts use `AIMUX_PROFILE=dev`, so local development does
 not collide with a globally installed `aimux` instance.
+
+## References
+
+- [Pierre — diffs.com](https://diffs.com) — inspiration for the git-mode diff
+  review experience: the split / stacked layout, progressive context folding,
+  and focusing on the first change rather than the top of the file.
+- [shiki](https://shiki.style) — syntax highlighting for the git diff view
+  and the source of the bundled theme catalog.
 
 ## License
 

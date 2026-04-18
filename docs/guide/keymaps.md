@@ -189,6 +189,22 @@ Document your own configs accordingly.
 - `Leader+b` - toggle session bar
 - `Leader+1` through `Leader+9` - switch sessions by index
 
+### `git-mode`
+
+Enter with `Ctrl+D` from `navigation`. Leading action keys:
+
+- `a` - stage the selected entry
+- `d` - unstage / delete (two-press confirm on destructive ops)
+- `c` - open the commit modal
+- `p` - push the current branch
+- `v` - toggle split / stacked diff
+- `t` - toggle flat / tree list
+- `?` - help (scoped to git-mode, rendered as an overlay)
+
+Navigation and diff scroll keys (`j`/`k`, `Ctrl+N`/`Ctrl+P`, `h`/`l`, arrows,
+`Ctrl+D`/`Ctrl+U`, `Backspace`/`Ctrl+H`/`Ctrl+L`) are documented in
+[`git-mode.md`](git-mode.md).
+
 ## Help Modal
 
 Press `?` in `navigation` mode to open the help modal.
@@ -209,6 +225,11 @@ Inside the modal:
 The list is capped at 60% of the terminal height and scrolls only when the
 selection leaves the visible window — navigation across mode groups stays
 in place visually.
+
+Pressing `?` inside `git-mode` opens a scoped variant of the same modal that
+only lists git-mode bindings. It renders as an overlay above the git view
+rather than taking over focus, so panel selection, diff scroll, and the
+split / stacked toggle stay intact while the modal is visible.
 
 ### Universal selection alternates
 
