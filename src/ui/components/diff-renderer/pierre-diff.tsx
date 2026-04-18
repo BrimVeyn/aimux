@@ -6,6 +6,8 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState }
 import type { ThemeId } from '../../themes'
 
 import { parsePatchFiles } from '../../../diff-parser'
+import { useAppStore } from '../../../state/app-store'
+import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { theme } from '../../theme'
 import { filetypeFromPath } from './filetype'
 import { tokenizeSide } from './highlight'
@@ -43,6 +45,14 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   }, [diff])
 
   const filetype = useMemo(() => filetypeFromPath(path), [path])
+
+  const collapsedList = useAppStore((s) => s.gitMode.collapsedHunks[path])
+  const collapsed = useMemo(() => new Set(collapsedList ?? []), [collapsedList])
+  const toggleHunk = useMemo(
+    () => (hunkIndex: number) =>
+      dispatchGlobal({ hunkIndex, path, type: 'git-mode-toggle-hunk-collapsed' }),
+    [path]
+  )
 
   const [highlights, setHighlights] = useState<DiffHighlights>(EMPTY_HIGHLIGHTS)
 
@@ -89,7 +99,23 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   }
 
   if (view === 'stacked') {
-    return <StackedView ref={stackedRef} file={file} highlights={highlights} />
+    return (
+      <StackedView
+        ref={stackedRef}
+        collapsed={collapsed}
+        file={file}
+        highlights={highlights}
+        onToggleHunk={toggleHunk}
+      />
+    )
   }
-  return <SplitView ref={splitRef} file={file} highlights={highlights} />
+  return (
+    <SplitView
+      ref={splitRef}
+      collapsed={collapsed}
+      file={file}
+      highlights={highlights}
+      onToggleHunk={toggleHunk}
+    />
+  )
 })

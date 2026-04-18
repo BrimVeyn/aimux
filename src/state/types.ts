@@ -192,6 +192,7 @@ export interface GitModeState {
   pendingDeletePath: string | null
   actionMessage: string | null
   diffView: GitDiffView
+  collapsedHunks: Record<string, number[]>
 }
 
 interface ModalBase {
@@ -457,6 +458,7 @@ export type GitModeAction =
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-toggle-hunk-collapsed'; path: string; hunkIndex: number }
   | {
       type: 'git-mode-optimistic-move'
       path: string

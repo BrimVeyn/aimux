@@ -19,6 +19,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'session-picker': 'modal.session-picker.filtering',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
+  'theme-picker': 'modal.theme-picker.filtering',
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {

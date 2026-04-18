@@ -15,7 +15,6 @@ import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
-import type { ThemeId } from './ui/themes'
 
 import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
@@ -39,6 +38,7 @@ import { appReducer, createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import { applyTheme } from './ui/theme'
+import { isKnownThemeId, registerUserThemes, type ThemeId } from './ui/themes'
 import {
   fetchLatestNpmVersion,
   getCurrentPackageVersion,
@@ -66,11 +66,16 @@ export function App({
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
+    registerUserThemes(resolvedConfig.themes)
     const config = loadConfig()
-    if (config.themeId) {
-      applyTheme(config.themeId)
-    }
-    return config.themeId ?? 'catppuccin-mocha'
+    const persisted = config.themeId && isKnownThemeId(config.themeId) ? config.themeId : undefined
+    const fromConfig =
+      resolvedConfig.theme && isKnownThemeId(resolvedConfig.theme)
+        ? resolvedConfig.theme
+        : undefined
+    const initial = persisted ?? fromConfig ?? 'catppuccin-mocha'
+    applyTheme(initial)
+    return initial
   })
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
     const json = loadConfig()

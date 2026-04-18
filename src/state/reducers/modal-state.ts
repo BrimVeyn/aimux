@@ -5,10 +5,8 @@ import type { AppAction, AppState } from '../types'
 import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
-import { THEME_IDS } from '../../ui/themes'
+import { filterThemeIds } from '../../ui/filter-themes'
 import { filterSessions, filterSnippets } from '../selectors'
-
-const THEME_COUNT = THEME_IDS.length
 
 function emptyModal() {
   return {
@@ -291,7 +289,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         const filtered = filterSnippets(state.snippets, state.modal.editBuffer)
         optionCount = filtered.length
       } else if (state.modal.type === 'theme-picker') {
-        optionCount = THEME_COUNT
+        optionCount = filterThemeIds(state.modal.editBuffer).length
       } else if (state.modal.type === 'update-available') {
         optionCount = 2
       } else {
@@ -357,6 +355,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const resetIndex =
         state.modal.type === 'session-picker' ||
         state.modal.type === 'snippet-picker' ||
+        state.modal.type === 'theme-picker' ||
         state.modal.type === 'help'
           ? 0
           : state.modal.selectedIndex
@@ -427,6 +426,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (
         state.modal.type === 'session-picker' ||
         state.modal.type === 'snippet-picker' ||
+        state.modal.type === 'theme-picker' ||
         state.modal.type === 'help'
       ) {
         return {

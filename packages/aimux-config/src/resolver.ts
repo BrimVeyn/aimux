@@ -25,6 +25,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     theme: userConfig.theme,
+    themes: userConfig.themes ?? {},
   }
 }
 

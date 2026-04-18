@@ -1,11 +1,17 @@
 import type { ThemedToken } from 'shiki'
 
-import { type ScrollBoxRenderable, TextAttributes } from '@opentui/core'
+import {
+  type MouseEvent as OtuiMouseEvent,
+  type ScrollBoxRenderable,
+  TextAttributes,
+} from '@opentui/core'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
 import type { DiffHighlights } from './pierre-diff'
 
+import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
+import { scrollGitDiff } from '../../git-view-controls'
 import { theme } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
 import { tokenToSpan } from './highlight'
@@ -18,10 +24,20 @@ export interface SplitViewHandle {
 interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
+  collapsed: ReadonlySet<number>
+  onToggleHunk: (hunkIndex: number) => void
+}
+
+function handleScroll(e: OtuiMouseEvent): void {
+  const delta = getScrollViewportDelta(e)
+  if (delta === null) return
+  e.preventDefault()
+  e.stopPropagation()
+  scrollGitDiff(delta)
 }
 
 export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
-  { file, highlights },
+  { collapsed, file, highlights, onToggleHunk },
   ref
 ) {
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
@@ -40,21 +56,22 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     []
   )
 
-  const rows = buildSplitRows(file)
+  const rows = buildSplitRows(file, collapsed)
   const gw = gutterWidth(file)
 
   return (
-    <box flexDirection="row" flexGrow={1} overflow="hidden">
+    <box flexDirection="row" flexGrow={1} overflow="hidden" onMouseScroll={handleScroll}>
       <scrollbox
         ref={leftRef}
         flexGrow={1}
         scrollY
         viewportCulling
         contentOptions={{ flexDirection: 'column', gap: 0 }}
+        onMouseScroll={handleScroll}
       >
         {rows.map((row, i) =>
           row.type === 'hunk-header' ? (
-            <HunkHeaderRow key={i} row={row} />
+            <HunkHeaderRow key={i} row={row} onToggle={onToggleHunk} />
           ) : (
             <HalfRow key={i} cell={row.left} gw={gw} tokens={highlights.del} />
           )
@@ -67,10 +84,11 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         scrollY
         viewportCulling
         contentOptions={{ flexDirection: 'column', gap: 0 }}
+        onMouseScroll={handleScroll}
       >
         {rows.map((row, i) =>
           row.type === 'hunk-header' ? (
-            <HunkHeaderRow key={i} row={row} />
+            <HunkHeaderRow key={i} row={row} onToggle={onToggleHunk} />
           ) : (
             <HalfRow key={i} cell={row.right} gw={gw} tokens={highlights.add} />
           )
@@ -80,10 +98,23 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   )
 })
 
-function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
+function HunkHeaderRow({
+  onToggle,
+  row,
+}: {
+  onToggle: (hunkIndex: number) => void
+  row: Extract<SplitRowOrHeader, { type: 'hunk-header' }>
+}) {
+  const arrow = row.collapsed ? '▶' : '▼'
   return (
-    <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.textMuted}>{row.spec}</text>
+    <box
+      flexDirection="row"
+      backgroundColor={theme.panelMuted}
+      paddingLeft={1}
+      paddingRight={1}
+      onMouseDown={() => onToggle(row.hunkIndex)}
+    >
+      <text fg={theme.textMuted}>{`${arrow} ${row.spec}`}</text>
       {row.context ? <text fg={theme.dim}> {row.context}</text> : null}
     </box>
   )

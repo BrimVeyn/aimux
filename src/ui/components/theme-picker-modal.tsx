@@ -95,6 +95,7 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
           {visible.map((id, i) => {
             const rowIndex = start + i
             const entry = THEMES[id]
+            if (!entry) return null
             const active = rowIndex === effectiveIndex
             const isCurrent = id === currentThemeId
             return (

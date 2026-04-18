@@ -5,6 +5,7 @@ import { sortFilesBySection } from './git-panel-state'
 export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
+    collapsedHunks: {},
     diffs: {},
     diffView: 'split',
     loading: {},
@@ -86,10 +87,19 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       return { ...state, gitMode: { ...state.gitMode, pendingDeletePath: action.path } }
     }
     case 'git-mode-clear-diff-cache': {
-      if (!(action.path in state.gitMode.diffs)) return state
-      const nextDiffs = { ...state.gitMode.diffs }
-      delete nextDiffs[action.path]
-      return { ...state, gitMode: { ...state.gitMode, diffs: nextDiffs } }
+      const hasDiff = action.path in state.gitMode.diffs
+      const hasCollapsed = action.path in state.gitMode.collapsedHunks
+      if (!hasDiff && !hasCollapsed) return state
+      const nextDiffs = hasDiff ? { ...state.gitMode.diffs } : state.gitMode.diffs
+      if (hasDiff) delete nextDiffs[action.path]
+      const nextCollapsed = hasCollapsed
+        ? { ...state.gitMode.collapsedHunks }
+        : state.gitMode.collapsedHunks
+      if (hasCollapsed) delete nextCollapsed[action.path]
+      return {
+        ...state,
+        gitMode: { ...state.gitMode, collapsedHunks: nextCollapsed, diffs: nextDiffs },
+      }
     }
     case 'git-mode-set-message': {
       if (state.gitMode.actionMessage === action.message) return state
@@ -98,6 +108,20 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-diff-view': {
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
+    }
+    case 'git-mode-toggle-hunk-collapsed': {
+      const existing = state.gitMode.collapsedHunks[action.path] ?? []
+      const has = existing.includes(action.hunkIndex)
+      const updated = has
+        ? existing.filter((i) => i !== action.hunkIndex)
+        : [...existing, action.hunkIndex].sort((a, b) => a - b)
+      const nextCollapsed = { ...state.gitMode.collapsedHunks }
+      if (updated.length === 0) {
+        delete nextCollapsed[action.path]
+      } else {
+        nextCollapsed[action.path] = updated
+      }
+      return { ...state, gitMode: { ...state.gitMode, collapsedHunks: nextCollapsed } }
     }
     case 'git-mode-optimistic-move': {
       const currentIdx = state.gitMode.selectedFileIndex

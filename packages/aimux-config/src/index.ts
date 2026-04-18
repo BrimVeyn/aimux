@@ -39,6 +39,7 @@ export type {
   // Mode / state
   ModeId,
   ModeKeymapDef,
+  NamedThemeDefinition,
   // Resolved config (internal, but exported for tooling)
   ResolvedConfig,
   ResolvedKeymapConfig,

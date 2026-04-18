@@ -1,6 +1,9 @@
 import { type ThemeColors, type ThemeId, THEMES } from './themes'
 
-export const theme: ThemeColors = { ...THEMES['catppuccin-mocha'].colors }
+const DEFAULT = THEMES['catppuccin-mocha']
+if (!DEFAULT) throw new Error('default theme missing')
+
+export const theme: ThemeColors = { ...DEFAULT.colors }
 
 export function applyTheme(id: ThemeId): void {
   const entry = THEMES[id]

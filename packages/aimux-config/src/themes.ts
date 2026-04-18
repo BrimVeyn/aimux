@@ -1,4 +1,4 @@
-import type { ThemeColors, ThemeDefinition, ThemeId } from './types'
+import type { NamedThemeDefinition, ThemeColors, ThemeDefinition, ThemeId } from './types'
 
 import { GENERATED_THEME_IDS, GENERATED_THEMES } from './themes.generated'
 
@@ -24,14 +24,10 @@ export function migrateThemeId(id: string | undefined): ThemeId {
 }
 
 export const themes = {
+  define(name: string, base: ThemeId, overrides: Partial<ThemeColors>): NamedThemeDefinition {
+    return { base, colors: overrides, name }
+  },
   extend(base: ThemeId, overrides: Partial<ThemeColors>): ThemeDefinition {
-    const baseTheme = THEMES[base]
-    if (!baseTheme) {
-      throw new Error(`themes.extend: unknown base theme "${base}"`)
-    }
-    return {
-      base,
-      colors: { ...baseTheme.colors, ...overrides },
-    }
+    return { base, colors: overrides }
   },
 }

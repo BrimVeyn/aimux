@@ -30,15 +30,22 @@ export interface HunkHeader {
   context?: string
   spec: string
   type: 'hunk-header'
+  hunkIndex: number
+  collapsed: boolean
 }
 
 export type SplitRowOrHeader = HunkHeader | SplitRow
 export type UnifiedRowOrHeader = HunkHeader | UnifiedRow
 
-export function buildSplitRows(file: FileDiffMetadata): SplitRowOrHeader[] {
+export function buildSplitRows(
+  file: FileDiffMetadata,
+  collapsed: ReadonlySet<number> = new Set()
+): SplitRowOrHeader[] {
   const rows: SplitRowOrHeader[] = []
-  for (const hunk of file.hunks) {
-    rows.push(makeHeader(hunk))
+  for (const [hIdx, hunk] of file.hunks.entries()) {
+    const isCollapsed = collapsed.has(hIdx)
+    rows.push(makeHeader(hunk, hIdx, isCollapsed))
+    if (isCollapsed) continue
     let delLine = hunk.deletionStart
     let addLine = hunk.additionStart
     for (const content of hunk.hunkContent) {
@@ -84,10 +91,15 @@ export function buildSplitRows(file: FileDiffMetadata): SplitRowOrHeader[] {
   return rows
 }
 
-export function buildUnifiedRows(file: FileDiffMetadata): UnifiedRowOrHeader[] {
+export function buildUnifiedRows(
+  file: FileDiffMetadata,
+  collapsed: ReadonlySet<number> = new Set()
+): UnifiedRowOrHeader[] {
   const rows: UnifiedRowOrHeader[] = []
-  for (const hunk of file.hunks) {
-    rows.push(makeHeader(hunk))
+  for (const [hIdx, hunk] of file.hunks.entries()) {
+    const isCollapsed = collapsed.has(hIdx)
+    rows.push(makeHeader(hunk, hIdx, isCollapsed))
+    if (isCollapsed) continue
     let delLine = hunk.deletionStart
     let addLine = hunk.additionStart
     for (const content of hunk.hunkContent) {
@@ -128,9 +140,9 @@ export function buildUnifiedRows(file: FileDiffMetadata): UnifiedRowOrHeader[] {
   return rows
 }
 
-function makeHeader(hunk: Hunk): HunkHeader {
+function makeHeader(hunk: Hunk, hunkIndex: number, collapsed: boolean): HunkHeader {
   const spec = `@@ -${hunk.deletionStart},${hunk.deletionCount} +${hunk.additionStart},${hunk.additionCount} @@`
-  return { context: hunk.hunkContext, spec, type: 'hunk-header' }
+  return { collapsed, context: hunk.hunkContext, hunkIndex, spec, type: 'hunk-header' }
 }
 
 function stripNewline(s: string): string {

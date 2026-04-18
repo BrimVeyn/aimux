@@ -210,6 +210,7 @@ export interface GitModeState {
   pendingDeletePath: string | null
   actionMessage: string | null
   diffView: GitDiffView
+  collapsedHunks: Record<string, number[]>
 }
 
 interface ModalBase {
@@ -552,11 +553,15 @@ export interface ThemeColors {
 
 import type { BundledTheme } from 'shiki'
 
-export type ThemeId = BundledTheme
+export type ThemeId = BundledTheme | (string & {})
 
 export interface ThemeDefinition {
   base?: ThemeId
-  colors: ThemeColors
+  colors: Partial<ThemeColors>
+}
+
+export interface NamedThemeDefinition extends ThemeDefinition {
+  name: string
 }
 
 // ─── Backend config (stub) ────────────────────────────────────────────────────
@@ -667,7 +672,8 @@ export interface GitPanePaneConfig extends GitPaneBaseConfig {
 export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
 
 export interface AimuxUserConfig {
-  theme?: ThemeId | ThemeDefinition
+  theme?: ThemeId
+  themes?: Record<string, NamedThemeDefinition>
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
@@ -700,7 +706,8 @@ export interface ResolvedKeymapConfig {
 }
 
 export interface ResolvedConfig {
-  theme: ThemeId | ThemeDefinition | undefined
+  theme: ThemeId | undefined
+  themes: Record<string, NamedThemeDefinition>
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig

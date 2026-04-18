@@ -1,11 +1,17 @@
 import type { ThemedToken } from 'shiki'
 
-import { type ScrollBoxRenderable, TextAttributes } from '@opentui/core'
+import {
+  type MouseEvent as OtuiMouseEvent,
+  type ScrollBoxRenderable,
+  TextAttributes,
+} from '@opentui/core'
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
 import type { DiffHighlights } from './pierre-diff'
 
+import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
+import { scrollGitDiff } from '../../git-view-controls'
 import { theme } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
 import { tokenToSpan } from './highlight'
@@ -17,10 +23,20 @@ export interface StackedViewHandle {
 interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
+  collapsed: ReadonlySet<number>
+  onToggleHunk: (hunkIndex: number) => void
+}
+
+function handleScroll(e: OtuiMouseEvent): void {
+  const delta = getScrollViewportDelta(e)
+  if (delta === null) return
+  e.preventDefault()
+  e.stopPropagation()
+  scrollGitDiff(delta)
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { file, highlights },
+  { collapsed, file, highlights, onToggleHunk },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -35,7 +51,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     []
   )
 
-  const rows = buildUnifiedRows(file)
+  const rows = buildUnifiedRows(file, collapsed)
   const gw = gutterWidth(file)
 
   return (
@@ -45,9 +61,16 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
       scrollY
       viewportCulling
       contentOptions={{ flexDirection: 'column', gap: 0 }}
+      onMouseScroll={handleScroll}
     >
       {rows.map((row, i) => (
-        <UnifiedRowRender key={i} gw={gw} highlights={highlights} row={row} />
+        <UnifiedRowRender
+          key={i}
+          gw={gw}
+          highlights={highlights}
+          row={row}
+          onToggleHunk={onToggleHunk}
+        />
       ))}
     </scrollbox>
   )
@@ -56,16 +79,25 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
 function UnifiedRowRender({
   gw,
   highlights,
+  onToggleHunk,
   row,
 }: {
   gw: number
   highlights: DiffHighlights
+  onToggleHunk: (hunkIndex: number) => void
   row: UnifiedRowOrHeader
 }) {
   if (row.type === 'hunk-header') {
+    const arrow = row.collapsed ? '▶' : '▼'
     return (
-      <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
-        <text fg={theme.textMuted}>{row.spec}</text>
+      <box
+        flexDirection="row"
+        backgroundColor={theme.panelMuted}
+        paddingLeft={1}
+        paddingRight={1}
+        onMouseDown={() => onToggleHunk(row.hunkIndex)}
+      >
+        <text fg={theme.textMuted}>{`${arrow} ${row.spec}`}</text>
         {row.context ? <text fg={theme.dim}> {row.context}</text> : null}
       </box>
     )
