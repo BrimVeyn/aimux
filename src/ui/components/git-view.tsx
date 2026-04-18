@@ -1,51 +1,21 @@
-import type { DiffRenderable } from '@opentui/core'
-
 import { memo, useEffect, useRef } from 'react'
 
-import type { DiffData } from '../../state/types'
+import type { DiffData, GitDiffView } from '../../state/types'
 
 import { fetchDiff } from '../../git/git-diff'
 import { useGitPanelPolling } from '../../git/git-poller'
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { setGitDiffScroller } from '../git-view-controls'
-import { getSyntaxClient, getSyntaxStyle } from '../syntax'
 import { theme } from '../theme'
+import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { fileKey, GitPanel } from './git-panel'
-
-interface CodePaneLike {
-  scrollY: number
-  maxScrollY: number
-}
-
-interface DiffRenderableInternals {
-  leftCodeRenderable?: CodePaneLike
-  rightCodeRenderable?: CodePaneLike
-}
-
-function filetypeFromPath(path: string): string | undefined {
-  const dot = path.lastIndexOf('.')
-  if (dot < 0) return undefined
-  const ext = path.slice(dot + 1).toLowerCase()
-  const map: Record<string, string> = {
-    cjs: 'javascript',
-    js: 'javascript',
-    jsx: 'javascript',
-    markdown: 'markdown',
-    md: 'markdown',
-    mdx: 'markdown',
-    mjs: 'javascript',
-    ts: 'typescript',
-    tsx: 'typescript',
-    zig: 'zig',
-  }
-  return map[ext]
-}
 
 interface DiffStageProps {
   diff: DiffData | undefined
   loading: boolean
-  diffRef: React.RefObject<DiffRenderable | null>
+  diffRef: React.RefObject<PierreDiffHandle | null>
+  view: GitDiffView
 }
 
 function placeholderText(diff: DiffData): string | null {
@@ -62,7 +32,7 @@ function placeholderText(diff: DiffData): string | null {
   return null
 }
 
-const DiffStage = memo(function DiffStage({ diff, diffRef, loading }: DiffStageProps) {
+const DiffStage = memo(function DiffStage({ diff, diffRef, loading, view }: DiffStageProps) {
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
@@ -94,8 +64,6 @@ const DiffStage = memo(function DiffStage({ diff, diffRef, loading }: DiffStageP
     )
   }
 
-  const filetype = filetypeFromPath(diff.path)
-
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
       {diff.oldPath ? (
@@ -105,22 +73,7 @@ const DiffStage = memo(function DiffStage({ diff, diffRef, loading }: DiffStageP
           </text>
         </box>
       ) : null}
-      <diff
-        ref={diffRef}
-        diff={diff.rawDiff}
-        view="split"
-        syncScroll
-        showLineNumbers
-        wrapMode="none"
-        filetype={filetype}
-        treeSitterClient={filetype ? getSyntaxClient() : undefined}
-        syntaxStyle={filetype ? getSyntaxStyle() : undefined}
-        addedBg={theme.diffAddBg}
-        removedBg={theme.diffRemoveBg}
-        addedSignColor={theme.success}
-        removedSignColor={theme.danger}
-        flexGrow={1}
-      />
+      <PierreDiff ref={diffRef} diff={diff.rawDiff} view={view} />
     </box>
   )
 })
@@ -132,7 +85,7 @@ export const GitView = memo(function GitView() {
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const focusMode = useAppStore((s) => s.focusMode)
-  const diffRef = useRef<DiffRenderable | null>(null)
+  const diffRef = useRef<PierreDiffHandle | null>(null)
 
   const currentSession = currentSessionId
     ? sessions.find((s) => s.id === currentSessionId)
@@ -147,16 +100,16 @@ export const GitView = memo(function GitView() {
 
   useEffect(() => {
     setGitDiffScroller((delta: number) => {
-      const node = diffRef.current as unknown as DiffRenderableInternals | null
+      const node = diffRef.current
       if (!node) return
-      const left = node.leftCodeRenderable
-      const right = node.rightCodeRenderable
-      if (!left || !right) return
-      const cap = Math.max(left.maxScrollY, right.maxScrollY)
-      const base = left.scrollY
+      const left = node.leftScroll
+      const right = node.rightScroll
+      if (!left) return
+      const cap = Math.max(left.scrollHeight - left.viewport.height, 0)
+      const base = left.scrollTop
       const nextScroll = Math.max(0, Math.min(cap, base + delta))
-      left.scrollY = nextScroll
-      right.scrollY = nextScroll
+      left.scrollTop = nextScroll
+      if (right && right !== left) right.scrollTop = nextScroll
     })
     return () => setGitDiffScroller(null)
   }, [])
@@ -225,7 +178,7 @@ export const GitView = memo(function GitView() {
             selectedFileKey={selectedFile ? fileKey(selectedFile) : null}
           />
         </box>
-        <DiffStage diff={diff} diffRef={diffRef} loading={loading} />
+        <DiffStage diff={diff} diffRef={diffRef} loading={loading} view={gitMode.diffView} />
       </box>
       {footerNode ? (
         <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} flexDirection="column">

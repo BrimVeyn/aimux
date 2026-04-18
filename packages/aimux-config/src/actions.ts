@@ -402,6 +402,8 @@ export function scrollGitDiff(delta: number): KeyResult {
   return r([], [{ delta, type: 'scroll-git-diff' }])
 }
 
+export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
+
 export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
   const file = ctx.state.gitPanel.files[ctx.state.gitMode.selectedFileIndex]
   if (!file) return r(clearPendingDelete(ctx))

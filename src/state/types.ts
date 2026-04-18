@@ -183,12 +183,15 @@ export interface DiffData {
   errorMessage?: string
 }
 
+export type GitDiffView = 'split' | 'stacked'
+
 export interface GitModeState {
   selectedFileIndex: number
   diffs: Record<string, DiffData>
   loading: Record<string, boolean>
   pendingDeletePath: string | null
   actionMessage: string | null
+  diffView: GitDiffView
 }
 
 interface ModalBase {
@@ -449,6 +452,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
+  | { type: 'git-mode-toggle-diff-view' }
   | {
       type: 'git-mode-optimistic-move'
       path: string

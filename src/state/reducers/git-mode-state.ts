@@ -6,6 +6,7 @@ export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
     diffs: {},
+    diffView: 'split',
     loading: {},
     pendingDeletePath: null,
     selectedFileIndex: 0,
@@ -79,6 +80,10 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-set-message': {
       if (state.gitMode.actionMessage === action.message) return state
       return { ...state, gitMode: { ...state.gitMode, actionMessage: action.message } }
+    }
+    case 'git-mode-toggle-diff-view': {
+      const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
+      return { ...state, gitMode: { ...state.gitMode, diffView: next } }
     }
     case 'git-mode-optimistic-move': {
       const currentIdx = state.gitMode.selectedFileIndex
