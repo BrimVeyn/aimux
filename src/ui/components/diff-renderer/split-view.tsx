@@ -69,6 +69,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         scrollY
         viewportCulling
         contentOptions={{ flexDirection: 'column', gap: 0 }}
+        verticalScrollbarOptions={{ visible: false }}
         onMouseScroll={handleScroll}
       >
         {rows.map((row, i) => (
