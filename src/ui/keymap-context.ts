@@ -18,17 +18,25 @@ export function useKeymap(): ResolvedKeymapConfig {
 const HELP_JOINER = '  ·  '
 const MAX_HELP_ENTRIES = 5
 
+interface BuildHintOptions {
+  excludeDescriptions?: readonly string[]
+}
+
 /** Build a single-line help string for a mode (used in modal headers and status bar). */
 export function buildHintText(
   config: ResolvedKeymapConfig,
   modeId: ModeId,
-  limit: number = MAX_HELP_ENTRIES
+  limit: number = MAX_HELP_ENTRIES,
+  options: BuildHintOptions = {}
 ): string {
   const bindings = describeBindings(config, modeId, {
     dedupeByDescription: true,
     withDescriptionOnly: true,
   })
   if (bindings.length === 0) return ''
-  const trimmed = bindings.slice(0, limit)
+  const excluded = new Set(options.excludeDescriptions ?? [])
+  const kept =
+    excluded.size > 0 ? bindings.filter((b) => !excluded.has(b.description ?? '')) : bindings
+  const trimmed = kept.slice(0, limit)
   return trimmed.map((b) => `${b.keysDisplay} ${b.description ?? ''}`.trim()).join(HELP_JOINER)
 }

@@ -71,6 +71,13 @@ export const enterInsert: ActionFn = (ctx: ModeContext) => {
 
 export const closeModal: KeyResult = r([{ type: 'close-modal' }], [], 'navigation')
 
+export const closeHelpModal: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const returnTo: ModeId =
+    modal.type === 'help' && modal.scope === 'git-mode' ? 'git-mode' : 'navigation'
+  return r([{ type: 'close-modal' }], [], returnTo)
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic actions (need ctx at runtime — ActionFn)
 // ---------------------------------------------------------------------------

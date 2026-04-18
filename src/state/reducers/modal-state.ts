@@ -256,8 +256,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'close-modal': {
-      const nextFocus: AppState['focusMode'] =
-        state.modal.type === 'git-commit' ? 'git' : 'navigation'
+      const returnsToGit =
+        state.modal.type === 'git-commit' ||
+        (state.modal.type === 'help' && state.modal.scope === 'git-mode')
+      const nextFocus: AppState['focusMode'] = returnsToGit ? 'git' : 'navigation'
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {

@@ -2,16 +2,19 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 
 import type { AppState, TabSession } from '../state/types'
 
+import { describeBindings } from '../input/keymap/describe-bindings'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
 export interface StatusBarModel {
   left: string
   right: string
+  help: string
 }
 
 const MAX_TAB_LABEL_LENGTH = 24
 const HINT_LIMIT = 6
+const HELP_DESCRIPTION = 'Help'
 
 function truncateLabel(label: string): string {
   if (label.length <= MAX_TAB_LABEL_LENGTH) {
@@ -30,7 +33,17 @@ function getActiveTabLabel(tab?: TabSession): string {
 }
 
 function hintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
-  return buildHintText(config, modeId, HINT_LIMIT)
+  return buildHintText(config, modeId, HINT_LIMIT, { excludeDescriptions: [HELP_DESCRIPTION] })
+}
+
+function helpHintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
+  const bindings = describeBindings(config, modeId, {
+    dedupeByDescription: true,
+    withDescriptionOnly: true,
+  })
+  const helpBinding = bindings.find((b) => b.description === HELP_DESCRIPTION)
+  if (!helpBinding) return ''
+  return `${helpBinding.keysDisplay} ${helpBinding.description ?? ''}`.trim()
 }
 
 export function getStatusBarModel(
@@ -52,24 +65,28 @@ export function getStatusBarModel(
   switch (state.focusMode) {
     case 'terminal-input':
       return {
+        help: '',
         left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
         right: hintForMode(config, 'terminal-input'),
       }
     case 'modal': {
       const modalMode = deriveModalModeId(state.modal.type)
       return {
+        help: '',
         left: `${sessionIcon}  ${sessionLabel}`,
         right: modalMode ? hintForMode(config, modalMode) : '',
       }
     }
     case 'git':
       return {
+        help: helpHintForMode(config, 'git-mode'),
         left: `${sessionIcon}  ${sessionLabel}`,
         right: hintForMode(config, 'git-mode'),
       }
     case 'command-edit': {
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {
+        help: '',
         left: `${sessionIcon}  ${sessionLabel}`,
         right: commandEditMode ? hintForMode(config, commandEditMode) : '',
       }
@@ -77,6 +94,7 @@ export function getStatusBarModel(
     case 'navigation':
     default:
       return {
+        help: helpHintForMode(config, 'navigation'),
         left: `${sessionIcon}  ${sessionLabel}  ${getActiveTabLabel(activeTab)}`,
         right: hintForMode(config, 'navigation'),
       }

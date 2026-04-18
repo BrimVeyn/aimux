@@ -61,7 +61,10 @@ export function StatusBar() {
       </box>
       <box width="100%" flexDirection="row" justifyContent="space-between">
         <text fg={theme.textMuted}>{model.right}</text>
-        <text fg={theme.dim}>v{APP_VERSION}</text>
+        <box flexDirection="row" gap={2}>
+          {model.help ? <text fg={theme.textMuted}>{model.help}</text> : null}
+          <text fg={theme.dim}>v{APP_VERSION}</text>
+        </box>
       </box>
     </box>
   )
