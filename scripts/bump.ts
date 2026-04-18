@@ -9,7 +9,7 @@
 // - config-kind: major | minor | patch | none (optional, default: none)
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 type BumpKind = 'major' | 'minor' | 'patch'
@@ -18,6 +18,7 @@ type ConfigArg = BumpKind | 'none'
 const ROOT = new URL('..', import.meta.url).pathname
 const ROOT_PKG = join(ROOT, 'package.json')
 const CONFIG_PKG = join(ROOT, 'packages/aimux-config/package.json')
+const LOCKFILE = join(ROOT, 'bun.lock')
 
 function fail(msg: string): never {
   console.error(`\u001b[31merror\u001b[0m: ${msg}`)
@@ -69,6 +70,19 @@ function rewriteVersion(raw: string, next: string): string {
     (_m, a: string, b: string) => `${a}${next}${b}`
   )
   if (updated === raw) fail('failed to rewrite version string')
+  return updated
+}
+
+/**
+ * Surgically update the `packages/aimux-config` workspace entry's version in
+ * bun.lock. We intentionally do NOT regenerate the lockfile during a release:
+ * a full regen would re-resolve every dependency, potentially dragging in
+ * unrelated upstream updates into a release commit.
+ */
+function rewriteLockfileConfigVersion(raw: string, next: string): string {
+  const pattern = /("packages\/aimux-config"\s*:\s*\{[^}]*?"version"\s*:\s*")[^"]+(")/
+  const updated = raw.replace(pattern, (_m, a: string, b: string) => `${a}${next}${b}`)
+  if (updated === raw) fail('could not locate aimux-config version entry in bun.lock')
   return updated
 }
 
@@ -166,8 +180,8 @@ async function main() {
   console.log(`  ${step++}. rewrite package.json version → ${rootNext}`)
   if (configPlan) {
     console.log(`  ${step++}. rewrite packages/aimux-config/package.json → ${configPlan.next}`)
+    console.log(`  ${step++}. patch aimux-config version in bun.lock → ${configPlan.next}`)
   }
-  console.log(`  ${step++}. bun install (sync lockfile)`)
   console.log(`  ${step++}. commit "${commitMsg}"`)
   console.log(`  ${step++}. create annotated tag ${tag}`)
   console.log(`  ${step++}. push ${branch} and ${tag} to origin`)
@@ -181,18 +195,15 @@ async function main() {
   writeFileSync(ROOT_PKG, rewriteVersion(rootPkg.raw, rootNext))
   if (configPlan) {
     writeFileSync(CONFIG_PKG, rewriteVersion(configPlan.raw, configPlan.next))
+    // Patch bun.lock in place. `bun pack` resolves `workspace:*` by reading
+    // the workspace entry's version from the lockfile — if that entry is
+    // stale, the published tarball pins the wrong aimux-config version.
+    const lockRaw = readFileSync(LOCKFILE, 'utf8')
+    writeFileSync(LOCKFILE, rewriteLockfileConfigVersion(lockRaw, configPlan.next))
   }
 
-  // Sync workspace lockfile. When aimux-config bumps we *must* hard-regen:
-  // bun keeps the `packages/<ws>` version entry cached even with --force, and
-  // `bun pack` reads that cached value when flattening `workspace:*`.
-  if (configPlan) {
-    rmSync(join(ROOT, 'bun.lock'), { force: true })
-  }
-  sh('bun', ['install'])
-
-  const stageFiles = ['package.json', 'bun.lock']
-  if (configPlan) stageFiles.push('packages/aimux-config/package.json')
+  const stageFiles = ['package.json']
+  if (configPlan) stageFiles.push('packages/aimux-config/package.json', 'bun.lock')
   sh('git', ['add', ...stageFiles])
   sh('git', ['commit', '-m', commitMsg])
   sh('git', ['tag', '-a', tag, '-m', `Release ${tag}`])
