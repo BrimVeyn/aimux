@@ -131,8 +131,14 @@ export function useTerminalResize({
 
   const terminalSize = useMemo(() => {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 1 : 0
+    const sessionBarRows = state.sessionBar.visible ? 1 : 0
+    const sessionBarTopOffset =
+      state.sessionBar.visible && state.sessionBar.position === 'top' ? 1 : 0
     const reservedRows =
-      MAIN_AREA_VERTICAL_PADDING + STATUS_BAR_HEIGHT + TERMINAL_PANE_VERTICAL_CHROME
+      MAIN_AREA_VERTICAL_PADDING +
+      STATUS_BAR_HEIGHT +
+      TERMINAL_PANE_VERTICAL_CHROME +
+      sessionBarRows
     const cols = Math.max(
       MIN_TERMINAL_COLS,
       Math.floor(dimensions.width - sidebarWidth - MAIN_AREA_HORIZONTAL_CHROME)
@@ -143,7 +149,7 @@ export function useTerminalResize({
       cols,
       rows,
       x: sidebarWidth + 1,
-      y: 1,
+      y: 1 + sessionBarTopOffset,
     }
 
     return { cols, rows }
@@ -153,6 +159,8 @@ export function useTerminalResize({
     dimensions.width,
     state.sidebar.visible,
     state.sidebar.width,
+    state.sessionBar.visible,
+    state.sessionBar.position,
   ])
 
   useLayoutEffect(() => {
@@ -174,7 +182,12 @@ export function useTerminalResize({
     })
     handledBySyncRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.sidebar.visible, state.sidebar.width])
+  }, [
+    state.sidebar.visible,
+    state.sidebar.width,
+    state.sessionBar.visible,
+    state.sessionBar.position,
+  ])
 
   useEffect(() => {
     if (handledBySyncRef.current) {
