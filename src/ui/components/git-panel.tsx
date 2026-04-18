@@ -29,7 +29,7 @@ interface GitPanelProps {
 function sectionTitle(section: GitFileSection, headOffset: number): string {
   switch (section) {
     case 'historical':
-      return `Changes since HEAD~${headOffset}`
+      return `HEAD~${headOffset}`
     case 'staged':
       return 'Staged Changes'
     case 'unstaged':

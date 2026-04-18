@@ -89,8 +89,8 @@ data loss.
 
 `]` and `[` shift a `HEAD~N` offset. At `N=0` (default) the panel shows the
 usual Staged / Changes / Untracked split against `HEAD`. At `N>0` the panel
-collapses into a single **Changes since HEAD~N** section listing every file
-that differs between `HEAD~N` and the working tree; the diff view and binary
+collapses into a single **HEAD~N** section listing every file that differs
+between `HEAD~N` and the working tree; the diff view and binary
 detection use `HEAD~N` as the baseline, and untracked files still appear
 since they aren't in any commit.
 

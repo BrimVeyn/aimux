@@ -205,10 +205,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             </box>
           ) : null}
           {gitMode.headOffset > 0 ? (
-            <text fg={theme.colors['editorWarning.foreground']}>
-              <strong>HEAD~{gitMode.headOffset}</strong>
-              <span fg={theme.colors['descriptionForeground']}> · [ newer · ] older</span>
-            </text>
+            <box flexDirection="row" gap={1}>
+              <text fg={theme.colors['editorWarning.foreground']}>
+                <strong>HEAD~{gitMode.headOffset}</strong>
+              </text>
+              <text fg={theme.colors['descriptionForeground']}>[ newer · ] older</text>
+            </box>
           ) : null}
           <text fg={theme.colors['editor.lineHighlightBackground']}>
             {'·'.repeat(Math.max(0, fileBarWidth - 2))}
