@@ -193,5 +193,28 @@ Document your own configs accordingly.
 
 Press `?` in `navigation` mode to open the help modal.
 
-The help view reflects the resolved keymap, so user overrides and removals are
+It lists every keybinding with a description, grouped by the mode it applies
+to. The view reflects the resolved keymap, so user overrides and removals are
 visible there.
+
+Inside the modal:
+
+- `j` / `k`, arrow `Up` / `Down`, or `Ctrl+N` / `Ctrl+P` move the selection
+  (selection wraps around at the top and bottom).
+- `/` opens a filter field; type to narrow the list by description, mode, keys,
+  or group. In filter mode, `Ctrl+N` / `Ctrl+P` and arrow keys still navigate,
+  `Esc` returns to the list, and all other keys edit the filter buffer.
+- `Esc` closes the modal.
+
+The list is capped at 60% of the terminal height and scrolls only when the
+selection leaves the visible window — navigation across mode groups stays
+in place visually.
+
+### Universal selection alternates
+
+Every picker / modal that supports a selection (new tab, session picker,
+snippet picker, theme picker, split picker, update-available, help, and their
+filter sub-modes) accepts **all** of the following as equivalent prev / next
+shortcuts: `j` / `k` (where the mode isn't already bound), arrow `Up` /
+`Down`, and `Ctrl+N` / `Ctrl+P`. Use whichever fits your flow — including
+inside filter fields that otherwise pass keystrokes through to the buffer.
