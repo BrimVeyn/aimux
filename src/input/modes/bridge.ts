@@ -33,6 +33,13 @@ const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 }
 
 export function deriveModeId(state: AppState): ModeId {
+  // Help renders as an overlay on top of git/navigation without flipping
+  // focusMode, so it needs modal-first dispatch. Filter sub-mode is tracked
+  // by editBuffer presence, not focusMode.
+  if (state.modal.type === 'help') {
+    return state.modal.editBuffer !== null ? 'modal.help.filtering' : 'modal.help'
+  }
+
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]
   if (directMode) {
     return directMode

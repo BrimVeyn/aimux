@@ -158,7 +158,7 @@ describe('mode handlers', () => {
       'Expected help modal close result'
     )
     expect(result.actions).toEqual([{ type: 'close-modal' }])
-    expect(result.transition).toBe('navigation')
+    expect(result.transition).toBeUndefined()
   })
 
   test('modal.help: Ctrl+B is not handled', () => {

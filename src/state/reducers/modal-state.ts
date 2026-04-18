@@ -45,7 +45,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const scopedEntries = scope ? allEntries.filter((e) => e.mode === scope) : allEntries
       return {
         ...state,
-        focusMode: 'modal',
         modal: {
           cursorPos: 0,
           editBuffer: null,
@@ -229,7 +228,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const buf = state.modal.editBuffer ?? ''
       return {
         ...state,
-        focusMode: 'command-edit',
         modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
@@ -256,10 +254,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'close-modal': {
-      const returnsToGit =
-        state.modal.type === 'git-commit' ||
-        (state.modal.type === 'help' && state.modal.scope === 'git-mode')
-      const nextFocus: AppState['focusMode'] = returnsToGit ? 'git' : 'navigation'
+      const closingType = state.modal.type
+      // Help is a pure overlay — it never flipped focusMode, so leave it alone.
+      if (closingType === 'help') {
+        return { ...state, modal: emptyModal() }
+      }
+      const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {
@@ -428,11 +428,16 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
+      if (state.modal.type === 'help') {
+        return {
+          ...state,
+          modal: { ...state.modal, cursorPos: 0, editBuffer: null, selectedIndex: 0 },
+        }
+      }
       if (
         state.modal.type === 'session-picker' ||
         state.modal.type === 'snippet-picker' ||
-        state.modal.type === 'theme-picker' ||
-        state.modal.type === 'help'
+        state.modal.type === 'theme-picker'
       ) {
         return {
           ...state,

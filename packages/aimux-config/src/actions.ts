@@ -33,7 +33,7 @@ export const themePicker: KeyResult = r(
   'modal.theme-picker'
 )
 export function helpModal(scope?: ModeId): KeyResult {
-  return r([{ scope, type: 'open-help-modal' }], [], 'modal.help')
+  return r([{ scope, type: 'open-help-modal' }])
 }
 
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
@@ -71,12 +71,7 @@ export const enterInsert: ActionFn = (ctx: ModeContext) => {
 
 export const closeModal: KeyResult = r([{ type: 'close-modal' }], [], 'navigation')
 
-export const closeHelpModal: ActionFn = (ctx: ModeContext) => {
-  const modal = ctx.state.modal
-  const returnTo: ModeId =
-    modal.type === 'help' && modal.scope === 'git-mode' ? 'git-mode' : 'navigation'
-  return r([{ type: 'close-modal' }], [], returnTo)
-}
+export const closeOverlayModal: KeyResult = r([{ type: 'close-modal' }])
 
 // ---------------------------------------------------------------------------
 // Dynamic actions (need ctx at runtime — ActionFn)

@@ -112,7 +112,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.help', (m) =>
       m
-        .map('<Esc>', actions.closeHelpModal, 'Close')
+        .map('<Esc>', actions.closeOverlayModal, 'Close')
         .map('j', actions.moveModalSelection(1), 'Next')
         .map('k', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
