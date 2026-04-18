@@ -1,7 +1,6 @@
 import type { SnippetRecord } from '../../state/types'
 
 import { filterSnippets } from '../../state/selectors'
-import { useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
@@ -24,12 +23,11 @@ function truncateContent(content: string): string {
 
 export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
   const filtered = filterSnippets(snippets, filter)
-  const help = useModalHelp('modal.snippet-picker')
 
   return (
     <ModalShell
       title="Snippets"
-      help={help}
+      keybindsModeId="modal.snippet-picker"
       width={uiTokens.modalWidth.xl}
       footer={<ModalFilterBar filter={filter} />}
     >
