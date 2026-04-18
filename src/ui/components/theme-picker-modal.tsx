@@ -1,4 +1,3 @@
-import { useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { THEME_IDS, type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
@@ -11,9 +10,13 @@ interface ThemePickerModalProps {
 }
 
 export function ThemePickerModal({ currentThemeId, selectedIndex }: ThemePickerModalProps) {
-  const help = useModalHelp('modal.theme-picker')
   return (
-    <ModalShell title="Select theme" help={help} width={uiTokens.modalWidth.md} listGap={0}>
+    <ModalShell
+      title="Select theme"
+      keybindsModeId="modal.theme-picker"
+      width={uiTokens.modalWidth.md}
+      listGap={0}
+    >
       {THEME_IDS.map((id, index) => {
         const entry = THEMES[id]
         const active = index === selectedIndex

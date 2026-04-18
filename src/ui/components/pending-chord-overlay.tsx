@@ -7,6 +7,7 @@ import { Surface } from './surface'
 
 export function PendingChordOverlay() {
   const pendingChords = useAppStore((s) => s.pendingChords)
+  const modalOpen = useAppStore((s) => s.modal.type !== null)
   const config = useKeymap()
 
   if (!pendingChords || pendingChords.length === 0) return null
@@ -15,7 +16,7 @@ export function PendingChordOverlay() {
   const display = pendingChords.map((c) => formatChord(c, leaderChord)).join(' ')
 
   return (
-    <box position="absolute" bottom={2} right={1}>
+    <box position="absolute" bottom={modalOpen ? 10 : 2} right={1}>
       <Surface tone="elevated" paddingLeft={1} paddingRight={1}>
         <box flexDirection="row">
           <text fg={theme.textMuted}>pending: </text>

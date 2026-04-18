@@ -1,4 +1,3 @@
-import { useModalHelp } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
@@ -19,12 +18,11 @@ export function SnippetEditorModal({
 }: SnippetEditorModalProps) {
   const nameActive = activeField === 'name'
   const contentActive = activeField === 'content'
-  const help = useModalHelp('modal.snippet-editor')
 
   return (
     <ModalShell
       title={isEditing ? 'Edit snippet' : 'Create snippet'}
-      help={help}
+      keybindsModeId="modal.snippet-editor"
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column">

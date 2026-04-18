@@ -1,7 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 
 import { describeBindings, groupDescribedBindings } from '../../input/keymap/describe-bindings'
-import { useKeymap, useModalHelp } from '../keymap-context'
+import { useKeymap } from '../keymap-context'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ModalShell } from './modal-shell'
@@ -22,10 +22,9 @@ const KEYS_COLUMN_WIDTH = 22
 
 export function HelpModal() {
   const config = useKeymap()
-  const help = useModalHelp('modal.help', 1)
 
   return (
-    <ModalShell title="Keybindings" help={help} width={uiTokens.modalWidth.lg}>
+    <ModalShell title="Keybindings" keybindsModeId="modal.help" width={uiTokens.modalWidth.lg}>
       {SECTIONS.map((section) => {
         const bindings = describeBindings(config, section.modeId, {
           dedupeByDescription: true,
