@@ -86,12 +86,19 @@ export function App({
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
     const userGitPane = resolvedConfig.gitPane
+    const fileListMode = userGitPane?.fileListMode ?? json.gitPane?.fileListMode ?? 'tree'
+    const diffModeRatio = userGitPane?.diffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
     const gitPaneOverrides = {
       ...json.gitPane,
+      diffModeRatio,
+      fileListMode,
       ...(userGitPane?.visible !== undefined ? { visible: userGitPane.visible } : {}),
       ...(userGitPane?.mode !== undefined ? { mode: userGitPane.mode } : {}),
       ...(userGitPane?.position !== undefined ? { position: userGitPane.position } : {}),
       ...(userGitPane?.ratio !== undefined ? { ratio: userGitPane.ratio } : {}),
+      ...(userGitPane?.diffModeRatio !== undefined
+        ? { diffModeRatio: userGitPane.diffModeRatio }
+        : {}),
       ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }

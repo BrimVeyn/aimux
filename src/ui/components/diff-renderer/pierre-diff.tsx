@@ -34,6 +34,7 @@ export interface FoldDispatch {
 }
 
 interface Props {
+  cacheKey: string
   diff: string
   path: string
   themeId: ThemeId
@@ -44,7 +45,7 @@ const EMPTY_HIGHLIGHTS: DiffHighlights = { add: [], del: [] }
 const EMPTY_FOLDS: Record<string, FoldState> = {}
 
 export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDiff(
-  { diff, path, themeId, view },
+  { cacheKey, diff, path, themeId, view },
   ref
 ) {
   const file = useMemo(() => {
@@ -65,15 +66,15 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     return Math.max(1, paneCols - prefix)
   }, [file, view, terminalCols, sidebarWidth])
 
-  const folds = useAppStore((s) => s.gitMode.folds[path]) ?? EMPTY_FOLDS
+  const folds = useAppStore((s) => s.gitMode.folds[cacheKey]) ?? EMPTY_FOLDS
   const foldDispatch = useMemo<FoldDispatch>(
     () => ({
       adjust: (foldId, side, delta) =>
-        dispatchGlobal({ delta, foldId, path, side, type: 'git-mode-fold-adjust' }),
+        dispatchGlobal({ delta, foldId, key: cacheKey, side, type: 'git-mode-fold-adjust' }),
       set: (foldId, top, bottom) =>
-        dispatchGlobal({ bottom, foldId, path, top, type: 'git-mode-fold-set' }),
+        dispatchGlobal({ bottom, foldId, key: cacheKey, top, type: 'git-mode-fold-set' }),
     }),
-    [path]
+    [cacheKey]
   )
 
   const [highlights, setHighlights] = useState<DiffHighlights>(EMPTY_HIGHLIGHTS)
@@ -134,7 +135,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     }
     const raf = requestAnimationFrame(apply)
     return () => cancelAnimationFrame(raf)
-  }, [path, file, view, contentWidth])
+  }, [cacheKey, file, view, contentWidth])
 
   if (!file) {
     return (

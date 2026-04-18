@@ -163,6 +163,8 @@ export interface GitPaneState {
   mode: 'embedded' | 'pane'
   position: 'top' | 'bottom' | 'left' | 'right'
   ratio: number
+  diffModeRatio: number
+  fileListMode: GitFileListMode
   path: GitPanePathConfig
   diffCount: GitPaneDiffCountConfig
 }
@@ -202,6 +204,7 @@ export interface DiffData {
 }
 
 export type GitDiffView = 'split' | 'stacked'
+export type GitFileListMode = 'tree' | 'flat'
 
 export interface FoldState {
   top: number
@@ -209,7 +212,8 @@ export interface FoldState {
 }
 
 export interface GitModeState {
-  selectedFileIndex: number
+  selectedEntryKey: string | null
+  collapsedFolders: Record<string, true>
   diffs: Record<string, DiffData>
   loading: Record<string, boolean>
   pendingDeletePath: string | null
@@ -428,6 +432,7 @@ export type UIAction =
   | { type: 'set-terminal-size'; cols: number; rows: number }
   | { type: 'toggle-git-pane' }
   | { type: 'resize-git-pane'; delta: number }
+  | { type: 'resize-git-diff-pane'; delta: number }
   | { type: 'set-git-pane-mode'; mode: 'embedded' | 'pane' }
   | { type: 'set-git-pane-position'; position: 'top' | 'bottom' | 'left' | 'right' }
   | { type: 'set-pending-chords'; chords: string[] | null }
@@ -449,14 +454,28 @@ export type GitPanelAction =
 export type GitModeAction =
   | { type: 'enter-git-mode' }
   | { type: 'exit-git-mode' }
-  | { type: 'git-mode-select-file'; delta: -1 | 1 }
-  | { type: 'git-mode-select-file-by-key'; section: GitFileSection; path: string }
-  | { type: 'git-mode-set-diff'; path: string; diff: DiffData }
-  | { type: 'git-mode-set-loading'; path: string; loading: boolean }
+  | { type: 'git-mode-move-selection'; delta: -1 | 1 }
+  | { type: 'git-mode-move-file-selection'; delta: -1 | 1 }
+  | { type: 'git-mode-select-entry-by-key'; key: string }
+  | { type: 'git-mode-toggle-folder'; key: string }
+  | { type: 'git-mode-toggle-selected-folder' }
+  | { type: 'git-mode-collapse-selection' }
+  | { type: 'git-mode-expand-selection' }
+  | { type: 'git-mode-toggle-file-list-mode' }
+  | { type: 'git-mode-set-diff'; key: string; diff: DiffData }
+  | { type: 'git-mode-set-loading'; key: string; loading: boolean }
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | {
+      type: 'git-mode-fold-adjust'
+      key: string
+      foldId: string
+      side: 'top' | 'bottom'
+      delta: number
+    }
+  | { type: 'git-mode-fold-set'; key: string; foldId: string; top: number; bottom: number }
   | {
       type: 'git-mode-optimistic-move'
       path: string
@@ -504,6 +523,8 @@ export type SideEffect =
   | { type: 'split-pane'; direction: SplitDirection }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
+  | { type: 'persist-git-diff-mode-ratio'; ratio: number }
+  | { type: 'persist-git-file-list-mode'; mode: GitFileListMode }
   | { type: 'git-stage'; path: string }
   | { type: 'git-unstage'; path: string }
   | { type: 'git-restore'; path: string }
@@ -660,6 +681,8 @@ export type GitPaneDiffCountConfig = { enabled: boolean }
 interface GitPaneBaseConfig {
   visible?: boolean
   ratio?: number
+  diffModeRatio?: number
+  fileListMode?: GitFileListMode
   path?: GitPanePathConfig
   diffCount?: GitPaneDiffCountConfig
 }

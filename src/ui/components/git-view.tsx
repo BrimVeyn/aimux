@@ -1,3 +1,4 @@
+import { useTerminalDimensions } from '@opentui/react'
 import { memo, useEffect, useRef } from 'react'
 
 import type { DiffData, GitDiffView } from '../../state/types'
@@ -7,13 +8,15 @@ import { fetchDiff } from '../../git/git-diff'
 import { useGitPanelPolling } from '../../git/git-poller'
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
+import { getSelectedGitFile, gitFileKey } from '../../state/git-tree'
 import { setGitDiffScroller } from '../git-view-controls'
 import { theme } from '../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
-import { fileKey, GitPanel } from './git-panel'
+import { GitPanel } from './git-panel'
 
 interface DiffStageProps {
   diff: DiffData | undefined
+  diffKey: string | null
   loading: boolean
   diffRef: React.RefObject<PierreDiffHandle | null>
   themeId: ThemeId
@@ -36,6 +39,7 @@ function placeholderText(diff: DiffData): string | null {
 
 const DiffStage = memo(function DiffStage({
   diff,
+  diffKey,
   diffRef,
   loading,
   themeId,
@@ -82,6 +86,7 @@ const DiffStage = memo(function DiffStage({
         </box>
       ) : null}
       <PierreDiff
+        cacheKey={diffKey ?? diff.path}
         ref={diffRef}
         diff={diff.rawDiff}
         path={diff.path}
@@ -97,7 +102,8 @@ interface GitViewProps {
 }
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
-  const sidebarWidth = useAppStore((s) => s.sidebar.width)
+  const dimensions = useTerminalDimensions()
+  const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
   const gitMode = useAppStore((s) => s.gitMode)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
@@ -112,9 +118,16 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
 
   useGitPanelPolling({ enabled: focusMode === 'git', projectPath })
 
-  const selectedFile = gitPanel.files[gitMode.selectedFileIndex]
-  const diff = selectedFile ? gitMode.diffs[selectedFile.path] : undefined
-  const loading = selectedFile ? !!gitMode.loading[selectedFile.path] : false
+  const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
+
+  const selectedFile = getSelectedGitFile(gitPanel.files, {
+    collapsedFolders: gitMode.collapsedFolders,
+    fileListMode: gitPane.fileListMode,
+    selectedEntryKey: gitMode.selectedEntryKey,
+  })
+  const selectedDiffKey = selectedFile ? gitFileKey(selectedFile) : null
+  const diff = selectedDiffKey ? gitMode.diffs[selectedDiffKey] : undefined
+  const loading = selectedDiffKey ? !!gitMode.loading[selectedDiffKey] : false
 
   useEffect(() => {
     setGitDiffScroller((delta: number) => {
@@ -135,13 +148,15 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   useEffect(() => {
     if (focusMode !== 'git') return
     if (!selectedFile || !projectPath) return
-    const path = selectedFile.path
+    if (!selectedDiffKey) return
     if (diff || loading) return
-    dispatchGlobal({ loading: true, path, type: 'git-mode-set-loading' })
+    dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
     void fetchDiff(projectPath, selectedFile)
-      .then((d) => dispatchGlobal({ diff: d, path, type: 'git-mode-set-diff' }))
-      .catch(() => dispatchGlobal({ loading: false, path, type: 'git-mode-set-loading' }))
-  }, [focusMode, projectPath, selectedFile, diff, loading])
+      .then((d) => dispatchGlobal({ diff: d, key: selectedDiffKey, type: 'git-mode-set-diff' }))
+      .catch(() =>
+        dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
+      )
+  }, [focusMode, projectPath, selectedFile, selectedDiffKey, diff, loading])
 
   const pendingPath = gitMode.pendingDeletePath
   const pendingIsUntracked =
@@ -149,7 +164,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     selectedFile?.path === pendingPath &&
     selectedFile.section === 'untracked'
   let pendingHint: string | null = null
-  if (pendingPath !== null) {
+  if (pendingPath !== null && selectedFile) {
     pendingHint = pendingIsUntracked
       ? 'press d again to delete file'
       : 'press d again to discard changes'
@@ -174,7 +189,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     <box flexDirection="column" flexGrow={1}>
       <box flexDirection="row" flexGrow={1}>
         <box
-          width={sidebarWidth}
+          width={fileBarWidth}
           flexDirection="column"
           backgroundColor={theme.panel}
           padding={0}
@@ -189,15 +204,18 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
               <text fg={theme.textMuted}>{gitPanel.branch}</text>
             </box>
           ) : null}
-          <text fg={theme.dim}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+          <text fg={theme.dim}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
           <GitPanel
+            collapsedFolders={gitMode.collapsedFolders}
+            fileListMode={gitPane.fileListMode}
             gitPanel={gitPanel}
             projectPath={projectPath}
-            selectedFileKey={selectedFile ? fileKey(selectedFile) : null}
+            selectedEntryKey={gitMode.selectedEntryKey}
           />
         </box>
         <DiffStage
           diff={diff}
+          diffKey={selectedDiffKey}
           diffRef={diffRef}
           loading={loading}
           themeId={themeId}

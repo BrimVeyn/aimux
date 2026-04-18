@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-import type { SessionBarPosition, WorkspaceSnapshotV1 } from './state/types'
+import type { GitFileListMode, SessionBarPosition, WorkspaceSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
@@ -23,6 +23,8 @@ function migrateThemeId(value: unknown): ThemeId | undefined {
 export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
 
 export interface PersistedGitPane {
+  diffModeRatio?: number
+  fileListMode?: GitFileListMode
   visible: boolean
   mode: 'embedded' | 'pane'
   position: 'top' | 'bottom' | 'left' | 'right'
@@ -51,8 +53,18 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
     v.position === 'right'
   const ratioOk =
     typeof v.ratio === 'number' && Number.isFinite(v.ratio) && v.ratio > 0 && v.ratio < 1
+  const diffModeRatioOk =
+    v.diffModeRatio === undefined ||
+    (typeof v.diffModeRatio === 'number' &&
+      Number.isFinite(v.diffModeRatio) &&
+      v.diffModeRatio > 0 &&
+      v.diffModeRatio < 1)
   const visibleOk = typeof v.visible === 'boolean'
-  if (!modeOk || !positionOk || !ratioOk || !visibleOk) return false
+  const fileListModeOk =
+    v.fileListMode === undefined || v.fileListMode === 'tree' || v.fileListMode === 'flat'
+  if (!modeOk || !positionOk || !ratioOk || !diffModeRatioOk || !visibleOk || !fileListModeOk) {
+    return false
+  }
   // cross-field coherence: embedded => top|bottom; pane => left|right
   if (v.mode === 'embedded' && v.position !== 'top' && v.position !== 'bottom') return false
   if (v.mode === 'pane' && v.position !== 'left' && v.position !== 'right') return false

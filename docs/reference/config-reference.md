@@ -147,6 +147,8 @@ type GitPaneConfig =
       position?: 'top' | 'bottom' // default 'bottom'
       visible?: boolean
       ratio?: number // 0..1, clamped to [0.2, 0.8]
+      diffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
+      fileListMode?: 'tree' | 'flat'
       path?: GitPanePathConfig
       diffCount?: GitPaneDiffCountConfig
     }
@@ -155,6 +157,8 @@ type GitPaneConfig =
       position?: 'left' | 'right' // default 'left'
       visible?: boolean
       ratio?: number
+      diffModeRatio?: number
+      fileListMode?: 'tree' | 'flat'
       path?: GitPanePathConfig
       diffCount?: GitPaneDiffCountConfig
     }
@@ -174,13 +178,17 @@ Runtime behavior:
   `{ mode: 'embedded', position: 'left' }` is a type error.
 - `ratio` controls size: in `embedded` mode it's the vertical split ratio
   against the tab list; in `pane` mode it maps to a column count in `[20, 80]`.
+- `diffModeRatio` controls the file-list width while you are in full-screen git
+  diff mode.
+- `fileListMode` controls whether the git file list renders as a folder tree or
+  as a flat list.
 - `path.enabled: false` hides the directory part of each file path, showing
   only the basename. When `enabled: true`, an optional `pathFn` rewrites the
   path before rendering (e.g. stripping a prefix).
 - `diffCount.enabled: false` hides the `+added / −removed` column.
-- `visible` and `ratio` are persisted across sessions in `aimux.json`. The
-  programmatic config values take precedence over the persisted values when
-  both are present.
+- `visible`, `ratio`, `diffModeRatio`, and `fileListMode` are persisted across
+  sessions in `aimux.json`. Programmatic config values take precedence over the
+  persisted values when both are present.
 
 Example:
 
@@ -189,6 +197,8 @@ export default defineConfig({
   gitPane: {
     mode: 'pane',
     position: 'right',
+    diffModeRatio: 0.3,
+    fileListMode: 'tree',
     ratio: 0.35,
     path: {
       enabled: true,

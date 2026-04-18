@@ -25,6 +25,8 @@ export function saveCurrentWorkspace(state: AppState): void {
     ...loadConfig(),
     customCommands: state.customCommands,
     gitPane: {
+      diffModeRatio: state.gitPane.diffModeRatio,
+      fileListMode: state.gitPane.fileListMode,
       mode: state.gitPane.mode,
       position: state.gitPane.position,
       ratio: state.gitPane.ratio,

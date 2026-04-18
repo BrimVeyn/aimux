@@ -12,6 +12,8 @@ interface GitPaneWidgetProps {
 
 export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: GitPaneWidgetProps) {
   const gitPanel = useAppStore((s) => s.gitPanel)
+  const gitMode = useAppStore((s) => s.gitMode)
+  const gitFileListMode = useAppStore((s) => s.gitPane.fileListMode)
   const pathConfig = useAppStore((s) => s.gitPane.path)
   const diffCountConfig = useAppStore((s) => s.gitPane.diffCount)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
@@ -37,10 +39,13 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
 
   return (
     <GitPanel
+      collapsedFolders={gitMode.collapsedFolders}
       diffCountConfig={diffCountConfig}
+      fileListMode={gitFileListMode}
       gitPanel={display}
       pathConfig={pathConfig}
       projectPath={projectPath}
+      selectedEntryKey={gitMode.selectedEntryKey}
     />
   )
 })

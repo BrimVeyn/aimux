@@ -1,6 +1,7 @@
 import type {
   AppAction,
   AppState,
+  GitModeState,
   GitPaneMode,
   GitPanePosition,
   GitPaneState,
@@ -24,6 +25,7 @@ const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 
 export interface InitialStateOverrides {
+  gitMode?: Partial<GitModeState>
   gitPane?: Partial<GitPaneState>
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
@@ -31,6 +33,8 @@ export interface InitialStateOverrides {
 
 const DEFAULT_GIT_PANE: GitPaneState = {
   diffCount: { enabled: true },
+  diffModeRatio: 0.35,
+  fileListMode: 'tree',
   mode: 'embedded',
   path: { enabled: true },
   position: 'bottom',
@@ -62,7 +66,7 @@ export function createInitialState(
     currentSessionId: null,
     customCommands,
     focusMode: showSessionPicker ? 'modal' : 'navigation',
-    gitMode: emptyGitMode(),
+    gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: {
       ...DEFAULT_GIT_PANE,
       ...overrides.gitPane,

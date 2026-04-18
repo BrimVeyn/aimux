@@ -47,6 +47,14 @@ test('resize-git-pane adjusts ratio', () => {
   expect(s1.gitPane.ratio).toBeCloseTo(0.6)
 })
 
+test('resize-git-diff-pane adjusts diff mode ratio', () => {
+  const s0 = seedState()
+  expect(s0.gitPane.diffModeRatio).toBe(0.35)
+  const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-diff-pane' })
+  expect(s1.gitPane.diffModeRatio).toBeCloseTo(0.45)
+  expect(s1.gitPane.ratio).toBe(0.5)
+})
+
 test('resize-git-pane clamps at bounds', () => {
   const s0 = seedState()
   const up = appReducer(s0, { delta: 2, type: 'resize-git-pane' })

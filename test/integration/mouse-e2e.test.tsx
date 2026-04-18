@@ -198,6 +198,8 @@ function MouseHarness({
       focusMode: 'terminal-input' as const,
       gitPane: {
         diffCount: { enabled: true },
+        diffModeRatio: 0.35,
+        fileListMode: 'tree' as const,
         mode: 'embedded' as const,
         path: { enabled: true },
         position: 'bottom' as const,

@@ -1,26 +1,28 @@
-import { memo, type ReactNode, useMemo } from 'react'
+import type { ScrollBoxRenderable } from '@opentui/core'
+
+import { memo, type ReactNode, useEffect, useMemo, useRef } from 'react'
 
 import type {
   GitFileEntry,
+  GitFileListMode,
   GitFileSection,
   GitPaneDiffCountConfig,
   GitPanelState,
   GitPanePathConfig,
 } from '../../state/types'
 
-import { dispatchGlobal } from '../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
+import { buildGitTreeRows, type GitTreeFileRow, type GitTreeFolderRow } from '../../state/git-tree'
 import { theme } from '../theme'
 
 interface GitPanelProps {
+  collapsedFolders?: Record<string, true>
+  fileListMode?: GitFileListMode
   gitPanel: GitPanelState
   projectPath: string | undefined
-  selectedFileKey?: string | null
+  selectedEntryKey?: string | null
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
-}
-
-export function fileKey(file: Pick<GitFileEntry, 'path' | 'section'>): string {
-  return `${file.section}:${file.path}`
 }
 
 const SECTION_ORDER: { key: GitFileSection; title: string }[] = [
@@ -44,16 +46,6 @@ function displayStatus(file: GitFileEntry): string {
   return file.status
 }
 
-function groupBySection(files: GitFileEntry[]): Record<GitFileSection, GitFileEntry[]> {
-  const groups: Record<GitFileSection, GitFileEntry[]> = {
-    staged: [],
-    unstaged: [],
-    untracked: [],
-  }
-  for (const file of files) groups[file.section].push(file)
-  return groups
-}
-
 function maxDigitWidth(files: GitFileEntry[]): { added: number; removed: number } {
   let addedMax = 1
   let removedMax = 1
@@ -68,7 +60,7 @@ function padRight(value: number | null, width: number): string {
   return String(value ?? 0).padStart(width, ' ')
 }
 
-export function splitPath(path: string): { prefix: string; basename: string } {
+function splitPath(path: string): { prefix: string; basename: string } {
   const slash = path.lastIndexOf('/')
   if (slash < 0) return { basename: path, prefix: '' }
   return { basename: path.slice(slash + 1), prefix: path.slice(0, slash + 1) }
@@ -78,30 +70,34 @@ function stripTrailingSlash(prefix: string): string {
   return prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
 }
 
-function renderPath(file: GitFileEntry, pathConfig: GitPanePathConfig): ReactNode {
-  const showDir = pathConfig.enabled
+function renderFileLabel(
+  file: GitFileEntry,
+  pathConfig: GitPanePathConfig,
+  fileListMode: GitFileListMode
+): ReactNode {
   const transform = pathConfig.enabled ? pathConfig.pathFn : undefined
   const displayPath = transform ? transform(file.path) : file.path
   const { basename, prefix } = splitPath(displayPath)
   const dir = stripTrailingSlash(prefix)
-  if (file.renamedFrom) {
-    const renamedDisplay = transform ? transform(file.renamedFrom) : file.renamedFrom
-    const renamed = splitPath(renamedDisplay)
-    const renamedDir = stripTrailingSlash(renamed.prefix)
+  const showDir = fileListMode === 'flat' && pathConfig.enabled && dir
+  if (!file.renamedFrom) {
     return (
       <text wrapMode="none">
-        <span fg={theme.text}>{renamed.basename}</span>
-        {showDir && renamedDir ? <span fg={theme.textMuted}> {renamedDir}</span> : null}
-        <span fg={theme.textMuted}> → </span>
         <span fg={theme.text}>{basename}</span>
-        {showDir && dir ? <span fg={theme.textMuted}> {dir}</span> : null}
+        {showDir ? <span fg={theme.textMuted}> {dir}</span> : null}
       </text>
     )
   }
+  const renamedDisplay = transform ? transform(file.renamedFrom) : file.renamedFrom
+  const renamed = splitPath(renamedDisplay)
+  const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
     <text wrapMode="none">
+      <span fg={theme.textMuted}>{renamed.basename}</span>
+      {showDir && renamedDir ? <span fg={theme.textMuted}> {renamedDir}</span> : null}
+      <span fg={theme.textMuted}> → </span>
       <span fg={theme.text}>{basename}</span>
-      {showDir && dir ? <span fg={theme.textMuted}> {dir}</span> : null}
+      {showDir ? <span fg={theme.textMuted}> {dir}</span> : null}
     </text>
   )
 }
@@ -133,68 +129,110 @@ function renderDiffCount(
   )
 }
 
+function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
+  const bg = isSelected ? theme.panelHighlight : undefined
+  const onSelect = (): void => {
+    dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
+  }
+  const onToggle = (): void => {
+    dispatchGlobal({ key: row.key, type: 'git-mode-toggle-folder' })
+  }
+  return (
+    <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
+      <box width={2} flexShrink={0} justifyContent="center">
+        <text bg={bg}> </text>
+      </box>
+      <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
+        <box flexDirection="row" gap={1} onMouseDown={onToggle}>
+          <text fg={theme.textMuted} bg={bg}>
+            {row.isCollapsed ? '▸' : '▾'}
+          </text>
+          <text fg={theme.text} bg={bg} wrapMode="none">
+            {row.name}
+          </text>
+        </box>
+      </box>
+    </box>
+  )
+}
+
 function renderFileRow(
-  file: GitFileEntry,
-  key: string,
+  row: GitTreeFileRow,
   addedW: number,
   removedW: number,
   isSelected: boolean,
+  fileListMode: GitFileListMode,
   pathConfig: GitPanePathConfig,
   diffCountConfig: GitPaneDiffCountConfig
 ): ReactNode {
+  const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
   const bg = isSelected ? theme.panelHighlight : undefined
   const onSelect = (): void => {
-    dispatchGlobal({ path: file.path, section: file.section, type: 'git-mode-select-file-by-key' })
+    dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
   return (
-    <box
-      key={key}
-      flexDirection="row"
-      gap={1}
-      paddingLeft={1}
-      backgroundColor={bg}
-      onMouseDown={onSelect}
-    >
-      <text fg={STATUS_COLORS[file.status]} bg={bg}>
-        <strong>{displayStatus(file)}</strong>
-      </text>
-      <box flexGrow={1} overflow="hidden">
-        {renderPath(file, pathConfig)}
+    <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
+      <box width={2} flexShrink={0} justifyContent="center">
+        <text fg={STATUS_COLORS[file.status]} bg={bg}>
+          <strong>{displayStatus(file)}</strong>
+        </text>
+      </box>
+      <box flexGrow={1} overflow="hidden" paddingLeft={fileListMode === 'tree' ? row.depth * 2 : 0}>
+        {renderFileLabel(file, pathConfig, fileListMode)}
       </box>
       {renderDiffCount(file, addedW, removedW, bg, diffCountConfig, hasNumstat)}
     </box>
   )
 }
 
-function renderSection(
+function renderTreeSection(
   section: GitFileSection,
   title: string,
   files: GitFileEntry[],
+  rows: Array<GitTreeFolderRow | GitTreeFileRow>,
   addedW: number,
   removedW: number,
-  selectedFileKey: string | null | undefined,
+  fileListMode: GitFileListMode,
+  selectedEntryKey: string | null | undefined,
+  showListModeToggle: boolean,
   pathConfig: GitPanePathConfig,
   diffCountConfig: GitPaneDiffCountConfig
 ): ReactNode {
   if (files.length === 0) return null
+  const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
+  const toggleListMode = (): void => {
+    dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
+    runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
+  }
   return (
     <box key={section} flexDirection="column">
-      <text fg={theme.accentAlt}>
-        <strong>
-          {title} ({files.length})
-        </strong>
-      </text>
-      {files.map((file, i) =>
-        renderFileRow(
-          file,
-          `${section}-${i}`,
-          addedW,
-          removedW,
-          !!selectedFileKey && fileKey(file) === selectedFileKey,
-          pathConfig,
-          diffCountConfig
-        )
+      <box flexDirection="row" justifyContent="space-between">
+        <text fg={theme.accentAlt}>
+          <strong>
+            {title} ({files.length})
+          </strong>
+        </text>
+        {showListModeToggle ? (
+          <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
+            <text fg={fileListMode === 'tree' ? theme.accent : theme.textMuted}>tree</text>
+            <text fg={theme.textMuted}>|</text>
+            <text fg={fileListMode === 'flat' ? theme.accent : theme.textMuted}>flat</text>
+          </box>
+        ) : null}
+      </box>
+      {rows.map((row) =>
+        row.kind === 'folder'
+          ? renderFolderRow(row, row.key === selectedEntryKey)
+          : renderFileRow(
+              row,
+              addedW,
+              removedW,
+              row.key === selectedEntryKey,
+              fileListMode,
+              pathConfig,
+              diffCountConfig
+            )
       )}
     </box>
   )
@@ -238,13 +276,19 @@ const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
 const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
 
 export const GitPanel = memo(function GitPanel({
+  collapsedFolders = {},
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
+  fileListMode = 'tree',
   gitPanel,
   pathConfig = DEFAULT_PATH_CONFIG,
   projectPath,
-  selectedFileKey,
+  selectedEntryKey,
 }: GitPanelProps) {
-  const groups = useMemo(() => groupBySection(gitPanel.files), [gitPanel.files])
+  const scrollRef = useRef<ScrollBoxRenderable | null>(null)
+  const tree = useMemo(
+    () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode),
+    [collapsedFolders, fileListMode, gitPanel.files]
+  )
   const { added: addedW, removed: removedW } = useMemo(
     () => maxDigitWidth(gitPanel.files),
     [gitPanel.files]
@@ -253,6 +297,21 @@ export const GitPanel = memo(function GitPanel({
   const statusNode = renderStatus(gitPanel, !!projectPath)
 
   const hasRemoteTracking = gitPanel.ahead > 0 || gitPanel.behind > 0
+  const toggleSection =
+    tree.sections.find((section) => section.section === 'unstaged' && section.files.length > 0)
+      ?.section ??
+    tree.sections.find((section) => section.files.length > 0)?.section ??
+    null
+
+  useEffect(() => {
+    const scrollbox = scrollRef.current
+    if (!scrollbox || !selectedEntryKey) return
+    const selectedIndex = tree.visibleRows.findIndex((row) => row.key === selectedEntryKey)
+    if (selectedIndex < 0) return
+    const viewportHeight = Math.max(1, scrollbox.viewport.height)
+    const target = Math.max(0, selectedIndex - Math.floor(viewportHeight / 2))
+    scrollbox.scrollTo({ x: 0, y: target })
+  }, [selectedEntryKey, tree.visibleRows])
 
   return (
     <box flexDirection="column" flexGrow={1} gap={0}>
@@ -264,22 +323,27 @@ export const GitPanel = memo(function GitPanel({
       {statusNode ?? (
         <scrollbox
           flexGrow={1}
+          ref={scrollRef}
           scrollY
           viewportCulling
           contentOptions={{ flexDirection: 'column', gap: 0 }}
         >
-          {SECTION_ORDER.map((s) =>
-            renderSection(
+          {SECTION_ORDER.map((s) => {
+            const section = tree.sections.find((entry) => entry.section === s.key)
+            return renderTreeSection(
               s.key,
               s.title,
-              groups[s.key],
+              section?.files ?? [],
+              section?.rows ?? [],
               addedW,
               removedW,
-              selectedFileKey,
+              fileListMode,
+              selectedEntryKey,
+              s.key === toggleSection,
               pathConfig,
               diffCountConfig
             )
-          )}
+          })}
         </scrollbox>
       )}
     </box>

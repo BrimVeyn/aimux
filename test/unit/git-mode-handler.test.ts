@@ -3,16 +3,22 @@ import { expect, test } from 'bun:test'
 
 import type { AppState, GitFileEntry } from '../../src/state/types'
 
+import { gitFolderKey } from '../../src/state/git-tree'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 const {
+  collapseGitSelection,
   exitGitMode,
+  expandGitSelection,
   gitCommitOpen,
   gitDestructiveSelected,
   gitPush,
   gitStageSelected,
   scrollGitDiff,
   selectGitFile,
+  selectGitFileOnly,
+  toggleGitFileListMode,
+  toggleSelectedGitFolder,
 } = actions
 
 function entry(path: string): GitFileEntry {
@@ -33,11 +39,43 @@ test('git-mode Esc transitions back to navigation with exit action', () => {
   expect(exitGitMode.actions[0]).toEqual({ type: 'exit-git-mode' })
 })
 
-test('git-mode j emits select-file action with no fetch side effect', () => {
+test('git-mode j emits move-selection action with no fetch side effect', () => {
   const state = seedWithFiles([entry('a.ts'), entry('b.ts')])
   const result = selectGitFile(1)({ state })
-  expect(result?.actions).toEqual([{ delta: 1, type: 'git-mode-select-file' }])
+  expect(result?.actions).toEqual([{ delta: 1, type: 'git-mode-move-selection' }])
   expect(result?.effects).toEqual([])
+})
+
+test('git-mode Ctrl+n and Ctrl+p emit file-only movement actions', () => {
+  const state = seedWithFiles([entry('a.ts'), entry('b.ts')])
+  expect(selectGitFileOnly(1)({ state })?.actions).toEqual([
+    { delta: 1, type: 'git-mode-move-file-selection' },
+  ])
+  expect(selectGitFileOnly(-1)({ state })?.actions).toEqual([
+    { delta: -1, type: 'git-mode-move-file-selection' },
+  ])
+})
+
+test('git-mode h and l emit toggle-folder actions', () => {
+  const state = seedWithFiles([entry('src/a.ts')])
+  expect(toggleSelectedGitFolder({ state })?.actions).toEqual([
+    { type: 'git-mode-toggle-selected-folder' },
+  ])
+})
+
+test('git-mode Left and Right keep collapse and expand actions', () => {
+  const state = seedWithFiles([entry('src/a.ts')])
+  expect(collapseGitSelection({ state })?.actions).toEqual([
+    { type: 'git-mode-collapse-selection' },
+  ])
+  expect(expandGitSelection({ state })?.actions).toEqual([{ type: 'git-mode-expand-selection' }])
+})
+
+test('git-mode t toggles flat/tree file list mode', () => {
+  const state = seedWithFiles([entry('a.ts')])
+  const result = toggleGitFileListMode({ state })
+  expect(result?.actions).toEqual([{ type: 'git-mode-toggle-file-list-mode' }])
+  expect(result?.effects).toEqual([{ mode: 'flat', type: 'persist-git-file-list-mode' }])
 })
 
 test('git-mode Ctrl+d emits scroll-git-diff effect (20 lines)', () => {
@@ -76,6 +114,31 @@ test('git-mode a is a no-op when file already staged', () => {
   ])
   const result = gitStageSelected({ state })
   expect(result?.effects).toEqual([])
+})
+
+test('git-mode a is a no-op when a folder is selected', () => {
+  let state = seedWithFiles([
+    { added: 0, path: 'src/a.ts', removed: 0, section: 'unstaged', status: 'M' },
+  ])
+  state = appReducer(state, {
+    key: gitFolderKey('unstaged', 'src'),
+    type: 'git-mode-select-entry-by-key',
+  })
+  const result = gitStageSelected({ state })
+  expect(result?.actions).toEqual([])
+  expect(result?.effects).toEqual([])
+})
+
+test('git-mode a still stages files whose path contains :dir:', () => {
+  let state = seedWithFiles([
+    { added: 0, path: 'src/:dir:/a.ts', removed: 0, section: 'unstaged', status: 'M' },
+  ])
+  state = appReducer(state, {
+    key: 'unstaged:src/:dir:/a.ts',
+    type: 'git-mode-select-entry-by-key',
+  })
+  const result = gitStageSelected({ state })
+  expect(result?.effects).toEqual([{ path: 'src/:dir:/a.ts', type: 'git-stage' }])
 })
 
 test('git-mode d unstages a staged modified file with optimistic move', () => {

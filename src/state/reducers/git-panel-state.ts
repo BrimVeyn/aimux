@@ -1,5 +1,7 @@
 import type { AppAction, AppState, GitFileEntry, GitFileSection, GitPanelState } from '../types'
 
+import { reconcileSelectedGitEntryKey } from '../git-tree'
+
 export const GIT_PANEL_MIN_RATIO = 0.2
 export const GIT_PANEL_MAX_RATIO = 0.8
 
@@ -63,6 +65,11 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       if (nextRatio === state.gitPane.ratio) return state
       return { ...state, gitPane: { ...state.gitPane, ratio: nextRatio } }
     }
+    case 'resize-git-diff-pane': {
+      const nextRatio = clampRatio(state.gitPane.diffModeRatio + action.delta)
+      if (nextRatio === state.gitPane.diffModeRatio) return state
+      return { ...state, gitPane: { ...state.gitPane, diffModeRatio: nextRatio } }
+    }
     case 'set-git-pane-mode': {
       if (state.gitPane.mode === action.mode) return state
       const isEmbedded = action.mode === 'embedded'
@@ -93,17 +100,25 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       const prev = state.gitPanel
       const next = action.payload
       const sortedNext = sortFilesBySection(next.files)
+      const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
+        sortedNext,
+        state.gitMode.collapsedFolders,
+        state.gitPane.fileListMode,
+        state.gitMode.selectedEntryKey
+      )
       if (
         prev.branch === next.branch &&
         prev.ahead === next.ahead &&
         prev.behind === next.behind &&
         prev.error === null &&
-        sameFiles(prev.files, sortedNext)
+        sameFiles(prev.files, sortedNext) &&
+        nextSelectedEntryKey === state.gitMode.selectedEntryKey
       ) {
         return state
       }
       return {
         ...state,
+        gitMode: { ...state.gitMode, selectedEntryKey: nextSelectedEntryKey },
         gitPanel: {
           ...prev,
           ahead: next.ahead,
@@ -116,9 +131,16 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
     }
     case 'git-refresh-error': {
       const prev = state.gitPanel
-      if (prev.error === action.kind && prev.files.length === 0) return state
+      if (
+        prev.error === action.kind &&
+        prev.files.length === 0 &&
+        state.gitMode.selectedEntryKey === null
+      ) {
+        return state
+      }
       return {
         ...state,
+        gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey: null },
         gitPanel: { ...prev, error: action.kind, files: [] },
       }
     }
@@ -133,7 +155,11 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       ) {
         return state
       }
-      return { ...state, gitPanel: emptyGitPanel() }
+      return {
+        ...state,
+        gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey: null },
+        gitPanel: emptyGitPanel(),
+      }
     }
     default:
       return null

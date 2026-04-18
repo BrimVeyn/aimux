@@ -53,7 +53,7 @@ Today it is used for values such as:
 
 - `customCommands`
 - `themeId`
-- `gitPane` (`{ visible, mode, position, ratio }`)
+- `gitPane` (`{ visible, mode, position, ratio, diffModeRatio, fileListMode }`)
 - `sessionBarVisible`
 - `sessionBarPosition`
 - `workspaceSnapshot` for legacy migration
@@ -118,7 +118,7 @@ That means your typed config can override app-managed session bar preferences.
 
 1. `resolvedConfig.gitPane` (typed config)
 2. `aimux.json.gitPane` (persisted state)
-3. built-in defaults (`{ mode: 'embedded', position: 'bottom', ratio: 0.5, ... }`)
+3. built-in defaults (`{ mode: 'embedded', position: 'bottom', ratio: 0.5, diffModeRatio: 0.35, fileListMode: 'tree', ... }`)
 
 Fields you do not set in your typed config fall through to the persisted or
 default values, so users can still toggle and resize at runtime without losing

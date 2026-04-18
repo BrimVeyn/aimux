@@ -1,6 +1,6 @@
 import type { KeyEvent } from '@opentui/core'
 
-import type { AppAction, AppState, TabSession } from '../../state/types'
+import type { AppAction, AppState, GitFileListMode, TabSession } from '../../state/types'
 
 export type ModeId =
   | 'navigation'
@@ -47,6 +47,8 @@ export type SideEffect =
   | { type: 'split-pane'; direction: import('../../state/layout-tree').SplitDirection }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
+  | { type: 'persist-git-diff-mode-ratio'; ratio: number }
+  | { type: 'persist-git-file-list-mode'; mode: GitFileListMode }
   | { type: 'git-stage'; path: string }
   | { type: 'git-unstage'; path: string }
   | { type: 'git-restore'; path: string }

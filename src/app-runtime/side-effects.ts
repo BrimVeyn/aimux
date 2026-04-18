@@ -460,6 +460,38 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       scrollGitDiff(effect.delta)
       return
     }
+    case 'persist-git-diff-mode-ratio': {
+      const config = loadConfig()
+      const persistedGitPane = config.gitPane
+      saveConfig({
+        ...config,
+        gitPane: {
+          diffModeRatio: effect.ratio,
+          fileListMode: persistedGitPane?.fileListMode,
+          mode: persistedGitPane?.mode ?? 'embedded',
+          position: persistedGitPane?.position ?? 'bottom',
+          ratio: persistedGitPane?.ratio ?? 0.5,
+          visible: persistedGitPane?.visible ?? true,
+        },
+      })
+      return
+    }
+    case 'persist-git-file-list-mode': {
+      const config = loadConfig()
+      const persistedGitPane = config.gitPane
+      saveConfig({
+        ...config,
+        gitPane: {
+          diffModeRatio: persistedGitPane?.diffModeRatio,
+          fileListMode: effect.mode,
+          mode: persistedGitPane?.mode ?? 'embedded',
+          position: persistedGitPane?.position ?? 'bottom',
+          ratio: persistedGitPane?.ratio ?? 0.5,
+          visible: persistedGitPane?.visible ?? true,
+        },
+      })
+      return
+    }
     case 'git-stage': {
       void enqueueGitOp(() => runGitAction(ctx, ['add', '--', effect.path], effect.path))
       return

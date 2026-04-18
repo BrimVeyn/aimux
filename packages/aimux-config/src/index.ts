@@ -19,6 +19,7 @@ export type {
   BackendConfig,
   BindingDef,
   FocusMode,
+  GitFileListMode,
   GitPaneConfig,
   GitPaneDiffCountConfig,
   GitPaneEmbeddedConfig,

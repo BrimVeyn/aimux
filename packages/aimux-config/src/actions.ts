@@ -109,6 +109,17 @@ export function resizeGitPane(delta: number): KeyResult {
   return r([{ delta, type: 'resize-git-pane' }])
 }
 
+export function resizeGitDiffPane(delta: number): ActionFn {
+  return (ctx: ModeContext) => {
+    const nextRatio = Math.max(0.2, Math.min(0.8, ctx.state.gitPane.diffModeRatio + delta))
+    if (nextRatio === ctx.state.gitPane.diffModeRatio) return r([])
+    return r(
+      [{ delta, type: 'resize-git-diff-pane' }],
+      [{ ratio: nextRatio, type: 'persist-git-diff-mode-ratio' }]
+    )
+  }
+}
+
 export function focusPane(direction: 'left' | 'right' | 'up' | 'down'): KeyResult {
   return r(
     [
@@ -391,17 +402,55 @@ function clearPendingDelete(ctx: ModeContext): AppAction[] {
   return [{ path: null, type: 'git-mode-set-pending-delete' }]
 }
 
+function gitFileKey(section: string, path: string): string {
+  return `${section}:${path}`
+}
+
+function selectedGitFile(ctx: ModeContext) {
+  const key = ctx.state.gitMode.selectedEntryKey
+  if (!key) return null
+  return (
+    ctx.state.gitPanel.files.find((file) => gitFileKey(file.section, file.path) === key) ?? null
+  )
+}
+
 export const exitGitMode: KeyResult = r([{ type: 'exit-git-mode' }], [], 'navigation')
 
 export function selectGitFile(delta: -1 | 1): ActionFn {
   return (ctx: ModeContext) => {
-    const total = ctx.state.gitPanel.files.length
-    if (total === 0) return r([])
-    const current = ctx.state.gitMode.selectedFileIndex
-    const next = (current + delta + total) % total
-    if (next === current) return r([])
-    return r([{ delta, type: 'git-mode-select-file' }])
+    if (ctx.state.gitPanel.files.length === 0) return r([])
+    return r([{ delta, type: 'git-mode-move-selection' }])
   }
+}
+
+export function selectGitFileOnly(delta: -1 | 1): ActionFn {
+  return (ctx: ModeContext) => {
+    if (ctx.state.gitPanel.files.length === 0) return r([])
+    return r([{ delta, type: 'git-mode-move-file-selection' }])
+  }
+}
+
+export const toggleSelectedGitFolder: ActionFn = (ctx: ModeContext) => {
+  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  return r([{ type: 'git-mode-toggle-selected-folder' }])
+}
+
+export const collapseGitSelection: ActionFn = (ctx: ModeContext) => {
+  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  return r([{ type: 'git-mode-collapse-selection' }])
+}
+
+export const expandGitSelection: ActionFn = (ctx: ModeContext) => {
+  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  return r([{ type: 'git-mode-expand-selection' }])
+}
+
+export const toggleGitFileListMode: ActionFn = (ctx: ModeContext) => {
+  const mode = ctx.state.gitPane.fileListMode === 'tree' ? 'flat' : 'tree'
+  return r(
+    [{ type: 'git-mode-toggle-file-list-mode' }],
+    [{ mode, type: 'persist-git-file-list-mode' }]
+  )
 }
 
 export function scrollGitDiff(delta: number): KeyResult {
@@ -411,7 +460,7 @@ export function scrollGitDiff(delta: number): KeyResult {
 export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
 
 export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
-  const file = ctx.state.gitPanel.files[ctx.state.gitMode.selectedFileIndex]
+  const file = selectedGitFile(ctx)
   if (!file) return r(clearPendingDelete(ctx))
   const actions = clearPendingDelete(ctx)
   if (file.section === 'staged') return r(actions)
@@ -425,7 +474,7 @@ export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
 }
 
 export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
-  const file = ctx.state.gitPanel.files[ctx.state.gitMode.selectedFileIndex]
+  const file = selectedGitFile(ctx)
   if (!file) return r(clearPendingDelete(ctx))
 
   if (file.section === 'staged') {
