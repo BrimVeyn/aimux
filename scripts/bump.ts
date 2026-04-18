@@ -183,8 +183,9 @@ async function main() {
     writeFileSync(CONFIG_PKG, rewriteVersion(configPlan.raw, configPlan.next))
   }
 
-  // Sync workspace lockfile so the release commit is self-contained.
-  sh('bun', ['install'])
+  // Sync workspace lockfile. When aimux-config bumps, --force re-resolves the
+  // `workspace:*` entry so `bun pack` doesn't flatten it to the old version.
+  sh('bun', configPlan ? ['install', '--force'] : ['install'])
 
   const stageFiles = ['package.json', 'bun.lock']
   if (configPlan) stageFiles.push('packages/aimux-config/package.json')
