@@ -2,7 +2,15 @@
 
 export { defineConfig } from './define-config'
 export * as actions from './actions'
-export { migrateThemeId, THEME_IDS, themes, THEMES } from './themes'
+export {
+  isKnownThemeId,
+  migrateThemeId,
+  registerUserThemes,
+  THEME_IDS,
+  themes,
+  THEMES,
+} from './themes'
+export { normalizeTheme } from './normalize-theme'
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'

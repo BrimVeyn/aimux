@@ -1,15 +1,29 @@
-// Build-time normalization: take a raw shiki theme and produce an aimux `Theme`
-// with every AIMUX_COLOR_KEY guaranteed to be set. The fallback chain here runs
-// once at generate time; nothing in this file runs at app runtime.
-
-import type { ThemeRegistrationResolved } from 'shiki'
+// Normalize a partial theme input into a full aimux `Theme` where every
+// AIMUX_COLOR_KEY is guaranteed to have a value. Used at build time by the
+// generator script and at runtime by registerUserThemes — same code path, same
+// guarantees.
 
 import {
   AIMUX_COLOR_KEYS,
   type AimuxColorKey,
   type Theme,
   type ThemeColorMap,
-} from '../packages/aimux-config/src/types'
+  type ThemeTokenRule,
+} from './types'
+
+export interface NormalizeInput {
+  name: string
+  displayName?: string
+  type?: 'dark' | 'light'
+  fg?: string
+  bg?: string
+  colors?: Record<string, string | null | undefined>
+  settings?: ThemeTokenRule[]
+  tokenColors?: ThemeTokenRule[]
+  colorReplacements?: Record<string, string>
+  semanticHighlighting?: boolean
+  semanticTokenColors?: Theme['semanticTokenColors']
+}
 
 function stripAlpha(hex: string | null | undefined): string {
   if (!hex || typeof hex !== 'string') return '#000000'
@@ -40,13 +54,13 @@ function toHex({ b, g, r }: { b: number; g: number; r: number }): string {
   return `#${h(r)}${h(g)}${h(b)}`
 }
 
-function shade(hex: string, amount: number): string {
+export function shade(hex: string, amount: number): string {
   const { b, g, r } = parseHex(hex)
   const d = amount * 255
   return toHex({ b: b + d, g: g + d, r: r + d })
 }
 
-function mix(a: string, b: string, t: number): string {
+export function mix(a: string, b: string, t: number): string {
   const ca = parseHex(a)
   const cb = parseHex(b)
   return toHex({
@@ -64,8 +78,6 @@ function first(map: Record<string, string | null | undefined>, keys: string[]): 
   return undefined
 }
 
-// For each required key: ordered list of alternate VSCode keys to try.
-// If none match, a computed fallback runs (see `computeFallback`).
 const FALLBACKS: Record<AimuxColorKey, string[]> = {
   'contrastBorder': ['editorGroup.border'],
   'descriptionForeground': ['editorLineNumber.foreground', 'foreground'],
@@ -73,7 +85,6 @@ const FALLBACKS: Record<AimuxColorKey, string[]> = {
   'diffEditor.removedLineBackground': [],
   'editor.background': [],
   'editor.foreground': [],
-
   'editor.lineHighlightBackground': [],
   'editor.selectionBackground': ['selection.background'],
   'editorCursor.foreground': ['editor.foreground'],
@@ -82,39 +93,31 @@ const FALLBACKS: Record<AimuxColorKey, string[]> = {
   'editorGroupHeader.tabsBackground': ['sideBar.background'],
   'editorLineNumber.foreground': ['descriptionForeground'],
   'editorWarning.foreground': ['terminal.ansiYellow'],
-
   'editorWidget.background': ['sideBar.background', 'editor.background'],
   'errorForeground': ['editorError.foreground', 'terminal.ansiRed'],
   'focusBorder': ['textLink.foreground'],
-
   'foreground': ['editor.foreground'],
   'gitDecoration.addedResourceForeground': ['terminal.ansiGreen'],
   'gitDecoration.deletedResourceForeground': ['terminal.ansiRed', 'editorError.foreground'],
-
   'gitDecoration.modifiedResourceForeground': ['terminal.ansiYellow'],
   'gitDecoration.untrackedResourceForeground': ['gitDecoration.addedResourceForeground'],
   'input.background': ['editorWidget.background'],
   'input.border': ['focusBorder', 'editorGroup.border'],
-
   'input.foreground': ['editor.foreground'],
   'list.activeSelectionBackground': ['editor.selectionBackground'],
   'list.activeSelectionForeground': ['editor.foreground'],
-
   'list.hoverBackground': ['list.activeSelectionBackground'],
   'panel.background': ['editor.background'],
   'panel.border': ['editorGroup.border', 'contrastBorder'],
   'sideBar.background': ['editorGroupHeader.tabsBackground', 'panel.background'],
   'sideBar.foreground': ['editor.foreground', 'foreground'],
   'sideBarSectionHeader.background': ['sideBar.background'],
-
   'sideBarSectionHeader.foreground': ['sideBar.foreground'],
   'terminal.ansiBlue': ['textLink.foreground'],
   'terminal.ansiCyan': [],
   'terminal.ansiGreen': ['gitDecoration.addedResourceForeground'],
-
   'terminal.ansiMagenta': [],
   'terminal.ansiRed': ['editorError.foreground'],
-
   'terminal.ansiYellow': ['editorWarning.foreground'],
   'textLink.activeForeground': ['textLink.foreground'],
   'textLink.foreground': ['editorLink.activeForeground', 'terminal.ansiBlue'],
@@ -139,7 +142,6 @@ function computeFallback(
       return fg
     case 'editorLineNumber.foreground':
       return mix(fg, bg, 0.55)
-
     case 'sideBar.background':
       return shade(bg, -0.04)
     case 'sideBar.foreground':
@@ -156,21 +158,18 @@ function computeFallback(
       return bg
     case 'panel.border':
       return shade(bg, 0.15)
-
     case 'focusBorder':
       return resolved['textLink.foreground'] ?? fg
     case 'editorGroup.border':
       return shade(bg, 0.15)
     case 'contrastBorder':
       return shade(bg, 0.2)
-
     case 'list.activeSelectionBackground':
       return shade(bg, 0.1)
     case 'list.activeSelectionForeground':
       return fg
     case 'list.hoverBackground':
       return shade(bg, 0.05)
-
     case 'foreground':
       return fg
     case 'descriptionForeground':
@@ -178,13 +177,11 @@ function computeFallback(
     case 'textLink.foreground':
     case 'textLink.activeForeground':
       return resolved['terminal.ansiBlue'] ?? fg
-
     case 'errorForeground':
     case 'editorError.foreground':
       return '#f38ba8'
     case 'editorWarning.foreground':
       return '#f6c177'
-
     case 'terminal.ansiRed':
       return '#f38ba8'
     case 'terminal.ansiGreen':
@@ -197,7 +194,6 @@ function computeFallback(
       return resolved['textLink.activeForeground'] ?? '#c4a7e7'
     case 'terminal.ansiCyan':
       return resolved['terminal.ansiBlue'] ?? '#89dceb'
-
     case 'gitDecoration.addedResourceForeground':
       return resolved['terminal.ansiGreen'] ?? '#8bd5ca'
     case 'gitDecoration.modifiedResourceForeground':
@@ -206,52 +202,41 @@ function computeFallback(
       return resolved['terminal.ansiRed'] ?? '#f38ba8'
     case 'gitDecoration.untrackedResourceForeground':
       return resolved['gitDecoration.addedResourceForeground'] ?? '#8bd5ca'
-
     case 'diffEditor.insertedLineBackground':
       return mix(bg, resolved['gitDecoration.addedResourceForeground'] ?? '#8bd5ca', 0.18)
     case 'diffEditor.removedLineBackground':
       return mix(bg, resolved['gitDecoration.deletedResourceForeground'] ?? '#f38ba8', 0.18)
-
     case 'input.background':
       return shade(bg, -0.04)
     case 'input.foreground':
       return fg
     case 'input.border':
       return shade(bg, 0.15)
-
     default:
       return fg
   }
 }
 
-export function normalizeTheme(raw: ThemeRegistrationResolved): Theme {
+export function normalizeTheme(raw: NormalizeInput): Theme {
   const srcColors = raw.colors ?? {}
-  const bg = stripAlpha(srcColors['editor.background'] ?? raw.bg)
-  const fg = stripAlpha(srcColors['editor.foreground'] ?? raw.fg)
+  const bg = stripAlpha(srcColors['editor.background'] ?? raw.bg ?? '#000000')
+  const fg = stripAlpha(srcColors['editor.foreground'] ?? raw.fg ?? '#ffffff')
 
-  // Pass 1: pull directly defined keys through the fallback chain.
   const resolved: ThemeColorMap = {} as ThemeColorMap
   for (const key of AIMUX_COLOR_KEYS) {
     const direct = srcColors[key]
-    if (direct) {
+    if (direct && typeof direct === 'string') {
       resolved[key] = stripAlpha(direct)
       continue
     }
     const alt = first(srcColors, FALLBACKS[key])
-    if (alt) {
-      resolved[key] = alt
-    }
+    if (alt) resolved[key] = alt
   }
-  // Pass 2: compute fallbacks for anything still missing. Order-dependent, so
-  // compute in the declared AIMUX_COLOR_KEYS order.
   for (const key of AIMUX_COLOR_KEYS) {
-    if (!resolved[key]) {
-      resolved[key] = computeFallback(key, bg, fg, resolved)
-    }
+    if (!resolved[key]) resolved[key] = computeFallback(key, bg, fg, resolved)
   }
-  // Preserve any other keys the theme defined (don't drop useful data).
   for (const [k, v] of Object.entries(srcColors)) {
-    if (!resolved[k]) resolved[k] = stripAlpha(v)
+    if (!resolved[k] && v && typeof v === 'string') resolved[k] = stripAlpha(v)
   }
 
   const out: Theme = {
@@ -261,7 +246,7 @@ export function normalizeTheme(raw: ThemeRegistrationResolved): Theme {
     fg,
     name: raw.name,
     settings: raw.settings ?? [],
-    type: raw.type,
+    type: raw.type ?? 'dark',
   }
   if (raw.colorReplacements && Object.keys(raw.colorReplacements).length > 0) {
     out.colorReplacements = raw.colorReplacements

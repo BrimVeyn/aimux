@@ -683,6 +683,17 @@ export interface NamedTheme extends Theme {
   displayName: string
 }
 
+/**
+ * Input shape accepted by `themes.full(...)` — lets users paste a shiki /
+ * VSCode theme JSON without typing every AIMUX_COLOR_KEY. `registerUserThemes`
+ * runs it through `normalizeTheme` to produce a complete `Theme`.
+ */
+export interface UserThemeInput extends Partial<Omit<Theme, 'colors' | 'name' | 'displayName'>> {
+  name: string
+  displayName: string
+  colors?: Partial<ThemeColorMap> & Record<string, string | undefined>
+}
+
 // ─── Backend config (stub) ────────────────────────────────────────────────────
 
 export interface BackendConfig {
@@ -794,7 +805,7 @@ export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
 
 export interface AimuxUserConfig {
   theme?: ThemeId
-  themes?: Record<string, NamedThemeDefinition>
+  themes?: Record<string, NamedThemeDefinition | UserThemeInput>
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
@@ -828,7 +839,7 @@ export interface ResolvedKeymapConfig {
 
 export interface ResolvedConfig {
   theme: ThemeId | undefined
-  themes: Record<string, NamedThemeDefinition>
+  themes: Record<string, NamedThemeDefinition | UserThemeInput>
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig
