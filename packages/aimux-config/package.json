@@ -1,6 +1,6 @@
 {
   "name": "@brimveyn/aimux-config",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "TypeScript configuration API for aimux — keymaps, themes, and backends with a fluent builder.",
   "keywords": [
     "aimux",
