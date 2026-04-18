@@ -23,8 +23,8 @@ export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProp
   const entries = typeof limit === 'number' ? bindings.slice(0, limit) : bindings
 
   return (
-    <box position="absolute" bottom={2} right={1}>
-      <Surface tone="elevated" paddingLeft={1} paddingRight={1} paddingTop={0} paddingBottom={0}>
+    <box position="absolute" bottom={3} right={5}>
+      <Surface tone="elevated" paddingLeft={2} paddingRight={2} paddingTop={1} paddingBottom={1}>
         {entries.map((binding) => (
           <box key={`${binding.keys}-${binding.description}`} flexDirection="row">
             <box width={KEYS_COLUMN_WIDTH}>
