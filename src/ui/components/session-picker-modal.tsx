@@ -2,6 +2,7 @@ import type { SessionRecord } from '../../state/types'
 
 import { filterSessions } from '../../state/selectors'
 import { abbreviatePath } from '../path-format'
+import { orderSessionsForDisplay } from '../session-ordering'
 import { theme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
@@ -19,13 +20,14 @@ interface SessionPickerModalProps {
 function formatSessionLine(
   session: SessionRecord,
   currentSessionId: string | null,
-  currentTabCount: number
+  currentTabCount: number,
+  displayIndex: number
 ): string {
   const tabCount =
     session.id === currentSessionId
       ? currentTabCount
       : (session.workspaceSnapshot?.tabs.length ?? 0)
-  return `${session.name} (${tabCount} tab${tabCount === 1 ? '' : 's'})`
+  return `[${displayIndex}] ${session.name} (${tabCount} tab${tabCount === 1 ? '' : 's'})`
 }
 
 function getEmptyStateMessage(hasFilter: boolean): string {
@@ -43,7 +45,9 @@ export function SessionPickerModal({
   selectedIndex,
   sessions,
 }: SessionPickerModalProps) {
-  const filtered = filterSessions(sessions, filter)
+  const ordered = orderSessionsForDisplay(sessions)
+  const baselineOrder = ordered.map((s) => s.id)
+  const filtered = filterSessions(ordered, filter)
   const hasFilter = !!filter
   const showFilteredEmptyState = filtered.length === 0 && sessions.length > 0
   const showInitialEmptyState = filtered.length === 0 && sessions.length === 0
@@ -63,13 +67,14 @@ export function SessionPickerModal({
       ) : null}
       {filtered.map((session, index) => {
         const active = index === selectedIndex
+        const displayIndex = baselineOrder.indexOf(session.id) + 1
         return (
           <ListItem
             key={session.id}
             active={active}
             title={
               <text fg={active ? theme.text : theme.textMuted}>
-                {formatSessionLine(session, currentSessionId, currentTabCount)}
+                {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
               </text>
             }
             subtitle={
