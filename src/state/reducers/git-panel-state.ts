@@ -5,7 +5,12 @@ import { reconcileSelectedGitEntryKey } from '../git-tree'
 export const GIT_PANEL_MIN_RATIO = 0.2
 export const GIT_PANEL_MAX_RATIO = 0.8
 
-const SECTION_RANK: Record<GitFileSection, number> = { staged: 0, unstaged: 1, untracked: 2 }
+const SECTION_RANK: Record<GitFileSection, number> = {
+  historical: 0,
+  staged: 1,
+  unstaged: 2,
+  untracked: 3,
+}
 
 export function sortFilesBySection(files: GitFileEntry[]): GitFileEntry[] {
   return [...files].sort((a, b) => {

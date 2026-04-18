@@ -199,6 +199,7 @@ Enter with `Ctrl+D` from `navigation`. Leading action keys:
 - `p` - push the current branch
 - `v` - toggle split / stacked diff
 - `t` - toggle flat / tree list
+- `]` / `[` - walk to an older / newer commit baseline (HEAD~N)
 - `?` - help (scoped to git-mode, rendered as an overlay)
 
 Navigation and diff scroll keys (`j`/`k`, `Ctrl+N`/`Ctrl+P`, `h`/`l`, arrows,

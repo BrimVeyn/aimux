@@ -23,13 +23,24 @@ interface GitPanelProps {
   selectedEntryKey?: string | null
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
+  headOffset?: number
 }
 
-const SECTION_ORDER: { key: GitFileSection; title: string }[] = [
-  { key: 'staged', title: 'Staged Changes' },
-  { key: 'unstaged', title: 'Changes' },
-  { key: 'untracked', title: 'Untracked' },
-]
+function sectionTitle(section: GitFileSection, headOffset: number): string {
+  switch (section) {
+    case 'historical':
+      return `Changes since HEAD~${headOffset}`
+    case 'staged':
+      return 'Staged Changes'
+    case 'unstaged':
+      return 'Changes'
+    case 'untracked':
+      return 'Untracked'
+  }
+}
+
+const BASE_SECTION_ORDER: GitFileSection[] = ['staged', 'unstaged', 'untracked']
+const HISTORICAL_SECTION_ORDER: GitFileSection[] = ['historical', 'untracked']
 
 const STATUS_COLORS: Record<GitFileEntry['status'], string> = {
   '?': theme.colors['gitDecoration.addedResourceForeground'],
@@ -301,10 +312,12 @@ export const GitPanel = memo(function GitPanel({
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
   fileListMode = 'tree',
   gitPanel,
+  headOffset = 0,
   pathConfig = DEFAULT_PATH_CONFIG,
   projectPath,
   selectedEntryKey,
 }: GitPanelProps) {
+  const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
     () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode),
@@ -350,18 +363,18 @@ export const GitPanel = memo(function GitPanel({
           viewportCulling
           contentOptions={{ flexDirection: 'column', gap: 0 }}
         >
-          {SECTION_ORDER.map((s) => {
-            const section = tree.sections.find((entry) => entry.section === s.key)
+          {sectionOrder.map((key) => {
+            const section = tree.sections.find((entry) => entry.section === key)
             return renderTreeSection(
-              s.key,
-              s.title,
+              key,
+              sectionTitle(key, headOffset),
               section?.files ?? [],
               section?.rows ?? [],
               addedW,
               removedW,
               fileListMode,
               selectedEntryKey,
-              s.key === toggleSection,
+              key === toggleSection,
               pathConfig,
               diffCountConfig
             )

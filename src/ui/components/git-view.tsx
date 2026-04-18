@@ -116,7 +116,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     : undefined
   const projectPath = currentSession?.projectPath
 
-  useGitPanelPolling({ enabled: focusMode === 'git', projectPath })
+  useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
 
@@ -151,12 +151,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (!selectedDiffKey) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(projectPath, selectedFile)
+    void fetchDiff(projectPath, selectedFile, gitMode.headOffset)
       .then((d) => dispatchGlobal({ diff: d, key: selectedDiffKey, type: 'git-mode-set-diff' }))
       .catch(() =>
         dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
       )
-  }, [focusMode, projectPath, selectedFile, selectedDiffKey, diff, loading])
+  }, [focusMode, projectPath, selectedFile, selectedDiffKey, diff, loading, gitMode.headOffset])
 
   const pendingPath = gitMode.pendingDeletePath
   const pendingIsUntracked =
@@ -204,6 +204,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
               <text fg={theme.colors['descriptionForeground']}>{gitPanel.branch}</text>
             </box>
           ) : null}
+          {gitMode.headOffset > 0 ? (
+            <text fg={theme.colors['editorWarning.foreground']}>
+              <strong>HEAD~{gitMode.headOffset}</strong>
+              <span fg={theme.colors['descriptionForeground']}> · [ newer · ] older</span>
+            </text>
+          ) : null}
           <text fg={theme.colors['editor.lineHighlightBackground']}>
             {'·'.repeat(Math.max(0, fileBarWidth - 2))}
           </text>
@@ -211,6 +217,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             collapsedFolders={gitMode.collapsedFolders}
             fileListMode={gitPane.fileListMode}
             gitPanel={gitPanel}
+            headOffset={gitMode.headOffset}
             projectPath={projectPath}
             selectedEntryKey={gitMode.selectedEntryKey}
           />

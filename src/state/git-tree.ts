@@ -1,6 +1,6 @@
 import type { GitFileEntry, GitFileListMode, GitFileSection } from './types'
 
-const SECTION_ORDER: GitFileSection[] = ['staged', 'unstaged', 'untracked']
+const SECTION_ORDER: GitFileSection[] = ['historical', 'staged', 'unstaged', 'untracked']
 
 interface GitTreeNode {
   files: GitFileEntry[]

@@ -9,9 +9,10 @@ const MAX_INTERVAL_MS = 30_000
 interface Options {
   enabled: boolean
   projectPath: string | undefined
+  headOffset: number
 }
 
-export function useGitPanelPolling({ enabled, projectPath }: Options): void {
+export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options): void {
   useEffect(() => {
     if (!enabled || !projectPath) return undefined
 
@@ -27,10 +28,17 @@ export function useGitPanelPolling({ enabled, projectPath }: Options): void {
     }
 
     const tick = async () => {
-      const result = await collectGitStatus(projectPath)
+      const result = await collectGitStatus(projectPath, { headOffset })
       if (cancelled) return
       if (result.kind === 'ok') {
         dispatchGlobal({ payload: result.payload, type: 'git-refresh-success' })
+        delay = BASE_INTERVAL_MS
+      } else if (result.kind === 'out-of-range') {
+        dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })
+        dispatchGlobal({
+          message: `no older commit — clamped to HEAD~${result.maxOffset}`,
+          type: 'git-mode-set-message',
+        })
         delay = BASE_INTERVAL_MS
       } else {
         dispatchGlobal({ kind: result.error, type: 'git-refresh-error' })
@@ -45,5 +53,5 @@ export function useGitPanelPolling({ enabled, projectPath }: Options): void {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [enabled, projectPath])
+  }, [enabled, projectPath, headOffset])
 }

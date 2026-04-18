@@ -62,6 +62,8 @@ Actions on the selected file:
 | `p`   | Push                                             |
 | `v`   | Toggle split / stacked diff                      |
 | `t`   | Toggle flat / tree list                          |
+| `]`   | Older commit (HEAD~N → N+1)                      |
+| `[`   | Newer commit (HEAD~N → N-1)                      |
 | `?`   | Help (scoped to git mode)                        |
 | `Esc` | Exit git mode                                    |
 
@@ -82,6 +84,27 @@ Diff view scroll and layout:
 The destructive `d` requires two presses on unstaged or untracked files
 (the first arms the action, the second confirms) to prevent accidental
 data loss.
+
+## Walking History
+
+`]` and `[` shift a `HEAD~N` offset. At `N=0` (default) the panel shows the
+usual Staged / Changes / Untracked split against `HEAD`. At `N>0` the panel
+collapses into a single **Changes since HEAD~N** section listing every file
+that differs between `HEAD~N` and the working tree; the diff view and binary
+detection use `HEAD~N` as the baseline, and untracked files still appear
+since they aren't in any commit.
+
+While the offset is non-zero:
+
+- `a` / `d` / `c` / `p` are disabled and surface a one-line message; the
+  status-bar footer drops them from its hint list so you see only the keys
+  that actually do something.
+- The current offset is shown above the panel (`HEAD~N · [ newer · ] older`)
+  and next to the session label in the status bar.
+- Pressing `]` past the oldest available commit clamps the offset and shows
+  `no older commit — clamped to HEAD~N`.
+
+Leaving git mode (`Esc`) resets the offset back to `0`.
 
 ## Help Modal
 

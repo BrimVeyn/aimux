@@ -88,6 +88,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
         .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
+        .map(']', actions.shiftGitHeadOffset(1), 'Older commit')
+        .map('[', actions.shiftGitHeadOffset(-1), 'Newer commit')
         .map('?', actions.helpModal('git-mode'), 'Help')
         .map('<Esc>', actions.exitGitMode, 'Exit git')
         .map('j', actions.selectGitFile(1), 'Next entry')

@@ -5,6 +5,7 @@
     "vhs",
     "commit",
     "rev-parse",
+    "rev-list",
     "push",
     "diff",
     "show",

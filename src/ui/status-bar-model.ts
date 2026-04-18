@@ -32,8 +32,15 @@ function getActiveTabLabel(tab?: TabSession): string {
   return `${truncateLabel(tab.title)} (${tab.status})`
 }
 
+const STAGING_DESCRIPTIONS = ['Stage', 'Unstage/delete', 'Commit', 'Push']
+
 function hintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
   return buildHintText(config, modeId, HINT_LIMIT, { excludeDescriptions: [HELP_DESCRIPTION] })
+}
+
+function hintForGitMode(config: ResolvedKeymapConfig, headOffset: number): string {
+  const exclude = headOffset > 0 ? [HELP_DESCRIPTION, ...STAGING_DESCRIPTIONS] : [HELP_DESCRIPTION]
+  return buildHintText(config, 'git-mode', HINT_LIMIT, { excludeDescriptions: exclude })
 }
 
 function helpHintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
@@ -77,12 +84,15 @@ export function getStatusBarModel(
         right: modalMode ? hintForMode(config, modalMode) : '',
       }
     }
-    case 'git':
+    case 'git': {
+      const headOffset = state.gitMode.headOffset
+      const offsetTag = headOffset > 0 ? `  HEAD~${headOffset}` : ''
       return {
         help: helpHintForMode(config, 'git-mode'),
-        left: `${sessionIcon}  ${sessionLabel}`,
-        right: hintForMode(config, 'git-mode'),
+        left: `${sessionIcon}  ${sessionLabel}${offsetTag}`,
+        right: hintForGitMode(config, headOffset),
       }
+    }
     case 'command-edit': {
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {

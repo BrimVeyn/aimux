@@ -62,6 +62,7 @@ export function emptyGitMode(): GitModeState {
     diffs: {},
     diffView: 'split',
     folds: {},
+    headOffset: 0,
     loading: {},
     pendingDeletePath: null,
     selectedEntryKey: null,
@@ -90,7 +91,18 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     }
     case 'exit-git-mode': {
       if (state.focusMode !== 'git') return state
-      return { ...state, focusMode: 'navigation' }
+      return {
+        ...state,
+        focusMode: 'navigation',
+        gitMode: {
+          ...state.gitMode,
+          actionMessage: null,
+          diffs: {},
+          folds: {},
+          headOffset: 0,
+          loading: {},
+        },
+      }
     }
     case 'git-mode-move-selection': {
       const next = moveGitSelection(
@@ -265,6 +277,37 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-diff-view': {
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
+    }
+    case 'git-mode-shift-head-offset': {
+      const next = Math.max(0, state.gitMode.headOffset + action.delta)
+      if (next === state.gitMode.headOffset) return state
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          actionMessage: null,
+          diffs: {},
+          folds: {},
+          headOffset: next,
+          loading: {},
+          pendingDeletePath: null,
+        },
+      }
+    }
+    case 'git-mode-set-head-offset': {
+      const next = Math.max(0, action.offset)
+      if (next === state.gitMode.headOffset) return state
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          diffs: {},
+          folds: {},
+          headOffset: next,
+          loading: {},
+          pendingDeletePath: null,
+        },
+      }
     }
     case 'git-mode-fold-adjust': {
       const perPath = state.gitMode.folds[action.key] ?? {}

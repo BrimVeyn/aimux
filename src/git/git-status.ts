@@ -16,6 +16,7 @@ interface NumstatRow {
 export type GitCollectResult =
   | { kind: 'ok'; payload: GitRefreshPayload }
   | { kind: 'error'; error: GitPanelError }
+  | { kind: 'out-of-range'; maxOffset: number }
 
 const STATUS_CODES = new Set(['M', 'A', 'D', 'R', 'C', 'U', '?'])
 
@@ -189,26 +190,106 @@ async function annotateUntrackedCounts(cwd: string, files: GitFileEntry[]): Prom
   }
 }
 
-export async function collectGitStatus(cwd: string): Promise<GitCollectResult> {
-  try {
-    const [statusResult, unstagedDiff, stagedDiff] = await Promise.all([
-      $`git -C ${cwd} status --porcelain=v2 -b -z --untracked-files=all`.quiet().nothrow(),
-      $`git -C ${cwd} -c core.quotePath=false diff --numstat`.quiet().nothrow(),
-      $`git -C ${cwd} -c core.quotePath=false diff --cached --numstat`.quiet().nothrow(),
-    ])
+interface CollectOptions {
+  headOffset?: number
+}
 
-    if (statusResult.exitCode !== 0) {
-      return { error: 'not-a-repo', kind: 'error' }
+function parseNameStatus(
+  output: string
+): { path: string; status: GitFileStatus; renamedFrom?: string }[] {
+  const rows: { path: string; status: GitFileStatus; renamedFrom?: string }[] = []
+  for (const raw of output.split('\n')) {
+    if (!raw) continue
+    const parts = raw.split('\t')
+    const code = parts[0] ?? ''
+    const letter = code[0] ?? ''
+    const status = toStatus(letter)
+    if (!status) continue
+    if (letter === 'R' || letter === 'C') {
+      const from = parts[1]
+      const to = parts[2]
+      if (!from || !to) continue
+      rows.push({ path: to, renamedFrom: from, status })
+    } else {
+      const path = parts.slice(1).join('\t')
+      if (!path) continue
+      rows.push({ path, status })
     }
+  }
+  return rows
+}
 
-    const statusText = statusResult.text()
-    const { ahead, behind, branch } = parseBranchLines(statusText)
-    const unstagedNumstat = parseNumstat(unstagedDiff.text())
-    const stagedNumstat = parseNumstat(stagedDiff.text())
-    const files = parsePorcelainEntries(statusText, stagedNumstat, unstagedNumstat)
-    await annotateUntrackedCounts(cwd, files)
+async function collectAgainstHead(cwd: string): Promise<GitCollectResult> {
+  const [statusResult, unstagedDiff, stagedDiff] = await Promise.all([
+    $`git -C ${cwd} status --porcelain=v2 -b -z --untracked-files=all`.quiet().nothrow(),
+    $`git -C ${cwd} -c core.quotePath=false diff --numstat`.quiet().nothrow(),
+    $`git -C ${cwd} -c core.quotePath=false diff --cached --numstat`.quiet().nothrow(),
+  ])
 
-    return { kind: 'ok', payload: { ahead, behind, branch, files } }
+  if (statusResult.exitCode !== 0) {
+    return { error: 'not-a-repo', kind: 'error' }
+  }
+
+  const statusText = statusResult.text()
+  const { ahead, behind, branch } = parseBranchLines(statusText)
+  const unstagedNumstat = parseNumstat(unstagedDiff.text())
+  const stagedNumstat = parseNumstat(stagedDiff.text())
+  const files = parsePorcelainEntries(statusText, stagedNumstat, unstagedNumstat)
+  await annotateUntrackedCounts(cwd, files)
+
+  return { kind: 'ok', payload: { ahead, behind, branch, files } }
+}
+
+async function collectAgainstHistorical(
+  cwd: string,
+  headOffset: number
+): Promise<GitCollectResult> {
+  const ref = `HEAD~${headOffset}`
+  const revParse = await $`git -C ${cwd} rev-parse ${ref}`.quiet().nothrow()
+  if (revParse.exitCode !== 0) {
+    const countResult = await $`git -C ${cwd} rev-list --count HEAD`.quiet().nothrow()
+    const count = countResult.exitCode === 0 ? Number.parseInt(countResult.text().trim(), 10) : NaN
+    const maxOffset = Number.isFinite(count) && count > 0 ? count - 1 : 0
+    return { kind: 'out-of-range', maxOffset }
+  }
+
+  const [statusResult, nameStatus, numstat, untrackedStatus] = await Promise.all([
+    $`git -C ${cwd} status --porcelain=v2 -b -z --untracked-files=all`.quiet().nothrow(),
+    $`git -C ${cwd} -c core.quotePath=false diff ${ref} --name-status`.quiet().nothrow(),
+    $`git -C ${cwd} -c core.quotePath=false diff ${ref} --numstat`.quiet().nothrow(),
+    $`git -C ${cwd} status --porcelain=v2 -z --untracked-files=all`.quiet().nothrow(),
+  ])
+
+  if (statusResult.exitCode !== 0) {
+    return { error: 'not-a-repo', kind: 'error' }
+  }
+
+  const { ahead, behind, branch } = parseBranchLines(statusResult.text())
+  const stats = parseNumstat(numstat.text())
+  const rows = parseNameStatus(nameStatus.text())
+  const files: GitFileEntry[] = rows.map((row) =>
+    buildEntry('historical', row.status, row.path, stats, row.renamedFrom)
+  )
+
+  // Untracked files live outside any commit — still surface them so `?` files
+  // don't vanish when the user walks history.
+  const porcelain = parsePorcelainEntries(untrackedStatus.text(), new Map(), new Map())
+  const untracked = porcelain.filter((f) => f.section === 'untracked')
+  await annotateUntrackedCounts(cwd, untracked)
+  files.push(...untracked)
+
+  return { kind: 'ok', payload: { ahead, behind, branch, files } }
+}
+
+export async function collectGitStatus(
+  cwd: string,
+  options: CollectOptions = {}
+): Promise<GitCollectResult> {
+  const headOffset = options.headOffset ?? 0
+  try {
+    return headOffset > 0
+      ? await collectAgainstHistorical(cwd, headOffset)
+      : await collectAgainstHead(cwd)
   } catch {
     return { error: 'unknown', kind: 'error' }
   }

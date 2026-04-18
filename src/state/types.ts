@@ -154,7 +154,7 @@ export interface GitPaneState {
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
 
-export type GitFileSection = 'staged' | 'unstaged' | 'untracked'
+export type GitFileSection = 'staged' | 'unstaged' | 'untracked' | 'historical'
 
 export interface GitFileEntry {
   path: string
@@ -204,6 +204,8 @@ export interface GitModeState {
   actionMessage: string | null
   diffView: GitDiffView
   folds: Record<string, Record<string, FoldState>>
+  /** Working-tree-vs-HEAD~N offset. 0 = working tree vs HEAD (default). */
+  headOffset: number
 }
 
 interface ModalBase {
@@ -477,6 +479,8 @@ export type GitModeAction =
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-shift-head-offset'; delta: number }
+  | { type: 'git-mode-set-head-offset'; offset: number }
   | {
       type: 'git-mode-fold-adjust'
       key: string

@@ -463,7 +463,22 @@ export function scrollGitDiff(delta: number): KeyResult {
 
 export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
 
+export function shiftGitHeadOffset(delta: number): KeyResult {
+  return r([
+    { delta, type: 'git-mode-shift-head-offset' },
+    { message: null, type: 'git-mode-set-message' },
+  ])
+}
+
 export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
   const file = selectedGitFile(ctx)
   if (!file) return r(clearPendingDelete(ctx))
   const actions = clearPendingDelete(ctx)
@@ -478,6 +493,14 @@ export const gitStageSelected: ActionFn = (ctx: ModeContext) => {
 }
 
 export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
   const file = selectedGitFile(ctx)
   if (!file) return r(clearPendingDelete(ctx))
 
@@ -514,10 +537,26 @@ export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
 }
 
 export const gitCommitOpen: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
   return r([...clearPendingDelete(ctx), { type: 'open-git-commit-modal' }], [], 'modal.git-commit')
 }
 
 export const gitPush: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
   return r(clearPendingDelete(ctx), [{ type: 'git-push' }])
 }
 

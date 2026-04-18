@@ -23,7 +23,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
     : undefined
   const projectPath = currentSession?.projectPath
 
-  useGitPanelPolling({ enabled: pollingEnabled, projectPath })
+  useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })
 
   const lastGoodRef = useRef<GitPanelState | null>(null)
   const prevProjectPathRef = useRef(projectPath)
