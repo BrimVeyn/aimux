@@ -9,7 +9,7 @@
 // - config-kind: major | minor | patch | none (optional, default: none)
 
 import { spawnSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 type BumpKind = 'major' | 'minor' | 'patch'
@@ -183,9 +183,13 @@ async function main() {
     writeFileSync(CONFIG_PKG, rewriteVersion(configPlan.raw, configPlan.next))
   }
 
-  // Sync workspace lockfile. When aimux-config bumps, --force re-resolves the
-  // `workspace:*` entry so `bun pack` doesn't flatten it to the old version.
-  sh('bun', configPlan ? ['install', '--force'] : ['install'])
+  // Sync workspace lockfile. When aimux-config bumps we *must* hard-regen:
+  // bun keeps the `packages/<ws>` version entry cached even with --force, and
+  // `bun pack` reads that cached value when flattening `workspace:*`.
+  if (configPlan) {
+    rmSync(join(ROOT, 'bun.lock'), { force: true })
+  }
+  sh('bun', ['install'])
 
   const stageFiles = ['package.json', 'bun.lock']
   if (configPlan) stageFiles.push('packages/aimux-config/package.json')
