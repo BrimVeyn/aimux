@@ -203,6 +203,11 @@ export interface DiffData {
 
 export type GitDiffView = 'split' | 'stacked'
 
+export interface FoldState {
+  top: number
+  bottom: number
+}
+
 export interface GitModeState {
   selectedFileIndex: number
   diffs: Record<string, DiffData>
@@ -210,7 +215,7 @@ export interface GitModeState {
   pendingDeletePath: string | null
   actionMessage: string | null
   diffView: GitDiffView
-  collapsedHunks: Record<string, number[]>
+  folds: Record<string, Record<string, FoldState>>
 }
 
 interface ModalBase {

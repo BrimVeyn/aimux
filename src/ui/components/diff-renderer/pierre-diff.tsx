@@ -3,12 +3,14 @@ import type { ThemedToken } from 'shiki'
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 
+import type { FoldState } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { parsePatchFiles } from '../../../diff-parser'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { theme } from '../../theme'
+import { buildSplitRows, buildUnifiedRows, firstChangeRowIndex } from './build-rows'
 import { filetypeFromPath } from './filetype'
 import { tokenizeSide } from './highlight'
 import { SplitView, type SplitViewHandle } from './split-view'
@@ -26,6 +28,11 @@ export interface DiffHighlights {
   del: ThemedToken[][]
 }
 
+export interface FoldDispatch {
+  adjust: (foldId: string, side: 'top' | 'bottom', delta: number) => void
+  set: (foldId: string, top: number, bottom: number) => void
+}
+
 interface Props {
   diff: string
   path: string
@@ -34,6 +41,7 @@ interface Props {
 }
 
 const EMPTY_HIGHLIGHTS: DiffHighlights = { add: [], del: [] }
+const EMPTY_FOLDS: Record<string, FoldState> = {}
 
 export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDiff(
   { diff, path, themeId, view },
@@ -46,11 +54,14 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
 
   const filetype = useMemo(() => filetypeFromPath(path), [path])
 
-  const collapsedList = useAppStore((s) => s.gitMode.collapsedHunks[path])
-  const collapsed = useMemo(() => new Set(collapsedList ?? []), [collapsedList])
-  const toggleHunk = useMemo(
-    () => (hunkIndex: number) =>
-      dispatchGlobal({ hunkIndex, path, type: 'git-mode-toggle-hunk-collapsed' }),
+  const folds = useAppStore((s) => s.gitMode.folds[path]) ?? EMPTY_FOLDS
+  const foldDispatch = useMemo<FoldDispatch>(
+    () => ({
+      adjust: (foldId, side, delta) =>
+        dispatchGlobal({ delta, foldId, path, side, type: 'git-mode-fold-adjust' }),
+      set: (foldId, top, bottom) =>
+        dispatchGlobal({ bottom, foldId, path, top, type: 'git-mode-fold-set' }),
+    }),
     [path]
   )
 
@@ -90,6 +101,28 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     [view]
   )
 
+  useEffect(() => {
+    if (!file) return
+    const rows =
+      view === 'split' ? buildSplitRows(file, EMPTY_FOLDS) : buildUnifiedRows(file, EMPTY_FOLDS)
+    const idx = firstChangeRowIndex(rows)
+    if (idx < 0) return
+    const target = Math.max(0, idx - 2)
+    const apply = (): void => {
+      if (view === 'split') {
+        const left = splitRef.current?.leftScroll
+        const right = splitRef.current?.rightScroll
+        if (left) left.scrollTop = target
+        if (right && right !== left) right.scrollTop = target
+      } else {
+        const node = stackedRef.current?.scroll
+        if (node) node.scrollTop = target
+      }
+    }
+    const raf = requestAnimationFrame(apply)
+    return () => cancelAnimationFrame(raf)
+  }, [path, file, view])
+
   if (!file) {
     return (
       <box flexGrow={1} padding={1}>
@@ -102,20 +135,20 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     return (
       <StackedView
         ref={stackedRef}
-        collapsed={collapsed}
         file={file}
+        foldDispatch={foldDispatch}
+        folds={folds}
         highlights={highlights}
-        onToggleHunk={toggleHunk}
       />
     )
   }
   return (
     <SplitView
       ref={splitRef}
-      collapsed={collapsed}
       file={file}
+      foldDispatch={foldDispatch}
+      folds={folds}
       highlights={highlights}
-      onToggleHunk={toggleHunk}
     />
   )
 })

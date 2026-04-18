@@ -8,12 +8,14 @@ import {
 import { forwardRef, useImperativeHandle, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
-import type { DiffHighlights } from './pierre-diff'
+import type { FoldState } from '../../../state/types'
+import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
 import { theme } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
+import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
 
 export interface SplitViewHandle {
@@ -24,8 +26,8 @@ export interface SplitViewHandle {
 interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
-  collapsed: ReadonlySet<number>
-  onToggleHunk: (hunkIndex: number) => void
+  folds: Record<string, FoldState>
+  foldDispatch: FoldDispatch
 }
 
 function handleScroll(e: OtuiMouseEvent): void {
@@ -37,7 +39,7 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
-  { collapsed, file, highlights, onToggleHunk },
+  { file, foldDispatch, folds, highlights },
   ref
 ) {
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
@@ -56,7 +58,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     []
   )
 
-  const rows = buildSplitRows(file, collapsed)
+  const rows = buildSplitRows(file, folds)
   const gw = gutterWidth(file)
 
   return (
@@ -69,13 +71,16 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         contentOptions={{ flexDirection: 'column', gap: 0 }}
         onMouseScroll={handleScroll}
       >
-        {rows.map((row, i) =>
-          row.type === 'hunk-header' ? (
-            <HunkHeaderRow key={i} row={row} onToggle={onToggleHunk} />
-          ) : (
-            <HalfRow key={i} cell={row.left} gw={gw} tokens={highlights.del} />
-          )
-        )}
+        {rows.map((row, i) => (
+          <SideRow
+            key={i}
+            cell={row.type === 'row' ? row.left : null}
+            foldDispatch={foldDispatch}
+            gw={gw}
+            header={row.type === 'hunk-header' ? row : null}
+            tokens={highlights.del}
+          />
+        ))}
       </scrollbox>
       <box width={1} backgroundColor={theme.dim} />
       <scrollbox
@@ -86,41 +91,58 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         contentOptions={{ flexDirection: 'column', gap: 0 }}
         onMouseScroll={handleScroll}
       >
-        {rows.map((row, i) =>
-          row.type === 'hunk-header' ? (
-            <HunkHeaderRow key={i} row={row} onToggle={onToggleHunk} />
-          ) : (
-            <HalfRow key={i} cell={row.right} gw={gw} tokens={highlights.add} />
-          )
-        )}
+        {rows.map((row, i) => (
+          <SideRow
+            key={i}
+            cell={row.type === 'row' ? row.right : null}
+            foldDispatch={foldDispatch}
+            gw={gw}
+            header={row.type === 'hunk-header' ? row : null}
+            tokens={highlights.add}
+          />
+        ))}
       </scrollbox>
     </box>
   )
 })
 
-function HunkHeaderRow({
-  onToggle,
-  row,
+function SideRow({
+  cell,
+  foldDispatch,
+  gw,
+  header,
+  tokens,
 }: {
-  onToggle: (hunkIndex: number) => void
-  row: Extract<SplitRowOrHeader, { type: 'hunk-header' }>
+  cell: SplitCell | null
+  foldDispatch: FoldDispatch
+  gw: number
+  header: Extract<SplitRowOrHeader, { type: 'hunk-header' }> | null
+  tokens: ThemedToken[][]
 }) {
-  const arrow = row.collapsed ? '▶' : '▼'
+  if (header) return <HunkHeaderRow row={header} />
+  if (!cell) return null
+  if (cell.type === 'fold') return <FoldStrip dispatch={foldDispatch} fold={cell.fold} />
+  return <HalfRow cell={cell} gw={gw} tokens={tokens} />
+}
+
+function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
   return (
-    <box
-      flexDirection="row"
-      backgroundColor={theme.panelMuted}
-      paddingLeft={1}
-      paddingRight={1}
-      onMouseDown={() => onToggle(row.hunkIndex)}
-    >
-      <text fg={theme.textMuted}>{`${arrow} ${row.spec}`}</text>
+    <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
+      <text fg={theme.textMuted}>{row.spec}</text>
       {row.context ? <text fg={theme.dim}> {row.context}</text> : null}
     </box>
   )
 }
 
-function HalfRow({ cell, gw, tokens }: { cell: SplitCell; gw: number; tokens: ThemedToken[][] }) {
+function HalfRow({
+  cell,
+  gw,
+  tokens,
+}: {
+  cell: Exclude<SplitCell, { type: 'fold' }>
+  gw: number
+  tokens: ThemedToken[][]
+}) {
   if (cell.type === 'filler') {
     return <box backgroundColor={theme.panelMuted} height={1} />
   }

@@ -185,6 +185,11 @@ export interface DiffData {
 
 export type GitDiffView = 'split' | 'stacked'
 
+export interface FoldState {
+  top: number
+  bottom: number
+}
+
 export interface GitModeState {
   selectedFileIndex: number
   diffs: Record<string, DiffData>
@@ -192,7 +197,7 @@ export interface GitModeState {
   pendingDeletePath: string | null
   actionMessage: string | null
   diffView: GitDiffView
-  collapsedHunks: Record<string, number[]>
+  folds: Record<string, Record<string, FoldState>>
 }
 
 interface ModalBase {
@@ -458,7 +463,14 @@ export type GitModeAction =
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
-  | { type: 'git-mode-toggle-hunk-collapsed'; path: string; hunkIndex: number }
+  | {
+      type: 'git-mode-fold-adjust'
+      path: string
+      foldId: string
+      side: 'top' | 'bottom'
+      delta: number
+    }
+  | { type: 'git-mode-fold-set'; path: string; foldId: string; top: number; bottom: number }
   | {
       type: 'git-mode-optimistic-move'
       path: string

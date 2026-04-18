@@ -1,13 +1,32 @@
-import type { AppAction, AppState, GitFileEntry, GitModeState } from '../types'
+import type { AppAction, AppState, FoldState, GitFileEntry, GitModeState } from '../types'
 
 import { sortFilesBySection } from './git-panel-state'
+
+function applyFold(state: AppState, path: string, foldId: string, next: FoldState): AppState {
+  const perPath = state.gitMode.folds[path] ?? {}
+  const prev = perPath[foldId] ?? { bottom: 0, top: 0 }
+  if (prev.top === next.top && prev.bottom === next.bottom) return state
+  const nextPerPath = { ...perPath }
+  if (next.top === 0 && next.bottom === 0) {
+    delete nextPerPath[foldId]
+  } else {
+    nextPerPath[foldId] = next
+  }
+  const nextFolds = { ...state.gitMode.folds }
+  if (Object.keys(nextPerPath).length === 0) {
+    delete nextFolds[path]
+  } else {
+    nextFolds[path] = nextPerPath
+  }
+  return { ...state, gitMode: { ...state.gitMode, folds: nextFolds } }
+}
 
 export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
-    collapsedHunks: {},
     diffs: {},
     diffView: 'split',
+    folds: {},
     loading: {},
     pendingDeletePath: null,
     selectedFileIndex: 0,
@@ -88,17 +107,15 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     }
     case 'git-mode-clear-diff-cache': {
       const hasDiff = action.path in state.gitMode.diffs
-      const hasCollapsed = action.path in state.gitMode.collapsedHunks
-      if (!hasDiff && !hasCollapsed) return state
+      const hasFolds = action.path in state.gitMode.folds
+      if (!hasDiff && !hasFolds) return state
       const nextDiffs = hasDiff ? { ...state.gitMode.diffs } : state.gitMode.diffs
       if (hasDiff) delete nextDiffs[action.path]
-      const nextCollapsed = hasCollapsed
-        ? { ...state.gitMode.collapsedHunks }
-        : state.gitMode.collapsedHunks
-      if (hasCollapsed) delete nextCollapsed[action.path]
+      const nextFolds = hasFolds ? { ...state.gitMode.folds } : state.gitMode.folds
+      if (hasFolds) delete nextFolds[action.path]
       return {
         ...state,
-        gitMode: { ...state.gitMode, collapsedHunks: nextCollapsed, diffs: nextDiffs },
+        gitMode: { ...state.gitMode, diffs: nextDiffs, folds: nextFolds },
       }
     }
     case 'git-mode-set-message': {
@@ -109,19 +126,20 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
     }
-    case 'git-mode-toggle-hunk-collapsed': {
-      const existing = state.gitMode.collapsedHunks[action.path] ?? []
-      const has = existing.includes(action.hunkIndex)
-      const updated = has
-        ? existing.filter((i) => i !== action.hunkIndex)
-        : [...existing, action.hunkIndex].sort((a, b) => a - b)
-      const nextCollapsed = { ...state.gitMode.collapsedHunks }
-      if (updated.length === 0) {
-        delete nextCollapsed[action.path]
-      } else {
-        nextCollapsed[action.path] = updated
-      }
-      return { ...state, gitMode: { ...state.gitMode, collapsedHunks: nextCollapsed } }
+    case 'git-mode-fold-adjust': {
+      const perPath = state.gitMode.folds[action.path] ?? {}
+      const prev = perPath[action.foldId] ?? { bottom: 0, top: 0 }
+      const nextSide = Math.max(0, prev[action.side] + action.delta)
+      const nextFold =
+        action.side === 'top'
+          ? { bottom: prev.bottom, top: nextSide }
+          : { bottom: nextSide, top: prev.top }
+      return applyFold(state, action.path, action.foldId, nextFold)
+    }
+    case 'git-mode-fold-set': {
+      const top = Math.max(0, action.top)
+      const bottom = Math.max(0, action.bottom)
+      return applyFold(state, action.path, action.foldId, { bottom, top })
     }
     case 'git-mode-optimistic-move': {
       const currentIdx = state.gitMode.selectedFileIndex
