@@ -115,12 +115,19 @@ Important files:
 
 ## Theme Runtime Model
 
-Theme picker state and persistence currently flow through `aimux.json.themeId`
-and runtime side effects, even though the config package also exports typed theme
-helpers.
+Theme state lives in three places:
 
-That is why theme docs need a `Partially supported` label for the top-level typed
-`theme` field.
+- `aimux.json.themeId` — the theme last confirmed in the picker, persisted per
+  profile.
+- `AimuxUserConfig.theme` / `.themes` — declarative initial theme and
+  user-defined themes from `aimux.config.ts`.
+- The in-memory `THEMES` registry — the shipped shiki + house themes merged
+  with user themes at startup via `registerUserThemes()`.
+
+On boot the runtime picks the active id as: persisted `themeId` (if known)
+→ `resolvedConfig.theme` → `aimux`. Shiki themes load on demand via
+`ensureShikiTheme()`; user-defined themes are registered with shiki by
+synthesizing a TextMate theme from their palette.
 
 ## Profiles and Isolation
 

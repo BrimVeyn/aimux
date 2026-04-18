@@ -73,7 +73,7 @@ export function App({
       resolvedConfig.theme && isKnownThemeId(resolvedConfig.theme)
         ? resolvedConfig.theme
         : undefined
-    const initial = persisted ?? fromConfig ?? 'catppuccin-mocha'
+    const initial = persisted ?? fromConfig ?? 'aimux'
     applyTheme(initial)
     return initial
   })

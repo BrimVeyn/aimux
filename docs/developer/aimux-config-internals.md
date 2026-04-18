@@ -111,14 +111,17 @@ behavior such as closing the active tab only when one exists.
 
 The package exports:
 
-- `THEMES`
-- `THEME_IDS`
-- `themes.extend()`
-- `themes.create()`
+- `THEMES` — merged record of generated shiki themes (`themes.generated.ts`)
+  and hand-curated house themes (`house-themes.ts`).
+- `THEME_IDS` — stable order: shiki ids first, house ids last.
+- `themes.define(name, base, overrides)` — builds a `NamedThemeDefinition` for
+  the `themes` config map.
+- `themes.extend(base, overrides)` — lower-level, unnamed variant.
+- `migrateThemeId(id)` — resolves a persisted id through legacy aliases.
 
-The package-level theme API is broader than what the app runtime currently uses
-on startup, so docs should label top-level typed theme config as `Partially
-supported`.
+House themes are shipped in `house-themes.ts` (duplicated in `src/ui/`).
+`scripts/generate-themes.ts` only writes the shiki portion; house themes are
+edited by hand.
 
 ## Backends and Other Deferred Surfaces
 

@@ -21,7 +21,8 @@ snippets, themes, and fully configurable keymaps.
 - snippets catalog and snippet picker
 - configurable git pane (embedded in the sidebar or as a standalone pane) and git mode
 - built-in help generated from the resolved keymap
-- theme picker with 11 built-in themes
+- theme picker with 67 built-in themes (shiki catalog + aimux house themes) and a `/` filter
+- shiki-powered syntax highlighting in the git diff view
 
 ## Install
 

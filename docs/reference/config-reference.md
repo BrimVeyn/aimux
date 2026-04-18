@@ -31,7 +31,8 @@ Additional export:
 
 ```ts
 defineConfig({
-  theme?: ThemeId | ThemeDefinition
+  theme?: ThemeId
+  themes?: Record<string, NamedThemeDefinition>
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
@@ -44,16 +45,17 @@ defineConfig({
 
 ## Support Matrix
 
-| Field        | Status              | Notes                                                                                             |
-| ------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
-| `keymaps`    | Supported           | Fully resolved and registered by the app                                                          |
-| `sessionBar` | Supported           | Used during app initialization; can override `aimux.json` values                                  |
-| `gitPane`    | Supported           | Controls placement and rendering of the git file list (see below)                                 |
-| `theme`      | Partially supported | Typed surface exists, but app startup currently initializes theme state from `aimux.json.themeId` |
-| `backends`   | Typed surface only  | Resolved by the config package, but current runtime wiring is deferred                            |
-| `sidebar`    | Typed surface only  | Type exists, but current runtime sidebar state comes from app-managed state and snapshots         |
-| `hooks`      | Typed surface only  | Type exists; runtime use is not currently wired                                                   |
-| `snippets`   | Typed surface only  | Type exists, but snippets are currently loaded from `aimux-snippets.json`                         |
+| Field        | Status             | Notes                                                                                     |
+| ------------ | ------------------ | ----------------------------------------------------------------------------------------- |
+| `keymaps`    | Supported          | Fully resolved and registered by the app                                                  |
+| `sessionBar` | Supported          | Used during app initialization; can override `aimux.json` values                          |
+| `gitPane`    | Supported          | Controls placement and rendering of the git file list (see below)                         |
+| `theme`      | Supported          | Initial theme id. Persisted `aimux.json.themeId` wins if present                          |
+| `themes`     | Supported          | User-defined themes; appear in the picker and power synthesized Shiki highlighting        |
+| `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                    |
+| `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots |
+| `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
+| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
 
 ## `defineConfig`
 
@@ -202,28 +204,34 @@ Legacy migration: config files written before `gitPane` existed stored
 are read once on load and converted to `{ mode: 'embedded', position: 'bottom',
 ratio, visible }`, then persisted under `gitPane` on the next save.
 
-## `theme`
-
-Status: `Partially supported`
+## `theme` and `themes`
 
 Type:
 
 ```ts
-theme?: ThemeId | ThemeDefinition
+theme?: ThemeId
+themes?: Record<string, NamedThemeDefinition>
 ```
 
-You can provide:
+`theme` is the initial theme id applied at startup. It can be any built-in id
+(shiki catalog + house themes `aimux` and `dracula-at-night`) or any key from
+your own `themes` map below.
 
-- a built-in `ThemeId`
-- a theme from `themes.extend()`
-- a theme from `themes.create()`
+`themes` declares user themes. Each entry is a `NamedThemeDefinition` with a
+display name, an optional base theme to inherit colors from, and partial
+overrides:
 
-Current caveat:
+```ts
+themes: {
+  'my-neon': themes.define('My Neon', 'aimux', {
+    accent: '#ff00aa',
+    accentAlt: '#00ffcc',
+  }),
+}
+```
 
-- the app runtime initializes theme state from `aimux.json.themeId`
-- the theme picker reads and writes built-in IDs through `aimux.json`
-- typed theme definitions are exported and valid at the package level, but are
-  not yet the primary runtime control path
+Precedence at startup: persisted `aimux.json.themeId` (if still known) → your
+`theme` field → fallback `aimux`.
 
 ## `backends`
 
@@ -324,12 +332,15 @@ You can also provide your own `ActionFn` for dynamic runtime behavior.
 
 Exports:
 
-- `themes.extend(baseThemeId, overrides)`
-- `themes.create(colors)`
-- `THEME_IDS`
-- `THEMES`
+- `themes.define(name, baseThemeId, overrides)` — build a `NamedThemeDefinition`
+  for use in the `themes` config map.
+- `themes.extend(baseThemeId, overrides)` — build an unnamed `ThemeDefinition`
+  (lower-level; prefer `themes.define` for config).
+- `THEME_IDS` — all shipped theme ids (shiki + house).
+- `THEMES` — record mapping id to `{ name, type, colors }`.
 
-Use the built-in IDs for the most reliable runtime integration today.
+See [`../guide/themes.md`](../guide/themes.md) for the full list of shipped
+themes and picker usage.
 
 ## Tooling Types
 

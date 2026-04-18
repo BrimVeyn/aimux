@@ -149,41 +149,47 @@ You can also bind a custom `ActionFn` for dynamic behavior.
 
 ## Themes
 
-Built-in theme IDs:
+aimux ships two house themes (`aimux`, `dracula-at-night`) plus every theme
+bundled by [shiki](https://shiki.style/themes) — 67 themes total.
 
-- `aimux`
-- `dracula`
-- `dracula-at-night`
-- `everforest`
-- `tokyo-night`
-- `gruvbox-dark`
-- `catppuccin-mocha`
-- `nord`
-- `solarized-dark`
-- `one-dark`
-- `kanagawa`
+Declare your own themes in config — they appear in the picker and power
+synthesized syntax highlighting:
+
+```ts
+import { defineConfig, themes } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  theme: 'my-neon',
+  themes: {
+    'my-neon': themes.define('My Neon', 'aimux', {
+      accent: '#ff00aa',
+    }),
+  },
+})
+```
 
 Helpers:
 
-```ts
-themes.extend(baseThemeId, overrides)
-themes.create(colors)
-```
+- `themes.define(name, baseId, overrides)` — build a `NamedThemeDefinition` for
+  the `themes` config map.
+- `themes.extend(baseId, overrides)` — lower-level, unnamed variant.
 
-Typed theme config is currently only `Partially supported` by the runtime.
+See [`../../docs/guide/themes.md`](../../docs/guide/themes.md) for picker
+shortcuts and the full shipped theme list.
 
 ## Support Status
 
-| Surface      | Status              | Notes                                                                 |
-| ------------ | ------------------- | --------------------------------------------------------------------- |
-| `keymaps`    | Supported           | Fully registered by the runtime                                       |
-| `sessionBar` | Supported           | Used during app initialization                                        |
-| `gitPane`    | Supported           | Placement and rendering of the git file list (see docs reference)     |
-| `theme`      | Partially supported | Package surface exists, but runtime startup uses `aimux.json.themeId` |
-| `backends`   | Typed surface only  | Runtime wiring deferred                                               |
-| `sidebar`    | Typed surface only  | Type exists, runtime not currently driven by this field               |
-| `hooks`      | Typed surface only  | Type exists, runtime use not currently wired                          |
-| `snippets`   | Typed surface only  | Runtime currently uses `aimux-snippets.json`                          |
+| Surface      | Status             | Notes                                                                |
+| ------------ | ------------------ | -------------------------------------------------------------------- |
+| `keymaps`    | Supported          | Fully registered by the runtime                                      |
+| `sessionBar` | Supported          | Used during app initialization                                       |
+| `gitPane`    | Supported          | Placement and rendering of the git file list (see docs reference)    |
+| `theme`      | Supported          | Initial theme id; `aimux.json.themeId` wins if still known           |
+| `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting |
+| `backends`   | Typed surface only | Runtime wiring deferred                                              |
+| `sidebar`    | Typed surface only | Type exists, runtime not currently driven by this field              |
+| `hooks`      | Typed surface only | Type exists, runtime use not currently wired                         |
+| `snippets`   | Typed surface only | Runtime currently uses `aimux-snippets.json`                         |
 
 ## Backends Subpath
 

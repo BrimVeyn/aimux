@@ -8,8 +8,6 @@ import { isWorkspaceSnapshotV1 } from './state/validation'
 import { THEME_IDS, type ThemeId } from './ui/themes'
 
 const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
-  'aimux': 'catppuccin-mocha',
-  'dracula-at-night': 'dracula',
   'everforest': 'everforest-dark',
   'gruvbox-dark': 'gruvbox-dark-hard',
   'kanagawa': 'kanagawa-wave',

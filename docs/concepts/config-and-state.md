@@ -126,15 +126,14 @@ their programmatic preferences.
 
 ### Theme
 
-The theme situation is different.
+The typed config exposes `theme` (initial id) and `themes` (a map of
+user-defined theme definitions built with `themes.define()`). User themes are
+merged into the runtime registry at startup and appear in the picker alongside
+the shipped themes.
 
-The typed config package exposes `theme`, `themes.extend()`, and
-`themes.create()`, but the app currently initializes theme state from
-`aimux.json.themeId`, and the theme picker persists a built-in `themeId` back to
-`aimux.json`.
-
-Treat typed theme definitions as `Partially supported` until the runtime fully
-consumes them.
+The picker persists the confirmed `themeId` to `aimux.json`. On next launch the
+persisted id wins if it still resolves to a known theme, otherwise the typed
+`theme` field is used, otherwise `aimux`.
 
 ### Sessions
 

@@ -1,6 +1,7 @@
 import type { NamedThemeDefinition } from '@brimveyn/aimux-config'
 import type { BundledTheme } from 'shiki'
 
+import { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
 import { GENERATED_THEME_IDS, GENERATED_THEMES } from './themes.generated'
 
 export interface ThemeColors {
@@ -31,10 +32,10 @@ export interface ThemeEntry {
   type: 'dark' | 'light'
 }
 
-export const THEMES: Record<string, ThemeEntry> = { ...GENERATED_THEMES }
-export const THEME_IDS: ThemeId[] = [...GENERATED_THEME_IDS]
+export const THEMES: Record<string, ThemeEntry> = { ...GENERATED_THEMES, ...HOUSE_THEMES }
+export const THEME_IDS: ThemeId[] = [...GENERATED_THEME_IDS, ...HOUSE_THEME_IDS]
 
-const DEFAULT_THEME_ID: ThemeId = 'catppuccin-mocha'
+const DEFAULT_THEME_ID: ThemeId = 'aimux'
 
 export function registerUserThemes(defs: Record<string, NamedThemeDefinition>): void {
   const fallback = THEMES[DEFAULT_THEME_ID]

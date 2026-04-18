@@ -1,6 +1,6 @@
 import { type ThemeColors, type ThemeId, THEMES } from './themes'
 
-const DEFAULT = THEMES['catppuccin-mocha']
+const DEFAULT = THEMES['aimux']
 if (!DEFAULT) throw new Error('default theme missing')
 
 export const theme: ThemeColors = { ...DEFAULT.colors }

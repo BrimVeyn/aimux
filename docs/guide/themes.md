@@ -1,81 +1,111 @@
 # Themes
 
-`aimux` ships with built-in themes and a runtime theme picker.
+aimux ships two house themes (`aimux`, `dracula-at-night`) plus the full
+[Shiki](https://shiki.style) theme catalog, for a total of 67 themes — all
+usable both as UI chrome and as the diff syntax-highlighting theme.
 
-The `@brimveyn/aimux-config` package also exposes typed theme helpers.
+## Runtime theme picker
 
-Those two layers overlap, but they are not currently equivalent.
+Open with `Ctrl+T` from `navigation` mode.
 
-## Built-in Theme IDs
+| Key                 | Action                                       |
+| ------------------- | -------------------------------------------- |
+| `j` / `k`           | Preview next / previous theme                |
+| `↑` / `↓`           | Same                                         |
+| `Ctrl+N` / `Ctrl+P` | Same                                         |
+| `Enter`             | Confirm selection (persists to `aimux.json`) |
+| `Esc`               | Restore the original theme and close         |
+| `/`                 | Enter filter mode                            |
 
-The built-in IDs are:
+In filter mode:
 
-- `aimux`
-- `dracula`
-- `dracula-at-night`
-- `everforest`
-- `tokyo-night`
-- `gruvbox-dark`
-- `catppuccin-mocha`
-- `nord`
-- `solarized-dark`
-- `one-dark`
-- `kanagawa`
+- Type to narrow the list. Matches against both the theme id (e.g. `dracula-at-night`) and its display name.
+- `Ctrl+N`/`Ctrl+P` or arrow keys continue to preview.
+- `Enter` confirms, `Esc` clears the filter and returns to the picker.
 
-## Runtime Theme Picker
+## Built-in theme ids
 
-The default shortcut is:
+Two house themes:
 
-- `Ctrl+T` from `navigation` mode
+- `aimux` — the default theme. Teal accent on a deep blue background.
+- `dracula-at-night` — darker take on Dracula.
 
-Inside the theme picker:
+Plus every theme bundled by [`shiki`](https://shiki.style/themes) — e.g.
+`dracula`, `tokyo-night`, `catppuccin-mocha`, `nord`, `solarized-dark`,
+`one-dark-pro`, `github-dark`, `monokai`, `vitesse-dark`, `gruvbox-dark-hard`,
+`kanagawa-wave`, `everforest-dark`, and about fifty more.
 
-- `j` / `k` move the preview selection
-- arrow keys also move the selection
-- `Enter` confirms the selected theme
-- `Esc` restores the original theme and closes the modal
+## User-defined themes
 
-When you confirm a theme, the runtime persists the chosen `themeId` to
-`aimux.json`.
-
-## Typed Theme Helpers
-
-`@brimveyn/aimux-config` exports:
-
-- `themes.extend(baseThemeId, overrides)`
-- `themes.create(colors)`
-- `THEMES`
-- `THEME_IDS`
-
-Example:
+Declare themes in `aimux.config.ts`. They appear in the picker next to the
+built-ins and power syntax highlighting via a synthesized Shiki theme.
 
 ```ts
 import { defineConfig, themes } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: themes.extend('tokyo-night', {
-    accent: '#ff9e64',
-  }),
+  // Initial theme — any built-in id, or an id from your `themes` map below.
+  theme: 'my-neon',
+
+  themes: {
+    'my-neon': themes.define('My Neon', 'aimux', {
+      accent: '#ff00aa',
+      accentAlt: '#00ffcc',
+    }),
+    'my-mono': themes.define('Mono', 'solarized-dark', {
+      accent: '#ffffff',
+      accentAlt: '#aaaaaa',
+    }),
+  },
 })
 ```
 
-## Support Status
+`themes.define(name, base, overrides)` takes a display name, a base theme to
+inherit palette values from, and a partial `ThemeColors` override. Fields you
+don't override are copied from the base.
 
-| Surface                                      | Status              | Notes                                                                                          |
-| -------------------------------------------- | ------------------- | ---------------------------------------------------------------------------------------------- |
-| Built-in theme picker                        | Supported           | Reads and writes `aimux.json.themeId`                                                          |
-| Built-in theme IDs                           | Supported           | Used by the runtime today                                                                      |
-| `themes.extend()`                            | Partially supported | Valid package API, but the runtime does not fully initialize from `resolvedConfig.theme`       |
-| `themes.create()`                            | Partially supported | Same caveat as above                                                                           |
-| top-level `theme` field in `aimux.config.ts` | Partially supported | Exposed by the config package, but app startup currently initializes from `aimux.json.themeId` |
+### How syntax highlighting works for user themes
 
-## Recommendation
+For built-in Shiki themes, the diff view tokenizes code with Shiki's native
+theme. For user themes (and the house themes `aimux` / `dracula-at-night`),
+aimux synthesizes a minimal Shiki theme from the palette:
 
-For the most predictable runtime behavior today:
+| aimux token | Applied to                                |
+| ----------- | ----------------------------------------- |
+| `textMuted` | comments (italic)                         |
+| `warning`   | strings, HTML attributes (italic)         |
+| `accentAlt` | keywords (bold), regex / escape sequences |
+| `danger`    | numbers, constants, HTML tags             |
+| `success`   | function names                            |
+| `accent`    | types (italic), object properties         |
+| `text`      | variables                                 |
 
-- use the built-in theme picker for day-to-day theme switching
-- treat typed theme definitions as advanced package surface area, not as the
-  primary runtime control path
+This covers the common scope surface — it won't reproduce the richness of a
+hand-crafted VSCode theme, but keeps code colors consistent with the UI.
 
-If you document team setup for other users, describe this as `Partially
-supported` rather than fully supported.
+## Persistence
+
+When you confirm a theme in the picker, aimux writes `themeId` to
+`aimux.json`. On next launch:
+
+1. Persisted `themeId` wins if it resolves to a known theme (built-in or user).
+2. Otherwise the `theme` field from `aimux.config.ts` is used.
+3. Otherwise `aimux`.
+
+If a persisted id is no longer known (theme removed from config, renamed, etc.)
+aimux falls back to the default.
+
+## Legacy theme migration
+
+Older aimux builds shipped a handful of themes that have been renamed to match
+Shiki's bundled ids. If your `aimux.json` has one of these, it's auto-migrated:
+
+| old id         | resolves to         |
+| -------------- | ------------------- |
+| `everforest`   | `everforest-dark`   |
+| `gruvbox-dark` | `gruvbox-dark-hard` |
+| `kanagawa`     | `kanagawa-wave`     |
+| `one-dark`     | `one-dark-pro`      |
+
+`aimux` and `dracula-at-night` are shipped under their original ids and need
+no migration.
