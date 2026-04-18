@@ -580,8 +580,12 @@ export type Action = KeyResult | ActionFn
 
 // ─── Keymap builder API types ─────────────────────────────────────────────────
 
+export interface BindingOptions {
+  repeatable?: boolean
+}
+
 export interface GroupBuilderApi {
-  map(keys: string, action: Action, description?: string): GroupBuilderApi
+  map(keys: string, action: Action, description?: string, opts?: BindingOptions): GroupBuilderApi
   group(
     prefix: string,
     name: string,
@@ -590,7 +594,12 @@ export interface GroupBuilderApi {
 }
 
 export interface ModeBindingBuilderApi {
-  map(keys: string, action: Action, description?: string): ModeBindingBuilderApi
+  map(
+    keys: string,
+    action: Action,
+    description?: string,
+    opts?: BindingOptions
+  ): ModeBindingBuilderApi
   unmap(keys: string): ModeBindingBuilderApi
   group(
     prefix: string,
@@ -633,6 +642,7 @@ export interface BindingDef {
   result: Action
   group?: string
   description?: string
+  repeatable?: boolean
 }
 
 export interface ModeKeymapDef {

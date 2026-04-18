@@ -18,6 +18,7 @@ export function buildKeymapHandlers(config: ResolvedKeymapConfig): KeymapModeHan
       const sequence = parseKeyNotation(binding.keys, leaderChord)
       trie.insert(sequence, {
         group: binding.group,
+        repeatable: binding.repeatable,
         result: binding.result,
       })
     }
