@@ -229,6 +229,7 @@ export interface ModalSnippetPicker extends ModalBase {
 
 export interface ModalThemePicker extends ModalBase {
   type: 'theme-picker'
+  entryCount: number
 }
 
 export interface ModalHelp extends ModalBase {
@@ -346,7 +347,9 @@ export type ModalAction =
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
   | { type: 'begin-help-filter' }
+  | { type: 'begin-theme-filter' }
   | { type: 'set-help-entry-count'; count: number }
+  | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 

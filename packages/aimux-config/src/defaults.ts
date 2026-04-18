@@ -137,6 +137,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-n>', actions.previewTheme(1))
         .map('<C-p>', actions.previewTheme(-1))
         .map('<CR>', actions.confirmTheme, 'Confirm')
+        .map('/', actions.beginThemeFilter, 'Filter')
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: theme-picker filtering
+    // -----------------------------------------------------------------------
+    .mode('modal.theme-picker.filtering', (m) =>
+      m
+        .map('<Esc>', actions.cancelCommandEdit('modal.theme-picker'), 'Cancel')
+        .map('<C-n>', actions.previewTheme(1), 'Next')
+        .map('<C-p>', actions.previewTheme(-1), 'Prev')
+        .map('<Down>', actions.previewTheme(1))
+        .map('<Up>', actions.previewTheme(-1))
+        .map('<CR>', actions.confirmTheme, 'Confirm')
+        .passthrough()
     )
 
     // -----------------------------------------------------------------------

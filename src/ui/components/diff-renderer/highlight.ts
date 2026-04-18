@@ -1,6 +1,6 @@
 import type { ThemedToken } from 'shiki'
 
-import { ensureShikiLang, getShikiHighlighter } from '../../shiki'
+import { ensureShikiLang, ensureShikiTheme, getShikiHighlighter } from '../../shiki'
 
 export interface HighlightSpan {
   bold?: boolean
@@ -29,8 +29,11 @@ export async function tokenizeSide(
 ): Promise<ThemedToken[][]> {
   if (lines.length === 0) return []
   const highlighter = await getShikiHighlighter()
-  const ok = await ensureShikiLang(highlighter, lang)
-  if (!ok) return []
+  const [langOk, themeOk] = await Promise.all([
+    ensureShikiLang(highlighter, lang),
+    ensureShikiTheme(highlighter, theme),
+  ])
+  if (!langOk || !themeOk) return []
   try {
     const result = highlighter.codeToTokens(lines.join(''), {
       // eslint-disable-next-line typescript/no-explicit-any

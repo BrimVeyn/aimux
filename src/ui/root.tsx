@@ -134,7 +134,11 @@ function renderModal(
       )
     case 'theme-picker':
       return (
-        <ThemePickerModal selectedIndex={modal.selectedIndex} currentThemeId={options.themeId} />
+        <ThemePickerModal
+          selectedIndex={modal.selectedIndex}
+          currentThemeId={options.themeId}
+          filter={modal.editBuffer}
+        />
       )
     case 'update-available':
       return (

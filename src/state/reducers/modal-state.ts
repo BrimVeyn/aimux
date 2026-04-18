@@ -162,6 +162,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: 0,
           editBuffer: null,
+          entryCount: 0,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'theme-picker',
@@ -222,6 +223,28 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     }
     case 'begin-help-filter': {
       if (state.modal.type !== 'help') {
+        return state
+      }
+      const buf = state.modal.editBuffer ?? ''
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
+      }
+    }
+    case 'set-theme-entry-count': {
+      if (state.modal.type !== 'theme-picker') return state
+      const clamped = Math.min(state.modal.selectedIndex, Math.max(0, action.count - 1))
+      if (state.modal.entryCount === action.count && clamped === state.modal.selectedIndex) {
+        return state
+      }
+      return {
+        ...state,
+        modal: { ...state.modal, entryCount: action.count, selectedIndex: clamped },
+      }
+    }
+    case 'begin-theme-filter': {
+      if (state.modal.type !== 'theme-picker') {
         return state
       }
       const buf = state.modal.editBuffer ?? ''

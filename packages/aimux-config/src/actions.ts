@@ -214,6 +214,12 @@ export const beginHelpFilter: KeyResult = r(
   'modal.help.filtering'
 )
 
+export const beginThemeFilter: KeyResult = r(
+  [{ type: 'begin-theme-filter' }],
+  [],
+  'modal.theme-picker.filtering'
+)
+
 export const confirmSplit: KeyResult = r([], [{ type: 'confirm-split' }])
 
 export const restoreTheme: KeyResult = r(

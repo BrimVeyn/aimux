@@ -17,6 +17,7 @@ export type ModeId =
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker'
+  | 'modal.theme-picker.filtering'
   | 'modal.help'
   | 'modal.help.filtering'
   | 'modal.split-picker'

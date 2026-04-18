@@ -34,9 +34,10 @@ import {
   type TabSession,
 } from '../state/types'
 import { saveCurrentWorkspace } from '../state/workspace-save'
+import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme } from '../ui/theme'
-import { THEME_IDS, type ThemeId } from '../ui/themes'
+import { type ThemeId } from '../ui/themes'
 import {
   handleCreateSessionEffect,
   handleDeleteSessionEffect,
@@ -167,16 +168,18 @@ function applyThemeEffect(
   ctx: SideEffectContext
 ): void {
   const { state } = ctx
+  const filter = state.modal.type === 'theme-picker' ? state.modal.editBuffer : null
+  const ids = filterThemeIds(filter)
 
   switch (effect.action) {
     case 'open':
-      applyTheme(THEME_IDS[0] ?? 'catppuccin-mocha')
+      applyTheme(ctx.themeId)
       return
     case 'restore':
       applyTheme(ctx.themeId)
       return
     case 'confirm': {
-      const selectedId = THEME_IDS[state.modal.selectedIndex]
+      const selectedId = ids[state.modal.selectedIndex]
       if (selectedId) {
         applyTheme(selectedId)
         ctx.setThemeId(selectedId)
@@ -185,9 +188,9 @@ function applyThemeEffect(
       return
     }
     case 'preview': {
-      const count = THEME_IDS.length
-      const nextIndex = (state.modal.selectedIndex + effect.delta + count) % count
-      const previewId = THEME_IDS[nextIndex]
+      if (ids.length === 0) return
+      const nextIndex = (state.modal.selectedIndex + effect.delta + ids.length) % ids.length
+      const previewId = ids[nextIndex]
       if (previewId) {
         applyTheme(previewId)
       }

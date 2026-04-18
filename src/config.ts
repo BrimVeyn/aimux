@@ -10,9 +10,9 @@ import { THEME_IDS, type ThemeId } from './ui/themes'
 const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
   'aimux': 'catppuccin-mocha',
   'dracula-at-night': 'dracula',
-  'everforest': 'catppuccin-mocha',
-  'gruvbox-dark': 'catppuccin-mocha',
-  'kanagawa': 'tokyo-night',
+  'everforest': 'everforest-dark',
+  'gruvbox-dark': 'gruvbox-dark-hard',
+  'kanagawa': 'kanagawa-wave',
   'one-dark': 'one-dark-pro',
 }
 

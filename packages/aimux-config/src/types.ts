@@ -23,6 +23,7 @@ export type ModeId =
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker'
+  | 'modal.theme-picker.filtering'
   | 'modal.help'
   | 'modal.help.filtering'
   | 'modal.split-picker'
@@ -241,6 +242,7 @@ export interface ModalSnippetPicker extends ModalBase {
 }
 export interface ModalThemePicker extends ModalBase {
   type: 'theme-picker'
+  entryCount: number
 }
 export interface ModalHelp extends ModalBase {
   type: 'help'
@@ -346,7 +348,9 @@ export type ModalAction =
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'begin-snippet-filter' }
   | { type: 'begin-help-filter' }
+  | { type: 'begin-theme-filter' }
   | { type: 'set-help-entry-count'; count: number }
+  | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
 
@@ -542,15 +546,13 @@ export interface ThemeColors {
   danger: string
   success: string
   dim: string
+  diffAddBg: string
+  diffRemoveBg: string
 }
 
-export type ThemeId =
-  | 'catppuccin-mocha'
-  | 'dracula'
-  | 'nord'
-  | 'one-dark-pro'
-  | 'solarized-dark'
-  | 'tokyo-night'
+import type { BundledTheme } from 'shiki'
+
+export type ThemeId = BundledTheme
 
 export interface ThemeDefinition {
   base?: ThemeId
