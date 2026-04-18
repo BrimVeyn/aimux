@@ -69,7 +69,23 @@ function tagExists(tag: string): boolean {
   return res.status === 0
 }
 
-function main() {
+async function confirm(question: string): Promise<boolean> {
+  if (!process.stdin.isTTY) {
+    fail('cannot prompt for confirmation without a TTY (pipe `yes` or run interactively)')
+  }
+  process.stdout.write(`${question} [y/N] `)
+  process.stdin.setEncoding('utf8')
+  const answer = await new Promise<string>((resolve) => {
+    const onData = (chunk: string) => {
+      process.stdin.off('data', onData)
+      resolve(chunk)
+    }
+    process.stdin.on('data', onData)
+  })
+  return /^\s*y(es)?\s*$/i.test(answer)
+}
+
+async function main() {
   const kind = parseKind(process.argv[2])
 
   requireCleanTree()
@@ -85,6 +101,18 @@ function main() {
   const branch = currentBranch()
   console.log(`\u001b[36m${pkg.name}\u001b[0m ${prev} → \u001b[32m${next}\u001b[0m (${kind})`)
   console.log(`branch: ${branch}`)
+  console.log('will:')
+  console.log(`  1. rewrite package.json version → ${next}`)
+  console.log('  2. bun install (sync lockfile)')
+  console.log(`  3. commit "chore(release): ${tag}"`)
+  console.log(`  4. create annotated tag ${tag}`)
+  console.log(`  5. push ${branch} and ${tag} to origin`)
+
+  const ok = await confirm('proceed?')
+  if (!ok) {
+    console.log('aborted.')
+    process.exit(1)
+  }
 
   // Update package.json: preserve trailing newline + JSON formatting (2-space).
   const updated = pkgRaw.replace(
@@ -109,4 +137,6 @@ function main() {
   console.log(`\u001b[32m✔\u001b[0m released ${tag}`)
 }
 
-main()
+main().catch((error) => {
+  fail(error instanceof Error ? error.message : String(error))
+})
