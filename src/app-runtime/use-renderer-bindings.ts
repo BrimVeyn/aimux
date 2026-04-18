@@ -50,7 +50,7 @@ export function useRendererBindings({
 
   useEffect(() => {
     renderer.useMouse = true
-    renderer.useConsole = false
+    renderer.consoleMode = 'disabled'
     renderer.console.hide()
     renderer.console.show = () => {}
 

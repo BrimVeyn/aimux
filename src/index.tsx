@@ -58,9 +58,9 @@ if (command === '--help' || command === '-h') {
 
 const renderer = await createCliRenderer({
   autoFocus: true,
+  consoleMode: 'disabled',
   exitOnCtrlC: false,
-  useAlternateScreen: true,
-  useConsole: false,
+  screenMode: 'alternate-screen',
   useMouse: true,
 })
 
