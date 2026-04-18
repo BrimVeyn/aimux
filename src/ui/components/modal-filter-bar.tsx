@@ -12,7 +12,7 @@ export function ModalFilterBar({ filter }: ModalFilterBarProps) {
 
   return (
     <Surface tone="input" paddingLeft={1} paddingRight={1} paddingTop={1} paddingBottom={1}>
-      <text fg={theme.text}>/{filter}_</text>
+      <text fg={theme.colors['editor.foreground']}>/{filter}_</text>
     </Surface>
   )
 }

@@ -31,19 +31,21 @@ const SidebarTop = memo(function SidebarTop() {
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
-      <text fg={theme.accent}>
+      <text fg={theme.colors['textLink.foreground']}>
         <strong>aimux</strong>
       </text>
-      <text fg={theme.accentAlt}>
+      <text fg={theme.colors['terminal.ansiMagenta']}>
         {currentSession ? currentSession.name : 'No session selected'}
       </text>
       {branch ? (
         <box flexDirection="row">
-          <text fg={theme.accent}>{'\u{e702}'} </text>
-          <text fg={theme.textMuted}>{branch}</text>
+          <text fg={theme.colors['textLink.foreground']}>{'\u{e702}'} </text>
+          <text fg={theme.colors['descriptionForeground']}>{branch}</text>
         </box>
       ) : null}
-      <text fg={theme.dim}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+      <text fg={theme.colors['editor.lineHighlightBackground']}>
+        {'·'.repeat(Math.max(0, sidebarWidth - 2))}
+      </text>
     </box>
   )
 })
@@ -56,11 +58,17 @@ function renderGroupGutter(
 ) {
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text fg={theme.accentAlt} bg={isActive ? theme.panelHighlight : undefined}>
+      <text
+        fg={theme.colors['terminal.ansiMagenta']}
+        bg={isActive ? theme.colors['list.activeSelectionBackground'] : undefined}
+      >
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text fg={theme.accentAlt} bg={isActive ? theme.panelHighlight : undefined}>
+      <text
+        fg={theme.colors['terminal.ansiMagenta']}
+        bg={isActive ? theme.colors['list.activeSelectionBackground'] : undefined}
+      >
         {isGroupEnd ? GUTTER_END : GUTTER_PAD}
       </text>
     </box>
@@ -101,7 +109,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
-          <text fg={theme.textMuted}>No tabs yet. Press Ctrl+n.</text>
+          <text fg={theme.colors['descriptionForeground']}>No tabs yet. Press Ctrl+n.</text>
         </box>
       ) : (
         tabs.map((tab, index) => {
@@ -157,7 +165,11 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.ratio) * 100)) : 1
   const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.ratio * 100)) : 0
 
-  const separator = <text fg={theme.dim}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+  const separator = (
+    <text fg={theme.colors['editor.lineHighlightBackground']}>
+      {'·'.repeat(Math.max(0, sidebarWidth - 2))}
+    </text>
+  )
   const gitBody = gitEmbedded ? (
     <box flexDirection="column" flexGrow={gitGrow} flexShrink={1} flexBasis={0} overflow="hidden">
       <GitPaneWidget pollingEnabled={gitPane.visible} />
@@ -169,7 +181,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       width={sidebarWidth}
       padding={0}
       flexDirection="column"
-      backgroundColor={theme.panel}
+      backgroundColor={theme.colors['sideBar.background']}
       gap={0}
     >
       <SidebarTop />

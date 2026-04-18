@@ -34,11 +34,23 @@ export function NewTabModal({ customCommands, editBuffer, selectedIndex }: NewTa
             <ListItem
               key={option.id}
               active={active}
-              title={<text fg={active ? theme.text : theme.textMuted}>{option.label}</text>}
+              title={
+                <text
+                  fg={
+                    active
+                      ? theme.colors['editor.foreground']
+                      : theme.colors['descriptionForeground']
+                  }
+                >
+                  {option.label}
+                </text>
+              }
               subtitle={
                 <box flexDirection="column">
-                  <text fg={theme.textMuted}>{option.description}</text>
-                  {customCmd ? <text fg={theme.accent}>{customCmd}</text> : null}
+                  <text fg={theme.colors['descriptionForeground']}>{option.description}</text>
+                  {customCmd ? (
+                    <text fg={theme.colors['textLink.foreground']}>{customCmd}</text>
+                  ) : null}
                 </box>
               }
             />

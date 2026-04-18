@@ -240,7 +240,12 @@ export function RootView({
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
   if (inGitMode) {
     return (
-      <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
+      <box
+        flexDirection="column"
+        width="100%"
+        height="100%"
+        backgroundColor={theme.colors['editor.background']}
+      >
         <GitView themeId={themeId} />
         <StatusBar />
         <PendingChordOverlay />
@@ -259,7 +264,12 @@ export function RootView({
   }
 
   return (
-    <box flexDirection="column" width="100%" height="100%" backgroundColor={theme.background}>
+    <box
+      flexDirection="column"
+      width="100%"
+      height="100%"
+      backgroundColor={theme.colors['editor.background']}
+    >
       {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar onTabActivate={onPaneActivate} />
@@ -340,7 +350,7 @@ function GitPaneInPaneMode({ ratio }: { ratio: number }) {
       flexDirection="column"
       width={width}
       flexShrink={0}
-      backgroundColor={theme.panel}
+      backgroundColor={theme.colors['sideBar.background']}
       overflow="hidden"
     >
       <GitPaneWidget pollingEnabled />

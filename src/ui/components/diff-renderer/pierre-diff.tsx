@@ -140,7 +140,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   if (!file) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.textMuted}>(could not parse diff)</text>
+        <text fg={theme.colors['descriptionForeground']}>(could not parse diff)</text>
       </box>
     )
   }

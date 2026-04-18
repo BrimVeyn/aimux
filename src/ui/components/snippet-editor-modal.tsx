@@ -26,12 +26,26 @@ export function SnippetEditorModal({
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column">
-        <text fg={nameActive ? theme.text : theme.textMuted}>Name</text>
+        <text
+          fg={
+            nameActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Name
+        </text>
         <InputField active={nameActive} value={snippetName} />
       </box>
 
       <box flexDirection="column">
-        <text fg={contentActive ? theme.text : theme.textMuted}>Content</text>
+        <text
+          fg={
+            contentActive
+              ? theme.colors['editor.foreground']
+              : theme.colors['descriptionForeground']
+          }
+        >
+          Content
+        </text>
         <InputField active={contentActive} value={snippetContent} />
       </box>
     </ModalShell>

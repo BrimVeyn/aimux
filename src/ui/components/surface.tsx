@@ -7,16 +7,16 @@ type SurfaceTone = 'muted' | 'elevated' | 'selected' | 'input' | 'inputActive'
 function getSurfaceColor(tone: SurfaceTone): string {
   switch (tone) {
     case 'elevated':
-      return theme.panel
+      return theme.colors['sideBar.background']
     case 'selected':
-      return theme.panelHighlight
+      return theme.colors['list.activeSelectionBackground']
     case 'input':
-      return theme.background
+      return theme.colors['editor.background']
     case 'inputActive':
-      return theme.panelHighlight
+      return theme.colors['list.activeSelectionBackground']
     case 'muted':
     default:
-      return theme.panelMuted
+      return theme.colors['sideBarSectionHeader.background']
   }
 }
 

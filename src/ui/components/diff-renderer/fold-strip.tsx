@@ -9,8 +9,13 @@ interface Props {
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} onMouseDown={onPress}>
-      <text fg={theme.accent}>{label}</text>
+    <box
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={theme.colors['sideBar.background']}
+      onMouseDown={onPress}
+    >
+      <text fg={theme.colors['textLink.foreground']}>{label}</text>
     </box>
   )
 }
@@ -66,8 +71,13 @@ export function FoldStrip({ dispatch, fold }: Props) {
   }
 
   return (
-    <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.textMuted}>{`⋯ ${hidden} hidden `}</text>
+    <box
+      flexDirection="row"
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={theme.colors['descriptionForeground']}>{`⋯ ${hidden} hidden `}</text>
       {controls}
     </box>
   )

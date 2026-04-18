@@ -108,7 +108,7 @@ export function SessionBar() {
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
-      backgroundColor={theme.panelMuted}
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
     >
       {visibleSessions.map((session) => {
         const displayIndex = baselineOrder.indexOf(session.id) + 1
@@ -168,9 +168,14 @@ function SessionChip({
   const showSpinner = busy && !active
   const spinner = useBusySpinner(showSpinner)
   const indicator = showSpinner ? spinner : '●'
-  const indicatorColor = active || showSpinner ? theme.accent : theme.success
-  const labelColor = active ? theme.text : theme.textMuted
-  const bgColor = dragging || active ? theme.panelHighlight : undefined
+  const indicatorColor =
+    active || showSpinner
+      ? theme.colors['textLink.foreground']
+      : theme.colors['gitDecoration.addedResourceForeground']
+  const labelColor = active
+    ? theme.colors['editor.foreground']
+    : theme.colors['descriptionForeground']
+  const bgColor = dragging || active ? theme.colors['list.activeSelectionBackground'] : undefined
 
   return (
     <box
@@ -200,7 +205,7 @@ function SessionChip({
       <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>
-      <text fg={theme.dim} selectable={false}>
+      <text fg={theme.colors['editor.lineHighlightBackground']} selectable={false}>
         {' '}
       </text>
     </box>

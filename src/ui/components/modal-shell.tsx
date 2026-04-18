@@ -40,14 +40,14 @@ export function ModalShell({
         left={0}
         width="100%"
         height="100%"
-        backgroundColor={theme.overlay}
+        backgroundColor={theme.colors['editorWidget.background']}
         opacity={0.7}
       />
       <Surface tone="elevated" padding={1} gap={1} width={width}>
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
-            <text fg={theme.accentAlt}>{title}</text>
-            {subtitle ? <text fg={theme.textMuted}>{subtitle}</text> : null}
+            <text fg={theme.colors['terminal.ansiMagenta']}>{title}</text>
+            {subtitle ? <text fg={theme.colors['descriptionForeground']}>{subtitle}</text> : null}
           </box>
           {children}
           {footer ? <box>{footer}</box> : null}

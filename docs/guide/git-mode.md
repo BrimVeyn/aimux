@@ -9,8 +9,8 @@ Enter it with `Ctrl+D` from navigation. Exit with `Esc`.
 
 Git mode splits the screen into two regions:
 
-- **Panel (left)** — file tree of the working copy, grouped into *Staged
-  Changes*, *Changes*, and *Untracked*.
+- **Panel (left)** — file tree of the working copy, grouped into _Staged
+  Changes_, _Changes_, and _Untracked_.
 - **Diff view (right)** — the diff of the currently selected file, with
   syntax highlighting.
 
@@ -54,16 +54,16 @@ colors stay consistent with the rest of the UI.
 
 Actions on the selected file:
 
-| Key | Action |
-| --- | --- |
-| `a` | Stage |
-| `d` | Unstage / delete (two-press for destructive ops) |
-| `c` | Open the commit modal |
-| `p` | Push |
-| `v` | Toggle split / stacked diff |
-| `t` | Toggle flat / tree list |
-| `?` | Help (scoped to git mode) |
-| `Esc` | Exit git mode |
+| Key   | Action                                           |
+| ----- | ------------------------------------------------ |
+| `a`   | Stage                                            |
+| `d`   | Unstage / delete (two-press for destructive ops) |
+| `c`   | Open the commit modal                            |
+| `p`   | Push                                             |
+| `v`   | Toggle split / stacked diff                      |
+| `t`   | Toggle flat / tree list                          |
+| `?`   | Help (scoped to git mode)                        |
+| `Esc` | Exit git mode                                    |
 
 Navigation in the panel:
 

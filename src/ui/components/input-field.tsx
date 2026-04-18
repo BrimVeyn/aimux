@@ -8,7 +8,7 @@ interface InputFieldProps {
 }
 
 export function InputField({ active, cursorPos, value }: InputFieldProps) {
-  const fg = active ? theme.text : theme.textMuted
+  const fg = active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
   if (!active) {
     return (
       <Surface tone="input" padding={1}>
@@ -29,7 +29,7 @@ export function InputField({ active, cursorPos, value }: InputFieldProps) {
     <Surface tone="inputActive" padding={1}>
       <text fg={fg}>
         {before}
-        <span bg={theme.text} fg={theme.background}>
+        <span bg={theme.colors['editor.foreground']} fg={theme.colors['editor.background']}>
           {cursorDisplay}
         </span>
         {trailing}

@@ -220,25 +220,34 @@ Type:
 
 ```ts
 theme?: ThemeId
-themes?: Record<string, NamedThemeDefinition>
+themes?: Record<string, NamedTheme | NamedThemeDefinition>
 ```
 
-`theme` is the initial theme id applied at startup. It can be any built-in id
+`theme` is the initial theme id applied at startup. It can be any shipped id
 (shiki catalog + house themes `aimux` and `dracula-at-night`) or any key from
-your own `themes` map below.
+your own `themes` map.
 
-`themes` declares user themes. Each entry is a `NamedThemeDefinition` with a
-display name, an optional base theme to inherit colors from, and partial
-overrides:
+`themes` declares user themes. Entries can be one of two shapes:
+
+- `NamedThemeDefinition` — palette shortcut built via `themes.define(name, base, overrides)`. Overrides use VSCode workbench color keys.
+- `NamedTheme` — full shiki-shape theme built via `themes.full({...})`. Use this to drop a VSCode theme JSON verbatim.
 
 ```ts
-themes: {
-  'my-neon': themes.define('My Neon', 'aimux', {
-    accent: '#ff00aa',
-    accentAlt: '#00ffcc',
-  }),
-}
+import { defineConfig, themes } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  theme: 'my-neon',
+  themes: {
+    'my-neon': themes.define('My Neon', 'aimux', {
+      'textLink.foreground': '#ff00aa',
+      'terminal.ansiMagenta': '#00ffcc',
+    }),
+  },
+})
 ```
+
+See [`../guide/themes.md`](../guide/themes.md) for the full VSCode color key
+reference and the `themes.full` authoring form.
 
 Precedence at startup: persisted `aimux.json.themeId` (if still known) → your
 `theme` field → fallback `aimux`.
@@ -342,12 +351,15 @@ You can also provide your own `ActionFn` for dynamic runtime behavior.
 
 Exports:
 
-- `themes.define(name, baseThemeId, overrides)` — build a `NamedThemeDefinition`
-  for use in the `themes` config map.
-- `themes.extend(baseThemeId, overrides)` — build an unnamed `ThemeDefinition`
-  (lower-level; prefer `themes.define` for config).
+- `themes.define(name, baseThemeId, overrides)` — palette shortcut. Patch VSCode
+  color keys on top of `baseThemeId`. Returns a `NamedThemeDefinition`.
+- `themes.full(theme)` — pass-through for a raw `NamedTheme` (shiki theme JSON
+  with `name`, `displayName`, `type`, `colors`, `settings`, …).
+- `themes.extend(baseThemeId, overrides)` — unnamed variant of `define`
+  (lower-level).
+- `AIMUX_COLOR_KEYS` — the VSCode color keys aimux's UI reads.
 - `THEME_IDS` — all shipped theme ids (shiki + house).
-- `THEMES` — record mapping id to `{ name, type, colors }`.
+- `THEMES` — record mapping id to a full `Theme` object.
 
 See [`../guide/themes.md`](../guide/themes.md) for the full list of shipped
 themes and picker usage.

@@ -60,10 +60,10 @@ export function SessionPickerModal({
       footer={<ModalFilterBar filter={filter} />}
     >
       {showFilteredEmptyState ? (
-        <text fg={theme.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
+        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
       ) : null}
       {showInitialEmptyState ? (
-        <text fg={theme.textMuted}>{getEmptyStateMessage(false)}</text>
+        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(false)}</text>
       ) : null}
       {filtered.map((session, index) => {
         const active = index === selectedIndex
@@ -73,13 +73,19 @@ export function SessionPickerModal({
             key={session.id}
             active={active}
             title={
-              <text fg={active ? theme.text : theme.textMuted}>
+              <text
+                fg={
+                  active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+                }
+              >
                 {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
               </text>
             }
             subtitle={
               session.projectPath ? (
-                <text fg={theme.textMuted}>{abbreviatePath(session.projectPath)}</text>
+                <text fg={theme.colors['descriptionForeground']}>
+                  {abbreviatePath(session.projectPath)}
+                </text>
               ) : undefined
             }
           />
@@ -88,7 +94,13 @@ export function SessionPickerModal({
       <ListItem
         active={selectedIndex === filtered.length}
         title={
-          <text fg={selectedIndex === filtered.length ? theme.text : theme.textMuted}>
+          <text
+            fg={
+              selectedIndex === filtered.length
+                ? theme.colors['editor.foreground']
+                : theme.colors['descriptionForeground']
+            }
+          >
             Create new session
           </text>
         }

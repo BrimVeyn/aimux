@@ -1,10 +1,16 @@
-import type { NamedThemeDefinition, ThemeColors, ThemeDefinition, ThemeId } from './types'
+import type {
+  NamedTheme,
+  NamedThemeDefinition,
+  Theme,
+  ThemeColorMap,
+  ThemeDefinition,
+  ThemeId,
+} from './types'
 
 import { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
 import { GENERATED_THEME_IDS, GENERATED_THEMES } from './themes.generated'
 
-export const THEMES: Record<string, { colors: ThemeColors; name: string; type: 'dark' | 'light' }> =
-  { ...GENERATED_THEMES, ...HOUSE_THEMES }
+export const THEMES: Record<string, Theme> = { ...GENERATED_THEMES, ...HOUSE_THEMES }
 export const THEME_IDS: ThemeId[] = [...GENERATED_THEME_IDS, ...HOUSE_THEME_IDS]
 
 const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
@@ -24,10 +30,24 @@ export function migrateThemeId(id: string | undefined): ThemeId {
 }
 
 export const themes = {
-  define(name: string, base: ThemeId, overrides: Partial<ThemeColors>): NamedThemeDefinition {
+  /**
+   * Palette shortcut. Clones `base`'s Theme and patches a few VSCode color keys
+   * in `colors`. Token settings inherit from the base unchanged.
+   */
+  define(name: string, base: ThemeId, overrides: Partial<ThemeColorMap>): NamedThemeDefinition {
     return { base, colors: overrides, name }
   },
-  extend(base: ThemeId, overrides: Partial<ThemeColors>): ThemeDefinition {
+  /**
+   * Lower-level, unnamed variant of `define`. Prefer `define` for config entries.
+   */
+  extend(base: ThemeId, overrides: Partial<ThemeColorMap>): ThemeDefinition {
     return { base, colors: overrides }
+  },
+  /**
+   * Identity passthrough for a full raw Shiki theme. Use this to drop a VSCode
+   * theme JSON verbatim into aimux config.
+   */
+  full(theme: NamedTheme): NamedTheme {
+    return theme
   },
 }

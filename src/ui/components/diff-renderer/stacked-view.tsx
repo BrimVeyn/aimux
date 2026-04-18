@@ -92,9 +92,16 @@ function UnifiedRowRender({
 }) {
   if (row.type === 'hunk-header') {
     return (
-      <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
-        <text fg={theme.textMuted}>{row.spec}</text>
-        {row.context ? <text fg={theme.dim}> {row.context}</text> : null}
+      <box
+        flexDirection="row"
+        backgroundColor={theme.colors['sideBarSectionHeader.background']}
+        paddingLeft={1}
+        paddingRight={1}
+      >
+        <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
+        {row.context ? (
+          <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
+        ) : null}
       </box>
     )
   }
@@ -107,21 +114,29 @@ function UnifiedRowRender({
     const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row" height={row.height}>
-        <text fg={theme.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={theme.text}> </text>
+        <text
+          fg={theme.colors['descriptionForeground']}
+        >{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
+        <text fg={theme.colors['editor.foreground']}> </text>
         <LineContent content={row.content} tokens={tokens} />
       </box>
     )
   }
-  const bg = row.type === 'addition' ? theme.diffAddBg : theme.diffRemoveBg
+  const bg =
+    row.type === 'addition'
+      ? theme.colors['diffEditor.insertedLineBackground']
+      : theme.colors['diffEditor.removedLineBackground']
   const sign = row.type === 'addition' ? '+' : '-'
-  const signColor = row.type === 'addition' ? theme.success : theme.danger
+  const signColor =
+    row.type === 'addition'
+      ? theme.colors['gitDecoration.addedResourceForeground']
+      : theme.colors['editorError.foreground']
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={bg} height={row.height}>
-      <text fg={theme.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
+      <text fg={theme.colors['descriptionForeground']}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
     </box>
@@ -130,7 +145,7 @@ function UnifiedRowRender({
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
   if (!tokens || tokens.length === 0) {
-    return <text fg={theme.text}>{content}</text>
+    return <text fg={theme.colors['editor.foreground']}>{content}</text>
   }
   return (
     <text>
@@ -141,7 +156,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? theme.text} attributes={attributes}>
+          <span key={i} fg={s.fg ?? theme.colors['editor.foreground']} attributes={attributes}>
             {s.text}
           </span>
         )

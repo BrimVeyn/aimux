@@ -28,9 +28,9 @@ export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProp
         {entries.map((binding) => (
           <box key={`${binding.keys}-${binding.description}`} flexDirection="row">
             <box width={KEYS_COLUMN_WIDTH}>
-              <text fg={theme.accentAlt}>{binding.keysDisplay}</text>
+              <text fg={theme.colors['terminal.ansiMagenta']}>{binding.keysDisplay}</text>
             </box>
-            <text fg={theme.textMuted}>{binding.description ?? ''}</text>
+            <text fg={theme.colors['descriptionForeground']}>{binding.description ?? ''}</text>
           </box>
         ))}
       </Surface>

@@ -85,7 +85,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
           />
         ))}
       </scrollbox>
-      <box width={1} backgroundColor={theme.background} />
+      <box width={1} backgroundColor={theme.colors['editor.background']} />
       <scrollbox
         ref={rightRef}
         flexGrow={1}
@@ -133,9 +133,16 @@ function SideRow({
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
   return (
-    <box flexDirection="row" backgroundColor={theme.panelMuted} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.textMuted}>{row.spec}</text>
-      {row.context ? <text fg={theme.dim}> {row.context}</text> : null}
+    <box
+      flexDirection="row"
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
+      {row.context ? (
+        <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
+      ) : null}
     </box>
   )
 }
@@ -152,25 +159,25 @@ function HalfRow({
   tokens: ThemedToken[][]
 }) {
   if (cell.type === 'filler') {
-    return <box backgroundColor={theme.panelMuted} height={height} />
+    return <box backgroundColor={theme.colors['sideBarSectionHeader.background']} height={height} />
   }
   let bg: string | undefined
   let sign = ' '
-  let signColor = theme.textMuted
+  let signColor = theme.colors['descriptionForeground']
   if (cell.type === 'addition') {
-    bg = theme.diffAddBg
+    bg = theme.colors['diffEditor.insertedLineBackground']
     sign = '+'
-    signColor = theme.success
+    signColor = theme.colors['gitDecoration.addedResourceForeground']
   } else if (cell.type === 'deletion') {
-    bg = theme.diffRemoveBg
+    bg = theme.colors['diffEditor.removedLineBackground']
     sign = '-'
-    signColor = theme.danger
+    signColor = theme.colors['editorError.foreground']
   }
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={bg} height={height}>
-      <text fg={theme.textMuted}>{` ${num} `}</text>
+      <text fg={theme.colors['descriptionForeground']}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />
     </box>
@@ -179,7 +186,7 @@ function HalfRow({
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
   if (!tokens || tokens.length === 0) {
-    return <text fg={theme.text}>{content}</text>
+    return <text fg={theme.colors['editor.foreground']}>{content}</text>
   }
   return (
     <text>
@@ -190,7 +197,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? theme.text} attributes={attributes}>
+          <span key={i} fg={s.fg ?? theme.colors['editor.foreground']} attributes={attributes}>
             {s.text}
           </span>
         )

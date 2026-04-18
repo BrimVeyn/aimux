@@ -149,11 +149,11 @@ You can also bind a custom `ActionFn` for dynamic behavior.
 
 ## Themes
 
-aimux ships two house themes (`aimux`, `dracula-at-night`) plus every theme
-bundled by [shiki](https://shiki.style/themes) — 67 themes total.
+aimux themes are [Shiki](https://shiki.style/themes) themes. Two house themes
+(`aimux`, `dracula-at-night`) ship alongside the full Shiki catalog — 67
+themes total. The same `Theme` object powers UI colors and code highlighting.
 
-Declare your own themes in config — they appear in the picker and power
-synthesized syntax highlighting:
+Declare your own themes in config:
 
 ```ts
 import { defineConfig, themes } from '@brimveyn/aimux-config'
@@ -161,21 +161,32 @@ import { defineConfig, themes } from '@brimveyn/aimux-config'
 export default defineConfig({
   theme: 'my-neon',
   themes: {
+    // Palette shortcut — patch VSCode color keys on top of a base theme.
     'my-neon': themes.define('My Neon', 'aimux', {
-      accent: '#ff00aa',
+      'textLink.foreground': '#ff00aa',
+      'terminal.ansiMagenta': '#00ffcc',
+    }),
+    // Or drop a full VSCode theme JSON verbatim:
+    'custom': themes.full({
+      name: 'custom',
+      displayName: 'Custom',
+      type: 'dark',
+      fg: '#eee',
+      bg: '#1a1a1a',
+      colors: {
+        /* VSCode workbench keys */
+      },
+      settings: [
+        /* TextMate token rules */
+      ],
     }),
   },
 })
 ```
 
-Helpers:
-
-- `themes.define(name, baseId, overrides)` — build a `NamedThemeDefinition` for
-  the `themes` config map.
-- `themes.extend(baseId, overrides)` — lower-level, unnamed variant.
-
 See [`../../docs/guide/themes.md`](../../docs/guide/themes.md) for picker
-shortcuts and the full shipped theme list.
+shortcuts, the VSCode color key reference, and migration notes if you're
+coming from the old palette alias API.
 
 ## Support Status
 

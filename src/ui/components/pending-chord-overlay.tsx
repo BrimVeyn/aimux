@@ -19,9 +19,9 @@ export function PendingChordOverlay() {
     <box position="absolute" bottom={modalOpen ? 10 : 2} right={1}>
       <Surface tone="elevated" paddingLeft={1} paddingRight={1}>
         <box flexDirection="row">
-          <text fg={theme.textMuted}>pending: </text>
-          <text fg={theme.accent}>{display}</text>
-          <text fg={theme.textMuted}> …</text>
+          <text fg={theme.colors['descriptionForeground']}>pending: </text>
+          <text fg={theme.colors['textLink.foreground']}>{display}</text>
+          <text fg={theme.colors['descriptionForeground']}> …</text>
         </box>
       </Surface>
     </box>

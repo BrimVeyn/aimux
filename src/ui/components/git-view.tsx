@@ -48,21 +48,21 @@ const DiffStage = memo(function DiffStage({
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.textMuted}>Loading diff…</text>
+        <text fg={theme.colors['descriptionForeground']}>Loading diff…</text>
       </box>
     )
   }
   if (!diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.textMuted}>Select a file.</text>
+        <text fg={theme.colors['descriptionForeground']}>Select a file.</text>
       </box>
     )
   }
   if (diff.errorMessage) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.danger}>{diff.errorMessage}</text>
+        <text fg={theme.colors['editorError.foreground']}>{diff.errorMessage}</text>
       </box>
     )
   }
@@ -71,7 +71,7 @@ const DiffStage = memo(function DiffStage({
   if (placeholder) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.textMuted}>{placeholder}</text>
+        <text fg={theme.colors['descriptionForeground']}>{placeholder}</text>
       </box>
     )
   }
@@ -80,7 +80,7 @@ const DiffStage = memo(function DiffStage({
     <box flexDirection="column" flexGrow={1} overflow="hidden">
       {diff.oldPath ? (
         <box paddingLeft={1} paddingRight={1}>
-          <text fg={theme.textMuted}>
+          <text fg={theme.colors['descriptionForeground']}>
             renamed: {diff.oldPath} → {diff.path}
           </text>
         </box>
@@ -173,13 +173,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
-      <text fg={theme.warning}>
+      <text fg={theme.colors['editorWarning.foreground']}>
         <strong>{pendingHint}</strong>
       </text>
     )
   } else if (actionMessage) {
     footerNode = actionMessage.split('\n').map((line, idx) => (
-      <text key={idx} fg={theme.accent}>
+      <text key={idx} fg={theme.colors['textLink.foreground']}>
         {line}
       </text>
     ))
@@ -191,20 +191,22 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
         <box
           width={fileBarWidth}
           flexDirection="column"
-          backgroundColor={theme.panel}
+          backgroundColor={theme.colors['sideBar.background']}
           padding={0}
           gap={0}
         >
-          <text fg={theme.accent}>
+          <text fg={theme.colors['textLink.foreground']}>
             <strong>aimux · git</strong>
           </text>
           {gitPanel.branch ? (
             <box flexDirection="row">
-              <text fg={theme.accent}>{'\u{e702}'} </text>
-              <text fg={theme.textMuted}>{gitPanel.branch}</text>
+              <text fg={theme.colors['textLink.foreground']}>{'\u{e702}'} </text>
+              <text fg={theme.colors['descriptionForeground']}>{gitPanel.branch}</text>
             </box>
           ) : null}
-          <text fg={theme.dim}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          <text fg={theme.colors['editor.lineHighlightBackground']}>
+            {'·'.repeat(Math.max(0, fileBarWidth - 2))}
+          </text>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
             fileListMode={gitPane.fileListMode}
@@ -223,7 +225,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
         />
       </box>
       {footerNode ? (
-        <box paddingLeft={1} paddingRight={1} backgroundColor={theme.panel} flexDirection="column">
+        <box
+          paddingLeft={1}
+          paddingRight={1}
+          backgroundColor={theme.colors['sideBar.background']}
+          flexDirection="column"
+        >
           {footerNode}
         </box>
       ) : null}

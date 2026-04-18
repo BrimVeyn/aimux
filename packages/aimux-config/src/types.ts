@@ -558,37 +558,126 @@ export interface ModeContext {
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 
-export interface ThemeColors {
-  background: string
-  panel: string
-  panelMuted: string
-  panelHighlight: string
-  overlay: string
-  border: string
-  borderActive: string
-  text: string
-  textMuted: string
-  accent: string
-  accentAlt: string
-  warning: string
-  danger: string
-  success: string
-  dim: string
-  diffAddBg: string
-  diffRemoveBg: string
-}
-
 import type { BundledTheme } from 'shiki'
 
 export type ThemeId = BundledTheme | (string & {})
 
+/**
+ * VSCode workbench color keys aimux's UI depends on. The build-time normalizer
+ * guarantees every `Theme` has all of these populated.
+ */
+export const AIMUX_COLOR_KEYS = [
+  // editor
+  'editor.background',
+  'editor.foreground',
+  'editor.lineHighlightBackground',
+  'editor.selectionBackground',
+  'editorLineNumber.foreground',
+  'editorCursor.foreground',
+  // sidebar / panels
+  'sideBar.background',
+  'sideBar.foreground',
+  'sideBarSectionHeader.background',
+  'sideBarSectionHeader.foreground',
+  'editorGroupHeader.tabsBackground',
+  'editorWidget.background',
+  'panel.background',
+  'panel.border',
+  // borders & focus
+  'focusBorder',
+  'editorGroup.border',
+  'contrastBorder',
+  // lists
+  'list.activeSelectionBackground',
+  'list.activeSelectionForeground',
+  'list.hoverBackground',
+  // text & links
+  'foreground',
+  'descriptionForeground',
+  'textLink.foreground',
+  'textLink.activeForeground',
+  // status
+  'errorForeground',
+  'editorError.foreground',
+  'editorWarning.foreground',
+  // terminal ANSI
+  'terminal.ansiRed',
+  'terminal.ansiGreen',
+  'terminal.ansiYellow',
+  'terminal.ansiBlue',
+  'terminal.ansiMagenta',
+  'terminal.ansiCyan',
+  // git decorations
+  'gitDecoration.addedResourceForeground',
+  'gitDecoration.modifiedResourceForeground',
+  'gitDecoration.deletedResourceForeground',
+  'gitDecoration.untrackedResourceForeground',
+  // diff editor
+  'diffEditor.insertedLineBackground',
+  'diffEditor.removedLineBackground',
+  // input
+  'input.background',
+  'input.foreground',
+  'input.border',
+] as const
+
+export type AimuxColorKey = (typeof AIMUX_COLOR_KEYS)[number]
+
+export type ThemeColorMap = Record<AimuxColorKey, string> & Record<string, string>
+
+export interface ThemeSettings {
+  fontStyle?: string
+  foreground?: string
+  background?: string
+  // Some bundled shiki themes include non-standard keys (e.g. `content`); allow passthrough.
+  [key: string]: string | undefined
+}
+
+export interface ThemeTokenRule {
+  name?: string
+  scope?: string | string[]
+  // `foreground` at the top level is used by a handful of shiki themes as a
+  // shorthand for `settings.foreground` — accept both forms.
+  foreground?: string
+  settings?: ThemeSettings
+}
+
+export interface Theme {
+  name: string
+  displayName: string
+  type: 'dark' | 'light'
+  fg: string
+  bg: string
+  colors: ThemeColorMap
+  settings: ThemeTokenRule[]
+  tokenColors?: ThemeTokenRule[]
+  colorReplacements?: Record<string, string>
+  semanticHighlighting?: boolean
+  semanticTokenColors?: Record<
+    string,
+    | string
+    | {
+        foreground?: string
+        fontStyle?: string
+        bold?: boolean
+        italic?: boolean
+        underline?: boolean
+      }
+  >
+}
+
+/** Partial-override shape for `themes.define(name, base, overrides)`. */
 export interface ThemeDefinition {
   base?: ThemeId
-  colors: Partial<ThemeColors>
+  colors: Partial<ThemeColorMap>
 }
 
 export interface NamedThemeDefinition extends ThemeDefinition {
   name: string
+}
+
+export interface NamedTheme extends Theme {
+  displayName: string
 }
 
 // ─── Backend config (stub) ────────────────────────────────────────────────────

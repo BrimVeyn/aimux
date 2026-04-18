@@ -134,7 +134,7 @@ export function SplitLayout({
       <box
         minWidth={node.direction === 'vertical' ? 1 : undefined}
         minHeight={node.direction === 'horizontal' ? 1 : undefined}
-        backgroundColor={theme.border}
+        backgroundColor={theme.colors['editorGroup.border']}
         onMouseDown={(e: OtuiMouseEvent) => {
           e.preventDefault()
           if (!onSeparatorDragStart) return

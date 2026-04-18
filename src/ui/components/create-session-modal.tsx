@@ -21,14 +21,14 @@ function getDirectoryResultIcon(result: DirectoryResult): string {
 
 function getDirectoryResultColor(result: DirectoryResult): string {
   if (result.type === 'worktree') {
-    return theme.warning
+    return theme.colors['editorWarning.foreground']
   }
 
   if (result.type === 'workspace') {
-    return theme.accentAlt
+    return theme.colors['terminal.ansiMagenta']
   }
 
-  return theme.accent
+  return theme.colors['textLink.foreground']
 }
 
 interface CreateSessionModalProps {
@@ -58,7 +58,11 @@ export function CreateSessionModal({
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column">
-        <text fg={dirActive ? theme.text : theme.textMuted}>Search projects</text>
+        <text
+          fg={dirActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
+        >
+          Search projects
+        </text>
         <InputField
           active={dirActive}
           value={
@@ -68,7 +72,7 @@ export function CreateSessionModal({
       </box>
 
       {dirActive && results.length === 0 && directoryQuery.length > 0 ? (
-        <text fg={theme.textMuted}>No matches</text>
+        <text fg={theme.colors['descriptionForeground']}>No matches</text>
       ) : null}
 
       {dirActive
@@ -82,7 +86,13 @@ export function CreateSessionModal({
                   <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>
                 }
                 title={
-                  <text fg={active ? theme.text : theme.textMuted}>
+                  <text
+                    fg={
+                      active
+                        ? theme.colors['editor.foreground']
+                        : theme.colors['descriptionForeground']
+                    }
+                  >
                     {abbreviatePath(result.path)}
                   </text>
                 }
@@ -92,7 +102,13 @@ export function CreateSessionModal({
         : null}
 
       <box flexDirection="column">
-        <text fg={nameActive ? theme.text : theme.textMuted}>Session name</text>
+        <text
+          fg={
+            nameActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Session name
+        </text>
         <InputField active={nameActive} value={sessionName} />
       </box>
     </ModalShell>

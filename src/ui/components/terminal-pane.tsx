@@ -46,14 +46,14 @@ function getTitle(
 
 function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
   if (isActive && focusMode === 'terminal-input') {
-    return theme.borderActive
+    return theme.colors['focusBorder']
   }
 
   if (isActive) {
-    return theme.accentAlt
+    return theme.colors['terminal.ansiMagenta']
   }
 
-  return theme.dim
+  return theme.colors['editor.lineHighlightBackground']
 }
 
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
@@ -72,7 +72,7 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
   }
 
   return (
-    <span key={key} fg={span.fg ?? theme.text} bg={span.bg}>
+    <span key={key} fg={span.fg ?? theme.colors['editor.foreground']} bg={span.bg}>
       {node}
     </span>
   )
@@ -90,7 +90,7 @@ const TerminalViewport = memo(function TerminalViewport({
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
     return (
-      <text fg={theme.text}>
+      <text fg={theme.colors['editor.foreground']}>
         {lines.map((line, lineIndex) => (
           <span key={`line-${lineIndex}`}>
             {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`))}
@@ -101,7 +101,11 @@ const TerminalViewport = memo(function TerminalViewport({
     )
   }
 
-  return <text fg={theme.text}>{buffer.length > 0 ? buffer : 'Waiting for session output...'}</text>
+  return (
+    <text fg={theme.colors['editor.foreground']}>
+      {buffer.length > 0 ? buffer : 'Waiting for session output...'}
+    </text>
+  )
 })
 
 export function TerminalPane({
@@ -179,19 +183,19 @@ export function TerminalPane({
         padding={0}
         flexDirection="column"
         flexGrow={1}
-        backgroundColor={theme.background}
+        backgroundColor={theme.colors['editor.background']}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}
         onMouseUp={forwardMouseEvent}
       >
         {!tab ? (
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-            <text fg={theme.dim}>· · ·</text>
-            <text fg={theme.textMuted}> </text>
+            <text fg={theme.colors['editor.lineHighlightBackground']}>· · ·</text>
+            <text fg={theme.colors['descriptionForeground']}> </text>
             <box flexDirection="row">
-              <text fg={theme.textMuted}>Press </text>
-              <text fg={theme.accent}>Ctrl+n</text>
-              <text fg={theme.textMuted}> to launch an assistant</text>
+              <text fg={theme.colors['descriptionForeground']}>Press </text>
+              <text fg={theme.colors['textLink.foreground']}>Ctrl+n</text>
+              <text fg={theme.colors['descriptionForeground']}> to launch an assistant</text>
             </box>
           </box>
         ) : (
@@ -209,12 +213,18 @@ export function TerminalPane({
         )}
       </box>
       {tab?.status === 'exited' && tab.exitCode !== undefined ? (
-        <text fg={theme.warning}>Process exited with code {tab.exitCode}</text>
+        <text fg={theme.colors['editorWarning.foreground']}>
+          Process exited with code {tab.exitCode}
+        </text>
       ) : null}
       {tab?.status === 'disconnected' ? (
-        <text fg={theme.warning}>Restored snapshot. Press Ctrl+r to restart this session.</text>
+        <text fg={theme.colors['editorWarning.foreground']}>
+          Restored snapshot. Press Ctrl+r to restart this session.
+        </text>
       ) : null}
-      {tab?.errorMessage ? <text fg={theme.danger}>{tab.errorMessage}</text> : null}
+      {tab?.errorMessage ? (
+        <text fg={theme.colors['editorError.foreground']}>{tab.errorMessage}</text>
+      ) : null}
     </box>
   )
 }

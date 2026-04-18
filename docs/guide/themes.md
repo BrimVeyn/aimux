@@ -1,8 +1,18 @@
 # Themes
 
-aimux ships two house themes (`aimux`, `dracula-at-night`) plus the full
-[Shiki](https://shiki.style) theme catalog, for a total of 67 themes — all
-usable both as UI chrome and as the diff syntax-highlighting theme.
+aimux themes are [Shiki](https://shiki.style/themes) themes. The in-memory
+`theme` object, the object fed to `highlighter.loadTheme(...)` for diff
+highlighting, and the object a user drops into `aimux.config.ts` all share one
+shape — a VSCode-style theme JSON. No aimux-specific palette aliases, no
+translation layer.
+
+aimux ships:
+
+- Two house themes: `aimux` (teal accents on deep blue, default) and
+  `dracula-at-night` (dark Dracula variant).
+- Every theme bundled by Shiki — `dracula`, `tokyo-night`, `catppuccin-mocha`,
+  `nord`, `one-dark-pro`, `github-dark`, `monokai`, plus 58 others. 67 themes
+  total.
 
 ## Runtime theme picker
 
@@ -17,88 +27,132 @@ Open with `Ctrl+T` from `navigation` mode.
 | `Esc`               | Restore the original theme and close         |
 | `/`                 | Enter filter mode                            |
 
-In filter mode:
+In filter mode typing narrows by id or display name; `Enter` confirms, `Esc`
+clears.
 
-- Type to narrow the list. Matches against both the theme id (e.g. `dracula-at-night`) and its display name.
-- `Ctrl+N`/`Ctrl+P` or arrow keys continue to preview.
-- `Enter` confirms, `Esc` clears the filter and returns to the picker.
+## Theme shape
 
-## Built-in theme ids
+A theme is a `Theme` object:
 
-Two house themes:
+```ts
+interface Theme {
+  name: string // id (e.g. 'aimux')
+  displayName: string // shown in picker
+  type: 'dark' | 'light'
+  fg: string // default foreground
+  bg: string // default background
+  colors: Record<string, string> // VSCode workbench color keys
+  settings: ThemeTokenRule[] // TextMate token rules
+  // plus optional tokenColors, colorReplacements, semantic*
+}
+```
 
-- `aimux` — the default theme. Teal accent on a deep blue background.
-- `dracula-at-night` — darker take on Dracula.
+`colors` is indexed by VSCode workbench keys (`editor.background`,
+`sideBar.background`, `textLink.foreground`, `terminal.ansiRed`, …). aimux's
+UI reads a documented subset directly from this map — no intermediate aliases.
 
-Plus every theme bundled by [`shiki`](https://shiki.style/themes) — e.g.
-`dracula`, `tokyo-night`, `catppuccin-mocha`, `nord`, `solarized-dark`,
-`one-dark-pro`, `github-dark`, `monokai`, `vitesse-dark`, `gruvbox-dark-hard`,
-`kanagawa-wave`, `everforest-dark`, and about fifty more.
-
-## User-defined themes
+## Authoring user themes
 
 Declare themes in `aimux.config.ts`. They appear in the picker next to the
-built-ins and power syntax highlighting via a synthesized Shiki theme.
+built-ins and power both UI chrome and code highlighting.
+
+### `themes.define(name, base, overrides)` — palette shortcut
+
+Patch a few VSCode color keys on top of an existing theme:
 
 ```ts
 import { defineConfig, themes } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  // Initial theme — any built-in id, or an id from your `themes` map below.
   theme: 'my-neon',
-
   themes: {
     'my-neon': themes.define('My Neon', 'aimux', {
-      accent: '#ff00aa',
-      accentAlt: '#00ffcc',
-    }),
-    'my-mono': themes.define('Mono', 'solarized-dark', {
-      accent: '#ffffff',
-      accentAlt: '#aaaaaa',
+      'textLink.foreground': '#ff00aa',
+      'terminal.ansiMagenta': '#00ffcc',
     }),
   },
 })
 ```
 
-`themes.define(name, base, overrides)` takes a display name, a base theme to
-inherit palette values from, and a partial `ThemeColors` override. Fields you
-don't override are copied from the base.
+Token settings (syntax highlighting rules) inherit from the base theme
+unchanged.
 
-### How syntax highlighting works for user themes
+### `themes.full(theme)` — raw shiki theme
 
-For built-in Shiki themes, the diff view tokenizes code with Shiki's native
-theme. For user themes (and the house themes `aimux` / `dracula-at-night`),
-aimux synthesizes a minimal Shiki theme from the palette:
+Drop a VSCode theme JSON verbatim:
 
-| aimux token | Applied to                                |
-| ----------- | ----------------------------------------- |
-| `textMuted` | comments (italic)                         |
-| `warning`   | strings, HTML attributes (italic)         |
-| `accentAlt` | keywords (bold), regex / escape sequences |
-| `danger`    | numbers, constants, HTML tags             |
-| `success`   | function names                            |
-| `accent`    | types (italic), object properties         |
-| `text`      | variables                                 |
+```ts
+themes.full({
+  name: 'my-theme',
+  displayName: 'My Theme',
+  type: 'dark',
+  fg: '#eeeeee',
+  bg: '#1a1a1a',
+  colors: {
+    'editor.background': '#1a1a1a',
+    'editor.foreground': '#eeeeee',
+    'textLink.foreground': '#88c0d0',
+    // …
+  },
+  settings: [
+    { scope: ['comment'], settings: { foreground: '#666', fontStyle: 'italic' } },
+    { scope: ['keyword'], settings: { foreground: '#ff79c6', fontStyle: 'bold' } },
+    // …
+  ],
+})
+```
 
-This covers the common scope surface — it won't reproduce the richness of a
-hand-crafted VSCode theme, but keeps code colors consistent with the UI.
+Any valid VSCode theme works — paste from `https://github.com/...`, tweak,
+ship.
 
-## Persistence
+## Key reference
 
-When you confirm a theme in the picker, aimux writes `themeId` to
-`aimux.json`. On next launch:
+aimux reads these VSCode keys from `theme.colors` at runtime. They're all
+guaranteed to be populated on every shipped theme (the build-time normalizer
+fills gaps via a fallback chain). User themes are normalized the same way at
+registration — missing keys resolve to a sensible default.
 
-1. Persisted `themeId` wins if it resolves to a known theme (built-in or user).
-2. Otherwise the `theme` field from `aimux.config.ts` is used.
-3. Otherwise `aimux`.
+| VSCode key                                        | Aimux uses it for                |
+| ------------------------------------------------- | -------------------------------- |
+| `editor.background`                               | app background                   |
+| `editor.foreground`                               | default text color               |
+| `editor.lineHighlightBackground`                  | subtle banding / dim backgrounds |
+| `editor.selectionBackground`                      | list / text selection            |
+| `editorLineNumber.foreground`                     | diff gutter, hint text           |
+| `sideBar.background`                              | side panels, surfaces            |
+| `sideBarSectionHeader.background`                 | section headers                  |
+| `editorGroupHeader.tabsBackground`                | tab strip                        |
+| `editorWidget.background`                         | modal / overlay backgrounds      |
+| `editorGroup.border`                              | pane separators                  |
+| `focusBorder`                                     | active tab / focused input       |
+| `list.activeSelectionBackground`                  | selected list row                |
+| `descriptionForeground`                           | muted / secondary text           |
+| `textLink.foreground`                             | accents, headings                |
+| `errorForeground` / `editorError.foreground`      | errors, `D` git status           |
+| `editorWarning.foreground`                        | warnings, `M` git status         |
+| `terminal.ansiRed/Green/Yellow/Blue/Magenta/Cyan` | ANSI-style accents in UI         |
+| `gitDecoration.addedResourceForeground`           | additions, `A` git status        |
+| `gitDecoration.modifiedResourceForeground`        | modified files                   |
+| `gitDecoration.deletedResourceForeground`         | deleted files                    |
+| `gitDecoration.untrackedResourceForeground`       | untracked files                  |
+| `diffEditor.insertedLineBackground`               | diff add background              |
+| `diffEditor.removedLineBackground`                | diff remove background           |
 
-If a persisted id is no longer known (theme removed from config, renamed, etc.)
-aimux falls back to the default.
+The full list lives in `AIMUX_COLOR_KEYS` (`@brimveyn/aimux-config`). Themes
+can also define any other VSCode key — aimux preserves extra entries so
+`highlighter.loadTheme(theme)` sees them exactly as shipped.
 
-## Legacy theme migration
+## Syntax highlighting
 
-Older aimux builds shipped a handful of themes that have been renamed to match
-Shiki's bundled ids. If your `aimux.json` has one of these, it's auto-migrated:
+Every theme carries real TextMate `settings`. The diff view calls
+`highlighter.loadTheme(THEMES[id])` directly — the colors you see in the UI
+and the colors on code tokens come from the same theme object.
+
+## Persistence & migration
+
+- Picker writes `themeId` to `aimux.json` on confirm.
+- On next launch: persisted id → `resolvedConfig.theme` → `aimux`.
+- Legacy ids renamed to shiki equivalents are auto-migrated:
 
 | old id         | resolves to         |
 | -------------- | ------------------- |
@@ -107,5 +161,28 @@ Shiki's bundled ids. If your `aimux.json` has one of these, it's auto-migrated:
 | `kanagawa`     | `kanagawa-wave`     |
 | `one-dark`     | `one-dark-pro`      |
 
-`aimux` and `dracula-at-night` are shipped under their original ids and need
-no migration.
+## Migrating from the old palette API
+
+Earlier aimux versions exposed a 17-field `ThemeColors` alias (`accent`,
+`panel`, `textMuted`, …). Those aliases are gone. Rewrite user themes using
+VSCode keys:
+
+| old alias        | VSCode key                              |
+| ---------------- | --------------------------------------- |
+| `background`     | `editor.background`                     |
+| `text`           | `editor.foreground`                     |
+| `textMuted`      | `descriptionForeground`                 |
+| `panel`          | `sideBar.background`                    |
+| `panelMuted`     | `sideBarSectionHeader.background`       |
+| `panelHighlight` | `list.activeSelectionBackground`        |
+| `overlay`        | `editorWidget.background`               |
+| `border`         | `editorGroup.border`                    |
+| `borderActive`   | `focusBorder`                           |
+| `dim`            | `editor.lineHighlightBackground`        |
+| `accent`         | `textLink.foreground`                   |
+| `accentAlt`      | `terminal.ansiMagenta`                  |
+| `warning`        | `editorWarning.foreground`              |
+| `danger`         | `editorError.foreground`                |
+| `success`        | `gitDecoration.addedResourceForeground` |
+| `diffAddBg`      | `diffEditor.insertedLineBackground`     |
+| `diffRemoveBg`   | `diffEditor.removedLineBackground`      |

@@ -113,15 +113,15 @@ function buildLine(
     let bg = getColorHex(current.getBgColor(), bgMode)
 
     if (current.isInverse()) {
-      const resolvedFg = fg ?? theme.text
-      const resolvedBg = bg ?? theme.background
+      const resolvedFg = fg ?? theme.colors['editor.foreground']
+      const resolvedBg = bg ?? theme.colors['editor.background']
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 
     const isCursorCell = cursorVisible && cursorColumn === column
     if (isCursorCell) {
-      const resolvedFg = fg ?? theme.text
-      const resolvedBg = bg ?? theme.background
+      const resolvedFg = fg ?? theme.colors['editor.foreground']
+      const resolvedBg = bg ?? theme.colors['editor.background']
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 

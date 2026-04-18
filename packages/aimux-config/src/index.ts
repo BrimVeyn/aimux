@@ -12,6 +12,7 @@ export type {
   // Action types
   Action,
   ActionFn,
+  AimuxColorKey,
   // User-facing config
   AimuxUserConfig,
   AppAction,
@@ -40,6 +41,7 @@ export type {
   // Mode / state
   ModeId,
   ModeKeymapDef,
+  NamedTheme,
   NamedThemeDefinition,
   // Resolved config (internal, but exported for tooling)
   ResolvedConfig,
@@ -51,8 +53,11 @@ export type {
   SnippetRecord,
   SplitDirection,
   TabSession,
-  // Themes
-  ThemeColors,
+  Theme,
+  ThemeColorMap,
   ThemeDefinition,
   ThemeId,
+  ThemeSettings,
+  ThemeTokenRule,
 } from './types'
+export { AIMUX_COLOR_KEYS } from './types'

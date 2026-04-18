@@ -79,7 +79,7 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
       listGap={0}
       footer={
         <box flexDirection="column" gap={0}>
-          <text fg={theme.dim}>
+          <text fg={theme.colors['editor.lineHighlightBackground']}>
             {filtered.length === 0
               ? ''
               : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
@@ -89,7 +89,9 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
       }
     >
       {filtered.length === 0 ? (
-        <text fg={theme.textMuted}>{filter ? 'No matching themes.' : 'No themes available.'}</text>
+        <text fg={theme.colors['descriptionForeground']}>
+          {filter ? 'No matching themes.' : 'No themes available.'}
+        </text>
       ) : (
         <box height={listHeight} flexDirection="column" overflow="hidden">
           {visible.map((id, i) => {
@@ -102,8 +104,22 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
               <ListItem
                 key={id}
                 active={active}
-                title={<text fg={active ? theme.text : theme.textMuted}>{entry.name}</text>}
-                trailing={isCurrent ? <text fg={theme.accent}>current</text> : undefined}
+                title={
+                  <text
+                    fg={
+                      active
+                        ? theme.colors['editor.foreground']
+                        : theme.colors['descriptionForeground']
+                    }
+                  >
+                    {entry.name}
+                  </text>
+                }
+                trailing={
+                  isCurrent ? (
+                    <text fg={theme.colors['textLink.foreground']}>current</text>
+                  ) : undefined
+                }
               />
             )
           })}

@@ -17,7 +17,13 @@ export function GitCommitModal({ activeField, body, cursorPos, title }: GitCommi
   return (
     <ModalShell title="Commit" keybindsModeId="modal.git-commit" width={uiTokens.modalWidth.xl}>
       <box flexDirection="column">
-        <text fg={titleActive ? theme.text : theme.textMuted}>Title</text>
+        <text
+          fg={
+            titleActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Title
+        </text>
         <InputField
           active={titleActive}
           cursorPos={titleActive ? cursorPos : undefined}
@@ -26,7 +32,13 @@ export function GitCommitModal({ activeField, body, cursorPos, title }: GitCommi
       </box>
 
       <box flexDirection="column">
-        <text fg={bodyActive ? theme.text : theme.textMuted}>Body (optional)</text>
+        <text
+          fg={
+            bodyActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Body (optional)
+        </text>
         <InputField
           active={bodyActive}
           cursorPos={bodyActive ? cursorPos : undefined}

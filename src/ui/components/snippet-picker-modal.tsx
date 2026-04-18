@@ -32,7 +32,7 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
       footer={<ModalFilterBar filter={filter} />}
     >
       {filtered.length === 0 ? (
-        <text fg={theme.textMuted}>
+        <text fg={theme.colors['descriptionForeground']}>
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
       ) : null}
@@ -43,11 +43,19 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
             key={snippet.id}
             active={active}
             title={
-              <text fg={active ? theme.text : theme.textMuted}>
+              <text
+                fg={
+                  active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+                }
+              >
                 <strong>{snippet.name}</strong>
               </text>
             }
-            subtitle={<text fg={theme.textMuted}>{truncateContent(snippet.content)}</text>}
+            subtitle={
+              <text fg={theme.colors['descriptionForeground']}>
+                {truncateContent(snippet.content)}
+              </text>
+            }
           />
         )
       })}

@@ -134,7 +134,7 @@ export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
       width={uiTokens.modalWidth.lg}
       footer={
         <box flexDirection="column" gap={0}>
-          <text fg={theme.dim}>
+          <text fg={theme.colors['editor.lineHighlightBackground']}>
             {filtered.length === 0
               ? ''
               : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
@@ -144,7 +144,7 @@ export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
       }
     >
       {filtered.length === 0 ? (
-        <text fg={theme.textMuted}>
+        <text fg={theme.colors['descriptionForeground']}>
           {filter ? 'No matching bindings.' : 'No bindings registered.'}
         </text>
       ) : (
@@ -154,14 +154,14 @@ export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
             if (row.kind === 'header') {
               return (
                 <box key={`h-${rowIndex}`} paddingLeft={1} paddingTop={i === 0 ? 0 : 1}>
-                  <text fg={theme.warning} wrapMode="none">
+                  <text fg={theme.colors['editorWarning.foreground']} wrapMode="none">
                     <strong>{row.label}</strong>
                   </text>
                 </box>
               )
             }
             const active = row.entryIndex === effectiveIndex
-            const bg = active ? theme.panelHighlight : undefined
+            const bg = active ? theme.colors['list.activeSelectionBackground'] : undefined
             return (
               <box
                 key={`e-${rowIndex}`}
@@ -171,12 +171,28 @@ export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
                 backgroundColor={bg}
               >
                 <box width={KEYS_COLUMN_WIDTH} flexShrink={0}>
-                  <text fg={active ? theme.accent : theme.accentAlt} bg={bg} wrapMode="none">
+                  <text
+                    fg={
+                      active
+                        ? theme.colors['textLink.foreground']
+                        : theme.colors['terminal.ansiMagenta']
+                    }
+                    bg={bg}
+                    wrapMode="none"
+                  >
                     {row.entry.keysDisplay}
                   </text>
                 </box>
                 <box flexGrow={1} overflow="hidden">
-                  <text fg={active ? theme.text : theme.textMuted} bg={bg} wrapMode="none">
+                  <text
+                    fg={
+                      active
+                        ? theme.colors['editor.foreground']
+                        : theme.colors['descriptionForeground']
+                    }
+                    bg={bg}
+                    wrapMode="none"
+                  >
                     {row.entry.description ?? ''}
                   </text>
                 </box>

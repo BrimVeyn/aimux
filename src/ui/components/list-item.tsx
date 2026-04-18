@@ -33,7 +33,15 @@ export function ListItem({
         <box flexDirection="row">
           {isRow ? null : (
             <>
-              <text fg={active ? theme.accent : theme.dim}>{active ? '›' : '·'}</text>
+              <text
+                fg={
+                  active
+                    ? theme.colors['textLink.foreground']
+                    : theme.colors['editor.lineHighlightBackground']
+                }
+              >
+                {active ? '›' : '·'}
+              </text>
               <text> </text>
             </>
           )}

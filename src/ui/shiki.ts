@@ -1,17 +1,16 @@
 import { type BundledLanguage, type BundledTheme, createHighlighter, type Highlighter } from 'shiki'
 
-import { synthShikiTheme } from './synth-shiki-theme'
 import { THEMES } from './themes'
-import { GENERATED_THEME_IDS } from './themes.generated'
 
-const DEFAULT_THEME: BundledTheme = 'catppuccin-mocha'
-const BUILTIN_IDS = new Set<string>(GENERATED_THEME_IDS)
+// Shiki's highlighter is created with at least one real shiki-bundled theme so
+// its worker can warm up. House and user themes load on demand.
+const WARM_THEME: BundledTheme = 'catppuccin-mocha'
 
 let highlighterPromise: Promise<Highlighter> | null = null
 
 export async function getShikiHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({ langs: [], themes: [DEFAULT_THEME] })
+    highlighterPromise = createHighlighter({ langs: [], themes: [WARM_THEME] })
   }
   return highlighterPromise
 }
@@ -29,20 +28,20 @@ export async function ensureShikiLang(h: Highlighter, lang: string): Promise<boo
   }
 }
 
-const loadedThemes = new Set<string>([DEFAULT_THEME])
+const loadedThemes = new Set<string>([WARM_THEME])
 
-export async function ensureShikiTheme(h: Highlighter, themeId: string): Promise<boolean> {
-  if (loadedThemes.has(themeId)) return true
+/**
+ * Load the theme keyed by `id` into the shiki highlighter. The same object
+ * powers the UI palette and the code highlighter — no synthesis, no mapping.
+ */
+export async function ensureShikiTheme(h: Highlighter, id: string): Promise<boolean> {
+  if (loadedThemes.has(id)) return true
+  const entry = THEMES[id]
+  if (!entry) return false
   try {
-    if (BUILTIN_IDS.has(themeId)) {
-      await h.loadTheme(themeId as BundledTheme)
-    } else {
-      const entry = THEMES[themeId]
-      if (!entry) return false
-      // eslint-disable-next-line typescript/no-explicit-any
-      await h.loadTheme(synthShikiTheme(themeId, entry.colors, entry.type) as any)
-    }
-    loadedThemes.add(themeId)
+    // eslint-disable-next-line typescript/no-explicit-any
+    await h.loadTheme(entry as any)
+    loadedThemes.add(id)
     return true
   } catch {
     return false

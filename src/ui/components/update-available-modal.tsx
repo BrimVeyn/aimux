@@ -35,7 +35,17 @@ export function UpdateAvailableModal({
               key={option.label}
               active={active}
               direction="row"
-              title={<text fg={active ? theme.text : theme.textMuted}>{option.label}</text>}
+              title={
+                <text
+                  fg={
+                    active
+                      ? theme.colors['editor.foreground']
+                      : theme.colors['descriptionForeground']
+                  }
+                >
+                  {option.label}
+                </text>
+              }
             />
           )
         })}

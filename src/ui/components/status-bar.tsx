@@ -9,16 +9,16 @@ import { theme } from '../theme'
 function getModeColor(focusMode: AppState['focusMode']): string {
   switch (focusMode) {
     case 'terminal-input':
-      return theme.accent
+      return theme.colors['textLink.foreground']
     case 'modal':
-      return theme.warning
+      return theme.colors['editorWarning.foreground']
     case 'command-edit':
-      return theme.warning
+      return theme.colors['editorWarning.foreground']
     case 'git':
-      return theme.success
+      return theme.colors['gitDecoration.addedResourceForeground']
     case 'navigation':
     default:
-      return theme.accentAlt
+      return theme.colors['terminal.ansiMagenta']
   }
 }
 
@@ -52,18 +52,18 @@ export function StatusBar() {
       paddingTop={0}
       paddingBottom={0}
       flexDirection="column"
-      backgroundColor={theme.panelMuted}
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
     >
       <box width="100%" flexDirection="row">
         <text fg={getModeColor(state.focusMode)}>[{getModeLabel(state.focusMode)}]</text>
         <text> </text>
-        <text fg={theme.text}>{model.left}</text>
+        <text fg={theme.colors['editor.foreground']}>{model.left}</text>
       </box>
       <box width="100%" flexDirection="row" justifyContent="space-between">
-        <text fg={theme.textMuted}>{model.right}</text>
+        <text fg={theme.colors['descriptionForeground']}>{model.right}</text>
         <box flexDirection="row" gap={2}>
-          {model.help ? <text fg={theme.textMuted}>{model.help}</text> : null}
-          <text fg={theme.dim}>v{APP_VERSION}</text>
+          {model.help ? <text fg={theme.colors['descriptionForeground']}>{model.help}</text> : null}
+          <text fg={theme.colors['editor.lineHighlightBackground']}>v{APP_VERSION}</text>
         </box>
       </box>
     </box>

@@ -32,13 +32,13 @@ const SECTION_ORDER: { key: GitFileSection; title: string }[] = [
 ]
 
 const STATUS_COLORS: Record<GitFileEntry['status'], string> = {
-  '?': theme.success,
-  'A': theme.success,
-  'C': theme.accent,
-  'D': theme.danger,
-  'M': theme.warning,
-  'R': theme.accent,
-  'U': theme.danger,
+  '?': theme.colors['gitDecoration.addedResourceForeground'],
+  'A': theme.colors['gitDecoration.addedResourceForeground'],
+  'C': theme.colors['textLink.foreground'],
+  'D': theme.colors['editorError.foreground'],
+  'M': theme.colors['editorWarning.foreground'],
+  'R': theme.colors['textLink.foreground'],
+  'U': theme.colors['editorError.foreground'],
 }
 
 function displayStatus(file: GitFileEntry): string {
@@ -83,8 +83,8 @@ function renderFileLabel(
   if (!file.renamedFrom) {
     return (
       <text wrapMode="none">
-        <span fg={theme.text}>{basename}</span>
-        {showDir ? <span fg={theme.textMuted}> {dir}</span> : null}
+        <span fg={theme.colors['editor.foreground']}>{basename}</span>
+        {showDir ? <span fg={theme.colors['descriptionForeground']}> {dir}</span> : null}
       </text>
     )
   }
@@ -93,11 +93,13 @@ function renderFileLabel(
   const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
     <text wrapMode="none">
-      <span fg={theme.textMuted}>{renamed.basename}</span>
-      {showDir && renamedDir ? <span fg={theme.textMuted}> {renamedDir}</span> : null}
-      <span fg={theme.textMuted}> → </span>
-      <span fg={theme.text}>{basename}</span>
-      {showDir ? <span fg={theme.textMuted}> {dir}</span> : null}
+      <span fg={theme.colors['descriptionForeground']}>{renamed.basename}</span>
+      {showDir && renamedDir ? (
+        <span fg={theme.colors['descriptionForeground']}> {renamedDir}</span>
+      ) : null}
+      <span fg={theme.colors['descriptionForeground']}> → </span>
+      <span fg={theme.colors['editor.foreground']}>{basename}</span>
+      {showDir ? <span fg={theme.colors['descriptionForeground']}> {dir}</span> : null}
     </text>
   )
 }
@@ -113,24 +115,30 @@ function renderDiffCount(
   if (!diffCountConfig.enabled) return null
   if (!hasNumstat) {
     return (
-      <text fg={theme.textMuted} bg={bg} flexShrink={0}>
+      <text fg={theme.colors['descriptionForeground']} bg={bg} flexShrink={0}>
         —
       </text>
     )
   }
   return (
     <box flexDirection="row" flexShrink={0}>
-      <text fg={theme.success} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
-      <text fg={theme.dim} bg={bg}>
+      <text
+        fg={theme.colors['gitDecoration.addedResourceForeground']}
+        bg={bg}
+      >{`+${padRight(file.added, addedW)}`}</text>
+      <text fg={theme.colors['editor.lineHighlightBackground']} bg={bg}>
         {' '}
       </text>
-      <text fg={theme.danger} bg={bg}>{`−${padRight(file.removed, removedW)}`}</text>
+      <text
+        fg={theme.colors['editorError.foreground']}
+        bg={bg}
+      >{`−${padRight(file.removed, removedW)}`}</text>
     </box>
   )
 }
 
 function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
-  const bg = isSelected ? theme.panelHighlight : undefined
+  const bg = isSelected ? theme.colors['list.activeSelectionBackground'] : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -141,10 +149,10 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
-          <text fg={theme.textMuted} bg={bg}>
+          <text fg={theme.colors['descriptionForeground']} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={theme.accentAlt} bg={bg} wrapMode="none">
+          <text fg={theme.colors['terminal.ansiMagenta']} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -164,7 +172,7 @@ function renderFileRow(
 ): ReactNode {
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected ? theme.panelHighlight : undefined
+  const bg = isSelected ? theme.colors['list.activeSelectionBackground'] : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -205,16 +213,32 @@ function renderTreeSection(
   return (
     <box key={section} flexDirection="column">
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.accentAlt}>
+        <text fg={theme.colors['terminal.ansiMagenta']}>
           <strong>
             {title} ({files.length})
           </strong>
         </text>
         {showListModeToggle ? (
           <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
-            <text fg={fileListMode === 'tree' ? theme.accent : theme.textMuted}>tree</text>
-            <text fg={theme.textMuted}>|</text>
-            <text fg={fileListMode === 'flat' ? theme.accent : theme.textMuted}>flat</text>
+            <text
+              fg={
+                fileListMode === 'tree'
+                  ? theme.colors['textLink.foreground']
+                  : theme.colors['descriptionForeground']
+              }
+            >
+              tree
+            </text>
+            <text fg={theme.colors['descriptionForeground']}>|</text>
+            <text
+              fg={
+                fileListMode === 'flat'
+                  ? theme.colors['textLink.foreground']
+                  : theme.colors['descriptionForeground']
+              }
+            >
+              flat
+            </text>
           </box>
         ) : null}
       </box>
@@ -255,16 +279,16 @@ function computeStatusPlaceholder(
   hasProjectPath: boolean
 ): StatusPlaceholder | null {
   if (!hasProjectPath) {
-    return { label: 'No active session', labelColor: theme.textMuted }
+    return { label: 'No active session', labelColor: theme.colors['descriptionForeground'] }
   }
   if (gitPanel.error === 'not-a-repo') {
-    return { label: 'Not a git repository', labelColor: theme.textMuted }
+    return { label: 'Not a git repository', labelColor: theme.colors['descriptionForeground'] }
   }
   if (gitPanel.error === 'unknown') {
-    return { label: 'Git error', labelColor: theme.danger }
+    return { label: 'Git error', labelColor: theme.colors['editorError.foreground'] }
   }
   if (gitPanel.files.length === 0) {
-    return { label: 'Working tree clean', labelColor: theme.textMuted }
+    return { label: 'Working tree clean', labelColor: theme.colors['descriptionForeground'] }
   }
   return null
 }
@@ -313,7 +337,7 @@ export const GitPanel = memo(function GitPanel({
   return (
     <box flexDirection="column" flexGrow={1} gap={0}>
       {hasRemoteTracking ? (
-        <text fg={theme.textMuted}>
+        <text fg={theme.colors['descriptionForeground']}>
           ↑{gitPanel.ahead} ↓{gitPanel.behind}
         </text>
       ) : null}
