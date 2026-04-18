@@ -83,7 +83,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
           />
         ))}
       </scrollbox>
-      <box width={1} backgroundColor={theme.dim} />
+      <box width={1} backgroundColor={theme.background} />
       <scrollbox
         ref={rightRef}
         flexGrow={1}
