@@ -1,160 +1,211 @@
 # @brimveyn/aimux-config
 
-TypeScript configuration API for [aimux](https://github.com/BrimVeyn/aimux) — the terminal multiplexer for AI CLIs.
+Typed configuration package for [`@brimveyn/aimux`](https://github.com/BrimVeyn/aimux).
 
-Write your keymaps, theme, and backends in a typed TypeScript file. Method-chaining builder inspired by nvim, with a prefix-trie resolver that supports leader keys and multi-key sequences.
+Use this package to author `aimux.config.ts` or `aimux.config.js` inside an
+`aimux` profile directory.
+
+## What This Package Does
+
+`@brimveyn/aimux-config` provides:
+
+- `defineConfig()` for typed config authoring
+- the keymap builder API
+- the built-in action catalog
+- theme helpers and built-in theme IDs
+- exported types for config, modes, state, and tooling
+
+It does not launch the app. The `aimux` runtime loads and consumes the resolved
+config.
 
 ## Install
 
+Install it inside an `aimux` profile directory:
+
 ```bash
-mkdir -p ~/.config/aimux && cd ~/.config/aimux
+mkdir -p ~/.config/aimux/default
+cd ~/.config/aimux/default
 bun init -y
 bun add -d @brimveyn/aimux-config
 ```
 
-Then create `~/.config/aimux/aimux.config.ts`:
+Then create:
+
+```text
+~/.config/aimux/default/aimux.config.ts
+```
+
+If you use another profile, replace `default` with that profile name.
+
+## Minimal Example
 
 ```ts
-import { defineConfig, actions, themes } from '@brimveyn/aimux-config'
+import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: themes.extend('tokyo-night', { accent: '#ff9e64' }),
+  sessionBar: {
+    position: 'top',
+    visible: true,
+  },
 
   keymaps: (k) =>
+    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
+})
+```
+
+This example only uses surfaces that are wired into the runtime today.
+
+## Key Notation
+
+| Notation                           | Meaning                    |
+| ---------------------------------- | -------------------------- |
+| `j`                                | bare character             |
+| `J`                                | shifted letter             |
+| `<C-n>`                            | Ctrl+N                     |
+| `<M-x>` or `<A-x>`                 | Meta or Alt + X            |
+| `<C-M-a>`                          | Ctrl+Alt+A                 |
+| `<CR>`                             | Enter                      |
+| `<Esc>`                            | Escape                     |
+| `<Tab>`                            | Tab                        |
+| `<BS>`                             | Backspace                  |
+| `<Space>`                          | Space                      |
+| `<Up>` `<Down>` `<Left>` `<Right>` | arrow keys                 |
+| `<leader>`                         | configured leader chord    |
+| `dd`                               | multi-key sequence         |
+| `<leader>tn`                       | leader, then `t`, then `n` |
+
+Ambiguous prefixes are resolved after the configured timeout.
+
+## Keymap Builder
+
+```ts
+k.leader(key)
+  .timeout(ms)
+  .mode(id | ids[], configure)
+```
+
+Mode builder methods:
+
+```ts
+m.map(keys, action, description?)
+  .unmap(keys)
+  .group(prefix, name, configure)
+  .passthrough()
+```
+
+Example with groups and multi-mode bindings:
+
+```ts
+import { defineConfig, actions } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  keymaps: (k) =>
     k
-      .leader('<Space>')
-      .timeout(300)
       .mode('navigation', (m) =>
         m
-          .map('j', actions.nextTab)
-          .map('k', actions.prevTab)
-          .map('<leader>g', actions.sessionPicker)
           .group('<leader>t', 'tabs', (g) =>
-            g.map('n', actions.newTab).map('r', actions.renameTab).map('x', actions.closeTab)
+            g
+              .map('n', actions.newTab, 'New tab')
+              .map('r', actions.renameTab, 'Rename tab')
+              .map('x', actions.closeTab, 'Close tab')
           )
+          .unmap('r')
+      )
+      .mode(['navigation', 'terminal-input'], (m) =>
+        m.map('<C-s>', actions.snippetPicker, 'Snippet picker')
       ),
 })
 ```
 
-## Key notation
+## Important Runtime Note About the Leader Key
 
-| Notation          | Matches                        |
-| ----------------- | ------------------------------ |
-| `j`               | Bare character `j`             |
-| `J`               | Shift+J (uppercase letter)     |
-| `<C-n>`           | Ctrl+N                         |
-| `<M-x>` / `<A-x>` | Meta/Alt+X                     |
-| `<C-M-a>`         | Ctrl+Alt+A                     |
-| `<CR>`            | Return/Enter                   |
-| `<Esc>`           | Escape                         |
-| `<Space>`         | Spacebar                       |
-| `<Tab>`           | Tab                            |
-| `<BS>`            | Backspace                      |
-| `<Up>` `<Down>`   | Arrow keys                     |
-| `<leader>`        | Configured leader chord        |
-| `dd`              | Multi-key sequence (d, then d) |
-| `<leader>tn`      | Leader, then t, then n         |
+The shipped runtime defaults use `Ctrl+W` as the leader key.
 
-Ambiguous prefixes (e.g., `d` is bound AND `dd` is bound) are resolved after a configurable timeout (default 300ms).
+The builder itself starts from `<Space>` internally, but the app merges user
+config on top of shipped defaults from `@brimveyn/aimux`. In practice:
 
-## Builder API
+- if you omit `.leader(...)`, the shipped leader stays `Ctrl+W`
+- if you set another leader such as `<C-a>`, it overrides the shipped leader
+- do not rely on `.leader('<Space>')` to switch the runtime leader to Space
 
-### Top-level config
-
-```ts
-defineConfig({
-  theme?: ThemeId | ThemeDefinition
-  keymaps?: (k: KeymapBuilder) => KeymapBuilder
-  backends?: Record<string, BackendConfig>   // stub for future use
-  sidebar?: SidebarConfig                    // stub
-  hooks?: HooksConfig                        // stub
-  snippets?: SnippetDef[]                    // stub
-})
-```
-
-### Keymap builder
-
-```ts
-k.leader(keys) // default: '<Space>'
-  .timeout(ms) // default: 300
-  .mode(id | ids[], configure) // define bindings for a mode (or several at once)
-```
-
-Pass an array of `ModeId`s to register the same bindings in every listed mode — handy for actions that should fire in both `navigation` and `terminal-input`, for example:
-
-```ts
-k.mode(['navigation', 'terminal-input'], (m) => m.map('<C-s>', actions.snippetPicker))
-```
-
-### Mode builder
-
-```ts
-m.map(keys, action) // bind a key/sequence to an action
-  .unmap(keys) // remove a default binding
-  .group(prefix, name, g) // sugar for leader-prefixed sub-trees
-  .passthrough() // for text-input modes: unmatched keys route to text input
-```
-
-### Groups
-
-Groups organize leader-key sub-trees. `.group('<leader>t', 'tabs', g => g.map('n', ...))` is sugar for `.map('<leader>tn', ...)` with a `name` label used by the help modal.
-
-```ts
-.group('<leader>t', 'tabs', (g) => g
-  .map('n', actions.newTab)
-  .map('r', actions.renameTab)
-  .map('x', actions.closeTab))
-```
+See [`../../docs/guide/keymaps.md`](../../docs/guide/keymaps.md) for the full
+explanation.
 
 ## Actions
 
-Pre-built actions cover every built-in aimux operation:
+Pre-built actions include:
 
-**Tab control** — `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`, `moveTab(n)`, `reorderTab(n)`
+- tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
+- sessions: `sessionPicker`, `switchSessionByIndex(n)` and session modal actions
+- snippets: `snippetPicker`, snippet editor and filter actions
+- themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
+- panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
+- UI: `toggleSidebar`, `toggleSessionBar`, `toggleGitPanel`
+- modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
+- git: enter git mode, stage, delete or unstage, commit, push
 
-**Modals** — `sessionPicker`, `snippetPicker`, `themePicker`, `helpModal`, `closeModal`
-
-**Sidebar / panels** — `toggleSidebar`, `resizeSidebar(n)`, `toggleGitPanel`, `resizeGitPanel(n)`
-
-**Layout / splits** — `splitVertical`, `splitHorizontal`, `focusPane('left'|'right'|'up'|'down')`, `resizePane(n, 'horizontal'|'vertical')`, `closePane`
-
-**Mode transitions** — `enterInsert`, `leaveTerminalInput`, `quit`
-
-**Custom actions** — write an `ActionFn` for dynamic logic:
-
-```ts
-.mode('navigation', (m) => m
-  .map('gT', (ctx) => {
-    const tabId = ctx.state.activeTabId
-    if (!tabId) return null
-    return {
-      actions: [{ type: 'close-active-tab' }],
-      effects: [{ type: 'close-tab', tabId }],
-    }
-  }))
-```
+You can also bind a custom `ActionFn` for dynamic behavior.
 
 ## Themes
 
+Built-in theme IDs:
+
+- `aimux`
+- `dracula`
+- `dracula-at-night`
+- `everforest`
+- `tokyo-night`
+- `gruvbox-dark`
+- `catppuccin-mocha`
+- `nord`
+- `solarized-dark`
+- `one-dark`
+- `kanagawa`
+
+Helpers:
+
 ```ts
-import { themes } from '@brimveyn/aimux-config'
-
-// Extend a built-in theme
-themes.extend('tokyo-night', {
-  accent: '#ff9e64',
-  background: '#1a1b26',
-})
-
-// Create a custom theme
-themes.create({
-  accent: '#...',
-  accentAlt: '#...',
-  background: '#...',
-  // ... all ThemeColors keys required
-})
+themes.extend(baseThemeId, overrides)
+themes.create(colors)
 ```
 
-Built-in themes: `aimux`, `tokyo-night`, `dracula`, `dracula-at-night`, `everforest`, `gruvbox-dark`, `catppuccin-mocha`, `nord`, `solarized-dark`, `one-dark`, `kanagawa`.
+Typed theme config is currently only `Partially supported` by the runtime.
+
+## Support Status
+
+| Surface      | Status              | Notes                                                                 |
+| ------------ | ------------------- | --------------------------------------------------------------------- |
+| `keymaps`    | Supported           | Fully registered by the runtime                                       |
+| `sessionBar` | Supported           | Used during app initialization                                        |
+| `theme`      | Partially supported | Package surface exists, but runtime startup uses `aimux.json.themeId` |
+| `backends`   | Typed surface only  | Runtime wiring deferred                                               |
+| `sidebar`    | Typed surface only  | Type exists, runtime not currently driven by this field               |
+| `hooks`      | Typed surface only  | Type exists, runtime use not currently wired                          |
+| `snippets`   | Typed surface only  | Runtime currently uses `aimux-snippets.json`                          |
+
+## Backends Subpath
+
+The package also exports:
+
+```ts
+@brimveyn/aimux-config/backends
+```
+
+Current helpers:
+
+- `claudeBackend()`
+- `codexBackend()`
+
+These helpers are documented as stubs. Do not treat them as a fully supported
+runtime backend override system yet.
+
+## More Documentation
+
+- [`../../docs/reference/config-reference.md`](../../docs/reference/config-reference.md)
+- [`../../docs/guide/keymaps.md`](../../docs/guide/keymaps.md)
+- [`../../docs/guide/themes.md`](../../docs/guide/themes.md)
+- [`../../docs/concepts/config-and-state.md`](../../docs/concepts/config-and-state.md)
+- [`../../docs/concepts/profiles.md`](../../docs/concepts/profiles.md)
 
 ## License
 

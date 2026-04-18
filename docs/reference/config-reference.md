@@ -1,0 +1,267 @@
+# `@brimveyn/aimux-config` Reference
+
+This is the exhaustive reference for the public configuration surface used by
+`aimux`.
+
+## Entry Points
+
+Package name:
+
+```ts
+@brimveyn/aimux-config
+```
+
+Primary exports:
+
+- `defineConfig`
+- `actions`
+- `themes`, `THEMES`, `THEME_IDS`
+- `GroupBuilder`, `KeymapBuilder`, `ModeBindingBuilder`
+- `getDefaultKeymapConfig`
+- `resolveConfig`
+- public types for config, state, and tooling
+
+Additional export:
+
+```ts
+@brimveyn/aimux-config/backends
+```
+
+## Top-level Config Object
+
+```ts
+defineConfig({
+  theme?: ThemeId | ThemeDefinition
+  keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
+  backends?: Record<string, BackendConfig>
+  sidebar?: SidebarConfig
+  sessionBar?: SessionBarConfig
+  hooks?: HooksConfig
+  snippets?: SnippetDef[]
+})
+```
+
+## Support Matrix
+
+| Field        | Status              | Notes                                                                                             |
+| ------------ | ------------------- | ------------------------------------------------------------------------------------------------- |
+| `keymaps`    | Supported           | Fully resolved and registered by the app                                                          |
+| `sessionBar` | Supported           | Used during app initialization; can override `aimux.json` values                                  |
+| `theme`      | Partially supported | Typed surface exists, but app startup currently initializes theme state from `aimux.json.themeId` |
+| `backends`   | Typed surface only  | Resolved by the config package, but current runtime wiring is deferred                            |
+| `sidebar`    | Typed surface only  | Type exists, but current runtime sidebar state comes from app-managed state and snapshots         |
+| `hooks`      | Typed surface only  | Type exists; runtime use is not currently wired                                                   |
+| `snippets`   | Typed surface only  | Type exists, but snippets are currently loaded from `aimux-snippets.json`                         |
+
+## `defineConfig`
+
+`defineConfig(config)` is the authoring helper for user config files.
+
+Use it in:
+
+- `~/.config/aimux/<profile>/aimux.config.ts`
+- `~/.config/aimux/<profile>/aimux.config.js`
+
+It is a typed pass-through helper, not a runtime loader by itself.
+
+## `keymaps`
+
+Status: `Supported`
+
+Type:
+
+```ts
+keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
+```
+
+Use this field to customize keybindings.
+
+Builder methods:
+
+- `leader(key)`
+- `timeout(ms)`
+- `mode(id | ids[], configure)`
+
+Mode builder methods:
+
+- `map(keys, action, description?)`
+- `unmap(keys)`
+- `group(prefix, name, configure)`
+- `passthrough()`
+
+Important runtime facts:
+
+- shipped default leader is `<C-w>`
+- shipped default timeout is `300`
+- repeated `.mode()` calls merge
+- same-key user bindings override earlier ones
+- `unmap()` removes defaults by exact key string
+- array mode definitions apply to every listed mode
+
+See `../guide/keymaps.md` for notation and merge semantics.
+
+## `sessionBar`
+
+Status: `Supported`
+
+Type:
+
+```ts
+sessionBar?: {
+  visible?: boolean
+  position?: 'top' | 'bottom'
+}
+```
+
+Runtime behavior:
+
+- consumed during app initialization
+- used as a higher-priority source than `aimux.json.sessionBarVisible`
+- used as a higher-priority source than `aimux.json.sessionBarPosition`
+
+Example:
+
+```ts
+export default defineConfig({
+  sessionBar: {
+    position: 'bottom',
+    visible: true,
+  },
+})
+```
+
+## `theme`
+
+Status: `Partially supported`
+
+Type:
+
+```ts
+theme?: ThemeId | ThemeDefinition
+```
+
+You can provide:
+
+- a built-in `ThemeId`
+- a theme from `themes.extend()`
+- a theme from `themes.create()`
+
+Current caveat:
+
+- the app runtime initializes theme state from `aimux.json.themeId`
+- the theme picker reads and writes built-in IDs through `aimux.json`
+- typed theme definitions are exported and valid at the package level, but are
+  not yet the primary runtime control path
+
+## `backends`
+
+Status: `Typed surface only`
+
+Type:
+
+```ts
+backends?: Record<string, BackendConfig>
+```
+
+`BackendConfig`:
+
+```ts
+interface BackendConfig {
+  command: string
+  args?: string[]
+}
+```
+
+Notes:
+
+- the config package resolves this field
+- helper functions such as `claudeBackend()` and `codexBackend()` are exported
+- the helper module explicitly documents runtime wiring as deferred
+
+Do not present this as a fully working runtime backend override surface today.
+
+## `sidebar`
+
+Status: `Typed surface only`
+
+Type:
+
+```ts
+interface SidebarConfig {
+  widgets?: string[]
+  width?: number
+}
+```
+
+Current runtime behavior is driven by app state and persisted workspace data,
+not by this top-level typed config field.
+
+## `hooks`
+
+Status: `Typed surface only`
+
+Type:
+
+```ts
+interface HooksConfig {
+  onSessionCreate?: (session: { name: string; projectPath?: string }) => void | Promise<void>
+}
+```
+
+This is currently a typed API surface, not a documented runtime feature.
+
+## `snippets`
+
+Status: `Typed surface only`
+
+Type:
+
+```ts
+interface SnippetDef {
+  name: string
+  trigger?: string
+  text: string
+}
+```
+
+Current runtime behavior:
+
+- snippets are loaded from `aimux-snippets.json`
+- the runtime seeds that file with default snippets on first use
+- the top-level typed `snippets` field is not currently the main runtime source
+
+## Actions
+
+`actions` exports the built-in action catalog used by keymaps.
+
+Common groups:
+
+- tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
+- sessions: `sessionPicker`, `switchSessionByIndex(n)` and session modal actions
+- snippets: `snippetPicker`, snippet filter and editor actions
+- themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
+- panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
+- UI: `toggleSidebar`, `resizeSidebar`, `toggleSessionBar`, `toggleGitPanel`
+- modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
+- git: `enterGitMode`, `exitGitMode`, stage/unstage/delete, commit, push
+
+You can also provide your own `ActionFn` for dynamic runtime behavior.
+
+## Themes API
+
+Exports:
+
+- `themes.extend(baseThemeId, overrides)`
+- `themes.create(colors)`
+- `THEME_IDS`
+- `THEMES`
+
+Use the built-in IDs for the most reliable runtime integration today.
+
+## Tooling Types
+
+The package exports many additional types such as `ResolvedConfig`, `AppState`,
+`ModeContext`, and `ResolvedKeymapConfig`.
+
+Those exports are useful for tooling and integration, but not all of them should
+be interpreted as stable end-user runtime promises.
