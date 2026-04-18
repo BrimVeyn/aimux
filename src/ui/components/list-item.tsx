@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { Surface } from './surface'
 
 export type ListItemDirection = 'row' | 'column'
@@ -22,6 +22,7 @@ export function ListItem({
   title,
   trailing,
 }: ListItemProps) {
+  const theme = useTheme()
   const isRow = direction === 'row'
   return (
     <Surface

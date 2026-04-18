@@ -9,7 +9,7 @@ import type { ThemeId } from '../../themes'
 import { parsePatchFiles } from '../../../diff-parser'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
-import { theme } from '../../theme'
+import { useTheme } from '../../theme'
 import { buildSplitRows, buildUnifiedRows, firstChangeRowOffset, gutterWidth } from './build-rows'
 import { filetypeFromPath } from './filetype'
 import { tokenizeSide } from './highlight'
@@ -48,6 +48,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   { cacheKey, diff, path, themeId, view },
   ref
 ) {
+  const theme = useTheme()
   const file = useMemo(() => {
     const patches = parsePatchFiles(diff)
     return patches[0]?.files[0]

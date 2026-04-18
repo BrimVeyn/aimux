@@ -1,22 +1,22 @@
 import type { ReactNode } from 'react'
 
-import { theme } from '../theme'
+import { getCurrentTheme } from '../theme'
 
 type SurfaceTone = 'muted' | 'elevated' | 'selected' | 'input' | 'inputActive'
 
 function getSurfaceColor(tone: SurfaceTone): string {
   switch (tone) {
     case 'elevated':
-      return theme.colors['sideBar.background']
+      return getCurrentTheme().colors['sideBar.background']
     case 'selected':
-      return theme.colors['list.activeSelectionBackground']
+      return getCurrentTheme().colors['list.activeSelectionBackground']
     case 'input':
-      return theme.colors['editor.background']
+      return getCurrentTheme().colors['editor.background']
     case 'inputActive':
-      return theme.colors['list.activeSelectionBackground']
+      return getCurrentTheme().colors['list.activeSelectionBackground']
     case 'muted':
     default:
-      return theme.colors['sideBarSectionHeader.background']
+      return getCurrentTheme().colors['sideBarSectionHeader.background']
   }
 }
 

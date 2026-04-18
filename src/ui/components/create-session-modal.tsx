@@ -1,7 +1,7 @@
 import type { DirectoryResult } from '../../state/types'
 
 import { abbreviatePath } from '../path-format'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ListItem } from './list-item'
@@ -21,14 +21,14 @@ function getDirectoryResultIcon(result: DirectoryResult): string {
 
 function getDirectoryResultColor(result: DirectoryResult): string {
   if (result.type === 'worktree') {
-    return theme.colors['editorWarning.foreground']
+    return getCurrentTheme().colors['editorWarning.foreground']
   }
 
   if (result.type === 'workspace') {
-    return theme.colors['terminal.ansiMagenta']
+    return getCurrentTheme().colors['terminal.ansiMagenta']
   }
 
-  return theme.colors['textLink.foreground']
+  return getCurrentTheme().colors['textLink.foreground']
 }
 
 interface CreateSessionModalProps {
@@ -48,6 +48,7 @@ export function CreateSessionModal({
   selectedIndex,
   sessionName,
 }: CreateSessionModalProps) {
+  const theme = useTheme()
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
 

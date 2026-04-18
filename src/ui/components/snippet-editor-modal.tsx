@@ -1,4 +1,4 @@
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
@@ -16,6 +16,7 @@ export function SnippetEditorModal({
   snippetContent,
   snippetName,
 }: SnippetEditorModalProps) {
+  const theme = useTheme()
   const nameActive = activeField === 'name'
   const contentActive = activeField === 'content'
 

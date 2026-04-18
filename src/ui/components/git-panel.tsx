@@ -13,7 +13,7 @@ import type {
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { buildGitTreeRows, type GitTreeFileRow, type GitTreeFolderRow } from '../../state/git-tree'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -42,14 +42,21 @@ function sectionTitle(section: GitFileSection, headOffset: number): string {
 const BASE_SECTION_ORDER: GitFileSection[] = ['staged', 'unstaged', 'untracked']
 const HISTORICAL_SECTION_ORDER: GitFileSection[] = ['historical', 'untracked']
 
-const STATUS_COLORS: Record<GitFileEntry['status'], string> = {
-  '?': theme.colors['gitDecoration.addedResourceForeground'],
-  'A': theme.colors['gitDecoration.addedResourceForeground'],
-  'C': theme.colors['textLink.foreground'],
-  'D': theme.colors['editorError.foreground'],
-  'M': theme.colors['editorWarning.foreground'],
-  'R': theme.colors['textLink.foreground'],
-  'U': theme.colors['editorError.foreground'],
+function statusColor(status: GitFileEntry['status']): string {
+  const t = getCurrentTheme()
+  switch (status) {
+    case '?':
+    case 'A':
+      return t.colors['gitDecoration.addedResourceForeground']
+    case 'C':
+    case 'R':
+      return t.colors['textLink.foreground']
+    case 'D':
+    case 'U':
+      return t.colors['editorError.foreground']
+    case 'M':
+      return t.colors['editorWarning.foreground']
+  }
 }
 
 function displayStatus(file: GitFileEntry): string {
@@ -94,8 +101,10 @@ function renderFileLabel(
   if (!file.renamedFrom) {
     return (
       <text wrapMode="none">
-        <span fg={theme.colors['editor.foreground']}>{basename}</span>
-        {showDir ? <span fg={theme.colors['descriptionForeground']}> {dir}</span> : null}
+        <span fg={getCurrentTheme().colors['editor.foreground']}>{basename}</span>
+        {showDir ? (
+          <span fg={getCurrentTheme().colors['descriptionForeground']}> {dir}</span>
+        ) : null}
       </text>
     )
   }
@@ -104,13 +113,13 @@ function renderFileLabel(
   const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
     <text wrapMode="none">
-      <span fg={theme.colors['descriptionForeground']}>{renamed.basename}</span>
+      <span fg={getCurrentTheme().colors['descriptionForeground']}>{renamed.basename}</span>
       {showDir && renamedDir ? (
-        <span fg={theme.colors['descriptionForeground']}> {renamedDir}</span>
+        <span fg={getCurrentTheme().colors['descriptionForeground']}> {renamedDir}</span>
       ) : null}
-      <span fg={theme.colors['descriptionForeground']}> → </span>
-      <span fg={theme.colors['editor.foreground']}>{basename}</span>
-      {showDir ? <span fg={theme.colors['descriptionForeground']}> {dir}</span> : null}
+      <span fg={getCurrentTheme().colors['descriptionForeground']}> → </span>
+      <span fg={getCurrentTheme().colors['editor.foreground']}>{basename}</span>
+      {showDir ? <span fg={getCurrentTheme().colors['descriptionForeground']}> {dir}</span> : null}
     </text>
   )
 }
@@ -126,7 +135,7 @@ function renderDiffCount(
   if (!diffCountConfig.enabled) return null
   if (!hasNumstat) {
     return (
-      <text fg={theme.colors['descriptionForeground']} bg={bg} flexShrink={0}>
+      <text fg={getCurrentTheme().colors['descriptionForeground']} bg={bg} flexShrink={0}>
         —
       </text>
     )
@@ -134,14 +143,14 @@ function renderDiffCount(
   return (
     <box flexDirection="row" flexShrink={0}>
       <text
-        fg={theme.colors['gitDecoration.addedResourceForeground']}
+        fg={getCurrentTheme().colors['gitDecoration.addedResourceForeground']}
         bg={bg}
       >{`+${padRight(file.added, addedW)}`}</text>
-      <text fg={theme.colors['editor.lineHighlightBackground']} bg={bg}>
+      <text fg={getCurrentTheme().colors['editor.lineHighlightBackground']} bg={bg}>
         {' '}
       </text>
       <text
-        fg={theme.colors['editorError.foreground']}
+        fg={getCurrentTheme().colors['editorError.foreground']}
         bg={bg}
       >{`−${padRight(file.removed, removedW)}`}</text>
     </box>
@@ -149,7 +158,7 @@ function renderDiffCount(
 }
 
 function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
-  const bg = isSelected ? theme.colors['list.activeSelectionBackground'] : undefined
+  const bg = isSelected ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -160,10 +169,10 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
-          <text fg={theme.colors['descriptionForeground']} bg={bg}>
+          <text fg={getCurrentTheme().colors['descriptionForeground']} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={theme.colors['terminal.ansiMagenta']} bg={bg} wrapMode="none">
+          <text fg={getCurrentTheme().colors['terminal.ansiMagenta']} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -183,14 +192,14 @@ function renderFileRow(
 ): ReactNode {
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected ? theme.colors['list.activeSelectionBackground'] : undefined
+  const bg = isSelected ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
-        <text fg={STATUS_COLORS[file.status]} bg={bg}>
+        <text fg={statusColor(file.status)} bg={bg}>
           <strong>{displayStatus(file)}</strong>
         </text>
       </box>
@@ -224,7 +233,7 @@ function renderTreeSection(
   return (
     <box key={section} flexDirection="column">
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={theme.colors['terminal.ansiMagenta']}>
+        <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
           <strong>
             {title} ({files.length})
           </strong>
@@ -234,18 +243,18 @@ function renderTreeSection(
             <text
               fg={
                 fileListMode === 'tree'
-                  ? theme.colors['textLink.foreground']
-                  : theme.colors['descriptionForeground']
+                  ? getCurrentTheme().colors['textLink.foreground']
+                  : getCurrentTheme().colors['descriptionForeground']
               }
             >
               tree
             </text>
-            <text fg={theme.colors['descriptionForeground']}>|</text>
+            <text fg={getCurrentTheme().colors['descriptionForeground']}>|</text>
             <text
               fg={
                 fileListMode === 'flat'
-                  ? theme.colors['textLink.foreground']
-                  : theme.colors['descriptionForeground']
+                  ? getCurrentTheme().colors['textLink.foreground']
+                  : getCurrentTheme().colors['descriptionForeground']
               }
             >
               flat
@@ -290,16 +299,25 @@ function computeStatusPlaceholder(
   hasProjectPath: boolean
 ): StatusPlaceholder | null {
   if (!hasProjectPath) {
-    return { label: 'No active session', labelColor: theme.colors['descriptionForeground'] }
+    return {
+      label: 'No active session',
+      labelColor: getCurrentTheme().colors['descriptionForeground'],
+    }
   }
   if (gitPanel.error === 'not-a-repo') {
-    return { label: 'Not a git repository', labelColor: theme.colors['descriptionForeground'] }
+    return {
+      label: 'Not a git repository',
+      labelColor: getCurrentTheme().colors['descriptionForeground'],
+    }
   }
   if (gitPanel.error === 'unknown') {
-    return { label: 'Git error', labelColor: theme.colors['editorError.foreground'] }
+    return { label: 'Git error', labelColor: getCurrentTheme().colors['editorError.foreground'] }
   }
   if (gitPanel.files.length === 0) {
-    return { label: 'Working tree clean', labelColor: theme.colors['descriptionForeground'] }
+    return {
+      label: 'Working tree clean',
+      labelColor: getCurrentTheme().colors['descriptionForeground'],
+    }
   }
   return null
 }
@@ -317,6 +335,7 @@ export const GitPanel = memo(function GitPanel({
   projectPath,
   selectedEntryKey,
 }: GitPanelProps) {
+  const theme = useTheme()
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(

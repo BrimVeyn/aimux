@@ -1,4 +1,4 @@
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
@@ -11,6 +11,7 @@ interface GitCommitModalProps {
 }
 
 export function GitCommitModal({ activeField, body, cursorPos, title }: GitCommitModalProps) {
+  const theme = useTheme()
   const titleActive = activeField === 'title'
   const bodyActive = activeField === 'body'
 

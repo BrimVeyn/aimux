@@ -8,9 +8,10 @@ import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 
 export function SessionBar() {
+  const theme = useTheme()
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -165,6 +166,7 @@ function SessionChip({
   onRef,
   session,
 }: SessionChipProps) {
+  const theme = useTheme()
   const showSpinner = busy && !active
   const spinner = useBusySpinner(showSpinner)
   const indicator = showSpinner ? spinner : '●'

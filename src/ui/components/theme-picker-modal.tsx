@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
@@ -45,6 +45,7 @@ function computeWindowStart(
 }
 
 export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: ThemePickerModalProps) {
+  const theme = useTheme()
   const dimensions = useTerminalDimensions()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 

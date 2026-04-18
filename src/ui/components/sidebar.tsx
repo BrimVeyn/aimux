@@ -3,7 +3,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
@@ -20,6 +20,7 @@ const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
 
 const SidebarTop = memo(function SidebarTop() {
+  const theme = useTheme()
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
@@ -59,15 +60,15 @@ function renderGroupGutter(
   return (
     <box flexDirection="column" width={1} overflow="hidden">
       <text
-        fg={theme.colors['terminal.ansiMagenta']}
-        bg={isActive ? theme.colors['list.activeSelectionBackground'] : undefined}
+        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
+        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
       >
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
       <text
-        fg={theme.colors['terminal.ansiMagenta']}
-        bg={isActive ? theme.colors['list.activeSelectionBackground'] : undefined}
+        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
+        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
       >
         {isGroupEnd ? GUTTER_END : GUTTER_PAD}
       </text>
@@ -80,6 +81,7 @@ interface TabsBodyProps {
 }
 
 const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
+  const theme = useTheme()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const focusMode = useAppStore((s) => s.focusMode)
@@ -149,6 +151,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 })
 
 export function Sidebar({ onTabActivate }: SidebarProps) {
+  const theme = useTheme()
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)

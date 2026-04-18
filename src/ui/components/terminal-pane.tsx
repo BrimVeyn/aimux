@@ -6,7 +6,7 @@ import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 
 interface TerminalPaneProps {
   tab?: TabSession
@@ -46,14 +46,14 @@ function getTitle(
 
 function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
   if (isActive && focusMode === 'terminal-input') {
-    return theme.colors['focusBorder']
+    return getCurrentTheme().colors['focusBorder']
   }
 
   if (isActive) {
-    return theme.colors['terminal.ansiMagenta']
+    return getCurrentTheme().colors['terminal.ansiMagenta']
   }
 
-  return theme.colors['editor.lineHighlightBackground']
+  return getCurrentTheme().colors['editor.lineHighlightBackground']
 }
 
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
@@ -72,7 +72,7 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
   }
 
   return (
-    <span key={key} fg={span.fg ?? theme.colors['editor.foreground']} bg={span.bg}>
+    <span key={key} fg={span.fg ?? getCurrentTheme().colors['editor.foreground']} bg={span.bg}>
       {node}
     </span>
   )
@@ -87,6 +87,7 @@ const TerminalViewport = memo(function TerminalViewport({
   buffer,
   viewport,
 }: TerminalViewportProps) {
+  const theme = useTheme()
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
     return (
@@ -123,6 +124,7 @@ export function TerminalPane({
   tab,
   tabId,
 }: TerminalPaneProps) {
+  const theme = useTheme()
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled

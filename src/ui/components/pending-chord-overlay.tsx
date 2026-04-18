@@ -2,10 +2,11 @@ import { parseKeyNotation } from '../../input/keymap/key-chord'
 import { formatChord } from '../../input/keymap/key-format'
 import { useAppStore } from '../../state/app-store'
 import { useKeymap } from '../keymap-context'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { Surface } from './surface'
 
 export function PendingChordOverlay() {
+  const theme = useTheme()
   const pendingChords = useAppStore((s) => s.pendingChords)
   const modalOpen = useAppStore((s) => s.modal.type !== null)
   const config = useKeymap()

@@ -1,4 +1,4 @@
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { Surface } from './surface'
 
 interface ModalFilterBarProps {
@@ -6,6 +6,7 @@ interface ModalFilterBarProps {
 }
 
 export function ModalFilterBar({ filter }: ModalFilterBarProps) {
+  const theme = useTheme()
   if (filter === null) {
     return null
   }

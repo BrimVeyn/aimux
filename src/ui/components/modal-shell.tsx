@@ -1,7 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 import type { ReactNode } from 'react'
 
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 import { Surface } from './surface'
 
@@ -24,6 +24,7 @@ export function ModalShell({
   title,
   width,
 }: ModalShellProps) {
+  const theme = useTheme()
   return (
     <box
       position="absolute"

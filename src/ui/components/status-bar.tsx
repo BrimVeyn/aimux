@@ -4,21 +4,22 @@ import { version as APP_VERSION } from '../../../package.json'
 import { useAppStore } from '../../state/app-store'
 import { useKeymap } from '../keymap-context'
 import { getStatusBarModel } from '../status-bar-model'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 
 function getModeColor(focusMode: AppState['focusMode']): string {
+  const t = getCurrentTheme()
   switch (focusMode) {
     case 'terminal-input':
-      return theme.colors['textLink.foreground']
+      return t.colors['textLink.foreground']
     case 'modal':
-      return theme.colors['editorWarning.foreground']
+      return t.colors['editorWarning.foreground']
     case 'command-edit':
-      return theme.colors['editorWarning.foreground']
+      return t.colors['editorWarning.foreground']
     case 'git':
-      return theme.colors['gitDecoration.addedResourceForeground']
+      return t.colors['gitDecoration.addedResourceForeground']
     case 'navigation':
     default:
-      return theme.colors['terminal.ansiMagenta']
+      return t.colors['terminal.ansiMagenta']
   }
 }
 
@@ -39,6 +40,7 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
 }
 
 export function StatusBar() {
+  const theme = useTheme()
   const state = useAppStore((s) => s)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
   const config = useKeymap()

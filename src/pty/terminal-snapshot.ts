@@ -2,7 +2,7 @@ import type { Terminal } from '@xterm/headless'
 
 import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/types'
 
-import { theme } from '../ui/theme'
+import { getCurrentTheme } from '../ui/theme'
 
 const ANSI_PALETTE = [
   '#000000',
@@ -113,15 +113,15 @@ function buildLine(
     let bg = getColorHex(current.getBgColor(), bgMode)
 
     if (current.isInverse()) {
-      const resolvedFg = fg ?? theme.colors['editor.foreground']
-      const resolvedBg = bg ?? theme.colors['editor.background']
+      const resolvedFg = fg ?? getCurrentTheme().colors['editor.foreground']
+      const resolvedBg = bg ?? getCurrentTheme().colors['editor.background']
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 
     const isCursorCell = cursorVisible && cursorColumn === column
     if (isCursorCell) {
-      const resolvedFg = fg ?? theme.colors['editor.foreground']
-      const resolvedBg = bg ?? theme.colors['editor.background']
+      const resolvedFg = fg ?? getCurrentTheme().colors['editor.foreground']
+      const resolvedBg = bg ?? getCurrentTheme().colors['editor.background']
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 

@@ -10,7 +10,7 @@ import type {
 
 import { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
 import { normalizeTheme } from './normalize-theme'
-import { GENERATED_THEME_IDS, GENERATED_THEMES } from './themes.generated'
+import { GENERATED_THEME_IDS, GENERATED_THEMES } from './themes/generated'
 
 export const THEMES: Record<string, Theme> = { ...GENERATED_THEMES, ...HOUSE_THEMES }
 export const THEME_IDS: ThemeId[] = [...GENERATED_THEME_IDS, ...HOUSE_THEME_IDS]

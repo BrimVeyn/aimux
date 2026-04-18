@@ -13,7 +13,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { theme } from '../../theme'
+import { useTheme } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
@@ -43,6 +43,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   { contentWidth, file, foldDispatch, folds, highlights },
   ref
 ) {
+  const theme = useTheme()
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
 
@@ -132,6 +133,7 @@ function SideRow({
 }
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
+  const theme = useTheme()
   return (
     <box
       flexDirection="row"
@@ -158,6 +160,7 @@ function HalfRow({
   height: number
   tokens: ThemedToken[][]
 }) {
+  const theme = useTheme()
   if (cell.type === 'filler') {
     return <box backgroundColor={theme.colors['sideBarSectionHeader.background']} height={height} />
   }
@@ -185,6 +188,7 @@ function HalfRow({
 }
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
+  const theme = useTheme()
   if (!tokens || tokens.length === 0) {
     return <text fg={theme.colors['editor.foreground']}>{content}</text>
   }

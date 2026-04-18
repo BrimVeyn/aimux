@@ -1,4 +1,4 @@
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { Surface } from './surface'
 
 interface InputFieldProps {
@@ -8,6 +8,7 @@ interface InputFieldProps {
 }
 
 export function InputField({ active, cursorPos, value }: InputFieldProps) {
+  const theme = useTheme()
   const fg = active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
   if (!active) {
     return (

@@ -13,7 +13,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { theme } from '../../theme'
+import { useTheme } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
@@ -90,6 +90,7 @@ function UnifiedRowRender({
   highlights: DiffHighlights
   row: UnifiedRowOrHeader
 }) {
+  const theme = useTheme()
   if (row.type === 'hunk-header') {
     return (
       <box
@@ -144,6 +145,7 @@ function UnifiedRowRender({
 }
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
+  const theme = useTheme()
   if (!tokens || tokens.length === 0) {
     return <text fg={theme.colors['editor.foreground']}>{content}</text>
   }

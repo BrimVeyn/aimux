@@ -1,5 +1,5 @@
 import { getAllAssistantOptions } from '../../pty/command-registry'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ListItem } from './list-item'
@@ -12,6 +12,7 @@ interface NewTabModalProps {
 }
 
 export function NewTabModal({ customCommands, editBuffer, selectedIndex }: NewTabModalProps) {
+  const theme = useTheme()
   const options = getAllAssistantOptions(customCommands)
   const selectedOption = options[selectedIndex]
   const isEditing = editBuffer !== null

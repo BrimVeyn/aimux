@@ -10,7 +10,7 @@ import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../state/git-tree'
 import { setGitDiffScroller } from '../git-view-controls'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { GitPanel } from './git-panel'
 
@@ -45,6 +45,7 @@ const DiffStage = memo(function DiffStage({
   themeId,
   view,
 }: DiffStageProps) {
+  const theme = useTheme()
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
@@ -102,6 +103,7 @@ interface GitViewProps {
 }
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
+  const theme = useTheme()
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)

@@ -24,7 +24,7 @@ import { StatusBar } from './components/status-bar'
 import { TerminalPane } from './components/terminal-pane'
 import { ThemePickerModal } from './components/theme-picker-modal'
 import { UpdateAvailableModal } from './components/update-available-modal'
-import { theme } from './theme'
+import { useTheme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -215,6 +215,7 @@ export function RootView({
   terminalRows,
   themeId,
 }: RootViewProps) {
+  const theme = useTheme()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
@@ -342,6 +343,7 @@ export function RootView({
 }
 
 function GitPaneInPaneMode({ ratio }: { ratio: number }) {
+  const theme = useTheme()
   // Ratio maps to a fixed column count (20..80), mirroring the reservation in
   // use-terminal-resize so the terminal-content area stays in sync.
   const width = Math.max(20, Math.min(80, Math.round(ratio * 80)))

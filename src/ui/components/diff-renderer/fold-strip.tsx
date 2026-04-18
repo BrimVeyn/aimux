@@ -1,4 +1,4 @@
-import { theme } from '../../theme'
+import { useTheme } from '../../theme'
 import { FOLD_STEP, type FoldInfo } from './build-rows'
 import { type FoldDispatch } from './pierre-diff'
 
@@ -8,6 +8,7 @@ interface Props {
 }
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
+  const theme = useTheme()
   return (
     <box
       paddingLeft={1}
@@ -25,6 +26,7 @@ function Spacer() {
 }
 
 export function FoldStrip({ dispatch, fold }: Props) {
+  const theme = useTheme()
   const { bottomExpanded, foldId, hidden, topExpanded, total } = fold
   const stepUp = Math.min(FOLD_STEP, hidden)
   const stepDown = Math.min(FOLD_STEP, hidden)

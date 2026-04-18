@@ -1,4 +1,4 @@
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
 import { ModalShell } from './modal-shell'
@@ -19,6 +19,7 @@ export function UpdateAvailableModal({
   latestVersion,
   selectedIndex,
 }: UpdateAvailableModalProps) {
+  const theme = useTheme()
   return (
     <ModalShell
       title="Update available"

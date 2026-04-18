@@ -2,7 +2,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 
 import { describeBindings } from '../../input/keymap/describe-bindings'
 import { useKeymap } from '../keymap-context'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { Surface } from './surface'
 
 const KEYS_COLUMN_WIDTH = 12
@@ -13,6 +13,7 @@ interface ModalKeybindsOverlayProps {
 }
 
 export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProps) {
+  const theme = useTheme()
   const config = useKeymap()
   const bindings = describeBindings(config, modeId, {
     dedupeByDescription: true,

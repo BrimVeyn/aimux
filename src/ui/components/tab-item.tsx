@@ -1,7 +1,7 @@
 import type { TabSession } from '../../state/types'
 
 import { useBusySpinner } from '../hooks/use-busy-spinner'
-import { theme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 
 interface TabItemProps {
   id?: string
@@ -15,15 +15,15 @@ interface TabItemProps {
 function getStatusColor(status: TabSession['status']): string {
   switch (status) {
     case 'running':
-      return theme.colors['gitDecoration.addedResourceForeground']
+      return getCurrentTheme().colors['gitDecoration.addedResourceForeground']
     case 'disconnected':
-      return theme.colors['editorWarning.foreground']
+      return getCurrentTheme().colors['editorWarning.foreground']
     case 'error':
-      return theme.colors['editorError.foreground']
+      return getCurrentTheme().colors['editorError.foreground']
     case 'exited':
-      return theme.colors['editorWarning.foreground']
+      return getCurrentTheme().colors['editorWarning.foreground']
     default:
-      return theme.colors['descriptionForeground']
+      return getCurrentTheme().colors['descriptionForeground']
   }
 }
 
@@ -37,20 +37,24 @@ function getIndicator(active: boolean, focused: boolean, inLayout: boolean): str
 
 function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean): string {
   if (active) {
-    return focused ? theme.colors['textLink.foreground'] : theme.colors['terminal.ansiMagenta']
+    return focused
+      ? getCurrentTheme().colors['textLink.foreground']
+      : getCurrentTheme().colors['terminal.ansiMagenta']
   }
 
   return inLayout
-    ? theme.colors['descriptionForeground']
-    : theme.colors['editor.lineHighlightBackground']
+    ? getCurrentTheme().colors['descriptionForeground']
+    : getCurrentTheme().colors['editor.lineHighlightBackground']
 }
 
 function BusyIndicator() {
+  const theme = useTheme()
   const frame = useBusySpinner()
   return <text fg={theme.colors['textLink.foreground']}>{frame} busy</text>
 }
 
 function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocusedInput: boolean }) {
+  const theme = useTheme()
   if (tab.status === 'error') {
     return <text fg={theme.colors['editorError.foreground']}>✗ error</text>
   }
@@ -79,6 +83,7 @@ function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocused
 }
 
 export function TabItem({ active, focused, id, inLayout, isFocusedInput, tab }: TabItemProps) {
+  const theme = useTheme()
   const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)

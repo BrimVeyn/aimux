@@ -1,7 +1,7 @@
 import type { SnippetRecord } from '../../state/types'
 
 import { filterSnippets } from '../../state/selectors'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
 import { ModalFilterBar } from './modal-filter-bar'
@@ -22,6 +22,7 @@ function truncateContent(content: string): string {
 }
 
 export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
+  const theme = useTheme()
   const filtered = filterSnippets(snippets, filter)
 
   return (

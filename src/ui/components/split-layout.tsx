@@ -11,7 +11,7 @@ import {
   type PaneRect,
   type SplitDirection,
 } from '../../state/layout-tree'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { TerminalPane } from './terminal-pane'
 
 const PANE_CHROME = PANE_BORDER
@@ -58,6 +58,7 @@ export function SplitLayout({
   onTerminalScrollEvent,
   tabs,
 }: SplitLayoutProps) {
+  const theme = useTheme()
   if (node.type === 'leaf') {
     const tab = tabs.find((t) => t.id === node.tabId)
     const isActive = node.tabId === activeTabId

@@ -10,7 +10,7 @@ import {
 } from '../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { useKeymap } from '../keymap-context'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ModalFilterBar } from './modal-filter-bar'
 import { ModalShell } from './modal-shell'
@@ -86,6 +86,7 @@ function computeWindowStart(
 }
 
 export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
+  const theme = useTheme()
   const config = useKeymap()
   const dimensions = useTerminalDimensions()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])

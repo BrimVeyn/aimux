@@ -3,7 +3,7 @@ import type { SessionRecord } from '../../state/types'
 import { filterSessions } from '../../state/selectors'
 import { abbreviatePath } from '../path-format'
 import { orderSessionsForDisplay } from '../session-ordering'
-import { theme } from '../theme'
+import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
 import { ModalFilterBar } from './modal-filter-bar'
@@ -45,6 +45,7 @@ export function SessionPickerModal({
   selectedIndex,
   sessions,
 }: SessionPickerModalProps) {
+  const theme = useTheme()
   const ordered = orderSessionsForDisplay(sessions)
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
