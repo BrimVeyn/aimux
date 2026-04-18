@@ -56,7 +56,8 @@
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
-    "knip": "knip-bun"
+    "knip": "knip-bun",
+    "bump": "bun run scripts/bump.ts"
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",
