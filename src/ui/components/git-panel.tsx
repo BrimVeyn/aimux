@@ -139,9 +139,6 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
   }
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
-      <box width={2} flexShrink={0} justifyContent="center">
-        <text bg={bg}> </text>
-      </box>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
           <text fg={theme.textMuted} bg={bg}>
@@ -325,6 +322,7 @@ export const GitPanel = memo(function GitPanel({
           flexGrow={1}
           ref={scrollRef}
           scrollY
+          scrollbarOptions={{ visible: false }}
           viewportCulling
           contentOptions={{ flexDirection: 'column', gap: 0 }}
         >
