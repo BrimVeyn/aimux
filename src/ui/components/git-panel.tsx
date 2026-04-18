@@ -147,7 +147,7 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
           <text fg={theme.textMuted} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={theme.text} bg={bg} wrapMode="none">
+          <text fg={theme.accentAlt} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>

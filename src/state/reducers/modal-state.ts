@@ -40,14 +40,17 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
-      const entryCount = keymap ? collectHelpEntries(keymap).length : 0
+      const scope = action.scope ?? null
+      const allEntries = keymap ? collectHelpEntries(keymap) : []
+      const scopedEntries = scope ? allEntries.filter((e) => e.mode === scope) : allEntries
       return {
         ...state,
         focusMode: 'modal',
         modal: {
           cursorPos: 0,
           editBuffer: null,
-          entryCount,
+          entryCount: scopedEntries.length,
+          scope,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'help',

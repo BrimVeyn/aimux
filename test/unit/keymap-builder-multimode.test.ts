@@ -7,7 +7,7 @@ import { describeBindings } from '../../src/input/keymap/describe-bindings'
 describe('KeymapBuilder.mode with array of modes', () => {
   test('registers identical bindings under every mode in the array', () => {
     const kb = new KeymapBuilder()
-    kb.mode(['navigation', 'terminal-input'], (m) => m.map('<C-s>', actions.helpModal, 'Help'))
+    kb.mode(['navigation', 'terminal-input'], (m) => m.map('<C-s>', actions.helpModal(), 'Help'))
     const built = kb._build()
     const nav = built.modes.get('navigation')
     const term = built.modes.get('terminal-input')
@@ -17,7 +17,7 @@ describe('KeymapBuilder.mode with array of modes', () => {
 
   test('single-string form still works', () => {
     const kb = new KeymapBuilder()
-    kb.mode('navigation', (m) => m.map('X', actions.helpModal))
+    kb.mode('navigation', (m) => m.map('X', actions.helpModal()))
     const built = kb._build()
     expect(built.modes.get('navigation')?.bindings.map((b) => b.keys)).toEqual(['X'])
     expect(built.modes.get('terminal-input')).toBeUndefined()
@@ -25,15 +25,17 @@ describe('KeymapBuilder.mode with array of modes', () => {
 
   test('empty array is a no-op (defines no modes)', () => {
     const kb = new KeymapBuilder()
-    kb.mode([], (m) => m.map('X', actions.helpModal))
+    kb.mode([], (m) => m.map('X', actions.helpModal()))
     const built = kb._build()
     expect(built.modes.size).toBe(0)
   })
 
   test('repeated mode calls merge bindings; same-keys entries let the later one win', () => {
     const kb = new KeymapBuilder()
-    kb.mode('navigation', (m) => m.map('Q', actions.helpModal, 'first').map('Z', actions.helpModal))
-    kb.mode(['navigation', 'git-mode'], (m) => m.map('Q', actions.helpModal, 'override'))
+    kb.mode('navigation', (m) =>
+      m.map('Q', actions.helpModal(), 'first').map('Z', actions.helpModal())
+    )
+    kb.mode(['navigation', 'git-mode'], (m) => m.map('Q', actions.helpModal(), 'override'))
     const built = kb._build()
     const nav = built.modes.get('navigation')
     expect(nav?.bindings.map((b) => b.keys).sort()).toEqual(['Q', 'Z'])
@@ -47,7 +49,7 @@ describe('resolveConfig with multi-mode bindings', () => {
   test('user bindings land in every listed mode and merge on top of defaults', () => {
     const resolved = resolveConfig({
       keymaps: (k) =>
-        k.mode(['navigation', 'git-mode'], (m) => m.map('Y', actions.helpModal, 'My action')),
+        k.mode(['navigation', 'git-mode'], (m) => m.map('Y', actions.helpModal(), 'My action')),
     })
     const nav = describeBindings(resolved.keymaps, 'navigation', { withDescriptionOnly: true })
     const git = describeBindings(resolved.keymaps, 'git-mode', { withDescriptionOnly: true })

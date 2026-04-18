@@ -102,6 +102,6 @@ describe('getStatusBarModel', () => {
     }
     const model = getStatusBarModel(state, undefined, CONFIG)
 
-    expect(model.right).toContain('Exit git')
+    expect(model.right).toContain('Stage')
   })
 })

@@ -1,4 +1,4 @@
-import type { ActionFn, AppAction, KeyResult, ModeContext } from './types'
+import type { ActionFn, AppAction, KeyResult, ModeContext, ModeId } from './types'
 
 function r(
   actions: KeyResult['actions'] = [],
@@ -32,7 +32,9 @@ export const themePicker: KeyResult = r(
   [{ action: 'open', type: 'apply-theme' }],
   'modal.theme-picker'
 )
-export const helpModal: KeyResult = r([{ type: 'open-help-modal' }], [], 'modal.help')
+export function helpModal(scope?: ModeId): KeyResult {
+  return r([{ scope, type: 'open-help-modal' }], [], 'modal.help')
+}
 
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
 export const toggleGitPane: KeyResult = r([{ type: 'toggle-git-pane' }])

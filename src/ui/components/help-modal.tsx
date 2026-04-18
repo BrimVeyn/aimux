@@ -1,7 +1,13 @@
+import type { ModeId } from '@brimveyn/aimux-config'
+
 import { useTerminalDimensions } from '@opentui/react'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
-import { collectHelpEntries, type HelpEntry } from '../../input/keymap/help-entries'
+import {
+  collectHelpEntries,
+  HELP_MODE_LABELS,
+  type HelpEntry,
+} from '../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { useKeymap } from '../keymap-context'
 import { theme } from '../theme'
@@ -12,6 +18,7 @@ import { ModalShell } from './modal-shell'
 interface HelpModalProps {
   filter: string | null
   selectedIndex: number
+  scope: ModeId | null
 }
 
 function matchesFilter(entry: HelpEntry, needle: string): boolean {
@@ -78,14 +85,23 @@ function computeWindowStart(
   return start
 }
 
-export function HelpModal({ filter, selectedIndex }: HelpModalProps) {
+export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
   const config = useKeymap()
   const dimensions = useTerminalDimensions()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
-  const filtered = useMemo(
-    () => allEntries.filter((e) => matchesFilter(e, filter ?? '')),
-    [allEntries, filter]
+  const scoped = useMemo(
+    () => (scope ? allEntries.filter((e) => e.mode === scope) : allEntries),
+    [allEntries, scope]
   )
+  const filtered = useMemo(
+    () => scoped.filter((e) => matchesFilter(e, filter ?? '')),
+    [scoped, filter]
+  )
+  const title = useMemo(() => {
+    if (!scope) return 'Keybindings'
+    const label = HELP_MODE_LABELS.find((m) => m.modeId === scope)?.label ?? scope
+    return `${label} — keybindings`
+  }, [scope])
   const rows = useMemo(() => buildRows(filtered), [filtered])
 
   useLayoutEffect(() => {
@@ -113,7 +129,7 @@ export function HelpModal({ filter, selectedIndex }: HelpModalProps) {
 
   return (
     <ModalShell
-      title="Keybindings"
+      title={title}
       keybindsModeId="modal.help"
       width={uiTokens.modalWidth.lg}
       footer={

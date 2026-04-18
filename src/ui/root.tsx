@@ -149,7 +149,13 @@ function renderModal(
         />
       )
     case 'help':
-      return <HelpModal filter={modal.editBuffer} selectedIndex={modal.selectedIndex} />
+      return (
+        <HelpModal
+          filter={modal.editBuffer}
+          selectedIndex={modal.selectedIndex}
+          scope={modal.scope}
+        />
+      )
     case 'git-commit': {
       const titleText =
         modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer

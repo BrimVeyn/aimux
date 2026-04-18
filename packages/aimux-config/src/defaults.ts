@@ -37,7 +37,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('k', actions.prevTab, 'Prev tab')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
-        .map('?', actions.helpModal, 'Help')
+        .map('?', actions.helpModal(), 'Help')
     )
 
     // -----------------------------------------------------------------------
@@ -82,6 +82,13 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('git-mode', (m) =>
       m
+        .map('a', actions.gitStageSelected, 'Stage')
+        .map('d', actions.gitDestructiveSelected, 'Unstage/delete')
+        .map('c', actions.gitCommitOpen, 'Commit')
+        .map('p', actions.gitPush, 'Push')
+        .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
+        .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
+        .map('?', actions.helpModal('git-mode'), 'Help')
         .map('<Esc>', actions.exitGitMode, 'Exit git')
         .map('j', actions.selectGitFile(1), 'Next entry')
         .map('k', actions.selectGitFile(-1), 'Prev entry')
@@ -98,12 +105,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Right>', actions.expandGitSelection, 'Expand folder')
         .map('<Down>', actions.scrollGitDiff(1), 'Scroll down')
         .map('<Up>', actions.scrollGitDiff(-1), 'Scroll up')
-        .map('a', actions.gitStageSelected, 'Stage')
-        .map('d', actions.gitDestructiveSelected, 'Unstage/delete')
-        .map('c', actions.gitCommitOpen, 'Commit')
-        .map('p', actions.gitPush, 'Push')
-        .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
-        .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
     )
 
     // -----------------------------------------------------------------------

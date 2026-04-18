@@ -1,3 +1,5 @@
+import type { ModeId } from '@brimveyn/aimux-config'
+
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
@@ -245,6 +247,7 @@ export interface ModalThemePicker extends ModalBase {
 export interface ModalHelp extends ModalBase {
   type: 'help'
   entryCount: number
+  scope: ModeId | null
 }
 
 export interface ModalSplitPicker extends ModalBase {
@@ -337,7 +340,7 @@ export interface AppState {
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
-  | { type: 'open-help-modal' }
+  | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
   | { type: 'open-session-picker' }
   | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
