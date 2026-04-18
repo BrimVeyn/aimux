@@ -46,8 +46,18 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('terminal-input', (m) =>
       m
         .map('<C-z>', actions.leaveTerminalInput, 'Leave insert')
-        .map('<Leader>', actions.enterLayoutMode, 'Layout mode')
         .map('<C-b>', actions.toggleSidebarFromInput, 'Toggle sidebar')
+        .map('<Leader>h', actions.focusPane('left'), 'Focus left')
+        .map('<Leader>j', actions.focusPane('down'), 'Focus down')
+        .map('<Leader>k', actions.focusPane('up'), 'Focus up')
+        .map('<Leader>l', actions.focusPane('right'), 'Focus right')
+        .map('<Leader>H', actions.resizePane(-1, 'vertical'), 'Shrink ←', { repeatable: true })
+        .map('<Leader>L', actions.resizePane(1, 'vertical'), 'Grow →', { repeatable: true })
+        .map('<Leader>K', actions.resizePane(-1, 'horizontal'), 'Shrink ↑', { repeatable: true })
+        .map('<Leader>J', actions.resizePane(1, 'horizontal'), 'Grow ↓', { repeatable: true })
+        .map('<Leader>|', actions.splitVertical, 'Split vertical')
+        .map('<Leader>-', actions.splitHorizontal, 'Split horizontal')
+        .map('<Leader>q', actions.closePane, 'Close pane')
     )
 
     // -----------------------------------------------------------------------
@@ -65,27 +75,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Leader>7', actions.switchSessionByIndex(7), 'Session 7')
         .map('<Leader>8', actions.switchSessionByIndex(8), 'Session 8')
         .map('<Leader>9', actions.switchSessionByIndex(9), 'Session 9')
-    )
-
-    // -----------------------------------------------------------------------
-    // Layout mode
-    // -----------------------------------------------------------------------
-    .mode('layout', (m) =>
-      m
-        .map('<Esc>', actions.exitLayoutToInput, 'Back to insert')
-        .map('<Leader>', actions.exitLayoutToInput, 'Back to insert')
-        .map('<C-z>', actions.exitLayoutToNavigation, 'Back to nav')
-        .map('H', actions.resizePane(-1, 'vertical'), 'Shrink ←')
-        .map('L', actions.resizePane(1, 'vertical'), 'Grow →')
-        .map('K', actions.resizePane(-1, 'horizontal'), 'Shrink ↑')
-        .map('J', actions.resizePane(1, 'horizontal'), 'Grow ↓')
-        .map('h', actions.focusPane('left'), 'Focus left')
-        .map('j', actions.focusPane('down'), 'Focus down')
-        .map('k', actions.focusPane('up'), 'Focus up')
-        .map('l', actions.focusPane('right'), 'Focus right')
-        .map('|', actions.splitVertical, 'Split vertical')
-        .map('-', actions.splitHorizontal, 'Split horizontal')
-        .map('q', actions.closePane, 'Close pane')
     )
 
     // -----------------------------------------------------------------------

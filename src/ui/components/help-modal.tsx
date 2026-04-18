@@ -14,7 +14,6 @@ interface ModeSection {
 const SECTIONS: ModeSection[] = [
   { modeId: 'navigation', title: 'Navigation' },
   { modeId: 'terminal-input', title: 'Terminal input' },
-  { modeId: 'layout', title: 'Layout' },
   { modeId: 'git-mode', title: 'Git mode' },
 ]
 

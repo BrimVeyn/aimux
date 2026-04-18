@@ -95,7 +95,9 @@ export default defineConfig({
             g.map('n', actions.newTab).map('r', actions.renameTab).map('x', actions.closeTab)
           )
       )
-      .mode('layout', (m) => m.map('|', actions.splitVertical).map('-', actions.splitHorizontal)),
+      .mode('terminal-input', (m) =>
+        m.map('<leader>|', actions.splitVertical).map('<leader>-', actions.splitHorizontal)
+      ),
 })
 ```
 

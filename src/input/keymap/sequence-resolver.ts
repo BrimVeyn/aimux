@@ -17,6 +17,8 @@ export class SequenceResolver {
   private timeoutHandle: ReturnType<typeof setTimeout> | null = null
   private onTimeout: ((binding: TrieBinding) => void) | null = null
   private onPendingChange: ((chords: KeyChord[] | null) => void) | null = null
+  private repeatTerminal: KeyChord | null = null
+  private repeatBinding: TrieBinding | null = null
 
   constructor(
     private readonly trie: KeyTrie,
@@ -37,16 +39,29 @@ export class SequenceResolver {
   feed(chord: KeyChord): ResolveResult {
     this.clearTimeout()
 
+    // Repeat: when not mid-sequence and the chord matches the last repeatable
+    // sequence's terminal key, re-fire it.
+    if (
+      this.currentNode === null &&
+      this.repeatTerminal !== null &&
+      this.repeatBinding !== null &&
+      chord === this.repeatTerminal
+    ) {
+      return { binding: this.repeatBinding, type: 'resolved' }
+    }
+
     const fromNode = this.currentNode ?? this.trie.root
     const match = this.trie.lookup(chord, fromNode)
 
     switch (match.type) {
       case 'exact': {
         this.resetState()
+        this.updateRepeatOnResolve(chord, match.binding)
         return { binding: match.binding, type: 'resolved' }
       }
 
       case 'prefix': {
+        this.clearRepeat()
         this.currentNode = match.node
         this.pendingBinding = null
         this.pendingChords.push(chord)
@@ -55,11 +70,12 @@ export class SequenceResolver {
       }
 
       case 'exact+prefix': {
+        this.clearRepeat()
         this.currentNode = match.node
         this.pendingBinding = match.binding
         this.pendingChords.push(chord)
         this.emitPendingChange()
-        this.startTimeout(match.binding)
+        this.startTimeout(chord, match.binding)
         return { type: 'pending' }
       }
 
@@ -69,6 +85,7 @@ export class SequenceResolver {
           this.resetState()
           return this.feed(chord)
         }
+        this.clearRepeat()
         return { type: 'passthrough' }
       }
     }
@@ -77,6 +94,7 @@ export class SequenceResolver {
   reset(): void {
     this.clearTimeout()
     this.resetState()
+    this.clearRepeat()
   }
 
   setTimeoutCallback(cb: (binding: TrieBinding) => void): void {
@@ -107,11 +125,26 @@ export class SequenceResolver {
     }
   }
 
-  private startTimeout(binding: TrieBinding): void {
+  private startTimeout(chord: KeyChord, binding: TrieBinding): void {
     this.timeoutHandle = setTimeout(() => {
       this.timeoutHandle = null
       this.resetState()
+      this.updateRepeatOnResolve(chord, binding)
       this.onTimeout?.(binding)
     }, this.config.timeoutMs)
+  }
+
+  private updateRepeatOnResolve(chord: KeyChord, binding: TrieBinding): void {
+    if (binding.repeatable) {
+      this.repeatTerminal = chord
+      this.repeatBinding = binding
+    } else {
+      this.clearRepeat()
+    }
+  }
+
+  private clearRepeat(): void {
+    this.repeatTerminal = null
+    this.repeatBinding = null
   }
 }

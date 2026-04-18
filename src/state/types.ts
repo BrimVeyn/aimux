@@ -6,13 +6,7 @@ export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'er
 
 export type TabActivity = 'busy' | 'idle'
 
-export type FocusMode =
-  | 'navigation'
-  | 'terminal-input'
-  | 'modal'
-  | 'command-edit'
-  | 'layout'
-  | 'git'
+export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
 
 export type ModalType =
   | 'new-tab'

@@ -118,7 +118,7 @@ Pre-built actions cover every built-in aimux operation:
 
 **Layout / splits** — `splitVertical`, `splitHorizontal`, `focusPane('left'|'right'|'up'|'down')`, `resizePane(n, 'horizontal'|'vertical')`, `closePane`
 
-**Mode transitions** — `enterInsert`, `enterLayoutMode`, `leaveTerminalInput`, `quit`
+**Mode transitions** — `enterInsert`, `leaveTerminalInput`, `quit`
 
 **Custom actions** — write an `ActionFn` for dynamic logic:
 

@@ -62,11 +62,6 @@ export function getStatusBarModel(
         right: modalMode ? hintForMode(config, modalMode) : '',
       }
     }
-    case 'layout':
-      return {
-        left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
-        right: hintForMode(config, 'layout'),
-      }
     case 'git':
       return {
         left: `${sessionIcon}  ${sessionLabel}`,

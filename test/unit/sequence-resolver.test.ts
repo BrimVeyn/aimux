@@ -230,4 +230,107 @@ describe('SequenceResolver', () => {
     resolver.feed('j')
     expect(pendingStates).toEqual([])
   })
+
+  describe('repeatable bindings', () => {
+    test('re-fires same binding on terminal key alone after resolve', () => {
+      const trie = new KeyTrie()
+      trie.insert(['C-w', 'J'], { repeatable: true, result: MOVE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 300 })
+
+      expect(resolver.feed('C-w').type).toBe('pending')
+      const first = resolver.feed('J')
+      expect(first.type).toBe('resolved')
+
+      const repeat1 = resolver.feed('J')
+      expect(repeat1.type).toBe('resolved')
+      if (repeat1.type === 'resolved') {
+        expect(repeat1.binding.result).toBe(MOVE_RESULT)
+      }
+
+      const repeat2 = resolver.feed('J')
+      expect(repeat2.type).toBe('resolved')
+    })
+
+    test('non-matching key breaks the repeat streak', () => {
+      const trie = new KeyTrie()
+      trie.insert(['C-w', 'J'], { repeatable: true, result: MOVE_RESULT })
+      trie.insert(['K'], { result: CLOSE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 300 })
+
+      resolver.feed('C-w')
+      resolver.feed('J')
+
+      const other = resolver.feed('K')
+      expect(other.type).toBe('resolved')
+      if (other.type === 'resolved') {
+        expect(other.binding.result).toBe(CLOSE_RESULT)
+      }
+
+      // 'J' should no longer repeat — it falls through to passthrough
+      expect(resolver.feed('J').type).toBe('passthrough')
+    })
+
+    test('non-repeatable binding does not set repeat state', () => {
+      const trie = new KeyTrie()
+      trie.insert(['C-w', 'J'], { result: MOVE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 300 })
+
+      resolver.feed('C-w')
+      resolver.feed('J')
+
+      expect(resolver.feed('J').type).toBe('passthrough')
+    })
+
+    test('starting a new prefix clears the repeat streak', () => {
+      const trie = new KeyTrie()
+      trie.insert(['C-w', 'J'], { repeatable: true, result: MOVE_RESULT })
+      trie.insert(['C-w', 'H'], { result: CLOSE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 300 })
+
+      resolver.feed('C-w')
+      resolver.feed('J')
+
+      // New chord on <C-w>: prefix branch clears repeat state
+      expect(resolver.feed('C-w').type).toBe('pending')
+      const resolved = resolver.feed('H')
+      expect(resolved.type).toBe('resolved')
+      if (resolved.type === 'resolved') {
+        expect(resolved.binding.result).toBe(CLOSE_RESULT)
+      }
+
+      // 'J' alone no longer repeats
+      expect(resolver.feed('J').type).toBe('passthrough')
+    })
+
+    test('reset() clears repeat state', () => {
+      const trie = new KeyTrie()
+      trie.insert(['C-w', 'J'], { repeatable: true, result: MOVE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 300 })
+
+      resolver.feed('C-w')
+      resolver.feed('J')
+      resolver.reset()
+
+      expect(resolver.feed('J').type).toBe('passthrough')
+    })
+
+    test('timeout-fired exact+prefix binding sets repeat when repeatable', async () => {
+      const trie = new KeyTrie()
+      trie.insert(['J'], { repeatable: true, result: MOVE_RESULT })
+      trie.insert(['J', 'X'], { result: CLOSE_RESULT })
+      const resolver = new SequenceResolver(trie, { timeoutMs: 10 })
+
+      const fired: KeyResult[] = []
+      resolver.setTimeoutCallback((binding) => {
+        fired.push(binding.result as KeyResult)
+      })
+
+      expect(resolver.feed('J').type).toBe('pending')
+      await new Promise((r) => setTimeout(r, 25))
+      expect(fired[0]).toBe(MOVE_RESULT)
+
+      // Now 'J' alone should repeat
+      expect(resolver.feed('J').type).toBe('resolved')
+    })
+  })
 })

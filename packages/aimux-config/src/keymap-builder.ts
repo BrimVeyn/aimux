@@ -1,6 +1,7 @@
 import type {
   Action,
   BindingDef,
+  BindingOptions,
   GroupBuilderApi,
   KeymapBuilderApi,
   ModeBindingBuilderApi,
@@ -21,11 +22,12 @@ export class GroupBuilder implements GroupBuilderApi {
     private readonly groupName: string
   ) {}
 
-  map(keys: string, action: Action, description?: string): this {
+  map(keys: string, action: Action, description?: string, opts?: BindingOptions): this {
     this.bindings.push({
       description,
       group: this.groupName,
       keys: `${this.prefix}${keys}`,
+      repeatable: opts?.repeatable,
       result: action,
     })
     return this
@@ -48,8 +50,8 @@ export class ModeBindingBuilder implements ModeBindingBuilderApi {
   private readonly removals: string[] = []
   private _passthrough = false
 
-  map(keys: string, action: Action, description?: string): this {
-    this.bindings.push({ description, keys, result: action })
+  map(keys: string, action: Action, description?: string, opts?: BindingOptions): this {
+    this.bindings.push({ description, keys, repeatable: opts?.repeatable, result: action })
     return this
   }
 

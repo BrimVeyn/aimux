@@ -6,6 +6,7 @@ export type ActionFn = (ctx: ModeContext) => KeyResult | null
 export interface TrieBinding {
   result: KeyResult | ActionFn
   group?: string
+  repeatable?: boolean
 }
 
 export interface TrieNode {

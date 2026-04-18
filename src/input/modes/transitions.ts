@@ -2,7 +2,6 @@ import type { ModeId } from './types'
 
 const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'git-mode': ['navigation', 'modal.git-commit'],
-  'layout': ['terminal-input', 'navigation', 'modal.split-picker'],
   'modal.create-session': ['navigation', 'modal.session-picker'],
   'modal.git-commit': ['git-mode'],
   'modal.help': ['navigation'],
@@ -20,7 +19,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.snippet-editor': ['navigation', 'modal.snippet-picker'],
   'modal.snippet-picker': ['navigation', 'modal.snippet-picker.filtering', 'modal.snippet-editor'],
   'modal.snippet-picker.filtering': ['modal.snippet-picker'],
-  'modal.split-picker': ['navigation'],
+  'modal.split-picker': ['navigation', 'terminal-input'],
   'modal.theme-picker': ['navigation'],
   'modal.update-available': ['navigation'],
   'navigation': [
@@ -34,7 +33,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.update-available',
     'git-mode',
   ],
-  'terminal-input': ['navigation', 'layout'],
+  'terminal-input': ['navigation', 'modal.split-picker'],
 }
 
 export function isValidTransition(from: ModeId, to: ModeId): boolean {

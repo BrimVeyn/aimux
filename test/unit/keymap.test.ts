@@ -71,30 +71,6 @@ describe('mode handlers', () => {
     expect(armed.actions).toEqual([])
   })
 
-  test('layout: Ctrl+Z exits to navigation and reveals sidebar if hidden', () => {
-    const handler = requireValue(getHandler('layout'), 'Missing layout handler')
-    const hiddenCtx = ctx()
-    hiddenCtx.state.sidebar = { ...hiddenCtx.state.sidebar, visible: false }
-    const hiddenResult = requireValue(
-      handler.handleKey(key('z', { ctrl: true }), hiddenCtx),
-      'Expected layout Ctrl+Z result'
-    )
-    expect(hiddenResult.transition).toBe('navigation')
-    expect(hiddenResult.actions).toEqual([
-      { focusMode: 'navigation', type: 'set-focus-mode' },
-      { type: 'toggle-sidebar' },
-    ])
-
-    const visibleCtx = ctx()
-    visibleCtx.state.sidebar = { ...visibleCtx.state.sidebar, visible: true }
-    const visibleResult = requireValue(
-      handler.handleKey(key('z', { ctrl: true }), visibleCtx),
-      'Expected layout Ctrl+Z result'
-    )
-    expect(visibleResult.transition).toBe('navigation')
-    expect(visibleResult.actions).toEqual([{ focusMode: 'navigation', type: 'set-focus-mode' }])
-  })
-
   test('navigation: Ctrl+Z opens sidebar when hidden, no-op when visible', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const hiddenCtx = ctx()
