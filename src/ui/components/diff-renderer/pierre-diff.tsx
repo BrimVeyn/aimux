@@ -1,20 +1,18 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ThemedToken } from 'shiki'
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 
-import type { FoldState } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
-import { parsePatchFiles } from '../../../diff-parser'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
+import { type FoldState } from '../../../state/types'
 import { useTheme } from '../../theme'
 import { buildSplitRows, buildUnifiedRows, firstChangeRowOffset, gutterWidth } from './build-rows'
-import { filetypeFromPath } from './filetype'
-import { tokenizeSide } from './highlight'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
+import { useDiffPreparation } from './use-diff-preparation'
 
 export type DiffView = 'split' | 'stacked'
 
@@ -41,7 +39,6 @@ interface Props {
   view: DiffView
 }
 
-const EMPTY_HIGHLIGHTS: DiffHighlights = { add: [], del: [] }
 const EMPTY_FOLDS: Record<string, FoldState> = {}
 
 export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDiff(
@@ -49,12 +46,9 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   ref
 ) {
   const theme = useTheme()
-  const file = useMemo(() => {
-    const patches = parsePatchFiles(diff)
-    return patches[0]?.files[0]
-  }, [diff])
-
-  const filetype = useMemo(() => filetypeFromPath(path), [path])
+  const preparation = useDiffPreparation(cacheKey, diff, path, themeId)
+  const file = preparation.file ?? undefined
+  const highlights: DiffHighlights = preparation.highlights
 
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
@@ -77,24 +71,6 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     }),
     [cacheKey]
   )
-
-  const [highlights, setHighlights] = useState<DiffHighlights>(EMPTY_HIGHLIGHTS)
-
-  useEffect(() => {
-    setHighlights(EMPTY_HIGHLIGHTS)
-    if (!file || !filetype) return
-    let cancelled = false
-    void Promise.all([
-      tokenizeSide(file.additionLines, filetype, themeId),
-      tokenizeSide(file.deletionLines, filetype, themeId),
-    ]).then(([add, del]) => {
-      if (cancelled) return
-      setHighlights({ add, del })
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [file, filetype, themeId])
 
   const splitRef = useRef<SplitViewHandle | null>(null)
   const stackedRef = useRef<StackedViewHandle | null>(null)
@@ -141,7 +117,9 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   if (!file) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.colors['descriptionForeground']}>(could not parse diff)</text>
+        <text fg={theme.colors['descriptionForeground']}>
+          {preparation.preparing ? 'Preparing diff…' : '(could not parse diff)'}
+        </text>
       </box>
     )
   }

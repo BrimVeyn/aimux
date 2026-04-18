@@ -38,7 +38,9 @@ const DEFAULT_GIT_PANE: GitPaneState = {
   mode: 'embedded',
   path: { enabled: true },
   position: 'bottom',
+  prefetchRadius: 5,
   ratio: 0.5,
+  treeCompaction: true,
   visible: true,
 }
 

@@ -1,4 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
+import type { ThemedToken } from 'shiki'
+
+import type { FileDiffMetadata } from '../diff-parser'
 
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 
@@ -148,8 +151,11 @@ export interface GitPaneState {
   ratio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
+  treeCompaction: boolean
   path: GitPanePathConfig
   diffCount: GitPaneDiffCountConfig
+  /** Prefetch this many neighbours around the selection. 0 disables prefetch. */
+  prefetchRadius: number
 }
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
@@ -195,10 +201,45 @@ export interface FoldState {
   bottom: number
 }
 
+export interface ParsedDiffEntry {
+  hash: string
+  // Stored as unknown at the state boundary; concrete type is FileDiffMetadata
+  // | null, narrowed at read sites via getParsedFile().
+  file: unknown
+}
+
+export interface HighlightsEntry {
+  hash: string
+  themeId: string
+  // See ParsedDiffEntry note — narrowed via getHighlights().
+  add: unknown
+  del: unknown
+}
+
+export function getParsedFile(entry: ParsedDiffEntry | undefined): FileDiffMetadata | null {
+  if (!entry) return null
+  return entry.file as FileDiffMetadata | null
+}
+
+export function getHighlightsTokens(entry: HighlightsEntry | undefined): {
+  add: ThemedToken[][]
+  del: ThemedToken[][]
+} | null {
+  if (!entry) return null
+  return {
+    add: entry.add as ThemedToken[][],
+    del: entry.del as ThemedToken[][],
+  }
+}
+
 export interface GitModeState {
   selectedEntryKey: string | null
   collapsedFolders: Record<string, true>
   diffs: Record<string, DiffData>
+  /** Parsed diff keyed by fileKey. Invalidated on file change or head offset shift. */
+  parsedFiles: Record<string, ParsedDiffEntry>
+  /** Tokenised highlights keyed by `${fileKey}|${themeId}`. */
+  highlights: Record<string, HighlightsEntry>
   loading: Record<string, boolean>
   pendingDeletePath: string | null
   actionMessage: string | null
@@ -473,7 +514,23 @@ export type GitModeAction =
   | { type: 'git-mode-collapse-selection' }
   | { type: 'git-mode-expand-selection' }
   | { type: 'git-mode-toggle-file-list-mode' }
-  | { type: 'git-mode-set-diff'; key: string; diff: DiffData }
+  | { type: 'git-mode-toggle-tree-compaction' }
+  | { type: 'git-mode-set-diff'; key: string; diff: DiffData; hash: string }
+  | {
+      type: 'git-mode-set-parsed'
+      key: string
+      hash: string
+      file: unknown
+    }
+  | {
+      type: 'git-mode-set-highlights'
+      key: string
+      hash: string
+      themeId: string
+      add: unknown
+      del: unknown
+    }
+  | { type: 'git-mode-invalidate-diffs'; paths: string[] }
   | { type: 'git-mode-set-loading'; key: string; loading: boolean }
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }

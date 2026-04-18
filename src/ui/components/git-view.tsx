@@ -4,6 +4,7 @@ import { memo, useEffect, useRef } from 'react'
 import type { DiffData, GitDiffView } from '../../state/types'
 import type { ThemeId } from '../themes'
 
+import { diffHash } from '../../git/diff-hash'
 import { fetchDiff } from '../../git/git-diff'
 import { useGitPanelPolling } from '../../git/git-poller'
 import { useAppStore } from '../../state/app-store'
@@ -12,6 +13,7 @@ import { getSelectedGitFile, gitFileKey } from '../../state/git-tree'
 import { setGitDiffScroller } from '../git-view-controls'
 import { useTheme } from '../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
+import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
 
 interface DiffStageProps {
@@ -124,6 +126,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
 
   const selectedFile = getSelectedGitFile(gitPanel.files, {
     collapsedFolders: gitMode.collapsedFolders,
+    compact: gitPane.treeCompaction,
     fileListMode: gitPane.fileListMode,
     selectedEntryKey: gitMode.selectedEntryKey,
   })
@@ -147,6 +150,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     return () => setGitDiffScroller(null)
   }, [])
 
+  useDiffPrefetch(gitMode.selectedEntryKey, gitPane.prefetchRadius, {
+    enabled: focusMode === 'git',
+    headOffset: gitMode.headOffset,
+    projectPath,
+    themeId,
+  })
+
   useEffect(() => {
     if (focusMode !== 'git') return
     if (!selectedFile || !projectPath) return
@@ -154,7 +164,14 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
     void fetchDiff(projectPath, selectedFile, gitMode.headOffset)
-      .then((d) => dispatchGlobal({ diff: d, key: selectedDiffKey, type: 'git-mode-set-diff' }))
+      .then((d) =>
+        dispatchGlobal({
+          diff: d,
+          hash: diffHash(d.rawDiff),
+          key: selectedDiffKey,
+          type: 'git-mode-set-diff',
+        })
+      )
       .catch(() =>
         dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
       )
@@ -219,6 +236,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           </text>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
+            compact={gitPane.treeCompaction}
             fileListMode={gitPane.fileListMode}
             gitPanel={gitPanel}
             headOffset={gitMode.headOffset}

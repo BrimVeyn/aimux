@@ -7,6 +7,7 @@ import {
   moveGitSelection,
   reconcileSelectedGitEntryKey,
 } from '../git-tree'
+import { clearDiffCacheForPath, clearDiffCacheForPaths } from './diff-cache'
 import { sortFilesBySection } from './git-panel-state'
 
 function applyFold(state: AppState, key: string, foldId: string, next: FoldState): AppState {
@@ -28,33 +29,6 @@ function applyFold(state: AppState, key: string, foldId: string, next: FoldState
   return { ...state, gitMode: { ...state.gitMode, folds: nextFolds } }
 }
 
-function clearDiffCacheForPath(state: AppState, path: string): AppState {
-  const nextDiffs = { ...state.gitMode.diffs }
-  const nextFolds = { ...state.gitMode.folds }
-  const nextLoading = { ...state.gitMode.loading }
-  let changed = false
-  for (const key of Object.keys(nextDiffs)) {
-    if (nextDiffs[key]?.path !== path) continue
-    delete nextDiffs[key]
-    changed = true
-  }
-  for (const key of Object.keys(nextFolds)) {
-    if (!key.endsWith(`:${path}`)) continue
-    delete nextFolds[key]
-    changed = true
-  }
-  for (const key of Object.keys(nextLoading)) {
-    if (!key.endsWith(`:${path}`)) continue
-    delete nextLoading[key]
-    changed = true
-  }
-  if (!changed) return state
-  return {
-    ...state,
-    gitMode: { ...state.gitMode, diffs: nextDiffs, folds: nextFolds, loading: nextLoading },
-  }
-}
-
 export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
@@ -63,7 +37,9 @@ export function emptyGitMode(): GitModeState {
     diffView: 'split',
     folds: {},
     headOffset: 0,
+    highlights: {},
     loading: {},
+    parsedFiles: {},
     pendingDeletePath: null,
     selectedEntryKey: null,
   }
@@ -84,7 +60,9 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
             state.gitPanel.files,
             state.gitMode.collapsedFolders,
             state.gitPane.fileListMode,
-            null
+            null,
+            [],
+            state.gitPane.treeCompaction
           ),
         },
       }
@@ -100,7 +78,9 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           diffs: {},
           folds: {},
           headOffset: 0,
+          highlights: {},
           loading: {},
+          parsedFiles: {},
         },
       }
     }
@@ -110,7 +90,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
-        action.delta
+        action.delta,
+        state.gitPane.treeCompaction
       )
       if (!next || next === state.gitMode.selectedEntryKey) return state
       return {
@@ -128,7 +109,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
-        action.delta
+        action.delta,
+        state.gitPane.treeCompaction
       )
       if (!next || next === state.gitMode.selectedEntryKey) return state
       return {
@@ -146,7 +128,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
-        [action.key]
+        [action.key],
+        state.gitPane.treeCompaction
       )
       if (!next || next !== action.key || next === state.gitMode.selectedEntryKey) return state
       return {
@@ -161,6 +144,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-folder': {
       const row = getSelectedGitRow(state.gitPanel.files, {
         collapsedFolders: state.gitMode.collapsedFolders,
+        compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
         selectedEntryKey: action.key,
       })
@@ -176,6 +160,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-selected-folder': {
       const row = getSelectedGitRow(state.gitPanel.files, {
         collapsedFolders: state.gitMode.collapsedFolders,
+        compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
         selectedEntryKey: state.gitMode.selectedEntryKey,
       })
@@ -191,6 +176,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-collapse-selection': {
       const row = getSelectedGitRow(state.gitPanel.files, {
         collapsedFolders: state.gitMode.collapsedFolders,
+        compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
         selectedEntryKey: state.gitMode.selectedEntryKey,
       })
@@ -217,6 +203,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-expand-selection': {
       const row = getSelectedGitRow(state.gitPanel.files, {
         collapsedFolders: state.gitMode.collapsedFolders,
+        compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
         selectedEntryKey: state.gitMode.selectedEntryKey,
       })
@@ -236,23 +223,89 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
             state.gitPanel.files,
             state.gitMode.collapsedFolders,
             fileListMode,
-            state.gitMode.selectedEntryKey
+            state.gitMode.selectedEntryKey,
+            [],
+            state.gitPane.treeCompaction
           ),
         },
         gitPane: { ...state.gitPane, fileListMode },
       }
     }
+    case 'git-mode-toggle-tree-compaction': {
+      const treeCompaction = !state.gitPane.treeCompaction
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          pendingDeletePath: null,
+          selectedEntryKey: reconcileSelectedGitEntryKey(
+            state.gitPanel.files,
+            state.gitMode.collapsedFolders,
+            state.gitPane.fileListMode,
+            state.gitMode.selectedEntryKey,
+            [],
+            treeCompaction
+          ),
+        },
+        gitPane: { ...state.gitPane, treeCompaction },
+      }
+    }
     case 'git-mode-set-diff': {
       const nextLoading = { ...state.gitMode.loading }
       delete nextLoading[action.key]
+      // Drop stale derived entries (parsed + highlights) whose hash no longer matches.
+      const nextParsed = { ...state.gitMode.parsedFiles }
+      const prevParsed = nextParsed[action.key]
+      if (prevParsed && prevParsed.hash !== action.hash) delete nextParsed[action.key]
+      const nextHighlights = { ...state.gitMode.highlights }
+      for (const key of Object.keys(nextHighlights)) {
+        if (!key.startsWith(`${action.key}|`)) continue
+        if (nextHighlights[key]?.hash !== action.hash) delete nextHighlights[key]
+      }
       return {
         ...state,
         gitMode: {
           ...state.gitMode,
           diffs: { ...state.gitMode.diffs, [action.key]: action.diff },
+          highlights: nextHighlights,
           loading: nextLoading,
+          parsedFiles: nextParsed,
         },
       }
+    }
+    case 'git-mode-set-parsed': {
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          parsedFiles: {
+            ...state.gitMode.parsedFiles,
+            [action.key]: { file: action.file, hash: action.hash },
+          },
+        },
+      }
+    }
+    case 'git-mode-set-highlights': {
+      const k = `${action.key}|${action.themeId}`
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          highlights: {
+            ...state.gitMode.highlights,
+            [k]: {
+              add: action.add,
+              del: action.del,
+              hash: action.hash,
+              themeId: action.themeId,
+            },
+          },
+        },
+      }
+    }
+    case 'git-mode-invalidate-diffs': {
+      if (action.paths.length === 0) return state
+      return clearDiffCacheForPaths(state, new Set(action.paths))
     }
     case 'git-mode-set-loading': {
       const nextLoading = { ...state.gitMode.loading }
@@ -289,7 +342,9 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           diffs: {},
           folds: {},
           headOffset: next,
+          highlights: {},
           loading: {},
+          parsedFiles: {},
           pendingDeletePath: null,
         },
       }
@@ -304,7 +359,9 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           diffs: {},
           folds: {},
           headOffset: next,
+          highlights: {},
           loading: {},
+          parsedFiles: {},
           pendingDeletePath: null,
         },
       }
@@ -357,7 +414,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         currentKey,
-        preferredSelection
+        preferredSelection,
+        state.gitPane.treeCompaction
       )
 
       return {

@@ -5,7 +5,7 @@ import {
   type ScrollBoxRenderable,
   TextAttributes,
 } from '@opentui/core'
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
 import type { FoldState } from '../../../state/types'
@@ -17,6 +17,9 @@ import { useTheme } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
+
+// Same cap as split-view — keeps the React child count bounded.
+const LARGE_ROW_CAP = 5000
 
 export interface StackedViewHandle {
   scroll: ScrollBoxRenderable | null
@@ -54,8 +57,13 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     []
   )
 
-  const rows = buildUnifiedRows(file, folds, contentWidth)
-  const gw = gutterWidth(file)
+  const rows = useMemo(
+    () => buildUnifiedRows(file, folds, contentWidth),
+    [file, folds, contentWidth]
+  )
+  const gw = useMemo(() => gutterWidth(file), [file])
+  const truncated = rows.length > LARGE_ROW_CAP
+  const displayRows = truncated ? rows.slice(0, LARGE_ROW_CAP) : rows
 
   return (
     <scrollbox
@@ -66,7 +74,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
       contentOptions={{ flexDirection: 'column', gap: 0 }}
       onMouseScroll={handleScroll}
     >
-      {rows.map((row, i) => (
+      {displayRows.map((row, i) => (
         <UnifiedRowRender
           key={i}
           foldDispatch={foldDispatch}
@@ -75,9 +83,26 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
           row={row}
         />
       ))}
+      {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
     </scrollbox>
   )
 })
+
+function TruncationNotice({ hidden }: { hidden: number }) {
+  const theme = useTheme()
+  return (
+    <box
+      flexDirection="row"
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={theme.colors['editorWarning.foreground']}>
+        …diff truncated — {hidden} more rows hidden
+      </text>
+    </box>
+  )
+}
 
 function UnifiedRowRender({
   foldDispatch,

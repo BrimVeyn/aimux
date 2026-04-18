@@ -10,7 +10,8 @@ function entry(path: string): GitFileEntry {
 }
 
 function seedWithFiles(files: GitFileEntry[]): AppState {
-  const s0 = createInitialState()
+  const base = createInitialState()
+  const s0: AppState = { ...base, gitPane: { ...base.gitPane, treeCompaction: false } }
   return appReducer(s0, {
     payload: { ahead: 0, behind: 0, branch: 'main', files },
     type: 'git-refresh-success',
@@ -166,6 +167,7 @@ test('git-mode-set-diff stores raw diff and clears loading', () => {
   expect(s1.gitMode.loading['unstaged:a.ts']).toBe(true)
   const s2 = appReducer(s1, {
     diff: diffFor('a.ts'),
+    hash: 'h',
     key: gitFileKey({ path: 'a.ts', section: 'unstaged' }),
     type: 'git-mode-set-diff',
   })
@@ -183,6 +185,7 @@ test('git-mode diff cache stays isolated for the same path in different sections
   const s1 = appReducer(s0, { key: stagedKey, loading: true, type: 'git-mode-set-loading' })
   const s2 = appReducer(s1, {
     diff: diffFor('src/app.ts'),
+    hash: 'h',
     key: stagedKey,
     type: 'git-mode-set-diff',
   })

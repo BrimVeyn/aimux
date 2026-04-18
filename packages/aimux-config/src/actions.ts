@@ -457,6 +457,14 @@ export const toggleGitFileListMode: ActionFn = (ctx: ModeContext) => {
   )
 }
 
+export const toggleTreeCompaction: ActionFn = (ctx: ModeContext) => {
+  const enabled = !ctx.state.gitPane.treeCompaction
+  return r(
+    [{ type: 'git-mode-toggle-tree-compaction' }],
+    [{ enabled, type: 'persist-git-tree-compaction' }]
+  )
+}
+
 export function scrollGitDiff(delta: number): KeyResult {
   return r([], [{ delta, type: 'scroll-git-diff' }])
 }

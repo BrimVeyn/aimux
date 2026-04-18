@@ -5,7 +5,7 @@ import {
   type ScrollBoxRenderable,
   TextAttributes,
 } from '@opentui/core'
-import { forwardRef, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
 import type { FoldState } from '../../../state/types'
@@ -17,6 +17,11 @@ import { useTheme } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
+
+// Cap DOM size for extreme diffs. Rows beyond this are hidden behind a banner;
+// users scroll within the visible window. Shiki highlighting is already skipped
+// upstream in prepare-diff for similarly large diffs.
+const LARGE_ROW_CAP = 5000
 
 export interface SplitViewHandle {
   leftScroll: ScrollBoxRenderable | null
@@ -60,8 +65,10 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     []
   )
 
-  const rows = buildSplitRows(file, folds, contentWidth)
-  const gw = gutterWidth(file)
+  const rows = useMemo(() => buildSplitRows(file, folds, contentWidth), [file, folds, contentWidth])
+  const gw = useMemo(() => gutterWidth(file), [file])
+  const truncated = rows.length > LARGE_ROW_CAP
+  const displayRows = truncated ? rows.slice(0, LARGE_ROW_CAP) : rows
 
   return (
     <box flexDirection="row" flexGrow={1} overflow="hidden" onMouseScroll={handleScroll}>
@@ -74,7 +81,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         verticalScrollbarOptions={{ visible: false }}
         onMouseScroll={handleScroll}
       >
-        {rows.map((row, i) => (
+        {displayRows.map((row, i) => (
           <SideRow
             key={i}
             cell={row.type === 'row' ? row.left : null}
@@ -85,6 +92,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
             tokens={highlights.del}
           />
         ))}
+        {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
       </scrollbox>
       <box width={1} backgroundColor={theme.colors['editor.background']} />
       <scrollbox
@@ -95,7 +103,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         contentOptions={{ flexDirection: 'column', gap: 0 }}
         onMouseScroll={handleScroll}
       >
-        {rows.map((row, i) => (
+        {displayRows.map((row, i) => (
           <SideRow
             key={i}
             cell={row.type === 'row' ? row.right : null}
@@ -106,10 +114,27 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
             tokens={highlights.add}
           />
         ))}
+        {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
       </scrollbox>
     </box>
   )
 })
+
+function TruncationNotice({ hidden }: { hidden: number }) {
+  const theme = useTheme()
+  return (
+    <box
+      flexDirection="row"
+      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      paddingLeft={1}
+      paddingRight={1}
+    >
+      <text fg={theme.colors['editorWarning.foreground']}>
+        …diff truncated — {hidden} more rows hidden
+      </text>
+    </box>
+  )
+}
 
 function SideRow({
   cell,

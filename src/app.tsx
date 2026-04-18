@@ -88,10 +88,14 @@ export function App({
     const userGitPane = resolvedConfig.gitPane
     const fileListMode = userGitPane?.fileListMode ?? json.gitPane?.fileListMode ?? 'tree'
     const diffModeRatio = userGitPane?.diffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
+    const treeCompaction = userGitPane?.treeCompaction ?? json.gitPane?.treeCompaction ?? true
+    const prefetchRadius = userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5
     const gitPaneOverrides = {
       ...json.gitPane,
       diffModeRatio,
       fileListMode,
+      prefetchRadius,
+      treeCompaction,
       ...(userGitPane?.visible !== undefined ? { visible: userGitPane.visible } : {}),
       ...(userGitPane?.mode !== undefined ? { mode: userGitPane.mode } : {}),
       ...(userGitPane?.position !== undefined ? { position: userGitPane.position } : {}),

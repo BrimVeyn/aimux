@@ -1,6 +1,7 @@
 import type { AppAction, AppState, GitFileEntry, GitFileSection, GitPanelState } from '../types'
 
 import { reconcileSelectedGitEntryKey } from '../git-tree'
+import { clearDiffCacheForPaths } from './diff-cache'
 
 export const GIT_PANEL_MIN_RATIO = 0.2
 export const GIT_PANEL_MAX_RATIO = 0.8
@@ -33,6 +34,32 @@ export function emptyGitPanel(): GitPanelState {
     error: null,
     files: [],
   }
+}
+
+function fileSignature(f: GitFileEntry): string {
+  return `${f.status}|${f.added ?? '-'}|${f.removed ?? '-'}|${f.renamedFrom ?? ''}`
+}
+
+// Paths whose content/status shifted between two snapshots — used to drop
+// stale cached diffs so we re-fetch instead of serving pre-edit data.
+function diffChangedPaths(prev: GitFileEntry[], next: GitFileEntry[]): Set<string> {
+  const prevByKey = new Map<string, string>()
+  for (const f of prev) prevByKey.set(`${f.section}:${f.path}`, fileSignature(f))
+  const changed = new Set<string>()
+  const nextKeys = new Set<string>()
+  for (const f of next) {
+    const key = `${f.section}:${f.path}`
+    nextKeys.add(key)
+    const prevSig = prevByKey.get(key)
+    if (prevSig !== fileSignature(f)) changed.add(f.path)
+  }
+  for (const [key, _sig] of prevByKey) {
+    if (nextKeys.has(key)) continue
+    const [, ...rest] = key.split(':')
+    const path = rest.join(':')
+    if (path) changed.add(path)
+  }
+  return changed
 }
 
 function sameFiles(a: GitFileEntry[], b: GitFileEntry[]): boolean {
@@ -109,7 +136,9 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
         sortedNext,
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
-        state.gitMode.selectedEntryKey
+        state.gitMode.selectedEntryKey,
+        [],
+        state.gitPane.treeCompaction
       )
       if (
         prev.branch === next.branch &&
@@ -121,7 +150,8 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       ) {
         return state
       }
-      return {
+      const changedPaths = diffChangedPaths(prev.files, sortedNext)
+      const base: AppState = {
         ...state,
         gitMode: { ...state.gitMode, selectedEntryKey: nextSelectedEntryKey },
         gitPanel: {
@@ -133,6 +163,7 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
           files: sortedNext,
         },
       }
+      return changedPaths.size === 0 ? base : clearDiffCacheForPaths(base, changedPaths)
     }
     case 'git-refresh-error': {
       const prev = state.gitPanel

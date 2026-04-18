@@ -471,6 +471,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           mode: persistedGitPane?.mode ?? 'embedded',
           position: persistedGitPane?.position ?? 'bottom',
           ratio: persistedGitPane?.ratio ?? 0.5,
+          treeCompaction: persistedGitPane?.treeCompaction,
           visible: persistedGitPane?.visible ?? true,
         },
       })
@@ -487,6 +488,24 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           mode: persistedGitPane?.mode ?? 'embedded',
           position: persistedGitPane?.position ?? 'bottom',
           ratio: persistedGitPane?.ratio ?? 0.5,
+          treeCompaction: persistedGitPane?.treeCompaction,
+          visible: persistedGitPane?.visible ?? true,
+        },
+      })
+      return
+    }
+    case 'persist-git-tree-compaction': {
+      const config = loadConfig()
+      const persistedGitPane = config.gitPane
+      saveConfig({
+        ...config,
+        gitPane: {
+          diffModeRatio: persistedGitPane?.diffModeRatio,
+          fileListMode: persistedGitPane?.fileListMode,
+          mode: persistedGitPane?.mode ?? 'embedded',
+          position: persistedGitPane?.position ?? 'bottom',
+          ratio: persistedGitPane?.ratio ?? 0.5,
+          treeCompaction: effect.enabled,
           visible: persistedGitPane?.visible ?? true,
         },
       })

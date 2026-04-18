@@ -203,7 +203,9 @@ function MouseHarness({
         mode: 'embedded' as const,
         path: { enabled: true },
         position: 'bottom' as const,
+        prefetchRadius: 0,
         ratio: 0.5,
+        treeCompaction: false,
         visible: true,
       },
       layout: {

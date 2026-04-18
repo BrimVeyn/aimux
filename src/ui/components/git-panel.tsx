@@ -24,6 +24,7 @@ interface GitPanelProps {
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
   headOffset?: number
+  compact?: boolean
 }
 
 function sectionTitle(section: GitFileSection, headOffset: number): string {
@@ -172,7 +173,10 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
           <text fg={getCurrentTheme().colors['descriptionForeground']} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={getCurrentTheme().colors['terminal.ansiMagenta']} bg={bg} wrapMode="none">
+          <text fg={getCurrentTheme().colors['textLink.foreground']} bg={bg}>
+            {row.isCollapsed ? '\uf07b' : '\uf07c'}
+          </text>
+          <text fg={getCurrentTheme().colors['textLink.foreground']} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -222,7 +226,8 @@ function renderTreeSection(
   selectedEntryKey: string | null | undefined,
   showListModeToggle: boolean,
   pathConfig: GitPanePathConfig,
-  diffCountConfig: GitPaneDiffCountConfig
+  diffCountConfig: GitPaneDiffCountConfig,
+  marginTop: number
 ): ReactNode {
   if (files.length === 0) return null
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
@@ -231,7 +236,7 @@ function renderTreeSection(
     runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
   }
   return (
-    <box key={section} flexDirection="column">
+    <box key={section} flexDirection="column" marginTop={marginTop}>
       <box flexDirection="row" justifyContent="space-between">
         <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
           <strong>
@@ -327,6 +332,7 @@ const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
 
 export const GitPanel = memo(function GitPanel({
   collapsedFolders = {},
+  compact = false,
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
   fileListMode = 'tree',
   gitPanel,
@@ -339,8 +345,8 @@ export const GitPanel = memo(function GitPanel({
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
-    () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode),
-    [collapsedFolders, fileListMode, gitPanel.files]
+    () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode, compact),
+    [collapsedFolders, compact, fileListMode, gitPanel.files]
   )
   const { added: addedW, removed: removedW } = useMemo(
     () => maxDigitWidth(gitPanel.files),
@@ -382,8 +388,11 @@ export const GitPanel = memo(function GitPanel({
           viewportCulling
           contentOptions={{ flexDirection: 'column', gap: 0 }}
         >
-          {sectionOrder.map((key) => {
+          {sectionOrder.map((key, idx) => {
             const section = tree.sections.find((entry) => entry.section === key)
+            const priorHasFiles = sectionOrder
+              .slice(0, idx)
+              .some((k) => (tree.sections.find((e) => e.section === k)?.files.length ?? 0) > 0)
             return renderTreeSection(
               key,
               sectionTitle(key, headOffset),
@@ -395,7 +404,8 @@ export const GitPanel = memo(function GitPanel({
               selectedEntryKey,
               key === toggleSection,
               pathConfig,
-              diffCountConfig
+              diffCountConfig,
+              priorHasFiles ? 1 : 0
             )
           })}
         </scrollbox>

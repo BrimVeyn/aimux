@@ -165,8 +165,10 @@ export interface GitPaneState {
   ratio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
+  treeCompaction: boolean
   path: GitPanePathConfig
   diffCount: GitPaneDiffCountConfig
+  prefetchRadius: number
 }
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
@@ -215,6 +217,10 @@ export interface GitModeState {
   selectedEntryKey: string | null
   collapsedFolders: Record<string, true>
   diffs: Record<string, DiffData>
+  /** Parsed diff cache (internal); detailed shape lives in src/state/types. */
+  parsedFiles: Record<string, { hash: string; file: unknown }>
+  /** Syntax-highlight cache (internal). */
+  highlights: Record<string, { hash: string; themeId: string; add: unknown; del: unknown }>
   loading: Record<string, boolean>
   pendingDeletePath: string | null
   actionMessage: string | null
@@ -464,7 +470,8 @@ export type GitModeAction =
   | { type: 'git-mode-collapse-selection' }
   | { type: 'git-mode-expand-selection' }
   | { type: 'git-mode-toggle-file-list-mode' }
-  | { type: 'git-mode-set-diff'; key: string; diff: DiffData }
+  | { type: 'git-mode-toggle-tree-compaction' }
+  | { type: 'git-mode-set-diff'; key: string; diff: DiffData; hash: string }
   | { type: 'git-mode-set-loading'; key: string; loading: boolean }
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }
@@ -529,6 +536,7 @@ export type SideEffect =
   | { type: 'scroll-git-diff'; delta: number }
   | { type: 'persist-git-diff-mode-ratio'; ratio: number }
   | { type: 'persist-git-file-list-mode'; mode: GitFileListMode }
+  | { type: 'persist-git-tree-compaction'; enabled: boolean }
   | { type: 'git-stage'; path: string }
   | { type: 'git-unstage'; path: string }
   | { type: 'git-restore'; path: string }
@@ -787,8 +795,11 @@ interface GitPaneBaseConfig {
   ratio?: number
   diffModeRatio?: number
   fileListMode?: GitFileListMode
+  treeCompaction?: boolean
   path?: GitPanePathConfig
   diffCount?: GitPaneDiffCountConfig
+  /** Prefetch N neighbouring diffs around the cursor; 0 disables. */
+  prefetchRadius?: number
 }
 
 export interface GitPaneEmbeddedConfig extends GitPaneBaseConfig {

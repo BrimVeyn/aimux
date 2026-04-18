@@ -25,6 +25,8 @@ export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
 export interface PersistedGitPane {
   diffModeRatio?: number
   fileListMode?: GitFileListMode
+  treeCompaction?: boolean
+  prefetchRadius?: number
   visible: boolean
   mode: 'embedded' | 'pane'
   position: 'top' | 'bottom' | 'left' | 'right'
@@ -62,7 +64,23 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   const visibleOk = typeof v.visible === 'boolean'
   const fileListModeOk =
     v.fileListMode === undefined || v.fileListMode === 'tree' || v.fileListMode === 'flat'
-  if (!modeOk || !positionOk || !ratioOk || !diffModeRatioOk || !visibleOk || !fileListModeOk) {
+  const treeCompactionOk = v.treeCompaction === undefined || typeof v.treeCompaction === 'boolean'
+  const prefetchRadiusOk =
+    v.prefetchRadius === undefined ||
+    (typeof v.prefetchRadius === 'number' &&
+      Number.isFinite(v.prefetchRadius) &&
+      v.prefetchRadius >= 0 &&
+      v.prefetchRadius <= 50)
+  if (
+    !modeOk ||
+    !positionOk ||
+    !ratioOk ||
+    !diffModeRatioOk ||
+    !visibleOk ||
+    !fileListModeOk ||
+    !treeCompactionOk ||
+    !prefetchRadiusOk
+  ) {
     return false
   }
   // cross-field coherence: embedded => top|bottom; pane => left|right

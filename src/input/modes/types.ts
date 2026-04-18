@@ -49,6 +49,7 @@ export type SideEffect =
   | { type: 'scroll-git-diff'; delta: number }
   | { type: 'persist-git-diff-mode-ratio'; ratio: number }
   | { type: 'persist-git-file-list-mode'; mode: GitFileListMode }
+  | { type: 'persist-git-tree-compaction'; enabled: boolean }
   | { type: 'git-stage'; path: string }
   | { type: 'git-unstage'; path: string }
   | { type: 'git-restore'; path: string }
