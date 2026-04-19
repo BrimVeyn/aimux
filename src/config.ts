@@ -37,6 +37,7 @@ export interface AimuxConfig {
   version: 2
   customCommands: Record<string, string>
   themeId?: ThemeId
+  themeTransparent?: boolean
   gitPane?: PersistedGitPane
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
@@ -126,6 +127,7 @@ export function loadConfigResult(): ConfigLoadResult {
       version?: number
       customCommands?: unknown
       themeId?: unknown
+      themeTransparent?: unknown
       gitPane?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
@@ -147,6 +149,12 @@ export function loadConfigResult(): ConfigLoadResult {
 
     if (parsed.themeId !== undefined && !isThemeId(parsed.themeId)) {
       issues.push('ignored invalid themeId')
+    }
+
+    const validThemeTransparent =
+      typeof parsed.themeTransparent === 'boolean' ? parsed.themeTransparent : undefined
+    if (parsed.themeTransparent !== undefined && validThemeTransparent === undefined) {
+      issues.push('ignored invalid themeTransparent')
     }
 
     let validGitPane = isPersistedGitPane(parsed.gitPane) ? parsed.gitPane : undefined
@@ -218,6 +226,7 @@ export function loadConfigResult(): ConfigLoadResult {
         sessionBarVisible: validSessionBarVisible,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
+        themeTransparent: validThemeTransparent,
         version: 2,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot

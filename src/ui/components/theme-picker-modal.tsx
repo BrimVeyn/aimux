@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo } from 'react'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
-import { useTheme } from '../theme'
+import { useTheme, useTransparent } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
 import { Picker, type PickerItem } from './picker'
@@ -26,6 +26,7 @@ export function ThemePickerModal({
   selectedIndex,
 }: ThemePickerModalProps) {
   const theme = useTheme()
+  const transparent = useTransparent()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
   useLayoutEffect(() => {
@@ -69,9 +70,14 @@ export function ThemePickerModal({
       filter={filter}
       cursorPos={cursorPos}
       footer={
-        <text fg={theme.colors['editor.lineHighlightBackground']}>
-          {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
-        </text>
+        <box flexDirection="column" gap={0}>
+          <text fg={theme.colors['editor.lineHighlightBackground']}>
+            {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
+          </text>
+          <text fg={theme.colors['descriptionForeground']}>
+            {` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}
+          </text>
+        </box>
       }
       items={items}
       selectedIndex={effectiveIndex}

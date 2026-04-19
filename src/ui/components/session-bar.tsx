@@ -10,10 +10,11 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { IDLE_SESSION_STATUS } from '../../state/types'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
-import { useTheme } from '../theme'
+import { useBg, useTheme } from '../theme'
 
 export function SessionBar() {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -107,7 +108,7 @@ export function SessionBar() {
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      backgroundColor={headerBg}
     >
       {visibleSessions.map((session) => {
         const displayIndex = baselineOrder.indexOf(session.id) + 1
@@ -180,13 +181,14 @@ function SessionChip({
   status,
 }: SessionChipProps) {
   const theme = useTheme()
+  const selectionBg = useBg('list.activeSelectionBackground')
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
   const labelColor = active
     ? theme.colors['editor.foreground']
     : theme.colors['descriptionForeground']
-  const bgColor = dragging || active ? theme.colors['list.activeSelectionBackground'] : undefined
+  const bgColor = dragging || active ? selectionBg : undefined
   const idleColor = theme.colors['gitDecoration.addedResourceForeground'] ?? ''
   const workingColor = theme.colors['textLink.foreground'] ?? ''
   const waitingColor = theme.colors['editorWarning.foreground'] ?? ''

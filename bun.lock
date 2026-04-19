@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@brimveyn/aimux",
@@ -28,6 +29,9 @@
     "packages/aimux-config": {
       "name": "@brimveyn/aimux-config",
       "version": "0.4.2",
+      "dependencies": {
+        "shiki": "^4.0.2",
+      },
     },
   },
   "packages": {

@@ -6,7 +6,7 @@ import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTheme, useBg, useTheme } from '../theme'
 
 interface TerminalPaneProps {
   tab?: TabSession
@@ -125,6 +125,7 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const theme = useTheme()
+  const editorBg = useBg('editor.background')
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
@@ -185,7 +186,7 @@ export function TerminalPane({
         padding={0}
         flexDirection="column"
         flexGrow={1}
-        backgroundColor={theme.colors['editor.background']}
+        backgroundColor={editorBg}
         onMouseDown={forwardMouseEvent}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}

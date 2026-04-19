@@ -87,24 +87,17 @@ function envInt(name: string, fallback: number): number {
 }
 
 const RENDER_COALESCE_MS = 16
-const DATA_DEBOUNCE_MS = envInt('AIMUX_RENDER_DEBOUNCE_MS', 32)
-const BURST_MAX_MS = envInt('AIMUX_RENDER_BURST_MS', 500)
+const DATA_DEBOUNCE_MS = envInt('AIMUX_RENDER_DEBOUNCE_MS', 0)
 
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
   private sessions = new Map<string, SessionHandle>()
   private pendingFlushes = new Map<string, ReturnType<typeof setTimeout>>()
-  private pendingBurstCaps = new Map<string, ReturnType<typeof setTimeout>>()
 
   private clearTimers(tabId: string): void {
     const flush = this.pendingFlushes.get(tabId)
     if (flush) {
       clearTimeout(flush)
       this.pendingFlushes.delete(tabId)
-    }
-    const burst = this.pendingBurstCaps.get(tabId)
-    if (burst) {
-      clearTimeout(burst)
-      this.pendingBurstCaps.delete(tabId)
     }
   }
 
@@ -117,20 +110,14 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       if (this.sessions.get(session.tabId) !== session) {
         return
       }
-      const burst = this.pendingBurstCaps.get(session.tabId)
-      if (burst) {
-        clearTimeout(burst)
-        this.pendingBurstCaps.delete(session.tabId)
-      }
       this.emitRenderIfChanged(session)
     }, RENDER_COALESCE_MS)
     this.pendingFlushes.set(session.tabId, timer)
   }
 
   private scheduleDataRender(session: SessionHandle): void {
-    const existingFlush = this.pendingFlushes.get(session.tabId)
-    if (existingFlush) {
-      clearTimeout(existingFlush)
+    if (this.pendingFlushes.has(session.tabId)) {
+      return
     }
     const flushTimer = setTimeout(() => {
       this.pendingFlushes.delete(session.tabId)
@@ -141,30 +128,9 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         this.scheduleDataRender(session)
         return
       }
-      const burst = this.pendingBurstCaps.get(session.tabId)
-      if (burst) {
-        clearTimeout(burst)
-        this.pendingBurstCaps.delete(session.tabId)
-      }
       this.emitRenderIfChanged(session)
     }, DATA_DEBOUNCE_MS)
     this.pendingFlushes.set(session.tabId, flushTimer)
-
-    if (!this.pendingBurstCaps.has(session.tabId)) {
-      const burstTimer = setTimeout(() => {
-        this.pendingBurstCaps.delete(session.tabId)
-        if (this.sessions.get(session.tabId) !== session) {
-          return
-        }
-        const flush = this.pendingFlushes.get(session.tabId)
-        if (flush) {
-          clearTimeout(flush)
-          this.pendingFlushes.delete(session.tabId)
-        }
-        this.emitRenderIfChanged(session)
-      }, BURST_MAX_MS)
-      this.pendingBurstCaps.set(session.tabId, burstTimer)
-    }
   }
 
   private flushRenderNow(session: SessionHandle): void {
