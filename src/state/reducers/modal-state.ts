@@ -74,10 +74,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-split-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: null,
           splitDirection: action.direction,
@@ -104,6 +104,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: initialName.length,
           editBuffer: initialName,
+          returnToSessionPicker: action.returnToSessionPicker ?? true,
           selectedIndex: 0,
           sessionTargetId: action.sessionTargetId ?? null,
           type: 'session-name',

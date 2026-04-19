@@ -314,14 +314,17 @@ export const toggleSidebarFromInput: KeyResult = r([{ type: 'toggle-sidebar' }])
 export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {
   const trimmed = (ctx.state.modal.editBuffer ?? '').trim()
   const sessionId = ctx.state.modal.sessionTargetId
-  if (trimmed && sessionId) {
-    return r(
-      [{ type: 'open-session-picker' }],
-      [{ name: trimmed, sessionId, type: 'rename-session' }],
-      'modal.session-picker.filtering'
-    )
-  }
-  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker.filtering')
+  const returnToPicker =
+    ctx.state.modal.type === 'session-name' ? ctx.state.modal.returnToSessionPicker : true
+  const closeAction: AppAction = returnToPicker
+    ? { type: 'open-session-picker' }
+    : { type: 'close-modal' }
+  const transition: KeyResult['transition'] = returnToPicker
+    ? 'modal.session-picker.filtering'
+    : 'navigation'
+  const effects: KeyResult['effects'] =
+    trimmed && sessionId ? [{ name: trimmed, sessionId, type: 'rename-session' }] : []
+  return r([closeAction], effects, transition)
 }
 
 // Rename tab modal

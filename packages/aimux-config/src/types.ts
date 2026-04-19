@@ -257,6 +257,7 @@ export interface ModalSessionPicker extends ModalBase {
 }
 export interface ModalSessionName extends ModalBase {
   type: 'session-name'
+  returnToSessionPicker: boolean
 }
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
@@ -357,7 +358,12 @@ export type ModalAction =
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-session-picker' }
-  | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
+  | {
+      type: 'open-session-name-modal'
+      sessionTargetId?: string
+      initialName?: string
+      returnToSessionPicker?: boolean
+    }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
   | { type: 'update-command-edit'; char: string }
@@ -532,7 +538,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
   | { type: 'rename-session'; sessionId: string; name: string }
-  | { type: 'split-pane'; direction: SplitDirection }
+  | { type: 'split-pane'; direction: SplitDirection; sourceTabId?: string }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
   | { type: 'persist-git-diff-mode-ratio'; ratio: number }
@@ -546,6 +552,7 @@ export type SideEffect =
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
+  | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────

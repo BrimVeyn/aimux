@@ -11,6 +11,7 @@ import { IDLE_SESSION_STATUS } from '../../state/types'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
 import { useBg, useTheme } from '../theme'
+import { ContextMenuBox } from './context-menu-box'
 
 export function SessionBar() {
   const theme = useTheme()
@@ -125,6 +126,22 @@ export function SessionBar() {
             onMouseDrag={handleMouseDrag}
             onMouseUp={commitDrop}
             onMouseDragEnd={cancelDrag}
+            rightClickMenu={[
+              [
+                'Rename',
+                () =>
+                  dispatchGlobal({
+                    initialName: session.name,
+                    returnToSessionPicker: false,
+                    sessionTargetId: session.id,
+                    type: 'open-session-name-modal',
+                  }),
+              ],
+              [
+                'Close',
+                () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
+              ],
+            ]}
           />
         )
       })}
@@ -166,6 +183,7 @@ interface SessionChipProps {
   onMouseDrag: (event: OtuiMouseEvent) => void
   onMouseUp: (event: OtuiMouseEvent) => void
   onMouseDragEnd: (event: OtuiMouseEvent) => void
+  rightClickMenu: Array<[string, () => void]>
 }
 
 function SessionChip({
@@ -177,6 +195,7 @@ function SessionChip({
   onMouseDragEnd,
   onMouseUp,
   onRef,
+  rightClickMenu,
   session,
   status,
 }: SessionChipProps) {
@@ -194,12 +213,13 @@ function SessionChip({
   const waitingColor = theme.colors['editorWarning.foreground'] ?? ''
 
   return (
-    <box
+    <ContextMenuBox
       ref={onRef}
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
+      rightClickMenu={rightClickMenu}
       onMouseDown={(e) => {
         e.preventDefault()
         onMouseDown(e)
@@ -236,6 +256,6 @@ function SessionChip({
       <text fg={theme.colors['editor.lineHighlightBackground']} selectable={false}>
         {' '}
       </text>
-    </box>
+    </ContextMenuBox>
   )
 }

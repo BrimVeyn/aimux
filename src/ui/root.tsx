@@ -6,6 +6,7 @@ import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
 import { GitPaneWidget } from './components/git-pane-widget'
@@ -252,6 +253,7 @@ export function RootView({
         <GitView themeId={themeId} />
         <StatusBar />
         <PendingChordOverlay />
+        <ContextMenuOverlay />
         {renderModal(modal, {
           createSessionFields,
           currentSessionId,
@@ -325,6 +327,7 @@ export function RootView({
       {sessionBarPosition === 'bottom' && <SessionBar />}
       <StatusBar />
       <PendingChordOverlay />
+      <ContextMenuOverlay />
       {renderModal(modal, {
         createSessionFields,
         currentSessionId,

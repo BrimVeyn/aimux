@@ -6,7 +6,10 @@ import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
+import { type ContextMenuItem, openContextMenu } from '../context-menu/controller'
 import { getCurrentTheme, useBg, useTheme } from '../theme'
+import { ContextMenuBox } from './context-menu-box'
 
 interface TerminalPaneProps {
   tab?: TabSession
@@ -129,7 +132,42 @@ export function TerminalPane({
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
+  const rightClickMenu: ContextMenuItem[] | undefined = tabId
+    ? [
+        [
+          'Split vertically',
+          () =>
+            runSideEffectGlobal({
+              direction: 'vertical',
+              sourceTabId: tabId,
+              type: 'split-pane',
+            }),
+        ],
+        [
+          'Split horizontally',
+          () =>
+            runSideEffectGlobal({
+              direction: 'horizontal',
+              sourceTabId: tabId,
+              type: 'split-pane',
+            }),
+        ],
+        [
+          'Close pane',
+          () => {
+            dispatchGlobal({ tabId, type: 'close-pane' })
+            runSideEffectGlobal({ tabId, type: 'close-tab' })
+          },
+        ],
+      ]
+    : undefined
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
+    if (event.type === 'down' && event.button === 2 && rightClickMenu) {
+      event.preventDefault()
+      event.stopPropagation()
+      openContextMenu(event.x, event.y, rightClickMenu)
+      return
+    }
     if (event.type === 'down') {
       logInputDebug('pane.mouseDown', {
         button: event.button,
@@ -179,7 +217,7 @@ export function TerminalPane({
   }
   return (
     <box flexDirection="column" flexGrow={1} gap={0}>
-      <box
+      <ContextMenuBox
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
         title={getTitle(tab, paneIsActive, focusMode)}
@@ -187,6 +225,7 @@ export function TerminalPane({
         flexDirection="column"
         flexGrow={1}
         backgroundColor={editorBg}
+        rightClickMenu={rightClickMenu}
         onMouseDown={forwardMouseEvent}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}
@@ -218,7 +257,7 @@ export function TerminalPane({
             <TerminalViewport viewport={tab.viewport} buffer={tab.buffer} />
           </box>
         )}
-      </box>
+      </ContextMenuBox>
       {tab?.status === 'disconnected' ? (
         <text fg={theme.colors['editorWarning.foreground']}>
           Restored snapshot. Press Ctrl+r to restart this session.

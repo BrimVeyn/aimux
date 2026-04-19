@@ -266,6 +266,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.confirmSplit, 'Confirm')
+        .passthrough()
     )
 
     // -----------------------------------------------------------------------
