@@ -100,7 +100,6 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       paddingRight={1}
       paddingTop={0}
       paddingBottom={0}
-      backgroundColor={active ? theme.colors['list.activeSelectionBackground'] : undefined}
       flexDirection="column"
       gap={0}
     >
