@@ -121,7 +121,7 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
               runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
             }}
           >
-            <text fg={theme.colors['gitDecoration.deletedResourceForeground']}>×</text>
+            <text fg={theme.colors['descriptionForeground']}>×</text>
           </box>
         ) : null}
       </box>

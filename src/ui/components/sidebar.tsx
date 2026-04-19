@@ -45,6 +45,20 @@ const SidebarTop = memo(function SidebarTop() {
           <text fg={theme.colors['descriptionForeground']}>{branch}</text>
         </box>
       ) : null}
+      <box
+        flexDirection="row"
+        border
+        borderColor={theme.colors['terminal.ansiMagenta']}
+        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        justifyContent="center"
+        marginTop={1}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          dispatchGlobal({ type: 'open-new-tab-modal' })
+        }}
+      >
+        <text fg={theme.colors['editor.foreground']}>+ New assistant</text>
+      </box>
       <text fg={theme.colors['editor.lineHighlightBackground']}>
         {'·'.repeat(Math.max(0, sidebarWidth - 2))}
       </text>
