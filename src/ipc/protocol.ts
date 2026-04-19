@@ -238,7 +238,6 @@ function isAttachResult(value: unknown): value is AttachResult {
         (tab.status === 'starting' ||
           tab.status === 'running' ||
           tab.status === 'disconnected' ||
-          tab.status === 'exited' ||
           tab.status === 'error') &&
         (tab.activity === undefined ||
           tab.activity === 'working' ||

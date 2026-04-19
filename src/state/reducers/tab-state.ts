@@ -432,16 +432,6 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, activity: action.activity })),
       }
-    case 'set-tab-status':
-      return {
-        ...state,
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
-          ...tab,
-          activity: action.status === 'running' ? tab.activity : undefined,
-          exitCode: action.exitCode,
-          status: action.status,
-        })),
-      }
     case 'set-tab-error':
       return {
         ...state,

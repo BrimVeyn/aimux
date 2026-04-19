@@ -68,7 +68,7 @@ describe('session persistence', () => {
     expect(tabs[0]?.activity).toBe('idle')
   })
 
-  test('restores sidebar and active tab safely', () => {
+  test('drops legacy exited tabs from snapshots', () => {
     const baseState = createInitialState()
     const restored = restoreWorkspaceState(baseState, {
       activeTabId: 'tab-1',
@@ -94,7 +94,8 @@ describe('session persistence', () => {
       version: 1,
     })
 
-    expect(restored.activeTabId).toBe('tab-1')
+    expect(restored.tabs).toHaveLength(0)
+    expect(restored.activeTabId).toBeNull()
     expect(restored.sidebar.visible).toBe(false)
     expect(restored.sidebar.width).toBe(22)
     expect(restored.focusMode).toBe('navigation')
@@ -125,7 +126,7 @@ describe('session persistence', () => {
           buffer: '',
           command: 'claude',
           id: 'tab-1',
-          status: 'exited',
+          status: 'running',
           terminalModes: {
             alternateScrollMode: false,
             bracketedPasteMode: false,
@@ -155,7 +156,7 @@ describe('session persistence', () => {
           buffer: '',
           command: 'zsh',
           id: 'tab-4',
-          status: 'exited',
+          status: 'running',
           terminalModes: {
             alternateScrollMode: false,
             bracketedPasteMode: false,

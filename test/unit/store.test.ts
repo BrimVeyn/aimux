@@ -480,7 +480,7 @@ describe('appReducer', () => {
           errorMessage: 'boom',
           exitCode: 2,
           id: '1',
-          status: 'exited',
+          status: 'error',
           terminalModes: {
             alternateScrollMode: true,
             bracketedPasteMode: true,

@@ -34,7 +34,13 @@ export type ModeId =
 
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 export type AssistantId = BuiltinAssistantId | (string & {})
-export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
+export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
+
+/**
+ * Status values that may appear in legacy on-disk workspace snapshots but are
+ * not produced by the running app anymore.
+ */
+export type LegacyPersistedTabStatus = TabStatus | 'exited'
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 export interface SessionStatus {
   working: boolean
@@ -93,7 +99,7 @@ export interface PersistedTabSnapshot {
   assistant: AssistantId
   title: string
   command: string
-  status: Exclude<TabStatus, 'disconnected'>
+  status: Exclude<LegacyPersistedTabStatus, 'disconnected'>
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
@@ -410,7 +416,6 @@ export type TabAction =
       terminalModes: TerminalModeState
     }
   | { type: 'set-tab-activity'; tabId: string; activity?: TabActivity }
-  | { type: 'set-tab-status'; tabId: string; status: TabStatus; exitCode?: number }
   | { type: 'set-tab-error'; tabId: string; message: string }
 
 export type LayoutAction =

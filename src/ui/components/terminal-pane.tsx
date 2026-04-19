@@ -218,11 +218,6 @@ export function TerminalPane({
           </box>
         )}
       </box>
-      {tab?.status === 'exited' && tab.exitCode !== undefined ? (
-        <text fg={theme.colors['editorWarning.foreground']}>
-          Process exited with code {tab.exitCode}
-        </text>
-      ) : null}
       {tab?.status === 'disconnected' ? (
         <text fg={theme.colors['editorWarning.foreground']}>
           Restored snapshot. Press Ctrl+r to restart this session.
