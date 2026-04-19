@@ -51,25 +51,14 @@ const SidebarTop = memo(function SidebarTop() {
   )
 })
 
-function renderGroupGutter(
-  isGroupStart: boolean,
-  isGroupMiddle: boolean,
-  isGroupEnd: boolean,
-  isActive: boolean
-) {
+function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGroupEnd: boolean) {
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text
-        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
-        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
-      >
+      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text
-        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
-        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
-      >
+      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
         {isGroupEnd ? GUTTER_END : GUTTER_PAD}
       </text>
     </box>
@@ -116,6 +105,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
       ) : (
         tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId
+          const alternate = index % 2 === 1
           const info = tabGroupInfo.get(tab.id)
           const inLayout = !!info?.inLayout
           const inGroup = info ? index >= info.groupStart && index <= info.groupEnd : false
@@ -127,11 +117,12 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
             <box
               key={tab.id}
               flexDirection="row"
+              backgroundColor={
+                alternate ? theme.colors['editor.lineHighlightBackground'] : undefined
+              }
               onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
             >
-              {inGroup
-                ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd, isActive)
-                : null}
+              {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
               <box flexGrow={1}>
                 <TabItem
                   id={`sidebar-tab-${tab.id}`}

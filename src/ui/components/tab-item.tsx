@@ -1,7 +1,7 @@
 import type { TabSession } from '../../state/types'
 
 import { useBusySpinner } from '../hooks/use-busy-spinner'
-import { getCurrentTheme, useBg, useTheme } from '../theme'
+import { getCurrentTheme, useTheme } from '../theme'
 
 interface TabItemProps {
   id?: string
@@ -88,7 +88,6 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
 
 export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
   const theme = useTheme()
-  const selectionBg = useBg('list.activeSelectionBackground')
   const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)
@@ -101,7 +100,6 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       paddingRight={1}
       paddingTop={0}
       paddingBottom={0}
-      backgroundColor={active ? selectionBg : undefined}
       flexDirection="column"
       gap={0}
     >
