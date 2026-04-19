@@ -34,14 +34,14 @@ describe('session bar reducer', () => {
     expect(s2).toBe(s1)
   })
 
-  test('set-session-busy records a per-session flag', () => {
+  test('set-session-status records a per-session status', () => {
     const s0 = createInitialState({}, [], [], false)
-    const s1 = appReducer(s0, { busy: true, sessionId: 'a', type: 'set-session-busy' })
-    expect(s1.sessionsBusy.a).toBe(true)
-    const s2 = appReducer(s1, { busy: false, sessionId: 'a', type: 'set-session-busy' })
-    expect(s2.sessionsBusy.a).toBe(false)
+    const s1 = appReducer(s0, { sessionId: 'a', status: 'working', type: 'set-session-status' })
+    expect(s1.sessionStatuses.a).toBe('working')
+    const s2 = appReducer(s1, { sessionId: 'a', status: 'idle', type: 'set-session-status' })
+    expect(s2.sessionStatuses.a).toBe('idle')
     // no-op when unchanged
-    const s3 = appReducer(s2, { busy: false, sessionId: 'a', type: 'set-session-busy' })
+    const s3 = appReducer(s2, { sessionId: 'a', status: 'idle', type: 'set-session-status' })
     expect(s3).toBe(s2)
   })
 

@@ -64,8 +64,8 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
       const maxIndex = filteredNew.length
       const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
-      const nextBusy = { ...state.sessionsBusy }
-      delete nextBusy[action.sessionId]
+      const nextStatuses = { ...state.sessionStatuses }
+      delete nextStatuses[action.sessionId]
       return {
         ...state,
         activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
@@ -79,7 +79,7 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           type: 'session-picker',
         },
         sessions: newSessions,
-        sessionsBusy: nextBusy,
+        sessionStatuses: nextStatuses,
         tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
       }
     }
@@ -101,11 +101,11 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       }
       return { ...state, sessions: ordered }
     }
-    case 'set-session-busy': {
-      if ((state.sessionsBusy[action.sessionId] ?? false) === action.busy) return state
+    case 'set-session-status': {
+      if ((state.sessionStatuses[action.sessionId] ?? 'idle') === action.status) return state
       return {
         ...state,
-        sessionsBusy: { ...state.sessionsBusy, [action.sessionId]: action.busy },
+        sessionStatuses: { ...state.sessionStatuses, [action.sessionId]: action.status },
       }
     }
     default:

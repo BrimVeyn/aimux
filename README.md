@@ -202,6 +202,9 @@ not collide with a globally installed `aimux` instance.
   and focusing on the first change rather than the top of the file.
 - [shiki](https://shiki.style) — syntax highlighting for the git diff view
   and the source of the bundled theme catalog.
+- [herdr](https://github.com/ogulcancelik/herdr) by @ogulcancelik — the
+  per-CLI assistant status heuristics (working / waiting-input / idle)
+  used in the session bar are adapted from herdr's `detect.rs` rule tables.
 
 ## License
 

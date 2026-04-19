@@ -50,7 +50,12 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
 function BusyIndicator() {
   const theme = useTheme()
   const frame = useBusySpinner()
-  return <text fg={theme.colors['textLink.foreground']}>{frame} busy</text>
+  return <text fg={theme.colors['textLink.foreground']}>{frame} working</text>
+}
+
+function WaitingIndicator() {
+  const theme = useTheme()
+  return <text fg={theme.colors['editorWarning.foreground']}>? waiting</text>
 }
 
 function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocusedInput: boolean }) {
@@ -71,8 +76,12 @@ function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocused
     return <text fg={theme.colors['focusBorder']}>▸ focused</text>
   }
 
-  if (tab.activity === 'busy') {
+  if (tab.activity === 'working') {
     return <BusyIndicator />
+  }
+
+  if (tab.activity === 'waiting-input') {
+    return <WaitingIndicator />
   }
 
   if (tab.activity === 'idle') {

@@ -5,6 +5,7 @@ import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
 import { logDebug } from '../debug/input-log'
+import { runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import {
   createTerminalBounds,
   forEachSplitPaneRect,
@@ -12,16 +13,13 @@ import {
   toTerminalContentSize,
 } from '../state/layout-resize'
 
-const SESSION_IDLE_TIMEOUT_MS = 2_000
-
 export class LocalSessionBackend
   extends EventEmitter<SessionBackendEvents>
   implements SessionBackend
 {
   private readonly sessionManager = new SessionManager()
   private currentSessionId: string | null = null
-  private readonly sessionIdleTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  private readonly sessionBusy = new Map<string, boolean>()
+  private readonly stopDetection: () => void
 
   constructor() {
     super()
@@ -29,7 +27,6 @@ export class LocalSessionBackend
       if (sessionId === this.currentSessionId) {
         this.emit('render', tabId, viewport, terminalModes)
       }
-      this.markSessionBusy(sessionId)
     })
     this.sessionManager.on('exit', (sessionId, tabId, exitCode) => {
       if (sessionId === this.currentSessionId) {
@@ -41,23 +38,18 @@ export class LocalSessionBackend
         this.emit('error', tabId, message)
       }
     })
-  }
-
-  private markSessionBusy(sessionId: string): void {
-    if (this.sessionBusy.get(sessionId) !== true) {
-      this.sessionBusy.set(sessionId, true)
-      this.emit('sessionActivity', sessionId, true)
-    }
-    const existing = this.sessionIdleTimers.get(sessionId)
-    if (existing) clearTimeout(existing)
-    const timer = setTimeout(() => {
-      this.sessionIdleTimers.delete(sessionId)
-      if (this.sessionBusy.get(sessionId) === true) {
-        this.sessionBusy.set(sessionId, false)
-        this.emit('sessionActivity', sessionId, false)
-      }
-    }, SESSION_IDLE_TIMEOUT_MS)
-    this.sessionIdleTimers.set(sessionId, timer)
+    this.stopDetection = runStatusDetectionLoop({
+      listSessions: () => this.sessionManager.listSessionIds(),
+      listTabs: (sessionId) => this.sessionManager.listTabs(sessionId),
+      onSessionStatus: (sessionId, status) => {
+        this.emit('sessionActivity', sessionId, status)
+      },
+      onTabStatus: (tabId, status, sessionId) => {
+        if (sessionId === this.currentSessionId) {
+          this.emit('tabActivity', tabId, status)
+        }
+      },
+    })
   }
 
   async attach(options: {
@@ -123,30 +115,22 @@ export class LocalSessionBackend
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     this.sessionManager.scroll(this.currentSessionId, tabId, deltaLines)
   }
 
   scrollViewportToBottom(tabId: string): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
   }
 
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     this.sessionManager.reapplyScrollIntent(this.currentSessionId, tabId, intent)
   }
 
   setActiveTab(tabId: string | null): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     logDebug('backend.local.setActiveTab', { sessionId: this.currentSessionId, tabId })
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
@@ -157,9 +141,7 @@ export class LocalSessionBackend
     intents?: Map<string, ScrollIntent>,
     options?: { sync?: boolean }
   ): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     this.sessionManager.resize(this.currentSessionId, cols, rows, intents, options)
   }
 
@@ -170,40 +152,28 @@ export class LocalSessionBackend
     intent?: ScrollIntent,
     options?: { sync?: boolean }
   ): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, intent, options)
   }
 
   disposeSession(tabId: string): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     logDebug('backend.local.disposeSession', { sessionId: this.currentSessionId, tabId })
     this.sessionManager.closeTab(this.currentSessionId, tabId)
   }
 
   disposeAll(): void {
-    if (!this.currentSessionId) {
-      return
-    }
+    if (!this.currentSessionId) return
     logDebug('backend.local.disposeAll', { sessionId: this.currentSessionId })
     this.sessionManager.disposeSession(this.currentSessionId)
   }
 
   destroy(keepSessions = true): void {
     logDebug('backend.local.destroy', { keepSessions, sessionId: this.currentSessionId })
-    if (!keepSessions) {
-      if (this.currentSessionId) {
-        this.sessionManager.disposeSession(this.currentSessionId)
-      }
+    if (!keepSessions && this.currentSessionId) {
+      this.sessionManager.disposeSession(this.currentSessionId)
     }
-    for (const timer of this.sessionIdleTimers.values()) {
-      clearTimeout(timer)
-    }
-    this.sessionIdleTimers.clear()
-    this.sessionBusy.clear()
+    this.stopDetection()
     this.currentSessionId = null
   }
 }

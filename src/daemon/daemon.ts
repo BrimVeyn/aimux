@@ -1,5 +1,7 @@
 import { connect, createServer, type Socket } from 'node:net'
 
+import type { AssistantId, TerminalSnapshot } from '../state/types'
+
 import { logDebug } from '../debug/input-log'
 import {
   type ClientRequest,
@@ -14,6 +16,7 @@ import {
   type ServerResponse,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
+import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
   getIpcDaemonSocketPath,
@@ -23,6 +26,13 @@ import {
   removeTerminalManagerSocketIfExists,
   tightenSocketPermissions,
 } from './runtime-paths'
+
+interface DaemonTabEntry {
+  sessionId: string
+  assistant: AssistantId
+  command: string
+  viewport: TerminalSnapshot | undefined
+}
 
 function send(socket: Socket, message: ServerResponse | ServerEvent): void {
   socket.write(encodeMessage(message))
@@ -115,6 +125,40 @@ export async function runDaemon(): Promise<void> {
   const attachedSessions = new Map<Socket, string>()
   const negotiatedVersions = new Map<Socket, number>()
 
+  // Per-tab registry so the status-detection loop can poll every terminal
+  // continuously, not just the one the UI is currently attached to.
+  const tabRegistry = new Map<string, DaemonTabEntry>()
+
+  const rememberTab = (
+    sessionId: string,
+    tabId: string,
+    assistant: AssistantId,
+    command: string,
+    viewport?: TerminalSnapshot
+  ): void => {
+    const existing = tabRegistry.get(tabId)
+    tabRegistry.set(tabId, {
+      assistant,
+      command,
+      sessionId,
+      viewport: viewport ?? existing?.viewport,
+    })
+  }
+
+  const broadcastAll = (event: ServerEvent): void => {
+    for (const socket of sockets) {
+      send(socket, event)
+    }
+  }
+
+  const broadcastForSession = (sessionId: string, event: ServerEvent): void => {
+    for (const socket of sockets) {
+      if (attachedSessions.get(socket) === sessionId) {
+        send(socket, event)
+      }
+    }
+  }
+
   manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
     logDebug('daemon.manager.render', {
       attachedSocketCount: sockets.size,
@@ -122,30 +166,57 @@ export async function runDaemon(): Promise<void> {
       tabId,
       viewportLines: viewport.lines.length,
     })
-    const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
-      }
+    const existing = tabRegistry.get(tabId)
+    if (existing) {
+      existing.viewport = viewport
+      existing.sessionId = sessionId
     }
+    const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
+    broadcastForSession(sessionId, event)
   })
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
+    tabRegistry.delete(tabId)
     const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
-      }
-    }
+    broadcastForSession(sessionId, event)
   })
   manager.on('error', (sessionId, tabId, message) => {
     logDebug('daemon.manager.error', { message, sessionId, tabId })
     const event: ServerEvent = { payload: { message, tabId }, type: 'tabError' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
+    broadcastForSession(sessionId, event)
+  })
+
+  const stopStatusLoop = runStatusDetectionLoop({
+    listSessions: () => {
+      const seen = new Set<string>()
+      for (const entry of tabRegistry.values()) seen.add(entry.sessionId)
+      return [...seen]
+    },
+    listTabs: (sessionId): LoopTabView[] => {
+      const result: LoopTabView[] = []
+      for (const [tabId, entry] of tabRegistry) {
+        if (entry.sessionId !== sessionId) continue
+        result.push({
+          assistant: entry.assistant,
+          command: entry.command,
+          id: tabId,
+          viewport: entry.viewport,
+        })
       }
-    }
+      return result
+    },
+    onSessionStatus: (sessionId, status) => {
+      logDebug('daemon.status.session', { sessionId, status })
+      broadcastAll({ payload: { sessionId, status }, type: 'sessionStatus' })
+    },
+    onTabStatus: (tabId, status, sessionId) => {
+      logDebug('daemon.status.tab', { sessionId, status, tabId })
+      // Per-tab events are only useful for the client attached to that session.
+      broadcastForSession(sessionId, {
+        payload: { sessionId, status, tabId },
+        type: 'tabStatus',
+      })
+    },
   })
 
   const server = createServer((socket) => {
@@ -213,6 +284,15 @@ export async function runDaemon(): Promise<void> {
                     sessionId: message.payload.sessionId,
                     workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
+                  for (const tab of attachResult.tabs) {
+                    rememberTab(
+                      message.payload.sessionId,
+                      tab.id,
+                      tab.assistant,
+                      tab.command,
+                      tab.viewport
+                    )
+                  }
                   send(socket, {
                     id: message.id,
                     payload: {
@@ -238,6 +318,12 @@ export async function runDaemon(): Promise<void> {
                     tabId: message.payload.tabId,
                     title: message.payload.title,
                   })
+                  rememberTab(
+                    sessionId,
+                    message.payload.tabId,
+                    message.payload.assistant,
+                    [message.payload.command, ...(message.payload.args ?? [])].join(' ')
+                  )
                   await manager.createTab({ ...message.payload, sessionId })
                   sendOk(socket, message.id)
                   logDebug('daemon.request.createTab.success', {
@@ -313,6 +399,7 @@ export async function runDaemon(): Promise<void> {
                 case 'closeTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  tabRegistry.delete(message.payload.tabId)
                   await manager.closeTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
@@ -321,6 +408,9 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = attachedSessions.get(socket)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   if (sessionId) {
+                    for (const [tabId, entry] of tabRegistry) {
+                      if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
+                    }
                     await manager.disposeSession(sessionId)
                   }
                   sendOk(socket, message.id)
@@ -371,6 +461,7 @@ export async function runDaemon(): Promise<void> {
 
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
+    stopStatusLoop()
     manager.destroy()
     server.close()
     process.exit(0)

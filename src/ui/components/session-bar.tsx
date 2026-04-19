@@ -2,7 +2,7 @@ import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord } from '../../state/types'
+import type { SessionRecord, TabActivity } from '../../state/types'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
@@ -15,7 +15,7 @@ export function SessionBar() {
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
-  const busyMap = useAppStore((s) => s.sessionsBusy)
+  const statusMap = useAppStore((s) => s.sessionStatuses)
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
@@ -119,7 +119,7 @@ export function SessionBar() {
             session={session}
             index={displayIndex}
             active={session.id === currentId}
-            busy={busyMap[session.id] ?? false}
+            status={statusMap[session.id] ?? 'idle'}
             dragging={draggingId === session.id}
             onRef={(r) => setChipRef(session.id, r)}
             onMouseDown={() => handleMouseDown(session.id)}
@@ -145,7 +145,7 @@ interface SessionChipProps {
   session: SessionRecord
   index: number
   active: boolean
-  busy: boolean
+  status: TabActivity
   dragging: boolean
   onRef: (ref: BoxRenderable | null) => void
   onMouseDown: (event: OtuiMouseEvent) => void
@@ -156,7 +156,6 @@ interface SessionChipProps {
 
 function SessionChip({
   active,
-  busy,
   dragging,
   index,
   onMouseDown,
@@ -165,15 +164,17 @@ function SessionChip({
   onMouseUp,
   onRef,
   session,
+  status,
 }: SessionChipProps) {
   const theme = useTheme()
-  const showSpinner = busy && !active
+  // The active session already has the user's attention, so suppress the
+  // spinner there; we still surface `?` on waiting-input because it's
+  // actionable even when focused.
+  const showSpinner = status === 'working' && !active
+  const showWaiting = status === 'waiting-input'
   const spinner = useBusySpinner(showSpinner)
-  const indicator = showSpinner ? spinner : '●'
-  const indicatorColor =
-    active || showSpinner
-      ? theme.colors['textLink.foreground']
-      : theme.colors['gitDecoration.addedResourceForeground']
+  const indicator = pickIndicator(showWaiting, showSpinner, spinner)
+  const indicatorColor = pickIndicatorColor(theme, { active, showSpinner, showWaiting })
   const labelColor = active
     ? theme.colors['editor.foreground']
     : theme.colors['descriptionForeground']
@@ -212,4 +213,19 @@ function SessionChip({
       </text>
     </box>
   )
+}
+
+function pickIndicator(showWaiting: boolean, showSpinner: boolean, spinner: string): string {
+  if (showWaiting) return '?'
+  if (showSpinner) return spinner
+  return '●'
+}
+
+function pickIndicatorColor(
+  theme: { colors: Record<string, string> },
+  flags: { active: boolean; showSpinner: boolean; showWaiting: boolean }
+): string {
+  if (flags.showWaiting) return theme.colors['editorWarning.foreground'] ?? ''
+  if (flags.active || flags.showSpinner) return theme.colors['textLink.foreground'] ?? ''
+  return theme.colors['gitDecoration.addedResourceForeground'] ?? ''
 }

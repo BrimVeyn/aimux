@@ -1,5 +1,6 @@
 import type {
   ScrollIntent,
+  TabActivity,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -8,8 +9,10 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
+// v3 adds tabStatus/sessionStatus server events. Accept v2 clients for
+// graceful upgrade; they just won't receive the new events.
 export const IPC_PROTOCOL_MIN_VERSION = 2
-export const IPC_PROTOCOL_VERSION = 2
+export const IPC_PROTOCOL_VERSION = 3
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -90,6 +93,8 @@ export type ServerEvent =
     }
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
+  | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
+  | { type: 'sessionStatus'; payload: { sessionId: string; status: TabActivity } }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
 
@@ -128,6 +133,10 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
+}
+
+function isTabActivity(value: unknown): value is TabActivity {
+  return value === 'working' || value === 'waiting-input' || value === 'idle'
 }
 
 function isTerminalSpan(value: unknown): boolean {
@@ -211,7 +220,10 @@ function isAttachResult(value: unknown): value is AttachResult {
           tab.status === 'disconnected' ||
           tab.status === 'exited' ||
           tab.status === 'error') &&
-        (tab.activity === undefined || tab.activity === 'busy' || tab.activity === 'idle') &&
+        (tab.activity === undefined ||
+          tab.activity === 'working' ||
+          tab.activity === 'waiting-input' ||
+          tab.activity === 'idle') &&
         isString(tab.buffer) &&
         isTerminalModeState(tab.terminalModes) &&
         isString(tab.command) &&
@@ -374,6 +386,15 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'tabError':
       assert(isString(value.payload.tabId), 'tabError.tabId must be a string')
       assert(isString(value.payload.message), 'tabError.message must be a string')
+      return value as ServerEvent
+    case 'tabStatus':
+      assert(isString(value.payload.sessionId), 'tabStatus.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
+      assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
+      return value as ServerEvent
+    case 'sessionStatus':
+      assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
+      assert(isTabActivity(value.payload.status), 'sessionStatus.status is invalid')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

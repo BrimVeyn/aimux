@@ -1,25 +1,16 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, TabSession, TerminalModeState } from '../state/types'
+import type { AppAction, TabActivity, TabSession, TerminalModeState } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
-
-const IDLE_ACTIVITY_TIMEOUT_MS = 2_000
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend
   dispatch: (action: AppAction) => void
   resizingRef: MutableRefObject<boolean>
-  timeouts: Pick<
-    TabRuntimeTimeouts,
-    | 'clearIdleTimer'
-    | 'clearStartupGrace'
-    | 'isStartupGraceActive'
-    | 'scheduleIdle'
-    | 'clearAllTimers'
-  >
+  timeouts: Pick<TabRuntimeTimeouts, 'clearIdleTimer' | 'clearStartupGrace' | 'clearAllTimers'>
 }
 
 function clearTabRuntimeState(
@@ -58,12 +49,8 @@ export function bindBackendRuntimeEvents({
       type: 'replace-tab-viewport',
       viewport,
     })
-    if (timeouts.isStartupGraceActive(tabId) || resizingRef.current) {
-      return
-    }
-
-    dispatch({ activity: 'busy', tabId, type: 'set-tab-activity' })
-    timeouts.scheduleIdle(tabId, IDLE_ACTIVITY_TIMEOUT_MS)
+    // Per-tab activity is driven by the backend's status-detection loop via
+    // the `tabActivity` event — no client-side idle timer needed.
   }
 
   const handleExit = (tabId: string, exitCode: number) => {
@@ -79,14 +66,19 @@ export function bindBackendRuntimeEvents({
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 
-  const handleSessionActivity = (sessionId: string, busy: boolean) => {
-    dispatch({ busy, sessionId, type: 'set-session-busy' })
+  const handleSessionActivity = (sessionId: string, status: TabActivity) => {
+    dispatch({ sessionId, status, type: 'set-session-status' })
+  }
+
+  const handleTabActivity = (tabId: string, activity: TabActivity) => {
+    dispatch({ activity, tabId, type: 'set-tab-activity' })
   }
 
   backend.on('render', handleRender)
   backend.on('exit', handleExit)
   backend.on('error', handleError)
   backend.on('sessionActivity', handleSessionActivity)
+  backend.on('tabActivity', handleTabActivity)
 
   return () => {
     timeouts.clearAllTimers()
@@ -94,6 +86,7 @@ export function bindBackendRuntimeEvents({
     backend.off('exit', handleExit)
     backend.off('error', handleError)
     backend.off('sessionActivity', handleSessionActivity)
+    backend.off('tabActivity', handleTabActivity)
     void backend.destroy(true)
   }
 }

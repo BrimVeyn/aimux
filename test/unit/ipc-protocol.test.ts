@@ -112,4 +112,25 @@ describe('ipc protocol framing', () => {
       })
     ).toThrow('tabRender.terminalModes is invalid')
   })
+
+  test('parses tabStatus and sessionStatus events', () => {
+    expect(
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: 'working', tabId: 'tab-1' },
+        type: 'tabStatus',
+      })
+    ).toMatchObject({ type: 'tabStatus' })
+    expect(
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: 'waiting-input' },
+        type: 'sessionStatus',
+      })
+    ).toMatchObject({ type: 'sessionStatus' })
+    expect(() =>
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: 'bogus', tabId: 'tab-1' },
+        type: 'tabStatus',
+      })
+    ).toThrow('tabStatus.status is invalid')
+  })
 })

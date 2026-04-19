@@ -14,7 +14,7 @@ describe('session persistence', () => {
       activeTabId: 'tab-1',
       tabs: [
         {
-          activity: 'busy' as const,
+          activity: 'working' as const,
           assistant: 'claude' as const,
           buffer: 'hello',
           command: 'claude',
