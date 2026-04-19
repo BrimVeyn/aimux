@@ -21,6 +21,12 @@ export type SessionBackendEvents = {
 export interface BackendAttachResult {
   tabs: TabSession[]
   activeTabId: string | null
+  /**
+   * Per-session status snapshot taken at attach time and applied
+   * atomically with tab hydration to prevent an unknown-tab race on
+   * separate `sessionActivity` events.
+   */
+  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
 }
 
 export interface SessionBackend extends EventEmitter<SessionBackendEvents> {

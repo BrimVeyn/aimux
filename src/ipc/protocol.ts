@@ -12,8 +12,12 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 
 // v4 widens sessionStatus from a single status enum to independent
 // {working, waiting} flags so a chip can show both at once.
-export const IPC_PROTOCOL_MIN_VERSION = 4
-export const IPC_PROTOCOL_VERSION = 4
+// v5 folds initial tab activities and session statuses into attachResult so
+// the client applies them atomically with tab creation — previously they
+// arrived as separate events and could lose to the unknown-tab no-op in
+// the reducer.
+export const IPC_PROTOCOL_MIN_VERSION = 5
+export const IPC_PROTOCOL_VERSION = 5
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -39,6 +43,13 @@ export interface AttachResult {
   protocolVersion: number
   tabs: TabSession[]
   activeTabId: string | null
+  /**
+   * Snapshot of every known session's status at attach time. Applied by
+   * the client atomically with `hydrate-workspace` so chips render the
+   * right state immediately, without the per-event race where a separate
+   * `sessionStatus` event could arrive before the session was in state.
+   */
+  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
 }
 
 export type ClientRequest =
@@ -240,7 +251,11 @@ function isAttachResult(value: unknown): value is AttachResult {
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
     ) &&
-    isNullableString(value.activeTabId)
+    isNullableString(value.activeTabId) &&
+    Array.isArray(value.initialSessionStatuses) &&
+    value.initialSessionStatuses.every(
+      (entry) => isObjectRecord(entry) && isString(entry.sessionId) && isSessionStatus(entry.status)
+    )
   )
 }
 

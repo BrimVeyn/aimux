@@ -58,6 +58,7 @@ describe('session backend bootstrap handshake', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
+                initialSessionStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -125,7 +126,12 @@ describe('session backend bootstrap handshake', () => {
           } else if (message.type === 'attach') {
             response = {
               id: message.id,
-              payload: { activeTabId: null, protocolVersion: 1, tabs: [] },
+              payload: {
+                activeTabId: null,
+                initialSessionStatuses: [],
+                protocolVersion: 1,
+                tabs: [],
+              },
               type: 'attachResult',
             }
           } else {

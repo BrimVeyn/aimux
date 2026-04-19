@@ -16,7 +16,20 @@
 import type { AssistantId, SessionStatus, TabActivity, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
+import { getLineText } from '../input/terminal-text-extraction'
 import { AssistantStatusDetector } from './assistant-status-detector'
+
+function tailPreview(viewport: TerminalSnapshot | undefined): string {
+  if (!viewport) return '<no-viewport>'
+  const lines = viewport.lines
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]
+    if (!line) continue
+    const text = getLineText(line).trim()
+    if (text.length > 0) return text.slice(0, 80)
+  }
+  return '<blank>'
+}
 
 /** Default polling interval. Cheap — detector is a handful of substring checks. */
 const DEFAULT_TICK_MS = 500
@@ -79,6 +92,7 @@ export function runStatusDetectionLoop(
     sessionId: string,
     tabs: LoopTabView[],
     now: number,
+    source: 'tick' | 'classifyNow',
     seenTabs?: Set<string>
   ): void {
     let working = false
@@ -95,14 +109,36 @@ export function runStatusDetectionLoop(
       if (status === 'working') working = true
       if (status === 'waiting-input') waiting = true
       const prev = lastTabStatus.get(tab.id)
-      if (!prev || prev.status !== status || prev.sessionId !== sessionId) {
+      const changed = !prev || prev.status !== status || prev.sessionId !== sessionId
+      logDebug('statusLoop.classify', {
+        assistant: tab.assistant,
+        changed,
+        prevSessionId: prev?.sessionId,
+        prevStatus: prev?.status,
+        sessionId,
+        source,
+        status,
+        tabId: tab.id,
+        tailPreview: tailPreview(tab.viewport),
+      })
+      if (changed) {
         lastTabStatus.set(tab.id, { sessionId, status })
         options.onTabStatus(tab.id, status, sessionId)
       }
     }
     const next: SessionStatus = { waiting, working }
     const prevSession = lastSessionStatus.get(sessionId)
-    if (!prevSession || prevSession.working !== working || prevSession.waiting !== waiting) {
+    const sessionChanged =
+      !prevSession || prevSession.working !== working || prevSession.waiting !== waiting
+    logDebug('statusLoop.classifySession', {
+      prev: prevSession,
+      sessionChanged,
+      sessionId,
+      source,
+      status: next,
+      tabCount: tabs.length,
+    })
+    if (sessionChanged) {
       lastSessionStatus.set(sessionId, next)
       options.onSessionStatus(sessionId, next)
     }
@@ -116,7 +152,7 @@ export function runStatusDetectionLoop(
 
     for (const sessionId of sessionIds) {
       seenSessions.add(sessionId)
-      classifySession(sessionId, options.listTabs(sessionId), now, seenTabs)
+      classifySession(sessionId, options.listTabs(sessionId), now, 'tick', seenTabs)
     }
 
     for (const tabId of lastTabStatus.keys()) {
@@ -134,7 +170,7 @@ export function runStatusDetectionLoop(
 
   return {
     classifyNow: (sessionId, tabs) => {
-      classifySession(sessionId, tabs, Date.now())
+      classifySession(sessionId, tabs, Date.now(), 'classifyNow')
     },
     getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,

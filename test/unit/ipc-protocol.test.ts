@@ -75,7 +75,9 @@ describe('ipc protocol framing', () => {
   })
 
   test('negotiates the highest compatible protocol version', () => {
-    expect(negotiateProtocolVersion(1, IPC_PROTOCOL_VERSION, 2, 4)).toBe(IPC_PROTOCOL_VERSION)
+    expect(negotiateProtocolVersion(1, IPC_PROTOCOL_VERSION, 2, IPC_PROTOCOL_VERSION)).toBe(
+      IPC_PROTOCOL_VERSION
+    )
     expect(negotiateProtocolVersion(3, 4, 1, 2)).toBeNull()
   })
 

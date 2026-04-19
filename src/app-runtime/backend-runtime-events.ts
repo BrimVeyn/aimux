@@ -73,10 +73,12 @@ export function bindBackendRuntimeEvents({
   }
 
   const handleSessionActivity = (sessionId: string, status: SessionStatus) => {
+    logInputDebug('app.backend.event.sessionActivity', { sessionId, status })
     dispatch({ sessionId, status, type: 'set-session-status' })
   }
 
   const handleTabActivity = (tabId: string, activity: TabActivity) => {
+    logInputDebug('app.backend.event.tabActivity', { activity, tabId })
     dispatch({ activity, tabId, type: 'set-tab-activity' })
   }
 

@@ -76,7 +76,24 @@ export class LocalSessionBackend
     } else {
       this.sessionManager.resize(options.sessionId, options.cols, options.rows)
     }
-    return this.sessionManager.attachSession(options.sessionId, options.workspaceSnapshot)
+    const attachResult = this.sessionManager.attachSession(
+      options.sessionId,
+      options.workspaceSnapshot
+    )
+    // Run a synchronous classification pass so every tab's activity and the
+    // session-status snapshot are available to embed in the reply — mirrors
+    // the remote backend's behavior and keeps hydrate dispatches atomic on
+    // the client side.
+    this.statusLoop.classifyNow(options.sessionId, this.sessionManager.listTabs(options.sessionId))
+    const tabsWithActivity = attachResult.tabs.map((tab) => ({
+      ...tab,
+      activity: this.statusLoop.getTabStatus(tab.id) ?? tab.activity,
+    }))
+    return {
+      activeTabId: attachResult.activeTabId,
+      initialSessionStatuses: this.statusLoop.snapshotSessions(),
+      tabs: tabsWithActivity,
+    }
   }
 
   createSession(options: {
