@@ -10,6 +10,7 @@ import type {
 
 import { buildHeadlessInvocation, isSupportedProvider } from '../auto-commit/headless-commands'
 import { composePromptFromTemplate, loadBriefingTemplate } from '../auto-commit/prompt-loader'
+import { stripAnsi } from '../auto-commit/strip-ansi'
 import { runSuggestion } from '../auto-commit/suggestion-runner'
 import { workingTreeHash } from '../auto-commit/working-tree-hash'
 import { isCommandAvailable } from '../pty/command-registry'
@@ -58,15 +59,33 @@ async function getTemplate(deps: DriverDeps): Promise<string> {
 }
 
 const UNTRACKED_FILE_BYTES_CAP = 8_000
+const SESSION_TAIL_BYTES_CAP = 8_000
 
-async function gatherContext(cwd: string): Promise<{ recentCommits: string; diff: string } | null> {
+export function extractSessionTail(buffer: string | undefined): string {
+  if (!buffer) return '[no session tail available]'
+  const stripped = stripAnsi(buffer).trimEnd()
+  if (stripped.length === 0) return '[no session tail available]'
+  return stripped.length > SESSION_TAIL_BYTES_CAP
+    ? stripped.slice(stripped.length - SESSION_TAIL_BYTES_CAP)
+    : stripped
+}
+
+interface GatheredContext {
+  recentCommits: string
+  diff: string
+  branch: string
+}
+
+async function gatherContext(cwd: string): Promise<GatheredContext | null> {
   const logArgs = ['log', '-5', '--format=%h %s']
   const diffArgs = ['diff', 'HEAD']
   const untrackedArgs = ['ls-files', '--others', '--exclude-standard']
-  const [log, diff, untracked] = await Promise.all([
+  const branchArgs = ['rev-parse', '--abbrev-ref', 'HEAD']
+  const [log, diff, untracked, branch] = await Promise.all([
     $`git -C ${cwd} ${logArgs}`.quiet().nothrow(),
     $`git -C ${cwd} ${diffArgs}`.quiet().nothrow(),
     $`git -C ${cwd} ${untrackedArgs}`.quiet().nothrow(),
+    $`git -C ${cwd} ${branchArgs}`.quiet().nothrow(),
   ])
   if (log.exitCode !== 0 || diff.exitCode !== 0 || untracked.exitCode !== 0) return null
 
@@ -89,7 +108,9 @@ async function gatherContext(cwd: string): Promise<{ recentCommits: string; diff
     untrackedSections.push(trimmed || `[new file: ${path} — empty or unreadable]`)
   }
 
+  const branchName = branch.exitCode === 0 ? branch.stdout.toString().trim() : ''
   return {
+    branch: branchName || '[unknown branch]',
     diff:
       diff.stdout.toString() +
       (untrackedSections.length > 0 ? `\n${untrackedSections.join('\n')}` : ''),
@@ -146,7 +167,9 @@ export async function onActivityTransition(
     deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
     return
   }
-  const prompt = composePromptFromTemplate(template, ctx)
+  const tab = deps.getState().tabs.find((t) => t.id === args.tabId)
+  const sessionTail = extractSessionTail(tab?.buffer)
+  const prompt = composePromptFromTemplate(template, { ...ctx, sessionTail })
   const finalInvocation = buildHeadlessInvocation(
     args.assistant,
     prompt,

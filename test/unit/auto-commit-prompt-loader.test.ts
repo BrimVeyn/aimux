@@ -30,16 +30,28 @@ test('loadBriefingTemplate falls back to shipped default when override missing',
   expect(out).toContain('BODY:')
   expect(out).toContain('{recentCommits}')
   expect(out).toContain('{diff}')
+  expect(out).toContain('{branch}')
+  expect(out).toContain('{sessionTail}')
 })
 
 test('composePromptFromTemplate substitutes placeholders', () => {
-  const tpl = 'commits: {recentCommits}\n---\ndiff: {diff}'
-  const out = composePromptFromTemplate(tpl, { diff: 'dd', recentCommits: 'abc one' })
-  expect(out).toBe('commits: abc one\n---\ndiff: dd')
+  const tpl = 'branch: {branch}\ncommits: {recentCommits}\ntail: {sessionTail}\ndiff: {diff}'
+  const out = composePromptFromTemplate(tpl, {
+    branch: 'feat/x',
+    diff: 'dd',
+    recentCommits: 'abc one',
+    sessionTail: 'user: add foo',
+  })
+  expect(out).toBe('branch: feat/x\ncommits: abc one\ntail: user: add foo\ndiff: dd')
 })
 
 test('composePromptFromTemplate leaves unknown placeholders untouched', () => {
   expect(
-    composePromptFromTemplate('hi {unknown} and {diff}', { diff: 'd', recentCommits: 'r' })
+    composePromptFromTemplate('hi {unknown} and {diff}', {
+      branch: 'b',
+      diff: 'd',
+      recentCommits: 'r',
+      sessionTail: 't',
+    })
   ).toBe('hi {unknown} and d')
 })

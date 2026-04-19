@@ -20,10 +20,14 @@ export async function loadBriefingTemplate(opts: LoadOptions): Promise<string> {
 export interface PromptSlots {
   recentCommits: string
   diff: string
+  branch: string
+  sessionTail: string
 }
 
 export function composePromptFromTemplate(template: string, slots: PromptSlots): string {
   return template
     .replaceAll('{recentCommits}', slots.recentCommits)
     .replaceAll('{diff}', slots.diff)
+    .replaceAll('{branch}', slots.branch)
+    .replaceAll('{sessionTail}', slots.sessionTail)
 }
