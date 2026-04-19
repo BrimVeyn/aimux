@@ -348,6 +348,7 @@ export function RootView({
         currentSessionId,
         currentTabCount: tabs.length,
         customCommands,
+        focusMode,
         sessions,
         snippetEditorFields,
         snippets,
