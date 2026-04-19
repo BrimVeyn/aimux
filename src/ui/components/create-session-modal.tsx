@@ -7,6 +7,8 @@ import { InputField } from './input-field'
 import { ListItem } from './list-item'
 import { ModalShell } from './modal-shell'
 
+const VISIBLE_ROWS = 8
+
 function getDirectoryResultIcon(result: DirectoryResult): string {
   if (result.type === 'worktree') {
     return '\u{e728}'
@@ -52,6 +54,9 @@ export function CreateSessionModal({
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
 
+  const scrollOffset = Math.max(0, selectedIndex - VISIBLE_ROWS + 1)
+  const visibleResults = results.slice(scrollOffset, scrollOffset + VISIBLE_ROWS)
+
   return (
     <ModalShell
       title="Create session"
@@ -66,19 +71,21 @@ export function CreateSessionModal({
         </text>
         <InputField
           active={dirActive}
+          placeholder="Type a project name..."
           value={
             pendingProjectPath && !dirActive ? abbreviatePath(pendingProjectPath) : directoryQuery
           }
         />
       </box>
 
-      {dirActive && results.length === 0 && directoryQuery.length > 0 ? (
-        <text fg={theme.colors['descriptionForeground']}>No matches</text>
-      ) : null}
-
-      {dirActive
-        ? results.map((result, index) => {
-            const active = index === selectedIndex
+      <box flexDirection="column" height={VISIBLE_ROWS}>
+        {results.length === 0 ? (
+          <text fg={theme.colors['descriptionForeground']}>
+            {directoryQuery.length > 0 ? 'No matches' : 'Type a project name to search...'}
+          </text>
+        ) : (
+          visibleResults.map((result, index) => {
+            const active = dirActive && scrollOffset + index === selectedIndex
             return (
               <ListItem
                 key={result.path}
@@ -100,7 +107,8 @@ export function CreateSessionModal({
               />
             )
           })
-        : null}
+        )}
+      </box>
 
       <box flexDirection="column">
         <text
