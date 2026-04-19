@@ -161,6 +161,21 @@ export class RemoteSessionBackend
       case 'tabError':
         this.emit('error', message.payload.tabId, message.payload.message)
         break
+      case 'tabStatus':
+        logDebug('backend.remote.tabStatus', {
+          sessionId: message.payload.sessionId,
+          status: message.payload.status,
+          tabId: message.payload.tabId,
+        })
+        this.emit('tabActivity', message.payload.tabId, message.payload.status)
+        break
+      case 'sessionStatus':
+        logDebug('backend.remote.sessionStatus', {
+          sessionId: message.payload.sessionId,
+          status: message.payload.status,
+        })
+        this.emit('sessionActivity', message.payload.sessionId, message.payload.status)
+        break
     }
   }
 

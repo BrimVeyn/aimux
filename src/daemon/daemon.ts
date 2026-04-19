@@ -1,5 +1,7 @@
 import { connect, createServer, type Socket } from 'node:net'
 
+import type { AssistantId, TerminalSnapshot } from '../state/types'
+
 import { logDebug } from '../debug/input-log'
 import {
   type ClientRequest,
@@ -14,6 +16,7 @@ import {
   type ServerResponse,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
+import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
   getIpcDaemonSocketPath,
@@ -23,6 +26,53 @@ import {
   removeTerminalManagerSocketIfExists,
   tightenSocketPermissions,
 } from './runtime-paths'
+
+export interface DaemonTabEntry {
+  sessionId: string
+  assistant: AssistantId
+  command: string
+  viewport: TerminalSnapshot | undefined
+  /**
+   * Monotonic viewport sequence. Incremented on every render-event write so
+   * stale writers (e.g. `attach` returning a pre-await snapshot) can refuse
+   * to clobber a fresher viewport that arrived via `render` while the
+   * `attachSession` call was still in flight.
+   */
+  viewportSeq: number
+}
+
+/**
+ * Merges an attach-time tab view into the registry without clobbering a
+ * viewport that arrived via a render event during the `attachSession` await.
+ *
+ * Returns the updated entry (also written into `registry`). `seq` is a
+ * monotonic counter scoped to the registry; pass the same counter into every
+ * call so the new entry slot gets a stable ordinal when we first observe it.
+ *
+ * Exported for unit tests — the attach path in `runDaemon` uses the same
+ * helper through a closure that threads the counter.
+ */
+export function mergeTabRegistryEntry(
+  registry: Map<string, DaemonTabEntry>,
+  sessionId: string,
+  tabId: string,
+  assistant: AssistantId,
+  command: string,
+  initialViewport: TerminalSnapshot | undefined,
+  allocateSeq: () => number
+): DaemonTabEntry {
+  const existing = registry.get(tabId)
+  const viewport = existing?.viewport ?? initialViewport
+  const entry: DaemonTabEntry = {
+    assistant,
+    command,
+    sessionId,
+    viewport,
+    viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
+  }
+  registry.set(tabId, entry)
+  return entry
+}
 
 function send(socket: Socket, message: ServerResponse | ServerEvent): void {
   socket.write(encodeMessage(message))
@@ -115,37 +165,121 @@ export async function runDaemon(): Promise<void> {
   const attachedSessions = new Map<Socket, string>()
   const negotiatedVersions = new Map<Socket, number>()
 
+  // Per-tab registry so the status-detection loop can poll every terminal
+  // continuously, not just the one the UI is currently attached to.
+  const tabRegistry = new Map<string, DaemonTabEntry>()
+  let nextViewportSeq = 1
+
+  const allocateSeq = (): number => nextViewportSeq++
+  const rememberTab = (
+    sessionId: string,
+    tabId: string,
+    assistant: AssistantId,
+    command: string,
+    initialViewport?: TerminalSnapshot
+  ): void => {
+    const before = tabRegistry.get(tabId)
+    const entry = mergeTabRegistryEntry(
+      tabRegistry,
+      sessionId,
+      tabId,
+      assistant,
+      command,
+      initialViewport,
+      allocateSeq
+    )
+    logDebug('daemon.rememberTab', {
+      hadExistingEntry: before !== undefined,
+      hadExistingViewport: before?.viewport !== undefined,
+      initialViewportProvided: initialViewport !== undefined,
+      preservedExistingViewport:
+        before?.viewport !== undefined && entry.viewport === before.viewport,
+      resultSeq: entry.viewportSeq,
+      sessionId,
+      tabId,
+    })
+  }
+
+  const broadcastAll = (event: ServerEvent): void => {
+    for (const socket of sockets) {
+      send(socket, event)
+    }
+  }
+
+  const broadcastForSession = (sessionId: string, event: ServerEvent): void => {
+    for (const socket of sockets) {
+      if (attachedSessions.get(socket) === sessionId) {
+        send(socket, event)
+      }
+    }
+  }
+
   manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
+    const existing = tabRegistry.get(tabId)
+    let newSeq: number | null = null
+    if (existing) {
+      existing.viewport = viewport
+      existing.viewportSeq = nextViewportSeq++
+      existing.sessionId = sessionId
+      newSeq = existing.viewportSeq
+    }
     logDebug('daemon.manager.render', {
       attachedSocketCount: sockets.size,
+      hadRegistryEntry: existing !== undefined,
+      newSeq,
       sessionId,
       tabId,
       viewportLines: viewport.lines.length,
     })
     const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
-      }
-    }
+    broadcastForSession(sessionId, event)
   })
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
+    tabRegistry.delete(tabId)
     const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
-      }
-    }
+    broadcastForSession(sessionId, event)
   })
   manager.on('error', (sessionId, tabId, message) => {
     logDebug('daemon.manager.error', { message, sessionId, tabId })
     const event: ServerEvent = { payload: { message, tabId }, type: 'tabError' }
-    for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
-        send(socket, event)
-      }
+    broadcastForSession(sessionId, event)
+  })
+
+  const listTabsForSession = (sessionId: string): LoopTabView[] => {
+    const result: LoopTabView[] = []
+    for (const [tabId, entry] of tabRegistry) {
+      if (entry.sessionId !== sessionId) continue
+      result.push({
+        assistant: entry.assistant,
+        command: entry.command,
+        id: tabId,
+        viewport: entry.viewport,
+      })
     }
+    return result
+  }
+
+  const statusLoop = runStatusDetectionLoop({
+    listSessions: () => {
+      const seen = new Set<string>()
+      for (const entry of tabRegistry.values()) seen.add(entry.sessionId)
+      return [...seen]
+    },
+    listTabs: listTabsForSession,
+    onSessionStatus: (sessionId, status) => {
+      logDebug('daemon.status.session', { sessionId, status })
+      broadcastAll({ payload: { sessionId, status }, type: 'sessionStatus' })
+    },
+    onTabStatus: (tabId, status, sessionId) => {
+      logDebug('daemon.status.tab', { sessionId, status, tabId })
+      // Broadcast to every client. Clients silently ignore events for tabIds
+      // they don't know about, so there's no UI impact — this costs one
+      // extra socket write per tab per change, which is trivial, and
+      // removes a race where in-flight tab events could be dropped when a
+      // client tears down its socket to switch sessions.
+      broadcastAll({ payload: { sessionId, status, tabId }, type: 'tabStatus' })
+    },
   })
 
   const server = createServer((socket) => {
@@ -213,12 +347,49 @@ export async function runDaemon(): Promise<void> {
                     sessionId: message.payload.sessionId,
                     workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
+                  for (const tab of attachResult.tabs) {
+                    rememberTab(
+                      message.payload.sessionId,
+                      tab.id,
+                      tab.assistant,
+                      tab.command,
+                      tab.viewport
+                    )
+                  }
+                  // Classify synchronously BEFORE sending attachResult so
+                  // each tab's activity and the full session-status snapshot
+                  // are available to embed in the reply. This makes the
+                  // client apply them atomically with `hydrate-workspace`
+                  // and closes the race where separate `tabStatus` events
+                  // landed before the tab existed in client state.
+                  const tabsForLoop = listTabsForSession(message.payload.sessionId)
+                  logDebug('daemon.attach.preClassify', {
+                    sessionId: message.payload.sessionId,
+                    tabs: tabsForLoop.map((t) => ({
+                      assistant: t.assistant,
+                      hasViewport: t.viewport !== undefined,
+                      id: t.id,
+                      seq: tabRegistry.get(t.id)?.viewportSeq ?? null,
+                    })),
+                  })
+                  statusLoop.classifyNow(message.payload.sessionId, tabsForLoop)
+                  const tabsWithActivity = attachResult.tabs.map((tab) => ({
+                    ...tab,
+                    activity: statusLoop.getTabStatus(tab.id) ?? tab.activity,
+                  }))
+                  const initialSessionStatuses = statusLoop.snapshotSessions()
+                  logDebug('daemon.attach.replay', {
+                    sessionId: message.payload.sessionId,
+                    sessions: initialSessionStatuses,
+                    tabs: tabsWithActivity.map((t) => ({ activity: t.activity, id: t.id })),
+                  })
                   send(socket, {
                     id: message.id,
                     payload: {
                       activeTabId: attachResult.activeTabId,
+                      initialSessionStatuses,
                       protocolVersion: negotiatedVersion,
-                      tabs: attachResult.tabs,
+                      tabs: tabsWithActivity,
                     },
                     type: 'attachResult',
                   })
@@ -238,6 +409,12 @@ export async function runDaemon(): Promise<void> {
                     tabId: message.payload.tabId,
                     title: message.payload.title,
                   })
+                  rememberTab(
+                    sessionId,
+                    message.payload.tabId,
+                    message.payload.assistant,
+                    [message.payload.command, ...(message.payload.args ?? [])].join(' ')
+                  )
                   await manager.createTab({ ...message.payload, sessionId })
                   sendOk(socket, message.id)
                   logDebug('daemon.request.createTab.success', {
@@ -313,6 +490,7 @@ export async function runDaemon(): Promise<void> {
                 case 'closeTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  tabRegistry.delete(message.payload.tabId)
                   await manager.closeTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
@@ -321,6 +499,9 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = attachedSessions.get(socket)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   if (sessionId) {
+                    for (const [tabId, entry] of tabRegistry) {
+                      if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
+                    }
                     await manager.disposeSession(sessionId)
                   }
                   sendOk(socket, message.id)
@@ -371,6 +552,7 @@ export async function runDaemon(): Promise<void> {
 
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
+    statusLoop.stop()
     manager.destroy()
     server.close()
     process.exit(0)

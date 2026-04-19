@@ -86,6 +86,7 @@ describe('RemoteSessionBackend', () => {
                 id: message.id,
                 payload: {
                   activeTabId: null,
+                  initialSessionStatuses: [],
                   protocolVersion: IPC_PROTOCOL_VERSION,
                   tabs: [],
                 },
@@ -202,6 +203,7 @@ describe('RemoteSessionBackend', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
+                initialSessionStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -286,7 +288,12 @@ describe('RemoteSessionBackend', () => {
           } else if (message.type === 'attach') {
             response = {
               id: message.id,
-              payload: { activeTabId: null, protocolVersion: 999, tabs: [] },
+              payload: {
+                activeTabId: null,
+                initialSessionStatuses: [],
+                protocolVersion: 999,
+                tabs: [],
+              },
               type: 'attachResult',
             }
           } else {

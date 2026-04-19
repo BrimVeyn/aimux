@@ -129,6 +129,70 @@ On boot the runtime picks the active id as: persisted `themeId` (if known)
 `ensureShikiTheme()`; user-defined themes are registered with shiki by
 synthesizing a TextMate theme from their palette.
 
+## Assistant Status Detection
+
+The daemon runs a continuous polling loop that classifies every live tab as
+`idle`, `working`, or `waiting-input` by scanning the last few lines of each
+tab's viewport through heuristics adapted from
+[herdr](https://github.com/ogulcancelik/herdr).
+
+### Data flow
+
+1. `src/pty/assistant-status-detection-loop.ts` — the loop; calls
+   `AssistantStatusDetector` per tab, emits `onTabStatus` / `onSessionStatus`
+   callbacks when the classification changes.
+2. `src/daemon/daemon.ts` — owns the `tabRegistry` (tab → viewport / sessionId
+   map) and feeds it to the loop; broadcasts `tabStatus` and `sessionStatus`
+   IPC events to all connected clients.
+3. Client-side (`src/app-runtime/backend-runtime-events.ts`) dispatches
+   `set-tab-activity` and `set-session-status` state actions on receipt.
+
+### Atomic attach
+
+When a client attaches, the daemon runs `classifyNow` synchronously before
+sending the `attachResult` response. The result payload embeds the current
+tab activities and session statuses (`initialSessionStatuses`) so the client
+applies them in a single `hydrate-workspace` dispatch — preventing the race
+where separate `tabStatus` / `sessionStatus` events arrived before the tab
+existed in client state.
+
+### Viewport sequencing
+
+Every `render` event increments a monotonic `viewportSeq` on the registry
+entry. When `rememberTab` is called after an `attachSession` await, it
+checks the existing entry's `viewportSeq` and refuses to clobber a fresher
+viewport that arrived via `render` while the call was in flight.
+
+Important files:
+
+- `src/pty/assistant-status-detection-loop.ts`
+- `src/pty/assistant-status-detector.ts`
+- `src/daemon/daemon.ts`
+- `src/app-runtime/backend-runtime-events.ts`
+
+## Breaking Updates
+
+When the daemon reports an incompatible protocol version during handshake,
+the app renders a `BreakingUpdateScreen` modal (blocking the UI) and asks
+the user to confirm before restarting the terminal manager. This prevents
+silent terminal-state loss on automatic daemon restarts.
+
+Important files:
+
+- `src/ui/breaking-update-screen.tsx`
+- `src/session-backend/bootstrap.ts`
+- `src/index.tsx`
+
+## IPC Protocol Versioning
+
+The IPC protocol version is declared in `src/ipc/protocol.ts`:
+
+- `IPC_PROTOCOL_VERSION` — the version this build speaks
+- `IPC_PROTOCOL_MIN_VERSION` — the oldest version this build accepts
+
+A mismatch triggers a daemon restart (and the breaking-update confirmation
+flow if the version gap is incompatible).
+
 ## Profiles and Isolation
 
 Profiles isolate both config files and runtime sockets.

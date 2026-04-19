@@ -2,6 +2,8 @@ import type { EventEmitter } from 'node:events'
 
 import type {
   ScrollIntent,
+  SessionStatus,
+  TabActivity,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -12,12 +14,19 @@ export type SessionBackendEvents = {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
-  sessionActivity: [sessionId: string, busy: boolean]
+  sessionActivity: [sessionId: string, status: SessionStatus]
+  tabActivity: [tabId: string, activity: TabActivity]
 }
 
 export interface BackendAttachResult {
   tabs: TabSession[]
   activeTabId: string | null
+  /**
+   * Per-session status snapshot taken at attach time and applied
+   * atomically with tab hydration to prevent an unknown-tab race on
+   * separate `sessionActivity` events.
+   */
+  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
 }
 
 export interface SessionBackend extends EventEmitter<SessionBackendEvents> {

@@ -90,7 +90,7 @@ export function createInitialState(
       visible: overrides.sessionBarVisible ?? true,
     },
     sessions,
-    sessionsBusy: {},
+    sessionStatuses: {},
     sidebar: {
       maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
       minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,

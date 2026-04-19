@@ -204,7 +204,9 @@ async function restartDaemon(socketPath: string): Promise<void> {
   await spawnDaemon()
 }
 
-export async function createSessionBackend(): Promise<SessionBackend> {
+export async function createSessionBackend(opts?: {
+  onBreakingUpdateRequired?: () => Promise<void>
+}): Promise<SessionBackend> {
   if (process.env.AIMUX_LOCAL_BACKEND === '1') {
     logDebug('backend.create.localExplicit')
     return new LocalSessionBackend()
@@ -237,6 +239,7 @@ export async function createSessionBackend(): Promise<SessionBackend> {
       error: handshake.error ?? 'incompatible daemon handshake',
       socketPath,
     })
+    await opts?.onBreakingUpdateRequired?.()
     await restartDaemon(socketPath)
     const retriedHandshake = await probeDaemonProtocolCompatibility(socketPath)
     logDebug('backend.create.handshakeAfterRestart', {

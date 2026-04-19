@@ -8,7 +8,6 @@ interface TabItemProps {
   tab: TabSession
   active: boolean
   focused: boolean
-  isFocusedInput: boolean
   inLayout?: boolean
 }
 
@@ -50,10 +49,15 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
 function BusyIndicator() {
   const theme = useTheme()
   const frame = useBusySpinner()
-  return <text fg={theme.colors['textLink.foreground']}>{frame} busy</text>
+  return <text fg={theme.colors['textLink.foreground']}>{frame} working</text>
 }
 
-function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocusedInput: boolean }) {
+function WaitingIndicator() {
+  const theme = useTheme()
+  return <text fg={theme.colors['editorWarning.foreground']}>? waiting</text>
+}
+
+function ActivityIndicator({ tab }: { tab: TabSession }) {
   const theme = useTheme()
   if (tab.status === 'error') {
     return <text fg={theme.colors['editorError.foreground']}>✗ error</text>
@@ -67,12 +71,12 @@ function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocused
     return <text fg={theme.colors['editorWarning.foreground']}>⏹ exited</text>
   }
 
-  if (isFocusedInput) {
-    return <text fg={theme.colors['focusBorder']}>▸ focused</text>
+  if (tab.activity === 'working') {
+    return <BusyIndicator />
   }
 
-  if (tab.activity === 'busy') {
-    return <BusyIndicator />
+  if (tab.activity === 'waiting-input') {
+    return <WaitingIndicator />
   }
 
   if (tab.activity === 'idle') {
@@ -82,7 +86,7 @@ function ActivityIndicator({ isFocusedInput, tab }: { tab: TabSession; isFocused
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
 }
 
-export function TabItem({ active, focused, id, inLayout, isFocusedInput, tab }: TabItemProps) {
+export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
   const theme = useTheme()
   const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
@@ -110,7 +114,7 @@ export function TabItem({ active, focused, id, inLayout, isFocusedInput, tab }: 
       </box>
       <box flexDirection="row">
         <text fg={theme.colors['descriptionForeground']}> {label} </text>
-        <ActivityIndicator tab={tab} isFocusedInput={isFocusedInput} />
+        <ActivityIndicator tab={tab} />
       </box>
     </box>
   )

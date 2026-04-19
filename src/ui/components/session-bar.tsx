@@ -2,10 +2,12 @@ import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord } from '../../state/types'
+import type { SessionRecord, SessionStatus } from '../../state/types'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
+// eslint-disable-next-line no-duplicate-imports
+import { IDLE_SESSION_STATUS } from '../../state/types'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
 import { useTheme } from '../theme'
@@ -15,7 +17,7 @@ export function SessionBar() {
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
-  const busyMap = useAppStore((s) => s.sessionsBusy)
+  const statusMap = useAppStore((s) => s.sessionStatuses)
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
@@ -60,13 +62,10 @@ export function SessionBar() {
     if (!draggingId) return
     const hit = findChipAtX(event.x)
     if (hit === null) {
-      // Cursor left the bar entirely — allow the next hit to re-trigger a swap.
       lastSwapWithRef.current = null
       return
     }
     if (hit === draggingId) {
-      // Over the dragged chip itself — reset hysteresis so re-entering a
-      // neighbour can swap again.
       lastSwapWithRef.current = null
       return
     }
@@ -90,7 +89,6 @@ export function SessionBar() {
       return
     }
 
-    // Drag did not change anything → treat as click, switch to that session.
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
       runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
@@ -119,7 +117,7 @@ export function SessionBar() {
             session={session}
             index={displayIndex}
             active={session.id === currentId}
-            busy={busyMap[session.id] ?? false}
+            status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
             dragging={draggingId === session.id}
             onRef={(r) => setChipRef(session.id, r)}
             onMouseDown={() => handleMouseDown(session.id)}
@@ -145,7 +143,7 @@ interface SessionChipProps {
   session: SessionRecord
   index: number
   active: boolean
-  busy: boolean
+  status: SessionStatus
   dragging: boolean
   onRef: (ref: BoxRenderable | null) => void
   onMouseDown: (event: OtuiMouseEvent) => void
@@ -156,7 +154,6 @@ interface SessionChipProps {
 
 function SessionChip({
   active,
-  busy,
   dragging,
   index,
   onMouseDown,
@@ -165,19 +162,19 @@ function SessionChip({
   onMouseUp,
   onRef,
   session,
+  status,
 }: SessionChipProps) {
   const theme = useTheme()
-  const showSpinner = busy && !active
+  const showSpinner = status.working
+  const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const indicator = showSpinner ? spinner : '●'
-  const indicatorColor =
-    active || showSpinner
-      ? theme.colors['textLink.foreground']
-      : theme.colors['gitDecoration.addedResourceForeground']
   const labelColor = active
     ? theme.colors['editor.foreground']
     : theme.colors['descriptionForeground']
   const bgColor = dragging || active ? theme.colors['list.activeSelectionBackground'] : undefined
+  const idleColor = theme.colors['gitDecoration.addedResourceForeground'] ?? ''
+  const workingColor = theme.colors['textLink.foreground'] ?? ''
+  const waitingColor = theme.colors['editorWarning.foreground'] ?? ''
 
   return (
     <box
@@ -201,9 +198,21 @@ function SessionChip({
         onMouseDragEnd(e)
       }}
     >
-      <text fg={indicatorColor} selectable={false}>
-        {indicator}{' '}
-      </text>
+      {showWaiting ? (
+        <text fg={waitingColor} selectable={false}>
+          ?{' '}
+        </text>
+      ) : null}
+      {showSpinner ? (
+        <text fg={workingColor} selectable={false}>
+          {spinner}{' '}
+        </text>
+      ) : null}
+      {!showWaiting && !showSpinner ? (
+        <text fg={active ? workingColor : idleColor} selectable={false}>
+          {'● '}
+        </text>
+      ) : null}
       <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>

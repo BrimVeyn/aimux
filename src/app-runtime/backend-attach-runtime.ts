@@ -48,6 +48,12 @@ function hydrateAttachedSession(
       tabs: result.tabs,
       type: 'hydrate-workspace',
     })
+    // Dispatch the session-status snapshot *after* hydrate-workspace so
+    // sidebar chips reflect per-session state on attach without waiting
+    // for the next daemon-side status transition.
+    for (const entry of result.initialSessionStatuses) {
+      dispatch({ sessionId: entry.sessionId, status: entry.status, type: 'set-session-status' })
+    }
     resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
     return
   }

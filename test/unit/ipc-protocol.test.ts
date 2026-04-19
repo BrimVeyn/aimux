@@ -75,7 +75,9 @@ describe('ipc protocol framing', () => {
   })
 
   test('negotiates the highest compatible protocol version', () => {
-    expect(negotiateProtocolVersion(1, IPC_PROTOCOL_VERSION, 2, 4)).toBe(IPC_PROTOCOL_VERSION)
+    expect(negotiateProtocolVersion(1, IPC_PROTOCOL_VERSION, 2, IPC_PROTOCOL_VERSION)).toBe(
+      IPC_PROTOCOL_VERSION
+    )
     expect(negotiateProtocolVersion(3, 4, 1, 2)).toBeNull()
   })
 
@@ -111,5 +113,32 @@ describe('ipc protocol framing', () => {
         type: 'tabRender',
       })
     ).toThrow('tabRender.terminalModes is invalid')
+  })
+
+  test('parses tabStatus and sessionStatus events', () => {
+    expect(
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: 'working', tabId: 'tab-1' },
+        type: 'tabStatus',
+      })
+    ).toMatchObject({ type: 'tabStatus' })
+    expect(
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: { waiting: true, working: false } },
+        type: 'sessionStatus',
+      })
+    ).toMatchObject({ type: 'sessionStatus' })
+    expect(() =>
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: 'bogus', tabId: 'tab-1' },
+        type: 'tabStatus',
+      })
+    ).toThrow('tabStatus.status is invalid')
+    expect(() =>
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: { waiting: 1, working: true } },
+        type: 'sessionStatus',
+      })
+    ).toThrow('sessionStatus.status is invalid')
   })
 })

@@ -386,10 +386,14 @@ describe('appReducer', () => {
       ],
     }
 
-    const busy = appReducer(initial, { activity: 'busy', tabId: '1', type: 'set-tab-activity' })
+    const busy = appReducer(initial, {
+      activity: 'working',
+      tabId: '1',
+      type: 'set-tab-activity',
+    })
     const idle = appReducer(busy, { activity: 'idle', tabId: '1', type: 'set-tab-activity' })
 
-    expect(busy.tabs[0]?.activity).toBe('busy')
+    expect(busy.tabs[0]?.activity).toBe('working')
     expect(idle.tabs[0]?.activity).toBe('idle')
   })
 
@@ -469,7 +473,7 @@ describe('appReducer', () => {
       focusMode: 'terminal-input' as const,
       tabs: [
         createTab({
-          activity: 'busy',
+          activity: 'working',
           assistant: 'claude',
           buffer: 'old output',
           command: 'claude',

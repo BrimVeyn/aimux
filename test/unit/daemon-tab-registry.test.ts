@@ -1,0 +1,89 @@
+import { describe, expect, test } from 'bun:test'
+
+import type { TerminalLine, TerminalSnapshot } from '../../src/state/types'
+
+import { type DaemonTabEntry, mergeTabRegistryEntry } from '../../src/daemon/daemon'
+
+function snapshot(tag: string): TerminalSnapshot {
+  const line: TerminalLine = { spans: [{ text: tag }] }
+  return { baseY: 0, cursorVisible: true, lines: [line], viewportY: 0 }
+}
+
+function makeAllocator(start = 1): () => number {
+  let seq = start
+  return () => seq++
+}
+
+describe('mergeTabRegistryEntry', () => {
+  test('writes viewport when the tab is new', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    const alloc = makeAllocator()
+    const vp = snapshot('attach')
+    mergeTabRegistryEntry(registry, 'S', 't1', 'claude', 'claude', vp, alloc)
+    expect(registry.get('t1')?.viewport).toBe(vp)
+    expect(registry.get('t1')?.viewportSeq).toBe(1)
+  })
+
+  test('preserves a fresher viewport written via render during attachSession await', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    const alloc = makeAllocator()
+
+    // Simulate: render event fired during the `attachSession` await and
+    // populated the registry with the live viewport.
+    const fresh = snapshot('fresh-from-render')
+    registry.set('t1', {
+      assistant: 'claude',
+      command: 'claude',
+      sessionId: 'S',
+      viewport: fresh,
+      viewportSeq: 42,
+    })
+
+    // Now the attach handler runs with the attach-time (older) viewport.
+    const stale = snapshot('stale-from-attach')
+    mergeTabRegistryEntry(registry, 'S', 't1', 'claude', 'claude', stale, alloc)
+
+    const entry = registry.get('t1')
+    expect(entry?.viewport).toBe(fresh)
+    // Seq must also be preserved so subsequent render events remain ordered
+    // relative to the live viewport, not reset behind it.
+    expect(entry?.viewportSeq).toBe(42)
+  })
+
+  test('updates metadata fields even when viewport is preserved', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    registry.set('t1', {
+      assistant: 'claude',
+      command: 'old-cmd',
+      sessionId: 'S-old',
+      viewport: snapshot('preserved'),
+      viewportSeq: 7,
+    })
+    mergeTabRegistryEntry(
+      registry,
+      'S-new',
+      't1',
+      'codex',
+      'new-cmd',
+      snapshot('ignored'),
+      makeAllocator()
+    )
+    const entry = registry.get('t1')
+    expect(entry?.sessionId).toBe('S-new')
+    expect(entry?.assistant).toBe('codex')
+    expect(entry?.command).toBe('new-cmd')
+  })
+
+  test('no viewport anywhere yields seq=0 placeholder (never bumps the allocator)', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    let allocCalls = 0
+    const alloc = (): number => {
+      allocCalls++
+      return 99
+    }
+    mergeTabRegistryEntry(registry, 'S', 't1', 'claude', 'claude', undefined, alloc)
+    expect(registry.get('t1')?.viewport).toBeUndefined()
+    expect(registry.get('t1')?.viewportSeq).toBe(0)
+    expect(allocCalls).toBe(0)
+  })
+})

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 
 import type {
   ScrollIntent,
+  TabSession,
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
@@ -127,5 +128,13 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
       registry.disposeAll()
     }
     this.registries.clear()
+  }
+
+  listSessionIds(): string[] {
+    return [...this.registries.keys()]
+  }
+
+  listTabs(sessionId: string): TabSession[] {
+    return this.registries.get(sessionId)?.listTabs() ?? []
   }
 }
