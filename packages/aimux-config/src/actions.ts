@@ -567,29 +567,77 @@ export const gitCommitCancel: KeyResult = r([{ type: 'close-modal' }], [], 'git-
 // Modal: auto-commit
 // ---------------------------------------------------------------------------
 
+function extractAutoCommitFields(modal: ModeContext['state']['modal']): {
+  title: string
+  body: string
+} | null {
+  if (modal.type !== 'auto-commit') return null
+  const editBuffer = modal.editBuffer ?? ''
+  const activeIsTitle = modal.activeField === 'title'
+  const title = (activeIsTitle ? editBuffer : modal.contentBuffer).trim()
+  const body = (activeIsTitle ? modal.contentBuffer : editBuffer).trim()
+  return { body, title }
+}
+
 export const autoCommitAccept: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  if (modal.type !== 'auto-commit') {
+  const fields = extractAutoCommitFields(modal)
+  if (modal.type !== 'auto-commit' || !fields) {
     return r([{ type: 'close-modal' }], [], 'navigation')
   }
   return r(
     [{ type: 'close-modal' }],
-    [{ sessionId: modal.sessionId, type: 'auto-commit-accept' }],
+    [
+      {
+        body: fields.body,
+        sessionId: modal.sessionId,
+        title: fields.title,
+        type: 'auto-commit-accept',
+      },
+    ],
     'navigation'
   )
 }
 
 export const autoCommitDismiss: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  if (modal.type !== 'auto-commit') {
+  const fields = extractAutoCommitFields(modal)
+  if (modal.type !== 'auto-commit' || !fields) {
     return r([{ type: 'close-modal' }], [], 'navigation')
   }
   return r(
     [{ type: 'close-modal' }],
-    [{ sessionId: modal.sessionId, type: 'auto-commit-dismiss' }],
+    [
+      {
+        body: fields.body,
+        sessionId: modal.sessionId,
+        title: fields.title,
+        type: 'auto-commit-dismiss',
+      },
+    ],
     'navigation'
   )
 }
+
+export const autoCommitReturnKey: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type === 'auto-commit' && modal.activeField === 'body') {
+    return r([{ char: '\n', type: 'update-command-edit' }])
+  }
+  return r([{ type: 'switch-create-session-field' }])
+}
+
+export const autoCommitEnterEdit: KeyResult = r(
+  [{ focusMode: 'command-edit', type: 'set-focus-mode' }],
+  [],
+  'modal.auto-commit.editing'
+)
+
+export const autoCommitLeaveEdit: KeyResult = r(
+  [{ focusMode: 'modal', type: 'set-focus-mode' }],
+  [],
+  'modal.auto-commit'
+)
 
 export const gitCommitSubmit: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal

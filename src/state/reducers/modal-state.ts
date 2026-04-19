@@ -219,13 +219,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'modal',
         modal: {
-          body: suggestion.body,
-          cursorPos: 0,
-          editBuffer: null,
+          activeField: 'title',
+          contentBuffer: suggestion.body,
+          cursorPos: suggestion.title.length,
+          editBuffer: suggestion.title,
           selectedIndex: 0,
           sessionId: action.sessionId,
           sessionTargetId: action.sessionId,
-          title: suggestion.title,
           type: 'auto-commit',
         },
       }
@@ -466,7 +466,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'git-commit') {
+      if (state.modal.type === 'git-commit' || state.modal.type === 'auto-commit') {
         const nextField = state.modal.activeField === 'title' ? 'body' : 'title'
         const nextEdit = state.modal.contentBuffer
         return {

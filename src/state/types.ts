@@ -348,8 +348,8 @@ export interface ModalUpdateAvailable extends ModalBase {
 export interface ModalAutoCommit extends ModalBase {
   type: 'auto-commit'
   sessionId: string
-  title: string
-  body: string
+  activeField: 'title' | 'body'
+  contentBuffer: string
 }
 
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
@@ -573,7 +573,7 @@ export type AutoCommitAction =
     }
   | { type: 'auto-commit-clear'; sessionId: string }
   | { type: 'auto-commit-accept'; sessionId: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string }
+  | { type: 'auto-commit-dismiss'; sessionId: string; title?: string; body?: string }
   | { type: 'open-auto-commit-modal'; sessionId: string }
 
 export type GitModeAction =

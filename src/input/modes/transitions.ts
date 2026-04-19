@@ -2,7 +2,8 @@ import type { ModeId } from './types'
 
 const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'git-mode': ['navigation', 'modal.git-commit'],
-  'modal.auto-commit': ['navigation'],
+  'modal.auto-commit': ['navigation', 'modal.auto-commit.editing'],
+  'modal.auto-commit.editing': ['navigation', 'modal.auto-commit'],
   'modal.create-session': ['navigation', 'modal.session-picker.filtering'],
   'modal.git-commit': ['git-mode'],
   'modal.help.filtering': ['navigation'],

@@ -299,6 +299,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('n', actions.autoCommitDismiss, 'Dismiss')
         .map('N', actions.autoCommitDismiss)
         .map('<Esc>', actions.autoCommitDismiss, 'Cancel')
+        .map('e', actions.autoCommitEnterEdit, 'Edit')
+        .map('i', actions.autoCommitEnterEdit)
+        .map('<Tab>', actions.autoCommitEnterEdit)
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: auto-commit (editing sub-mode)
+    // -----------------------------------------------------------------------
+    .mode('modal.auto-commit.editing', (m) =>
+      m
+        .map('<Esc>', actions.autoCommitLeaveEdit, 'Done editing')
+        .map('<C-CR>', actions.autoCommitAccept, 'Commit')
+        .map('<Tab>', actions.switchField, 'Next field')
+        .map('<CR>', actions.autoCommitReturnKey, 'Newline / confirm')
+        .passthrough()
     )
 
   return kb._build()

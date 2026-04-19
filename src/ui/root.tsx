@@ -1,7 +1,7 @@
 import type { MouseEvent } from '@opentui/core'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
-import type { ModalState, SessionRecord, SnippetRecord } from '../state/types'
+import type { FocusMode, ModalState, SessionRecord, SnippetRecord } from '../state/types'
 import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
@@ -74,6 +74,7 @@ function renderModal(
     themeId: ThemeId
     createSessionFields: { directoryQuery: string; sessionName: string }
     snippetEditorFields: { snippetName: string; snippetContent: string }
+    focusMode: FocusMode
   }
 ) {
   switch (modal.type) {
@@ -178,8 +179,21 @@ function renderModal(
         />
       )
     }
-    case 'auto-commit':
-      return <AutoCommitModal body={modal.body} title={modal.title} />
+    case 'auto-commit': {
+      const titleText =
+        modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
+      const bodyText =
+        modal.activeField === 'title' ? modal.contentBuffer : (modal.editBuffer ?? '')
+      return (
+        <AutoCommitModal
+          activeField={modal.activeField}
+          body={bodyText}
+          cursorPos={modal.cursorPos ?? (modal.editBuffer ?? '').length}
+          editing={options.focusMode === 'command-edit'}
+          title={titleText}
+        />
+      )
+    }
     case null:
       return null
     default:
@@ -260,6 +274,7 @@ export function RootView({
           currentSessionId,
           currentTabCount: tabs.length,
           customCommands,
+          focusMode,
           sessions,
           snippetEditorFields,
           snippets,

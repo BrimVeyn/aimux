@@ -10,6 +10,7 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 }
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
+  'auto-commit': 'modal.auto-commit.editing',
   'create-session': 'modal.create-session',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',

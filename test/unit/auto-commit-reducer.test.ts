@@ -210,6 +210,64 @@ test('dismiss on generating aborts and goes idle', () => {
   expect(ctrl.signal.aborted).toBe(true)
 })
 
+test('dismiss with edited title/body writes edits and marks dismissed', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        body: 'original body',
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: TAB,
+        title: 'original title',
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = expectNonNull(
+    reduceAutoCommitState(state, {
+      body: 'edited body',
+      sessionId: SESSION,
+      title: 'edited title',
+      type: 'auto-commit-dismiss',
+    } as AppAction)
+  )
+  expect(next.bySession[SESSION]).toEqual({
+    body: 'edited body',
+    dismissed: true,
+    generatedAt: 1,
+    kind: 'ready',
+    tabId: TAB,
+    title: 'edited title',
+    workingTreeHash: HASH,
+  })
+})
+
+test('dismiss without title/body keeps the AI-generated text', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        body: 'original body',
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: TAB,
+        title: 'original title',
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = expectNonNull(
+    reduceAutoCommitState(state, {
+      sessionId: SESSION,
+      type: 'auto-commit-dismiss',
+    } as AppAction)
+  )
+  expect(next.bySession[SESSION]).toMatchObject({
+    body: 'original body',
+    dismissed: true,
+    title: 'original title',
+  })
+})
+
 test('accept on dismissed ready still goes idle and clears', () => {
   const state: AutoCommitState = {
     bySession: {

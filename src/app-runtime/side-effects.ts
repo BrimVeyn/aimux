@@ -545,12 +545,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'auto-commit-accept': {
-      const sessionId = effect.sessionId
-      void enqueueGitOp(() => runAutoCommitAccept(ctx, sessionId))
+      const { body, sessionId, title } = effect
+      void enqueueGitOp(() => runAutoCommitAccept(ctx, sessionId, title, body))
       return
     }
     case 'auto-commit-dismiss': {
-      ctx.dispatch({ sessionId: effect.sessionId, type: 'auto-commit-dismiss' })
+      ctx.dispatch({
+        body: effect.body,
+        sessionId: effect.sessionId,
+        title: effect.title,
+        type: 'auto-commit-dismiss',
+      })
       return
     }
     case 'confirm-update-selection': {
@@ -679,9 +684,13 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
 }
 
-async function runAutoCommitAccept(ctx: SideEffectContext, sessionId: string): Promise<void> {
-  const suggestion = ctx.state.autoCommit.bySession[sessionId]
-  if (!suggestion || suggestion.kind !== 'ready') return
+async function runAutoCommitAccept(
+  ctx: SideEffectContext,
+  sessionId: string,
+  title: string,
+  body: string
+): Promise<void> {
+  if (!title) return
   const cwd = ctx.getCurrentSessionProjectPath()
   if (!cwd) return
 
@@ -695,9 +704,9 @@ async function runAutoCommitAccept(ctx: SideEffectContext, sessionId: string): P
     return
   }
 
-  const commitResult = suggestion.body
-    ? await $`git -C ${cwd} commit -m ${suggestion.title} -m ${suggestion.body}`.quiet().nothrow()
-    : await $`git -C ${cwd} commit -m ${suggestion.title}`.quiet().nothrow()
+  const commitResult = body
+    ? await $`git -C ${cwd} commit -m ${title} -m ${body}`.quiet().nothrow()
+    : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
 
   if (commitResult.exitCode !== 0) {
     ctx.dispatch({
@@ -708,7 +717,7 @@ async function runAutoCommitAccept(ctx: SideEffectContext, sessionId: string): P
   }
 
   ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
-  ctx.dispatch({ message: `committed: ${suggestion.title}`, type: 'git-mode-set-message' })
+  ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {

@@ -1,18 +1,31 @@
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
+import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
 import { WizardHead } from './wizard-head'
 
 interface AutoCommitModalProps {
+  activeField: 'title' | 'body'
+  editing: boolean
   title: string
   body: string
+  cursorPos: number
 }
 
-export function AutoCommitModal({ body, title }: AutoCommitModalProps) {
+export function AutoCommitModal({
+  activeField,
+  body,
+  cursorPos,
+  editing,
+  title,
+}: AutoCommitModalProps) {
   const theme = useTheme()
+  const titleActive = editing && activeField === 'title'
+  const bodyActive = editing && activeField === 'body'
+
   return (
     <ModalShell
-      keybindsModeId="modal.auto-commit"
+      keybindsModeId={editing ? 'modal.auto-commit.editing' : 'modal.auto-commit'}
       title="Auto-commit suggestion"
       width={uiTokens.modalWidth.xl}
     >
@@ -20,15 +33,33 @@ export function AutoCommitModal({ body, title }: AutoCommitModalProps) {
         <WizardHead />
       </box>
       <box flexDirection="column">
-        <text fg={theme.colors['descriptionForeground']}>Title</text>
-        <text>{title}</text>
+        <text
+          fg={
+            titleActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Title
+        </text>
+        <InputField
+          active={titleActive}
+          cursorPos={titleActive ? cursorPos : undefined}
+          value={title}
+        />
       </box>
+
       <box flexDirection="column">
-        <text fg={theme.colors['descriptionForeground']}>Body</text>
-        <text>{body || '—'}</text>
-      </box>
-      <box flexDirection="row" justifyContent="center">
-        <text fg={theme.colors['descriptionForeground']}>[Y] Commit [N] Dismiss</text>
+        <text
+          fg={
+            bodyActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+          }
+        >
+          Body
+        </text>
+        <InputField
+          active={bodyActive}
+          cursorPos={bodyActive ? cursorPos : undefined}
+          value={body}
+        />
       </box>
     </ModalShell>
   )

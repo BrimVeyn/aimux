@@ -39,8 +39,17 @@ export function reduceAutoCommitState(
       const current = state.bySession[action.sessionId]
       if (!current || current.kind === 'idle') return null
       if (current.kind === 'ready') {
-        if (current.dismissed === true) return null
-        return setBySession(state, action.sessionId, { ...current, dismissed: true })
+        const nextTitle = action.title ?? current.title
+        const nextBody = action.body ?? current.body
+        const unchanged =
+          current.dismissed === true && nextTitle === current.title && nextBody === current.body
+        if (unchanged) return null
+        return setBySession(state, action.sessionId, {
+          ...current,
+          body: nextBody,
+          dismissed: true,
+          title: nextTitle,
+        })
       }
       try {
         current.abortController.abort()

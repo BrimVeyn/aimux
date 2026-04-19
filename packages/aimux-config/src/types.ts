@@ -25,6 +25,7 @@ export type ModeId =
   | 'modal.split-picker'
   | 'modal.git-commit'
   | 'modal.auto-commit'
+  | 'modal.auto-commit.editing'
   | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -306,8 +307,8 @@ export interface ModalUpdateAvailable extends ModalBase {
 export interface ModalAutoCommit extends ModalBase {
   type: 'auto-commit'
   sessionId: string
-  title: string
-  body: string
+  activeField: 'title' | 'body'
+  contentBuffer: string
 }
 
 export type ModalState =
@@ -552,7 +553,7 @@ export type AutoCommitAction =
     }
   | { type: 'auto-commit-clear'; sessionId: string }
   | { type: 'auto-commit-accept'; sessionId: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string }
+  | { type: 'auto-commit-dismiss'; sessionId: string; title?: string; body?: string }
   | { type: 'open-auto-commit-modal'; sessionId: string }
 
 export type AppAction =
@@ -600,8 +601,8 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-push' }
-  | { type: 'auto-commit-accept'; sessionId: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string }
+  | { type: 'auto-commit-accept'; sessionId: string; title: string; body: string }
+  | { type: 'auto-commit-dismiss'; sessionId: string; title: string; body: string }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'toggle-transparent' }
