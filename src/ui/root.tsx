@@ -84,6 +84,8 @@ function renderModal(
           customCommands={options.customCommands}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
+          editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
+          editBuffer={modal.editBuffer ?? ''}
         />
       )
     case 'session-picker':

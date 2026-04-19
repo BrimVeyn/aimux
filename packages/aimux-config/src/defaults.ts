@@ -178,6 +178,13 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .passthrough()
     )
 
+    .mode('modal.new-tab.editing-command', (m) =>
+      m
+        .map('<Esc>', actions.cancelEditCustomCommand, 'Cancel')
+        .map('<CR>', actions.saveCustomCommand, 'Save')
+        .passthrough()
+    )
+
     // -----------------------------------------------------------------------
     // Modal: session-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------

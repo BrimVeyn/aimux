@@ -16,6 +16,8 @@ export interface PickerItem {
   subtitle?: ReactNode
   trailing?: ReactNode
   onClick?: () => void
+  onEdit?: () => void
+  onDelete?: () => void
 }
 
 interface PickerProps {
@@ -35,6 +37,34 @@ interface PickerProps {
 
 const VIEWPORT_HEIGHT_RATIO = 0.6
 const MODAL_CHROME_ROWS = 6
+
+function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: () => void }) {
+  const theme = useTheme()
+  return (
+    <box flexDirection="row" gap={1}>
+      {onEdit ? (
+        <box
+          onMouseDown={(event) => {
+            event.stopPropagation()
+            onEdit()
+          }}
+        >
+          <text fg={theme.colors['textLink.foreground']}>[edit]</text>
+        </box>
+      ) : null}
+      {onDelete ? (
+        <box
+          onMouseDown={(event) => {
+            event.stopPropagation()
+            onDelete()
+          }}
+        >
+          <text fg={theme.colors['editorError.foreground']}>[del]</text>
+        </box>
+      ) : null}
+    </box>
+  )
+}
 
 export function Picker({
   cursorPos,
@@ -119,6 +149,11 @@ export function Picker({
             }
             const active = index === selectedIndex
             const capturedIndex = index
+            const trailing =
+              item.trailing ??
+              (active && (item.onEdit || item.onDelete) ? (
+                <PickerItemCtas onEdit={item.onEdit} onDelete={item.onDelete} />
+              ) : null)
             nodes.push(
               <ListItem
                 key={item.key}
@@ -126,7 +161,7 @@ export function Picker({
                 active={active}
                 title={item.title}
                 subtitle={item.subtitle}
-                trailing={item.trailing}
+                trailing={trailing}
                 onHover={() => {
                   if (isScrollingRef.current) return
                   skipNextScrollRef.current = true

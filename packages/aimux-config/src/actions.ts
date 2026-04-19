@@ -252,6 +252,18 @@ export const saveSnippetEditor: KeyResult = r(
   'navigation'
 )
 
+export const saveCustomCommand: KeyResult = r(
+  [],
+  [{ type: 'save-custom-command' }],
+  'modal.new-tab.command-edit'
+)
+
+export const cancelEditCustomCommand: KeyResult = r(
+  [{ type: 'cancel-command-edit' }],
+  [],
+  'modal.new-tab.command-edit'
+)
+
 // ---------------------------------------------------------------------------
 // Update-available modal
 // ---------------------------------------------------------------------------

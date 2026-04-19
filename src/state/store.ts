@@ -125,6 +125,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'set-snippets':
       return { ...state, snippets: action.snippets }
+    case 'set-custom-commands':
+      return { ...state, customCommands: action.customCommands }
     case 'delete-snippet': {
       const newSnippets = state.snippets.filter((s) => s.id !== action.snippetId)
       const filteredNew = filterSnippets(newSnippets, state.modal.editBuffer)

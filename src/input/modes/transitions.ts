@@ -5,7 +5,8 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.create-session': ['navigation', 'modal.session-picker.filtering'],
   'modal.git-commit': ['git-mode'],
   'modal.help.filtering': ['navigation'],
-  'modal.new-tab.command-edit': ['navigation'],
+  'modal.new-tab.command-edit': ['navigation', 'modal.new-tab.editing-command'],
+  'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],
   'modal.rename-tab': ['navigation'],
   'modal.session-name': ['modal.session-picker.filtering', 'navigation'],
   'modal.session-picker.filtering': ['navigation', 'modal.session-name', 'modal.create-session'],
@@ -17,6 +18,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'navigation': [
     'terminal-input',
     'modal.new-tab.command-edit',
+    'modal.new-tab.editing-command',
     'modal.session-picker.filtering',
     'modal.help.filtering',
     'modal.snippet-picker.filtering',

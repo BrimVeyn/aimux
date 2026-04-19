@@ -144,24 +144,28 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
   }
 }
 
-function saveCustomCommandSelection(state: AppState): void {
-  const option = getAllAssistantOptions(state.customCommands)[state.modal.selectedIndex]
-  if (!option || state.modal.editBuffer === null) {
+function saveCustomCommandSelection(ctx: SideEffectContext): void {
+  const { dispatch, state } = ctx
+  if (state.modal.type !== 'new-tab' || state.modal.editingCommand === null) {
     return
   }
+  const assistantId = state.modal.editingCommand
+  if (state.modal.editBuffer === null) return
 
   const trimmed = state.modal.editBuffer.trim()
   const newCustomCommands = { ...state.customCommands }
   if (trimmed) {
-    newCustomCommands[option.id] = trimmed
+    newCustomCommands[assistantId] = trimmed
   } else {
-    delete newCustomCommands[option.id]
+    delete newCustomCommands[assistantId]
   }
 
   saveConfig({
     ...loadConfig(),
     customCommands: newCustomCommands,
   })
+  dispatch({ customCommands: newCustomCommands, type: 'set-custom-commands' })
+  dispatch({ type: 'cancel-command-edit' })
 }
 
 function applyThemeEffect(
@@ -437,7 +441,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'save-custom-command': {
-      saveCustomCommandSelection(state)
+      saveCustomCommandSelection(ctx)
       return
     }
     case 'apply-theme': {

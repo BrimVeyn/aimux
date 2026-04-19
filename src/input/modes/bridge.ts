@@ -40,6 +40,9 @@ export function deriveModeId(state: AppState): ModeId {
   }
 
   if (state.focusMode === 'command-edit') {
+    if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
+      return 'modal.new-tab.editing-command'
+    }
     const modalType = state.modal.type
     const commandEditMode = modalType ? COMMAND_EDIT_MODE_IDS[modalType] : undefined
     if (commandEditMode) {

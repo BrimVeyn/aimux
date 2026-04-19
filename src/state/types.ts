@@ -282,6 +282,7 @@ export interface ModalClosed extends ModalBase {
 
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
+  editingCommand: AssistantId | null
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -402,6 +403,7 @@ export interface AppState {
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
+  | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
   | { type: 'open-session-picker' }
@@ -571,6 +573,7 @@ export type GitModeAction =
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
   | { type: 'delete-snippet'; snippetId: string }
+  | { type: 'set-custom-commands'; customCommands: Record<AssistantId, string> }
 
 export type AppAction =
   | ModalAction

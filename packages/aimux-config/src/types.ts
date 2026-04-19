@@ -13,6 +13,7 @@ export type ModeId =
   | 'terminal-input'
   | 'git-mode'
   | 'modal.new-tab.command-edit'
+  | 'modal.new-tab.editing-command'
   | 'modal.session-picker.filtering'
   | 'modal.session-name'
   | 'modal.create-session'
@@ -249,6 +250,7 @@ export interface ModalClosed extends ModalBase {
 
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
+  editingCommand: AssistantId | null
 }
 export interface ModalSessionPicker extends ModalBase {
   type: 'session-picker'

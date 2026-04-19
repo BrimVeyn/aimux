@@ -33,11 +33,26 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          editingCommand: null,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'new-tab',
         },
       }
+    case 'open-edit-custom-command': {
+      if (state.modal.type !== 'new-tab') return state
+      const current = state.customCommands[action.assistantId] ?? ''
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          cursorPos: current.length,
+          editBuffer: current,
+          editingCommand: action.assistantId,
+        },
+      }
+    }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
@@ -353,12 +368,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         nextBuffer = buffer.slice(0, cursor) + action.char + buffer.slice(cursor)
         nextCursor = cursor + action.char.length
       }
+      const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
       const resetIndex =
-        state.modal.type === 'session-picker' ||
-        state.modal.type === 'snippet-picker' ||
-        state.modal.type === 'theme-picker' ||
-        state.modal.type === 'new-tab' ||
-        state.modal.type === 'help'
+        !isNewTabEditing &&
+        (state.modal.type === 'session-picker' ||
+          state.modal.type === 'snippet-picker' ||
+          state.modal.type === 'theme-picker' ||
+          state.modal.type === 'new-tab' ||
+          state.modal.type === 'help')
           ? 0
           : state.modal.selectedIndex
       return {
@@ -372,6 +389,17 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'cancel-command-edit': {
+      if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: 0,
+            editBuffer: '',
+            editingCommand: null,
+          },
+        }
+      }
       if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
