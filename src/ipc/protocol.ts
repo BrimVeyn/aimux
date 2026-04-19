@@ -16,8 +16,8 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 // the client applies them atomically with tab creation — previously they
 // arrived as separate events and could lose to the unknown-tab no-op in
 // the reducer.
-export const IPC_PROTOCOL_MIN_VERSION = 5
-export const IPC_PROTOCOL_VERSION = 5
+export const IPC_PROTOCOL_MIN_VERSION = 6
+export const IPC_PROTOCOL_VERSION = 6
 
 export interface ProtocolHelloRequest {
   minVersion: number
