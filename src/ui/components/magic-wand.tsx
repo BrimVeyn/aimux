@@ -7,7 +7,13 @@ interface MagicWandProps {
 export function MagicWand({ onClick }: MagicWandProps) {
   const theme = useTheme()
   return (
-    <box onMouseDown={onClick}>
+    <box
+      onMouseDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onClick()
+      }}
+    >
       <text fg={theme.colors['textLink.foreground']}>🪄</text>
     </box>
   )

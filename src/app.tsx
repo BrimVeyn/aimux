@@ -329,18 +329,19 @@ export function App({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useKeyboard((key) => {
+    const currentState = stateRef.current
     // Global quit: Ctrl+C in any mode except terminal-input
-    if (key.ctrl && key.name === 'c' && state.focusMode !== 'terminal-input') {
+    if (key.ctrl && key.name === 'c' && currentState.focusMode !== 'terminal-input') {
       key.preventDefault()
-      executeSideEffect({ state, type: 'quit' }, sideEffectCtx)
+      executeSideEffect({ state: currentState, type: 'quit' }, sideEffectCtx)
       return
     }
 
-    const modeId = deriveModeId(state)
+    const modeId = deriveModeId(currentState)
     const handler = getHandler(modeId)
     if (!handler) return
 
-    const ctx: ModeContext = { state }
+    const ctx: ModeContext = { state: currentState }
     const result = handler.handleKey(key, ctx)
     if (!result) return
 

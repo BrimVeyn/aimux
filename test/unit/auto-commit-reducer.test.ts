@@ -135,3 +135,100 @@ test('ready state survives an unrelated action', () => {
   const next = reduceAutoCommitState(state, { type: 'close-modal' } as AppAction)
   expect(next).toBeNull()
 })
+
+test('dismiss on ready keeps the suggestion and marks it dismissed', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        body: 'b',
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: TAB,
+        title: 't',
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = expectNonNull(
+    reduceAutoCommitState(state, {
+      sessionId: SESSION,
+      type: 'auto-commit-dismiss',
+    } as AppAction)
+  )
+  expect(next.bySession[SESSION]).toEqual({
+    body: 'b',
+    dismissed: true,
+    generatedAt: 1,
+    kind: 'ready',
+    tabId: TAB,
+    title: 't',
+    workingTreeHash: HASH,
+  })
+})
+
+test('dismiss on already-dismissed ready is a no-op', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        body: 'b',
+        dismissed: true,
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: TAB,
+        title: 't',
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = reduceAutoCommitState(state, {
+    sessionId: SESSION,
+    type: 'auto-commit-dismiss',
+  } as AppAction)
+  expect(next).toBeNull()
+})
+
+test('dismiss on generating aborts and goes idle', () => {
+  const ctrl = new AbortController()
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        abortController: ctrl,
+        kind: 'generating',
+        startedAt: 0,
+        tabId: TAB,
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = expectNonNull(
+    reduceAutoCommitState(state, {
+      sessionId: SESSION,
+      type: 'auto-commit-dismiss',
+    } as AppAction)
+  )
+  expect(next.bySession[SESSION]).toEqual({ kind: 'idle' })
+  expect(ctrl.signal.aborted).toBe(true)
+})
+
+test('accept on dismissed ready still goes idle and clears', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      [SESSION]: {
+        body: 'b',
+        dismissed: true,
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: TAB,
+        title: 't',
+        workingTreeHash: HASH,
+      },
+    },
+  }
+  const next = expectNonNull(
+    reduceAutoCommitState(state, {
+      sessionId: SESSION,
+      type: 'auto-commit-accept',
+    } as AppAction)
+  )
+  expect(next.bySession[SESSION]).toEqual({ kind: 'idle' })
+})

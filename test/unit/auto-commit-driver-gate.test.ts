@@ -136,6 +136,60 @@ test('does re-trigger when ready with a different hash', () => {
   ).toBe(true)
 })
 
+test('does not re-trigger a dismissed ready with the same hash', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      s1: {
+        body: '',
+        dismissed: true,
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: 't1',
+        title: 't',
+        workingTreeHash: 'h1',
+      },
+    },
+  }
+  expect(
+    shouldTriggerAutoCommit({
+      assistant: 'claude',
+      currentHash: 'h1',
+      enabled: true,
+      git: DIRTY_GIT,
+      hasProjectPath: true,
+      sessionId: 's1',
+      state,
+    })
+  ).toBe(false)
+})
+
+test('does re-trigger when dismissed ready sees a new hash', () => {
+  const state: AutoCommitState = {
+    bySession: {
+      s1: {
+        body: '',
+        dismissed: true,
+        generatedAt: 1,
+        kind: 'ready',
+        tabId: 't1',
+        title: 't',
+        workingTreeHash: 'h-old',
+      },
+    },
+  }
+  expect(
+    shouldTriggerAutoCommit({
+      assistant: 'claude',
+      currentHash: 'h-new',
+      enabled: true,
+      git: DIRTY_GIT,
+      hasProjectPath: true,
+      sessionId: 's1',
+      state,
+    })
+  ).toBe(true)
+})
+
 test('does not trigger while already generating the same hash', () => {
   const ctrl = new AbortController()
   const state: AutoCommitState = {

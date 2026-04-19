@@ -545,6 +545,7 @@ export type AutoCommitSuggestion =
       title: string
       body: string
       generatedAt: number
+      dismissed?: boolean
     }
 
 export interface AutoCommitState {

@@ -550,8 +550,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'auto-commit-dismiss': {
-      ctx.dispatch({ type: 'close-modal' })
-      ctx.dispatch({ sessionId: effect.sessionId, type: 'auto-commit-clear' })
+      ctx.dispatch({ sessionId: effect.sessionId, type: 'auto-commit-dismiss' })
       return
     }
     case 'confirm-update-selection': {
@@ -708,7 +707,6 @@ async function runAutoCommitAccept(ctx: SideEffectContext, sessionId: string): P
     return
   }
 
-  ctx.dispatch({ type: 'close-modal' })
   ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
   ctx.dispatch({ message: `committed: ${suggestion.title}`, type: 'git-mode-set-message' })
 }
