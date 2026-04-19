@@ -408,21 +408,15 @@ export type ModalAction =
   | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
-  | { type: 'begin-command-edit' }
   | { type: 'update-command-edit'; char: string }
-  | { type: 'commit-command-edit' }
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }
-  | { type: 'begin-session-filter' }
   | { type: 'open-rename-tab-modal' }
   | { type: 'open-snippet-picker' }
   | { type: 'open-snippet-editor'; snippetId?: string }
-  | { type: 'begin-snippet-filter' }
-  | { type: 'begin-help-filter' }
-  | { type: 'begin-theme-filter' }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }

@@ -52,41 +52,6 @@ describe('custom assistants', () => {
     expect(next.modal.selectedIndex).toBe(0)
   })
 
-  test('begin-command-edit works for custom assistant', () => {
-    const state = {
-      ...createInitialState({ 'my-ai': '/usr/local/bin/my-ai' }, [], [], false),
-      focusMode: 'modal' as const,
-      modal: {
-        editBuffer: null,
-        selectedIndex: ASSISTANT_OPTIONS.length, // custom assistant index
-        sessionTargetId: null,
-        type: 'new-tab' as const,
-      },
-    }
-
-    const next = appReducer(state, { type: 'begin-command-edit' })
-    expect(next.focusMode).toBe('command-edit')
-    expect(next.modal.editBuffer).toBe('/usr/local/bin/my-ai')
-  })
-
-  test('commit-command-edit saves custom command for custom assistant', () => {
-    const state = {
-      ...createInitialState({ 'my-ai': '/usr/local/bin/my-ai' }, [], [], false),
-      focusMode: 'command-edit' as const,
-      modal: {
-        editBuffer: '/new/path/my-ai --verbose',
-        selectedIndex: ASSISTANT_OPTIONS.length,
-        sessionTargetId: null,
-        type: 'new-tab' as const,
-      },
-    }
-
-    const next = appReducer(state, { type: 'commit-command-edit' })
-    expect(next.customCommands['my-ai']).toBe('/new/path/my-ai --verbose')
-    expect(next.modal.editBuffer).toBeNull()
-    expect(next.focusMode).toBe('modal')
-  })
-
   test('state initializes with custom commands from config', () => {
     const state = createInitialState(
       {

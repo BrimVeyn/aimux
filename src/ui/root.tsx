@@ -82,7 +82,8 @@ function renderModal(
         <NewTabModal
           selectedIndex={modal.selectedIndex}
           customCommands={options.customCommands}
-          editBuffer={modal.editBuffer}
+          filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'session-picker':
@@ -157,6 +158,7 @@ function renderModal(
           filter={modal.editBuffer}
           selectedIndex={modal.selectedIndex}
           scope={modal.scope}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'git-commit': {

@@ -15,22 +15,26 @@ function r(
 export const nextTab: KeyResult = r([{ delta: 1, type: 'move-active-tab' }])
 export const prevTab: KeyResult = r([{ delta: -1, type: 'move-active-tab' }])
 
-export const newTab: KeyResult = r([{ type: 'open-new-tab-modal' }], [], 'modal.new-tab')
+export const newTab: KeyResult = r(
+  [{ type: 'open-new-tab-modal' }],
+  [],
+  'modal.new-tab.command-edit'
+)
 export const renameTab: KeyResult = r([{ type: 'open-rename-tab-modal' }], [], 'modal.rename-tab')
 export const sessionPicker: KeyResult = r(
   [{ type: 'open-session-picker' }],
   [],
-  'modal.session-picker'
+  'modal.session-picker.filtering'
 )
 export const snippetPicker: KeyResult = r(
   [{ type: 'open-snippet-picker' }],
   [],
-  'modal.snippet-picker'
+  'modal.snippet-picker.filtering'
 )
 export const themePicker: KeyResult = r(
   [{ type: 'open-theme-picker' }],
   [{ action: 'open', type: 'apply-theme' }],
-  'modal.theme-picker'
+  'modal.theme-picker.filtering'
 )
 export function helpModal(scope?: ModeId): KeyResult {
   return r([{ scope, type: 'open-help-modal' }])
@@ -160,20 +164,8 @@ export function moveModalSelectionWithPreview(
 
 export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
 
-export const beginCommandEdit: KeyResult = r(
-  [{ type: 'begin-command-edit' }],
-  [],
-  'modal.new-tab.command-edit'
-)
-
 export const cancelCommandEdit = (returnTo: KeyResult['transition']): KeyResult =>
   r([{ type: 'cancel-command-edit' }], [], returnTo)
-
-export const commitCommandEdit: KeyResult = r(
-  [{ type: 'commit-command-edit' }],
-  [{ type: 'save-custom-command' }],
-  'modal.new-tab'
-)
 
 export const confirmSelectedSession: KeyResult = r([], [{ type: 'confirm-selected-session' }])
 
@@ -189,12 +181,6 @@ export const openRenameSelectedSession: KeyResult = r(
 )
 
 export const deleteSelectedSession: KeyResult = r([], [{ type: 'delete-selected-session' }])
-
-export const beginSessionFilter: KeyResult = r(
-  [{ type: 'begin-session-filter' }],
-  [],
-  'modal.session-picker.filtering'
-)
 
 export const openSnippetEditor: KeyResult = r(
   [{ type: 'open-snippet-editor' }],
@@ -215,24 +201,6 @@ export const pasteSnippetToGroup: KeyResult = r(
   [{ type: 'close-modal' }],
   [{ type: 'paste-snippet-to-group' }],
   'navigation'
-)
-
-export const beginSnippetFilter: KeyResult = r(
-  [{ type: 'begin-snippet-filter' }],
-  [],
-  'modal.snippet-picker.filtering'
-)
-
-export const beginHelpFilter: KeyResult = r(
-  [{ type: 'begin-help-filter' }],
-  [],
-  'modal.help.filtering'
-)
-
-export const beginThemeFilter: KeyResult = r(
-  [{ type: 'begin-theme-filter' }],
-  [],
-  'modal.theme-picker.filtering'
 )
 
 export const confirmSplit: KeyResult = r([], [{ type: 'confirm-split' }])
@@ -262,20 +230,20 @@ export const selectDirectory: KeyResult = r([{ type: 'select-directory' }])
 export const backToSessionPicker: KeyResult = r(
   [{ type: 'open-session-picker' }],
   [],
-  'modal.session-picker'
+  'modal.session-picker.filtering'
 )
 
 export const createSessionEscape: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.modal.type === 'create-session' && !ctx.state.modal.returnToSessionPicker) {
     return r([{ type: 'close-modal' }], [], 'navigation')
   }
-  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker')
+  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker.filtering')
 }
 
 export const backToSnippetPicker: KeyResult = r(
   [{ type: 'open-snippet-picker' }],
   [],
-  'modal.snippet-picker'
+  'modal.snippet-picker.filtering'
 )
 
 export const saveSnippetEditor: KeyResult = r(
@@ -336,10 +304,10 @@ export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {
     return r(
       [{ type: 'open-session-picker' }],
       [{ name: trimmed, sessionId, type: 'rename-session' }],
-      'modal.session-picker'
+      'modal.session-picker.filtering'
     )
   }
-  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker')
+  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker.filtering')
 }
 
 // Rename tab modal

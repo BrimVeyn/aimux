@@ -44,7 +44,7 @@ describe('appReducer', () => {
     const next = appReducer(initial, { type: 'open-session-picker' })
 
     expect(next.modal.type).toBe('session-picker')
-    expect(next.focusMode).toBe('modal')
+    expect(next.focusMode).toBe('command-edit')
   })
 
   test('loads selected session and marks it current', () => {
@@ -134,7 +134,7 @@ describe('appReducer', () => {
     const closed = appReducer(opened, { type: 'close-modal' })
 
     expect(opened.modal.type).toBe('new-tab')
-    expect(opened.focusMode).toBe('modal')
+    expect(opened.focusMode).toBe('command-edit')
     expect(closed.modal.type).toBeNull()
     expect(closed.focusMode).toBe('navigation')
   })

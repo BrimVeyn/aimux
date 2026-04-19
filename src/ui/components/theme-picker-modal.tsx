@@ -63,7 +63,7 @@ export function ThemePickerModal({
   return (
     <Picker
       title="Select theme"
-      keybindsModeId="modal.theme-picker"
+      keybindsModeId="modal.theme-picker.filtering"
       width={uiTokens.modalWidth.md}
       listGap={0}
       filter={filter}

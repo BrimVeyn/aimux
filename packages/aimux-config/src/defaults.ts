@@ -111,24 +111,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: help
-    // -----------------------------------------------------------------------
-    .mode('modal.help', (m) =>
-      m
-        .map('<Esc>', actions.closeOverlayModal, 'Close')
-        .map('<Down>', actions.moveModalSelection(1), 'Next')
-        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
-        .map('<C-n>', actions.moveModalSelection(1))
-        .map('<C-p>', actions.moveModalSelection(-1))
-        .map('/', actions.beginHelpFilter, 'Filter')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: help filtering
+    // Modal: help (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.help.filtering', (m) =>
       m
-        .map('<Esc>', actions.cancelCommandEdit('modal.help'), 'Cancel')
+        .map('<Esc>', actions.closeOverlayModal, 'Close')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -137,21 +124,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: theme-picker
-    // -----------------------------------------------------------------------
-    .mode('modal.theme-picker', (m) =>
-      m
-        .map('<Esc>', actions.restoreTheme, 'Cancel')
-        .map('<Down>', actions.previewTheme(1), 'Next')
-        .map('<Up>', actions.previewTheme(-1), 'Prev')
-        .map('<C-n>', actions.previewTheme(1))
-        .map('<C-p>', actions.previewTheme(-1))
-        .map('<CR>', actions.confirmTheme, 'Confirm')
-        .map('/', actions.beginThemeFilter, 'Filter')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: theme-picker filtering
+    // Modal: theme-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.theme-picker.filtering', (m) =>
       m
@@ -192,26 +165,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: new-tab
-    // -----------------------------------------------------------------------
-    .mode('modal.new-tab', (m) =>
-      m
-        .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('<Down>', actions.moveModalSelection(1), 'Next')
-        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
-        .map('<C-n>', actions.moveModalSelection(1))
-        .map('<C-p>', actions.moveModalSelection(-1))
-        .map('<CR>', actions.launchSelectedAssistant, 'Launch')
-        .map('e', actions.beginCommandEdit, 'Edit command')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: new-tab command-edit
+    // Modal: new-tab (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.new-tab.command-edit', (m) =>
       m
-        .map('<Esc>', actions.cancelCommandEdit('modal.new-tab'), 'Cancel')
-        .map('<CR>', actions.commitCommandEdit, 'Save')
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<CR>', actions.launchSelectedAssistant, 'Launch')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -220,28 +179,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: session-picker
-    // -----------------------------------------------------------------------
-    .mode('modal.session-picker', (m) =>
-      m
-        .map('<Esc>', actions.sessionPickerEscape, 'Cancel')
-        .map('<Down>', actions.moveModalSelection(1), 'Next')
-        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
-        .map('<C-n>', actions.moveModalSelection(1))
-        .map('<C-p>', actions.moveModalSelection(-1))
-        .map('<CR>', actions.confirmSelectedSession, 'Open')
-        .map('n', actions.openCreateSessionModal, 'New')
-        .map('r', actions.openRenameSelectedSession, 'Rename')
-        .map('d', actions.deleteSelectedSession, 'Delete')
-        .map('/', actions.beginSessionFilter, 'Filter')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: session-picker filtering
+    // Modal: session-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.session-picker.filtering', (m) =>
       m
-        .map('<Esc>', actions.cancelCommandEdit('modal.session-picker'), 'Cancel')
+        .map('<Esc>', actions.sessionPickerEscape, 'Cancel')
         .map('<CR>', actions.confirmSelectedSession, 'Open')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
@@ -276,30 +218,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: snippet-picker
-    // -----------------------------------------------------------------------
-    .mode('modal.snippet-picker', (m) =>
-      m
-        .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('<Down>', actions.moveModalSelection(1), 'Next')
-        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
-        .map('<C-n>', actions.moveModalSelection(1))
-        .map('<C-p>', actions.moveModalSelection(-1))
-        .map('<CR>', actions.pasteSelectedSnippet, 'Send')
-        .map('a', actions.pasteSnippetToGroup, 'Send to group')
-        .map('n', actions.openSnippetEditor, 'New')
-        .map('r', actions.editSelectedSnippet, 'Edit')
-        .map('e', actions.editSelectedSnippet)
-        .map('d', actions.deleteSelectedSnippet, 'Delete')
-        .map('/', actions.beginSnippetFilter, 'Filter')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: snippet-picker filtering
+    // Modal: snippet-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.snippet-picker.filtering', (m) =>
       m
-        .map('<Esc>', actions.cancelCommandEdit('modal.snippet-picker'), 'Cancel')
+        .map('<Esc>', actions.closeModal, 'Cancel')
         .map('<CR>', actions.snippetFilterPaste, 'Send')
         .map('<C-a>', actions.snippetFilterPasteToGroup, 'Send to group')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')

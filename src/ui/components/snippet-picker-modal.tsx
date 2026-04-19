@@ -54,7 +54,7 @@ export function SnippetPickerModal({
   return (
     <Picker
       title="Snippets"
-      keybindsModeId="modal.snippet-picker"
+      keybindsModeId="modal.snippet-picker.filtering"
       width={uiTokens.modalWidth.xl}
       gap={1}
       filter={filter}

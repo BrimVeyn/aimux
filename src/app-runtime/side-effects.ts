@@ -24,7 +24,7 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { filterSessions, filterSnippets } from '../state/selectors'
+import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import {
   type AppAction,
@@ -68,9 +68,10 @@ export interface SideEffectContext {
 }
 
 function getSelectedAssistantOption(state: AppState) {
-  return (
-    getAllAssistantOptions(state.customCommands)[state.modal.selectedIndex] ?? getAssistantOption(0)
-  )
+  const all = getAllAssistantOptions(state.customCommands)
+  const filter = state.modal.type === 'new-tab' ? state.modal.editBuffer : null
+  const list = filterAssistants(all, filter)
+  return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
 }
 
 function handleSessionSelection(ctx: SideEffectContext): void {

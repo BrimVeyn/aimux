@@ -94,7 +94,7 @@ export function SessionPickerModal({
   return (
     <Picker
       title="Sessions"
-      keybindsModeId="modal.session-picker"
+      keybindsModeId="modal.session-picker.filtering"
       width={uiTokens.modalWidth.lg}
       gap={1}
       filter={filter}

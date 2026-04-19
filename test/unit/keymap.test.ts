@@ -121,7 +121,7 @@ describe('mode handlers', () => {
       'Expected session picker result'
     )
     expect(result.actions).toEqual([{ type: 'open-session-picker' }])
-    expect(result.transition).toBe('modal.session-picker')
+    expect(result.transition).toBe('modal.session-picker.filtering')
   })
 
   test('navigation: Shift+J reorders tab', () => {
@@ -152,19 +152,13 @@ describe('mode handlers', () => {
   })
 
   test('modal.help: escape closes modal', () => {
-    const handler = requireValue(getHandler('modal.help'), 'Missing help handler')
+    const handler = requireValue(getHandler('modal.help.filtering'), 'Missing help handler')
     const result = requireValue(
       handler.handleKey(key('escape'), ctx()),
       'Expected help modal close result'
     )
     expect(result.actions).toEqual([{ type: 'close-modal' }])
     expect(result.transition).toBeUndefined()
-  })
-
-  test('modal.help: Ctrl+B is not handled', () => {
-    const handler = requireValue(getHandler('modal.help'), 'Missing help handler')
-    const result = handler.handleKey(key('b', { ctrl: true }), ctx())
-    expect(result).toBeNull()
   })
 
   test('terminal-input: Ctrl+Z resolves to leave-terminal-input', () => {
@@ -206,7 +200,7 @@ describe('mode handlers', () => {
 
   test('modal.session-picker: escape blocked without currentSessionId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker'),
+      getHandler('modal.session-picker.filtering'),
       'Missing session-picker handler'
     )
     const result = handler.handleKey(key('escape'), ctx({ currentSessionId: null }))
@@ -215,7 +209,7 @@ describe('mode handlers', () => {
 
   test('modal.session-picker: escape works with currentSessionId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker'),
+      getHandler('modal.session-picker.filtering'),
       'Missing session-picker handler'
     )
     const result = requireValue(
@@ -225,41 +219,11 @@ describe('mode handlers', () => {
     expect(result.transition).toBe('navigation')
   })
 
-  test('modal.session-picker: n opens create-session', () => {
-    const handler = requireValue(
-      getHandler('modal.session-picker'),
-      'Missing session-picker handler'
-    )
-    const result = requireValue(
-      handler.handleKey(key('n'), ctx()),
-      'Expected create-session transition'
-    )
-    expect(result.transition).toBe('modal.create-session')
-  })
-
-  test('modal.snippet-picker: n opens snippet-editor', () => {
-    const handler = requireValue(
-      getHandler('modal.snippet-picker'),
-      'Missing snippet-picker handler'
-    )
-    const result = requireValue(
-      handler.handleKey(key('n'), ctx()),
-      'Expected snippet-editor transition'
-    )
-    expect(result.transition).toBe('modal.snippet-editor')
-  })
-
-  test('modal.new-tab: e enters command edit', () => {
-    const handler = requireValue(getHandler('modal.new-tab'), 'Missing new-tab handler')
-    const result = requireValue(
-      handler.handleKey(key('e'), ctx()),
-      'Expected command edit transition'
-    )
-    expect(result.transition).toBe('modal.new-tab.command-edit')
-  })
-
   test('modal.theme-picker: return confirms theme', () => {
-    const handler = requireValue(getHandler('modal.theme-picker'), 'Missing theme-picker handler')
+    const handler = requireValue(
+      getHandler('modal.theme-picker.filtering'),
+      'Missing theme-picker handler'
+    )
     const result = requireValue(
       handler.handleKey(key('return'), ctx()),
       'Expected theme confirmation result'
