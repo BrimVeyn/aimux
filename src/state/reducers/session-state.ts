@@ -102,7 +102,14 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       return { ...state, sessions: ordered }
     }
     case 'set-session-status': {
-      if ((state.sessionStatuses[action.sessionId] ?? 'idle') === action.status) return state
+      const prev = state.sessionStatuses[action.sessionId]
+      if (
+        prev !== undefined &&
+        prev.working === action.status.working &&
+        prev.waiting === action.status.waiting
+      ) {
+        return state
+      }
       return {
         ...state,
         sessionStatuses: { ...state.sessionStatuses, [action.sessionId]: action.status },

@@ -186,7 +186,7 @@ export async function runDaemon(): Promise<void> {
     broadcastForSession(sessionId, event)
   })
 
-  const stopStatusLoop = runStatusDetectionLoop({
+  const statusLoop = runStatusDetectionLoop({
     listSessions: () => {
       const seen = new Set<string>()
       for (const entry of tabRegistry.values()) seen.add(entry.sessionId)
@@ -302,6 +302,17 @@ export async function runDaemon(): Promise<void> {
                     },
                     type: 'attachResult',
                   })
+                  // Replay current statuses so the freshly-attached client
+                  // reflects every tab and session immediately, without
+                  // waiting for the next flag change.
+                  for (const snapshot of statusLoop.snapshotSessions()) {
+                    send(socket, { payload: snapshot, type: 'sessionStatus' })
+                  }
+                  for (const snapshot of statusLoop.snapshotTabs()) {
+                    if (snapshot.sessionId === message.payload.sessionId) {
+                      send(socket, { payload: snapshot, type: 'tabStatus' })
+                    }
+                  }
                   logDebug('daemon.request.attach.success', {
                     activeTabId: attachResult.activeTabId,
                     sessionId: message.payload.sessionId,
@@ -461,7 +472,7 @@ export async function runDaemon(): Promise<void> {
 
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
-    stopStatusLoop()
+    statusLoop.stop()
     manager.destroy()
     server.close()
     process.exit(0)

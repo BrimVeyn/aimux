@@ -11,6 +11,18 @@ export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'er
 
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 
+/**
+ * Per-session status flags. Both can be true at once (e.g. one tab working,
+ * another waiting for user input) so we keep them as independent booleans
+ * rather than a single priority enum.
+ */
+export interface SessionStatus {
+  working: boolean
+  waiting: boolean
+}
+
+export const IDLE_SESSION_STATUS: SessionStatus = { waiting: false, working: false }
+
 export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
 
 export type ModalType =
@@ -364,7 +376,7 @@ export interface AppState {
   tabGroupMap: Record<string, string>
   sessions: SessionRecord[]
   currentSessionId: string | null
-  sessionStatuses: Record<string, TabActivity>
+  sessionStatuses: Record<string, SessionStatus>
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
@@ -417,7 +429,7 @@ export type SessionAction =
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string }
   | { type: 'reorder-sessions'; orderedIds: string[] }
-  | { type: 'set-session-status'; sessionId: string; status: TabActivity }
+  | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
 
 // -- Tab actions --
 export type TabAction =

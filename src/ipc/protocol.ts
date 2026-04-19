@@ -1,5 +1,6 @@
 import type {
   ScrollIntent,
+  SessionStatus,
   TabActivity,
   TabSession,
   TerminalModeState,
@@ -9,10 +10,10 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
-// v3 adds tabStatus/sessionStatus server events. Accept v2 clients for
-// graceful upgrade; they just won't receive the new events.
-export const IPC_PROTOCOL_MIN_VERSION = 2
-export const IPC_PROTOCOL_VERSION = 3
+// v4 widens sessionStatus from a single status enum to independent
+// {working, waiting} flags so a chip can show both at once.
+export const IPC_PROTOCOL_MIN_VERSION = 4
+export const IPC_PROTOCOL_VERSION = 4
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -94,7 +95,7 @@ export type ServerEvent =
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
-  | { type: 'sessionStatus'; payload: { sessionId: string; status: TabActivity } }
+  | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
 
@@ -137,6 +138,14 @@ function isStringArray(value: unknown): value is string[] {
 
 function isTabActivity(value: unknown): value is TabActivity {
   return value === 'working' || value === 'waiting-input' || value === 'idle'
+}
+
+function isSessionStatus(value: unknown): value is SessionStatus {
+  return (
+    isObjectRecord(value) &&
+    typeof value.working === 'boolean' &&
+    typeof value.waiting === 'boolean'
+  )
 }
 
 function isTerminalSpan(value: unknown): boolean {
@@ -394,7 +403,7 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       return value as ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
-      assert(isTabActivity(value.payload.status), 'sessionStatus.status is invalid')
+      assert(isSessionStatus(value.payload.status), 'sessionStatus.status is invalid')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

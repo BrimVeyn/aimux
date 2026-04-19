@@ -34,15 +34,24 @@ describe('session bar reducer', () => {
     expect(s2).toBe(s1)
   })
 
-  test('set-session-status records a per-session status', () => {
+  test('set-session-status records per-session working/waiting flags', () => {
     const s0 = createInitialState({}, [], [], false)
-    const s1 = appReducer(s0, { sessionId: 'a', status: 'working', type: 'set-session-status' })
-    expect(s1.sessionStatuses.a).toBe('working')
-    const s2 = appReducer(s1, { sessionId: 'a', status: 'idle', type: 'set-session-status' })
-    expect(s2.sessionStatuses.a).toBe('idle')
+    const working = { waiting: false, working: true }
+    const both = { waiting: true, working: true }
+    const idle = { waiting: false, working: false }
+
+    const s1 = appReducer(s0, { sessionId: 'a', status: working, type: 'set-session-status' })
+    expect(s1.sessionStatuses.a).toEqual(working)
+
+    const s2 = appReducer(s1, { sessionId: 'a', status: both, type: 'set-session-status' })
+    expect(s2.sessionStatuses.a).toEqual(both)
+
+    const s3 = appReducer(s2, { sessionId: 'a', status: idle, type: 'set-session-status' })
+    expect(s3.sessionStatuses.a).toEqual(idle)
+
     // no-op when unchanged
-    const s3 = appReducer(s2, { sessionId: 'a', status: 'idle', type: 'set-session-status' })
-    expect(s3).toBe(s2)
+    const s4 = appReducer(s3, { sessionId: 'a', status: idle, type: 'set-session-status' })
+    expect(s4).toBe(s3)
   })
 
   test('reorder-sessions rewrites order fields', () => {

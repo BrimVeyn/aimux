@@ -2,10 +2,12 @@ import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord, TabActivity } from '../../state/types'
+import type { SessionRecord, SessionStatus } from '../../state/types'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
+// eslint-disable-next-line no-duplicate-imports
+import { IDLE_SESSION_STATUS } from '../../state/types'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
 import { useTheme } from '../theme'
@@ -60,13 +62,10 @@ export function SessionBar() {
     if (!draggingId) return
     const hit = findChipAtX(event.x)
     if (hit === null) {
-      // Cursor left the bar entirely — allow the next hit to re-trigger a swap.
       lastSwapWithRef.current = null
       return
     }
     if (hit === draggingId) {
-      // Over the dragged chip itself — reset hysteresis so re-entering a
-      // neighbour can swap again.
       lastSwapWithRef.current = null
       return
     }
@@ -90,7 +89,6 @@ export function SessionBar() {
       return
     }
 
-    // Drag did not change anything → treat as click, switch to that session.
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
       runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
@@ -119,7 +117,7 @@ export function SessionBar() {
             session={session}
             index={displayIndex}
             active={session.id === currentId}
-            status={statusMap[session.id] ?? 'idle'}
+            status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
             dragging={draggingId === session.id}
             onRef={(r) => setChipRef(session.id, r)}
             onMouseDown={() => handleMouseDown(session.id)}
@@ -145,7 +143,7 @@ interface SessionChipProps {
   session: SessionRecord
   index: number
   active: boolean
-  status: TabActivity
+  status: SessionStatus
   dragging: boolean
   onRef: (ref: BoxRenderable | null) => void
   onMouseDown: (event: OtuiMouseEvent) => void
@@ -167,18 +165,19 @@ function SessionChip({
   status,
 }: SessionChipProps) {
   const theme = useTheme()
-  // The active session already has the user's attention, so suppress the
-  // spinner there; we still surface `?` on waiting-input because it's
-  // actionable even when focused.
-  const showSpinner = status === 'working' && !active
-  const showWaiting = status === 'waiting-input'
+  // Active session suppresses its own working spinner (user is already
+  // looking at it) but still surfaces the waiting-input glyph — it's an
+  // actionable prompt.
+  const showSpinner = status.working && !active
+  const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const indicator = pickIndicator(showWaiting, showSpinner, spinner)
-  const indicatorColor = pickIndicatorColor(theme, { active, showSpinner, showWaiting })
   const labelColor = active
     ? theme.colors['editor.foreground']
     : theme.colors['descriptionForeground']
   const bgColor = dragging || active ? theme.colors['list.activeSelectionBackground'] : undefined
+  const idleColor = theme.colors['gitDecoration.addedResourceForeground'] ?? ''
+  const workingColor = theme.colors['textLink.foreground'] ?? ''
+  const waitingColor = theme.colors['editorWarning.foreground'] ?? ''
 
   return (
     <box
@@ -202,9 +201,21 @@ function SessionChip({
         onMouseDragEnd(e)
       }}
     >
-      <text fg={indicatorColor} selectable={false}>
-        {indicator}{' '}
-      </text>
+      {showWaiting ? (
+        <text fg={waitingColor} selectable={false}>
+          ?{' '}
+        </text>
+      ) : null}
+      {showSpinner ? (
+        <text fg={workingColor} selectable={false}>
+          {spinner}{' '}
+        </text>
+      ) : null}
+      {!showWaiting && !showSpinner ? (
+        <text fg={active ? workingColor : idleColor} selectable={false}>
+          {'● '}
+        </text>
+      ) : null}
       <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>
@@ -213,19 +224,4 @@ function SessionChip({
       </text>
     </box>
   )
-}
-
-function pickIndicator(showWaiting: boolean, showSpinner: boolean, spinner: string): string {
-  if (showWaiting) return '?'
-  if (showSpinner) return spinner
-  return '●'
-}
-
-function pickIndicatorColor(
-  theme: { colors: Record<string, string> },
-  flags: { active: boolean; showSpinner: boolean; showWaiting: boolean }
-): string {
-  if (flags.showWaiting) return theme.colors['editorWarning.foreground'] ?? ''
-  if (flags.active || flags.showSpinner) return theme.colors['textLink.foreground'] ?? ''
-  return theme.colors['gitDecoration.addedResourceForeground'] ?? ''
 }

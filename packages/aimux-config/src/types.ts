@@ -36,6 +36,10 @@ export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
+export interface SessionStatus {
+  working: boolean
+  waiting: boolean
+}
 export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
 export type SplitDirection = 'horizontal' | 'vertical'
 
@@ -328,7 +332,7 @@ export interface AppState {
   tabGroupMap: Record<string, string>
   sessions: SessionRecord[]
   currentSessionId: string | null
-  sessionStatuses: Record<string, TabActivity>
+  sessionStatuses: Record<string, SessionStatus>
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
@@ -379,7 +383,7 @@ export type SessionAction =
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string }
   | { type: 'reorder-sessions'; orderedIds: string[] }
-  | { type: 'set-session-status'; sessionId: string; status: TabActivity }
+  | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
 
 export type TabAction =
   | { type: 'add-tab'; tab: TabSession }

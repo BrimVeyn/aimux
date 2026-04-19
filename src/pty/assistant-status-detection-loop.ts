@@ -3,13 +3,17 @@
  *
  * Backends drive this loop to monitor every known terminal at a fixed cadence:
  * every tick we pull each tab's current viewport, run the detector on the last
- * ~10 non-blank lines, and report per-tab + aggregated per-session statuses to
- * the backend's transport. The loop is the single source of truth so that
- * idle tabs can't erase a sibling's waiting-input (aggregation is max-priority
- * `working` > `waiting-input` > `idle`), and so that clients receive status
- * for every session the backend owns, not just the attached one.
+ * ~10 non-blank lines, and report per-tab + per-session statuses to the
+ * backend's transport. The loop is the single source of truth so that idle
+ * tabs can't erase a sibling's waiting-input, and so that clients receive
+ * status for every session the backend owns, not just the attached one.
+ *
+ * Per-session status is a pair of independent booleans:
+ *   - `working`: at least one tab is working.
+ *   - `waiting`: at least one tab is waiting for user input.
+ * Both can be true at the same time — the chip renders one glyph per flag.
  */
-import type { AssistantId, TabActivity, TerminalSnapshot } from '../state/types'
+import type { AssistantId, SessionStatus, TabActivity, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { AssistantStatusDetector } from './assistant-status-detector'
@@ -29,18 +33,30 @@ export interface StatusDetectionLoopOptions {
   listTabs: (sessionId: string) => LoopTabView[]
   /** Emitted when a tab's status changes. */
   onTabStatus: (tabId: string, status: TabActivity, sessionId: string) => void
-  /** Emitted when a session's aggregate status changes. */
-  onSessionStatus: (sessionId: string, status: TabActivity) => void
+  /** Emitted when either flag on a session changes. */
+  onSessionStatus: (sessionId: string, status: SessionStatus) => void
   tickMs?: number
 }
 
-export function runStatusDetectionLoop(options: StatusDetectionLoopOptions): () => void {
+export interface StatusDetectionLoopHandle {
+  stop: () => void
+  /** Last classified status for a tab, for on-attach replay. */
+  getTabStatus: (tabId: string) => TabActivity | undefined
+  /** Last session flags, for on-attach replay. */
+  getSessionStatus: (sessionId: string) => SessionStatus | undefined
+  /** Snapshot of every known session's flags. */
+  snapshotSessions: () => Array<{ sessionId: string; status: SessionStatus }>
+  /** Snapshot of every known tab's status plus its session. */
+  snapshotTabs: () => Array<{ tabId: string; sessionId: string; status: TabActivity }>
+}
+
+export function runStatusDetectionLoop(
+  options: StatusDetectionLoopOptions
+): StatusDetectionLoopHandle {
   const tickMs = options.tickMs ?? DEFAULT_TICK_MS
   const detector = new AssistantStatusDetector()
-  const lastTabStatus = new Map<string, TabActivity>()
-  const lastSessionStatus = new Map<string, TabActivity>()
-  const knownTabs = new Set<string>()
-  const knownSessions = new Set<string>()
+  const lastTabStatus = new Map<string, { status: TabActivity; sessionId: string }>()
+  const lastSessionStatus = new Map<string, SessionStatus>()
 
   const timer = setInterval(() => {
     try {
@@ -62,7 +78,8 @@ export function runStatusDetectionLoop(options: StatusDetectionLoopOptions): () 
     for (const sessionId of sessionIds) {
       seenSessions.add(sessionId)
       const tabs = options.listTabs(sessionId)
-      let aggregate: TabActivity = 'idle'
+      let working = false
+      let waiting = false
       for (const tab of tabs) {
         seenTabs.add(tab.id)
         const status = detector.classify({
@@ -72,48 +89,51 @@ export function runStatusDetectionLoop(options: StatusDetectionLoopOptions): () 
           tabId: tab.id,
           viewport: tab.viewport,
         })
-        if (status === 'working') {
-          aggregate = 'working'
-        } else if (status === 'waiting-input' && aggregate !== 'working') {
-          aggregate = 'waiting-input'
-        }
+        if (status === 'working') working = true
+        if (status === 'waiting-input') waiting = true
         const prev = lastTabStatus.get(tab.id)
-        if (prev !== status) {
-          lastTabStatus.set(tab.id, status)
-          knownTabs.add(tab.id)
+        if (!prev || prev.status !== status || prev.sessionId !== sessionId) {
+          lastTabStatus.set(tab.id, { sessionId, status })
           options.onTabStatus(tab.id, status, sessionId)
         }
       }
+      const next: SessionStatus = { waiting, working }
       const prevSession = lastSessionStatus.get(sessionId)
-      if (prevSession !== aggregate) {
-        lastSessionStatus.set(sessionId, aggregate)
-        knownSessions.add(sessionId)
-        options.onSessionStatus(sessionId, aggregate)
+      if (!prevSession || prevSession.working !== working || prevSession.waiting !== waiting) {
+        lastSessionStatus.set(sessionId, next)
+        options.onSessionStatus(sessionId, next)
       }
     }
 
-    // Forget tabs that vanished so stale entries don't hold the aggregate hostage.
-    for (const tabId of knownTabs) {
+    for (const tabId of lastTabStatus.keys()) {
       if (!seenTabs.has(tabId)) {
         detector.forget(tabId)
         lastTabStatus.delete(tabId)
-        knownTabs.delete(tabId)
       }
     }
-    for (const sessionId of knownSessions) {
+    for (const sessionId of lastSessionStatus.keys()) {
       if (!seenSessions.has(sessionId)) {
         lastSessionStatus.delete(sessionId)
-        knownSessions.delete(sessionId)
       }
     }
   }
 
-  return () => {
-    clearInterval(timer)
-    detector.clear()
-    lastTabStatus.clear()
-    lastSessionStatus.clear()
-    knownTabs.clear()
-    knownSessions.clear()
+  return {
+    getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
+    getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
+    snapshotSessions: () =>
+      [...lastSessionStatus.entries()].map(([sessionId, status]) => ({ sessionId, status })),
+    snapshotTabs: () =>
+      [...lastTabStatus.entries()].map(([tabId, entry]) => ({
+        sessionId: entry.sessionId,
+        status: entry.status,
+        tabId,
+      })),
+    stop: () => {
+      clearInterval(timer)
+      detector.clear()
+      lastTabStatus.clear()
+      lastSessionStatus.clear()
+    },
   }
 }

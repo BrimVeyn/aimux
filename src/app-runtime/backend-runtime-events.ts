@@ -1,7 +1,13 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, TabActivity, TabSession, TerminalModeState } from '../state/types'
+import type {
+  AppAction,
+  SessionStatus,
+  TabActivity,
+  TabSession,
+  TerminalModeState,
+} from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
@@ -66,7 +72,7 @@ export function bindBackendRuntimeEvents({
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 
-  const handleSessionActivity = (sessionId: string, status: TabActivity) => {
+  const handleSessionActivity = (sessionId: string, status: SessionStatus) => {
     dispatch({ sessionId, status, type: 'set-session-status' })
   }
 

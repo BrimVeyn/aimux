@@ -19,7 +19,7 @@ export class LocalSessionBackend
 {
   private readonly sessionManager = new SessionManager()
   private currentSessionId: string | null = null
-  private readonly stopDetection: () => void
+  private readonly statusLoop: ReturnType<typeof runStatusDetectionLoop>
 
   constructor() {
     super()
@@ -38,7 +38,7 @@ export class LocalSessionBackend
         this.emit('error', tabId, message)
       }
     })
-    this.stopDetection = runStatusDetectionLoop({
+    this.statusLoop = runStatusDetectionLoop({
       listSessions: () => this.sessionManager.listSessionIds(),
       listTabs: (sessionId) => this.sessionManager.listTabs(sessionId),
       onSessionStatus: (sessionId, status) => {
@@ -173,7 +173,7 @@ export class LocalSessionBackend
     if (!keepSessions && this.currentSessionId) {
       this.sessionManager.disposeSession(this.currentSessionId)
     }
-    this.stopDetection()
+    this.statusLoop.stop()
     this.currentSessionId = null
   }
 }

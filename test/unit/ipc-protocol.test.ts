@@ -122,7 +122,7 @@ describe('ipc protocol framing', () => {
     ).toMatchObject({ type: 'tabStatus' })
     expect(
       parseServerMessage({
-        payload: { sessionId: 'session-1', status: 'waiting-input' },
+        payload: { sessionId: 'session-1', status: { waiting: true, working: false } },
         type: 'sessionStatus',
       })
     ).toMatchObject({ type: 'sessionStatus' })
@@ -132,5 +132,11 @@ describe('ipc protocol framing', () => {
         type: 'tabStatus',
       })
     ).toThrow('tabStatus.status is invalid')
+    expect(() =>
+      parseServerMessage({
+        payload: { sessionId: 'session-1', status: { waiting: 1, working: true } },
+        type: 'sessionStatus',
+      })
+    ).toThrow('sessionStatus.status is invalid')
   })
 })

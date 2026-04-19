@@ -2,6 +2,7 @@ import type { EventEmitter } from 'node:events'
 
 import type {
   ScrollIntent,
+  SessionStatus,
   TabActivity,
   TabSession,
   TerminalModeState,
@@ -13,7 +14,7 @@ export type SessionBackendEvents = {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
-  sessionActivity: [sessionId: string, status: TabActivity]
+  sessionActivity: [sessionId: string, status: SessionStatus]
   tabActivity: [tabId: string, activity: TabActivity]
 }
 
