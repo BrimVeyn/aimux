@@ -12,6 +12,7 @@ import { runRestartDaemon } from './restart-daemon'
 import { runRestartTerminalManager } from './restart-terminal-manager'
 import { createSessionBackend } from './session-backend/bootstrap'
 import { runTerminalManager } from './terminal-manager/terminal-manager'
+import { BreakingUpdateScreen } from './ui/breaking-update-screen'
 import { runUpdate } from './update'
 
 const command = process.argv[2]
@@ -64,7 +65,14 @@ const renderer = await createCliRenderer({
   useMouse: true,
 })
 
-const backend = await createSessionBackend()
+const root = createRoot(renderer)
+
+const backend = await createSessionBackend({
+  onBreakingUpdateRequired: () =>
+    new Promise<void>((resolve) => {
+      root.render(<BreakingUpdateScreen onConfirm={resolve} />)
+    }),
+})
 logDebug('index.backendReady', { backend: backend.constructor.name, runtimeProfile })
 
 const resolvedConfig = await loadUserConfig()
@@ -73,4 +81,4 @@ logDebug('index.userConfigLoaded', {
   modeCount: resolvedConfig.keymaps.modes.size,
 })
 
-createRoot(renderer).render(<App backend={backend} resolvedConfig={resolvedConfig} />)
+root.render(<App backend={backend} resolvedConfig={resolvedConfig} />)
