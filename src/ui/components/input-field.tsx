@@ -1,4 +1,4 @@
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { Surface } from './surface'
 
 interface InputFieldProps {
@@ -9,15 +9,13 @@ interface InputFieldProps {
 }
 
 export function InputField({ active, cursorPos, placeholder, value }: InputFieldProps) {
-  const theme = useTheme()
-  const fg = active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
+  const t = useTokens()
+  const fg = active ? t.palette.ink : t.muted
   if (!active) {
     const showPlaceholder = !value && !!placeholder
     return (
       <Surface tone="input" padding={1}>
-        <text fg={showPlaceholder ? theme.colors['editorLineNumber.foreground'] : fg}>
-          {showPlaceholder ? placeholder : value}
-        </text>
+        <text fg={showPlaceholder ? t.faint : fg}>{showPlaceholder ? placeholder : value}</text>
       </Surface>
     )
   }
@@ -34,7 +32,7 @@ export function InputField({ active, cursorPos, placeholder, value }: InputField
     <Surface tone="inputActive" padding={1}>
       <text fg={fg}>
         {before}
-        <span bg={theme.colors['editor.foreground']} fg={theme.colors['editor.background']}>
+        <span bg={t.palette.ink} fg={t.palette.neutral}>
           {cursorDisplay}
         </span>
         {trailing}

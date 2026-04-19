@@ -57,8 +57,7 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip-bun",
-    "bump": "bun run scripts/bump.ts",
-    "generate-themes": "bun run scripts/generate-themes.ts"
+    "bump": "bun run scripts/bump.ts"
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",

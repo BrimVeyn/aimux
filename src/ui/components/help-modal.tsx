@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo } from 'react'
 import { collectHelpEntries, HELP_MODE_LABELS } from '../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { useKeymap } from '../keymap-context'
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { Picker, type PickerItem } from './picker'
 
@@ -23,7 +23,7 @@ function matchesFilter(needle: string, ...fields: (string | undefined)[]): boole
 }
 
 export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const config = useKeymap()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
   const scoped = useMemo(
@@ -54,18 +54,12 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       group: entry.modeLabel,
       key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
-        <text
-          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-          wrapMode="none"
-        >
+        <text fg={active ? t.palette.ink : t.muted} wrapMode="none">
           {entry.description ?? ''}
         </text>
       ),
       trailing: (
-        <text
-          fg={active ? theme.colors['textLink.foreground'] : theme.colors['terminal.ansiMagenta']}
-          wrapMode="none"
-        >
+        <text fg={active ? t.palette.primary : t.accent} wrapMode="none">
           {entry.keysDisplay}
         </text>
       ),
@@ -82,9 +76,7 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={theme.colors['descriptionForeground']}>
-          {filter ? 'No matching bindings.' : 'No bindings registered.'}
-        </text>
+        <text fg={t.muted}>{filter ? 'No matching bindings.' : 'No bindings registered.'}</text>
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />

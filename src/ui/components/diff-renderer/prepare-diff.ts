@@ -14,7 +14,6 @@ export interface PreparedDiff {
 
 interface PrepareOptions {
   signal?: AbortSignal
-  themeId: string
   /** Skip Shiki for big files to keep prepare under a few tens of ms. */
   skipHighlightThreshold?: number
 }
@@ -55,11 +54,11 @@ export async function prepareDiff(
 
   await yieldToEventLoop()
   throwIfAborted(opts.signal)
-  const add = await tokenizeSide(file.additionLines, filetype, opts.themeId)
+  const add = await tokenizeSide(file.additionLines, filetype)
   throwIfAborted(opts.signal)
   await yieldToEventLoop()
   throwIfAborted(opts.signal)
-  const del = await tokenizeSide(file.deletionLines, filetype, opts.themeId)
+  const del = await tokenizeSide(file.deletionLines, filetype)
   throwIfAborted(opts.signal)
 
   return { file, filetype, hash, highlights: { add, del } }

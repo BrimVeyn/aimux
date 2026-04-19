@@ -4,7 +4,7 @@ import type { TabSession } from '../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTokens, useTokens } from '../theme'
 import { ContextMenuBox } from './context-menu-box'
 
 interface TabItemProps {
@@ -16,15 +16,16 @@ interface TabItemProps {
 }
 
 function getStatusColor(status: TabSession['status']): string {
+  const t = getCurrentTokens()
   switch (status) {
     case 'running':
-      return getCurrentTheme().colors['gitDecoration.addedResourceForeground']
+      return t.palette.success
     case 'disconnected':
-      return getCurrentTheme().colors['editorWarning.foreground']
+      return t.palette.warning
     case 'error':
-      return getCurrentTheme().colors['editorError.foreground']
+      return t.palette.error
     default:
-      return getCurrentTheme().colors['descriptionForeground']
+      return t.muted
   }
 }
 
@@ -37,36 +38,33 @@ function getIndicator(active: boolean, focused: boolean, inLayout: boolean): str
 }
 
 function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean): string {
+  const t = getCurrentTokens()
   if (active) {
-    return focused
-      ? getCurrentTheme().colors['textLink.foreground']
-      : getCurrentTheme().colors['terminal.ansiMagenta']
+    return focused ? t.palette.primary : t.accent
   }
 
-  return inLayout
-    ? getCurrentTheme().colors['descriptionForeground']
-    : getCurrentTheme().colors['editor.lineHighlightBackground']
+  return inLayout ? t.muted : t.hover
 }
 
 function BusyIndicator() {
-  const theme = useTheme()
+  const t = useTokens()
   const frame = useBusySpinner()
-  return <text fg={theme.colors['textLink.foreground']}>{frame} working</text>
+  return <text fg={t.palette.primary}>{frame} working</text>
 }
 
 function WaitingIndicator() {
-  const theme = useTheme()
-  return <text fg={theme.colors['editorWarning.foreground']}>? waiting</text>
+  const t = useTokens()
+  return <text fg={t.palette.warning}>? waiting</text>
 }
 
 function ActivityIndicator({ tab }: { tab: TabSession }) {
-  const theme = useTheme()
+  const t = useTokens()
   if (tab.status === 'error') {
-    return <text fg={theme.colors['editorError.foreground']}>✗ error</text>
+    return <text fg={t.palette.error}>✗ error</text>
   }
 
   if (tab.status === 'disconnected') {
-    return <text fg={theme.colors['editorWarning.foreground']}>⏸ restore</text>
+    return <text fg={t.palette.warning}>⏸ restore</text>
   }
 
   if (tab.activity === 'working') {
@@ -78,14 +76,14 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   }
 
   if (tab.activity === 'idle') {
-    return <text fg={theme.colors['gitDecoration.addedResourceForeground']}>● idle</text>
+    return <text fg={t.palette.success}>● idle</text>
   }
 
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
 }
 
 export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)
@@ -137,11 +135,7 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       <box flexDirection="row" alignItems="center">
         <text fg={indicatorColor}>{indicator} </text>
         <box flexGrow={1}>
-          <text
-            fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-          >
-            {tab.title}
-          </text>
+          <text fg={active ? t.palette.ink : t.muted}>{tab.title}</text>
         </box>
         {hovered ? (
           <box
@@ -151,12 +145,12 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
               runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
             }}
           >
-            <text fg={theme.colors['descriptionForeground']}>×</text>
+            <text fg={t.muted}>×</text>
           </box>
         ) : null}
       </box>
       <box flexDirection="row">
-        <text fg={theme.colors['descriptionForeground']}> {label} </text>
+        <text fg={t.muted}> {label} </text>
         <ActivityIndicator tab={tab} />
       </box>
     </ContextMenuBox>

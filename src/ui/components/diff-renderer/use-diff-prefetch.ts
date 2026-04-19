@@ -108,7 +108,6 @@ export function useDiffPrefetch(
       dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })
       const prep = await prepareDiff(diff.rawDiff, task.file.path, {
         signal: task.controller.signal,
-        themeId,
       })
       if (task.controller.signal.aborted) return
       dispatchGlobal({

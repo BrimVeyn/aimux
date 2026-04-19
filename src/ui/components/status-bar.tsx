@@ -4,22 +4,21 @@ import { version as APP_VERSION } from '../../../package.json'
 import { useAppStore } from '../../state/app-store'
 import { useKeymap } from '../keymap-context'
 import { getStatusBarModel } from '../status-bar-model'
-import { getCurrentTheme, useBg, useTheme } from '../theme'
+import { getCurrentTokens, useBg, useTokens } from '../theme'
 
 function getModeColor(focusMode: AppState['focusMode']): string {
-  const t = getCurrentTheme()
+  const t = getCurrentTokens()
   switch (focusMode) {
     case 'terminal-input':
-      return t.colors['textLink.foreground']
+      return t.palette.primary
     case 'modal':
-      return t.colors['editorWarning.foreground']
     case 'command-edit':
-      return t.colors['editorWarning.foreground']
+      return t.palette.warning
     case 'git':
-      return t.colors['gitDecoration.addedResourceForeground']
+      return t.palette.success
     case 'navigation':
     default:
-      return t.colors['terminal.ansiMagenta']
+      return t.accent
   }
 }
 
@@ -40,8 +39,8 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
 }
 
 export function StatusBar() {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   const state = useAppStore((s) => s)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
   const config = useKeymap()
@@ -60,13 +59,13 @@ export function StatusBar() {
       <box width="100%" flexDirection="row">
         <text fg={getModeColor(state.focusMode)}>[{getModeLabel(state.focusMode)}]</text>
         <text> </text>
-        <text fg={theme.colors['editor.foreground']}>{model.left}</text>
+        <text fg={t.palette.ink}>{model.left}</text>
       </box>
       <box width="100%" flexDirection="row" justifyContent="space-between">
-        <text fg={theme.colors['descriptionForeground']}>{model.right}</text>
+        <text fg={t.muted}>{model.right}</text>
         <box flexDirection="row" gap={2}>
-          {model.help ? <text fg={theme.colors['descriptionForeground']}>{model.help}</text> : null}
-          <text fg={theme.colors['editor.lineHighlightBackground']}>v{APP_VERSION}</text>
+          {model.help ? <text fg={t.muted}>{model.help}</text> : null}
+          <text fg={t.hover}>v{APP_VERSION}</text>
         </box>
       </box>
     </box>

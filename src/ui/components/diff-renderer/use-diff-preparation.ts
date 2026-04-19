@@ -68,7 +68,7 @@ export function useDiffPreparation(
 
     const controller = new AbortController()
     setPreparing(true)
-    void prepareDiff(diff, path, { signal: controller.signal, themeId })
+    void prepareDiff(diff, path, { signal: controller.signal })
       .then((result) => {
         if (controller.signal.aborted) return
         setLocalFile(result.file)

@@ -1,4 +1,4 @@
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
@@ -16,7 +16,7 @@ export function SnippetEditorModal({
   snippetContent,
   snippetName,
 }: SnippetEditorModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const nameActive = activeField === 'name'
   const contentActive = activeField === 'content'
 
@@ -27,26 +27,12 @@ export function SnippetEditorModal({
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column">
-        <text
-          fg={
-            nameActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-          }
-        >
-          Name
-        </text>
+        <text fg={nameActive ? t.palette.ink : t.muted}>Name</text>
         <InputField active={nameActive} value={snippetName} />
       </box>
 
       <box flexDirection="column">
-        <text
-          fg={
-            contentActive
-              ? theme.colors['editor.foreground']
-              : theme.colors['descriptionForeground']
-          }
-        >
-          Content
-        </text>
+        <text fg={contentActive ? t.palette.ink : t.muted}>Content</text>
         <InputField active={contentActive} value={snippetContent} />
       </box>
     </ModalShell>

@@ -11,7 +11,7 @@ import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../state/git-tree'
 import { setGitDiffScroller } from '../git-view-controls'
-import { useBg, useTheme } from '../theme'
+import { useBg, useTokens } from '../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
@@ -47,25 +47,25 @@ const DiffStage = memo(function DiffStage({
   themeId,
   view,
 }: DiffStageProps) {
-  const theme = useTheme()
+  const t = useTokens()
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.colors['descriptionForeground']}>Loading diff…</text>
+        <text fg={t.muted}>Loading diff…</text>
       </box>
     )
   }
   if (!diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.colors['descriptionForeground']}>Select a file.</text>
+        <text fg={t.muted}>Select a file.</text>
       </box>
     )
   }
   if (diff.errorMessage) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.colors['editorError.foreground']}>{diff.errorMessage}</text>
+        <text fg={t.palette.error}>{diff.errorMessage}</text>
       </box>
     )
   }
@@ -74,7 +74,7 @@ const DiffStage = memo(function DiffStage({
   if (placeholder) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={theme.colors['descriptionForeground']}>{placeholder}</text>
+        <text fg={t.muted}>{placeholder}</text>
       </box>
     )
   }
@@ -83,7 +83,7 @@ const DiffStage = memo(function DiffStage({
     <box flexDirection="column" flexGrow={1} overflow="hidden">
       {diff.oldPath ? (
         <box paddingLeft={1} paddingRight={1}>
-          <text fg={theme.colors['descriptionForeground']}>
+          <text fg={t.muted}>
             renamed: {diff.oldPath} → {diff.path}
           </text>
         </box>
@@ -105,8 +105,8 @@ interface GitViewProps {
 }
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
-  const theme = useTheme()
-  const sidebarBg = useBg('sideBar.background')
+  const t = useTokens()
+  const sidebarBg = useBg('elevated')
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
@@ -193,13 +193,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
-      <text fg={theme.colors['editorWarning.foreground']}>
+      <text fg={t.palette.warning}>
         <strong>{pendingHint}</strong>
       </text>
     )
   } else if (actionMessage) {
     footerNode = actionMessage.split('\n').map((line, idx) => (
-      <text key={idx} fg={theme.colors['textLink.foreground']}>
+      <text key={idx} fg={t.palette.primary}>
         {line}
       </text>
     ))
@@ -215,26 +215,24 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           padding={0}
           gap={0}
         >
-          <text fg={theme.colors['textLink.foreground']}>
+          <text fg={t.palette.primary}>
             <strong>aimux · git</strong>
           </text>
           {gitPanel.branch ? (
             <box flexDirection="row">
-              <text fg={theme.colors['textLink.foreground']}>{'\u{e702}'} </text>
-              <text fg={theme.colors['descriptionForeground']}>{gitPanel.branch}</text>
+              <text fg={t.palette.primary}>{'\u{e702}'} </text>
+              <text fg={t.muted}>{gitPanel.branch}</text>
             </box>
           ) : null}
           {gitMode.headOffset > 0 ? (
             <box flexDirection="row" gap={1}>
-              <text fg={theme.colors['editorWarning.foreground']}>
+              <text fg={t.palette.warning}>
                 <strong>HEAD~{gitMode.headOffset}</strong>
               </text>
-              <text fg={theme.colors['descriptionForeground']}>[ newer · ] older</text>
+              <text fg={t.muted}>[ newer · ] older</text>
             </box>
           ) : null}
-          <text fg={theme.colors['editor.lineHighlightBackground']}>
-            {'·'.repeat(Math.max(0, fileBarWidth - 2))}
-          </text>
+          <text fg={t.hover}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}

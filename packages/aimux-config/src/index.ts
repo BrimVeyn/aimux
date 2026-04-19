@@ -2,15 +2,23 @@
 
 export { defineConfig } from './define-config'
 export * as actions from './actions'
+export { isKnownThemeId, migrateThemeId, THEME_IDS, THEMES } from './themes'
+export { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
+export { OPENCODE_THEME_IDS, OPENCODE_THEMES } from './themes/opencode'
 export {
-  isKnownThemeId,
-  migrateThemeId,
-  registerUserThemes,
-  THEME_IDS,
-  themes,
-  THEMES,
-} from './themes'
-export { normalizeTheme } from './normalize-theme'
+  accent,
+  border,
+  diffAddBg,
+  diffDeleteBg,
+  elevated,
+  extendPalette,
+  faint,
+  hover,
+  mix,
+  muted,
+  selected,
+} from './palette-utils'
+export { paletteToShikiTheme } from './palette-to-shiki'
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
@@ -20,7 +28,9 @@ export type {
   // Action types
   Action,
   ActionFn,
-  AimuxColorKey,
+  AimuxPalette,
+  AimuxTheme,
+  AimuxThemeConfig,
   // User-facing config
   AimuxUserConfig,
   AppAction,
@@ -49,8 +59,6 @@ export type {
   // Mode / state
   ModeId,
   ModeKeymapDef,
-  NamedTheme,
-  NamedThemeDefinition,
   // Resolved config (internal, but exported for tooling)
   ResolvedConfig,
   ResolvedKeymapConfig,
@@ -62,10 +70,6 @@ export type {
   SplitDirection,
   TabSession,
   Theme,
-  ThemeColorMap,
-  ThemeDefinition,
   ThemeId,
-  ThemeSettings,
-  ThemeTokenRule,
+  ThemeMode,
 } from './types'
-export { AIMUX_COLOR_KEYS } from './types'

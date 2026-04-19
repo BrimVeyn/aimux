@@ -1,16 +1,27 @@
-import { type BundledLanguage, type BundledTheme, createHighlighter, type Highlighter } from 'shiki'
+import {
+  type BundledLanguage,
+  createHighlighter,
+  type Highlighter,
+  type ThemeRegistrationRaw,
+} from 'shiki'
 
-import { THEMES } from './themes'
+import { getCurrentTheme } from './theme-store'
+import { paletteToShikiTheme } from './themes'
 
-// Shiki's highlighter is created with at least one real shiki-bundled theme so
-// its worker can warm up. House and user themes load on demand.
-const WARM_THEME: BundledTheme = 'catppuccin-mocha'
+function buildActiveTheme(): { id: string; raw: ThemeRegistrationRaw } {
+  const theme = getCurrentTheme()
+  const id = `${theme.name}-${theme.mode}`
+  return { id, raw: paletteToShikiTheme({ mode: theme.mode, name: id, palette: theme.palette }) }
+}
 
 let highlighterPromise: Promise<Highlighter> | null = null
+let activeThemeId: string | null = null
 
 export async function getShikiHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({ langs: [], themes: [WARM_THEME] })
+    const initial = buildActiveTheme()
+    activeThemeId = initial.id
+    highlighterPromise = createHighlighter({ langs: [], themes: [initial.raw] })
   }
   return highlighterPromise
 }
@@ -28,22 +39,19 @@ export async function ensureShikiLang(h: Highlighter, lang: string): Promise<boo
   }
 }
 
-const loadedThemes = new Set<string>([WARM_THEME])
-
 /**
- * Load the theme keyed by `id` into the shiki highlighter. The same object
- * powers the UI palette and the code highlighter — no synthesis, no mapping.
+ * Make sure the active aimux theme (light or dark, with any palette overrides)
+ * is loaded into the highlighter. Returns the registered theme name so the
+ * caller can pass it to `codeToTokens`.
  */
-export async function ensureShikiTheme(h: Highlighter, id: string): Promise<boolean> {
-  if (loadedThemes.has(id)) return true
-  const entry = THEMES[id]
-  if (!entry) return false
+export async function ensureActiveShikiTheme(h: Highlighter): Promise<string> {
+  const { id, raw } = buildActiveTheme()
+  if (id === activeThemeId) return id
   try {
-    // eslint-disable-next-line typescript/no-explicit-any
-    await h.loadTheme(entry as any)
-    loadedThemes.add(id)
-    return true
+    await h.loadTheme(raw)
+    activeThemeId = id
   } catch {
-    return false
+    // Reloading the theme is best-effort; on failure we keep using the prior id.
   }
+  return activeThemeId ?? id
 }

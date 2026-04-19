@@ -578,138 +578,40 @@ export interface ModeContext {
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 
-import type { BundledTheme } from 'shiki'
-
-export type ThemeId = BundledTheme | (string & {})
-
 /**
- * VSCode workbench color keys aimux's UI depends on. The build-time normalizer
- * guarantees every `Theme` has all of these populated.
+ * Compact opencode-style semantic palette. Required tokens cover every UI role;
+ * optional tokens fall back via helpers in `palette-utils.ts`.
  */
-export const AIMUX_COLOR_KEYS = [
-  // editor
-  'editor.background',
-  'editor.foreground',
-  'editor.lineHighlightBackground',
-  'editor.selectionBackground',
-  'editorLineNumber.foreground',
-  'editorCursor.foreground',
-  // sidebar / panels
-  'sideBar.background',
-  'sideBar.foreground',
-  'sideBarSectionHeader.background',
-  'sideBarSectionHeader.foreground',
-  'editorGroupHeader.tabsBackground',
-  'editorWidget.background',
-  'panel.background',
-  'panel.border',
-  // borders & focus
-  'focusBorder',
-  'editorGroup.border',
-  'contrastBorder',
-  // lists
-  'list.activeSelectionBackground',
-  'list.activeSelectionForeground',
-  'list.hoverBackground',
-  // text & links
-  'foreground',
-  'descriptionForeground',
-  'textLink.foreground',
-  'textLink.activeForeground',
-  // status
-  'errorForeground',
-  'editorError.foreground',
-  'editorWarning.foreground',
-  // terminal ANSI
-  'terminal.ansiRed',
-  'terminal.ansiGreen',
-  'terminal.ansiYellow',
-  'terminal.ansiBlue',
-  'terminal.ansiMagenta',
-  'terminal.ansiCyan',
-  // git decorations
-  'gitDecoration.addedResourceForeground',
-  'gitDecoration.modifiedResourceForeground',
-  'gitDecoration.deletedResourceForeground',
-  'gitDecoration.untrackedResourceForeground',
-  // diff editor
-  'diffEditor.insertedLineBackground',
-  'diffEditor.removedLineBackground',
-  // input
-  'input.background',
-  'input.foreground',
-  'input.border',
-] as const
-
-export type AimuxColorKey = (typeof AIMUX_COLOR_KEYS)[number]
-
-export type ThemeColorMap = Record<AimuxColorKey, string> & Record<string, string>
-
-export interface ThemeSettings {
-  fontStyle?: string
-  foreground?: string
-  background?: string
-  // Some bundled shiki themes include non-standard keys (e.g. `content`); allow passthrough.
-  [key: string]: string | undefined
+export interface AimuxPalette {
+  // required
+  neutral: string
+  ink: string
+  primary: string
+  success: string
+  warning: string
+  error: string
+  info: string
+  // optional
+  accent?: string
+  interactive?: string
+  diffAdd?: string
+  diffDelete?: string
 }
 
-export interface ThemeTokenRule {
-  name?: string
-  scope?: string | string[]
-  // `foreground` at the top level is used by a handful of shiki themes as a
-  // shorthand for `settings.foreground` — accept both forms.
-  foreground?: string
-  settings?: ThemeSettings
-}
+export type ThemeMode = 'light' | 'dark'
+// eslint-disable-next-line typescript/no-redundant-type-constituents
+export type ThemeId = 'aimux-light' | 'aimux-dark' | (string & {})
 
-export interface Theme {
+export interface AimuxTheme {
   name: string
+  mode: ThemeMode
   displayName: string
-  type: 'dark' | 'light'
+  palette: AimuxPalette
   fg: string
   bg: string
-  colors: ThemeColorMap
-  settings: ThemeTokenRule[]
-  tokenColors?: ThemeTokenRule[]
-  colorReplacements?: Record<string, string>
-  semanticHighlighting?: boolean
-  semanticTokenColors?: Record<
-    string,
-    | string
-    | {
-        foreground?: string
-        fontStyle?: string
-        bold?: boolean
-        italic?: boolean
-        underline?: boolean
-      }
-  >
 }
 
-/** Partial-override shape for `themes.define(name, base, overrides)`. */
-export interface ThemeDefinition {
-  base?: ThemeId
-  colors: Partial<ThemeColorMap>
-}
-
-export interface NamedThemeDefinition extends ThemeDefinition {
-  name: string
-}
-
-export interface NamedTheme extends Theme {
-  displayName: string
-}
-
-/**
- * Input shape accepted by `themes.full(...)` — lets users paste a shiki /
- * VSCode theme JSON without typing every AIMUX_COLOR_KEY. `registerUserThemes`
- * runs it through `normalizeTheme` to produce a complete `Theme`.
- */
-export interface UserThemeInput extends Partial<Omit<Theme, 'colors' | 'name' | 'displayName'>> {
-  name: string
-  displayName: string
-  colors?: Partial<ThemeColorMap> & Record<string, string | undefined>
-}
+export type Theme = AimuxTheme
 
 // ─── Backend config (stub) ────────────────────────────────────────────────────
 
@@ -823,9 +725,13 @@ export interface GitPanePaneConfig extends GitPaneBaseConfig {
 
 export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
 
+export interface AimuxThemeConfig {
+  mode?: ThemeMode
+  paletteOverrides?: Partial<AimuxPalette>
+}
+
 export interface AimuxUserConfig {
-  theme?: ThemeId
-  themes?: Record<string, NamedThemeDefinition | UserThemeInput>
+  theme?: AimuxThemeConfig
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
@@ -858,8 +764,7 @@ export interface ResolvedKeymapConfig {
 }
 
 export interface ResolvedConfig {
-  theme: ThemeId | undefined
-  themes: Record<string, NamedThemeDefinition | UserThemeInput>
+  theme: AimuxThemeConfig | undefined
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig

@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo } from 'react'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
-import { useTheme, useTransparent } from '../theme'
+import { useTokens, useTransparent } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
 import { Picker, type PickerItem } from './picker'
@@ -25,7 +25,7 @@ export function ThemePickerModal({
   filter,
   selectedIndex,
 }: ThemePickerModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const transparent = useTransparent()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -47,16 +47,8 @@ export function ThemePickerModal({
           dispatchGlobal({ type: 'close-modal' })
           runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
         },
-        title: (
-          <text
-            fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-          >
-            {entry.name}
-          </text>
-        ),
-        trailing: isCurrent ? (
-          <text fg={theme.colors['textLink.foreground']}>current</text>
-        ) : undefined,
+        title: <text fg={active ? t.palette.ink : t.muted}>{entry.displayName}</text>,
+        trailing: isCurrent ? <text fg={t.palette.primary}>current</text> : undefined,
       },
     ]
   })
@@ -70,21 +62,15 @@ export function ThemePickerModal({
       cursorPos={cursorPos}
       footer={
         <box flexDirection="column" gap={0}>
-          <text fg={theme.colors['editor.lineHighlightBackground']}>
+          <text fg={t.hover}>
             {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
           </text>
-          <text fg={theme.colors['descriptionForeground']}>
-            {` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}
-          </text>
+          <text fg={t.muted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
         </box>
       }
       items={items}
       selectedIndex={effectiveIndex}
-      emptyState={
-        <text fg={theme.colors['descriptionForeground']}>
-          {filter ? 'No matching themes.' : 'No themes available.'}
-        </text>
-      }
+      emptyState={<text fg={t.muted}>No themes available.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

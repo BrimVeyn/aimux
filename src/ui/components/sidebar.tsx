@@ -1,11 +1,9 @@
-import type { Theme } from '@brimveyn/aimux-config'
-
 import { type ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
-import { getCurrentTheme, useBg, useTheme } from '../theme'
+import { getCurrentTokens, type ThemeTokens, useBg, useTokens } from '../theme'
 import { ContextMenuBox } from './context-menu-box'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
@@ -25,19 +23,19 @@ const GUTTER_PAD = '│'
 function getRowBackground({
   alternate,
   isActive,
-  theme,
+  tokens,
 }: {
   isActive: boolean
   alternate: boolean
-  theme: Theme
+  tokens: ThemeTokens
 }): string | undefined {
-  if (isActive) return theme.colors['list.activeSelectionBackground']
-  if (alternate) return theme.colors['editor.lineHighlightBackground']
+  if (isActive) return tokens.selected
+  if (alternate) return tokens.hover
   return undefined
 }
 
 const SidebarTop = memo(function SidebarTop() {
-  const theme = useTheme()
+  const tokens = useTokens()
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
@@ -49,22 +47,20 @@ const SidebarTop = memo(function SidebarTop() {
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
-      <text fg={theme.colors['textLink.foreground']}>
+      <text fg={tokens.palette.primary}>
         <strong>aimux</strong>
       </text>
-      <text fg={theme.colors['terminal.ansiMagenta']}>
-        {currentSession ? currentSession.name : 'No session selected'}
-      </text>
+      <text fg={tokens.accent}>{currentSession ? currentSession.name : 'No session selected'}</text>
       {branch ? (
         <box flexDirection="row">
-          <text fg={theme.colors['textLink.foreground']}>{'\u{e702}'} </text>
-          <text fg={theme.colors['descriptionForeground']}>{branch}</text>
+          <text fg={tokens.palette.primary}>{'\u{e702}'} </text>
+          <text fg={tokens.muted}>{branch}</text>
         </box>
       ) : null}
       <box
         flexDirection="row"
         paddingY={1}
-        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        backgroundColor={tokens.selected}
         justifyContent="center"
         marginTop={1}
         onMouseDown={(e) => {
@@ -72,25 +68,22 @@ const SidebarTop = memo(function SidebarTop() {
           dispatchGlobal({ type: 'open-new-tab-modal' })
         }}
       >
-        <text fg={theme.colors['editor.foreground']}>+ New assistant</text>
+        <text fg={tokens.palette.ink}>+ New assistant</text>
       </box>
-      <text fg={theme.colors['editor.lineHighlightBackground']}>
-        {'·'.repeat(Math.max(0, sidebarWidth - 2))}
-      </text>
+      <text fg={tokens.hover}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
     </box>
   )
 })
 
 function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGroupEnd: boolean) {
+  const t = getCurrentTokens()
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
+      <text fg={t.accent}>
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
-        {isGroupEnd ? GUTTER_END : GUTTER_PAD}
-      </text>
+      <text fg={t.accent}>{isGroupEnd ? GUTTER_END : GUTTER_PAD}</text>
     </box>
   )
 }
@@ -100,7 +93,7 @@ interface TabsBodyProps {
 }
 
 const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
-  const theme = useTheme()
+  const tokens = useTokens()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const focusMode = useAppStore((s) => s.focusMode)
@@ -130,7 +123,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
-          <text fg={theme.colors['descriptionForeground']}>No tabs yet. Press Ctrl+n.</text>
+          <text fg={tokens.muted}>No tabs yet. Press Ctrl+n.</text>
         </box>
       ) : (
         tabs.map((tab, index) => {
@@ -146,7 +139,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           return (
             <box
               key={tab.id}
-              backgroundColor={getRowBackground({ alternate, isActive, theme })}
+              backgroundColor={getRowBackground({ alternate, isActive, tokens })}
               flexDirection="row"
               onMouseDown={(event) => {
                 event.stopPropagation()
@@ -172,8 +165,8 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 })
 
 export function Sidebar({ onTabActivate }: SidebarProps) {
-  const theme = useTheme()
-  const sidebarBg = useBg('sideBar.background')
+  const tokens = useTokens()
+  const sidebarBg = useBg('elevated')
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
@@ -191,11 +184,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.ratio) * 100)) : 1
   const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.ratio * 100)) : 0
 
-  const separator = (
-    <text fg={theme.colors['editor.lineHighlightBackground']}>
-      {'·'.repeat(Math.max(0, sidebarWidth - 2))}
-    </text>
-  )
+  const separator = <text fg={tokens.hover}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
   const gitBody = gitEmbedded ? (
     <box flexDirection="column" flexGrow={gitGrow} flexShrink={1} flexBasis={0} overflow="hidden">
       <GitPaneWidget pollingEnabled={gitPane.visible} />

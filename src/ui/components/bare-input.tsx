@@ -1,4 +1,4 @@
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 
 interface BareInputProps {
   value: string
@@ -7,10 +7,10 @@ interface BareInputProps {
 }
 
 export function BareInput({ cursorPos, placeholder = '', value }: BareInputProps) {
-  const theme = useTheme()
-  const fg = theme.colors['editor.foreground']
-  const bg = theme.colors['editor.background']
-  const placeholderFg = theme.colors['editorLineNumber.foreground']
+  const t = useTokens()
+  const fg = t.palette.ink
+  const bg = t.palette.neutral
+  const placeholderFg = t.faint
 
   if (!value) {
     const firstChar = placeholder.charAt(0) || ' '

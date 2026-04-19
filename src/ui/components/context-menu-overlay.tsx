@@ -7,12 +7,12 @@ import {
   type ContextMenuState,
   subscribeContextMenu,
 } from '../context-menu/controller'
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 
 export function ContextMenuOverlay() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [selected, setSelected] = useState(0)
-  const theme = useTheme()
+  const t = useTokens()
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
   const terminalRows = useAppStore((s) => s.layout.terminalRows)
 
@@ -51,7 +51,6 @@ export function ContextMenuOverlay() {
   if (!menu) return null
 
   const maxLabel = Math.max(...menu.items.map(([label]) => label.length))
-  // +2 horizontal padding, +2 border
   const width = maxLabel + 4
   const height = menu.items.length + 2
   const left = Math.max(0, Math.min(menu.anchorX, terminalCols - width))
@@ -78,8 +77,8 @@ export function ContextMenuOverlay() {
         width={width}
         flexDirection="column"
         border
-        borderColor={theme.colors['focusBorder']}
-        backgroundColor={theme.colors['sideBar.background']}
+        borderColor={t.palette.primary}
+        backgroundColor={t.elevated}
         onMouseDown={(e) => {
           e.stopPropagation()
         }}
@@ -93,7 +92,7 @@ export function ContextMenuOverlay() {
               flexShrink={0}
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={active ? theme.colors['list.activeSelectionBackground'] : undefined}
+              backgroundColor={active ? t.selected : undefined}
               onMouseOver={() => setSelected(index)}
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -103,12 +102,7 @@ export function ContextMenuOverlay() {
                 onSelect()
               }}
             >
-              <text
-                fg={
-                  active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-                }
-                selectable={false}
-              >
+              <text fg={active ? t.palette.ink : t.muted} selectable={false}>
                 {label}
               </text>
             </box>

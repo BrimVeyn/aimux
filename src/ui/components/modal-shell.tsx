@@ -3,7 +3,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 import { type BoxRenderable, type OptimizedBuffer, RGBA } from '@opentui/core'
 import { type ReactNode } from 'react'
 
-import { useTheme, useTransparent } from '../theme'
+import { useTokens, useTransparent } from '../theme'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 
 interface ModalShellProps {
@@ -32,16 +32,11 @@ const TRANSPARENT_RGBA = RGBA.fromValues(0, 0, 0, 0)
 //
 // `setCell` (→ `bufferSetCell` → zig `buffer.set`) bypasses both: it writes
 // the cell unconditionally, no alpha check, no blending, no char preservation.
-// That overwrites each chrome char with a space while keeping the cell bg
-// transparent, so the terminal emulator's own (blurred) window bg still shows
-// through. Children (modal content) then render on top as normal.
 function fillModalInteriorWithSpaces(this: BoxRenderable, buffer: OptimizedBuffer): void {
   const x0 = this.screenX
   const y0 = this.screenY
   const w = this.width
   const h = this.height
-  // Inset by 1 on each side so we don't erase the border that renderSelf just
-  // drew. The modal always has a single-cell border.
   const startX = x0 + 1
   const startY = y0 + 1
   const endX = x0 + w - 1
@@ -62,9 +57,9 @@ export function ModalShell({
   title,
   width,
 }: ModalShellProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const transparent = useTransparent()
-  const bg = transparent ? 'transparent' : theme.colors['sideBar.background']
+  const bg = transparent ? 'transparent' : t.elevated
   return (
     <box
       position="absolute"
@@ -77,7 +72,7 @@ export function ModalShell({
     >
       <box
         border
-        borderColor={theme.colors['focusBorder']}
+        borderColor={t.palette.primary}
         backgroundColor={bg}
         padding={1}
         width={width}
@@ -85,8 +80,8 @@ export function ModalShell({
       >
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
-            <text fg={theme.colors['terminal.ansiMagenta']}>{title}</text>
-            {subtitle ? <text fg={theme.colors['descriptionForeground']}>{subtitle}</text> : null}
+            <text fg={t.accent}>{title}</text>
+            {subtitle ? <text fg={t.muted}>{subtitle}</text> : null}
           </box>
           {children}
           {footer ? <box>{footer}</box> : null}

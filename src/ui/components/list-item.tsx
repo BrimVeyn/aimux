@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { Surface } from './surface'
 
 export type ListItemDirection = 'row' | 'column'
@@ -28,7 +28,7 @@ export function ListItem({
   title,
   trailing,
 }: ListItemProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const isRow = direction === 'row'
   return (
     <box id={id} onMouseOver={onHover} onMouseDown={onClick}>
@@ -41,15 +41,7 @@ export function ListItem({
           <box flexDirection="row">
             {isRow ? null : (
               <>
-                <text
-                  fg={
-                    active
-                      ? theme.colors['textLink.foreground']
-                      : theme.colors['editor.lineHighlightBackground']
-                  }
-                >
-                  {active ? '›' : '·'}
-                </text>
+                <text fg={active ? t.palette.primary : t.hover}>{active ? '›' : '·'}</text>
                 <text> </text>
               </>
             )}

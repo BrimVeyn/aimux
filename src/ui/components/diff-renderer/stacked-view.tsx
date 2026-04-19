@@ -13,12 +13,11 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { useBg, useTheme, useTransparent } from '../../theme'
+import { useBg, useTokens, useTransparent } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
 
-// Same cap as split-view — keeps the React child count bounded.
 const LARGE_ROW_CAP = 5000
 
 export interface StackedViewHandle {
@@ -89,13 +88,11 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
 })
 
 function TruncationNotice({ hidden }: { hidden: number }) {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.colors['editorWarning.foreground']}>
-        …diff truncated — {hidden} more rows hidden
-      </text>
+      <text fg={t.palette.warning}>…diff truncated — {hidden} more rows hidden</text>
     </box>
   )
 }
@@ -111,16 +108,14 @@ function UnifiedRowRender({
   highlights: DiffHighlights
   row: UnifiedRowOrHeader
 }) {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-        <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
-        {row.context ? (
-          <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
-        ) : null}
+        <text fg={t.muted}>{row.spec}</text>
+        {row.context ? <text fg={t.hover}> {row.context}</text> : null}
       </box>
     )
   }
@@ -133,29 +128,21 @@ function UnifiedRowRender({
     const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row" height={row.height}>
-        <text
-          fg={theme.colors['descriptionForeground']}
-        >{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={theme.colors['editor.foreground']}> </text>
+        <text fg={t.muted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
+        <text fg={t.palette.ink}> </text>
         <LineContent content={row.content} tokens={tokens} />
       </box>
     )
   }
-  const bg =
-    row.type === 'addition'
-      ? theme.colors['diffEditor.insertedLineBackground']
-      : theme.colors['diffEditor.removedLineBackground']
+  const bg = row.type === 'addition' ? t.diffAddBg : t.diffDeleteBg
   const sign = row.type === 'addition' ? '+' : '-'
-  const signColor =
-    row.type === 'addition'
-      ? theme.colors['gitDecoration.addedResourceForeground']
-      : theme.colors['editorError.foreground']
+  const signColor = row.type === 'addition' ? t.palette.success : t.palette.error
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={row.height}>
-      <text fg={theme.colors['descriptionForeground']}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
+      <text fg={t.muted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
     </box>
@@ -163,20 +150,20 @@ function UnifiedRowRender({
 }
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
-  const theme = useTheme()
+  const t = useTokens()
   if (!tokens || tokens.length === 0) {
-    return <text fg={theme.colors['editor.foreground']}>{content}</text>
+    return <text fg={t.palette.ink}>{content}</text>
   }
   return (
     <text>
-      {tokens.map((t, i) => {
-        const s = tokenToSpan(t)
+      {tokens.map((tok, i) => {
+        const s = tokenToSpan(tok)
         let attributes = 0
         if (s.bold) attributes |= TextAttributes.BOLD
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? theme.colors['editor.foreground']} attributes={attributes}>
+          <span key={i} fg={s.fg ?? t.palette.ink} attributes={attributes}>
             {s.text}
           </span>
         )

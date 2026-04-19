@@ -2,7 +2,7 @@ import type { SnippetRecord } from '../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterSnippets } from '../../state/selectors'
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { Picker, type PickerItem } from './picker'
 
@@ -27,7 +27,7 @@ export function SnippetPickerModal({
   selectedIndex,
   snippets,
 }: SnippetPickerModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const filtered = filterSnippets(snippets, filter)
 
   const items: PickerItem[] = filtered.map((snippet, index) => {
@@ -40,13 +40,9 @@ export function SnippetPickerModal({
       },
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
       onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
-      subtitle: (
-        <text fg={theme.colors['descriptionForeground']}>{truncateContent(snippet.content)}</text>
-      ),
+      subtitle: <text fg={t.muted}>{truncateContent(snippet.content)}</text>,
       title: (
-        <text
-          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-        >
+        <text fg={active ? t.palette.ink : t.muted}>
           <strong>{snippet.name}</strong>
         </text>
       ),
@@ -64,7 +60,7 @@ export function SnippetPickerModal({
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={theme.colors['descriptionForeground']}>
+        <text fg={t.muted}>
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
       }

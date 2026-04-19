@@ -13,14 +13,11 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { useBg, useTheme, useTransparent } from '../../theme'
+import { useBg, useTokens, useTransparent } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
 
-// Cap DOM size for extreme diffs. Rows beyond this are hidden behind a banner;
-// users scroll within the visible window. Shiki highlighting is already skipped
-// upstream in prepare-diff for similarly large diffs.
 const LARGE_ROW_CAP = 5000
 
 export interface SplitViewHandle {
@@ -48,7 +45,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   { contentWidth, file, foldDispatch, folds, highlights },
   ref
 ) {
-  const separatorBg = useBg('editor.background')
+  const separatorBg = useBg('base')
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
 
@@ -121,13 +118,11 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
 })
 
 function TruncationNotice({ hidden }: { hidden: number }) {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.colors['editorWarning.foreground']}>
-        …diff truncated — {hidden} more rows hidden
-      </text>
+      <text fg={t.palette.warning}>…diff truncated — {hidden} more rows hidden</text>
     </box>
   )
 }
@@ -154,14 +149,12 @@ function SideRow({
 }
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
-      {row.context ? (
-        <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
-      ) : null}
+      <text fg={t.muted}>{row.spec}</text>
+      {row.context ? <text fg={t.hover}> {row.context}</text> : null}
     </box>
   )
 }
@@ -177,29 +170,29 @@ function HalfRow({
   height: number
   tokens: ThemedToken[][]
 }) {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   const transparent = useTransparent()
   if (cell.type === 'filler') {
     return <box backgroundColor={headerBg} height={height} />
   }
   let bg: string | undefined
   let sign = ' '
-  let signColor = theme.colors['descriptionForeground']
+  let signColor = t.muted
   if (cell.type === 'addition') {
-    bg = theme.colors['diffEditor.insertedLineBackground']
+    bg = t.diffAddBg
     sign = '+'
-    signColor = theme.colors['gitDecoration.addedResourceForeground']
+    signColor = t.palette.success
   } else if (cell.type === 'deletion') {
-    bg = theme.colors['diffEditor.removedLineBackground']
+    bg = t.diffDeleteBg
     sign = '-'
-    signColor = theme.colors['editorError.foreground']
+    signColor = t.palette.error
   }
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={height}>
-      <text fg={theme.colors['descriptionForeground']}>{` ${num} `}</text>
+      <text fg={t.muted}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />
     </box>
@@ -207,20 +200,20 @@ function HalfRow({
 }
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
-  const theme = useTheme()
+  const t = useTokens()
   if (!tokens || tokens.length === 0) {
-    return <text fg={theme.colors['editor.foreground']}>{content}</text>
+    return <text fg={t.palette.ink}>{content}</text>
   }
   return (
     <text>
-      {tokens.map((t, i) => {
-        const s = tokenToSpan(t)
+      {tokens.map((tok, i) => {
+        const s = tokenToSpan(tok)
         let attributes = 0
         if (s.bold) attributes |= TextAttributes.BOLD
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? theme.colors['editor.foreground']} attributes={attributes}>
+          <span key={i} fg={s.fg ?? t.palette.ink} attributes={attributes}>
             {s.text}
           </span>
         )

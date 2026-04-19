@@ -223,7 +223,7 @@ export function RootView({
   terminalRows,
   themeId,
 }: RootViewProps) {
-  const editorBg = useBg('editor.background')
+  const editorBg = useBg('base')
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
@@ -343,7 +343,7 @@ export function RootView({
 }
 
 function GitPaneInPaneMode({ ratio }: { ratio: number }) {
-  const bg = useBg('sideBar.background')
+  const bg = useBg('elevated')
   // Ratio maps to a fixed column count (20..80), mirroring the reservation in
   // use-terminal-resize so the terminal-content area stays in sync.
   const width = Math.max(20, Math.min(80, Math.round(ratio * 80)))
