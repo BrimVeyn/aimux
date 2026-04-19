@@ -38,6 +38,8 @@ export function SnippetPickerModal({
         dispatchGlobal({ type: 'close-modal' })
         runSideEffectGlobal({ type: 'paste-selected-snippet' })
       },
+      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
+      onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
       subtitle: (
         <text fg={theme.colors['descriptionForeground']}>{truncateContent(snippet.content)}</text>
       ),

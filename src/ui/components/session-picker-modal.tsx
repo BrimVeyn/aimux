@@ -58,6 +58,7 @@ export function SessionPickerModal({
     return {
       key: session.id,
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
       subtitle: session.projectPath ? (
         <text fg={theme.colors['descriptionForeground']}>
           {abbreviatePath(session.projectPath)}
