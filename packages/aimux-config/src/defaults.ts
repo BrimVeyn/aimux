@@ -46,6 +46,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('k', actions.prevTab, 'Prev tab')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
+        .map('c', actions.openAutoCommitModal, 'Open auto-commit')
         .map('?', actions.helpModal(), 'Help')
     )
 

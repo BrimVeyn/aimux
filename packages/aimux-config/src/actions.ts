@@ -627,6 +627,14 @@ export const autoCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   return r([{ type: 'switch-create-session-field' }])
 }
 
+export const openAutoCommitModal: ActionFn = (ctx: ModeContext) => {
+  const sid = ctx.state.currentSessionId
+  if (!sid) return null
+  const suggestion = ctx.state.autoCommit.bySession[sid]
+  if (!suggestion || suggestion.kind !== 'ready') return null
+  return r([{ sessionId: sid, type: 'open-auto-commit-modal' }], [], 'modal.auto-commit')
+}
+
 export const autoCommitEnterEdit: KeyResult = r(
   [{ focusMode: 'command-edit', type: 'set-focus-mode' }],
   [],

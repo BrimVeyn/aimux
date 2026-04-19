@@ -1,3 +1,4 @@
+import { actions } from '@brimveyn/aimux-config'
 import { expect, test } from 'bun:test'
 
 import type { AppAction, AppState, AutoCommitState } from '../../src/state/types'
@@ -65,4 +66,24 @@ test('open-auto-commit-modal is a no-op when no ready suggestion exists', () => 
     type: 'open-auto-commit-modal',
   } as AppAction)
   expect(next).toBe(state)
+})
+
+test('openAutoCommitModal action returns null when no session is active', () => {
+  const state = createInitialState()
+  const result = actions.openAutoCommitModal({ state })
+  expect(result).toBeNull()
+})
+
+test('openAutoCommitModal action returns null when no ready suggestion', () => {
+  const state = { ...createInitialState(), currentSessionId: SESSION }
+  const result = actions.openAutoCommitModal({ state })
+  expect(result).toBeNull()
+})
+
+test('openAutoCommitModal action opens the modal when ready', () => {
+  const state = { ...seededState('t', 'b'), currentSessionId: SESSION }
+  const result = actions.openAutoCommitModal({ state })
+  expect(result).not.toBeNull()
+  expect(result?.actions).toEqual([{ sessionId: SESSION, type: 'open-auto-commit-modal' }])
+  expect(result?.transition).toBe('modal.auto-commit')
 })
