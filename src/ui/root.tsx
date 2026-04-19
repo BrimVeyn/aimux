@@ -93,6 +93,7 @@ function renderModal(
           currentSessionId={options.currentSessionId}
           currentTabCount={options.currentTabCount}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'session-name':
@@ -121,6 +122,7 @@ function renderModal(
           snippets={options.snippets}
           selectedIndex={modal.selectedIndex}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'snippet-editor':
@@ -138,6 +140,7 @@ function renderModal(
           selectedIndex={modal.selectedIndex}
           currentThemeId={options.themeId}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'update-available':

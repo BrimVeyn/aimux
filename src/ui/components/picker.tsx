@@ -4,6 +4,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { useTerminalDimensions } from '@opentui/react'
 import { type ReactNode, useLayoutEffect, useRef } from 'react'
 
+import { BareInput } from './bare-input'
 import { ListItem } from './list-item'
 import { ModalShell } from './modal-shell'
 
@@ -26,13 +27,17 @@ interface PickerProps {
   selectedIndex: number
   emptyState?: ReactNode
   onHover: (index: number) => void
+  filter: string | null
+  cursorPos?: number
 }
 
 const VIEWPORT_HEIGHT_RATIO = 0.6
 const MODAL_CHROME_ROWS = 6
 
 export function Picker({
+  cursorPos,
   emptyState,
+  filter,
   footer,
   gap = 0,
   items,
@@ -50,6 +55,7 @@ export function Picker({
   const scrollboxRef = useRef<ScrollBoxRenderable | null>(null)
   const isScrollingRef = useRef(false)
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const skipNextScrollRef = useRef(false)
 
   const resetScrollTimer = () => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
@@ -61,6 +67,10 @@ export function Picker({
 
   useLayoutEffect(() => {
     if (!scrollboxRef.current) return
+    if (skipNextScrollRef.current) {
+      skipNextScrollRef.current = false
+      return
+    }
     const target = items[selectedIndex]?.key
     if (!target) return
     isScrollingRef.current = true
@@ -76,6 +86,7 @@ export function Picker({
       listGap={listGap}
       footer={footer}
     >
+      <BareInput value={filter ?? ''} cursorPos={cursorPos} placeholder="Type to filter..." />
       {items.length === 0 ? (emptyState ?? null) : null}
       <scrollbox
         ref={scrollboxRef}
@@ -99,6 +110,7 @@ export function Picker({
               trailing={item.trailing}
               onHover={() => {
                 if (isScrollingRef.current) return
+                skipNextScrollRef.current = true
                 onHover(index)
               }}
               onClick={item.onClick}

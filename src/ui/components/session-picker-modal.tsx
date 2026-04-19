@@ -6,7 +6,6 @@ import { abbreviatePath } from '../path-format'
 import { orderSessionsForDisplay } from '../session-ordering'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
-import { ModalFilterBar } from './modal-filter-bar'
 import { Picker, type PickerItem } from './picker'
 
 interface SessionPickerModalProps {
@@ -15,6 +14,7 @@ interface SessionPickerModalProps {
   currentSessionId: string | null
   currentTabCount: number
   filter: string | null
+  cursorPos?: number
 }
 
 function formatSessionLine(
@@ -41,6 +41,7 @@ function getEmptyStateMessage(hasFilter: boolean): string {
 export function SessionPickerModal({
   currentSessionId,
   currentTabCount,
+  cursorPos,
   filter,
   selectedIndex,
   sessions,
@@ -96,7 +97,8 @@ export function SessionPickerModal({
       keybindsModeId="modal.session-picker"
       width={uiTokens.modalWidth.lg}
       gap={1}
-      footer={<ModalFilterBar filter={filter} />}
+      filter={filter}
+      cursorPos={cursorPos}
       items={items}
       selectedIndex={selectedIndex}
       emptyState={

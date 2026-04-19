@@ -72,10 +72,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-session-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'session-picker',
@@ -128,10 +128,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-snippet-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'snippet-picker',
@@ -159,10 +159,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-theme-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           entryCount: 0,
           selectedIndex: 0,
           sessionTargetId: null,
@@ -474,11 +474,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type === 'snippet-picker' ||
         state.modal.type === 'theme-picker'
       ) {
-        return {
-          ...state,
-          focusMode: 'modal',
-          modal: { ...state.modal, cursorPos: 0, editBuffer: null, selectedIndex: 0 },
-        }
+        // Pickers are always in filter mode — Esc closes the modal entirely.
+        return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
       return {
         ...state,

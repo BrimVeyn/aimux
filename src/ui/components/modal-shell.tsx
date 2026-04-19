@@ -42,7 +42,7 @@ export function ModalShell({
         width="100%"
         height="100%"
         backgroundColor={theme.colors['editorWidget.background']}
-        opacity={0.7}
+        opacity={0.8}
       />
       <Surface tone="elevated" padding={1} gap={1} width={width}>
         <box width="100%" flexDirection="column" gap={listGap}>

@@ -5,13 +5,13 @@ import { filterThemeIds } from '../filter-themes'
 import { useTheme } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
-import { ModalFilterBar } from './modal-filter-bar'
 import { Picker, type PickerItem } from './picker'
 
 interface ThemePickerModalProps {
   currentThemeId: ThemeId
   filter: string | null
   selectedIndex: number
+  cursorPos?: number
 }
 
 function clampSelection(index: number, count: number): number {
@@ -19,7 +19,12 @@ function clampSelection(index: number, count: number): number {
   return Math.max(0, Math.min(count - 1, index))
 }
 
-export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: ThemePickerModalProps) {
+export function ThemePickerModal({
+  currentThemeId,
+  cursorPos,
+  filter,
+  selectedIndex,
+}: ThemePickerModalProps) {
   const theme = useTheme()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -61,15 +66,12 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
       keybindsModeId="modal.theme-picker"
       width={uiTokens.modalWidth.md}
       listGap={0}
+      filter={filter}
+      cursorPos={cursorPos}
       footer={
-        <box flexDirection="column" gap={0}>
-          <text fg={theme.colors['editor.lineHighlightBackground']}>
-            {filtered.length === 0
-              ? ''
-              : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
-          </text>
-          <ModalFilterBar filter={filter} />
-        </box>
+        <text fg={theme.colors['editor.lineHighlightBackground']}>
+          {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
+        </text>
       }
       items={items}
       selectedIndex={effectiveIndex}

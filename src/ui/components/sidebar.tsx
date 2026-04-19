@@ -1,5 +1,4 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
-
+import { type ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
@@ -84,6 +83,12 @@ function renderGroupGutter(
         fg={getCurrentTheme().colors['terminal.ansiMagenta']}
         bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
       >
+        {GUTTER_PAD}
+      </text>
+      <text
+        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
+        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
+      >
         {isGroupEnd ? GUTTER_END : GUTTER_PAD}
       </text>
     </box>
@@ -139,7 +144,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
           return (
             <box
-              paddingBottom={1}
+              paddingBottom={inGroup ? 0 : 1}
               key={tab.id}
               backgroundColor={
                 isActive ? theme.colors['list.activeSelectionBackground'] : undefined

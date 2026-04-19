@@ -116,10 +116,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.help', (m) =>
       m
         .map('<Esc>', actions.closeOverlayModal, 'Close')
-        .map('j', actions.moveModalSelection(1), 'Next')
-        .map('k', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1), 'Next')
+        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('/', actions.beginHelpFilter, 'Filter')
@@ -144,10 +142,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.theme-picker', (m) =>
       m
         .map('<Esc>', actions.restoreTheme, 'Cancel')
-        .map('j', actions.previewTheme(1), 'Next')
-        .map('k', actions.previewTheme(-1), 'Prev')
-        .map('<Down>', actions.previewTheme(1))
-        .map('<Up>', actions.previewTheme(-1))
+        .map('<Down>', actions.previewTheme(1), 'Next')
+        .map('<Up>', actions.previewTheme(-1), 'Prev')
         .map('<C-n>', actions.previewTheme(1))
         .map('<C-p>', actions.previewTheme(-1))
         .map('<CR>', actions.confirmTheme, 'Confirm')
@@ -159,7 +155,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.theme-picker.filtering', (m) =>
       m
-        .map('<Esc>', actions.cancelCommandEdit('modal.theme-picker'), 'Cancel')
+        .map('<Esc>', actions.restoreTheme, 'Cancel')
         .map('<C-n>', actions.previewTheme(1), 'Next')
         .map('<C-p>', actions.previewTheme(-1), 'Prev')
         .map('<Down>', actions.previewTheme(1))
@@ -176,8 +172,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('l', actions.moveModalSelection(1), 'Next')
         .map('h', actions.moveModalSelection(-1), 'Prev')
-        .map('j', actions.moveModalSelection(1))
-        .map('k', actions.moveModalSelection(-1))
         .map('<Right>', actions.moveModalSelection(1))
         .map('<Left>', actions.moveModalSelection(-1))
         .map('<Down>', actions.moveModalSelection(1))
@@ -203,10 +197,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.new-tab', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('j', actions.moveModalSelection(1), 'Next')
-        .map('k', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1), 'Next')
+        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.launchSelectedAssistant, 'Launch')
@@ -233,10 +225,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.session-picker', (m) =>
       m
         .map('<Esc>', actions.sessionPickerEscape, 'Cancel')
-        .map('j', actions.moveModalSelection(1), 'Next')
-        .map('k', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1), 'Next')
+        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.confirmSelectedSession, 'Open')
@@ -291,10 +281,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.snippet-picker', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('j', actions.moveModalSelection(1), 'Next')
-        .map('k', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1), 'Next')
+        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.pasteSelectedSnippet, 'Send')
@@ -342,10 +330,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('modal.split-picker', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('j', actions.moveModalSelection(1), 'Next')
-        .map('k', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<Down>', actions.moveModalSelection(1), 'Next')
+        .map('<Up>', actions.moveModalSelection(-1), 'Prev')
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.confirmSplit, 'Confirm')

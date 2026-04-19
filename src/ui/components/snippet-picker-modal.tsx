@@ -4,13 +4,13 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterSnippets } from '../../state/selectors'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
-import { ModalFilterBar } from './modal-filter-bar'
 import { Picker, type PickerItem } from './picker'
 
 interface SnippetPickerModalProps {
   snippets: SnippetRecord[]
   selectedIndex: number
   filter: string | null
+  cursorPos?: number
 }
 
 const MAX_PREVIEW_LENGTH = 60
@@ -21,7 +21,12 @@ function truncateContent(content: string): string {
   return `${normalized.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
 }
 
-export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
+export function SnippetPickerModal({
+  cursorPos,
+  filter,
+  selectedIndex,
+  snippets,
+}: SnippetPickerModalProps) {
   const theme = useTheme()
   const filtered = filterSnippets(snippets, filter)
 
@@ -52,7 +57,8 @@ export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetP
       keybindsModeId="modal.snippet-picker"
       width={uiTokens.modalWidth.xl}
       gap={1}
-      footer={<ModalFilterBar filter={filter} />}
+      filter={filter}
+      cursorPos={cursorPos}
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
