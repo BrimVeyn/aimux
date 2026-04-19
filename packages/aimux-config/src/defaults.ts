@@ -1,7 +1,16 @@
-import type { ResolvedKeymapConfig } from './types'
+import type { AutoCommitConfig, ResolvedKeymapConfig } from './types'
 
 import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
+
+export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
+  enabled: true,
+  models: {
+    claude: 'claude-haiku-4-5',
+    codex: 'gpt-5-mini',
+  },
+  timeoutMs: 60_000,
+}
 
 /**
  * Build the default keymap — 1:1 transcription of all existing handlers.
@@ -361,6 +370,18 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.gitCommitReturnKey, 'Newline / confirm')
         .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: auto-commit
+    // -----------------------------------------------------------------------
+    .mode('modal.auto-commit', (m) =>
+      m
+        .map('y', actions.autoCommitAccept, 'Commit')
+        .map('Y', actions.autoCommitAccept)
+        .map('n', actions.autoCommitDismiss, 'Dismiss')
+        .map('N', actions.autoCommitDismiss)
+        .map('<Esc>', actions.autoCommitDismiss, 'Cancel')
     )
 
   return kb._build()

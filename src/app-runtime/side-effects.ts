@@ -538,6 +538,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void enqueueGitOp(() => runGitPush(ctx))
       return
     }
+    case 'auto-commit-accept': {
+      const sessionId = effect.sessionId
+      void enqueueGitOp(() => runAutoCommitAccept(ctx, sessionId))
+      return
+    }
+    case 'auto-commit-dismiss': {
+      ctx.dispatch({ type: 'close-modal' })
+      ctx.dispatch({ sessionId: effect.sessionId, type: 'auto-commit-clear' })
+      return
+    }
     case 'confirm-update-selection': {
       handleConfirmUpdateSelection(ctx)
       return
@@ -656,6 +666,39 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     return
   }
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+}
+
+async function runAutoCommitAccept(ctx: SideEffectContext, sessionId: string): Promise<void> {
+  const suggestion = ctx.state.autoCommit.bySession[sessionId]
+  if (!suggestion || suggestion.kind !== 'ready') return
+  const cwd = ctx.getCurrentSessionProjectPath()
+  if (!cwd) return
+
+  const addArgs = ['add', '-A']
+  const addResult = await $`git -C ${cwd} ${addArgs}`.quiet().nothrow()
+  if (addResult.exitCode !== 0) {
+    ctx.dispatch({
+      message: addResult.stderr.toString().trim() || 'auto-commit: git add failed',
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+
+  const commitResult = suggestion.body
+    ? await $`git -C ${cwd} commit -m ${suggestion.title} -m ${suggestion.body}`.quiet().nothrow()
+    : await $`git -C ${cwd} commit -m ${suggestion.title}`.quiet().nothrow()
+
+  if (commitResult.exitCode !== 0) {
+    ctx.dispatch({
+      message: commitResult.stderr.toString().trim() || 'auto-commit: commit failed',
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+
+  ctx.dispatch({ type: 'close-modal' })
+  ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+  ctx.dispatch({ message: `committed: ${suggestion.title}`, type: 'git-mode-set-message' })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {

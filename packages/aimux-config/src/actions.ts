@@ -574,6 +574,34 @@ export const gitPush: ActionFn = (ctx: ModeContext) => {
 
 export const gitCommitCancel: KeyResult = r([{ type: 'close-modal' }], [], 'git-mode')
 
+// ---------------------------------------------------------------------------
+// Modal: auto-commit
+// ---------------------------------------------------------------------------
+
+export const autoCommitAccept: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'auto-commit') {
+    return r([{ type: 'close-modal' }], [], 'navigation')
+  }
+  return r(
+    [{ type: 'close-modal' }],
+    [{ sessionId: modal.sessionId, type: 'auto-commit-accept' }],
+    'navigation'
+  )
+}
+
+export const autoCommitDismiss: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'auto-commit') {
+    return r([{ type: 'close-modal' }], [], 'navigation')
+  }
+  return r(
+    [{ type: 'close-modal' }],
+    [{ sessionId: modal.sessionId, type: 'auto-commit-dismiss' }],
+    'navigation'
+  )
+}
+
 export const gitCommitSubmit: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
   if (modal.type !== 'git-commit') {

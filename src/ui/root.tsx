@@ -6,6 +6,7 @@ import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { AutoCommitModal } from './components/auto-commit-modal'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
 import { GitPaneWidget } from './components/git-pane-widget'
@@ -170,6 +171,8 @@ function renderModal(
         />
       )
     }
+    case 'auto-commit':
+      return <AutoCommitModal body={modal.body} title={modal.title} />
     case null:
       return null
     default:

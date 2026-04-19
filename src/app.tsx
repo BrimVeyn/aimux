@@ -17,6 +17,7 @@ import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
 
 import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
+import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
@@ -29,7 +30,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
-import { getProfileName } from './profile-paths'
+import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { appStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
@@ -201,6 +202,13 @@ export function App({
 
   useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
+  useAutoCommitDriver({
+    config: resolvedConfig.autoCommit,
+    dispatch,
+    getProfileConfigRoot: getProfileConfigDir,
+    state,
+    stateRef,
+  })
 
   const terminalSize = useTerminalResize({
     backend,

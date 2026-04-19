@@ -196,6 +196,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'git-commit',
         },
       }
+    case 'open-auto-commit-modal': {
+      const suggestion = state.autoCommit.bySession[action.sessionId]
+      if (!suggestion || suggestion.kind !== 'ready') return state
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          body: suggestion.body,
+          cursorPos: 0,
+          editBuffer: null,
+          selectedIndex: 0,
+          sessionId: action.sessionId,
+          sessionTargetId: action.sessionId,
+          title: suggestion.title,
+          type: 'auto-commit',
+        },
+      }
+    }
     case 'begin-snippet-filter': {
       if (state.modal.type !== 'snippet-picker') {
         return state

@@ -23,6 +23,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
+  'auto-commit': 'modal.auto-commit',
   'help': 'modal.help',
   'new-tab': 'modal.new-tab',
   'session-picker': 'modal.session-picker',

@@ -25,6 +25,7 @@ export type {
   AimuxUserConfig,
   AppAction,
   AppState,
+  AutoCommitConfig,
   BackendConfig,
   BindingDef,
   FocusMode,
