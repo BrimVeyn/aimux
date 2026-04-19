@@ -58,6 +58,7 @@ export type SideEffect =
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
+  | { type: 'toggle-transparent' }
 
 export interface KeyResult {
   actions: AppAction[]

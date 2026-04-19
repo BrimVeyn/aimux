@@ -13,7 +13,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { useTheme } from '../../theme'
+import { useBg, useTheme, useTransparent } from '../../theme'
 import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
@@ -90,13 +90,9 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
 
 function TruncationNotice({ hidden }: { hidden: number }) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   return (
-    <box
-      flexDirection="row"
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
-      paddingLeft={1}
-      paddingRight={1}
-    >
+    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={theme.colors['editorWarning.foreground']}>
         …diff truncated — {hidden} more rows hidden
       </text>
@@ -116,14 +112,11 @@ function UnifiedRowRender({
   row: UnifiedRowOrHeader
 }) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
+  const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
-      <box
-        flexDirection="row"
-        backgroundColor={theme.colors['sideBarSectionHeader.background']}
-        paddingLeft={1}
-        paddingRight={1}
-      >
+      <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
         <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
         {row.context ? (
           <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
@@ -161,7 +154,7 @@ function UnifiedRowRender({
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={bg} height={row.height}>
+    <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={row.height}>
       <text fg={theme.colors['descriptionForeground']}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
