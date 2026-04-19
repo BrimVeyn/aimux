@@ -66,7 +66,6 @@ export function ThemePickerModal({
       title="Select theme"
       keybindsModeId="modal.theme-picker.filtering"
       width={uiTokens.modalWidth.md}
-      listGap={0}
       filter={filter}
       cursorPos={cursorPos}
       footer={

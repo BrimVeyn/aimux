@@ -67,7 +67,7 @@ export function createInitialState(
     activeTabId: null,
     currentSessionId: null,
     customCommands,
-    focusMode: showSessionPicker ? 'modal' : 'navigation',
+    focusMode: showSessionPicker ? 'command-edit' : 'navigation',
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: {
       ...DEFAULT_GIT_PANE,
@@ -82,7 +82,13 @@ export function createInitialState(
     },
     layoutTrees: {},
     modal: showSessionPicker
-      ? { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'session-picker' }
+      ? {
+          cursorPos: 0,
+          editBuffer: '',
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'session-picker',
+        }
       : emptyModal(),
     pendingChords: null,
     sessionBar: {
