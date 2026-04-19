@@ -1,8 +1,3 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
-
-import { useTerminalDimensions } from '@opentui/react'
-import { useLayoutEffect, useRef } from 'react'
-
 import type { SessionRecord } from '../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
@@ -11,9 +6,8 @@ import { abbreviatePath } from '../path-format'
 import { orderSessionsForDisplay } from '../session-ordering'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
-import { ListItem } from './list-item'
 import { ModalFilterBar } from './modal-filter-bar'
-import { ModalShell } from './modal-shell'
+import { Picker, type PickerItem } from './picker'
 
 interface SessionPickerModalProps {
   sessions: SessionRecord[]
@@ -22,9 +16,6 @@ interface SessionPickerModalProps {
   currentTabCount: number
   filter: string | null
 }
-
-const VIEWPORT_HEIGHT_RATIO = 0.6
-const MODAL_CHROME_ROWS = 6
 
 function formatSessionLine(
   session: SessionRecord,
@@ -55,114 +46,65 @@ export function SessionPickerModal({
   sessions,
 }: SessionPickerModalProps) {
   const theme = useTheme()
-  const dimensions = useTerminalDimensions()
   const ordered = orderSessionsForDisplay(sessions)
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
   const hasFilter = !!filter
-  const showFilteredEmptyState = filtered.length === 0 && sessions.length > 0
-  const showInitialEmptyState = filtered.length === 0 && sessions.length === 0
 
-  const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
-  const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
+  const sessionItems: PickerItem[] = filtered.map((session, index) => {
+    const active = index === selectedIndex
+    const displayIndex = baselineOrder.indexOf(session.id) + 1
+    return {
+      key: session.id,
+      onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+      subtitle: session.projectPath ? (
+        <text fg={theme.colors['descriptionForeground']}>
+          {abbreviatePath(session.projectPath)}
+        </text>
+      ) : undefined,
+      title: (
+        <text
+          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
+        >
+          {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
+        </text>
+      ),
+    }
+  })
 
-  const scrollboxRef = useRef<ScrollBoxRenderable | null>(null)
-  const isScrollingRef = useRef(false)
-  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const createNewItem: PickerItem = {
+    key: '__create-new__',
+    onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+    title: (
+      <text
+        fg={
+          selectedIndex === filtered.length
+            ? theme.colors['editor.foreground']
+            : theme.colors['descriptionForeground']
+        }
+      >
+        Create new session
+      </text>
+    ),
+  }
 
-  useLayoutEffect(() => {
-    if (!scrollboxRef.current) return
-    isScrollingRef.current = true
-    scrollboxRef.current.scrollChildIntoView(`session-item-${selectedIndex}`)
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-    scrollTimerRef.current = setTimeout(() => {
-      isScrollingRef.current = false
-      scrollTimerRef.current = null
-    }, 10)
-  }, [selectedIndex])
+  const items = [...sessionItems, createNewItem]
 
   return (
-    <ModalShell
+    <Picker
       title="Sessions"
       keybindsModeId="modal.session-picker"
       width={uiTokens.modalWidth.lg}
+      gap={1}
       footer={<ModalFilterBar filter={filter} />}
-    >
-      {showFilteredEmptyState ? (
-        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
-      ) : null}
-      {showInitialEmptyState ? (
-        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(false)}</text>
-      ) : null}
-      <scrollbox
-        ref={scrollboxRef}
-        scrollY
-        height={listHeight}
-        contentOptions={{ flexDirection: 'column', gap: 1 }}
-        onMouseScroll={() => {
-          isScrollingRef.current = true
-          if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
-          scrollTimerRef.current = setTimeout(() => {
-            isScrollingRef.current = false
-            scrollTimerRef.current = null
-          }, 100)
-        }}
-      >
-        {filtered.map((session, index) => {
-          const active = index === selectedIndex
-          const displayIndex = baselineOrder.indexOf(session.id) + 1
-          return (
-            <ListItem
-              key={session.id}
-              id={`session-item-${index}`}
-              active={active}
-              title={
-                <text
-                  fg={
-                    active
-                      ? theme.colors['editor.foreground']
-                      : theme.colors['descriptionForeground']
-                  }
-                >
-                  {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
-                </text>
-              }
-              subtitle={
-                session.projectPath ? (
-                  <text fg={theme.colors['descriptionForeground']}>
-                    {abbreviatePath(session.projectPath)}
-                  </text>
-                ) : undefined
-              }
-              onHover={() => {
-                if (isScrollingRef.current) return
-                dispatchGlobal({ index, type: 'set-modal-selection-index' })
-              }}
-              onClick={() => runSideEffectGlobal({ type: 'confirm-selected-session' })}
-            />
-          )
-        })}
-        <ListItem
-          id={`session-item-${filtered.length}`}
-          active={selectedIndex === filtered.length}
-          title={
-            <text
-              fg={
-                selectedIndex === filtered.length
-                  ? theme.colors['editor.foreground']
-                  : theme.colors['descriptionForeground']
-              }
-            >
-              Create new session
-            </text>
-          }
-          onHover={() => {
-            if (isScrollingRef.current) return
-            dispatchGlobal({ index: filtered.length, type: 'set-modal-selection-index' })
-          }}
-          onClick={() => runSideEffectGlobal({ type: 'confirm-selected-session' })}
-        />
-      </scrollbox>
-    </ModalShell>
+      items={items}
+      selectedIndex={selectedIndex}
+      emptyState={
+        filtered.length === 0 ? (
+          <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
+        ) : undefined
+      }
+      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+    />
   )
 }

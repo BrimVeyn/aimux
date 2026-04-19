@@ -139,7 +139,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
           return (
             <box
-              paddingTop={1}
+              paddingBottom={1}
               key={tab.id}
               backgroundColor={
                 isActive ? theme.colors['list.activeSelectionBackground'] : undefined
