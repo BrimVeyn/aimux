@@ -6,6 +6,7 @@ import { memo, useMemo, useRef } from 'react'
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getCurrentTheme, useBg, useTheme } from '../theme'
+import { ContextMenuBox } from './context-menu-box'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
@@ -202,12 +203,23 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   ) : null
 
   return (
-    <box
+    <ContextMenuBox
       width={sidebarWidth}
       padding={0}
       flexDirection="column"
       backgroundColor={sidebarBg}
       gap={0}
+      rightClickMenu={[
+        ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
+        ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
+        [
+          'Toggle diff mode',
+          () => {
+            dispatchGlobal({ type: 'enter-git-mode' })
+            dispatchGlobal({ type: 'git-mode-toggle-diff-view' })
+          },
+        ],
+      ]}
       onMouseDown={() => {
         if (focusMode === 'terminal-input') {
           dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
@@ -236,6 +248,6 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
           {gitBody}
         </>
       ) : null}
-    </box>
+    </ContextMenuBox>
   )
 }

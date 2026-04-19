@@ -5,6 +5,7 @@ import type { TabSession } from '../../state/types'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { getCurrentTheme, useTheme } from '../theme'
+import { ContextMenuBox } from './context-menu-box'
 
 interface TabItemProps {
   id?: string
@@ -92,7 +93,7 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
   const [hovered, setHovered] = useState(false)
 
   return (
-    <box
+    <ContextMenuBox
       id={id}
       paddingLeft={1}
       paddingRight={1}
@@ -100,6 +101,36 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       paddingBottom={0}
       flexDirection="column"
       gap={0}
+      rightClickMenu={[
+        [
+          'Rename',
+          () => {
+            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+            dispatchGlobal({ type: 'open-rename-tab-modal' })
+          },
+        ],
+        [
+          'Close',
+          () => {
+            dispatchGlobal({ tabId: tab.id, type: 'close-tab' })
+            runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
+          },
+        ],
+        [
+          'Move up',
+          () => {
+            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+            dispatchGlobal({ delta: -1, type: 'reorder-active-tab' })
+          },
+        ],
+        [
+          'Move down',
+          () => {
+            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+            dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
+          },
+        ],
+      ]}
       onMouseOver={() => setHovered(true)}
       onMouseOut={() => setHovered(false)}
     >
@@ -128,6 +159,6 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
         <text fg={theme.colors['descriptionForeground']}> {label} </text>
         <ActivityIndicator tab={tab} />
       </box>
-    </box>
+    </ContextMenuBox>
   )
 }
