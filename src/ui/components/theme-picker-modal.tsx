@@ -87,7 +87,7 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
               : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
           </text>
           <text fg={theme.colors['descriptionForeground']}>
-            {` transparent: ${transparent ? 'on' : 'off'} — press t to toggle`}
+            {` transparent: ${transparent ? 'on' : 'off'}`}
           </text>
           <ModalFilterBar filter={filter} />
         </box>
