@@ -6,6 +6,7 @@ import {
   getIpcDaemonSocketPath,
   getSocketSecurityIssue,
   removeDaemonSocketIfExists,
+  removeTerminalManagerSocketIfExists,
 } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
@@ -15,7 +16,12 @@ import {
   MessageDecoder,
   parseServerMessage,
 } from '../ipc/protocol'
-import { findIpcDaemonPid, killProcess, spawnDetachedIpcDaemon } from '../platform/daemon-control'
+import {
+  findIpcDaemonPid,
+  findTerminalManagerPid,
+  killProcess,
+  spawnDetachedIpcDaemon,
+} from '../platform/daemon-control'
 import { LocalSessionBackend } from './local-session-backend'
 import { RemoteSessionBackend } from './remote-session-backend'
 
@@ -204,6 +210,19 @@ async function restartDaemon(socketPath: string): Promise<void> {
   await spawnDaemon()
 }
 
+// Kill the terminal-manager and clear its socket so the restarted daemon
+// spawns a fresh one via ensureTerminalManagerReady. Without this, the new
+// daemon reconnects to the still-running old terminal-manager and the
+// breaking protocol mismatch persists.
+async function stopTerminalManager(): Promise<void> {
+  const pid = await findTerminalManagerPid()
+  if (pid !== null) {
+    logDebug('backend.stopTerminalManager.killing', { pid })
+    await killProcess(pid)
+  }
+  removeTerminalManagerSocketIfExists()
+}
+
 export async function createSessionBackend(opts?: {
   onBreakingUpdateRequired?: () => Promise<void>
 }): Promise<SessionBackend> {
@@ -240,6 +259,7 @@ export async function createSessionBackend(opts?: {
       socketPath,
     })
     await opts?.onBreakingUpdateRequired?.()
+    await stopTerminalManager()
     await restartDaemon(socketPath)
     const retriedHandshake = await probeDaemonProtocolCompatibility(socketPath)
     logDebug('backend.create.handshakeAfterRestart', {
