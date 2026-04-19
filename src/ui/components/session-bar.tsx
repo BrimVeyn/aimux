@@ -135,7 +135,7 @@ export function SessionBar() {
         backgroundColor={theme.colors['list.activeSelectionBackground']}
         onMouseDown={(e) => {
           e.stopPropagation()
-          dispatchGlobal({ type: 'open-create-session-modal' })
+          dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
         }}
       >
         <text fg={theme.colors['editor.foreground']} selectable={false}>

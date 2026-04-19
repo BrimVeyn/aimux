@@ -286,6 +286,7 @@ export interface ModalCreateSession extends ModalBase {
   pendingProjectPath: string | null
   activeField: 'directory' | 'name'
   nameBuffer: string
+  returnToSessionPicker: boolean
 }
 export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
@@ -366,7 +367,7 @@ export type ModalAction =
   | { type: 'update-command-edit'; char: string }
   | { type: 'commit-command-edit' }
   | { type: 'cancel-command-edit' }
-  | { type: 'open-create-session-modal' }
+  | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }

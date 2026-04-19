@@ -178,7 +178,7 @@ export const commitCommandEdit: KeyResult = r(
 export const confirmSelectedSession: KeyResult = r([], [{ type: 'confirm-selected-session' }])
 
 export const openCreateSessionModal: KeyResult = r(
-  [{ type: 'open-create-session-modal' }],
+  [{ returnToSessionPicker: true, type: 'open-create-session-modal' }],
   [],
   'modal.create-session'
 )
@@ -264,6 +264,13 @@ export const backToSessionPicker: KeyResult = r(
   [],
   'modal.session-picker'
 )
+
+export const createSessionEscape: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'create-session' && !ctx.state.modal.returnToSessionPicker) {
+    return r([{ type: 'close-modal' }], [], 'navigation')
+  }
+  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker')
+}
 
 export const backToSnippetPicker: KeyResult = r(
   [{ type: 'open-snippet-picker' }],

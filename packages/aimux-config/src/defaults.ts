@@ -275,7 +275,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.create-session', (m) =>
       m
-        .map('<Esc>', actions.backToSessionPicker, 'Cancel')
+        .map('<Esc>', actions.createSessionEscape, 'Cancel')
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.confirmCreateSession, 'Confirm')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')

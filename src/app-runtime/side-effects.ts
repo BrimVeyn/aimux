@@ -87,7 +87,7 @@ function handleSessionSelection(ctx: SideEffectContext): void {
     return
   }
 
-  dispatch({ type: 'open-create-session-modal' })
+  dispatch({ returnToSessionPicker: true, type: 'open-create-session-modal' })
 }
 
 function handleSelectedSessionDelete(ctx: SideEffectContext): void {

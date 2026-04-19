@@ -106,6 +106,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           nameBuffer: '',
           pendingProjectPath: null,
+          returnToSessionPicker: action.returnToSessionPicker,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'create-session',
@@ -311,6 +312,40 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           selectedIndex: (state.modal.selectedIndex + action.delta + optionCount) % optionCount,
         },
       }
+    }
+    case 'set-modal-selection-index': {
+      if (
+        state.modal.type !== 'new-tab' &&
+        state.modal.type !== 'session-picker' &&
+        state.modal.type !== 'snippet-picker' &&
+        state.modal.type !== 'theme-picker' &&
+        state.modal.type !== 'create-session' &&
+        state.modal.type !== 'split-picker' &&
+        state.modal.type !== 'update-available' &&
+        state.modal.type !== 'help'
+      ) {
+        return state
+      }
+      let optionCount: number
+      if (state.modal.type === 'help') {
+        optionCount = state.modal.entryCount
+      } else if (state.modal.type === 'new-tab' || state.modal.type === 'split-picker') {
+        optionCount = getAllAssistantOptions(state.customCommands).length
+      } else if (state.modal.type === 'create-session') {
+        optionCount = state.modal.directoryResults.length
+      } else if (state.modal.type === 'snippet-picker') {
+        optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
+      } else if (state.modal.type === 'theme-picker') {
+        optionCount = filterThemeIds(state.modal.editBuffer).length
+      } else if (state.modal.type === 'update-available') {
+        optionCount = 2
+      } else {
+        optionCount = Math.max(1, filterSessions(state.sessions, state.modal.editBuffer).length + 1)
+      }
+      if (optionCount === 0) return state
+      const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
+      if (clamped === state.modal.selectedIndex) return state
+      return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
     }
     case 'move-modal-cursor': {
       if (state.modal.editBuffer === null) return state
