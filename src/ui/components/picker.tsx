@@ -4,12 +4,14 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { useTerminalDimensions } from '@opentui/react'
 import { type ReactNode, useLayoutEffect, useRef } from 'react'
 
+import { useTheme } from '../theme'
 import { BareInput } from './bare-input'
 import { ListItem } from './list-item'
 import { ModalShell } from './modal-shell'
 
 export interface PickerItem {
   key: string
+  group?: string
   title: ReactNode
   subtitle?: ReactNode
   trailing?: ReactNode
@@ -48,6 +50,7 @@ export function Picker({
   title,
   width,
 }: PickerProps) {
+  const theme = useTheme()
   const dimensions = useTerminalDimensions()
   const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
   const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
@@ -98,25 +101,43 @@ export function Picker({
           resetScrollTimer()
         }}
       >
-        {items.map((item, index) => {
-          const active = index === selectedIndex
-          return (
-            <ListItem
-              key={item.key}
-              id={item.key}
-              active={active}
-              title={item.title}
-              subtitle={item.subtitle}
-              trailing={item.trailing}
-              onHover={() => {
-                if (isScrollingRef.current) return
-                skipNextScrollRef.current = true
-                onHover(index)
-              }}
-              onClick={item.onClick}
-            />
-          )
-        })}
+        {(() => {
+          let prevGroup: string | undefined
+          const nodes: ReactNode[] = []
+          for (let index = 0; index < items.length; index++) {
+            const item = items[index]
+            if (!item) continue
+            if (item.group && item.group !== prevGroup) {
+              nodes.push(
+                <box key={`group::${item.group}`} paddingLeft={1} paddingTop={index === 0 ? 0 : 1}>
+                  <text fg={theme.colors['editorWarning.foreground']} wrapMode="none">
+                    {item.group}
+                  </text>
+                </box>
+              )
+              prevGroup = item.group
+            }
+            const active = index === selectedIndex
+            const capturedIndex = index
+            nodes.push(
+              <ListItem
+                key={item.key}
+                id={item.key}
+                active={active}
+                title={item.title}
+                subtitle={item.subtitle}
+                trailing={item.trailing}
+                onHover={() => {
+                  if (isScrollingRef.current) return
+                  skipNextScrollRef.current = true
+                  onHover(capturedIndex)
+                }}
+                onClick={item.onClick}
+              />
+            )
+          }
+          return nodes
+        })()}
       </scrollbox>
     </ModalShell>
   )

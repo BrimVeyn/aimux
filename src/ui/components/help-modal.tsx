@@ -51,12 +51,8 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
   const items: PickerItem[] = filtered.map((entry, index) => {
     const active = index === selectedIndex
     return {
-      key: `${entry.mode}::${entry.keysDisplay}`,
-      subtitle: (
-        <text fg={theme.colors['editorWarning.foreground']} wrapMode="none">
-          {entry.modeLabel}
-        </text>
-      ),
+      group: entry.modeLabel,
+      key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
         <text
           fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
