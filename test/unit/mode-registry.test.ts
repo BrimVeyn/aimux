@@ -64,7 +64,7 @@ describe('transitionTo', () => {
     registerMode(
       createHandler({
         handleKey: () => null,
-        id: 'modal.help',
+        id: 'modal.help.filtering',
         onEnter: (): KeyResult => ({
           actions: [{ type: 'close-modal' }],
           effects: [{ state, type: 'quit' }],
@@ -74,15 +74,15 @@ describe('transitionTo', () => {
   })
 
   test('combines exit and enter hooks for valid transitions', () => {
-    expect(transitionTo('navigation', 'modal.help', ctx)).toEqual({
+    expect(transitionTo('navigation', 'modal.help.filtering', ctx)).toEqual({
       actions: [{ type: 'open-help-modal' }, { type: 'close-modal' }],
       effects: [{ state, type: 'quit' }],
-      transition: 'modal.help',
+      transition: 'modal.help.filtering',
     })
   })
 
   test('returns empty result for invalid transitions', () => {
-    expect(transitionTo('modal.help', 'git-mode', ctx)).toEqual({
+    expect(transitionTo('modal.help.filtering', 'git-mode', ctx)).toEqual({
       actions: [],
       effects: [],
     })

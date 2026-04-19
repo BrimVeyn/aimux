@@ -1,9 +1,11 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { Theme } from '@brimveyn/aimux-config'
 
+import { type ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
-import { getCurrentTheme, useTheme } from '../theme'
+import { dispatchGlobal } from '../../state/dispatch-ref'
+import { getCurrentTheme, useBg, useTheme } from '../theme'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
@@ -18,6 +20,20 @@ const GUTTER_START = '╭'
 const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
+
+function getRowBackground({
+  alternate,
+  isActive,
+  theme,
+}: {
+  isActive: boolean
+  alternate: boolean
+  theme: Theme
+}): string | undefined {
+  if (isActive) return theme.colors['list.activeSelectionBackground']
+  if (alternate) return theme.colors['editor.lineHighlightBackground']
+  return undefined
+}
 
 const SidebarTop = memo(function SidebarTop() {
   const theme = useTheme()
@@ -44,6 +60,19 @@ const SidebarTop = memo(function SidebarTop() {
           <text fg={theme.colors['descriptionForeground']}>{branch}</text>
         </box>
       ) : null}
+      <box
+        flexDirection="row"
+        paddingY={1}
+        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        justifyContent="center"
+        marginTop={1}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          dispatchGlobal({ type: 'open-new-tab-modal' })
+        }}
+      >
+        <text fg={theme.colors['editor.foreground']}>+ New assistant</text>
+      </box>
       <text fg={theme.colors['editor.lineHighlightBackground']}>
         {'·'.repeat(Math.max(0, sidebarWidth - 2))}
       </text>
@@ -51,25 +80,14 @@ const SidebarTop = memo(function SidebarTop() {
   )
 })
 
-function renderGroupGutter(
-  isGroupStart: boolean,
-  isGroupMiddle: boolean,
-  isGroupEnd: boolean,
-  isActive: boolean
-) {
+function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGroupEnd: boolean) {
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text
-        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
-        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
-      >
+      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text
-        fg={getCurrentTheme().colors['terminal.ansiMagenta']}
-        bg={isActive ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined}
-      >
+      <text fg={getCurrentTheme().colors['terminal.ansiMagenta']}>
         {isGroupEnd ? GUTTER_END : GUTTER_PAD}
       </text>
     </box>
@@ -116,6 +134,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
       ) : (
         tabs.map((tab, index) => {
           const isActive = tab.id === activeTabId
+          const alternate = index % 2 === 1
           const info = tabGroupInfo.get(tab.id)
           const inLayout = !!info?.inLayout
           const inGroup = info ? index >= info.groupStart && index <= info.groupEnd : false
@@ -126,12 +145,14 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           return (
             <box
               key={tab.id}
+              backgroundColor={getRowBackground({ alternate, isActive, theme })}
               flexDirection="row"
-              onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
+              onMouseDown={(event) => {
+                event.stopPropagation()
+                onTabActivate?.(tab.id)
+              }}
             >
-              {inGroup
-                ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd, isActive)
-                : null}
+              {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
               <box flexGrow={1}>
                 <TabItem
                   id={`sidebar-tab-${tab.id}`}
@@ -151,9 +172,11 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
 export function Sidebar({ onTabActivate }: SidebarProps) {
   const theme = useTheme()
+  const sidebarBg = useBg('sideBar.background')
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
+  const focusMode = useAppStore((s) => s.focusMode)
 
   if (!sidebarVisible) {
     return null
@@ -183,8 +206,13 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       width={sidebarWidth}
       padding={0}
       flexDirection="column"
-      backgroundColor={theme.colors['sideBar.background']}
+      backgroundColor={sidebarBg}
       gap={0}
+      onMouseDown={() => {
+        if (focusMode === 'terminal-input') {
+          dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
+        }
+      }}
     >
       <SidebarTop />
       {gitOnTop ? (

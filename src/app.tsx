@@ -38,7 +38,7 @@ import { loadSnippetCatalog } from './state/snippet-catalog'
 import { appReducer, createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
-import { applyTheme } from './ui/theme'
+import { applyTheme, setTransparent } from './ui/theme'
 import { isKnownThemeId, registerUserThemes, type ThemeId } from './ui/themes'
 import {
   fetchLatestNpmVersion,
@@ -76,6 +76,7 @@ export function App({
         : undefined
     const initial = persisted ?? fromConfig ?? 'aimux'
     applyTheme(initial)
+    setTransparent(config.themeTransparent ?? false)
     return initial
   })
   const [state, dispatch] = useReducer(appReducer, undefined, () => {

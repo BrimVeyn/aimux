@@ -114,17 +114,17 @@ export function getStatusBarModel(
 function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null {
   switch (modalType) {
     case 'help':
-      return 'modal.help'
+      return 'modal.help.filtering'
     case 'new-tab':
-      return 'modal.new-tab'
+      return 'modal.new-tab.command-edit'
     case 'session-picker':
-      return 'modal.session-picker'
+      return 'modal.session-picker.filtering'
     case 'snippet-picker':
-      return 'modal.snippet-picker'
+      return 'modal.snippet-picker.filtering'
     case 'split-picker':
       return 'modal.split-picker'
     case 'theme-picker':
-      return 'modal.theme-picker'
+      return 'modal.theme-picker.filtering'
     case 'update-available':
       return 'modal.update-available'
     default:

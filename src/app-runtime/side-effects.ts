@@ -24,7 +24,7 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { filterSessions, filterSnippets } from '../state/selectors'
+import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import {
   type AppAction,
@@ -36,7 +36,7 @@ import {
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
-import { applyTheme } from '../ui/theme'
+import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
 import {
   handleCreateSessionEffect,
@@ -68,9 +68,10 @@ export interface SideEffectContext {
 }
 
 function getSelectedAssistantOption(state: AppState) {
-  return (
-    getAllAssistantOptions(state.customCommands)[state.modal.selectedIndex] ?? getAssistantOption(0)
-  )
+  const all = getAllAssistantOptions(state.customCommands)
+  const filter = state.modal.type === 'new-tab' ? state.modal.editBuffer : null
+  const list = filterAssistants(all, filter)
+  return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
 }
 
 function handleSessionSelection(ctx: SideEffectContext): void {
@@ -87,7 +88,7 @@ function handleSessionSelection(ctx: SideEffectContext): void {
     return
   }
 
-  dispatch({ type: 'open-create-session-modal' })
+  dispatch({ returnToSessionPicker: true, type: 'open-create-session-modal' })
 }
 
 function handleSelectedSessionDelete(ctx: SideEffectContext): void {
@@ -143,24 +144,28 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
   }
 }
 
-function saveCustomCommandSelection(state: AppState): void {
-  const option = getAllAssistantOptions(state.customCommands)[state.modal.selectedIndex]
-  if (!option || state.modal.editBuffer === null) {
+function saveCustomCommandSelection(ctx: SideEffectContext): void {
+  const { dispatch, state } = ctx
+  if (state.modal.type !== 'new-tab' || state.modal.editingCommand === null) {
     return
   }
+  const assistantId = state.modal.editingCommand
+  if (state.modal.editBuffer === null) return
 
   const trimmed = state.modal.editBuffer.trim()
   const newCustomCommands = { ...state.customCommands }
   if (trimmed) {
-    newCustomCommands[option.id] = trimmed
+    newCustomCommands[assistantId] = trimmed
   } else {
-    delete newCustomCommands[option.id]
+    delete newCustomCommands[assistantId]
   }
 
   saveConfig({
     ...loadConfig(),
     customCommands: newCustomCommands,
   })
+  dispatch({ customCommands: newCustomCommands, type: 'set-custom-commands' })
+  dispatch({ type: 'cancel-command-edit' })
 }
 
 function applyThemeEffect(
@@ -299,6 +304,7 @@ function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
     tabId: tab.id,
   })
   dispatch({ tab, type: 'add-tab' })
+  dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
   startTabSession(
     backend,
     dispatch,
@@ -435,7 +441,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'save-custom-command': {
-      saveCustomCommandSelection(state)
+      saveCustomCommandSelection(ctx)
       return
     }
     case 'apply-theme': {
@@ -554,6 +560,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'switch-session-by-index': {
       handleSwitchSessionByIndex(ctx, effect.index)
+      return
+    }
+    case 'toggle-transparent': {
+      const next = !getTransparent()
+      setTransparent(next)
+      saveConfig({ ...loadConfig(), themeTransparent: next })
       return
     }
     default:

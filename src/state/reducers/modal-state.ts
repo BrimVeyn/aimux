@@ -6,7 +6,7 @@ import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
-import { filterSessions, filterSnippets } from '../selectors'
+import { filterAssistants, filterSessions, filterSnippets } from '../selectors'
 
 function emptyModal() {
   return {
@@ -29,15 +29,30 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-new-tab-modal':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
+          editingCommand: null,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'new-tab',
         },
       }
+    case 'open-edit-custom-command': {
+      if (state.modal.type !== 'new-tab') return state
+      const current = state.customCommands[action.assistantId] ?? ''
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          cursorPos: current.length,
+          editBuffer: current,
+          editingCommand: action.assistantId,
+        },
+      }
+    }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
@@ -47,7 +62,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           entryCount: scopedEntries.length,
           scope,
           selectedIndex: 0,
@@ -72,10 +87,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-session-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'session-picker',
@@ -106,6 +121,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           nameBuffer: '',
           pendingProjectPath: null,
+          returnToSessionPicker: action.returnToSessionPicker,
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'create-session',
@@ -127,10 +143,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-snippet-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'snippet-picker',
@@ -158,10 +174,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'open-theme-picker':
       return {
         ...state,
-        focusMode: 'modal',
+        focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
-          editBuffer: null,
+          editBuffer: '',
           entryCount: 0,
           selectedIndex: 0,
           sessionTargetId: null,
@@ -214,17 +230,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'begin-snippet-filter': {
-      if (state.modal.type !== 'snippet-picker') {
-        return state
-      }
-      const buf = state.modal.editBuffer ?? ''
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
-      }
-    }
     case 'set-help-entry-count': {
       if (state.modal.type !== 'help') return state
       if (state.modal.entryCount === action.count) {
@@ -239,16 +244,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: { ...state.modal, entryCount: action.count, selectedIndex: clamped },
       }
     }
-    case 'begin-help-filter': {
-      if (state.modal.type !== 'help') {
-        return state
-      }
-      const buf = state.modal.editBuffer ?? ''
-      return {
-        ...state,
-        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
-      }
-    }
     case 'set-theme-entry-count': {
       if (state.modal.type !== 'theme-picker') return state
       const clamped = Math.min(state.modal.selectedIndex, Math.max(0, action.count - 1))
@@ -258,17 +253,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         modal: { ...state.modal, entryCount: action.count, selectedIndex: clamped },
-      }
-    }
-    case 'begin-theme-filter': {
-      if (state.modal.type !== 'theme-picker') {
-        return state
-      }
-      const buf = state.modal.editBuffer ?? ''
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
     case 'close-modal': {
@@ -304,7 +288,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return state
       }
       let optionCount: number
-      if (state.modal.type === 'new-tab' || state.modal.type === 'split-picker') {
+      if (state.modal.type === 'new-tab') {
+        optionCount = filterAssistants(
+          getAllAssistantOptions(state.customCommands),
+          state.modal.editBuffer
+        ).length
+      } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
       } else if (state.modal.type === 'create-session') {
         optionCount = state.modal.directoryResults.length
@@ -330,6 +319,45 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'set-modal-selection-index': {
+      if (
+        state.modal.type !== 'new-tab' &&
+        state.modal.type !== 'session-picker' &&
+        state.modal.type !== 'snippet-picker' &&
+        state.modal.type !== 'theme-picker' &&
+        state.modal.type !== 'create-session' &&
+        state.modal.type !== 'split-picker' &&
+        state.modal.type !== 'update-available' &&
+        state.modal.type !== 'help'
+      ) {
+        return state
+      }
+      let optionCount: number
+      if (state.modal.type === 'help') {
+        optionCount = state.modal.entryCount
+      } else if (state.modal.type === 'new-tab') {
+        optionCount = filterAssistants(
+          getAllAssistantOptions(state.customCommands),
+          state.modal.editBuffer
+        ).length
+      } else if (state.modal.type === 'split-picker') {
+        optionCount = getAllAssistantOptions(state.customCommands).length
+      } else if (state.modal.type === 'create-session') {
+        optionCount = state.modal.directoryResults.length
+      } else if (state.modal.type === 'snippet-picker') {
+        optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
+      } else if (state.modal.type === 'theme-picker') {
+        optionCount = filterThemeIds(state.modal.editBuffer).length
+      } else if (state.modal.type === 'update-available') {
+        optionCount = 2
+      } else {
+        optionCount = Math.max(1, filterSessions(state.sessions, state.modal.editBuffer).length + 1)
+      }
+      if (optionCount === 0) return state
+      const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
+      if (clamped === state.modal.selectedIndex) return state
+      return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
+    }
     case 'move-modal-cursor': {
       if (state.modal.editBuffer === null) return state
       const len = state.modal.editBuffer.length
@@ -341,23 +369,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       next = clampCursor(next, len)
       if (next === current) return state
       return { ...state, modal: { ...state.modal, cursorPos: next } }
-    }
-    case 'begin-command-edit': {
-      if (state.modal.type !== 'new-tab' && state.modal.type !== 'session-name') {
-        return state
-      }
-      if (state.modal.type === 'session-name') {
-        return { ...state, focusMode: 'command-edit' }
-      }
-      const allOptions = getAllAssistantOptions(state.customCommands)
-      const option = allOptions[state.modal.selectedIndex]
-      const assistantId = option?.id
-      const currentCmd = (assistantId && state.customCommands[assistantId]) ?? option?.command ?? ''
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, cursorPos: currentCmd.length, editBuffer: currentCmd },
-      }
     }
     case 'update-command-edit': {
       if (state.modal.editBuffer === null) {
@@ -375,11 +386,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         nextBuffer = buffer.slice(0, cursor) + action.char + buffer.slice(cursor)
         nextCursor = cursor + action.char.length
       }
+      const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
       const resetIndex =
-        state.modal.type === 'session-picker' ||
-        state.modal.type === 'snippet-picker' ||
-        state.modal.type === 'theme-picker' ||
-        state.modal.type === 'help'
+        !isNewTabEditing &&
+        (state.modal.type === 'session-picker' ||
+          state.modal.type === 'snippet-picker' ||
+          state.modal.type === 'theme-picker' ||
+          state.modal.type === 'new-tab' ||
+          state.modal.type === 'help')
           ? 0
           : state.modal.selectedIndex
       return {
@@ -392,76 +406,30 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'commit-command-edit': {
-      if (state.modal.editBuffer === null) {
-        return state
-      }
-      if (state.modal.type === 'create-session') {
-        return state
-      }
-      if (state.modal.type === 'snippet-editor') {
-        return state
-      }
-      if (state.modal.type === 'rename-tab') {
-        return state
-      }
-      if (state.modal.type === 'session-name') {
-        return state
-      }
-      if (state.modal.type === 'session-picker' || state.modal.type === 'snippet-picker') {
-        return {
-          ...state,
-          focusMode: 'modal',
-          modal: { ...state.modal, selectedIndex: 0 },
-        }
-      }
-      if (state.modal.type !== 'new-tab') {
-        return state
-      }
-      const allOpts = getAllAssistantOptions(state.customCommands)
-      const option = allOpts[state.modal.selectedIndex]
-      const assistantId = option?.id
-      if (!assistantId) {
-        return {
-          ...state,
-          focusMode: 'modal',
-          modal: { ...state.modal, cursorPos: 0, editBuffer: null },
-        }
-      }
-      const trimmed = state.modal.editBuffer.trim()
-      const newCustomCommands = { ...state.customCommands }
-      if (trimmed) {
-        newCustomCommands[assistantId] = trimmed
-      } else {
-        delete newCustomCommands[assistantId]
-      }
-      return {
-        ...state,
-        customCommands: newCustomCommands,
-        focusMode: 'modal',
-        modal: { ...state.modal, cursorPos: 0, editBuffer: null },
-      }
-    }
     case 'cancel-command-edit': {
+      if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: 0,
+            editBuffer: '',
+            editingCommand: null,
+          },
+        }
+      }
       if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
-      if (state.modal.type === 'help') {
-        return {
-          ...state,
-          modal: { ...state.modal, cursorPos: 0, editBuffer: null, selectedIndex: 0 },
-        }
-      }
+      // Pickers and overlays with auto-filter — Esc closes the modal entirely.
       if (
         state.modal.type === 'session-picker' ||
         state.modal.type === 'snippet-picker' ||
-        state.modal.type === 'theme-picker'
+        state.modal.type === 'theme-picker' ||
+        state.modal.type === 'new-tab' ||
+        state.modal.type === 'help'
       ) {
-        return {
-          ...state,
-          focusMode: 'modal',
-          modal: { ...state.modal, cursorPos: 0, editBuffer: null, selectedIndex: 0 },
-        }
+        return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
       return {
         ...state,
@@ -540,17 +508,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
               : state.modal.nameBuffer,
           pendingProjectPath: selected.path,
         },
-      }
-    }
-    case 'begin-session-filter': {
-      if (state.modal.type !== 'session-picker') {
-        return state
-      }
-      const buf = state.modal.editBuffer ?? ''
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, cursorPos: buf.length, editBuffer: buf },
       }
     }
     case 'open-rename-tab-modal': {

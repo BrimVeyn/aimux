@@ -11,7 +11,7 @@ import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../state/git-tree'
 import { setGitDiffScroller } from '../git-view-controls'
-import { useTheme } from '../theme'
+import { useBg, useTheme } from '../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
@@ -106,6 +106,7 @@ interface GitViewProps {
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const theme = useTheme()
+  const sidebarBg = useBg('sideBar.background')
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
@@ -210,7 +211,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
         <box
           width={fileBarWidth}
           flexDirection="column"
-          backgroundColor={theme.colors['sideBar.background']}
+          backgroundColor={sidebarBg}
           padding={0}
           gap={0}
         >
@@ -254,12 +255,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
         />
       </box>
       {footerNode ? (
-        <box
-          paddingLeft={1}
-          paddingRight={1}
-          backgroundColor={theme.colors['sideBar.background']}
-          flexDirection="column"
-        >
+        <box paddingLeft={1} paddingRight={1} backgroundColor={sidebarBg} flexDirection="column">
           {footerNode}
         </box>
       ) : null}

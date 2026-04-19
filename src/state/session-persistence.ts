@@ -20,7 +20,7 @@ export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   }
 }
 
-function getDisconnectedStatus(status: WorkspaceSnapshotV1['tabs'][number]['status']): TabStatus {
+function getDisconnectedStatus(status: TabStatus): TabStatus {
   if (status === 'running' || status === 'starting') {
     return 'disconnected'
   }
@@ -61,20 +61,25 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
     return []
   }
 
-  return snapshot.tabs.map((tab) => ({
-    activity: 'idle',
-    assistant: tab.assistant,
-    buffer: tab.buffer,
-    command: tab.command,
-    errorMessage: tab.errorMessage,
-    exitCode: tab.exitCode,
-    id: tab.id,
-    scrollIntent: tab.scrollIntent ?? DEFAULT_SCROLL_INTENT,
-    status: getDisconnectedStatus(tab.status),
-    terminalModes: tab.terminalModes,
-    title: tab.title,
-    viewport: tab.viewport,
-  }))
+  return snapshot.tabs
+    .filter(
+      (tab): tab is typeof tab & { status: Exclude<typeof tab.status, 'exited'> } =>
+        tab.status !== 'exited'
+    )
+    .map((tab) => ({
+      activity: 'idle',
+      assistant: tab.assistant,
+      buffer: tab.buffer,
+      command: tab.command,
+      errorMessage: tab.errorMessage,
+      exitCode: tab.exitCode,
+      id: tab.id,
+      scrollIntent: tab.scrollIntent ?? DEFAULT_SCROLL_INTENT,
+      status: getDisconnectedStatus(tab.status),
+      terminalModes: tab.terminalModes,
+      title: tab.title,
+      viewport: tab.viewport,
+    }))
 }
 
 export function restoreLayoutTrees(

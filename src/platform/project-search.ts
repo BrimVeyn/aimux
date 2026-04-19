@@ -7,15 +7,18 @@ import type { DirectoryResult } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 
-export async function searchProjectDirectories(query: string): Promise<DirectoryResult[]> {
-  if (!query.trim()) {
-    return []
-  }
+interface DirectoryCache {
+  repoPaths: string[]
+  workspaceSet: Set<string>
+  cachedAt: number
+}
 
+const CACHE_TTL_MS = 60_000
+let directoryCache: DirectoryCache | null = null
+
+async function buildCache(): Promise<DirectoryCache> {
   const home = homedir()
-
   try {
-    // Step 1: Find all git repos (nothrow: find exits 1 on macOS permission errors)
     const gitResult =
       await $`find ${home} -maxdepth 4 -name .git -not -path '*/node_modules/*' -not -path '*/target/*' -not -path '*/dist/*' 2>/dev/null`
         .quiet()
@@ -27,7 +30,6 @@ export async function searchProjectDirectories(query: string): Promise<Directory
       .filter((line) => line.length > 0)
       .map((p) => p.replace(/\/\.git$/, ''))
 
-    // Step 2: Find workspace parents (dirs with 2+ child repos that aren't repos themselves)
     const repoSet = new Set(repoPaths)
     const parentCount = new Map<string, number>()
     for (const repo of repoPaths) {
@@ -39,10 +41,37 @@ export async function searchProjectDirectories(query: string): Promise<Directory
     const workspacePaths = [...parentCount.entries()]
       .filter(([, count]) => count >= 2)
       .map(([p]) => p)
-    const workspaceSet = new Set(workspacePaths)
 
-    // Step 3: Combine and fuzzy filter
-    const allPaths = [...repoPaths, ...workspacePaths].join('\n')
+    return { cachedAt: Date.now(), repoPaths, workspaceSet: new Set(workspacePaths) }
+  } catch (error) {
+    logDebug('platform.projectSearch.buildCache.error', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { cachedAt: Date.now(), repoPaths: [], workspaceSet: new Set() }
+  }
+}
+
+async function getOrBuildCache(): Promise<DirectoryCache> {
+  if (directoryCache && Date.now() - directoryCache.cachedAt < CACHE_TTL_MS) {
+    return directoryCache
+  }
+  directoryCache = await buildCache()
+  return directoryCache
+}
+
+export async function warmDirectoryCache(): Promise<void> {
+  await getOrBuildCache()
+}
+
+export async function searchProjectDirectories(query: string): Promise<DirectoryResult[]> {
+  if (!query.trim()) {
+    return []
+  }
+
+  try {
+    const cache = await getOrBuildCache()
+    const allPaths = [...cache.repoPaths, ...cache.workspaceSet].join('\n')
+
     const filtered =
       await $`printf '%s' ${allPaths} | fzf --filter=${query} --no-sort | head -50`.quiet()
     const resultPaths = filtered
@@ -51,12 +80,16 @@ export async function searchProjectDirectories(query: string): Promise<Directory
       .split('\n')
       .filter((line) => line.length > 0)
 
-    // Step 4: Classify each result (shortest paths first, limit to 10)
     resultPaths.sort((a, b) => a.length - b.length)
     resultPaths.splice(10)
+
+    if (resultPaths.length === 0 && query.trim().startsWith('/')) {
+      return [{ path: query.trim(), type: 'git-repo' }]
+    }
+
     return Promise.all(
       resultPaths.map(async (path) => {
-        if (workspaceSet.has(path)) {
+        if (cache.workspaceSet.has(path)) {
           return { path, type: 'workspace' as const }
         }
         const gitPath = join(path, '.git')

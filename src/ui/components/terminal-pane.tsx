@@ -6,7 +6,7 @@ import type { TerminalContentOrigin } from '../../input/raw-input-handler'
 import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../state/types'
 
 import { logInputDebug } from '../../debug/input-log'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTheme, useBg, useTheme } from '../theme'
 
 interface TerminalPaneProps {
   tab?: TabSession
@@ -125,6 +125,7 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const theme = useTheme()
+  const editorBg = useBg('editor.background')
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
@@ -185,7 +186,8 @@ export function TerminalPane({
         padding={0}
         flexDirection="column"
         flexGrow={1}
-        backgroundColor={theme.colors['editor.background']}
+        backgroundColor={editorBg}
+        onMouseDown={forwardMouseEvent}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}
         onMouseUp={forwardMouseEvent}
@@ -205,7 +207,10 @@ export function TerminalPane({
             flexDirection="column"
             flexGrow={1}
             width="100%"
-            onMouseDown={forwardMouseEvent}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              forwardMouseEvent(e)
+            }}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
@@ -214,11 +219,6 @@ export function TerminalPane({
           </box>
         )}
       </box>
-      {tab?.status === 'exited' && tab.exitCode !== undefined ? (
-        <text fg={theme.colors['editorWarning.foreground']}>
-          Process exited with code {tab.exitCode}
-        </text>
-      ) : null}
       {tab?.status === 'disconnected' ? (
         <text fg={theme.colors['editorWarning.foreground']}>
           Restored snapshot. Press Ctrl+r to restart this session.

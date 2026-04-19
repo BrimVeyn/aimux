@@ -14,10 +14,10 @@ describe('describeBindings', () => {
 
   test('filters out bindings without descriptions when requested', () => {
     const config = getDefaultKeymapConfig()
-    const withDesc = describeBindings(config, 'modal.theme-picker', {
+    const withDesc = describeBindings(config, 'modal.theme-picker.filtering', {
       withDescriptionOnly: true,
     })
-    const all = describeBindings(config, 'modal.theme-picker')
+    const all = describeBindings(config, 'modal.theme-picker.filtering')
     expect(all.length).toBeGreaterThan(withDesc.length)
     expect(withDesc.every((b) => !!b.description)).toBe(true)
   })

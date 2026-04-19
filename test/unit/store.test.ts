@@ -3,12 +3,6 @@ import { describe, expect, test } from 'bun:test'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 describe('initial state', () => {
-  test('can start in startup picker mode', () => {
-    const state = createInitialState({}, [], [], true)
-    expect(state.focusMode).toBe('modal')
-    expect(state.modal.type).toBe('session-picker')
-  })
-
   test('defaults to navigation mode without startup picker', () => {
     const state = createInitialState()
     expect(state.focusMode).toBe('navigation')
@@ -44,7 +38,7 @@ describe('appReducer', () => {
     const next = appReducer(initial, { type: 'open-session-picker' })
 
     expect(next.modal.type).toBe('session-picker')
-    expect(next.focusMode).toBe('modal')
+    expect(next.focusMode).toBe('command-edit')
   })
 
   test('loads selected session and marks it current', () => {
@@ -134,7 +128,7 @@ describe('appReducer', () => {
     const closed = appReducer(opened, { type: 'close-modal' })
 
     expect(opened.modal.type).toBe('new-tab')
-    expect(opened.focusMode).toBe('modal')
+    expect(opened.focusMode).toBe('command-edit')
     expect(closed.modal.type).toBeNull()
     expect(closed.focusMode).toBe('navigation')
   })
@@ -480,7 +474,7 @@ describe('appReducer', () => {
           errorMessage: 'boom',
           exitCode: 2,
           id: '1',
-          status: 'exited',
+          status: 'error',
           terminalModes: {
             alternateScrollMode: true,
             bracketedPasteMode: true,

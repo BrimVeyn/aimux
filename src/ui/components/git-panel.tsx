@@ -14,7 +14,7 @@ import type {
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { buildGitTreeRows, type GitTreeFileRow, type GitTreeFolderRow } from '../../state/git-tree'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTheme, getTransparent, useTheme, useTransparent } from '../theme'
 import { MagicWand } from './magic-wand'
 
 interface GitPanelProps {
@@ -161,7 +161,10 @@ function renderDiffCount(
 }
 
 function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
-  const bg = isSelected ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined
+  const bg =
+    isSelected && !getTransparent()
+      ? getCurrentTheme().colors['list.activeSelectionBackground']
+      : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -198,7 +201,10 @@ function renderFileRow(
 ): ReactNode {
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected ? getCurrentTheme().colors['list.activeSelectionBackground'] : undefined
+  const bg =
+    isSelected && !getTransparent()
+      ? getCurrentTheme().colors['list.activeSelectionBackground']
+      : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -348,6 +354,7 @@ export const GitPanel = memo(function GitPanel({
   selectedEntryKey,
 }: GitPanelProps) {
   const theme = useTheme()
+  useTransparent()
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const autoCommitSuggestion = useAppStore((s) =>

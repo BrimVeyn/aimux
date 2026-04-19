@@ -24,21 +24,15 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'auto-commit': 'modal.auto-commit',
-  'help': 'modal.help',
-  'new-tab': 'modal.new-tab',
-  'session-picker': 'modal.session-picker',
-  'snippet-picker': 'modal.snippet-picker',
   'split-picker': 'modal.split-picker',
-  'theme-picker': 'modal.theme-picker',
   'update-available': 'modal.update-available',
 }
 
 export function deriveModeId(state: AppState): ModeId {
   // Help renders as an overlay on top of git/navigation without flipping
-  // focusMode, so it needs modal-first dispatch. Filter sub-mode is tracked
-  // by editBuffer presence, not focusMode.
+  // focusMode, so it needs modal-first dispatch. Always in filter mode.
   if (state.modal.type === 'help') {
-    return state.modal.editBuffer !== null ? 'modal.help.filtering' : 'modal.help'
+    return 'modal.help.filtering'
   }
 
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]
@@ -47,6 +41,9 @@ export function deriveModeId(state: AppState): ModeId {
   }
 
   if (state.focusMode === 'command-edit') {
+    if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
+      return 'modal.new-tab.editing-command'
+    }
     const modalType = state.modal.type
     const commandEditMode = modalType ? COMMAND_EDIT_MODE_IDS[modalType] : undefined
     if (commandEditMode) {

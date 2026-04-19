@@ -1,13 +1,12 @@
 import type { SessionRecord } from '../../state/types'
 
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterSessions } from '../../state/selectors'
 import { abbreviatePath } from '../path-format'
 import { orderSessionsForDisplay } from '../session-ordering'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
-import { ListItem } from './list-item'
-import { ModalFilterBar } from './modal-filter-bar'
-import { ModalShell } from './modal-shell'
+import { Picker, type PickerItem } from './picker'
 
 interface SessionPickerModalProps {
   sessions: SessionRecord[]
@@ -15,6 +14,7 @@ interface SessionPickerModalProps {
   currentSessionId: string | null
   currentTabCount: number
   filter: string | null
+  cursorPos?: number
 }
 
 function formatSessionLine(
@@ -41,6 +41,7 @@ function getEmptyStateMessage(hasFilter: boolean): string {
 export function SessionPickerModal({
   currentSessionId,
   currentTabCount,
+  cursorPos,
   filter,
   selectedIndex,
   sessions,
@@ -50,62 +51,63 @@ export function SessionPickerModal({
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
   const hasFilter = !!filter
-  const showFilteredEmptyState = filtered.length === 0 && sessions.length > 0
-  const showInitialEmptyState = filtered.length === 0 && sessions.length === 0
+
+  const sessionItems: PickerItem[] = filtered.map((session, index) => {
+    const active = index === selectedIndex
+    const displayIndex = baselineOrder.indexOf(session.id) + 1
+    return {
+      key: session.id,
+      onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
+      subtitle: session.projectPath ? (
+        <text fg={theme.colors['descriptionForeground']}>
+          {abbreviatePath(session.projectPath)}
+        </text>
+      ) : undefined,
+      title: (
+        <text
+          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
+        >
+          {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
+        </text>
+      ),
+    }
+  })
+
+  const createNewItem: PickerItem = {
+    key: '__create-new__',
+    onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+    title: (
+      <text
+        fg={
+          selectedIndex === filtered.length
+            ? theme.colors['editor.foreground']
+            : theme.colors['descriptionForeground']
+        }
+      >
+        Create new session
+      </text>
+    ),
+  }
+
+  const items = [...sessionItems, createNewItem]
 
   return (
-    <ModalShell
+    <Picker
       title="Sessions"
-      keybindsModeId="modal.session-picker"
+      keybindsModeId="modal.session-picker.filtering"
       width={uiTokens.modalWidth.lg}
-      footer={<ModalFilterBar filter={filter} />}
-    >
-      {showFilteredEmptyState ? (
-        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
-      ) : null}
-      {showInitialEmptyState ? (
-        <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(false)}</text>
-      ) : null}
-      {filtered.map((session, index) => {
-        const active = index === selectedIndex
-        const displayIndex = baselineOrder.indexOf(session.id) + 1
-        return (
-          <ListItem
-            key={session.id}
-            active={active}
-            title={
-              <text
-                fg={
-                  active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-                }
-              >
-                {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
-              </text>
-            }
-            subtitle={
-              session.projectPath ? (
-                <text fg={theme.colors['descriptionForeground']}>
-                  {abbreviatePath(session.projectPath)}
-                </text>
-              ) : undefined
-            }
-          />
-        )
-      })}
-      <ListItem
-        active={selectedIndex === filtered.length}
-        title={
-          <text
-            fg={
-              selectedIndex === filtered.length
-                ? theme.colors['editor.foreground']
-                : theme.colors['descriptionForeground']
-            }
-          >
-            Create new session
-          </text>
-        }
-      />
-    </ModalShell>
+      gap={1}
+      filter={filter}
+      cursorPos={cursorPos}
+      items={items}
+      selectedIndex={selectedIndex}
+      emptyState={
+        filtered.length === 0 ? (
+          <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
+        ) : undefined
+      }
+      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+    />
   )
 }
