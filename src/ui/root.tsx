@@ -24,7 +24,7 @@ import { StatusBar } from './components/status-bar'
 import { TerminalPane } from './components/terminal-pane'
 import { ThemePickerModal } from './components/theme-picker-modal'
 import { UpdateAvailableModal } from './components/update-available-modal'
-import { useTheme } from './theme'
+import { useBg } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -215,7 +215,7 @@ export function RootView({
   terminalRows,
   themeId,
 }: RootViewProps) {
-  const theme = useTheme()
+  const editorBg = useBg('editor.background')
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
@@ -241,12 +241,7 @@ export function RootView({
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
   if (inGitMode) {
     return (
-      <box
-        flexDirection="column"
-        width="100%"
-        height="100%"
-        backgroundColor={theme.colors['editor.background']}
-      >
+      <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
         <GitView themeId={themeId} />
         <StatusBar />
         <PendingChordOverlay />
@@ -265,12 +260,7 @@ export function RootView({
   }
 
   return (
-    <box
-      flexDirection="column"
-      width="100%"
-      height="100%"
-      backgroundColor={theme.colors['editor.background']}
-    >
+    <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
       {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar onTabActivate={onPaneActivate} />
@@ -343,18 +333,12 @@ export function RootView({
 }
 
 function GitPaneInPaneMode({ ratio }: { ratio: number }) {
-  const theme = useTheme()
+  const bg = useBg('sideBar.background')
   // Ratio maps to a fixed column count (20..80), mirroring the reservation in
   // use-terminal-resize so the terminal-content area stays in sync.
   const width = Math.max(20, Math.min(80, Math.round(ratio * 80)))
   return (
-    <box
-      flexDirection="column"
-      width={width}
-      flexShrink={0}
-      backgroundColor={theme.colors['sideBar.background']}
-      overflow="hidden"
-    >
+    <box flexDirection="column" width={width} flexShrink={0} backgroundColor={bg} overflow="hidden">
       <GitPaneWidget pollingEnabled />
     </box>
   )

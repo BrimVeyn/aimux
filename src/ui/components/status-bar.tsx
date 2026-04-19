@@ -4,7 +4,7 @@ import { version as APP_VERSION } from '../../../package.json'
 import { useAppStore } from '../../state/app-store'
 import { useKeymap } from '../keymap-context'
 import { getStatusBarModel } from '../status-bar-model'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTheme, useBg, useTheme } from '../theme'
 
 function getModeColor(focusMode: AppState['focusMode']): string {
   const t = getCurrentTheme()
@@ -41,6 +41,7 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
 
 export function StatusBar() {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   const state = useAppStore((s) => s)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
   const config = useKeymap()
@@ -54,7 +55,7 @@ export function StatusBar() {
       paddingTop={0}
       paddingBottom={0}
       flexDirection="column"
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
+      backgroundColor={headerBg}
     >
       <box width="100%" flexDirection="row">
         <text fg={getModeColor(state.focusMode)}>[{getModeLabel(state.focusMode)}]</text>

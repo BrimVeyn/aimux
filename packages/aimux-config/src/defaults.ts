@@ -151,6 +151,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-n>', actions.previewTheme(1))
         .map('<C-p>', actions.previewTheme(-1))
         .map('<CR>', actions.confirmTheme, 'Confirm')
+        .map('t', actions.toggleTransparent, 'Toggle transparent')
         .map('/', actions.beginThemeFilter, 'Filter')
     )
 
