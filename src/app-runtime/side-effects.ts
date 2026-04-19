@@ -299,6 +299,7 @@ function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
     tabId: tab.id,
   })
   dispatch({ tab, type: 'add-tab' })
+  dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
   startTabSession(
     backend,
     dispatch,

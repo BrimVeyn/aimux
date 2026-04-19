@@ -3,6 +3,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
+import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getCurrentTheme, useTheme } from '../theme'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
@@ -127,7 +128,10 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
             <box
               key={tab.id}
               flexDirection="row"
-              onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
+              onMouseDown={(event) => {
+                event.stopPropagation()
+                onTabActivate?.(tab.id)
+              }}
             >
               {inGroup
                 ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd, isActive)
@@ -154,6 +158,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
+  const focusMode = useAppStore((s) => s.focusMode)
 
   if (!sidebarVisible) {
     return null
@@ -185,6 +190,11 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       flexDirection="column"
       backgroundColor={theme.colors['sideBar.background']}
       gap={0}
+      onMouseDown={() => {
+        if (focusMode === 'terminal-input') {
+          dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
+        }
+      }}
     >
       <SidebarTop />
       {gitOnTop ? (

@@ -186,6 +186,7 @@ export function TerminalPane({
         flexDirection="column"
         flexGrow={1}
         backgroundColor={theme.colors['editor.background']}
+        onMouseDown={forwardMouseEvent}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}
         onMouseUp={forwardMouseEvent}
@@ -205,7 +206,10 @@ export function TerminalPane({
             flexDirection="column"
             flexGrow={1}
             width="100%"
-            onMouseDown={forwardMouseEvent}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              forwardMouseEvent(e)
+            }}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
