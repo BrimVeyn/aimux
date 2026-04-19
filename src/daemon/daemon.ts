@@ -211,11 +211,12 @@ export async function runDaemon(): Promise<void> {
     },
     onTabStatus: (tabId, status, sessionId) => {
       logDebug('daemon.status.tab', { sessionId, status, tabId })
-      // Per-tab events are only useful for the client attached to that session.
-      broadcastForSession(sessionId, {
-        payload: { sessionId, status, tabId },
-        type: 'tabStatus',
-      })
+      // Broadcast to every client. Clients silently ignore events for tabIds
+      // they don't know about, so there's no UI impact — this costs one
+      // extra socket write per tab per change, which is trivial, and
+      // removes a race where in-flight tab events could be dropped when a
+      // client tears down its socket to switch sessions.
+      broadcastAll({ payload: { sessionId, status, tabId }, type: 'tabStatus' })
     },
   })
 
@@ -293,6 +294,19 @@ export async function runDaemon(): Promise<void> {
                       tab.viewport
                     )
                   }
+                  // Run a synchronous classification pass for this session
+                  // so the replay snapshot below is populated even on the
+                  // first attach to a brand-new session (the 500 ms loop
+                  // may not have ticked for it yet).
+                  statusLoop.classifyNow(
+                    message.payload.sessionId,
+                    attachResult.tabs.map((tab) => ({
+                      assistant: tab.assistant,
+                      command: tab.command,
+                      id: tab.id,
+                      viewport: tab.viewport,
+                    }))
+                  )
                   send(socket, {
                     id: message.id,
                     payload: {

@@ -48,6 +48,12 @@ export interface StatusDetectionLoopHandle {
   snapshotSessions: () => Array<{ sessionId: string; status: SessionStatus }>
   /** Snapshot of every known tab's status plus its session. */
   snapshotTabs: () => Array<{ tabId: string; sessionId: string; status: TabActivity }>
+  /**
+   * Synchronously run classification for a single session. Used on client
+   * attach so the replay snapshot is populated *before* the client reads it,
+   * rather than relying on the next scheduled tick.
+   */
+  classifyNow: (sessionId: string, tabs: LoopTabView[]) => void
 }
 
 export function runStatusDetectionLoop(
@@ -69,6 +75,39 @@ export function runStatusDetectionLoop(
   }, tickMs)
   timer.unref?.()
 
+  function classifySession(
+    sessionId: string,
+    tabs: LoopTabView[],
+    now: number,
+    seenTabs?: Set<string>
+  ): void {
+    let working = false
+    let waiting = false
+    for (const tab of tabs) {
+      seenTabs?.add(tab.id)
+      const status = detector.classify({
+        assistant: tab.assistant,
+        command: tab.command,
+        now,
+        tabId: tab.id,
+        viewport: tab.viewport,
+      })
+      if (status === 'working') working = true
+      if (status === 'waiting-input') waiting = true
+      const prev = lastTabStatus.get(tab.id)
+      if (!prev || prev.status !== status || prev.sessionId !== sessionId) {
+        lastTabStatus.set(tab.id, { sessionId, status })
+        options.onTabStatus(tab.id, status, sessionId)
+      }
+    }
+    const next: SessionStatus = { waiting, working }
+    const prevSession = lastSessionStatus.get(sessionId)
+    if (!prevSession || prevSession.working !== working || prevSession.waiting !== waiting) {
+      lastSessionStatus.set(sessionId, next)
+      options.onSessionStatus(sessionId, next)
+    }
+  }
+
   function tick(): void {
     const now = Date.now()
     const sessionIds = options.listSessions()
@@ -77,32 +116,7 @@ export function runStatusDetectionLoop(
 
     for (const sessionId of sessionIds) {
       seenSessions.add(sessionId)
-      const tabs = options.listTabs(sessionId)
-      let working = false
-      let waiting = false
-      for (const tab of tabs) {
-        seenTabs.add(tab.id)
-        const status = detector.classify({
-          assistant: tab.assistant,
-          command: tab.command,
-          now,
-          tabId: tab.id,
-          viewport: tab.viewport,
-        })
-        if (status === 'working') working = true
-        if (status === 'waiting-input') waiting = true
-        const prev = lastTabStatus.get(tab.id)
-        if (!prev || prev.status !== status || prev.sessionId !== sessionId) {
-          lastTabStatus.set(tab.id, { sessionId, status })
-          options.onTabStatus(tab.id, status, sessionId)
-        }
-      }
-      const next: SessionStatus = { waiting, working }
-      const prevSession = lastSessionStatus.get(sessionId)
-      if (!prevSession || prevSession.working !== working || prevSession.waiting !== waiting) {
-        lastSessionStatus.set(sessionId, next)
-        options.onSessionStatus(sessionId, next)
-      }
+      classifySession(sessionId, options.listTabs(sessionId), now, seenTabs)
     }
 
     for (const tabId of lastTabStatus.keys()) {
@@ -119,6 +133,9 @@ export function runStatusDetectionLoop(
   }
 
   return {
+    classifyNow: (sessionId, tabs) => {
+      classifySession(sessionId, tabs, Date.now())
+    },
     getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
     snapshotSessions: () =>

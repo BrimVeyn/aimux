@@ -138,7 +138,6 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
                   tab={tab}
                   active={isActive}
                   focused={focusMode === 'navigation'}
-                  isFocusedInput={isActive && focusMode === 'terminal-input'}
                   inLayout={inLayout}
                 />
               </box>

@@ -165,10 +165,7 @@ function SessionChip({
   status,
 }: SessionChipProps) {
   const theme = useTheme()
-  // Active session suppresses its own working spinner (user is already
-  // looking at it) but still surfaces the waiting-input glyph — it's an
-  // actionable prompt.
-  const showSpinner = status.working && !active
+  const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
   const labelColor = active
