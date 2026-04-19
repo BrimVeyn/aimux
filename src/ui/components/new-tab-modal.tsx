@@ -1,4 +1,5 @@
 import { getAllAssistantOptions } from '../../pty/command-registry'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
@@ -27,36 +28,40 @@ export function NewTabModal({ customCommands, editBuffer, selectedIndex }: NewTa
       {isEditing ? (
         <InputField active value={editBuffer ?? ''} />
       ) : (
-        options.map((option, index) => {
-          const active = index === selectedIndex
-          const customCmd = customCommands[option.id]
+        <box flexDirection="column" gap={1}>
+          {options.map((option, index) => {
+            const active = index === selectedIndex
+            const customCmd = customCommands[option.id]
 
-          return (
-            <ListItem
-              key={option.id}
-              active={active}
-              title={
-                <text
-                  fg={
-                    active
-                      ? theme.colors['editor.foreground']
-                      : theme.colors['descriptionForeground']
-                  }
-                >
-                  {option.label}
-                </text>
-              }
-              subtitle={
-                <box flexDirection="column">
-                  <text fg={theme.colors['descriptionForeground']}>{option.description}</text>
-                  {customCmd ? (
-                    <text fg={theme.colors['textLink.foreground']}>{customCmd}</text>
-                  ) : null}
-                </box>
-              }
-            />
-          )
-        })
+            return (
+              <ListItem
+                key={option.id}
+                active={active}
+                title={
+                  <text
+                    fg={
+                      active
+                        ? theme.colors['editor.foreground']
+                        : theme.colors['descriptionForeground']
+                    }
+                  >
+                    {option.label}
+                  </text>
+                }
+                subtitle={
+                  <box flexDirection="column">
+                    <text fg={theme.colors['descriptionForeground']}>{option.description}</text>
+                    {customCmd ? (
+                      <text fg={theme.colors['textLink.foreground']}>{customCmd}</text>
+                    ) : null}
+                  </box>
+                }
+                onHover={() => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+                onClick={() => runSideEffectGlobal({ type: 'launch-selected-assistant' })}
+              />
+            )
+          })}
+        </box>
       )}
     </ModalShell>
   )

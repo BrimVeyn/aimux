@@ -1,7 +1,9 @@
+import type { ScrollBoxRenderable } from '@opentui/core'
+
 import { useTerminalDimensions } from '@opentui/react'
 import { useLayoutEffect, useMemo, useRef } from 'react'
 
-import { dispatchGlobal } from '../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
 import { useTheme } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
@@ -24,26 +26,6 @@ function clampSelection(index: number, count: number): number {
   return Math.max(0, Math.min(count - 1, index))
 }
 
-function computeWindowStart(
-  prevStart: number,
-  selectedRowIndex: number,
-  total: number,
-  windowSize: number
-): number {
-  if (total <= windowSize) return 0
-  const margin = 1
-  const maxStart = total - windowSize
-  let start = Math.max(0, Math.min(maxStart, prevStart))
-  const topThreshold = start + margin
-  const bottomThreshold = start + windowSize - 1 - margin
-  if (selectedRowIndex < topThreshold) {
-    start = Math.max(0, selectedRowIndex - margin)
-  } else if (selectedRowIndex > bottomThreshold) {
-    start = Math.min(maxStart, selectedRowIndex - windowSize + 1 + margin)
-  }
-  return start
-}
-
 export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: ThemePickerModalProps) {
   const theme = useTheme()
   const dimensions = useTerminalDimensions()
@@ -57,20 +39,20 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
   const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
   const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
 
-  const prevStartRef = useRef(0)
-  const prevFilterRef = useRef<string | null>(filter)
-  if (prevFilterRef.current !== filter) {
-    prevFilterRef.current = filter
-    prevStartRef.current = 0
-  }
-  const start = computeWindowStart(
-    prevStartRef.current,
-    effectiveIndex,
-    filtered.length,
-    listHeight
-  )
-  prevStartRef.current = start
-  const visible = filtered.slice(start, start + listHeight)
+  const scrollboxRef = useRef<ScrollBoxRenderable | null>(null)
+  const isScrollingRef = useRef(false)
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useLayoutEffect(() => {
+    if (!scrollboxRef.current) return
+    isScrollingRef.current = true
+    scrollboxRef.current.scrollChildIntoView(`theme-item-${effectiveIndex}`)
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+    scrollTimerRef.current = setTimeout(() => {
+      isScrollingRef.current = false
+      scrollTimerRef.current = null
+    }, 10)
+  }, [effectiveIndex])
 
   return (
     <ModalShell
@@ -94,9 +76,21 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
           {filter ? 'No matching themes.' : 'No themes available.'}
         </text>
       ) : (
-        <box height={listHeight} flexDirection="column" overflow="hidden">
-          {visible.map((id, i) => {
-            const rowIndex = start + i
+        <scrollbox
+          ref={scrollboxRef}
+          scrollY
+          height={listHeight}
+          contentOptions={{ flexDirection: 'column' }}
+          onMouseScroll={() => {
+            isScrollingRef.current = true
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
+            scrollTimerRef.current = setTimeout(() => {
+              isScrollingRef.current = false
+              scrollTimerRef.current = null
+            }, 100)
+          }}
+        >
+          {filtered.map((id, rowIndex) => {
             const entry = THEMES[id]
             if (!entry) return null
             const active = rowIndex === effectiveIndex
@@ -104,6 +98,7 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
             return (
               <ListItem
                 key={id}
+                id={`theme-item-${rowIndex}`}
                 active={active}
                 title={
                   <text
@@ -121,10 +116,18 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
                     <text fg={theme.colors['textLink.foreground']}>current</text>
                   ) : undefined
                 }
+                onHover={() => {
+                  if (isScrollingRef.current) return
+                  dispatchGlobal({ index: rowIndex, type: 'set-modal-selection-index' })
+                }}
+                onClick={() => {
+                  dispatchGlobal({ type: 'close-modal' })
+                  runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
+                }}
               />
             )
           })}
-        </box>
+        </scrollbox>
       )}
     </ModalShell>
   )

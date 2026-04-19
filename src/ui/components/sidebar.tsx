@@ -47,8 +47,7 @@ const SidebarTop = memo(function SidebarTop() {
       ) : null}
       <box
         flexDirection="row"
-        border
-        borderColor={theme.colors['terminal.ansiMagenta']}
+        paddingY={1}
         backgroundColor={theme.colors['list.activeSelectionBackground']}
         justifyContent="center"
         marginTop={1}
@@ -140,7 +139,11 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
           return (
             <box
+              paddingTop={1}
               key={tab.id}
+              backgroundColor={
+                isActive ? theme.colors['list.activeSelectionBackground'] : undefined
+              }
               flexDirection="row"
               onMouseDown={(event) => {
                 event.stopPropagation()
