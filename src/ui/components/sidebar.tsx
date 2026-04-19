@@ -144,7 +144,6 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
           return (
             <box
-              paddingBottom={inGroup ? 0 : 1}
               key={tab.id}
               backgroundColor={getRowBackground({ alternate, isActive, theme })}
               flexDirection="row"
