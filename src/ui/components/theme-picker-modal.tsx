@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
-import { useTheme } from '../theme'
+import { useTheme, useTransparent } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
 import { ListItem } from './list-item'
@@ -46,6 +46,7 @@ function computeWindowStart(
 
 export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: ThemePickerModalProps) {
   const theme = useTheme()
+  const transparent = useTransparent()
   const dimensions = useTerminalDimensions()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -84,6 +85,9 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
             {filtered.length === 0
               ? ''
               : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
+          </text>
+          <text fg={theme.colors['descriptionForeground']}>
+            {` transparent: ${transparent ? 'on' : 'off'}`}
           </text>
           <ModalFilterBar filter={filter} />
         </box>

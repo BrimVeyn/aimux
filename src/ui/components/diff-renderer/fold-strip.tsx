@@ -1,4 +1,4 @@
-import { useTheme } from '../../theme'
+import { useBg, useTheme } from '../../theme'
 import { FOLD_STEP, type FoldInfo } from './build-rows'
 import { type FoldDispatch } from './pierre-diff'
 
@@ -9,13 +9,9 @@ interface Props {
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
   const theme = useTheme()
+  const bg = useBg('sideBar.background')
   return (
-    <box
-      paddingLeft={1}
-      paddingRight={1}
-      backgroundColor={theme.colors['sideBar.background']}
-      onMouseDown={onPress}
-    >
+    <box paddingLeft={1} paddingRight={1} backgroundColor={bg} onMouseDown={onPress}>
       <text fg={theme.colors['textLink.foreground']}>{label}</text>
     </box>
   )
@@ -27,6 +23,7 @@ function Spacer() {
 
 export function FoldStrip({ dispatch, fold }: Props) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   const { bottomExpanded, foldId, hidden, topExpanded, total } = fold
   const stepUp = Math.min(FOLD_STEP, hidden)
   const stepDown = Math.min(FOLD_STEP, hidden)
@@ -73,12 +70,7 @@ export function FoldStrip({ dispatch, fold }: Props) {
   }
 
   return (
-    <box
-      flexDirection="row"
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
-      paddingLeft={1}
-      paddingRight={1}
-    >
+    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={theme.colors['descriptionForeground']}>{`⋯ ${hidden} hidden `}</text>
       {controls}
     </box>

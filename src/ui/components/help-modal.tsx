@@ -10,7 +10,7 @@ import {
 } from '../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { useKeymap } from '../keymap-context'
-import { useTheme } from '../theme'
+import { useBg, useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { ModalFilterBar } from './modal-filter-bar'
 import { ModalShell } from './modal-shell'
@@ -87,6 +87,7 @@ function computeWindowStart(
 
 export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
   const theme = useTheme()
+  const selectionBg = useBg('list.activeSelectionBackground')
   const config = useKeymap()
   const dimensions = useTerminalDimensions()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
@@ -162,7 +163,7 @@ export function HelpModal({ filter, scope, selectedIndex }: HelpModalProps) {
               )
             }
             const active = row.entryIndex === effectiveIndex
-            const bg = active ? theme.colors['list.activeSelectionBackground'] : undefined
+            const bg = active ? selectionBg : undefined
             return (
               <box
                 key={`e-${rowIndex}`}

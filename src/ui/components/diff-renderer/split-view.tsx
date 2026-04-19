@@ -13,7 +13,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
-import { useTheme } from '../../theme'
+import { useBg, useTheme, useTransparent } from '../../theme'
 import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
@@ -48,7 +48,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   { contentWidth, file, foldDispatch, folds, highlights },
   ref
 ) {
-  const theme = useTheme()
+  const separatorBg = useBg('editor.background')
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
 
@@ -94,7 +94,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         ))}
         {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
       </scrollbox>
-      <box width={1} backgroundColor={theme.colors['editor.background']} />
+      <box width={1} backgroundColor={separatorBg} />
       <scrollbox
         ref={rightRef}
         flexGrow={1}
@@ -122,13 +122,9 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
 
 function TruncationNotice({ hidden }: { hidden: number }) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   return (
-    <box
-      flexDirection="row"
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
-      paddingLeft={1}
-      paddingRight={1}
-    >
+    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={theme.colors['editorWarning.foreground']}>
         …diff truncated — {hidden} more rows hidden
       </text>
@@ -159,13 +155,9 @@ function SideRow({
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
   return (
-    <box
-      flexDirection="row"
-      backgroundColor={theme.colors['sideBarSectionHeader.background']}
-      paddingLeft={1}
-      paddingRight={1}
-    >
+    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={theme.colors['descriptionForeground']}>{row.spec}</text>
       {row.context ? (
         <text fg={theme.colors['editor.lineHighlightBackground']}> {row.context}</text>
@@ -186,8 +178,10 @@ function HalfRow({
   tokens: ThemedToken[][]
 }) {
   const theme = useTheme()
+  const headerBg = useBg('sideBarSectionHeader.background')
+  const transparent = useTransparent()
   if (cell.type === 'filler') {
-    return <box backgroundColor={theme.colors['sideBarSectionHeader.background']} height={height} />
+    return <box backgroundColor={headerBg} height={height} />
   }
   let bg: string | undefined
   let sign = ' '
@@ -204,7 +198,7 @@ function HalfRow({
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={bg} height={height}>
+    <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={height}>
       <text fg={theme.colors['descriptionForeground']}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />

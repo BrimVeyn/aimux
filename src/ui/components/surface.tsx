@@ -1,22 +1,24 @@
 import type { ReactNode } from 'react'
 
-import { getCurrentTheme } from '../theme'
+import type { ThemeColorMap } from '../themes'
+
+import { useBg } from '../theme'
 
 type SurfaceTone = 'muted' | 'elevated' | 'selected' | 'input' | 'inputActive'
 
-function getSurfaceColor(tone: SurfaceTone): string {
+function toneToColorKey(tone: SurfaceTone): keyof ThemeColorMap {
   switch (tone) {
     case 'elevated':
-      return getCurrentTheme().colors['sideBar.background']
+      return 'sideBar.background'
     case 'selected':
-      return getCurrentTheme().colors['list.activeSelectionBackground']
+      return 'list.activeSelectionBackground'
     case 'input':
-      return getCurrentTheme().colors['editor.background']
+      return 'editor.background'
     case 'inputActive':
-      return getCurrentTheme().colors['list.activeSelectionBackground']
+      return 'list.activeSelectionBackground'
     case 'muted':
     default:
-      return getCurrentTheme().colors['sideBarSectionHeader.background']
+      return 'sideBarSectionHeader.background'
   }
 }
 
@@ -45,9 +47,10 @@ export function Surface({
   tone = 'muted',
   width,
 }: SurfaceProps) {
+  const bg = useBg(toneToColorKey(tone))
   return (
     <box
-      backgroundColor={getSurfaceColor(tone)}
+      backgroundColor={bg}
       flexDirection={flexDirection}
       gap={gap}
       padding={padding}

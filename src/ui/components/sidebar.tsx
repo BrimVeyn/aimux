@@ -3,7 +3,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
-import { getCurrentTheme, useTheme } from '../theme'
+import { getCurrentTheme, useBg, useTheme } from '../theme'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
@@ -142,6 +142,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
 
 export function Sidebar({ onTabActivate }: SidebarProps) {
   const theme = useTheme()
+  const sidebarBg = useBg('sideBar.background')
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
@@ -174,7 +175,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       width={sidebarWidth}
       padding={0}
       flexDirection="column"
-      backgroundColor={theme.colors['sideBar.background']}
+      backgroundColor={sidebarBg}
       gap={0}
     >
       <SidebarTop />

@@ -36,7 +36,7 @@ import {
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
-import { applyTheme } from '../ui/theme'
+import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
 import {
   handleCreateSessionEffect,
@@ -544,6 +544,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'switch-session-by-index': {
       handleSwitchSessionByIndex(ctx, effect.index)
+      return
+    }
+    case 'toggle-transparent': {
+      const next = !getTransparent()
+      setTransparent(next)
+      saveConfig({ ...loadConfig(), themeTransparent: next })
       return
     }
     default:
