@@ -187,6 +187,7 @@ export function TerminalPane({
         flexDirection="column"
         flexGrow={1}
         backgroundColor={editorBg}
+        onMouseDown={forwardMouseEvent}
         onMouseDrag={forwardMouseEvent}
         onMouseScroll={forwardScrollEvent}
         onMouseUp={forwardMouseEvent}
@@ -206,7 +207,10 @@ export function TerminalPane({
             flexDirection="column"
             flexGrow={1}
             width="100%"
-            onMouseDown={forwardMouseEvent}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              forwardMouseEvent(e)
+            }}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
@@ -215,11 +219,6 @@ export function TerminalPane({
           </box>
         )}
       </box>
-      {tab?.status === 'exited' && tab.exitCode !== undefined ? (
-        <text fg={theme.colors['editorWarning.foreground']}>
-          Process exited with code {tab.exitCode}
-        </text>
-      ) : null}
       {tab?.status === 'disconnected' ? (
         <text fg={theme.colors['editorWarning.foreground']}>
           Restored snapshot. Press Ctrl+r to restart this session.

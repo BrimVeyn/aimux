@@ -1,4 +1,16 @@
+import type { AssistantOption } from '../pty/command-registry'
 import type { SessionRecord, SnippetRecord } from './types'
+
+export function filterAssistants(
+  options: AssistantOption[],
+  filter: string | null
+): AssistantOption[] {
+  if (!filter) return options
+  const lower = filter.toLowerCase()
+  return options.filter(
+    (o) => o.label.toLowerCase().includes(lower) || o.description.toLowerCase().includes(lower)
+  )
+}
 
 export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
   if (!filter) {

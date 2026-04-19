@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 import type { AppAction, ModalState } from '../state/types'
 
-import { searchProjectDirectories } from '../platform/project-search'
+import { searchProjectDirectories, warmDirectoryCache } from '../platform/project-search'
 
 const DEFAULT_DIRECTORY_SEARCH_DEBOUNCE_MS = 200
 
@@ -24,6 +24,11 @@ export function useDirectorySearch(
   debounceMs = DEFAULT_DIRECTORY_SEARCH_DEBOUNCE_MS
 ): void {
   const directoryQuery = getDirectoryQuery(modal)
+
+  useEffect(() => {
+    if (modal.type !== 'create-session') return
+    void warmDirectoryCache()
+  }, [modal.type])
 
   useEffect(() => {
     if (modal.type !== 'create-session') {

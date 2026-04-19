@@ -1,8 +1,10 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { Theme } from '@brimveyn/aimux-config'
 
+import { type ScrollBoxRenderable } from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
+import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getCurrentTheme, useBg, useTheme } from '../theme'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
@@ -18,6 +20,20 @@ const GUTTER_START = '╭'
 const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
+
+function getRowBackground({
+  alternate,
+  isActive,
+  theme,
+}: {
+  isActive: boolean
+  alternate: boolean
+  theme: Theme
+}): string | undefined {
+  if (isActive) return theme.colors['list.activeSelectionBackground']
+  if (alternate) return theme.colors['editor.lineHighlightBackground']
+  return undefined
+}
 
 const SidebarTop = memo(function SidebarTop() {
   const theme = useTheme()
@@ -44,6 +60,19 @@ const SidebarTop = memo(function SidebarTop() {
           <text fg={theme.colors['descriptionForeground']}>{branch}</text>
         </box>
       ) : null}
+      <box
+        flexDirection="row"
+        paddingY={1}
+        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        justifyContent="center"
+        marginTop={1}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          dispatchGlobal({ type: 'open-new-tab-modal' })
+        }}
+      >
+        <text fg={theme.colors['editor.foreground']}>+ New assistant</text>
+      </box>
       <text fg={theme.colors['editor.lineHighlightBackground']}>
         {'·'.repeat(Math.max(0, sidebarWidth - 2))}
       </text>
@@ -116,11 +145,12 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           return (
             <box
               key={tab.id}
+              backgroundColor={getRowBackground({ alternate, isActive, theme })}
               flexDirection="row"
-              backgroundColor={
-                alternate ? theme.colors['editor.lineHighlightBackground'] : undefined
-              }
-              onMouseDown={onTabActivate ? () => onTabActivate(tab.id) : undefined}
+              onMouseDown={(event) => {
+                event.stopPropagation()
+                onTabActivate?.(tab.id)
+              }}
             >
               {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
               <box flexGrow={1}>
@@ -146,6 +176,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
+  const focusMode = useAppStore((s) => s.focusMode)
 
   if (!sidebarVisible) {
     return null
@@ -177,6 +208,11 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       flexDirection="column"
       backgroundColor={sidebarBg}
       gap={0}
+      onMouseDown={() => {
+        if (focusMode === 'terminal-input') {
+          dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
+        }
+      }}
     >
       <SidebarTop />
       {gitOnTop ? (

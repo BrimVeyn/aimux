@@ -1,16 +1,16 @@
 import type { SnippetRecord } from '../../state/types'
 
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterSnippets } from '../../state/selectors'
 import { useTheme } from '../theme'
 import { uiTokens } from '../ui-tokens'
-import { ListItem } from './list-item'
-import { ModalFilterBar } from './modal-filter-bar'
-import { ModalShell } from './modal-shell'
+import { Picker, type PickerItem } from './picker'
 
 interface SnippetPickerModalProps {
   snippets: SnippetRecord[]
   selectedIndex: number
   filter: string | null
+  cursorPos?: number
 }
 
 const MAX_PREVIEW_LENGTH = 60
@@ -21,45 +21,54 @@ function truncateContent(content: string): string {
   return `${normalized.slice(0, MAX_PREVIEW_LENGTH - 3)}...`
 }
 
-export function SnippetPickerModal({ filter, selectedIndex, snippets }: SnippetPickerModalProps) {
+export function SnippetPickerModal({
+  cursorPos,
+  filter,
+  selectedIndex,
+  snippets,
+}: SnippetPickerModalProps) {
   const theme = useTheme()
   const filtered = filterSnippets(snippets, filter)
 
+  const items: PickerItem[] = filtered.map((snippet, index) => {
+    const active = index === selectedIndex
+    return {
+      key: snippet.id,
+      onClick: () => {
+        dispatchGlobal({ type: 'close-modal' })
+        runSideEffectGlobal({ type: 'paste-selected-snippet' })
+      },
+      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
+      onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
+      subtitle: (
+        <text fg={theme.colors['descriptionForeground']}>{truncateContent(snippet.content)}</text>
+      ),
+      title: (
+        <text
+          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
+        >
+          <strong>{snippet.name}</strong>
+        </text>
+      ),
+    }
+  })
+
   return (
-    <ModalShell
+    <Picker
       title="Snippets"
-      keybindsModeId="modal.snippet-picker"
+      keybindsModeId="modal.snippet-picker.filtering"
       width={uiTokens.modalWidth.xl}
-      footer={<ModalFilterBar filter={filter} />}
-    >
-      {filtered.length === 0 ? (
+      gap={1}
+      filter={filter}
+      cursorPos={cursorPos}
+      items={items}
+      selectedIndex={selectedIndex}
+      emptyState={
         <text fg={theme.colors['descriptionForeground']}>
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
-      ) : null}
-      {filtered.map((snippet, index) => {
-        const active = index === selectedIndex
-        return (
-          <ListItem
-            key={snippet.id}
-            active={active}
-            title={
-              <text
-                fg={
-                  active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-                }
-              >
-                <strong>{snippet.name}</strong>
-              </text>
-            }
-            subtitle={
-              <text fg={theme.colors['descriptionForeground']}>
-                {truncateContent(snippet.content)}
-              </text>
-            }
-          />
-        )
-      })}
-    </ModalShell>
+      }
+      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+    />
   )
 }

@@ -82,7 +82,10 @@ function renderModal(
         <NewTabModal
           selectedIndex={modal.selectedIndex}
           customCommands={options.customCommands}
-          editBuffer={modal.editBuffer}
+          filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
+          editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
+          editBuffer={modal.editBuffer ?? ''}
         />
       )
     case 'session-picker':
@@ -93,6 +96,7 @@ function renderModal(
           currentSessionId={options.currentSessionId}
           currentTabCount={options.currentTabCount}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'session-name':
@@ -121,6 +125,7 @@ function renderModal(
           snippets={options.snippets}
           selectedIndex={modal.selectedIndex}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'snippet-editor':
@@ -138,6 +143,7 @@ function renderModal(
           selectedIndex={modal.selectedIndex}
           currentThemeId={options.themeId}
           filter={modal.editBuffer}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'update-available':
@@ -154,6 +160,7 @@ function renderModal(
           filter={modal.editBuffer}
           selectedIndex={modal.selectedIndex}
           scope={modal.scope}
+          cursorPos={modal.cursorPos}
         />
       )
     case 'git-commit': {

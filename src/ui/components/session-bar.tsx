@@ -13,6 +13,7 @@ import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering
 import { useBg, useTheme } from '../theme'
 
 export function SessionBar() {
+  const theme = useTheme()
   const headerBg = useBg('sideBarSectionHeader.background')
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
@@ -127,6 +128,21 @@ export function SessionBar() {
           />
         )
       })}
+      <box flexGrow={1} />
+      <box
+        flexDirection="row"
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        onMouseDown={(e) => {
+          e.stopPropagation()
+          dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
+        }}
+      >
+        <text fg={theme.colors['editor.foreground']} selectable={false}>
+          + New
+        </text>
+      </box>
     </box>
   )
 }

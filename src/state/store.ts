@@ -67,7 +67,7 @@ export function createInitialState(
     activeTabId: null,
     currentSessionId: null,
     customCommands,
-    focusMode: showSessionPicker ? 'modal' : 'navigation',
+    focusMode: showSessionPicker ? 'command-edit' : 'navigation',
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: {
       ...DEFAULT_GIT_PANE,
@@ -82,7 +82,13 @@ export function createInitialState(
     },
     layoutTrees: {},
     modal: showSessionPicker
-      ? { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: 'session-picker' }
+      ? {
+          cursorPos: 0,
+          editBuffer: '',
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'session-picker',
+        }
       : emptyModal(),
     pendingChords: null,
     sessionBar: {
@@ -125,6 +131,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'set-snippets':
       return { ...state, snippets: action.snippets }
+    case 'set-custom-commands':
+      return { ...state, customCommands: action.customCommands }
     case 'delete-snippet': {
       const newSnippets = state.snippets.filter((s) => s.id !== action.snippetId)
       const filteredNew = filterSnippets(newSnippets, state.modal.editBuffer)

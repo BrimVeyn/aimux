@@ -7,7 +7,13 @@ export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
 
-export type TabStatus = 'starting' | 'running' | 'disconnected' | 'exited' | 'error'
+export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
+
+/**
+ * Status values that may appear in legacy on-disk workspace snapshots but are
+ * not produced by the running app anymore. Filtered at restore time.
+ */
+export type LegacyPersistedTabStatus = TabStatus | 'exited'
 
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 
@@ -84,7 +90,7 @@ export interface PersistedTabSnapshot {
   assistant: AssistantId
   title: string
   command: string
-  status: Exclude<TabStatus, 'disconnected'>
+  status: Exclude<LegacyPersistedTabStatus, 'disconnected'>
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
@@ -276,6 +282,7 @@ export interface ModalClosed extends ModalBase {
 
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
+  editingCommand: AssistantId | null
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -322,6 +329,7 @@ export interface ModalCreateSession extends ModalBase {
   pendingProjectPath: string | null
   activeField: 'directory' | 'name'
   nameBuffer: string
+  returnToSessionPicker: boolean
 }
 
 export interface ModalSnippetEditor extends ModalBase {
@@ -395,31 +403,27 @@ export interface AppState {
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
+  | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
   | { type: 'open-session-picker' }
   | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
-  | { type: 'begin-command-edit' }
   | { type: 'update-command-edit'; char: string }
-  | { type: 'commit-command-edit' }
   | { type: 'cancel-command-edit' }
-  | { type: 'open-create-session-modal' }
+  | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }
-  | { type: 'begin-session-filter' }
   | { type: 'open-rename-tab-modal' }
   | { type: 'open-snippet-picker' }
   | { type: 'open-snippet-editor'; snippetId?: string }
-  | { type: 'begin-snippet-filter' }
-  | { type: 'begin-help-filter' }
-  | { type: 'begin-theme-filter' }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'set-modal-selection-index'; index: number }
 
 // -- Session actions --
 export type SessionAction =
@@ -459,7 +463,6 @@ export type TabAction =
     }
   | { type: 'set-scroll-intent'; tabId: string; intent: ScrollIntent }
   | { type: 'set-tab-activity'; tabId: string; activity?: TabActivity }
-  | { type: 'set-tab-status'; tabId: string; status: TabStatus; exitCode?: number }
   | { type: 'set-tab-error'; tabId: string; message: string }
 
 // -- Layout actions --
@@ -570,6 +573,7 @@ export type GitModeAction =
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
   | { type: 'delete-snippet'; snippetId: string }
+  | { type: 'set-custom-commands'; customCommands: Record<AssistantId, string> }
 
 export type AppAction =
   | ModalAction

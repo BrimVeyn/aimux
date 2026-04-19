@@ -44,13 +44,13 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       this.emit('render', tabId, viewport, terminalModes)
     })
     this.ptyManager.on('exit', (tabId, exitCode) => {
-      const tab = this.tabs.get(tabId)
-      if (!tab) {
+      if (!this.tabs.has(tabId)) {
         return
       }
-      tab.status = 'exited'
-      tab.exitCode = exitCode
-      tab.activity = undefined
+      this.tabs.delete(tabId)
+      if (this.activeTabId === tabId) {
+        this.activeTabId = this.listTabs()[0]?.id ?? null
+      }
       logDebug('daemon.registry.exit', { exitCode, tabId })
       this.emit('exit', tabId, exitCode)
     })

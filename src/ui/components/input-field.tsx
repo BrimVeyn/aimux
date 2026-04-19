@@ -5,15 +5,19 @@ interface InputFieldProps {
   active: boolean
   value: string
   cursorPos?: number
+  placeholder?: string
 }
 
-export function InputField({ active, cursorPos, value }: InputFieldProps) {
+export function InputField({ active, cursorPos, placeholder, value }: InputFieldProps) {
   const theme = useTheme()
   const fg = active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
   if (!active) {
+    const showPlaceholder = !value && !!placeholder
     return (
       <Surface tone="input" padding={1}>
-        <text fg={fg}>{value}</text>
+        <text fg={showPlaceholder ? theme.colors['editorLineNumber.foreground'] : fg}>
+          {showPlaceholder ? placeholder : value}
+        </text>
       </Surface>
     )
   }

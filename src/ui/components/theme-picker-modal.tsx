@@ -1,53 +1,32 @@
-import { useTerminalDimensions } from '@opentui/react'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 
-import { dispatchGlobal } from '../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterThemeIds } from '../filter-themes'
 import { useTheme, useTransparent } from '../theme'
 import { type ThemeId, THEMES } from '../themes'
 import { uiTokens } from '../ui-tokens'
-import { ListItem } from './list-item'
-import { ModalFilterBar } from './modal-filter-bar'
-import { ModalShell } from './modal-shell'
+import { Picker, type PickerItem } from './picker'
 
 interface ThemePickerModalProps {
   currentThemeId: ThemeId
   filter: string | null
   selectedIndex: number
+  cursorPos?: number
 }
-
-const VIEWPORT_HEIGHT_RATIO = 0.6
-const MODAL_CHROME_ROWS = 6
 
 function clampSelection(index: number, count: number): number {
   if (count === 0) return 0
   return Math.max(0, Math.min(count - 1, index))
 }
 
-function computeWindowStart(
-  prevStart: number,
-  selectedRowIndex: number,
-  total: number,
-  windowSize: number
-): number {
-  if (total <= windowSize) return 0
-  const margin = 1
-  const maxStart = total - windowSize
-  let start = Math.max(0, Math.min(maxStart, prevStart))
-  const topThreshold = start + margin
-  const bottomThreshold = start + windowSize - 1 - margin
-  if (selectedRowIndex < topThreshold) {
-    start = Math.max(0, selectedRowIndex - margin)
-  } else if (selectedRowIndex > bottomThreshold) {
-    start = Math.min(maxStart, selectedRowIndex - windowSize + 1 + margin)
-  }
-  return start
-}
-
-export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: ThemePickerModalProps) {
+export function ThemePickerModal({
+  currentThemeId,
+  cursorPos,
+  filter,
+  selectedIndex,
+}: ThemePickerModalProps) {
   const theme = useTheme()
   const transparent = useTransparent()
-  const dimensions = useTerminalDimensions()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
   useLayoutEffect(() => {
@@ -55,81 +34,58 @@ export function ThemePickerModal({ currentThemeId, filter, selectedIndex }: Them
   }, [filtered.length])
 
   const effectiveIndex = clampSelection(selectedIndex, filtered.length)
-  const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
-  const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
 
-  const prevStartRef = useRef(0)
-  const prevFilterRef = useRef<string | null>(filter)
-  if (prevFilterRef.current !== filter) {
-    prevFilterRef.current = filter
-    prevStartRef.current = 0
-  }
-  const start = computeWindowStart(
-    prevStartRef.current,
-    effectiveIndex,
-    filtered.length,
-    listHeight
-  )
-  prevStartRef.current = start
-  const visible = filtered.slice(start, start + listHeight)
+  const items: PickerItem[] = filtered.flatMap((id, rowIndex) => {
+    const entry = THEMES[id]
+    if (!entry) return []
+    const active = rowIndex === effectiveIndex
+    const isCurrent = id === currentThemeId
+    return [
+      {
+        key: id,
+        onClick: () => {
+          dispatchGlobal({ type: 'close-modal' })
+          runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
+        },
+        title: (
+          <text
+            fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
+          >
+            {entry.name}
+          </text>
+        ),
+        trailing: isCurrent ? (
+          <text fg={theme.colors['textLink.foreground']}>current</text>
+        ) : undefined,
+      },
+    ]
+  })
 
   return (
-    <ModalShell
+    <Picker
       title="Select theme"
-      keybindsModeId="modal.theme-picker"
+      keybindsModeId="modal.theme-picker.filtering"
       width={uiTokens.modalWidth.md}
-      listGap={0}
+      filter={filter}
+      cursorPos={cursorPos}
       footer={
         <box flexDirection="column" gap={0}>
           <text fg={theme.colors['editor.lineHighlightBackground']}>
-            {filtered.length === 0
-              ? ''
-              : ` ${effectiveIndex + 1} / ${filtered.length}${filter ? '' : ' — type / to filter'}`}
+            {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
           </text>
           <text fg={theme.colors['descriptionForeground']}>
-            {` transparent: ${transparent ? 'on' : 'off'}`}
+            {` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}
           </text>
-          <ModalFilterBar filter={filter} />
         </box>
       }
-    >
-      {filtered.length === 0 ? (
+      items={items}
+      selectedIndex={effectiveIndex}
+      emptyState={
         <text fg={theme.colors['descriptionForeground']}>
           {filter ? 'No matching themes.' : 'No themes available.'}
         </text>
-      ) : (
-        <box height={listHeight} flexDirection="column" overflow="hidden">
-          {visible.map((id, i) => {
-            const rowIndex = start + i
-            const entry = THEMES[id]
-            if (!entry) return null
-            const active = rowIndex === effectiveIndex
-            const isCurrent = id === currentThemeId
-            return (
-              <ListItem
-                key={id}
-                active={active}
-                title={
-                  <text
-                    fg={
-                      active
-                        ? theme.colors['editor.foreground']
-                        : theme.colors['descriptionForeground']
-                    }
-                  >
-                    {entry.name}
-                  </text>
-                }
-                trailing={
-                  isCurrent ? (
-                    <text fg={theme.colors['textLink.foreground']}>current</text>
-                  ) : undefined
-                }
-              />
-            )
-          })}
-        </box>
-      )}
-    </ModalShell>
+      }
+      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+    />
   )
 }

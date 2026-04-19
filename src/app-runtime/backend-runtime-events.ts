@@ -62,8 +62,7 @@ export function bindBackendRuntimeEvents({
   const handleExit = (tabId: string, exitCode: number) => {
     logInputDebug('app.backend.event.exit', { exitCode, tabId })
     clearTabRuntimeState(timeouts, tabId)
-    dispatch({ exitCode, status: 'exited', tabId, type: 'set-tab-status' })
-    dispatch({ activity: undefined, tabId, type: 'set-tab-activity' })
+    dispatch({ tabId, type: 'close-tab' })
   }
 
   const handleError = (tabId: string, message: string) => {
