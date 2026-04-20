@@ -1,5 +1,5 @@
 import type { SessionBackend } from '../session-backend/types'
-import type { TabSession } from '../state/types'
+import type { AppAction, TabSession } from '../state/types'
 
 import { buildPtyPastePayload } from '../input/paste'
 
