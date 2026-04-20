@@ -25,7 +25,7 @@ function stateWithReadySuggestion(title: string, body: string): AppState {
   return { ...base, autoCommit, currentSessionId: SESSION }
 }
 
-test('open-git-commit-modal pre-fills from a ready suggestion', () => {
+test('open-git-commit-modal always opens empty, even with a ready suggestion', () => {
   const state = stateWithReadySuggestion('feat: add thing', 'body text')
   const next = reduceModalState(state, {
     sessionId: SESSION,
@@ -36,10 +36,43 @@ test('open-git-commit-modal pre-fills from a ready suggestion', () => {
   if (n.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
   expect(n.focusMode).toBe('command-edit')
   expect(n.modal.activeField).toBe('title')
-  expect(n.modal.editBuffer).toBe('feat: add thing')
-  expect(n.modal.contentBuffer).toBe('body text')
-  expect(n.modal.cursorPos).toBe('feat: add thing'.length)
+  expect(n.modal.editBuffer).toBe('')
+  expect(n.modal.contentBuffer).toBe('')
+  expect(n.modal.cursorPos).toBe(0)
   expect(n.modal.stage).toBe('edit')
+})
+
+test('git-commit-use-background-suggestion fills title/body and enters confirm', () => {
+  const state = stateWithReadySuggestion('feat: x', 'body')
+  const opened = reduceModalState(state, {
+    sessionId: SESSION,
+    type: 'open-git-commit-modal',
+  } as AppAction) as AppState
+  const next = reduceModalState(opened, {
+    sessionId: SESSION,
+    type: 'git-commit-use-background-suggestion',
+  } as AppAction)
+  expect(next).not.toBeNull()
+  const n = next as AppState
+  if (n.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
+  expect(n.modal.stage).toBe('confirm')
+  expect(n.modal.editBuffer).toBe('feat: x')
+  expect(n.modal.contentBuffer).toBe('body')
+  expect(n.modal.activeField).toBe('title')
+  expect(n.modal.cursorPos).toBe('feat: x'.length)
+})
+
+test('git-commit-use-background-suggestion is a no-op when suggestion is not ready', () => {
+  const base = createInitialState()
+  const opened = reduceModalState(base, {
+    sessionId: SESSION,
+    type: 'open-git-commit-modal',
+  } as AppAction) as AppState
+  const next = reduceModalState(opened, {
+    sessionId: SESSION,
+    type: 'git-commit-use-background-suggestion',
+  } as AppAction)
+  expect(next).toBeNull()
 })
 
 test('open-git-commit-modal falls back to empty when no ready suggestion exists', () => {
@@ -189,12 +222,17 @@ test('auto-commit-generation-ready for a different session does not touch the mo
 })
 
 test('switch-create-session-field swaps buffers on the git-commit modal', () => {
-  const state = stateWithReadySuggestion('feat: x', 'body text')
-  const opened = reduceModalState(state, {
+  const base = createInitialState()
+  const opened = reduceModalState(base, {
     sessionId: SESSION,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
-  const switched = reduceModalState(opened, {
+  if (opened.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
+  const filled: AppState = {
+    ...opened,
+    modal: { ...opened.modal, contentBuffer: 'body text', editBuffer: 'feat: x' },
+  }
+  const switched = reduceModalState(filled, {
     type: 'switch-create-session-field',
   } as AppAction) as AppState
   if (switched.modal.type !== 'git-commit') throw new Error('expected git-commit modal')

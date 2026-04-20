@@ -35,34 +35,6 @@ function useSpinnerFrame(active: boolean): string {
   return SPINNER_FRAMES[index] ?? '⠋'
 }
 
-const AUTO_COMMIT_LABEL = 'Auto-commit'
-// label + padding (1+1) + border (1+1)
-const BUTTON_WIDTH = AUTO_COMMIT_LABEL.length + 2 + 2
-// one content row + border (1+1)
-const BUTTON_HEIGHT = 3
-
-function buildPerimeter(w: number, h: number): ReadonlyArray<{ x: number; y: number }> {
-  const cells: { x: number; y: number }[] = []
-  for (let x = 0; x < w; x++) cells.push({ x, y: 0 })
-  for (let y = 1; y < h; y++) cells.push({ x: w - 1, y })
-  for (let x = w - 2; x >= 0; x--) cells.push({ x, y: h - 1 })
-  for (let y = h - 2; y >= 1; y--) cells.push({ x: 0, y })
-  return cells
-}
-
-const BUTTON_PERIMETER = buildPerimeter(BUTTON_WIDTH, BUTTON_HEIGHT)
-const MARCHING_ANTS_INTERVAL_MS = 100
-
-function useMarchingAntsIndex(active: boolean, length: number): number {
-  const [index, setIndex] = useState(0)
-  useEffect(() => {
-    if (!active) return
-    const id = setInterval(() => setIndex((i) => (i + 1) % length), MARCHING_ANTS_INTERVAL_MS)
-    return () => clearInterval(id)
-  }, [active, length])
-  return index % length
-}
-
 function pickModeId(stage: 'edit' | 'generating' | 'confirm'): ModeId {
   if (stage === 'generating') return 'modal.git-commit.generating'
   if (stage === 'confirm') return 'modal.git-commit.confirm'
@@ -115,13 +87,13 @@ export function GitCommitModal({
   const isConfirm = stage === 'confirm'
   const isGenerating = stage === 'generating'
   const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const isBgGenerating = useAppStore((s) => {
+  const bgKind = useAppStore((s) => {
     const id = s.currentSessionId
-    return id ? s.autoCommit.bySession[id]?.kind === 'generating' : false
+    return id ? s.autoCommit.bySession[id]?.kind : undefined
   })
-  const antsActive = isBgGenerating && !isConfirm && !isGenerating
-  const antsIndex = useMarchingAntsIndex(antsActive, BUTTON_PERIMETER.length)
-  const antsPos = BUTTON_PERIMETER[antsIndex] ?? { x: 0, y: 0 }
+  const isBgGenerating = bgKind === 'generating'
+  const showBgSpinner = isBgGenerating && !isConfirm && !isGenerating
+  const bgSpinnerFrame = useSpinnerFrame(showBgSpinner)
 
   const onAutoCommitClick = (): void => {
     const hasTitle = title.trim().length > 0
@@ -129,8 +101,14 @@ export function GitCommitModal({
       dispatchGlobal({ type: 'git-commit-enter-confirm' })
       return
     }
+    if (bgKind === 'ready') {
+      dispatchGlobal({ sessionId: currentSessionId, type: 'git-commit-use-background-suggestion' })
+      return
+    }
     dispatchGlobal({ sessionId: currentSessionId, type: 'git-commit-enter-generating' })
-    runSideEffectGlobal({ sessionId: currentSessionId, type: 'generate-auto-commit-now' })
+    if (bgKind !== 'generating') {
+      runSideEffectGlobal({ sessionId: currentSessionId, type: 'generate-auto-commit-now' })
+    }
   }
 
   const modeId = pickModeId(stage)
@@ -178,21 +156,19 @@ export function GitCommitModal({
             borderColor={t.palette.primary}
             paddingLeft={1}
             paddingRight={1}
-            position="relative"
+            flexDirection="row"
+            gap={1}
+            alignItems="center"
             onMouseDown={(event) => {
               event.preventDefault()
               event.stopPropagation()
               onAutoCommitClick()
             }}
           >
+            {showBgSpinner ? <text fg={t.palette.primary}>{bgSpinnerFrame}</text> : null}
             <text fg={t.palette.primary}>
               <strong>Auto-commit</strong>
             </text>
-            {antsActive ? (
-              <box position="absolute" top={antsPos.y} left={antsPos.x} zIndex={10}>
-                <text fg={t.accent}>●</text>
-              </box>
-            ) : null}
           </box>
           <text fg={t.muted}>C-a · stages all changes (AI-suggests message if empty)</text>
         </box>

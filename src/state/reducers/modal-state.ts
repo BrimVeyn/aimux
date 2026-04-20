@@ -202,19 +202,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     case 'open-git-commit-modal': {
       const sessionId = action.sessionId
-      const suggestion = sessionId ? state.autoCommit.bySession[sessionId] : undefined
-      const prefill =
-        suggestion && suggestion.kind === 'ready'
-          ? { body: suggestion.body, title: suggestion.title }
-          : { body: '', title: '' }
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           activeField: 'title',
-          contentBuffer: prefill.body,
-          cursorPos: prefill.title.length,
-          editBuffer: prefill.title,
+          contentBuffer: '',
+          cursorPos: 0,
+          editBuffer: '',
           selectedIndex: 0,
           sessionTargetId: sessionId ?? null,
           stage: 'edit',
@@ -274,6 +269,25 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           contentBuffer: action.body,
           cursorPos: action.title.length,
           editBuffer: action.title,
+          stage: 'confirm',
+        },
+      }
+    }
+    case 'git-commit-use-background-suggestion': {
+      if (state.modal.type !== 'git-commit' || state.modal.sessionTargetId !== action.sessionId) {
+        return null
+      }
+      const suggestion = state.autoCommit.bySession[action.sessionId]
+      if (!suggestion || suggestion.kind !== 'ready') return null
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          activeField: 'title',
+          contentBuffer: suggestion.body,
+          cursorPos: suggestion.title.length,
+          editBuffer: suggestion.title,
           stage: 'confirm',
         },
       }

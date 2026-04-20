@@ -624,6 +624,7 @@ export type GitModeAction =
   | { type: 'git-commit-leave-confirm' }
   | { type: 'git-commit-enter-generating'; sessionId: string }
   | { type: 'git-commit-leave-generating' }
+  | { type: 'git-commit-use-background-suggestion'; sessionId: string }
 
 // -- Data actions --
 export type DataAction =
