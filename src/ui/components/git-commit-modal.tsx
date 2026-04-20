@@ -137,7 +137,7 @@ export function GitCommitModal({
       )}
 
       {isConfirm || isGenerating ? null : (
-        <box flexDirection="row" gap={1} marginTop={1}>
+        <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
           <box
             border
             borderColor={t.palette.primary}
@@ -150,12 +150,10 @@ export function GitCommitModal({
             }}
           >
             <text fg={t.palette.primary}>
-              <strong>🪄 Auto-commit</strong>
+              <strong>Auto-commit</strong>
             </text>
           </box>
-          <box alignItems="center">
-            <text fg={t.muted}>C-a · stages all changes (AI-suggests message if empty)</text>
-          </box>
+          <text fg={t.muted}>C-a · stages all changes (AI-suggests message if empty)</text>
         </box>
       )}
     </ModalShell>
