@@ -7,6 +7,7 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { filterAssistants, filterSessions, filterSnippets } from '../selectors'
+import { reduceAutoCommitState } from './auto-commit-state'
 
 function emptyModal() {
   return {
@@ -199,7 +200,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'update-available',
         },
       }
-    case 'open-git-commit-modal':
+    case 'open-git-commit-modal': {
+      const sessionId = action.sessionId
       return {
         ...state,
         focusMode: 'command-edit',
@@ -209,10 +211,112 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           selectedIndex: 0,
-          sessionTargetId: null,
+          sessionTargetId: sessionId ?? null,
+          stage: 'edit',
           type: 'git-commit',
         },
       }
+    }
+    case 'git-commit-enter-confirm': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'confirm' },
+      }
+    }
+    case 'git-commit-leave-confirm': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
+      }
+    }
+    case 'git-commit-enter-generating': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: { ...state.modal, sessionTargetId: action.sessionId, stage: 'generating' },
+      }
+    }
+    case 'git-commit-leave-generating': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
+      }
+    }
+    case 'auto-commit-generation-ready': {
+      if (
+        state.modal.type !== 'git-commit' ||
+        state.modal.stage !== 'generating' ||
+        state.modal.sessionTargetId !== action.sessionId
+      ) {
+        return null
+      }
+      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
+      if (!nextAutoCommit) {
+        // Stale result (hash mismatch or slice was cleared mid-flight): don't
+        // strand the modal in `generating` — flip back to edit so the user
+        // isn't stuck staring at a spinner that will never resolve.
+        return {
+          ...state,
+          focusMode: 'command-edit',
+          modal: { ...state.modal, stage: 'edit' },
+        }
+      }
+      return {
+        ...state,
+        autoCommit: nextAutoCommit,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          activeField: 'title',
+          contentBuffer: action.body,
+          cursorPos: action.title.length,
+          editBuffer: action.title,
+          stage: 'confirm',
+        },
+      }
+    }
+    case 'git-commit-use-background-suggestion': {
+      if (state.modal.type !== 'git-commit' || state.modal.sessionTargetId !== action.sessionId) {
+        return null
+      }
+      const suggestion = state.autoCommit.bySession[action.sessionId]
+      if (!suggestion || suggestion.kind !== 'ready') return null
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          activeField: 'title',
+          contentBuffer: suggestion.body,
+          cursorPos: suggestion.title.length,
+          editBuffer: suggestion.title,
+          stage: 'confirm',
+        },
+      }
+    }
+    case 'auto-commit-clear': {
+      if (
+        state.modal.type !== 'git-commit' ||
+        state.modal.stage !== 'generating' ||
+        state.modal.sessionTargetId !== action.sessionId
+      ) {
+        return null
+      }
+      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
+      return {
+        ...state,
+        autoCommit: nextAutoCommit ?? state.autoCommit,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
+      }
+    }
     case 'set-help-entry-count': {
       if (state.modal.type !== 'help') return state
       if (state.modal.entryCount === action.count) {

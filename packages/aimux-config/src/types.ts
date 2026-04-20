@@ -24,6 +24,8 @@ export type ModeId =
   | 'modal.help.filtering'
   | 'modal.split-picker'
   | 'modal.git-commit'
+  | 'modal.git-commit.confirm'
+  | 'modal.git-commit.generating'
   | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -291,6 +293,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
+  stage: 'edit' | 'generating' | 'confirm'
 }
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
@@ -331,6 +334,28 @@ export interface SessionBarState {
   position: SessionBarPosition
 }
 
+export type AutoCommitSuggestion =
+  | { kind: 'idle' }
+  | {
+      kind: 'generating'
+      tabId: string
+      workingTreeHash: string
+      abortController: AbortController
+      startedAt: number
+    }
+  | {
+      kind: 'ready'
+      tabId: string
+      workingTreeHash: string
+      title: string
+      body: string
+      generatedAt: number
+    }
+
+export interface AutoCommitState {
+  bySession: Record<string, AutoCommitSuggestion>
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -349,6 +374,7 @@ export interface AppState {
   customCommands: Record<AssistantId, string>
   gitPanel: GitPanelState
   gitMode: GitModeState
+  autoCommit: AutoCommitState
   pendingChords: string[] | null
 }
 
@@ -503,11 +529,34 @@ export type GitModeAction =
       fromSection: GitFileSection
       toSection: GitFileSection | null
     }
-  | { type: 'open-git-commit-modal' }
+  | { type: 'open-git-commit-modal'; sessionId?: string }
+  | { type: 'git-commit-enter-confirm' }
+  | { type: 'git-commit-leave-confirm' }
+  | { type: 'git-commit-enter-generating'; sessionId: string }
+  | { type: 'git-commit-leave-generating' }
 
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
   | { type: 'delete-snippet'; snippetId: string }
+
+export type AutoCommitAction =
+  | {
+      type: 'auto-commit-generation-started'
+      sessionId: string
+      tabId: string
+      workingTreeHash: string
+      abortController: AbortController
+      startedAt: number
+    }
+  | {
+      type: 'auto-commit-generation-ready'
+      sessionId: string
+      workingTreeHash: string
+      title: string
+      body: string
+      generatedAt: number
+    }
+  | { type: 'auto-commit-clear'; sessionId: string }
 
 export type AppAction =
   | ModalAction
@@ -518,6 +567,7 @@ export type AppAction =
   | DataAction
   | GitPanelAction
   | GitModeAction
+  | AutoCommitAction
 
 // ─── Side effects ─────────────────────────────────────────────────────────────
 
@@ -552,6 +602,8 @@ export type SideEffect =
   | { type: 'git-restore'; path: string }
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
+  | { type: 'git-commit-auto'; title: string; body: string }
+  | { type: 'generate-auto-commit-now'; sessionId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
@@ -728,6 +780,12 @@ export interface GitPanePaneConfig extends GitPaneBaseConfig {
 
 export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
 
+export interface AutoCommitConfig {
+  enabled: boolean
+  timeoutMs: number
+  models: Partial<Record<string, string>>
+}
+
 export interface AimuxThemeConfig {
   mode?: ThemeMode
   paletteOverrides?: Partial<AimuxPalette>
@@ -756,6 +814,7 @@ export interface AimuxUserConfig {
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
+  autoCommit?: Partial<AutoCommitConfig>
   statusBar?: StatusBarConfig
 }
 
@@ -790,5 +849,6 @@ export interface ResolvedConfig {
   gitPane: GitPaneConfig
   hooks: HooksConfig
   snippets: SnippetDef[]
+  autoCommit: AutoCommitConfig
   statusBar: StatusBarConfig
 }

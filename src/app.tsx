@@ -1,5 +1,4 @@
-import type { ResolvedConfig } from '@brimveyn/aimux-config'
-
+import { type ResolvedConfig, setAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import {
   useCallback,
@@ -17,6 +16,7 @@ import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { SessionBackend } from './session-backend/types'
 
 import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
+import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
@@ -29,7 +29,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
-import { getProfileName } from './profile-paths'
+import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore } from './state/app-store'
@@ -56,6 +56,10 @@ export function App({
   backend: SessionBackend
   resolvedConfig: ResolvedConfig
 }) {
+  // Publish the auto-commit enabled flag before any children render so
+  // actions (which live outside React) can read it synchronously.
+  setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+
   const keymapHandlers = useMemo(
     () => {
       setActiveKeymap(resolvedConfig.keymaps)
@@ -227,6 +231,13 @@ export function App({
 
   useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
+  useAutoCommitDriver({
+    config: resolvedConfig.autoCommit,
+    dispatch,
+    getProfileConfigRoot: getProfileConfigDir,
+    state,
+    stateRef,
+  })
 
   const terminalSize = useTerminalResize({
     backend,
@@ -349,18 +360,19 @@ export function App({
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useKeyboard((key) => {
+    const currentState = stateRef.current
     // Global quit: Ctrl+C in any mode except terminal-input
-    if (key.ctrl && key.name === 'c' && state.focusMode !== 'terminal-input') {
+    if (key.ctrl && key.name === 'c' && currentState.focusMode !== 'terminal-input') {
       key.preventDefault()
-      executeSideEffect({ state, type: 'quit' }, sideEffectCtx)
+      executeSideEffect({ state: currentState, type: 'quit' }, sideEffectCtx)
       return
     }
 
-    const modeId = deriveModeId(state)
+    const modeId = deriveModeId(currentState)
     const handler = getHandler(modeId)
     if (!handler) return
 
-    const ctx: ModeContext = { state }
+    const ctx: ModeContext = { state: currentState }
     const result = handler.handleKey(key, ctx)
     if (!result) return
 

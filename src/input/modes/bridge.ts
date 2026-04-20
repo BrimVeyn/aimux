@@ -43,6 +43,9 @@ export function deriveModeId(state: AppState): ModeId {
     if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
       return 'modal.new-tab.editing-command'
     }
+    if (state.modal.type === 'git-commit' && state.modal.stage === 'confirm') {
+      return 'modal.git-commit.confirm'
+    }
     const modalType = state.modal.type
     const commandEditMode = modalType ? COMMAND_EDIT_MODE_IDS[modalType] : undefined
     if (commandEditMode) {
@@ -53,6 +56,9 @@ export function deriveModeId(state: AppState): ModeId {
   }
 
   if (state.focusMode === 'modal') {
+    if (state.modal.type === 'git-commit' && state.modal.stage === 'generating') {
+      return 'modal.git-commit.generating'
+    }
     const modalType = state.modal.type
     const modalMode = modalType ? MODAL_MODE_IDS[modalType] : undefined
     if (modalMode) {

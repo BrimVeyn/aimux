@@ -323,6 +323,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
+  stage: 'edit' | 'generating' | 'confirm'
 }
 
 export interface ModalCreateSession extends ModalBase {
@@ -397,6 +398,7 @@ export interface AppState {
   customCommands: Record<AssistantId, string>
   gitPanel: GitPanelState
   gitMode: GitModeState
+  autoCommit: AutoCommitState
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
@@ -527,6 +529,50 @@ export type GitPanelAction =
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
 
+// -- Auto-commit state & actions --
+export type AutoCommitSuggestion =
+  | { kind: 'idle' }
+  | {
+      kind: 'generating'
+      tabId: string
+      workingTreeHash: string
+      abortController: AbortController
+      startedAt: number
+    }
+  | {
+      kind: 'ready'
+      tabId: string
+      workingTreeHash: string
+      title: string
+      body: string
+      generatedAt: number
+    }
+
+export interface AutoCommitState {
+  bySession: Record<string, AutoCommitSuggestion>
+}
+
+export const EMPTY_AUTO_COMMIT_STATE: AutoCommitState = { bySession: {} }
+
+export type AutoCommitAction =
+  | {
+      type: 'auto-commit-generation-started'
+      sessionId: string
+      tabId: string
+      workingTreeHash: string
+      abortController: AbortController
+      startedAt: number
+    }
+  | {
+      type: 'auto-commit-generation-ready'
+      sessionId: string
+      workingTreeHash: string
+      title: string
+      body: string
+      generatedAt: number
+    }
+  | { type: 'auto-commit-clear'; sessionId: string }
+
 export type GitModeAction =
   | { type: 'enter-git-mode' }
   | { type: 'exit-git-mode' }
@@ -576,7 +622,12 @@ export type GitModeAction =
       fromSection: GitFileSection
       toSection: GitFileSection | null
     }
-  | { type: 'open-git-commit-modal' }
+  | { type: 'open-git-commit-modal'; sessionId?: string }
+  | { type: 'git-commit-enter-confirm' }
+  | { type: 'git-commit-leave-confirm' }
+  | { type: 'git-commit-enter-generating'; sessionId: string }
+  | { type: 'git-commit-leave-generating' }
+  | { type: 'git-commit-use-background-suggestion'; sessionId: string }
 
 // -- Data actions --
 export type DataAction =
@@ -593,3 +644,4 @@ export type AppAction =
   | DataAction
   | GitPanelAction
   | GitModeAction
+  | AutoCommitAction

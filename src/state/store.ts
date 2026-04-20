@@ -1,15 +1,4 @@
-import type {
-  AppAction,
-  AppState,
-  GitModeState,
-  GitPaneMode,
-  GitPanePosition,
-  GitPaneState,
-  SessionBarPosition,
-  SessionRecord,
-  SnippetRecord,
-} from './types'
-
+import { reduceAutoCommit } from './reducers/auto-commit-state'
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
@@ -17,6 +6,18 @@ import { reduceSessionState } from './reducers/session-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
+import {
+  type AppAction,
+  type AppState,
+  EMPTY_AUTO_COMMIT_STATE,
+  type GitModeState,
+  type GitPaneMode,
+  type GitPanePosition,
+  type GitPaneState,
+  type SessionBarPosition,
+  type SessionRecord,
+  type SnippetRecord,
+} from './types'
 
 const DEFAULT_SIDEBAR_WIDTH = 28
 const DEFAULT_SIDEBAR_MIN_WIDTH = 18
@@ -66,6 +67,7 @@ export function createInitialState(
   )
   return {
     activeTabId: null,
+    autoCommit: EMPTY_AUTO_COMMIT_STATE,
     currentSessionId: null,
     customCommands,
     focusMode: showSessionPicker ? 'command-edit' : 'navigation',
@@ -128,6 +130,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const gitModeState = reduceGitModeState(state, action)
   if (gitModeState) return gitModeState
+
+  const autoCommitState = reduceAutoCommit(state, action)
+  if (autoCommitState) return autoCommitState
 
   switch (action.type) {
     case 'set-snippets':
