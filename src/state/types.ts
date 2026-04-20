@@ -166,7 +166,8 @@ export interface GitPaneState {
   visible: boolean
   mode: GitPaneMode
   position: GitPanePosition
-  ratio: number
+  paneRatio: number
+  embeddedRatio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
   treeCompaction: boolean
@@ -502,10 +503,12 @@ export type LayoutAction =
 export type UIAction =
   | { type: 'toggle-sidebar' }
   | { type: 'resize-sidebar'; delta: number }
+  | { type: 'set-sidebar-width'; width: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
   | { type: 'toggle-git-pane' }
   | { type: 'resize-git-pane'; delta: number }
+  | { type: 'set-git-pane-ratio'; target: 'pane' | 'embedded'; ratio: number }
   | { type: 'resize-git-diff-pane'; delta: number }
   | { type: 'set-git-pane-mode'; mode: GitPaneMode }
   | { type: 'set-git-pane-position'; position: GitPanePosition }

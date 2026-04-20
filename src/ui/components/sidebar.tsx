@@ -1,10 +1,15 @@
-import { type ScrollBoxRenderable } from '@opentui/core'
+import {
+  type BoxRenderable,
+  type MouseEvent as OtuiMouseEvent,
+  type ScrollBoxRenderable,
+} from '@opentui/core'
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getCurrentTokens, type ThemeTokens, useBg, useTokens } from '../theme'
 import { ContextMenuBox } from './context-menu-box'
+import { buildGitPaneContextMenu } from './git-pane-context-menu'
 import { GitPaneWidget } from './git-pane-widget'
 import { buildTabGroupInfo } from './sidebar-group-metadata'
 import { TabItem } from './tab-item'
@@ -13,12 +18,21 @@ import { useSidebarBranch } from './use-sidebar-branch'
 
 interface SidebarProps {
   onTabActivate?: (tabId: string) => void
+  onResizeDrag?: (event: OtuiMouseEvent) => boolean
+  onResizeDragEnd?: () => void
+  onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
+  onEmbeddedGitResizeStart?: (info: {
+    containerStart: number
+    position: 'top' | 'bottom'
+    totalSize: number
+  }) => void
 }
 
 const GUTTER_START = '╭'
 const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
+const RESIZE_HANDLE = '│'
 
 function getRowBackground({
   alternate,
@@ -34,9 +48,8 @@ function getRowBackground({
   return undefined
 }
 
-const SidebarTop = memo(function SidebarTop() {
+const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: number }) {
   const tokens = useTokens()
-  const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const currentSession = currentSessionId
@@ -70,7 +83,7 @@ const SidebarTop = memo(function SidebarTop() {
       >
         <text fg={tokens.palette.ink}>+ New assistant</text>
       </box>
-      <text fg={tokens.hover}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+      <text fg={tokens.hover}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
     </box>
   )
 })
@@ -164,13 +177,20 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
   )
 })
 
-export function Sidebar({ onTabActivate }: SidebarProps) {
+export function Sidebar({
+  onEmbeddedGitResizeStart,
+  onResizeDrag,
+  onResizeDragEnd,
+  onSidebarResizeStart,
+  onTabActivate,
+}: SidebarProps) {
   const tokens = useTokens()
   const sidebarBg = useBg('elevated')
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
   const focusMode = useAppStore((s) => s.focusMode)
+  const bodyRef = useRef<BoxRenderable | null>(null)
 
   if (!sidebarVisible) {
     return null
@@ -179,15 +199,51 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
   const gitEmbedded = gitPane.mode === 'embedded' && gitPane.visible
   const gitOnTop = gitEmbedded && gitPane.position === 'top'
   const gitOnBottom = gitEmbedded && gitPane.position === 'bottom'
+  const contentWidth = Math.max(1, sidebarWidth - 1)
+  const gitPaneMenu = buildGitPaneContextMenu(
+    gitPane,
+    () => dispatchGlobal({ type: 'toggle-git-pane' }),
+    (mode, position) => {
+      dispatchGlobal({ mode, type: 'set-git-pane-mode' })
+      dispatchGlobal({ position, type: 'set-git-pane-position' })
+    }
+  )
 
   // flex-grow scaled by 100 (integer preferred); tabs gets (1-ratio), git gets ratio.
-  const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.ratio) * 100)) : 1
-  const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.ratio * 100)) : 0
+  const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.embeddedRatio) * 100)) : 1
+  const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.embeddedRatio * 100)) : 0
 
-  const separator = <text fg={tokens.hover}>{'·'.repeat(Math.max(0, sidebarWidth - 2))}</text>
+  const separator = <text fg={tokens.hover}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
   const gitBody = gitEmbedded ? (
-    <box flexDirection="column" flexGrow={gitGrow} flexShrink={1} flexBasis={0} overflow="hidden">
+    <ContextMenuBox
+      flexDirection="column"
+      flexGrow={gitGrow}
+      flexShrink={1}
+      flexBasis={0}
+      overflow="hidden"
+      rightClickMenu={gitPaneMenu}
+    >
       <GitPaneWidget pollingEnabled={gitPane.visible} />
+    </ContextMenuBox>
+  ) : null
+  const embeddedHandle = gitEmbedded ? (
+    <box
+      minHeight={1}
+      flexShrink={0}
+      backgroundColor={tokens.border}
+      onMouseDown={(event) => {
+        const body = bodyRef.current
+        if (!body) return
+        event.preventDefault()
+        event.stopPropagation()
+        onEmbeddedGitResizeStart?.({
+          containerStart: body.y,
+          position: gitPane.position === 'top' ? 'top' : 'bottom',
+          totalSize: Math.max(1, body.height),
+        })
+      }}
+    >
+      <text fg={tokens.border}>{RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}</text>
     </box>
   ) : null
 
@@ -198,6 +254,7 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
       flexDirection="column"
       backgroundColor={sidebarBg}
       gap={0}
+      overflow="hidden"
       rightClickMenu={[
         ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
         ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
@@ -214,29 +271,56 @@ export function Sidebar({ onTabActivate }: SidebarProps) {
           dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
         }
       }}
+      onMouseDrag={(event) => {
+        if (onResizeDrag?.(event)) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }}
+      onMouseUp={() => {
+        onResizeDragEnd?.()
+      }}
     >
-      <SidebarTop />
-      {gitOnTop ? (
-        <>
-          {gitBody}
-          {separator}
-        </>
-      ) : null}
-      <box
-        flexDirection="column"
-        flexGrow={tabsGrow}
-        flexShrink={1}
-        flexBasis={0}
-        overflow="hidden"
-      >
-        <TabsBody onTabActivate={onTabActivate} />
+      <box flexDirection="row" width={sidebarWidth} flexGrow={1} overflow="hidden">
+        <box width={contentWidth} flexGrow={1} flexDirection="column" overflow="hidden">
+          <SidebarTop contentWidth={contentWidth} />
+          <box ref={bodyRef} flexDirection="column" flexGrow={1} overflow="hidden">
+            {gitOnTop ? (
+              <>
+                {gitBody}
+                {embeddedHandle}
+              </>
+            ) : null}
+            <box
+              flexDirection="column"
+              flexGrow={tabsGrow}
+              flexShrink={1}
+              flexBasis={0}
+              overflow="hidden"
+            >
+              <TabsBody onTabActivate={onTabActivate} />
+            </box>
+            {gitOnBottom ? (
+              <>
+                {embeddedHandle}
+                {gitBody}
+              </>
+            ) : null}
+          </box>
+          {!gitEmbedded ? separator : null}
+        </box>
+        <box
+          height="100%"
+          width={1}
+          flexShrink={0}
+          backgroundColor={tokens.border}
+          onMouseDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onSidebarResizeStart?.({ initialWidth: sidebarWidth, screenStart: event.x })
+          }}
+        />
       </box>
-      {gitOnBottom ? (
-        <>
-          {separator}
-          {gitBody}
-        </>
-      ) : null}
     </ContextMenuBox>
   )
 }

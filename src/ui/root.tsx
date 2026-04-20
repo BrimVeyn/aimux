@@ -5,10 +5,15 @@ import type { FocusMode, ModalState, SessionRecord, SnippetRecord } from '../sta
 import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
+import { dispatchGlobal } from '../state/dispatch-ref'
+import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { AIUsagePopover } from './components/ai-usage-popover'
+import { ContextMenuBox } from './components/context-menu-box'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
+import { buildGitPaneContextMenu } from './components/git-pane-context-menu'
 import { GitPaneWidget } from './components/git-pane-widget'
 import { GitView } from './components/git-view'
 import { HelpModal } from './components/help-modal'
@@ -25,7 +30,7 @@ import { StatusBar } from './components/status-bar'
 import { TerminalPane } from './components/terminal-pane'
 import { ThemePickerModal } from './components/theme-picker-modal'
 import { UpdateAvailableModal } from './components/update-available-modal'
-import { useBg } from './theme'
+import { useBg, useTokens } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -201,6 +206,17 @@ interface RootViewProps {
   onTerminalClick?: (event: MouseEvent, origin: TerminalContentOrigin, tabId?: string) => void
   onPaneActivate?: (tabId: string) => void
   onSplitResize?: (tabId: string, ratio: number, axis: SplitDirection) => void
+  onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
+  onGitPaneResizeStart?: (info: {
+    initialWidth: number
+    screenStart: number
+    side: 'left' | 'right'
+  }) => void
+  onEmbeddedGitResizeStart?: (info: {
+    containerStart: number
+    position: 'top' | 'bottom'
+    totalSize: number
+  }) => void
   onSeparatorDragStart?: (info: {
     tabId: string
     direction: SplitDirection
@@ -217,10 +233,13 @@ export function RootView({
   contentOrigin,
   localScrollbackEnabled,
   mouseForwardingEnabled,
+  onEmbeddedGitResizeStart,
+  onGitPaneResizeStart,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
   onSeparatorDragStart,
+  onSidebarResizeStart,
   onSplitResize,
   onTerminalClick,
   onTerminalMouseEvent,
@@ -244,7 +263,7 @@ export function RootView({
   const gitPaneMode = useAppStore((s) => s.gitPane.mode)
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
   const gitPanePosition = useAppStore((s) => s.gitPane.position)
-  const gitPaneRatio = useAppStore((s) => s.gitPane.ratio)
+  const gitPaneRatio = useAppStore((s) => s.gitPane.paneRatio)
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
   const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
@@ -260,6 +279,7 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
+        <AIUsagePopover />
         {renderModal(modal, {
           activeAssistant: activeTab?.assistant,
           createSessionFields,
@@ -277,12 +297,36 @@ export function RootView({
   }
 
   return (
-    <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
+    <box
+      flexDirection="column"
+      width="100%"
+      height="100%"
+      backgroundColor={editorBg}
+      onMouseDrag={(event) => {
+        if (onSeparatorDrag?.(event)) {
+          event.preventDefault()
+          event.stopPropagation()
+        }
+      }}
+      onMouseUp={() => {
+        onSeparatorDragEnd?.()
+      }}
+    >
       {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
-        <Sidebar onTabActivate={onPaneActivate} />
+        <Sidebar
+          onTabActivate={onPaneActivate}
+          onEmbeddedGitResizeStart={onEmbeddedGitResizeStart}
+          onResizeDrag={onSeparatorDrag}
+          onResizeDragEnd={onSeparatorDragEnd}
+          onSidebarResizeStart={onSidebarResizeStart}
+        />
         {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
-          <GitPaneInPaneMode ratio={gitPaneRatio} />
+          <GitPaneInPaneMode
+            position="left"
+            ratio={gitPaneRatio}
+            onGitPaneResizeStart={onGitPaneResizeStart}
+          />
         ) : null}
         {activeTree && activeTree.type === 'split' ? (
           <SplitLayout
@@ -329,7 +373,11 @@ export function RootView({
           />
         )}
         {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (
-          <GitPaneInPaneMode ratio={gitPaneRatio} />
+          <GitPaneInPaneMode
+            position="right"
+            ratio={gitPaneRatio}
+            onGitPaneResizeStart={onGitPaneResizeStart}
+          />
         ) : null}
       </box>
       {sessionBarPosition === 'bottom' && <SessionBar />}
@@ -351,14 +399,58 @@ export function RootView({
   )
 }
 
-function GitPaneInPaneMode({ ratio }: { ratio: number }) {
+function GitPaneInPaneMode({
+  onGitPaneResizeStart,
+  position,
+  ratio,
+}: {
+  ratio: number
+  position: 'left' | 'right'
+  onGitPaneResizeStart?: (info: {
+    initialWidth: number
+    screenStart: number
+    side: 'left' | 'right'
+  }) => void
+}) {
   const bg = useBg('elevated')
-  // Ratio maps to a fixed column count (20..80), mirroring the reservation in
-  // use-terminal-resize so the terminal-content area stays in sync.
-  const width = Math.max(20, Math.min(80, Math.round(ratio * 80)))
+  const tokens = useTokens()
+  const gitPane = useAppStore((s) => s.gitPane)
+  const width = getGitPaneWidthFromRatio(ratio)
+  const contentWidth = Math.max(1, width - 1)
+  const gitPaneMenu = buildGitPaneContextMenu(
+    gitPane,
+    () => dispatchGlobal({ type: 'toggle-git-pane' }),
+    (mode, nextPosition) => {
+      dispatchGlobal({ mode, type: 'set-git-pane-mode' })
+      dispatchGlobal({ position: nextPosition, type: 'set-git-pane-position' })
+    }
+  )
+  const handle = (
+    <box
+      width={1}
+      flexShrink={0}
+      backgroundColor={tokens.border}
+      onMouseDown={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onGitPaneResizeStart?.({ initialWidth: width, screenStart: event.x, side: position })
+      }}
+    />
+  )
   return (
     <box flexDirection="column" width={width} flexShrink={0} backgroundColor={bg} overflow="hidden">
-      <GitPaneWidget pollingEnabled />
+      <box flexDirection="row" flexGrow={1} overflow="hidden">
+        {position === 'right' ? handle : null}
+        <ContextMenuBox
+          width={contentWidth}
+          flexGrow={1}
+          overflow="hidden"
+          rightClickMenu={gitPaneMenu}
+        >
+          <GitPaneWidget pollingEnabled />
+        </ContextMenuBox>
+        {position === 'left' ? handle : null}
+      </box>
     </box>
   )
 }

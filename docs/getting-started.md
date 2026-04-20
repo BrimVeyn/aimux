@@ -1,3 +1,8 @@
+---
+title: Getting Started
+description: First-run setup, creating a profile, and your first session.
+---
+
 # Getting Started
 
 This guide walks through the supported setup path for a normal `aimux`

@@ -20,6 +20,17 @@ function entry(overrides: Partial<GitFileEntry> = {}): GitFileEntry {
   }
 }
 
+function moveGitPane(
+  state: AppState,
+  mode: 'embedded' | 'pane',
+  position: 'top' | 'bottom' | 'left' | 'right'
+) {
+  return appReducer(appReducer(state, { mode, type: 'set-git-pane-mode' }), {
+    position,
+    type: 'set-git-pane-position',
+  })
+}
+
 test('toggle-git-pane flips visibility', () => {
   const s0 = seedState()
   const s1 = appReducer(s0, { type: 'toggle-git-pane' })
@@ -42,9 +53,29 @@ test('toggle-git-pane reveals hidden sidebar when enabling in embedded mode', ()
 
 test('resize-git-pane adjusts ratio', () => {
   const s0 = seedState()
-  expect(s0.gitPane.ratio).toBe(0.5)
+  expect(s0.gitPane.embeddedRatio).toBe(0.5)
   const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-pane' })
-  expect(s1.gitPane.ratio).toBeCloseTo(0.6)
+  expect(s1.gitPane.embeddedRatio).toBeCloseTo(0.6)
+  expect(s1.gitPane.paneRatio).toBe(0.5)
+})
+
+test('resize-git-pane updates pane ratio in pane mode', () => {
+  const s0 = appReducer(seedState(), { mode: 'pane', type: 'set-git-pane-mode' })
+  expect(s0.gitPane.paneRatio).toBe(0.5)
+  const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-pane' })
+  expect(s1.gitPane.paneRatio).toBeCloseTo(0.6)
+  expect(s1.gitPane.embeddedRatio).toBe(0.5)
+})
+
+test('set-git-pane-ratio targets embedded or pane layout independently', () => {
+  const s0 = seedState()
+  const embedded = appReducer(s0, { ratio: 0.7, target: 'embedded', type: 'set-git-pane-ratio' })
+  expect(embedded.gitPane.embeddedRatio).toBe(0.7)
+  expect(embedded.gitPane.paneRatio).toBe(0.5)
+
+  const pane = appReducer(embedded, { ratio: 0.3, target: 'pane', type: 'set-git-pane-ratio' })
+  expect(pane.gitPane.embeddedRatio).toBe(0.7)
+  expect(pane.gitPane.paneRatio).toBe(0.3)
 })
 
 test('resize-git-diff-pane adjusts diff mode ratio', () => {
@@ -52,15 +83,16 @@ test('resize-git-diff-pane adjusts diff mode ratio', () => {
   expect(s0.gitPane.diffModeRatio).toBe(0.35)
   const s1 = appReducer(s0, { delta: 0.1, type: 'resize-git-diff-pane' })
   expect(s1.gitPane.diffModeRatio).toBeCloseTo(0.45)
-  expect(s1.gitPane.ratio).toBe(0.5)
+  expect(s1.gitPane.embeddedRatio).toBe(0.5)
+  expect(s1.gitPane.paneRatio).toBe(0.5)
 })
 
 test('resize-git-pane clamps at bounds', () => {
   const s0 = seedState()
   const up = appReducer(s0, { delta: 2, type: 'resize-git-pane' })
-  expect(up.gitPane.ratio).toBe(0.8)
+  expect(up.gitPane.embeddedRatio).toBe(0.8)
   const down = appReducer(s0, { delta: -2, type: 'resize-git-pane' })
-  expect(down.gitPane.ratio).toBe(0.2)
+  expect(down.gitPane.embeddedRatio).toBe(0.2)
 })
 
 test('resize-git-pane returns same state at bound', () => {
@@ -86,6 +118,34 @@ test('set-git-pane-position rejects invalid position for current mode', () => {
   expect(unchanged).toBe(s0)
   const top = appReducer(s0, { position: 'top', type: 'set-git-pane-position' })
   expect(top.gitPane.position).toBe('top')
+})
+
+test('menu-style move transitions from embedded top to pane left', () => {
+  const s0 = appReducer(seedState(), { position: 'top', type: 'set-git-pane-position' })
+  const s1 = moveGitPane(s0, 'pane', 'left')
+  expect(s1.gitPane.mode).toBe('pane')
+  expect(s1.gitPane.position).toBe('left')
+})
+
+test('menu-style move transitions from embedded bottom to pane right', () => {
+  const s0 = seedState()
+  const s1 = moveGitPane(s0, 'pane', 'right')
+  expect(s1.gitPane.mode).toBe('pane')
+  expect(s1.gitPane.position).toBe('right')
+})
+
+test('menu-style move transitions from pane left to embedded top', () => {
+  const s0 = appReducer(seedState(), { mode: 'pane', type: 'set-git-pane-mode' })
+  const s1 = moveGitPane(s0, 'embedded', 'top')
+  expect(s1.gitPane.mode).toBe('embedded')
+  expect(s1.gitPane.position).toBe('top')
+})
+
+test('menu-style move transitions from pane right to embedded bottom', () => {
+  const s0 = moveGitPane(seedState(), 'pane', 'right')
+  const s1 = moveGitPane(s0, 'embedded', 'bottom')
+  expect(s1.gitPane.mode).toBe('embedded')
+  expect(s1.gitPane.position).toBe('bottom')
 })
 
 test('git-refresh-success replaces files + branch state', () => {

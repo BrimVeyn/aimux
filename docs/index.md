@@ -1,3 +1,8 @@
+---
+title: aimux
+description: Terminal multiplexer for AI CLIs — Claude, Codex, OpenCode, and shells in one TUI.
+---
+
 # aimux Documentation
 
 This directory contains the detailed documentation for `@brimveyn/aimux` and

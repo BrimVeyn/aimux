@@ -479,14 +479,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'persist-git-diff-mode-ratio': {
       const config = loadConfig()
       const persistedGitPane = config.gitPane
+      const paneRatio = persistedGitPane?.paneRatio ?? persistedGitPane?.ratio ?? 0.5
+      const embeddedRatio = persistedGitPane?.embeddedRatio ?? persistedGitPane?.ratio ?? 0.5
       saveConfig({
         ...config,
         gitPane: {
           diffModeRatio: effect.ratio,
+          embeddedRatio,
           fileListMode: persistedGitPane?.fileListMode,
           mode: persistedGitPane?.mode ?? 'embedded',
+          paneRatio,
           position: persistedGitPane?.position ?? 'bottom',
-          ratio: persistedGitPane?.ratio ?? 0.5,
           treeCompaction: persistedGitPane?.treeCompaction,
           visible: persistedGitPane?.visible ?? true,
         },
@@ -496,14 +499,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'persist-git-file-list-mode': {
       const config = loadConfig()
       const persistedGitPane = config.gitPane
+      const paneRatio = persistedGitPane?.paneRatio ?? persistedGitPane?.ratio ?? 0.5
+      const embeddedRatio = persistedGitPane?.embeddedRatio ?? persistedGitPane?.ratio ?? 0.5
       saveConfig({
         ...config,
         gitPane: {
           diffModeRatio: persistedGitPane?.diffModeRatio,
+          embeddedRatio,
           fileListMode: effect.mode,
           mode: persistedGitPane?.mode ?? 'embedded',
+          paneRatio,
           position: persistedGitPane?.position ?? 'bottom',
-          ratio: persistedGitPane?.ratio ?? 0.5,
           treeCompaction: persistedGitPane?.treeCompaction,
           visible: persistedGitPane?.visible ?? true,
         },
@@ -513,14 +519,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'persist-git-tree-compaction': {
       const config = loadConfig()
       const persistedGitPane = config.gitPane
+      const paneRatio = persistedGitPane?.paneRatio ?? persistedGitPane?.ratio ?? 0.5
+      const embeddedRatio = persistedGitPane?.embeddedRatio ?? persistedGitPane?.ratio ?? 0.5
       saveConfig({
         ...config,
         gitPane: {
           diffModeRatio: persistedGitPane?.diffModeRatio,
+          embeddedRatio,
           fileListMode: persistedGitPane?.fileListMode,
           mode: persistedGitPane?.mode ?? 'embedded',
+          paneRatio,
           position: persistedGitPane?.position ?? 'bottom',
-          ratio: persistedGitPane?.ratio ?? 0.5,
           treeCompaction: effect.enabled,
           visible: persistedGitPane?.visible ?? true,
         },

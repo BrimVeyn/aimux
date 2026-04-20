@@ -1,3 +1,8 @@
+---
+title: Keymaps
+description: Key notation, modes, leader keys, multi-key sequences, help metadata, and override rules.
+---
+
 # Keymaps
 
 `aimux` keymaps are defined through `@brimveyn/aimux-config` and resolved at

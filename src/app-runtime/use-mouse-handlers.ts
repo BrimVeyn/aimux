@@ -16,8 +16,21 @@ import {
   resolveClickSelection,
 } from './click-selection-resolver'
 import { requestRenderUpTree } from './render-invalidation'
-import { getSplitRatioFromDrag, type SplitDragState } from './split-drag-controller'
+import {
+  type AnchoredRatioDragState,
+  type AxisDragState,
+  getAnchoredRatioFromDrag,
+  getAxisDeltaFromDrag,
+  getSplitRatioFromDrag,
+  type SplitDragState,
+} from './split-drag-controller'
 import { getForwardedMouseSequence, getScrollViewportDelta } from './terminal-mouse-adapter'
+
+type ResizeDragState =
+  | ({ kind: 'split' } & SplitDragState)
+  | ({ initialWidth: number; kind: 'sidebar' } & AxisDragState)
+  | ({ initialWidth: number; kind: 'git-pane'; side: 'left' | 'right' } & AxisDragState)
+  | ({ kind: 'embedded-git'; position: 'top' | 'bottom' } & AnchoredRatioDragState)
 
 interface UseMouseHandlersOptions {
   state: AppState
@@ -68,7 +81,7 @@ export function useMouseHandlers({
   renderer,
   state,
 }: UseMouseHandlersOptions) {
-  const separatorDragRef = useRef<SplitDragState | null>(null)
+  const separatorDragRef = useRef<ResizeDragState | null>(null)
   const multiClickRef = useRef(new MultiClickDetector())
 
   const handleTerminalMouseEvent = (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
@@ -113,7 +126,45 @@ export function useMouseHandlers({
     screenStart: number
     totalSize: number
   }) => {
-    separatorDragRef.current = info
+    separatorDragRef.current = { kind: 'split', ...info }
+  }
+
+  const handleSidebarResizeStart = (info: { initialWidth: number; screenStart: number }) => {
+    separatorDragRef.current = {
+      axis: 'x',
+      initialWidth: info.initialWidth,
+      kind: 'sidebar',
+      screenStart: info.screenStart,
+    }
+  }
+
+  const handleGitPaneResizeStart = (info: {
+    initialWidth: number
+    screenStart: number
+    side: 'left' | 'right'
+  }) => {
+    separatorDragRef.current = {
+      axis: 'x',
+      initialWidth: info.initialWidth,
+      kind: 'git-pane',
+      screenStart: info.screenStart,
+      side: info.side,
+    }
+  }
+
+  const handleEmbeddedGitResizeStart = (info: {
+    containerStart: number
+    position: 'top' | 'bottom'
+    totalSize: number
+  }) => {
+    separatorDragRef.current = {
+      anchor: info.position === 'top' ? 'start' : 'end',
+      axis: 'y',
+      kind: 'embedded-git',
+      position: info.position,
+      screenStart: info.containerStart,
+      totalSize: info.totalSize,
+    }
   }
 
   const handleSeparatorDrag = (event: OtuiMouseEvent): boolean => {
@@ -122,8 +173,42 @@ export function useMouseHandlers({
       return false
     }
 
-    const newRatio = getSplitRatioFromDrag(event, drag)
-    dispatch({ axis: drag.direction, ratio: newRatio, tabId: drag.tabId, type: 'set-split-ratio' })
+    switch (drag.kind) {
+      case 'split': {
+        const newRatio = getSplitRatioFromDrag(event, drag)
+        dispatch({
+          axis: drag.direction,
+          ratio: newRatio,
+          tabId: drag.tabId,
+          type: 'set-split-ratio',
+        })
+        break
+      }
+      case 'sidebar': {
+        const nextWidth = Math.round(drag.initialWidth + getAxisDeltaFromDrag(event, drag))
+        dispatch({ type: 'set-sidebar-width', width: nextWidth })
+        break
+      }
+      case 'git-pane': {
+        const delta = getAxisDeltaFromDrag(event, drag)
+        const direction = drag.side === 'left' ? 1 : -1
+        const nextWidth = drag.initialWidth + delta * direction
+        dispatch({
+          ratio: nextWidth / 80,
+          target: 'pane',
+          type: 'set-git-pane-ratio',
+        })
+        break
+      }
+      case 'embedded-git': {
+        dispatch({
+          ratio: getAnchoredRatioFromDrag(event, drag),
+          target: 'embedded',
+          type: 'set-git-pane-ratio',
+        })
+        break
+      }
+    }
     return true
   }
 
@@ -171,10 +256,13 @@ export function useMouseHandlers({
   }
 
   return {
+    handleEmbeddedGitResizeStart,
+    handleGitPaneResizeStart,
     handlePaneActivate,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
     handleSeparatorDragStart,
+    handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
     handleTerminalMouseEvent,

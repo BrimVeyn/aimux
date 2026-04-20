@@ -35,12 +35,13 @@ export interface InitialStateOverrides {
 const DEFAULT_GIT_PANE: GitPaneState = {
   diffCount: { enabled: true },
   diffModeRatio: 0.35,
+  embeddedRatio: 0.5,
   fileListMode: 'tree',
   mode: 'embedded',
+  paneRatio: 0.5,
   path: { enabled: true },
   position: 'bottom',
   prefetchRadius: 5,
-  ratio: 0.5,
   treeCompaction: true,
   visible: true,
 }

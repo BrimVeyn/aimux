@@ -1,3 +1,8 @@
+---
+title: Config Reference
+description: Exhaustive reference for the @brimveyn/aimux-config surface.
+---
+
 # `@brimveyn/aimux-config` Reference
 
 This is the exhaustive reference for the public configuration surface used by
@@ -41,6 +46,7 @@ defineConfig({
   hooks?: HooksConfig
   snippets?: SnippetDef[]
   autoCommit?: Partial<AutoCommitConfig>
+  statusBar?: StatusBarConfig
 })
 ```
 
@@ -58,6 +64,7 @@ defineConfig({
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
 | `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
 | `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`   |
+| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI session usage indicator                  |
 
 ## `defineConfig`
 
@@ -378,6 +385,54 @@ export default defineConfig({
 
 See [`../guide/git-mode.md#auto-commit`](../guide/git-mode.md#auto-commit)
 for the full user-facing walkthrough.
+
+## `statusBar`
+
+Status: `Supported`
+
+Type:
+
+```ts
+interface StatusBarConfig {
+  aiUsage?: AIUsageToolConfig
+}
+
+interface AIUsageToolConfig {
+  enabled?: boolean // default false
+  tools?: Array<'claude' | 'codex'> // default ['claude', 'codex']
+  pollSeconds?: number // default 60; clamped to a minimum of 5
+  claudePlan?: 'auto' | 'pro' | 'max5' | 'max20' // default 'auto'; reserved
+  codexWeeklyLimit?: number // reserved
+}
+```
+
+Runtime behavior:
+
+- when `aiUsage.enabled !== true` the indicator is hidden and no polling happens
+- the indicator lives on the right side of the status bar and supports click to
+  open a details popover
+- Claude data comes from `api.anthropic.com/api/oauth/usage` using the
+  OAuth token stored in the macOS Keychain (`Claude Code-credentials`)
+- Codex data comes from `chatgpt.com/backend-api/wham/usage` using the OAuth
+  token stored in `~/.codex/auth.json`
+- all colors are pulled from the active theme palette; no hardcoded colors
+
+See [`../guide/ai-usage-indicator.md`](../guide/ai-usage-indicator.md) for the
+full guide, field reference, and platform requirements.
+
+Example:
+
+```ts
+export default defineConfig({
+  statusBar: {
+    aiUsage: {
+      enabled: true,
+      pollSeconds: 60,
+      tools: ['claude', 'codex'],
+    },
+  },
+})
+```
 
 ## Actions
 

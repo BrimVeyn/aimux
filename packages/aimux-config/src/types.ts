@@ -170,7 +170,8 @@ export interface GitPaneState {
   visible: boolean
   mode: 'embedded' | 'pane'
   position: 'top' | 'bottom' | 'left' | 'right'
-  ratio: number
+  paneRatio: number
+  embeddedRatio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
   treeCompaction: boolean
@@ -469,10 +470,12 @@ export type LayoutAction =
 export type UIAction =
   | { type: 'toggle-sidebar' }
   | { type: 'resize-sidebar'; delta: number }
+  | { type: 'set-sidebar-width'; width: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
   | { type: 'toggle-git-pane' }
   | { type: 'resize-git-pane'; delta: number }
+  | { type: 'set-git-pane-ratio'; target: 'pane' | 'embedded'; ratio: number }
   | { type: 'resize-git-diff-pane'; delta: number }
   | { type: 'set-git-pane-mode'; mode: 'embedded' | 'pane' }
   | { type: 'set-git-pane-position'; position: 'top' | 'bottom' | 'left' | 'right' }
@@ -788,6 +791,20 @@ export interface AimuxThemeConfig {
   paletteOverrides?: Partial<AimuxPalette>
 }
 
+export type AIUsageTool = 'claude' | 'codex'
+
+export interface AIUsageToolConfig {
+  enabled?: boolean
+  pollSeconds?: number
+  claudePlan?: 'auto' | 'pro' | 'max5' | 'max20'
+  codexWeeklyLimit?: number
+  tools?: AIUsageTool[]
+}
+
+export interface StatusBarConfig {
+  aiUsage?: AIUsageToolConfig
+}
+
 export interface AimuxUserConfig {
   theme?: AimuxThemeConfig
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
@@ -798,6 +815,7 @@ export interface AimuxUserConfig {
   hooks?: HooksConfig
   snippets?: SnippetDef[]
   autoCommit?: Partial<AutoCommitConfig>
+  statusBar?: StatusBarConfig
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -832,4 +850,5 @@ export interface ResolvedConfig {
   hooks: HooksConfig
   snippets: SnippetDef[]
   autoCommit: AutoCommitConfig
+  statusBar: StatusBarConfig
 }
