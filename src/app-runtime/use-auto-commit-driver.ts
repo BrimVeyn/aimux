@@ -9,7 +9,7 @@ import {
   onGitRefresh,
   onManualTrigger,
 } from './auto-commit-driver'
-import { setActiveAutoCommitDriver } from './auto-commit-ref'
+import { clearActiveAutoCommitDriverIfMatches, setActiveAutoCommitDriver } from './auto-commit-ref'
 
 interface Options {
   state: AppState
@@ -52,17 +52,23 @@ export function useAutoCommitDriver({
   depsRef.current = deps
 
   useEffect(() => {
-    setActiveAutoCommitDriver((args) => onManualTrigger(depsRef.current, args))
-    return () => setActiveAutoCommitDriver(null)
+    const handler: (args: Parameters<typeof onManualTrigger>[1]) => Promise<void> = (args) =>
+      onManualTrigger(depsRef.current, args)
+    setActiveAutoCommitDriver(handler)
+    return () => clearActiveAutoCommitDriverIfMatches(handler)
   }, [])
 
   const prevActivityRef = useRef<Map<string, TabActivity | undefined>>(new Map())
 
   useEffect(() => {
+    // Always refresh the activity map so re-enabling mid-session doesn't fire
+    // a stale "became idle" transition. Skip only the dispatch work.
     const prev = prevActivityRef.current
     const next = new Map<string, TabActivity | undefined>()
+    const enabled = configRef.current.enabled
     for (const tab of state.tabs) {
       next.set(tab.id, tab.activity)
+      if (!enabled) continue
       const before = prev.get(tab.id)
       const becameIdle =
         (before === 'working' || before === 'waiting-input') && tab.activity === 'idle'
@@ -87,6 +93,7 @@ export function useAutoCommitDriver({
   const gitStabilizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    if (!configRef.current.enabled) return
     const sessionId = state.currentSessionId
     if (!sessionId) return
     const payload = gitPayloadFromState(state)

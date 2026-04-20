@@ -209,6 +209,19 @@ async function runGeneration(
   if (!probe) return
   if (!isCommandAvailable(probe.executable)) return
 
+  // Supersede any in-flight generation for this session. Without this, a
+  // rapid sequence of activity transitions (each with a different working
+  // tree hash) would leak concurrent headless subprocesses until each hit
+  // its 60 s timeout — burning real API credits.
+  const existing = deps.getState().autoCommit.bySession[args.sessionId]
+  if (existing && existing.kind === 'generating') {
+    try {
+      existing.abortController.abort()
+    } catch {
+      // ignore
+    }
+  }
+
   const controller = new AbortController()
   deps.dispatch({
     abortController: controller,

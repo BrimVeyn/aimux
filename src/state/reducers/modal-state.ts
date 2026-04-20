@@ -258,7 +258,16 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return null
       }
       const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
-      if (!nextAutoCommit) return null
+      if (!nextAutoCommit) {
+        // Stale result (hash mismatch or slice was cleared mid-flight): don't
+        // strand the modal in `generating` — flip back to edit so the user
+        // isn't stuck staring at a spinner that will never resolve.
+        return {
+          ...state,
+          focusMode: 'command-edit',
+          modal: { ...state.modal, stage: 'edit' },
+        }
+      }
       return {
         ...state,
         autoCommit: nextAutoCommit,
