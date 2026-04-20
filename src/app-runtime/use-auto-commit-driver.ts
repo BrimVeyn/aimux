@@ -19,6 +19,8 @@ interface Options {
   getProfileConfigRoot: () => string
 }
 
+const GIT_STABILIZATION_DEBOUNCE_MS = 2000
+
 function gitPayloadFromState(state: AppState): GitRefreshPayload | null {
   const panel = state.gitPanel
   if (panel.error !== null) return null
@@ -82,6 +84,8 @@ export function useAutoCommitDriver({
   }, [state])
 
   const lastGitHashRef = useRef<string | null>(null)
+  const gitStabilizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   useEffect(() => {
     const sessionId = state.currentSessionId
     if (!sessionId) return
@@ -91,5 +95,32 @@ export function useAutoCommitDriver({
     if (lastGitHashRef.current === cacheKey) return
     lastGitHashRef.current = cacheKey
     onGitRefresh(depsRef.current, sessionId, payload)
+
+    // Debounced trigger: when the working tree stays stable for
+    // GIT_STABILIZATION_DEBOUNCE_MS, try to start generation. Covers cases
+    // where the assistant's activity spinner never appears (e.g. Claude in
+    // fast mode) and where the user edits via an external editor.
+    if (gitStabilizeTimerRef.current) clearTimeout(gitStabilizeTimerRef.current)
+    const activeTabId = state.activeTabId
+    const activeTab = activeTabId ? state.tabs.find((tab) => tab.id === activeTabId) : undefined
+    if (!activeTab) return
+    const session = state.sessions.find((s) => s.id === sessionId)
+    gitStabilizeTimerRef.current = setTimeout(() => {
+      gitStabilizeTimerRef.current = null
+      void onActivityTransition(depsRef.current, {
+        assistant: activeTab.assistant,
+        git: payload,
+        projectPath: session?.projectPath,
+        sessionId,
+        tabId: activeTab.id,
+      })
+    }, GIT_STABILIZATION_DEBOUNCE_MS)
   }, [state])
+
+  useEffect(
+    () => () => {
+      if (gitStabilizeTimerRef.current) clearTimeout(gitStabilizeTimerRef.current)
+    },
+    []
+  )
 }
