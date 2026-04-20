@@ -701,14 +701,21 @@ async function runGitCommitAuto(
   const cwd = ctx.getCurrentSessionProjectPath()
   if (!cwd) return
 
-  const addArgs = ['add', '-A']
-  const addResult = await $`git -C ${cwd} ${addArgs}`.quiet().nothrow()
-  if (addResult.exitCode !== 0) {
-    ctx.dispatch({
-      message: addResult.stderr.toString().trim() || 'auto-commit: git add failed',
-      type: 'git-mode-set-message',
-    })
-    return
+  // If the user has manually staged files, respect that intent and commit
+  // only the staged set — don't run `git add -A` which would sweep up
+  // unrelated unstaged/untracked changes. With nothing staged, `add -A`
+  // keeps the "commit everything" behaviour the user expects from auto-commit.
+  const hasStaged = ctx.state.gitPanel.files.some((f) => f.section === 'staged')
+  if (!hasStaged) {
+    const addArgs = ['add', '-A']
+    const addResult = await $`git -C ${cwd} ${addArgs}`.quiet().nothrow()
+    if (addResult.exitCode !== 0) {
+      ctx.dispatch({
+        message: addResult.stderr.toString().trim() || 'auto-commit: git add failed',
+        type: 'git-mode-set-message',
+      })
+      return
+    }
   }
 
   const commitResult = body
