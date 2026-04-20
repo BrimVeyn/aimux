@@ -167,7 +167,8 @@ export async function onManualTrigger(
   const existing = deps.getState().autoCommit.bySession[args.sessionId]
   // An in-flight generation will dispatch ready/clear; just wait for it.
   if (existing && existing.kind === 'generating') return
-  if (existing && existing.kind === 'ready' && existing.workingTreeHash === currentHash) return
+  // Manual trigger is always user-intent to regenerate, even if a ready
+  // suggestion exists at the same hash — the user explicitly asked for it.
 
   const probe = buildHeadlessInvocation(args.assistant, '__probe__', config.models[args.assistant])
   if (!probe) return fail(`no headless invocation for ${args.assistant}`)

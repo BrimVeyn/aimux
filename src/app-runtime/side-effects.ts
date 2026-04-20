@@ -737,11 +737,16 @@ async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: strin
   const session = ctx.state.sessions.find((s) => s.id === sessionId)
   const panel = ctx.state.gitPanel
   if (panel.error !== null) {
+    ctx.dispatch({ message: 'auto-commit: git panel unavailable', type: 'git-mode-set-message' })
     ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
     return
   }
   const tab = ctx.activeTab
   if (!tab) {
+    ctx.dispatch({
+      message: 'auto-commit: no active assistant tab — open a claude/codex session first',
+      type: 'git-mode-set-message',
+    })
     ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
     return
   }
