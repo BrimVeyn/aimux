@@ -33,6 +33,8 @@ export type {
   AimuxThemeConfig,
   // User-facing config
   AimuxUserConfig,
+  AIUsageTool,
+  AIUsageToolConfig,
   AppAction,
   AppState,
   BackendConfig,
@@ -68,6 +70,7 @@ export type {
   SnippetDef,
   SnippetRecord,
   SplitDirection,
+  StatusBarConfig,
   TabSession,
   Theme,
   ThemeId,

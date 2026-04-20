@@ -8,6 +8,7 @@ import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { AIUsagePopover } from './components/ai-usage-popover'
 import { ContextMenuBox } from './components/context-menu-box'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
@@ -272,6 +273,7 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
+        <AIUsagePopover />
         {renderModal(modal, {
           createSessionFields,
           currentSessionId,
