@@ -1,3 +1,8 @@
+---
+title: Architecture
+description: App, daemon, terminal-manager, and state flow.
+---
+
 # Architecture
 
 This page is for developers who need the runtime model behind `aimux`, not just

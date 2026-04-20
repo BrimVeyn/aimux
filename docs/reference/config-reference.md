@@ -1,3 +1,8 @@
+---
+title: Config Reference
+description: Exhaustive reference for the @brimveyn/aimux-config surface.
+---
+
 # `@brimveyn/aimux-config` Reference
 
 This is the exhaustive reference for the public configuration surface used by
