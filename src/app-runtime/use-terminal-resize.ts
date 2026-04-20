@@ -4,6 +4,7 @@ import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, AppState, ScrollIntent } from '../state/types'
 
+import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import {
   createTerminalBounds,
   forEachSplitPaneRect,
@@ -140,8 +141,7 @@ export function useTerminalResize({
       STATUS_BAR_HEIGHT +
       TERMINAL_PANE_VERTICAL_CHROME +
       sessionBarRows
-    const gitPaneRaw = gitPaneInPaneMode ? Math.round(state.gitPane.ratio * 80) : 0
-    const gitPaneWidth = gitPaneInPaneMode ? Math.max(20, Math.min(80, gitPaneRaw)) : 0
+    const gitPaneWidth = gitPaneInPaneMode ? getGitPaneWidthFromRatio(state.gitPane.paneRatio) : 0
     const gitOnLeft = gitPaneInPaneMode && state.gitPane.position === 'left'
     const cols = Math.max(
       MIN_TERMINAL_COLS,
@@ -167,7 +167,7 @@ export function useTerminalResize({
     state.sessionBar.position,
     gitPaneInPaneMode,
     state.gitPane.position,
-    state.gitPane.ratio,
+    state.gitPane.paneRatio,
   ])
 
   useLayoutEffect(() => {
@@ -196,7 +196,7 @@ export function useTerminalResize({
     state.sessionBar.position,
     gitPaneInPaneMode,
     state.gitPane.position,
-    state.gitPane.ratio,
+    state.gitPane.paneRatio,
   ])
 
   useEffect(() => {

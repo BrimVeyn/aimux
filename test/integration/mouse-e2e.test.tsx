@@ -1,18 +1,22 @@
 import { createTestRenderer } from '@opentui/core/testing'
 import { createRoot, useTerminalDimensions } from '@opentui/react'
-import { afterEach, describe, test } from 'bun:test'
+import { afterEach, describe, expect, test } from 'bun:test'
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
 
 import type { TerminalContentOrigin } from '../../src/input/raw-input-handler'
+import type { SessionBackend } from '../../src/session-backend/types'
 import type { TabSession, TerminalModeState, TerminalSnapshot } from '../../src/state/types'
 
+import { useMouseHandlers } from '../../src/app-runtime/use-mouse-handlers'
 import { encodeMouseEventForPty } from '../../src/input/mouse-forwarding'
 import { parseCommand } from '../../src/pty/command-registry'
 import { PtyManager } from '../../src/pty/pty-manager'
 import { appStore } from '../../src/state/app-store'
+import { getGitPaneWidthFromRatio } from '../../src/state/git-pane-sizing'
+import { appReducer, createInitialState } from '../../src/state/store'
 import { RootView } from '../../src/ui/root'
 
 const TEST_WIDTH = 120
@@ -199,12 +203,13 @@ function MouseHarness({
       gitPane: {
         diffCount: { enabled: true },
         diffModeRatio: 0.35,
+        embeddedRatio: 0.5,
         fileListMode: 'tree' as const,
         mode: 'embedded' as const,
+        paneRatio: 0.5,
         path: { enabled: true },
         position: 'bottom' as const,
         prefetchRadius: 0,
-        ratio: 0.5,
         treeCompaction: false,
         visible: true,
       },
@@ -317,6 +322,127 @@ async function mountMouseHarness(
   return { captureCharFrame, cleanup, mockMouse, renderOnce }
 }
 
+const RESIZE_CONTENT_ORIGIN: TerminalContentOrigin = { cols: 80, rows: 24, x: 30, y: 2 }
+const RESIZE_BACKEND = {
+  scrollViewport() {},
+  write() {},
+} as unknown as SessionBackend
+const RESIZE_RENDERER = {
+  clearSelection() {},
+  startSelection() {},
+  updateSelection() {},
+}
+
+function ResizeHarness({
+  embeddedRatio = 0.5,
+  gitPaneMode = 'embedded',
+  gitPanePosition = 'bottom',
+}: {
+  gitPaneMode: 'embedded' | 'pane'
+  gitPanePosition: 'top' | 'bottom' | 'left' | 'right'
+  embeddedRatio?: number
+}) {
+  const [state, dispatch] = useReducer(appReducer, undefined, () => {
+    const base = createInitialState()
+    return {
+      ...base,
+      activeTabId: TEST_TAB_ID,
+      focusMode: 'navigation' as const,
+      gitPane: {
+        ...base.gitPane,
+        embeddedRatio,
+        mode: gitPaneMode,
+        position: gitPanePosition,
+        visible: true,
+      },
+      sessionBar: { ...base.sessionBar, visible: false },
+      tabs: [
+        {
+          activity: 'idle',
+          assistant: 'claude',
+          buffer: 'ready',
+          command: 'claude',
+          id: TEST_TAB_ID,
+          status: 'running',
+          terminalModes: INITIAL_TERMINAL_MODES,
+          title: 'Resize target',
+        } satisfies TabSession,
+      ],
+    }
+  })
+
+  const handlers = useMouseHandlers({
+    activeLocalScrollbackEnabled: false,
+    activeMouseForwardingEnabled: false,
+    backend: RESIZE_BACKEND,
+    dispatch,
+    renderer: RESIZE_RENDERER,
+    state,
+  })
+
+  useLayoutEffect(() => {
+    appStore.setState({ ...state, dispatch })
+  }, [dispatch, state])
+
+  return (
+    <RootView
+      themeId="aimux-dark"
+      contentOrigin={RESIZE_CONTENT_ORIGIN}
+      mouseForwardingEnabled={false}
+      localScrollbackEnabled={false}
+      onTerminalMouseEvent={() => {}}
+      onTerminalScrollEvent={() => {}}
+      onTerminalClick={handlers.handleTerminalClick}
+      onPaneActivate={handlers.handlePaneActivate}
+      onSplitResize={handlers.handleSplitResize}
+      onSidebarResizeStart={handlers.handleSidebarResizeStart}
+      onGitPaneResizeStart={handlers.handleGitPaneResizeStart}
+      onEmbeddedGitResizeStart={handlers.handleEmbeddedGitResizeStart}
+      onSeparatorDragStart={handlers.handleSeparatorDragStart}
+      onSeparatorDrag={handlers.handleSeparatorDrag}
+      onSeparatorDragEnd={handlers.handleSeparatorDragEnd}
+      terminalCols={80}
+      terminalRows={24}
+    />
+  )
+}
+
+async function mountResizeHarness(options: {
+  embeddedRatio?: number
+  gitPaneMode: 'embedded' | 'pane'
+  gitPanePosition: 'top' | 'bottom' | 'left' | 'right'
+}) {
+  const { mockMouse, renderer, renderOnce } = await createTestRenderer({
+    height: TEST_HEIGHT,
+    useMouse: true,
+    width: TEST_WIDTH,
+  })
+  const root = createRoot(renderer)
+  root.render(<ResizeHarness {...options} />)
+
+  let cleanedUp = false
+  const cleanup = () => {
+    if (cleanedUp) return
+    cleanedUp = true
+    root.unmount()
+  }
+  cleanups.push(cleanup)
+
+  await renderOnce()
+  await renderOnce()
+  await waitFor(
+    renderOnce,
+    () => {
+      const gitPane = appStore.getState().gitPane
+      return gitPane.mode === options.gitPaneMode && gitPane.position === options.gitPanePosition
+    },
+    () => JSON.stringify(appStore.getState().gitPane),
+    1_000
+  )
+
+  return { cleanup, mockMouse, renderOnce }
+}
+
 describe('mouse passthrough integration', () => {
   test('forwards click events to the PTY in terminal-input mode', async () => {
     const app = await mountMouseHarness(createMouseFixtureCommand(), {
@@ -374,4 +500,71 @@ describe('mouse passthrough integration', () => {
       app.captureCharFrame
     )
   }, 15_000)
+})
+
+describe('mouse resize integration', () => {
+  test('drags the sidebar edge to resize width', async () => {
+    const app = await mountResizeHarness({ gitPaneMode: 'embedded', gitPanePosition: 'bottom' })
+    const initialWidth = appStore.getState().sidebar.width
+
+    let changed = false
+    for (let x = initialWidth - 1; x <= initialWidth + 2 && !changed; x += 1) {
+      for (let y = 4; y <= 20; y += 2) {
+        await app.mockMouse.drag(x, y, x + 6, y)
+        await app.renderOnce()
+        if (appStore.getState().sidebar.width > initialWidth) {
+          changed = true
+          break
+        }
+      }
+    }
+
+    expect(changed).toBe(true)
+    expect(appStore.getState().sidebar.width).toBeGreaterThan(initialWidth)
+  })
+
+  test('drags the side git pane edge to resize pane width', async () => {
+    const app = await mountResizeHarness({ gitPaneMode: 'pane', gitPanePosition: 'left' })
+    const initialRatio = appStore.getState().gitPane.paneRatio
+    const paneWidth = getGitPaneWidthFromRatio(initialRatio)
+    const startX = appStore.getState().sidebar.width + paneWidth
+
+    let changed = false
+    for (let x = startX - 1; x <= startX + 2; x += 1) {
+      await app.mockMouse.drag(x, 8, x + 6, 8)
+      await app.renderOnce()
+      if (appStore.getState().gitPane.paneRatio > initialRatio) {
+        changed = true
+        break
+      }
+    }
+
+    expect(changed).toBe(true)
+    expect(appStore.getState().gitPane.paneRatio).toBeGreaterThan(initialRatio)
+    expect(appStore.getState().gitPane.embeddedRatio).toBe(0.5)
+  })
+
+  test('drags the embedded git divider to resize height without changing sidebar width', async () => {
+    const app = await mountResizeHarness({
+      embeddedRatio: 0.5,
+      gitPaneMode: 'embedded',
+      gitPanePosition: 'bottom',
+    })
+    const initialRatio = appStore.getState().gitPane.embeddedRatio
+    const initialSidebarWidth = appStore.getState().sidebar.width
+
+    let changed = false
+    for (let y = 8; y <= 28; y += 1) {
+      await app.mockMouse.drag(8, y, 8, y + 4)
+      await app.renderOnce()
+      if (appStore.getState().gitPane.embeddedRatio !== initialRatio) {
+        changed = true
+        break
+      }
+    }
+
+    expect(changed).toBe(true)
+    expect(appStore.getState().gitPane.embeddedRatio).not.toBe(initialRatio)
+    expect(appStore.getState().sidebar.width).toBe(initialSidebarWidth)
+  })
 })

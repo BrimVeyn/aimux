@@ -9,6 +9,12 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
         state.sidebar.maxWidth,
         Math.max(state.sidebar.minWidth, state.sidebar.width + action.delta)
       )
+      if (width === state.sidebar.width) return state
+      return { ...state, sidebar: { ...state.sidebar, width } }
+    }
+    case 'set-sidebar-width': {
+      const width = Math.min(state.sidebar.maxWidth, Math.max(state.sidebar.minWidth, action.width))
+      if (width === state.sidebar.width) return state
       return { ...state, sidebar: { ...state.sidebar, width } }
     }
     case 'set-focus-mode':

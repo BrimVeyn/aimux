@@ -22,7 +22,9 @@ export interface PersistedGitPane {
   visible: boolean
   mode: 'embedded' | 'pane'
   position: 'top' | 'bottom' | 'left' | 'right'
-  ratio: number
+  paneRatio?: number
+  embeddedRatio?: number
+  ratio?: number
 }
 
 export interface AimuxConfig {
@@ -47,7 +49,20 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
     v.position === 'left' ||
     v.position === 'right'
   const ratioOk =
-    typeof v.ratio === 'number' && Number.isFinite(v.ratio) && v.ratio > 0 && v.ratio < 1
+    v.ratio === undefined ||
+    (typeof v.ratio === 'number' && Number.isFinite(v.ratio) && v.ratio > 0 && v.ratio < 1)
+  const paneRatioOk =
+    v.paneRatio === undefined ||
+    (typeof v.paneRatio === 'number' &&
+      Number.isFinite(v.paneRatio) &&
+      v.paneRatio > 0 &&
+      v.paneRatio < 1)
+  const embeddedRatioOk =
+    v.embeddedRatio === undefined ||
+    (typeof v.embeddedRatio === 'number' &&
+      Number.isFinite(v.embeddedRatio) &&
+      v.embeddedRatio > 0 &&
+      v.embeddedRatio < 1)
   const diffModeRatioOk =
     v.diffModeRatio === undefined ||
     (typeof v.diffModeRatio === 'number' &&
@@ -68,6 +83,8 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
     !modeOk ||
     !positionOk ||
     !ratioOk ||
+    !paneRatioOk ||
+    !embeddedRatioOk ||
     !diffModeRatioOk ||
     !visibleOk ||
     !fileListModeOk ||
@@ -169,7 +186,9 @@ export function loadConfigResult(): ConfigLoadResult {
           : undefined
       if (legacyVisible !== undefined || legacyRatio !== undefined) {
         validGitPane = {
+          embeddedRatio: legacyRatio ?? 0.5,
           mode: 'embedded',
+          paneRatio: legacyRatio ?? 0.5,
           position: 'bottom',
           ratio: legacyRatio ?? 0.5,
           visible: legacyVisible ?? true,

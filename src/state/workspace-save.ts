@@ -26,10 +26,11 @@ export function saveCurrentWorkspace(state: AppState): void {
     customCommands: state.customCommands,
     gitPane: {
       diffModeRatio: state.gitPane.diffModeRatio,
+      embeddedRatio: state.gitPane.embeddedRatio,
       fileListMode: state.gitPane.fileListMode,
       mode: state.gitPane.mode,
+      paneRatio: state.gitPane.paneRatio,
       position: state.gitPane.position,
-      ratio: state.gitPane.ratio,
       visible: state.gitPane.visible,
     },
     sessionBarPosition: state.sessionBar.position,

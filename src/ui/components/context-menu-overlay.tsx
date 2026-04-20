@@ -53,8 +53,10 @@ export function ContextMenuOverlay() {
   const maxLabel = Math.max(...menu.items.map(([label]) => label.length))
   const width = maxLabel + 4
   const height = menu.items.length + 2
-  const left = Math.max(0, Math.min(menu.anchorX, terminalCols - width))
-  const top = Math.max(0, Math.min(menu.anchorY, terminalRows - height))
+  const left =
+    menu.anchorX + width <= terminalCols ? menu.anchorX : Math.max(0, menu.anchorX - width)
+  const top =
+    menu.anchorY + height <= terminalRows ? menu.anchorY : Math.max(0, menu.anchorY - height)
 
   return (
     <box position="absolute" top={0} left={0} width="100%" height="100%">

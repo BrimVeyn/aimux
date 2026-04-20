@@ -1,10 +1,8 @@
 import type { AppAction, AppState, GitFileEntry, GitFileSection, GitPanelState } from '../types'
 
+import { clampGitPaneRatio } from '../git-pane-sizing'
 import { reconcileSelectedGitEntryKey } from '../git-tree'
 import { clearDiffCacheForPaths } from './diff-cache'
-
-export const GIT_PANEL_MIN_RATIO = 0.2
-export const GIT_PANEL_MAX_RATIO = 0.8
 
 const SECTION_RANK: Record<GitFileSection, number> = {
   historical: 0,
@@ -23,7 +21,7 @@ export function sortFilesBySection(files: GitFileEntry[]): GitFileEntry[] {
 }
 
 function clampRatio(value: number): number {
-  return Math.max(GIT_PANEL_MIN_RATIO, Math.min(GIT_PANEL_MAX_RATIO, value))
+  return clampGitPaneRatio(value)
 }
 
 export function emptyGitPanel(): GitPanelState {
@@ -93,9 +91,16 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       }
     }
     case 'resize-git-pane': {
-      const nextRatio = clampRatio(state.gitPane.ratio + action.delta)
-      if (nextRatio === state.gitPane.ratio) return state
-      return { ...state, gitPane: { ...state.gitPane, ratio: nextRatio } }
+      const target = state.gitPane.mode === 'pane' ? 'paneRatio' : 'embeddedRatio'
+      const nextRatio = clampRatio(state.gitPane[target] + action.delta)
+      if (nextRatio === state.gitPane[target]) return state
+      return { ...state, gitPane: { ...state.gitPane, [target]: nextRatio } }
+    }
+    case 'set-git-pane-ratio': {
+      const key = action.target === 'pane' ? 'paneRatio' : 'embeddedRatio'
+      const nextRatio = clampRatio(action.ratio)
+      if (nextRatio === state.gitPane[key]) return state
+      return { ...state, gitPane: { ...state.gitPane, [key]: nextRatio } }
     }
     case 'resize-git-diff-pane': {
       const nextRatio = clampRatio(state.gitPane.diffModeRatio + action.delta)

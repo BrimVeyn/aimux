@@ -88,16 +88,25 @@ export function App({
     const diffModeRatio = userGitPane?.diffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
     const treeCompaction = userGitPane?.treeCompaction ?? json.gitPane?.treeCompaction ?? true
     const prefetchRadius = userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5
+    const persistedPaneRatio = json.gitPane?.paneRatio ?? json.gitPane?.ratio ?? 0.5
+    const persistedEmbeddedRatio = json.gitPane?.embeddedRatio ?? json.gitPane?.ratio ?? 0.5
     const gitPaneOverrides = {
       ...json.gitPane,
       diffModeRatio,
+      embeddedRatio:
+        userGitPane?.mode === 'embedded' && userGitPane?.ratio !== undefined
+          ? userGitPane.ratio
+          : persistedEmbeddedRatio,
       fileListMode,
+      paneRatio:
+        userGitPane?.mode === 'pane' && userGitPane?.ratio !== undefined
+          ? userGitPane.ratio
+          : persistedPaneRatio,
       prefetchRadius,
       treeCompaction,
       ...(userGitPane?.visible !== undefined ? { visible: userGitPane.visible } : {}),
       ...(userGitPane?.mode !== undefined ? { mode: userGitPane.mode } : {}),
       ...(userGitPane?.position !== undefined ? { position: userGitPane.position } : {}),
-      ...(userGitPane?.ratio !== undefined ? { ratio: userGitPane.ratio } : {}),
       ...(userGitPane?.diffModeRatio !== undefined
         ? { diffModeRatio: userGitPane.diffModeRatio }
         : {}),
@@ -210,10 +219,13 @@ export function App({
   })
 
   const {
+    handleEmbeddedGitResizeStart,
+    handleGitPaneResizeStart,
     handlePaneActivate,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
     handleSeparatorDragStart,
+    handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
     handleTerminalMouseEvent,
@@ -349,9 +361,12 @@ export function App({
         onTerminalClick={handleTerminalClick}
         onPaneActivate={handlePaneActivate}
         onSplitResize={handleSplitResize}
+        onEmbeddedGitResizeStart={handleEmbeddedGitResizeStart}
+        onGitPaneResizeStart={handleGitPaneResizeStart}
         onSeparatorDragStart={handleSeparatorDragStart}
         onSeparatorDrag={handleSeparatorDrag}
         onSeparatorDragEnd={handleSeparatorDragEnd}
+        onSidebarResizeStart={handleSidebarResizeStart}
         terminalCols={terminalSize.cols}
         terminalRows={terminalSize.rows}
       />
