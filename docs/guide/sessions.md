@@ -1,3 +1,8 @@
+---
+title: Sessions
+description: Session picker, project-bound sessions, persistence, reorder, and reconnect behavior.
+---
+
 # Sessions
 
 Sessions are the top-level workspace concept in `aimux`.

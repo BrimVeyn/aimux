@@ -1,3 +1,8 @@
+---
+title: aimux-config Internals
+description: Builder internals, merge rules, and support-status caveats.
+---
+
 # `aimux-config` Internals
 
 This page explains the current behavior of the `@brimveyn/aimux-config` package

@@ -1,3 +1,8 @@
+---
+title: Git Mode
+description: In-app review, diff view, stage, commit, and push workflow.
+---
+
 # Git Mode
 
 Git mode is a dedicated in-app workflow for reviewing, staging, committing,

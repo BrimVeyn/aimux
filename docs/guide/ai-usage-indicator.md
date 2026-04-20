@@ -1,3 +1,8 @@
+---
+title: AI Usage Indicator
+description: Bottom-bar indicator showing live Claude Code and Codex session usage, sourced from the official OAuth endpoints.
+---
+
 # AI Usage Indicator
 
 `aimux` can show the current **session usage** of AI CLI tools (Claude Code,
