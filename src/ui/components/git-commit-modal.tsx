@@ -1,3 +1,4 @@
+import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { useEffect, useState } from 'react'
 
 import type { ModeId } from '../../input/modes/types'
@@ -158,7 +159,7 @@ export function GitCommitModal({
         </>
       )}
 
-      {isConfirm || isGenerating ? null : (
+      {isConfirm || isGenerating || !isAutoCommitEnabled() ? null : (
         <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
           <box
             border

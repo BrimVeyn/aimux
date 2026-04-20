@@ -40,6 +40,7 @@ defineConfig({
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
+  autoCommit?: Partial<AutoCommitConfig>
 })
 ```
 
@@ -56,6 +57,7 @@ defineConfig({
 | `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots |
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
 | `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
+| `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`   |
 
 ## `defineConfig`
 
@@ -328,6 +330,54 @@ Current runtime behavior:
 - snippets are loaded from `aimux-snippets.json`
 - the runtime seeds that file with default snippets on first use
 - the top-level typed `snippets` field is not currently the main runtime source
+
+## `autoCommit`
+
+Status: `Supported`
+
+Type:
+
+```ts
+autoCommit?: {
+  enabled?: boolean                          // default: false
+  timeoutMs?: number                         // default: 60_000
+  models?: Partial<Record<string, string>>   // per-provider model override
+}
+```
+
+Controls the AI-assisted commit message flow surfaced in the commit modal
+(`c` in git mode). When `enabled: false` (the default), the `[ Auto-commit ]`
+button is hidden, `Ctrl+A` surfaces a status message pointing here, and no
+background request is ever made. When `enabled: true`:
+
+- A background driver watches the working tree and pre-generates a commit
+  message (Claude Haiku by default) whenever the tree stays stable for ~2 s.
+- The `[ Auto-commit ]` button and `Ctrl+A` inside the modal consume the
+  cached suggestion if ready, or show a loading overlay until it arrives.
+- Manual staging is respected: with files already staged, the generated
+  message (and the actual commit) only cover the staged set; with nothing
+  staged, `git add -A` is run before committing.
+
+Supported providers: `claude`, `codex`, `opencode`. The active tab's
+assistant determines which CLI is invoked.
+
+Example:
+
+```ts
+export default defineConfig({
+  autoCommit: {
+    enabled: true,
+    models: {
+      claude: 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+    },
+    timeoutMs: 60_000,
+  },
+})
+```
+
+See [`../guide/git-mode.md#auto-commit`](../guide/git-mode.md#auto-commit)
+for the full user-facing walkthrough.
 
 ## Actions
 

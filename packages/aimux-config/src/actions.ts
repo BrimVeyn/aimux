@@ -1,5 +1,10 @@
 import type { ActionFn, AppAction, KeyResult, ModeContext, ModeId } from './types'
 
+import { isAutoCommitEnabled } from './auto-commit-runtime'
+
+const AUTO_COMMIT_DISABLED_MESSAGE =
+  'auto-commit is disabled — set autoCommit: { enabled: true } in aimux.config.ts'
+
 function r(
   actions: KeyResult['actions'] = [],
   effects: KeyResult['effects'] = [],
@@ -592,6 +597,9 @@ export const gitCommitCancel: ActionFn = (ctx: ModeContext) => {
 export const gitCommitEnterConfirm: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
   if (modal.type !== 'git-commit') return null
+  if (!isAutoCommitEnabled()) {
+    return r([{ message: AUTO_COMMIT_DISABLED_MESSAGE, type: 'git-mode-set-message' }])
+  }
   const fields = extractGitCommitFields(modal)
   const hasTitle = !!fields && fields.title.length > 0
   if (hasTitle) {
@@ -624,6 +632,9 @@ export const gitCommitLeaveGenerating: ActionFn = (ctx: ModeContext) => {
 }
 
 export const gitCommitAutoAccept: ActionFn = (ctx: ModeContext) => {
+  if (!isAutoCommitEnabled()) {
+    return r([{ message: AUTO_COMMIT_DISABLED_MESSAGE, type: 'git-mode-set-message' }])
+  }
   const fields = extractGitCommitFields(ctx.state.modal)
   if (!fields) {
     return r([{ type: 'close-modal' }], [], 'git-mode')

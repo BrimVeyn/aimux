@@ -1,5 +1,4 @@
-import type { ResolvedConfig } from '@brimveyn/aimux-config'
-
+import { type ResolvedConfig, setAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import {
   useCallback,
@@ -55,6 +54,10 @@ export function App({
   backend: SessionBackend
   resolvedConfig: ResolvedConfig
 }) {
+  // Publish the auto-commit enabled flag before any children render so
+  // actions (which live outside React) can read it synchronously.
+  setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+
   const keymapHandlers = useMemo(
     () => {
       setActiveKeymap(resolvedConfig.keymaps)

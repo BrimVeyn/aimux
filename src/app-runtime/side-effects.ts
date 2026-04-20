@@ -1,3 +1,4 @@
+import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { $ } from 'bun'
 
 import type { SideEffect } from '../input/modes/types'
@@ -550,11 +551,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'git-commit-auto': {
+      if (!isAutoCommitEnabled()) return
       const { body, title } = effect
       void enqueueGitOp(() => runGitCommitAuto(ctx, title, body))
       return
     }
     case 'generate-auto-commit-now': {
+      if (!isAutoCommitEnabled()) return
       void runGenerateAutoCommitNow(ctx, effect.sessionId)
       return
     }

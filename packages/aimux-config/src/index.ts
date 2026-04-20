@@ -22,6 +22,7 @@ export { paletteToShikiTheme } from './palette-to-shiki'
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
+export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 
 // Type exports
 export type {

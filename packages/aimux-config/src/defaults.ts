@@ -4,7 +4,7 @@ import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
 
 export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
-  enabled: true,
+  enabled: false,
   models: {
     claude: 'claude-haiku-4-5',
     codex: 'gpt-5-mini',

@@ -1,4 +1,4 @@
-import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
+import { getDefaultKeymapConfig, setAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { expect, test } from 'bun:test'
 
 import type { KeyInput, ModeContext } from '../../src/input/modes/types'
@@ -10,6 +10,8 @@ import { getHandler } from '../../src/input/modes/registry'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 registerAllModes(getDefaultKeymapConfig())
+// These tests assert the auto-commit keybinding flow, so opt in explicitly.
+setAutoCommitEnabled(true)
 
 function key(
   name: string,
