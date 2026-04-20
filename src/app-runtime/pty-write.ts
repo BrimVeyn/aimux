@@ -1,6 +1,7 @@
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, TabSession } from '../state/types'
 
+import { logInputDebug } from '../debug/input-log'
 import { buildPtyPastePayload } from '../input/paste'
 
 export interface PtyWriteOptions {
@@ -20,6 +21,12 @@ export function writeToTab(
   dispatch?: (action: AppAction) => void,
   options?: PtyWriteOptions
 ): void {
+  logInputDebug('ptyWrite.writeToTab', {
+    autoBottom: options?.autoBottom ?? true,
+    inputLength: input.length,
+    inputPreview: input.slice(0, 64),
+    tabId,
+  })
   if ((options?.autoBottom ?? true) && tab && shouldScrollViewportToBottom(tab)) {
     backend.scrollViewportToBottom(tabId)
     dispatch?.({ intent: { kind: 'bottom' }, tabId, type: 'set-scroll-intent' })
