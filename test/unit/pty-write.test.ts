@@ -27,8 +27,9 @@ function createTab(overrides?: Partial<TabSession>): TabSession {
 }
 
 describe('writeToTab', () => {
-  test('scrolls viewport to bottom before writing when tab is scrolled back', () => {
+  test('preserves scrollback when writing into a scrolled tab', () => {
     const backend = createBackend()
+    const dispatch = mock(() => {})
     const tab = createTab({
       viewport: {
         baseY: 10,
@@ -38,10 +39,11 @@ describe('writeToTab', () => {
       },
     })
 
-    writeToTab(backend as SessionBackend, 'tab-1', tab, 'input')
+    writeToTab(backend as SessionBackend, 'tab-1', tab, 'input', dispatch)
 
-    expect(backend.scrollViewportToBottom).toHaveBeenCalledWith('tab-1')
+    expect(backend.scrollViewportToBottom).not.toHaveBeenCalled()
     expect(backend.write).toHaveBeenCalledWith('tab-1', 'input')
+    expect(dispatch).not.toHaveBeenCalled()
   })
 
   test('writes directly when no viewport sync is needed', () => {
@@ -56,6 +58,25 @@ describe('writeToTab', () => {
 })
 
 describe('writePasteToTab', () => {
+  test('preserves scrollback when pasting into a scrolled tab', () => {
+    const backend = createBackend()
+    const dispatch = mock(() => {})
+    const tab = createTab({
+      viewport: {
+        baseY: 10,
+        cursorVisible: true,
+        lines: [],
+        viewportY: 4,
+      },
+    })
+
+    writePasteToTab(backend as SessionBackend, 'tab-1', tab, 'hello', dispatch)
+
+    expect(backend.scrollViewportToBottom).not.toHaveBeenCalled()
+    expect(backend.write).toHaveBeenCalledWith('tab-1', 'hello')
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
   test('wraps payload when bracketed paste mode is enabled', () => {
     const backend = createBackend()
     const tab = createTab({

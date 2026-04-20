@@ -1,25 +1,15 @@
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, TabSession } from '../state/types'
+import type { TabSession } from '../state/types'
 
 import { buildPtyPastePayload } from '../input/paste'
-
-function shouldScrollViewportToBottom(tab: TabSession): boolean {
-  const viewport = tab.viewport
-  return viewport !== undefined && viewport.viewportY < viewport.baseY
-}
 
 export function writeToTab(
   backend: SessionBackend,
   tabId: string,
-  tab: TabSession | undefined,
+  _tab: TabSession | undefined,
   input: string,
-  dispatch?: (action: AppAction) => void
+  _dispatch?: unknown
 ): void {
-  if (tab && shouldScrollViewportToBottom(tab)) {
-    backend.scrollViewportToBottom(tabId)
-    dispatch?.({ intent: { kind: 'bottom' }, tabId, type: 'set-scroll-intent' })
-  }
-
   backend.write(tabId, input)
 }
 
