@@ -27,7 +27,7 @@ function createTab(overrides?: Partial<TabSession>): TabSession {
 }
 
 describe('writeToTab', () => {
-  test('preserves scrollback when writing into a scrolled tab', () => {
+  test('scrolls viewport to bottom before writing when auto-bottom is enabled', () => {
     const backend = createBackend()
     const dispatch = mock(() => {})
     const tab = createTab({
@@ -40,6 +40,29 @@ describe('writeToTab', () => {
     })
 
     writeToTab(backend as SessionBackend, 'tab-1', tab, 'input', dispatch)
+
+    expect(backend.scrollViewportToBottom).toHaveBeenCalledWith('tab-1')
+    expect(backend.write).toHaveBeenCalledWith('tab-1', 'input')
+    expect(dispatch).toHaveBeenCalledWith({
+      intent: { kind: 'bottom' },
+      tabId: 'tab-1',
+      type: 'set-scroll-intent',
+    })
+  })
+
+  test('preserves scrollback when auto-bottom is disabled', () => {
+    const backend = createBackend()
+    const dispatch = mock(() => {})
+    const tab = createTab({
+      viewport: {
+        baseY: 10,
+        cursorVisible: true,
+        lines: [],
+        viewportY: 4,
+      },
+    })
+
+    writeToTab(backend as SessionBackend, 'tab-1', tab, 'input', dispatch, { autoBottom: false })
 
     expect(backend.scrollViewportToBottom).not.toHaveBeenCalled()
     expect(backend.write).toHaveBeenCalledWith('tab-1', 'input')
@@ -58,7 +81,7 @@ describe('writeToTab', () => {
 })
 
 describe('writePasteToTab', () => {
-  test('preserves scrollback when pasting into a scrolled tab', () => {
+  test('scrolls viewport to bottom when pasting into a scrolled tab', () => {
     const backend = createBackend()
     const dispatch = mock(() => {})
     const tab = createTab({
@@ -72,9 +95,13 @@ describe('writePasteToTab', () => {
 
     writePasteToTab(backend as SessionBackend, 'tab-1', tab, 'hello', dispatch)
 
-    expect(backend.scrollViewportToBottom).not.toHaveBeenCalled()
+    expect(backend.scrollViewportToBottom).toHaveBeenCalledWith('tab-1')
     expect(backend.write).toHaveBeenCalledWith('tab-1', 'hello')
-    expect(dispatch).not.toHaveBeenCalled()
+    expect(dispatch).toHaveBeenCalledWith({
+      intent: { kind: 'bottom' },
+      tabId: 'tab-1',
+      type: 'set-scroll-intent',
+    })
   })
 
   test('wraps payload when bracketed paste mode is enabled', () => {

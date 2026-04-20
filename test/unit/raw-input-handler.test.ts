@@ -14,7 +14,9 @@ function setup(overrides?: {
   const activeTabId: string | null =
     overrides && 'activeTabId' in overrides ? (overrides.activeTabId ?? null) : 'tab-1'
   const bracketedPasteModeEnabled = overrides?.bracketedPasteModeEnabled ?? false
-  const writeToPty = mock((_tabId: string, _data: string) => {})
+  const writeToPty = mock(
+    (_tabId: string, _data: string, _options?: { autoBottom?: boolean }) => {}
+  )
   const leaveTerminalInput = mock(() => {})
   const consumeLeaderPrefix = mock(() => {})
   const toggleSidebar = mock(() => {})
@@ -55,7 +57,7 @@ describe('createRawInputHandler', () => {
   test('forwards raw keyboard sequences to PTY in terminal-input mode', () => {
     const { handler, writeToPty } = setup()
     expect(handler('\x1b[A')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[A')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[A', { autoBottom: true })
   })
 
   test('passes through when not in terminal-input mode', () => {
@@ -122,25 +124,37 @@ describe('createRawInputHandler', () => {
   test('forwards printable characters', () => {
     const { handler, writeToPty } = setup()
     expect(handler('a')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', 'a')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', 'a', { autoBottom: true })
   })
 
   test('normalizes Kitty Ctrl+C to ETX', () => {
     const { handler, writeToPty } = setup()
     expect(handler('\x1b[99;5u')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x03')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x03', { autoBottom: true })
   })
 
   test('normalizes Kitty Ctrl+L to form feed', () => {
     const { handler, writeToPty } = setup()
     expect(handler('\x1b[108;5u')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\f')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\f', { autoBottom: true })
   })
 
   test('normalizes Kitty Ctrl+/ to unit separator', () => {
     const { handler, writeToPty } = setup()
     expect(handler('\x1b[47;5u')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1f')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1f', { autoBottom: true })
+  })
+
+  test('forwards focus-in sequence without auto-bottom', () => {
+    const { handler, writeToPty } = setup()
+    expect(handler('\x1b[I')).toBe(true)
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[I', { autoBottom: false })
+  })
+
+  test('forwards focus-out sequence without auto-bottom', () => {
+    const { handler, writeToPty } = setup()
+    expect(handler('\x1b[O')).toBe(true)
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[O', { autoBottom: false })
   })
 
   test('swallows Kitty Cmd+C without forwarding to PTY', () => {
@@ -176,7 +190,7 @@ describe('createRawInputHandler', () => {
   test('forwards raw bracketed paste content without wrappers when inner mode is disabled', () => {
     const { handler, leaveTerminalInput, toggleSidebar, writeToPty } = setup()
     expect(handler('\x1b[200~hello\nworld\x1b[201~')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', 'hello\nworld')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', 'hello\nworld', { autoBottom: true })
     expect(toggleSidebar).not.toHaveBeenCalled()
     expect(leaveTerminalInput).not.toHaveBeenCalled()
   })
@@ -184,13 +198,15 @@ describe('createRawInputHandler', () => {
   test('preserves bracketed paste wrappers when inner mode is enabled', () => {
     const { handler, writeToPty } = setup({ bracketedPasteModeEnabled: true })
     expect(handler('\x1b[200~hello\nworld\x1b[201~')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[200~hello\nworld\x1b[201~')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[200~hello\nworld\x1b[201~', {
+      autoBottom: true,
+    })
   })
 
   test('does not treat pasted Ctrl+B or Ctrl+Z as shortcuts', () => {
     const { handler, leaveTerminalInput, toggleSidebar, writeToPty } = setup()
     expect(handler('\x1b[200~\x02\x1a\x1b[201~')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x02\x1a')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x02\x1a', { autoBottom: true })
     expect(toggleSidebar).not.toHaveBeenCalled()
     expect(leaveTerminalInput).not.toHaveBeenCalled()
   })
@@ -198,7 +214,7 @@ describe('createRawInputHandler', () => {
   test('does not treat pasted Ctrl+W as a shortcut', () => {
     const { consumeLeaderPrefix, handler, writeToPty } = setup()
     expect(handler('\x1b[200~\x17\x1b[201~')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x17')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x17', { autoBottom: true })
     expect(consumeLeaderPrefix).not.toHaveBeenCalled()
   })
 
@@ -207,6 +223,8 @@ describe('createRawInputHandler', () => {
     expect(handler('\x1b[200~hello')).toBe(true)
     expect(writeToPty).not.toHaveBeenCalled()
     expect(handler('\nworld\x1b[201~')).toBe(true)
-    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[200~hello\nworld\x1b[201~')
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', '\x1b[200~hello\nworld\x1b[201~', {
+      autoBottom: true,
+    })
   })
 })

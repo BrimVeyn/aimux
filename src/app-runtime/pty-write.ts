@@ -3,13 +3,28 @@ import type { AppAction, TabSession } from '../state/types'
 
 import { buildPtyPastePayload } from '../input/paste'
 
+export interface PtyWriteOptions {
+  autoBottom?: boolean
+}
+
+function shouldScrollViewportToBottom(tab: TabSession): boolean {
+  const viewport = tab.viewport
+  return viewport !== undefined && viewport.viewportY < viewport.baseY
+}
+
 export function writeToTab(
   backend: SessionBackend,
   tabId: string,
-  _tab: TabSession | undefined,
+  tab: TabSession | undefined,
   input: string,
-  _dispatch?: unknown
+  dispatch?: (action: AppAction) => void,
+  options?: PtyWriteOptions
 ): void {
+  if ((options?.autoBottom ?? true) && tab && shouldScrollViewportToBottom(tab)) {
+    backend.scrollViewportToBottom(tabId)
+    dispatch?.({ intent: { kind: 'bottom' }, tabId, type: 'set-scroll-intent' })
+  }
+
   backend.write(tabId, input)
 }
 
@@ -21,5 +36,5 @@ export function writePasteToTab(
   dispatch?: (action: AppAction) => void
 ): void {
   const payload = buildPtyPastePayload(text, tab?.terminalModes.bracketedPasteMode ?? false)
-  writeToTab(backend, tabId, tab, payload, dispatch)
+  writeToTab(backend, tabId, tab, payload, dispatch, { autoBottom: true })
 }

@@ -1,3 +1,4 @@
+import type { PtyWriteOptions } from '../app-runtime/pty-write'
 import type { FocusMode } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
@@ -10,6 +11,8 @@ const KITTY_MOD_SUPER = 8
 const KITTY_MOD_HYPER = 16
 const KITTY_MOD_META = 32
 const KITTY_HOST_MOD_MASK = KITTY_MOD_SUPER | KITTY_MOD_HYPER | KITTY_MOD_META
+const FOCUS_IN_SEQUENCE = `${ESC}[I`
+const FOCUS_OUT_SEQUENCE = `${ESC}[O`
 
 function normalizeControlSequence(sequence: string): string | null {
   const match = KITTY_CTRL_RE.exec(sequence)
@@ -79,7 +82,7 @@ export function createRawInputHandler(deps: {
   getFocusMode: () => FocusMode
   getActiveTabId: () => string | null
   getBracketedPasteModeEnabled: () => boolean
-  writeToPty: (tabId: string, data: string) => void
+  writeToPty: (tabId: string, data: string, options?: PtyWriteOptions) => void
   /**
    * Dispatch a configured terminal-input shortcut.
    * Returns true if the chord was consumed by the keymap, false otherwise.
@@ -88,6 +91,10 @@ export function createRawInputHandler(deps: {
 }): (sequence: string) => boolean {
   let bracketedPasteBuffer: string | null = null
 
+  function isFocusReportSequence(sequence: string): boolean {
+    return sequence === FOCUS_IN_SEQUENCE || sequence === FOCUS_OUT_SEQUENCE
+  }
+
   function flushPaste(tabId: string, payload: string): void {
     logInputDebug('raw.flushPaste', {
       bracketedPasteModeEnabled: deps.getBracketedPasteModeEnabled(),
@@ -95,7 +102,9 @@ export function createRawInputHandler(deps: {
       payloadPreview: payload.slice(0, 120),
       tabId,
     })
-    deps.writeToPty(tabId, buildPtyPastePayload(payload, deps.getBracketedPasteModeEnabled()))
+    deps.writeToPty(tabId, buildPtyPastePayload(payload, deps.getBracketedPasteModeEnabled()), {
+      autoBottom: true,
+    })
   }
 
   function handleTerminalShortcut(sequence: string): boolean {
@@ -162,7 +171,7 @@ export function createRawInputHandler(deps: {
       return true
     }
 
-    deps.writeToPty(tabId, normalized)
+    deps.writeToPty(tabId, normalized, { autoBottom: !isFocusReportSequence(normalized) })
     return true
   }
 
