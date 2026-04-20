@@ -46,7 +46,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('k', actions.prevTab, 'Prev tab')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
-        .map('c', actions.openAutoCommitModal, 'Open auto-commit')
         .map('?', actions.helpModal(), 'Help')
     )
 
@@ -286,35 +285,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.gitCommitCancel, 'Cancel')
         .map('<C-CR>', actions.gitCommitSubmit, 'Commit')
+        .map('<C-a>', actions.gitCommitEnterConfirm, 'Auto-commit (stage all)')
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.gitCommitReturnKey, 'Newline / confirm')
         .passthrough()
     )
 
     // -----------------------------------------------------------------------
-    // Modal: auto-commit
+    // Modal: git-commit confirm (auto-commit stage all + commit)
     // -----------------------------------------------------------------------
-    .mode('modal.auto-commit', (m) =>
+    .mode('modal.git-commit.confirm', (m) =>
       m
-        .map('y', actions.autoCommitAccept, 'Commit')
-        .map('Y', actions.autoCommitAccept)
-        .map('n', actions.autoCommitDismiss, 'Dismiss')
-        .map('N', actions.autoCommitDismiss)
-        .map('<Esc>', actions.autoCommitDismiss, 'Cancel')
-        .map('e', actions.autoCommitEnterEdit, 'Edit')
-        .map('i', actions.autoCommitEnterEdit)
-        .map('<Tab>', actions.autoCommitEnterEdit)
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: auto-commit (editing sub-mode)
-    // -----------------------------------------------------------------------
-    .mode('modal.auto-commit.editing', (m) =>
-      m
-        .map('<Esc>', actions.autoCommitLeaveEdit, 'Done editing')
-        .map('<C-CR>', actions.autoCommitAccept, 'Commit')
+        .map('<Esc>', actions.gitCommitLeaveConfirm, 'Cancel auto-commit')
+        .map('<CR>', actions.gitCommitAutoAccept, 'Stage all + commit')
+        .map('<C-CR>', actions.gitCommitAutoAccept, 'Stage all + commit')
         .map('<Tab>', actions.switchField, 'Next field')
-        .map('<CR>', actions.autoCommitReturnKey, 'Newline / confirm')
         .passthrough()
     )
 

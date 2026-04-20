@@ -24,8 +24,7 @@ export type ModeId =
   | 'modal.help.filtering'
   | 'modal.split-picker'
   | 'modal.git-commit'
-  | 'modal.auto-commit'
-  | 'modal.auto-commit.editing'
+  | 'modal.git-commit.confirm'
   | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -292,6 +291,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
+  stage: 'edit' | 'confirm'
 }
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
@@ -303,13 +303,6 @@ export interface ModalUpdateAvailable extends ModalBase {
   type: 'update-available'
   currentVersion: string
   latestVersion: string
-}
-
-export interface ModalAutoCommit extends ModalBase {
-  type: 'auto-commit'
-  sessionId: string
-  activeField: 'title' | 'body'
-  contentBuffer: string
 }
 
 export type ModalState =
@@ -325,7 +318,6 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
-  | ModalAutoCommit
   | ModalUpdateAvailable
 
 export interface LayoutState {
@@ -356,7 +348,6 @@ export type AutoCommitSuggestion =
       title: string
       body: string
       generatedAt: number
-      dismissed?: boolean
     }
 
 export interface AutoCommitState {
@@ -534,7 +525,9 @@ export type GitModeAction =
       fromSection: GitFileSection
       toSection: GitFileSection | null
     }
-  | { type: 'open-git-commit-modal' }
+  | { type: 'open-git-commit-modal'; sessionId?: string }
+  | { type: 'git-commit-enter-confirm' }
+  | { type: 'git-commit-leave-confirm' }
 
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
@@ -558,9 +551,6 @@ export type AutoCommitAction =
       generatedAt: number
     }
   | { type: 'auto-commit-clear'; sessionId: string }
-  | { type: 'auto-commit-accept'; sessionId: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string; title?: string; body?: string }
-  | { type: 'open-auto-commit-modal'; sessionId: string }
 
 export type AppAction =
   | ModalAction
@@ -606,9 +596,8 @@ export type SideEffect =
   | { type: 'git-restore'; path: string }
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
+  | { type: 'git-commit-auto'; title: string; body: string }
   | { type: 'git-push' }
-  | { type: 'auto-commit-accept'; sessionId: string; title: string; body: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string; title: string; body: string }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }

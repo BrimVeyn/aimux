@@ -10,7 +10,6 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 }
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
-  'auto-commit': 'modal.auto-commit.editing',
   'create-session': 'modal.create-session',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',
@@ -25,7 +24,6 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
-  'auto-commit': 'modal.auto-commit',
   'update-available': 'modal.update-available',
 }
 
@@ -44,6 +42,9 @@ export function deriveModeId(state: AppState): ModeId {
   if (state.focusMode === 'command-edit') {
     if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
       return 'modal.new-tab.editing-command'
+    }
+    if (state.modal.type === 'git-commit' && state.modal.stage === 'confirm') {
+      return 'modal.git-commit.confirm'
     }
     const modalType = state.modal.type
     const commandEditMode = modalType ? COMMAND_EDIT_MODE_IDS[modalType] : undefined

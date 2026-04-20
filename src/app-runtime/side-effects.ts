@@ -548,22 +548,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void enqueueGitOp(() => runGitCommit(ctx, title, body))
       return
     }
+    case 'git-commit-auto': {
+      const { body, title } = effect
+      void enqueueGitOp(() => runGitCommitAuto(ctx, title, body))
+      return
+    }
     case 'git-push': {
       void enqueueGitOp(() => runGitPush(ctx))
-      return
-    }
-    case 'auto-commit-accept': {
-      const { body, sessionId, title } = effect
-      void enqueueGitOp(() => runAutoCommitAccept(ctx, sessionId, title, body))
-      return
-    }
-    case 'auto-commit-dismiss': {
-      ctx.dispatch({
-        body: effect.body,
-        sessionId: effect.sessionId,
-        title: effect.title,
-        type: 'auto-commit-dismiss',
-      })
       return
     }
     case 'confirm-update-selection': {
@@ -689,16 +680,19 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     })
     return
   }
+  clearAutoCommitForCurrentSession(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
 }
 
-async function runAutoCommitAccept(
+async function runGitCommitAuto(
   ctx: SideEffectContext,
-  sessionId: string,
   title: string,
   body: string
 ): Promise<void> {
-  if (!title) return
+  if (!title) {
+    ctx.dispatch({ message: 'empty commit title', type: 'git-mode-set-message' })
+    return
+  }
   const cwd = ctx.getCurrentSessionProjectPath()
   if (!cwd) return
 
@@ -724,8 +718,14 @@ async function runAutoCommitAccept(
     return
   }
 
-  ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+  clearAutoCommitForCurrentSession(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+}
+
+function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
+  const sessionId = ctx.state.currentSessionId
+  if (!sessionId) return
+  ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {

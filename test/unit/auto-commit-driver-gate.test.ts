@@ -136,12 +136,11 @@ test('does re-trigger when ready with a different hash', () => {
   ).toBe(true)
 })
 
-test('does not re-trigger a dismissed ready with the same hash', () => {
+test('does not re-trigger a ready suggestion with the same hash', () => {
   const state: AutoCommitState = {
     bySession: {
       s1: {
         body: '',
-        dismissed: true,
         generatedAt: 1,
         kind: 'ready',
         tabId: 't1',
@@ -163,12 +162,11 @@ test('does not re-trigger a dismissed ready with the same hash', () => {
   ).toBe(false)
 })
 
-test('does re-trigger when dismissed ready sees a new hash', () => {
+test('does re-trigger a ready suggestion when the hash changes', () => {
   const state: AutoCommitState = {
     bySession: {
       s1: {
         body: '',
-        dismissed: true,
         generatedAt: 1,
         kind: 'ready',
         tabId: 't1',

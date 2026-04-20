@@ -11,11 +11,9 @@ import type {
   GitPanePathConfig,
 } from '../../state/types'
 
-import { useAppStore } from '../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { buildGitTreeRows, type GitTreeFileRow, type GitTreeFolderRow } from '../../state/git-tree'
 import { getCurrentTokens, getTransparent, useTokens, useTransparent } from '../theme'
-import { MagicWand } from './magic-wand'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -222,8 +220,7 @@ function renderTreeSection(
   showListModeToggle: boolean,
   pathConfig: GitPanePathConfig,
   diffCountConfig: GitPaneDiffCountConfig,
-  marginTop: number,
-  wandSlot: ReactNode | null
+  marginTop: number
 ): ReactNode {
   if (files.length === 0) return null
   const t = getCurrentTokens()
@@ -235,14 +232,11 @@ function renderTreeSection(
   return (
     <box key={section} flexDirection="column" marginTop={marginTop}>
       <box flexDirection="row" justifyContent="space-between">
-        <box flexDirection="row" gap={1}>
-          <text fg={t.accent}>
-            <strong>
-              {title} ({files.length})
-            </strong>
-          </text>
-          {wandSlot}
-        </box>
+        <text fg={t.accent}>
+          <strong>
+            {title} ({files.length})
+          </strong>
+        </text>
         {showListModeToggle ? (
           <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
             <text fg={fileListMode === 'tree' ? t.palette.primary : t.muted}>tree</text>
@@ -320,19 +314,6 @@ export const GitPanel = memo(function GitPanel({
   const t = useTokens()
   useTransparent()
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const autoCommitSuggestion = useAppStore((s) =>
-    currentSessionId ? s.autoCommit.bySession[currentSessionId] : undefined
-  )
-  const wandReady = autoCommitSuggestion?.kind === 'ready'
-  const wandSlot =
-    wandReady && currentSessionId ? (
-      <MagicWand
-        onClick={() => {
-          dispatchGlobal({ sessionId: currentSessionId, type: 'open-auto-commit-modal' })
-        }}
-      />
-    ) : null
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
     () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode, compact),
@@ -395,8 +376,7 @@ export const GitPanel = memo(function GitPanel({
               key === toggleSection,
               pathConfig,
               diffCountConfig,
-              priorHasFiles ? 1 : 0,
-              key === 'untracked' ? wandSlot : null
+              priorHasFiles ? 1 : 0
             )
           })}
         </scrollbox>

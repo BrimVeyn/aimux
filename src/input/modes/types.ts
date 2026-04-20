@@ -18,8 +18,7 @@ export type ModeId =
   | 'modal.help.filtering'
   | 'modal.split-picker'
   | 'modal.git-commit'
-  | 'modal.auto-commit'
-  | 'modal.auto-commit.editing'
+  | 'modal.git-commit.confirm'
   | 'modal.update-available'
 
 export type SideEffect =
@@ -57,9 +56,8 @@ export type SideEffect =
   | { type: 'git-restore'; path: string }
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
+  | { type: 'git-commit-auto'; title: string; body: string }
   | { type: 'git-push' }
-  | { type: 'auto-commit-accept'; sessionId: string; title: string; body: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string; title: string; body: string }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }

@@ -35,31 +35,7 @@ export function reduceAutoCommitState(
         workingTreeHash: current.workingTreeHash,
       })
     }
-    case 'auto-commit-dismiss': {
-      const current = state.bySession[action.sessionId]
-      if (!current || current.kind === 'idle') return null
-      if (current.kind === 'ready') {
-        const nextTitle = action.title ?? current.title
-        const nextBody = action.body ?? current.body
-        const unchanged =
-          current.dismissed === true && nextTitle === current.title && nextBody === current.body
-        if (unchanged) return null
-        return setBySession(state, action.sessionId, {
-          ...current,
-          body: nextBody,
-          dismissed: true,
-          title: nextTitle,
-        })
-      }
-      try {
-        current.abortController.abort()
-      } catch {
-        // ignore
-      }
-      return setBySession(state, action.sessionId, { kind: 'idle' })
-    }
-    case 'auto-commit-clear':
-    case 'auto-commit-accept': {
+    case 'auto-commit-clear': {
       const current = state.bySession[action.sessionId]
       if (!current || current.kind === 'idle') return null
       if (current.kind === 'generating') {

@@ -43,7 +43,6 @@ export type ModalType =
   | 'help'
   | 'split-picker'
   | 'git-commit'
-  | 'auto-commit'
   | 'update-available'
   | null
 
@@ -323,6 +322,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
+  stage: 'edit' | 'confirm'
 }
 
 export interface ModalCreateSession extends ModalBase {
@@ -346,13 +346,6 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
-export interface ModalAutoCommit extends ModalBase {
-  type: 'auto-commit'
-  sessionId: string
-  activeField: 'title' | 'body'
-  contentBuffer: string
-}
-
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -373,7 +366,6 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
-  | ModalAutoCommit
   | ModalUpdateAvailable
 
 export interface LayoutState {
@@ -551,7 +543,6 @@ export type AutoCommitSuggestion =
       title: string
       body: string
       generatedAt: number
-      dismissed?: boolean
     }
 
 export interface AutoCommitState {
@@ -578,9 +569,6 @@ export type AutoCommitAction =
       generatedAt: number
     }
   | { type: 'auto-commit-clear'; sessionId: string }
-  | { type: 'auto-commit-accept'; sessionId: string }
-  | { type: 'auto-commit-dismiss'; sessionId: string; title?: string; body?: string }
-  | { type: 'open-auto-commit-modal'; sessionId: string }
 
 export type GitModeAction =
   | { type: 'enter-git-mode' }
@@ -631,7 +619,9 @@ export type GitModeAction =
       fromSection: GitFileSection
       toSection: GitFileSection | null
     }
-  | { type: 'open-git-commit-modal' }
+  | { type: 'open-git-commit-modal'; sessionId?: string }
+  | { type: 'git-commit-enter-confirm' }
+  | { type: 'git-commit-leave-confirm' }
 
 // -- Data actions --
 export type DataAction =

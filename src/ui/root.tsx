@@ -6,7 +6,6 @@ import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
-import { AutoCommitModal } from './components/auto-commit-modal'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
@@ -176,21 +175,7 @@ function renderModal(
           activeField={modal.activeField}
           body={bodyText}
           cursorPos={modal.cursorPos ?? (modal.editBuffer ?? '').length}
-          title={titleText}
-        />
-      )
-    }
-    case 'auto-commit': {
-      const titleText =
-        modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
-      const bodyText =
-        modal.activeField === 'title' ? modal.contentBuffer : (modal.editBuffer ?? '')
-      return (
-        <AutoCommitModal
-          activeField={modal.activeField}
-          body={bodyText}
-          cursorPos={modal.cursorPos ?? (modal.editBuffer ?? '').length}
-          editing={options.focusMode === 'command-edit'}
+          stage={modal.stage}
           title={titleText}
         />
       )

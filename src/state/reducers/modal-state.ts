@@ -199,36 +199,42 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'update-available',
         },
       }
-    case 'open-git-commit-modal':
+    case 'open-git-commit-modal': {
+      const sessionId = action.sessionId
+      const suggestion = sessionId ? state.autoCommit.bySession[sessionId] : undefined
+      const prefill =
+        suggestion && suggestion.kind === 'ready'
+          ? { body: suggestion.body, title: suggestion.title }
+          : { body: '', title: '' }
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           activeField: 'title',
-          contentBuffer: '',
-          cursorPos: 0,
-          editBuffer: '',
+          contentBuffer: prefill.body,
+          cursorPos: prefill.title.length,
+          editBuffer: prefill.title,
           selectedIndex: 0,
-          sessionTargetId: null,
+          sessionTargetId: sessionId ?? null,
+          stage: 'edit',
           type: 'git-commit',
         },
       }
-    case 'open-auto-commit-modal': {
-      const suggestion = state.autoCommit.bySession[action.sessionId]
-      if (!suggestion || suggestion.kind !== 'ready') return state
+    }
+    case 'git-commit-enter-confirm': {
+      if (state.modal.type !== 'git-commit') return state
       return {
         ...state,
-        focusMode: 'modal',
-        modal: {
-          activeField: 'title',
-          contentBuffer: suggestion.body,
-          cursorPos: suggestion.title.length,
-          editBuffer: suggestion.title,
-          selectedIndex: 0,
-          sessionId: action.sessionId,
-          sessionTargetId: action.sessionId,
-          type: 'auto-commit',
-        },
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'confirm' },
+      }
+    }
+    case 'git-commit-leave-confirm': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
       }
     }
     case 'set-help-entry-count': {
@@ -467,7 +473,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'git-commit' || state.modal.type === 'auto-commit') {
+      if (state.modal.type === 'git-commit') {
         const nextField = state.modal.activeField === 'title' ? 'body' : 'title'
         const nextEdit = state.modal.contentBuffer
         return {

@@ -136,7 +136,7 @@ test('ready state survives an unrelated action', () => {
   expect(next).toBeNull()
 })
 
-test('dismiss on ready keeps the suggestion and marks it dismissed', () => {
+test('clear on ready goes idle', () => {
   const state: AutoCommitState = {
     bySession: {
       [SESSION]: {
@@ -152,140 +152,7 @@ test('dismiss on ready keeps the suggestion and marks it dismissed', () => {
   const next = expectNonNull(
     reduceAutoCommitState(state, {
       sessionId: SESSION,
-      type: 'auto-commit-dismiss',
-    } as AppAction)
-  )
-  expect(next.bySession[SESSION]).toEqual({
-    body: 'b',
-    dismissed: true,
-    generatedAt: 1,
-    kind: 'ready',
-    tabId: TAB,
-    title: 't',
-    workingTreeHash: HASH,
-  })
-})
-
-test('dismiss on already-dismissed ready is a no-op', () => {
-  const state: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
-        body: 'b',
-        dismissed: true,
-        generatedAt: 1,
-        kind: 'ready',
-        tabId: TAB,
-        title: 't',
-        workingTreeHash: HASH,
-      },
-    },
-  }
-  const next = reduceAutoCommitState(state, {
-    sessionId: SESSION,
-    type: 'auto-commit-dismiss',
-  } as AppAction)
-  expect(next).toBeNull()
-})
-
-test('dismiss on generating aborts and goes idle', () => {
-  const ctrl = new AbortController()
-  const state: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
-        abortController: ctrl,
-        kind: 'generating',
-        startedAt: 0,
-        tabId: TAB,
-        workingTreeHash: HASH,
-      },
-    },
-  }
-  const next = expectNonNull(
-    reduceAutoCommitState(state, {
-      sessionId: SESSION,
-      type: 'auto-commit-dismiss',
-    } as AppAction)
-  )
-  expect(next.bySession[SESSION]).toEqual({ kind: 'idle' })
-  expect(ctrl.signal.aborted).toBe(true)
-})
-
-test('dismiss with edited title/body writes edits and marks dismissed', () => {
-  const state: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
-        body: 'original body',
-        generatedAt: 1,
-        kind: 'ready',
-        tabId: TAB,
-        title: 'original title',
-        workingTreeHash: HASH,
-      },
-    },
-  }
-  const next = expectNonNull(
-    reduceAutoCommitState(state, {
-      body: 'edited body',
-      sessionId: SESSION,
-      title: 'edited title',
-      type: 'auto-commit-dismiss',
-    } as AppAction)
-  )
-  expect(next.bySession[SESSION]).toEqual({
-    body: 'edited body',
-    dismissed: true,
-    generatedAt: 1,
-    kind: 'ready',
-    tabId: TAB,
-    title: 'edited title',
-    workingTreeHash: HASH,
-  })
-})
-
-test('dismiss without title/body keeps the AI-generated text', () => {
-  const state: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
-        body: 'original body',
-        generatedAt: 1,
-        kind: 'ready',
-        tabId: TAB,
-        title: 'original title',
-        workingTreeHash: HASH,
-      },
-    },
-  }
-  const next = expectNonNull(
-    reduceAutoCommitState(state, {
-      sessionId: SESSION,
-      type: 'auto-commit-dismiss',
-    } as AppAction)
-  )
-  expect(next.bySession[SESSION]).toMatchObject({
-    body: 'original body',
-    dismissed: true,
-    title: 'original title',
-  })
-})
-
-test('accept on dismissed ready still goes idle and clears', () => {
-  const state: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
-        body: 'b',
-        dismissed: true,
-        generatedAt: 1,
-        kind: 'ready',
-        tabId: TAB,
-        title: 't',
-        workingTreeHash: HASH,
-      },
-    },
-  }
-  const next = expectNonNull(
-    reduceAutoCommitState(state, {
-      sessionId: SESSION,
-      type: 'auto-commit-accept',
+      type: 'auto-commit-clear',
     } as AppAction)
   )
   expect(next.bySession[SESSION]).toEqual({ kind: 'idle' })
