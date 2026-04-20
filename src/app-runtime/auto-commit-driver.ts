@@ -10,6 +10,7 @@ import type {
 
 import { buildHeadlessInvocation, isSupportedProvider } from '../auto-commit/headless-commands'
 import { composePromptFromTemplate, loadBriefingTemplate } from '../auto-commit/prompt-loader'
+import { hasStagedFiles } from '../auto-commit/staging-mode'
 import { stripAnsi } from '../auto-commit/strip-ansi'
 import { runSuggestion } from '../auto-commit/suggestion-runner'
 import { workingTreeHash } from '../auto-commit/working-tree-hash'
@@ -76,11 +77,30 @@ interface GatheredContext {
   branch: string
 }
 
-async function gatherContext(cwd: string): Promise<GatheredContext | null> {
+async function gatherContext(cwd: string, stagedOnly: boolean): Promise<GatheredContext | null> {
   const logArgs = ['log', '-5', '--format=%h %s']
-  const diffArgs = ['diff', 'HEAD']
-  const untrackedArgs = ['ls-files', '--others', '--exclude-standard']
+  const diffArgs = stagedOnly ? ['diff', '--cached'] : ['diff', 'HEAD']
   const branchArgs = ['rev-parse', '--abbrev-ref', 'HEAD']
+
+  // In staged-only mode we don't include untracked files: a file cannot be
+  // staged without first being tracked. Only git-diff-HEAD mode needs the
+  // untracked synthetic diffs.
+  if (stagedOnly) {
+    const [log, diff, branch] = await Promise.all([
+      $`git -C ${cwd} ${logArgs}`.quiet().nothrow(),
+      $`git -C ${cwd} ${diffArgs}`.quiet().nothrow(),
+      $`git -C ${cwd} ${branchArgs}`.quiet().nothrow(),
+    ])
+    if (log.exitCode !== 0 || diff.exitCode !== 0) return null
+    const branchName = branch.exitCode === 0 ? branch.stdout.toString().trim() : ''
+    return {
+      branch: branchName || '[unknown branch]',
+      diff: diff.stdout.toString(),
+      recentCommits: log.stdout.toString().trim(),
+    }
+  }
+
+  const untrackedArgs = ['ls-files', '--others', '--exclude-standard']
   const [log, diff, untracked, branch] = await Promise.all([
     $`git -C ${cwd} ${logArgs}`.quiet().nothrow(),
     $`git -C ${cwd} ${diffArgs}`.quiet().nothrow(),
@@ -200,7 +220,8 @@ async function runGeneration(
   })
 
   const template = await getTemplate(deps)
-  const ctx = await gatherContext(args.projectPath as string)
+  const stagedOnly = args.git ? hasStagedFiles(args.git) : false
+  const ctx = await gatherContext(args.projectPath as string, stagedOnly)
   if (!ctx) {
     deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
     return

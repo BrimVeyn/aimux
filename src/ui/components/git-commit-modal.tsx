@@ -94,6 +94,9 @@ export function GitCommitModal({
   const isBgGenerating = bgKind === 'generating'
   const showBgSpinner = isBgGenerating && !isConfirm && !isGenerating
   const bgSpinnerFrame = useSpinnerFrame(showBgSpinner)
+  const stagedCount = useAppStore(
+    (s) => s.gitPanel.files.filter((f) => f.section === 'staged').length
+  )
 
   const onAutoCommitClick = (): void => {
     const hasTitle = title.trim().length > 0
@@ -120,9 +123,15 @@ export function GitCommitModal({
 
       {isConfirm ? (
         <box flexDirection="column">
-          <text fg={t.palette.warning}>
-            <strong>git add -A</strong> will stage every change before committing.
-          </text>
+          {stagedCount > 0 ? (
+            <text fg={t.palette.warning}>
+              Commit will include the <strong>{stagedCount} staged file(s)</strong> only.
+            </text>
+          ) : (
+            <text fg={t.palette.warning}>
+              <strong>git add -A</strong> will stage every change before committing.
+            </text>
+          )}
           <text fg={t.muted}>Enter to confirm · Esc to cancel · edits below still apply.</text>
         </box>
       ) : null}
