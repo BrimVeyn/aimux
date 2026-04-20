@@ -5,7 +5,7 @@ import type { UsageSnapshot } from './types'
 import { fetchClaudeUsage } from './adapters/claude'
 import { fetchCodexUsage } from './adapters/codex'
 
-const DEFAULT_POLL_SECONDS = 20
+const DEFAULT_POLL_SECONDS = 60
 const DEFAULT_TOOLS: AIUsageTool[] = ['claude', 'codex']
 
 export interface AIUsageServiceHandle {

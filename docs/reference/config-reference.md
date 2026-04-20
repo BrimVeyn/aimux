@@ -345,7 +345,7 @@ interface StatusBarConfig {
 interface AIUsageToolConfig {
   enabled?: boolean // default false
   tools?: Array<'claude' | 'codex'> // default ['claude', 'codex']
-  pollSeconds?: number // default 20; clamped to a minimum of 5
+  pollSeconds?: number // default 60; clamped to a minimum of 5
   claudePlan?: 'auto' | 'pro' | 'max5' | 'max20' // default 'auto'; reserved
   codexWeeklyLimit?: number // reserved
 }
@@ -372,7 +372,7 @@ export default defineConfig({
   statusBar: {
     aiUsage: {
       enabled: true,
-      pollSeconds: 20,
+      pollSeconds: 60,
       tools: ['claude', 'codex'],
     },
   },
