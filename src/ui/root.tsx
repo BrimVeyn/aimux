@@ -6,6 +6,7 @@ import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { AIUsagePopover } from './components/ai-usage-popover'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
 import { GitCommitModal } from './components/git-commit-modal'
@@ -254,6 +255,7 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
+        <AIUsagePopover />
         {renderModal(modal, {
           createSessionFields,
           currentSessionId,

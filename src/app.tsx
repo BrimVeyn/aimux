@@ -30,6 +30,8 @@ import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
 import { getProfileName } from './profile-paths'
+import { startAIUsageService } from './services/ai-usage/provider'
+import { aiUsageStore } from './state/ai-usage-store'
 import { appStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
@@ -129,6 +131,23 @@ export function App({
       setActiveSideEffectRunner(null)
     }
   }, [dispatch])
+
+  useEffect(() => {
+    const aiUsage = resolvedConfig.statusBar?.aiUsage
+    if (!aiUsage?.enabled) {
+      aiUsageStore.getState().setEnabled(false)
+      return
+    }
+    aiUsageStore.getState().setEnabled(true)
+    const handle = startAIUsageService(aiUsage, (snap) => {
+      aiUsageStore.getState().setSnapshot(snap)
+    })
+    return () => {
+      handle.stop()
+      aiUsageStore.getState().clear()
+      aiUsageStore.getState().setEnabled(false)
+    }
+  }, [resolvedConfig.statusBar?.aiUsage])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return

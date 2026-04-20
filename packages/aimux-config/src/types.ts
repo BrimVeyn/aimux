@@ -730,6 +730,20 @@ export interface AimuxThemeConfig {
   paletteOverrides?: Partial<AimuxPalette>
 }
 
+export type AIUsageTool = 'claude' | 'codex'
+
+export interface AIUsageToolConfig {
+  enabled?: boolean
+  pollSeconds?: number
+  claudePlan?: 'auto' | 'pro' | 'max5' | 'max20'
+  codexWeeklyLimit?: number
+  tools?: AIUsageTool[]
+}
+
+export interface StatusBarConfig {
+  aiUsage?: AIUsageToolConfig
+}
+
 export interface AimuxUserConfig {
   theme?: AimuxThemeConfig
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
@@ -739,6 +753,7 @@ export interface AimuxUserConfig {
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
+  statusBar?: StatusBarConfig
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -772,4 +787,5 @@ export interface ResolvedConfig {
   gitPane: GitPaneConfig
   hooks: HooksConfig
   snippets: SnippetDef[]
+  statusBar: StatusBarConfig
 }
