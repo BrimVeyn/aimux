@@ -5,19 +5,11 @@ import type { GitFileListMode, SessionBarPosition, WorkspaceSnapshotV1 } from '.
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
 import { isWorkspaceSnapshotV1 } from './state/validation'
-import { THEME_IDS, type ThemeId } from './ui/themes'
-
-const LEGACY_THEME_ALIASES: Record<string, ThemeId> = {
-  'everforest': 'everforest-dark',
-  'gruvbox-dark': 'gruvbox-dark-hard',
-  'kanagawa': 'kanagawa-wave',
-  'one-dark': 'one-dark-pro',
-}
+import { migrateThemeId as resolveLegacyThemeId, type ThemeId } from './ui/themes'
 
 function migrateThemeId(value: unknown): ThemeId | undefined {
   if (typeof value !== 'string') return undefined
-  if (THEME_IDS.includes(value as ThemeId)) return value as ThemeId
-  return LEGACY_THEME_ALIASES[value]
+  return resolveLegacyThemeId(value)
 }
 
 export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`

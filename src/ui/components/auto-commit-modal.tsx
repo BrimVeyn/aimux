@@ -1,4 +1,4 @@
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
@@ -19,7 +19,7 @@ export function AutoCommitModal({
   editing,
   title,
 }: AutoCommitModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const titleActive = editing && activeField === 'title'
   const bodyActive = editing && activeField === 'body'
 
@@ -33,13 +33,7 @@ export function AutoCommitModal({
         <WizardHead />
       </box>
       <box flexDirection="column">
-        <text
-          fg={
-            titleActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-          }
-        >
-          Title
-        </text>
+        <text fg={titleActive ? t.palette.ink : t.muted}>Title</text>
         <InputField
           active={titleActive}
           cursorPos={titleActive ? cursorPos : undefined}
@@ -48,13 +42,7 @@ export function AutoCommitModal({
       </box>
 
       <box flexDirection="column">
-        <text
-          fg={
-            bodyActive ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']
-          }
-        >
-          Body
-        </text>
+        <text fg={bodyActive ? t.palette.ink : t.muted}>Body</text>
         <InputField
           active={bodyActive}
           cursorPos={bodyActive ? cursorPos : undefined}

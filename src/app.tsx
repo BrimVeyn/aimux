@@ -39,7 +39,7 @@ import { appReducer, createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import { applyTheme, setTransparent } from './ui/theme'
-import { isKnownThemeId, registerUserThemes, type ThemeId } from './ui/themes'
+import { isKnownThemeId, type ThemeId } from './ui/themes'
 import {
   fetchLatestNpmVersion,
   getCurrentPackageVersion,
@@ -67,15 +67,12 @@ export function App({
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
-    registerUserThemes(resolvedConfig.themes)
     const config = loadConfig()
     const persisted = config.themeId && isKnownThemeId(config.themeId) ? config.themeId : undefined
-    const fromConfig =
-      resolvedConfig.theme && isKnownThemeId(resolvedConfig.theme)
-        ? resolvedConfig.theme
-        : undefined
-    const initial = persisted ?? fromConfig ?? 'aimux'
-    applyTheme(initial)
+    const fromConfig: ThemeId =
+      resolvedConfig.theme?.mode === 'light' ? 'aimux-light' : 'aimux-dark'
+    const initial: ThemeId = persisted ?? fromConfig
+    applyTheme(initial, resolvedConfig.theme?.paletteOverrides)
     setTransparent(config.themeTransparent ?? false)
     return initial
   })

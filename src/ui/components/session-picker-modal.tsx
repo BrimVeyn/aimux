@@ -4,7 +4,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterSessions } from '../../state/selectors'
 import { abbreviatePath } from '../path-format'
 import { orderSessionsForDisplay } from '../session-ordering'
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { Picker, type PickerItem } from './picker'
 
@@ -31,10 +31,7 @@ function formatSessionLine(
 }
 
 function getEmptyStateMessage(hasFilter: boolean): string {
-  if (hasFilter) {
-    return 'No matching sessions.'
-  }
-
+  if (hasFilter) return 'No matching sessions.'
   return 'No sessions yet. Press Enter or n to create your first session.'
 }
 
@@ -46,7 +43,7 @@ export function SessionPickerModal({
   selectedIndex,
   sessions,
 }: SessionPickerModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
   const ordered = orderSessionsForDisplay(sessions)
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
@@ -60,14 +57,10 @@ export function SessionPickerModal({
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
       subtitle: session.projectPath ? (
-        <text fg={theme.colors['descriptionForeground']}>
-          {abbreviatePath(session.projectPath)}
-        </text>
+        <text fg={t.muted}>{abbreviatePath(session.projectPath)}</text>
       ) : undefined,
       title: (
-        <text
-          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-        >
+        <text fg={active ? t.palette.ink : t.muted}>
           {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
         </text>
       ),
@@ -78,13 +71,7 @@ export function SessionPickerModal({
     key: '__create-new__',
     onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
     title: (
-      <text
-        fg={
-          selectedIndex === filtered.length
-            ? theme.colors['editor.foreground']
-            : theme.colors['descriptionForeground']
-        }
-      >
+      <text fg={selectedIndex === filtered.length ? t.palette.ink : t.muted}>
         Create new session
       </text>
     ),
@@ -104,7 +91,7 @@ export function SessionPickerModal({
       selectedIndex={selectedIndex}
       emptyState={
         filtered.length === 0 ? (
-          <text fg={theme.colors['descriptionForeground']}>{getEmptyStateMessage(hasFilter)}</text>
+          <text fg={t.muted}>{getEmptyStateMessage(hasFilter)}</text>
         ) : undefined
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}

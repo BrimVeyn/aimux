@@ -1,11 +1,11 @@
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 
 interface MagicWandProps {
   onClick: () => void
 }
 
 export function MagicWand({ onClick }: MagicWandProps) {
-  const theme = useTheme()
+  const t = useTokens()
   return (
     <box
       onMouseDown={(event) => {
@@ -14,7 +14,7 @@ export function MagicWand({ onClick }: MagicWandProps) {
         onClick()
       }}
     >
-      <text fg={theme.colors['textLink.foreground']}>🪄</text>
+      <text fg={t.palette.primary}>🪄</text>
     </box>
   )
 }

@@ -10,11 +10,12 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { IDLE_SESSION_STATUS } from '../../state/types'
 import { useBusySpinner } from '../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering'
-import { useBg, useTheme } from '../theme'
+import { useBg, useTokens } from '../theme'
+import { ContextMenuBox } from './context-menu-box'
 
 export function SessionBar() {
-  const theme = useTheme()
-  const headerBg = useBg('sideBarSectionHeader.background')
+  const t = useTokens()
+  const headerBg = useBg('elevated')
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -22,11 +23,7 @@ export function SessionBar() {
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
-  // Hysteresis: the id of the chip we most recently swapped with. While the
-  // cursor remains over that chip we refuse to swap back (prevents oscillation
-  // when a long chip's new bounds still cover the cursor after a swap).
   const lastSwapWithRef = useRef<string | null>(null)
-  // Live bounds of each chip after render, keyed by session id.
   const chipRefs = useRef(new Map<string, BoxRenderable>())
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
@@ -125,6 +122,22 @@ export function SessionBar() {
             onMouseDrag={handleMouseDrag}
             onMouseUp={commitDrop}
             onMouseDragEnd={cancelDrag}
+            rightClickMenu={[
+              [
+                'Rename',
+                () =>
+                  dispatchGlobal({
+                    initialName: session.name,
+                    returnToSessionPicker: false,
+                    sessionTargetId: session.id,
+                    type: 'open-session-name-modal',
+                  }),
+              ],
+              [
+                'Close',
+                () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
+              ],
+            ]}
           />
         )
       })}
@@ -133,13 +146,13 @@ export function SessionBar() {
         flexDirection="row"
         paddingLeft={1}
         paddingRight={1}
-        backgroundColor={theme.colors['list.activeSelectionBackground']}
+        backgroundColor={t.selected}
         onMouseDown={(e) => {
           e.stopPropagation()
           dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
         }}
       >
-        <text fg={theme.colors['editor.foreground']} selectable={false}>
+        <text fg={t.palette.ink} selectable={false}>
           + New
         </text>
       </box>
@@ -166,6 +179,7 @@ interface SessionChipProps {
   onMouseDrag: (event: OtuiMouseEvent) => void
   onMouseUp: (event: OtuiMouseEvent) => void
   onMouseDragEnd: (event: OtuiMouseEvent) => void
+  rightClickMenu: Array<[string, () => void]>
 }
 
 function SessionChip({
@@ -177,29 +191,29 @@ function SessionChip({
   onMouseDragEnd,
   onMouseUp,
   onRef,
+  rightClickMenu,
   session,
   status,
 }: SessionChipProps) {
-  const theme = useTheme()
-  const selectionBg = useBg('list.activeSelectionBackground')
+  const t = useTokens()
+  const selectionBg = useBg('selected')
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const labelColor = active
-    ? theme.colors['editor.foreground']
-    : theme.colors['descriptionForeground']
+  const labelColor = active ? t.palette.ink : t.muted
   const bgColor = dragging || active ? selectionBg : undefined
-  const idleColor = theme.colors['gitDecoration.addedResourceForeground'] ?? ''
-  const workingColor = theme.colors['textLink.foreground'] ?? ''
-  const waitingColor = theme.colors['editorWarning.foreground'] ?? ''
+  const idleColor = t.palette.success
+  const workingColor = t.palette.primary
+  const waitingColor = t.palette.warning
 
   return (
-    <box
+    <ContextMenuBox
       ref={onRef}
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
+      rightClickMenu={rightClickMenu}
       onMouseDown={(e) => {
         e.preventDefault()
         onMouseDown(e)
@@ -233,9 +247,9 @@ function SessionChip({
       <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>
-      <text fg={theme.colors['editor.lineHighlightBackground']} selectable={false}>
+      <text fg={t.hover} selectable={false}>
         {' '}
       </text>
-    </box>
+    </ContextMenuBox>
   )
 }

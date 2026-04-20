@@ -1,25 +1,30 @@
-// Thin runtime re-export. Theme data, types, normalization, and registration
-// all live in `@brimveyn/aimux-config` so the dependency-free config package is
-// the single source of truth. The mutable theme singleton + `applyTheme` stay
-// in `./theme.ts` since they're UI-layer concerns.
+// Thin runtime re-export. Theme data, types, palette utilities, and the
+// palette-to-Shiki generator all live in `@brimveyn/aimux-config`.
 
 export type {
-  AimuxColorKey,
-  NamedTheme,
-  NamedThemeDefinition,
+  AimuxPalette,
+  AimuxTheme,
+  AimuxThemeConfig,
   Theme,
-  ThemeColorMap,
   ThemeId,
-  ThemeSettings,
-  ThemeTokenRule,
+  ThemeMode,
 } from '@brimveyn/aimux-config'
 
 export {
-  AIMUX_COLOR_KEYS,
+  accent,
+  border,
+  diffAddBg,
+  diffDeleteBg,
+  elevated,
+  extendPalette,
+  faint,
+  hover,
   isKnownThemeId,
   migrateThemeId,
-  normalizeTheme,
-  registerUserThemes,
+  mix,
+  muted,
+  paletteToShikiTheme,
+  selected,
   THEME_IDS,
   THEMES,
 } from '@brimveyn/aimux-config'

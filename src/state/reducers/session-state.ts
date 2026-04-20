@@ -46,13 +46,6 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
     case 'rename-session-record':
       return {
         ...state,
-        focusMode: 'modal',
-        modal: {
-          editBuffer: null,
-          selectedIndex: state.modal.selectedIndex,
-          sessionTargetId: null,
-          type: 'session-picker',
-        },
         sessions: state.sessions.map((session) =>
           session.id === action.sessionId
             ? { ...session, name: action.name, updatedAt: new Date().toISOString() }

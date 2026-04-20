@@ -292,6 +292,7 @@ export interface ModalSessionPicker extends ModalBase {
 
 export interface ModalSessionName extends ModalBase {
   type: 'session-name'
+  returnToSessionPicker: boolean
 }
 
 export interface ModalRenameTab extends ModalBase {
@@ -417,7 +418,12 @@ export type ModalAction =
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
   | { type: 'open-session-picker' }
-  | { type: 'open-session-name-modal'; sessionTargetId?: string; initialName?: string }
+  | {
+      type: 'open-session-name-modal'
+      sessionTargetId?: string
+      initialName?: string
+      returnToSessionPicker?: boolean
+    }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
   | { type: 'update-command-edit'; char: string }

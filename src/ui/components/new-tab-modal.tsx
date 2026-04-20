@@ -3,7 +3,7 @@ import type { AssistantId } from '../../state/types'
 import { getAllAssistantOptions, getAssistantOption } from '../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { filterAssistants } from '../../state/selectors'
-import { useTheme } from '../theme'
+import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
 import { ModalShell } from './modal-shell'
@@ -26,7 +26,7 @@ export function NewTabModal({
   filter,
   selectedIndex,
 }: NewTabModalProps) {
-  const theme = useTheme()
+  const t = useTokens()
 
   if (editingCommand !== null) {
     const option =
@@ -39,9 +39,7 @@ export function NewTabModal({
         width={uiTokens.modalWidth.md}
       >
         <box flexDirection="column">
-          <text fg={theme.colors['descriptionForeground']}>
-            Custom command (blank to reset to default: {option.command})
-          </text>
+          <text fg={t.muted}>Custom command (blank to reset to default: {option.command})</text>
           <InputField
             active
             value={editBuffer}
@@ -65,17 +63,11 @@ export function NewTabModal({
       onEdit: () => dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
       subtitle: (
         <box flexDirection="column">
-          <text fg={theme.colors['descriptionForeground']}>{option.description}</text>
-          {customCmd ? <text fg={theme.colors['textLink.foreground']}>{customCmd}</text> : null}
+          <text fg={t.muted}>{option.description}</text>
+          {customCmd ? <text fg={t.palette.primary}>{customCmd}</text> : null}
         </box>
       ),
-      title: (
-        <text
-          fg={active ? theme.colors['editor.foreground'] : theme.colors['descriptionForeground']}
-        >
-          {option.label}
-        </text>
-      ),
+      title: <text fg={active ? t.palette.ink : t.muted}>{option.label}</text>,
     }
   })
 
@@ -89,7 +81,7 @@ export function NewTabModal({
       cursorPos={cursorPos}
       items={items}
       selectedIndex={selectedIndex}
-      emptyState={<text fg={theme.colors['descriptionForeground']}>No matching assistants.</text>}
+      emptyState={<text fg={t.muted}>No matching assistants.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

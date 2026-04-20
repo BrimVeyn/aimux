@@ -1,13 +1,16 @@
 // Back-compat shim: the theme singleton has been replaced with a Zustand store.
-// React components should import `useTheme` from `./theme-store`; non-React
-// callers use `getCurrentTheme()`. `applyTheme` moved to the store module.
+// React components use `useTokens` for derived shades; non-React callers use
+// `getCurrentTheme()` / `getCurrentTokens()`.
 
 export {
   applyTheme,
   getCurrentTheme,
+  getCurrentTokens,
   getTransparent,
   setTransparent,
+  type SurfaceToken,
+  type ThemeTokens,
   useBg,
-  useTheme,
+  useTokens,
   useTransparent,
 } from './theme-store'

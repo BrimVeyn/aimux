@@ -42,7 +42,11 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
   | { type: 'rename-session'; sessionId: string; name: string }
-  | { type: 'split-pane'; direction: import('../../state/layout-tree').SplitDirection }
+  | {
+      type: 'split-pane'
+      direction: import('../../state/layout-tree').SplitDirection
+      sourceTabId?: string
+    }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
   | { type: 'persist-git-diff-mode-ratio'; ratio: number }
@@ -58,6 +62,7 @@ export type SideEffect =
   | { type: 'auto-commit-dismiss'; sessionId: string; title: string; body: string }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
+  | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
 
 export interface KeyResult {

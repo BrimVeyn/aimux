@@ -20,12 +20,12 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'session-picker': 'modal.session-picker.filtering',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
+  'split-picker': 'modal.split-picker',
   'theme-picker': 'modal.theme-picker.filtering',
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'auto-commit': 'modal.auto-commit',
-  'split-picker': 'modal.split-picker',
   'update-available': 'modal.update-available',
 }
 

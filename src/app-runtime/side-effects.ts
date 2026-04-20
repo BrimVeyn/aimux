@@ -385,6 +385,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleSelectedSessionDelete(ctx)
       return
     }
+    case 'delete-session': {
+      handleDeleteSessionEffect(state, backend, dispatch, effect.sessionId)
+      return
+    }
     case 'open-rename-selected-session': {
       openSelectedSessionRename(ctx)
       return
@@ -453,8 +457,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'split-pane': {
-      const customCommand = state.customCommands.terminal
-      const tab = createTabSession('terminal', customCommand, state.customCommands)
+      const sourceTab = effect.sourceTabId
+        ? state.tabs.find((t) => t.id === effect.sourceTabId)
+        : undefined
+      const assistant = sourceTab?.assistant ?? 'terminal'
+      const customCommand = state.customCommands[assistant]
+      const tab = createTabSession(assistant, customCommand, state.customCommands)
       executeSplitPane(ctx, effect.direction, tab)
       return
     }

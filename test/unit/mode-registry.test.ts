@@ -38,7 +38,11 @@ describe('deriveModeId', () => {
       deriveModeId(
         makeState({
           focusMode: 'modal',
-          modal: { ...createInitialState().modal, type: 'session-name' },
+          modal: {
+            ...createInitialState().modal,
+            returnToSessionPicker: true,
+            type: 'session-name',
+          },
         })
       )
     ).toBe('navigation')
