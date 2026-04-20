@@ -227,4 +227,27 @@ describe('createRawInputHandler', () => {
       autoBottom: true,
     })
   })
+
+  test('preserves char order when fed rapidly one-by-one (Espanso-style)', () => {
+    const { handler, writeToPty } = setup()
+    const phrase = 'Fais une review de cette branch en merge (style PR). utilise superpower'
+    for (const ch of phrase) {
+      handler(ch)
+    }
+    const calls = writeToPty.mock.calls
+    expect(calls).toHaveLength(phrase.length)
+    const reconstructed = calls.map((c) => c[1]).join('')
+    expect(reconstructed).toBe(phrase)
+  })
+
+  test('preserves char order when fed in mixed-size chunks', () => {
+    const { handler, writeToPty } = setup()
+    const phrase = 'Fais une review de cette branch'
+    const chunks = ['Fa', 'i', 's ', 'une ', 'r', 'e', 'view ', 'de cette ', 'branch']
+    for (const chunk of chunks) {
+      handler(chunk)
+    }
+    const reconstructed = writeToPty.mock.calls.map((c) => c[1]).join('')
+    expect(reconstructed).toBe(phrase)
+  })
 })

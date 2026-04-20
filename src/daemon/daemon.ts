@@ -286,9 +286,14 @@ export async function runDaemon(): Promise<void> {
     logDebug('daemon.client.connected')
     sockets.add(socket)
     const decoder = new MessageDecoder<ClientRequest>(parseClientRequest)
+    // Serialize chunk processing per socket. Each async iteration crosses a
+    // microtask boundary, so without chaining, concurrent `data` callbacks
+    // interleave their `await manager.write(...)` calls and PTY writes land
+    // out of order (visible as scrambled chars during fast typing/Espanso).
+    let processing: Promise<void> = Promise.resolve()
 
     socket.on('data', (chunk) => {
-      void (async () => {
+      processing = processing.then(async () => {
         try {
           for (const message of decoder.push(chunk)) {
             try {
@@ -527,7 +532,7 @@ export async function runDaemon(): Promise<void> {
           decoder.reset()
           send(socket, { id: crypto.randomUUID(), payload: { message }, type: 'error' })
         }
-      })()
+      })
     })
 
     socket.on('close', () => {
