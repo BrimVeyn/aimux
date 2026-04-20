@@ -4,52 +4,81 @@ import type { UsageSnapshot } from '../types'
 
 import { runCli } from '../spawn'
 
-interface CcusageBlock {
-  id?: string
-  isActive?: boolean
-  blockStart?: string
-  blockEnd?: string
-  timeRemaining?: string
-  inputTokens?: number
-  outputTokens?: number
-  cacheCreationTokens?: number
-  cacheReadTokens?: number
-  totalTokens?: number
-  costUSD?: number
-  burnRate?: number | { tokensPerHour?: number; tokensPerMinute?: number }
-  tokenLimitStatus?: {
-    limit?: number
-    percentUsed?: number
+interface ClaudeOAuthCreds {
+  accessToken: string
+  expiresAt?: number
+}
+
+interface ClaudeKeychainPayload {
+  claudeAiOauth?: {
+    accessToken?: string
+    expiresAt?: number
+    refreshToken?: string
   }
 }
 
-interface CcusageBlocksOutput {
-  blocks?: CcusageBlock[]
+interface UsageWindow {
+  utilization?: number
+  resets_at?: string
 }
 
-function resolvePlanFlag(plan: AIUsageToolConfig['claudePlan']): string {
-  switch (plan) {
-    case 'pro':
-    case 'max5':
-    case 'max20':
-      return plan
-    case 'auto':
-    default:
-      return 'max'
+interface ClaudeUsageResponse {
+  five_hour?: UsageWindow
+  seven_day?: UsageWindow
+  seven_day_sonnet?: UsageWindow
+  seven_day_opus?: UsageWindow
+  extra_usage?: UsageWindow & { spent_usd?: number; limit_usd?: number }
+}
+
+const USAGE_URL = 'https://api.anthropic.com/api/oauth/usage'
+const OAUTH_BETA_HEADER = 'oauth-2025-04-20'
+const FETCH_TIMEOUT_MS = 15_000
+
+let cachedCreds: ClaudeOAuthCreds | null = null
+const CREDS_EXPIRY_BUFFER_MS = 60_000
+
+async function readClaudeCreds(): Promise<ClaudeOAuthCreds> {
+  const now = Date.now()
+  if (
+    cachedCreds &&
+    typeof cachedCreds.expiresAt === 'number' &&
+    cachedCreds.expiresAt - CREDS_EXPIRY_BUFFER_MS > now
+  ) {
+    return cachedCreds
   }
-}
 
-function extractBurnRate(raw: CcusageBlock['burnRate']): number | null {
-  if (raw === null || raw === undefined) return null
-  if (typeof raw === 'number') return raw
-  if (typeof raw === 'object') {
-    if (typeof raw.tokensPerHour === 'number') return raw.tokensPerHour
-    if (typeof raw.tokensPerMinute === 'number') return raw.tokensPerMinute * 60
+  if (process.platform !== 'darwin') {
+    throw new Error('claude usage requires macOS keychain (darwin only)')
   }
-  return null
+  const result = await runCli('security', [
+    'find-generic-password',
+    '-s',
+    'Claude Code-credentials',
+    '-w',
+  ])
+  if (!result.ok) {
+    throw new Error(`keychain read failed — run \`claude\` to sign in`)
+  }
+  const parsed = JSON.parse(result.stdout.trim()) as ClaudeKeychainPayload
+  const access = parsed.claudeAiOauth?.accessToken
+  if (!access) {
+    throw new Error('no accessToken in Claude Code keychain')
+  }
+  cachedCreds = { accessToken: access, expiresAt: parsed.claudeAiOauth?.expiresAt }
+  return cachedCreds
 }
 
-export async function fetchClaudeUsage(config: AIUsageToolConfig): Promise<UsageSnapshot> {
+function formatRemainingFromIso(iso: string | undefined): string | null {
+  if (!iso) return null
+  const ms = new Date(iso).getTime() - Date.now()
+  if (ms <= 0) return null
+  const totalMin = Math.round(ms / 60_000)
+  const h = Math.floor(totalMin / 60)
+  const m = totalMin % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}h`
+}
+
+export async function fetchClaudeUsage(_config: AIUsageToolConfig): Promise<UsageSnapshot> {
   const now = new Date().toISOString()
   const base: UsageSnapshot = {
     burnRatePerHour: null,
@@ -63,46 +92,42 @@ export async function fetchClaudeUsage(config: AIUsageToolConfig): Promise<Usage
   }
 
   try {
-    const planFlag = resolvePlanFlag(config.claudePlan)
-    const result = await runCli('bunx', [
-      '-y',
-      'ccusage',
-      'blocks',
-      '--active',
-      '--json',
-      '--token-limit',
-      planFlag,
-    ])
+    const creds = await readClaudeCreds()
 
-    if (!result.ok) {
-      return { ...base, error: result.error }
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+    let response: Response
+    try {
+      response = await fetch(USAGE_URL, {
+        headers: {
+          'anthropic-beta': OAUTH_BETA_HEADER,
+          'Authorization': `Bearer ${creds.accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timer)
     }
 
-    const parsed = JSON.parse(result.stdout) as CcusageBlocksOutput
-    const active = parsed.blocks?.find((b) => b.isActive) ?? parsed.blocks?.[0]
-    if (!active) {
-      return { ...base, error: 'no-active-block' }
+    if (response.status === 401 || response.status === 403) {
+      cachedCreds = null
+      return { ...base, error: 'claude oauth expired — run `claude` to re-auth' }
+    }
+    if (!response.ok) {
+      return { ...base, error: `claude api ${response.status}` }
     }
 
-    const input = active.inputTokens ?? 0
-    const output = active.outputTokens ?? 0
-    const cache = (active.cacheCreationTokens ?? 0) + (active.cacheReadTokens ?? 0)
-    const total = active.totalTokens ?? input + output + cache
-
-    let percent = active.tokenLimitStatus?.percentUsed ?? null
-    if (percent === null && active.tokenLimitStatus?.limit) {
-      percent = (total / active.tokenLimitStatus.limit) * 100
-    }
-    if (percent !== null) percent = Math.max(0, Math.min(100, percent))
+    const parsed = (await response.json()) as ClaudeUsageResponse
+    const fiveHour = parsed.five_hour
+    const utilization = typeof fiveHour?.utilization === 'number' ? fiveHour.utilization : null
+    const percent = utilization === null ? null : Math.max(0, Math.min(100, utilization))
 
     return {
       ...base,
-      burnRatePerHour: extractBurnRate(active.burnRate),
-      costUSD: active.costUSD ?? null,
       percent,
-      resetAt: active.blockEnd ?? null,
-      timeRemaining: active.timeRemaining ?? null,
-      tokens: { cache, input, output, total },
+      resetAt: fiveHour?.resets_at ?? null,
+      timeRemaining: formatRemainingFromIso(fiveHour?.resets_at),
       tool: 'claude',
     }
   } catch (error) {
