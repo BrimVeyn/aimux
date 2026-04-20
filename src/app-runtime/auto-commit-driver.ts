@@ -147,6 +147,43 @@ export async function onActivityTransition(
   })
   if (!should) return
 
+  await runGeneration(deps, args, currentHash, config)
+}
+
+export async function onManualTrigger(
+  deps: DriverDeps,
+  args: ActivityTransitionArgs
+): Promise<void> {
+  const config = deps.getConfig()
+  const fail = (reason: string): void => {
+    deps.dispatch({ message: `auto-commit: ${reason}`, type: 'git-mode-set-message' })
+    deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
+  }
+  if (!config.enabled) return fail('disabled in config')
+  if (!args.git || args.git.files.length === 0) return fail('no changes to summarise')
+  if (!args.projectPath) return fail('no project path for current session')
+
+  const currentHash = workingTreeHash(args.git)
+  const existing = deps.getState().autoCommit.bySession[args.sessionId]
+  // An in-flight generation will dispatch ready/clear; just wait for it.
+  if (existing && existing.kind === 'generating') return
+  if (existing && existing.kind === 'ready' && existing.workingTreeHash === currentHash) return
+
+  const probe = buildHeadlessInvocation(args.assistant, '__probe__', config.models[args.assistant])
+  if (!probe) return fail(`no headless invocation for ${args.assistant}`)
+  if (!isCommandAvailable(probe.executable)) {
+    return fail(`'${probe.executable}' not found in PATH`)
+  }
+
+  await runGeneration(deps, args, currentHash, config)
+}
+
+async function runGeneration(
+  deps: DriverDeps,
+  args: ActivityTransitionArgs,
+  currentHash: string,
+  config: AutoCommitConfigSnapshot
+): Promise<void> {
   const probe = buildHeadlessInvocation(args.assistant, '__probe__', config.models[args.assistant])
   if (!probe) return
   if (!isCommandAvailable(probe.executable)) return

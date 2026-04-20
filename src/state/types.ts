@@ -322,7 +322,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
-  stage: 'edit' | 'confirm'
+  stage: 'edit' | 'generating' | 'confirm'
 }
 
 export interface ModalCreateSession extends ModalBase {
@@ -622,6 +622,8 @@ export type GitModeAction =
   | { type: 'open-git-commit-modal'; sessionId?: string }
   | { type: 'git-commit-enter-confirm' }
   | { type: 'git-commit-leave-confirm' }
+  | { type: 'git-commit-enter-generating'; sessionId: string }
+  | { type: 'git-commit-leave-generating' }
 
 // -- Data actions --
 export type DataAction =

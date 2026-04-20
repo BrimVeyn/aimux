@@ -25,6 +25,7 @@ export type ModeId =
   | 'modal.split-picker'
   | 'modal.git-commit'
   | 'modal.git-commit.confirm'
+  | 'modal.git-commit.generating'
   | 'modal.update-available'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -291,7 +292,7 @@ export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
   contentBuffer: string
-  stage: 'edit' | 'confirm'
+  stage: 'edit' | 'generating' | 'confirm'
 }
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
@@ -528,6 +529,8 @@ export type GitModeAction =
   | { type: 'open-git-commit-modal'; sessionId?: string }
   | { type: 'git-commit-enter-confirm' }
   | { type: 'git-commit-leave-confirm' }
+  | { type: 'git-commit-enter-generating'; sessionId: string }
+  | { type: 'git-commit-leave-generating' }
 
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
@@ -597,6 +600,7 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-commit-auto'; title: string; body: string }
+  | { type: 'generate-auto-commit-now'; sessionId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }

@@ -38,6 +38,7 @@ import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
+import { triggerAutoCommitNow } from './auto-commit-ref'
 import {
   handleCreateSessionEffect,
   handleDeleteSessionEffect,
@@ -553,6 +554,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void enqueueGitOp(() => runGitCommitAuto(ctx, title, body))
       return
     }
+    case 'generate-auto-commit-now': {
+      void runGenerateAutoCommitNow(ctx, effect.sessionId)
+      return
+    }
     case 'git-push': {
       void enqueueGitOp(() => runGitPush(ctx))
       return
@@ -726,6 +731,32 @@ function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
   const sessionId = ctx.state.currentSessionId
   if (!sessionId) return
   ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+}
+
+async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: string): Promise<void> {
+  const session = ctx.state.sessions.find((s) => s.id === sessionId)
+  const panel = ctx.state.gitPanel
+  if (panel.error !== null) {
+    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    return
+  }
+  const tab = ctx.activeTab
+  if (!tab) {
+    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    return
+  }
+  await triggerAutoCommitNow({
+    assistant: tab.assistant,
+    git: {
+      ahead: panel.ahead,
+      behind: panel.behind,
+      branch: panel.branch,
+      files: panel.files,
+    },
+    projectPath: session?.projectPath,
+    sessionId,
+    tabId: tab.id,
+  })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {

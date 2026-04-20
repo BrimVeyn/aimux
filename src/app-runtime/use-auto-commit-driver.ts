@@ -7,7 +7,9 @@ import {
   type DriverDeps,
   onActivityTransition,
   onGitRefresh,
+  onManualTrigger,
 } from './auto-commit-driver'
+import { setActiveAutoCommitDriver } from './auto-commit-ref'
 
 interface Options {
   state: AppState
@@ -46,6 +48,11 @@ export function useAutoCommitDriver({
   }
   const depsRef = useRef(deps)
   depsRef.current = deps
+
+  useEffect(() => {
+    setActiveAutoCommitDriver((args) => onManualTrigger(depsRef.current, args))
+    return () => setActiveAutoCommitDriver(null)
+  }, [])
 
   const prevActivityRef = useRef<Map<string, TabActivity | undefined>>(new Map())
 

@@ -1,4 +1,9 @@
-import { dispatchGlobal } from '../../state/dispatch-ref'
+import { useEffect, useState } from 'react'
+
+import type { ModeId } from '../../input/modes/types'
+
+import { useAppStore } from '../../state/app-store'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { useTokens } from '../theme'
 import { uiTokens } from '../ui-tokens'
 import { InputField } from './input-field'
@@ -9,13 +14,70 @@ interface GitCommitModalProps {
   title: string
   body: string
   cursorPos: number
-  stage: 'edit' | 'confirm'
+  stage: 'edit' | 'generating' | 'confirm'
+  assistant?: string
+  model?: string
+}
+
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+const SPINNER_INTERVAL_MS = 80
+
+function useSpinnerFrame(active: boolean): string {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const id = setInterval(
+      () => setIndex((i) => (i + 1) % SPINNER_FRAMES.length),
+      SPINNER_INTERVAL_MS
+    )
+    return () => clearInterval(id)
+  }, [active])
+  return SPINNER_FRAMES[index] ?? '⠋'
+}
+
+function pickModeId(stage: 'edit' | 'generating' | 'confirm'): ModeId {
+  if (stage === 'generating') return 'modal.git-commit.generating'
+  if (stage === 'confirm') return 'modal.git-commit.confirm'
+  return 'modal.git-commit'
+}
+
+function pickShellTitle(stage: 'edit' | 'generating' | 'confirm'): string {
+  if (stage === 'generating') return 'Auto-commit'
+  if (stage === 'confirm') return 'Auto-commit (stage all + commit)'
+  return 'Commit'
+}
+
+function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: string }) {
+  const t = useTokens()
+  const frame = useSpinnerFrame(true)
+  const providerLabel = [assistant, model].filter(Boolean).join(' · ') || 'configured provider'
+  return (
+    <box
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+      paddingTop={2}
+      paddingBottom={2}
+    >
+      <text fg={t.palette.primary}>🪄</text>
+      <box marginTop={1} flexDirection="row" gap={1}>
+        <text fg={t.palette.primary}>{frame}</text>
+        <text fg={t.palette.ink}>Generating commit message</text>
+      </box>
+      <text fg={t.muted}>via {providerLabel}</text>
+      <box marginTop={1}>
+        <text fg={t.muted}>Esc to cancel</text>
+      </box>
+    </box>
+  )
 }
 
 export function GitCommitModal({
   activeField,
+  assistant,
   body,
   cursorPos,
+  model,
   stage,
   title,
 }: GitCommitModalProps) {
@@ -23,13 +85,26 @@ export function GitCommitModal({
   const titleActive = activeField === 'title'
   const bodyActive = activeField === 'body'
   const isConfirm = stage === 'confirm'
+  const isGenerating = stage === 'generating'
+  const currentSessionId = useAppStore((s) => s.currentSessionId)
+
+  const onAutoCommitClick = (): void => {
+    const hasTitle = title.trim().length > 0
+    if (hasTitle || !currentSessionId) {
+      dispatchGlobal({ type: 'git-commit-enter-confirm' })
+      return
+    }
+    dispatchGlobal({ sessionId: currentSessionId, type: 'git-commit-enter-generating' })
+    runSideEffectGlobal({ sessionId: currentSessionId, type: 'generate-auto-commit-now' })
+  }
+
+  const modeId = pickModeId(stage)
+  const shellTitle = pickShellTitle(stage)
 
   return (
-    <ModalShell
-      title={isConfirm ? 'Auto-commit (stage all + commit)' : 'Commit'}
-      keybindsModeId={isConfirm ? 'modal.git-commit.confirm' : 'modal.git-commit'}
-      width={uiTokens.modalWidth.xl}
-    >
+    <ModalShell title={shellTitle} keybindsModeId={modeId} width={uiTokens.modalWidth.xl}>
+      {isGenerating ? <GeneratingOverlay assistant={assistant} model={model} /> : null}
+
       {isConfirm ? (
         <box flexDirection="column">
           <text fg={t.palette.warning}>
@@ -39,42 +114,48 @@ export function GitCommitModal({
         </box>
       ) : null}
 
-      <box flexDirection="column">
-        <text fg={titleActive ? t.palette.ink : t.muted}>Title</text>
-        <InputField
-          active={titleActive}
-          cursorPos={titleActive ? cursorPos : undefined}
-          value={title}
-        />
-      </box>
+      {isGenerating ? null : (
+        <>
+          <box flexDirection="column">
+            <text fg={titleActive ? t.palette.ink : t.muted}>Title</text>
+            <InputField
+              active={titleActive}
+              cursorPos={titleActive ? cursorPos : undefined}
+              value={title}
+            />
+          </box>
 
-      <box flexDirection="column">
-        <text fg={bodyActive ? t.palette.ink : t.muted}>Body (optional)</text>
-        <InputField
-          active={bodyActive}
-          cursorPos={bodyActive ? cursorPos : undefined}
-          value={body}
-        />
-      </box>
+          <box flexDirection="column">
+            <text fg={bodyActive ? t.palette.ink : t.muted}>Body (optional)</text>
+            <InputField
+              active={bodyActive}
+              cursorPos={bodyActive ? cursorPos : undefined}
+              value={body}
+            />
+          </box>
+        </>
+      )}
 
-      {isConfirm ? null : (
+      {isConfirm || isGenerating ? null : (
         <box flexDirection="row" gap={1} marginTop={1}>
           <box
-            onMouseDown={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              dispatchGlobal({ type: 'git-commit-enter-confirm' })
-            }}
-            borderStyle="single"
+            border
             borderColor={t.palette.primary}
             paddingLeft={1}
             paddingRight={1}
+            onMouseDown={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              onAutoCommitClick()
+            }}
           >
             <text fg={t.palette.primary}>
               <strong>🪄 Auto-commit</strong>
             </text>
           </box>
-          <text fg={t.muted}>C-a · stages all changes with this message</text>
+          <box alignItems="center">
+            <text fg={t.muted}>C-a · stages all changes (AI-suggests message if empty)</text>
+          </box>
         </box>
       )}
     </ModalShell>

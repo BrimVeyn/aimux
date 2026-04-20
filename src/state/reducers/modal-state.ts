@@ -7,6 +7,7 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { filterAssistants, filterSessions, filterSnippets } from '../selectors'
+import { reduceAutoCommitState } from './auto-commit-state'
 
 function emptyModal() {
   return {
@@ -233,6 +234,62 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type !== 'git-commit') return state
       return {
         ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
+      }
+    }
+    case 'git-commit-enter-generating': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: { ...state.modal, sessionTargetId: action.sessionId, stage: 'generating' },
+      }
+    }
+    case 'git-commit-leave-generating': {
+      if (state.modal.type !== 'git-commit') return state
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: { ...state.modal, stage: 'edit' },
+      }
+    }
+    case 'auto-commit-generation-ready': {
+      if (
+        state.modal.type !== 'git-commit' ||
+        state.modal.stage !== 'generating' ||
+        state.modal.sessionTargetId !== action.sessionId
+      ) {
+        return null
+      }
+      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
+      if (!nextAutoCommit) return null
+      return {
+        ...state,
+        autoCommit: nextAutoCommit,
+        focusMode: 'command-edit',
+        modal: {
+          ...state.modal,
+          activeField: 'title',
+          contentBuffer: action.body,
+          cursorPos: action.title.length,
+          editBuffer: action.title,
+          stage: 'confirm',
+        },
+      }
+    }
+    case 'auto-commit-clear': {
+      if (
+        state.modal.type !== 'git-commit' ||
+        state.modal.stage !== 'generating' ||
+        state.modal.sessionTargetId !== action.sessionId
+      ) {
+        return null
+      }
+      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
+      return {
+        ...state,
+        autoCommit: nextAutoCommit ?? state.autoCommit,
         focusMode: 'command-edit',
         modal: { ...state.modal, stage: 'edit' },
       }

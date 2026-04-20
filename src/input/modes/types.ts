@@ -19,6 +19,7 @@ export type ModeId =
   | 'modal.split-picker'
   | 'modal.git-commit'
   | 'modal.git-commit.confirm'
+  | 'modal.git-commit.generating'
   | 'modal.update-available'
 
 export type SideEffect =
@@ -57,6 +58,7 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-commit-auto'; title: string; body: string }
+  | { type: 'generate-auto-commit-now'; sessionId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }

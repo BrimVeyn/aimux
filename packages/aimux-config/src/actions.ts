@@ -590,8 +590,22 @@ export const gitCommitCancel: ActionFn = (ctx: ModeContext) => {
 }
 
 export const gitCommitEnterConfirm: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type !== 'git-commit') return null
-  return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
+  const modal = ctx.state.modal
+  if (modal.type !== 'git-commit') return null
+  const fields = extractGitCommitFields(modal)
+  const hasTitle = !!fields && fields.title.length > 0
+  if (hasTitle) {
+    return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
+  }
+  const sessionId = ctx.state.currentSessionId
+  if (!sessionId) {
+    return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
+  }
+  return r(
+    [{ sessionId, type: 'git-commit-enter-generating' }],
+    [{ sessionId, type: 'generate-auto-commit-now' }],
+    'modal.git-commit.generating'
+  )
 }
 
 export const gitCommitLeaveConfirm: KeyResult = r(
@@ -599,6 +613,15 @@ export const gitCommitLeaveConfirm: KeyResult = r(
   [],
   'modal.git-commit'
 )
+
+export const gitCommitLeaveGenerating: ActionFn = (ctx: ModeContext) => {
+  const sessionId = ctx.state.currentSessionId
+  const actionsList: AppAction[] = [{ type: 'git-commit-leave-generating' }]
+  if (sessionId) {
+    actionsList.push({ sessionId, type: 'auto-commit-clear' })
+  }
+  return r(actionsList, [], 'modal.git-commit')
+}
 
 export const gitCommitAutoAccept: ActionFn = (ctx: ModeContext) => {
   const fields = extractGitCommitFields(ctx.state.modal)

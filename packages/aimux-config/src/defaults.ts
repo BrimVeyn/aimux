@@ -303,5 +303,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .passthrough()
     )
 
+    // -----------------------------------------------------------------------
+    // Modal: git-commit generating (waiting for LLM)
+    // -----------------------------------------------------------------------
+    .mode('modal.git-commit.generating', (m) =>
+      m.map('<Esc>', actions.gitCommitLeaveGenerating, 'Cancel generation')
+    )
+
   return kb._build()
 }

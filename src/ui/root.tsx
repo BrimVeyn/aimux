@@ -75,6 +75,8 @@ function renderModal(
     createSessionFields: { directoryQuery: string; sessionName: string }
     snippetEditorFields: { snippetName: string; snippetContent: string }
     focusMode: FocusMode
+    activeAssistant?: string
+    autoCommitModel?: string
   }
 ) {
   switch (modal.type) {
@@ -173,8 +175,10 @@ function renderModal(
       return (
         <GitCommitModal
           activeField={modal.activeField}
+          assistant={options.activeAssistant}
           body={bodyText}
           cursorPos={modal.cursorPos ?? (modal.editBuffer ?? '').length}
+          model={options.autoCommitModel}
           stage={modal.stage}
           title={titleText}
         />
@@ -257,6 +261,7 @@ export function RootView({
         <PendingChordOverlay />
         <ContextMenuOverlay />
         {renderModal(modal, {
+          activeAssistant: activeTab?.assistant,
           createSessionFields,
           currentSessionId,
           currentTabCount: tabs.length,
