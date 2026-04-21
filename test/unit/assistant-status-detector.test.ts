@@ -4,7 +4,7 @@ import type { TerminalLine, TerminalSnapshot } from '../../src/state/types'
 
 import { AssistantStatusDetector, isShellCommand } from '../../src/pty/assistant-status-detector'
 
-function snapshot(...lines: string[]): TerminalSnapshot {
+function snapshot(lines: string[], tailLines: string[] = lines): TerminalSnapshot {
   const terminalLines: TerminalLine[] = lines.map((text) => ({
     spans: [{ text }],
   }))
@@ -12,6 +12,7 @@ function snapshot(...lines: string[]): TerminalSnapshot {
     baseY: 0,
     cursorVisible: true,
     lines: terminalLines,
+    tailLines: tailLines.map((text) => ({ spans: [{ text }] })),
     viewportY: 0,
   }
 }
@@ -23,7 +24,7 @@ describe('AssistantStatusDetector', () => {
       assistant: 'terminal',
       command: 'zsh',
       tabId: 't',
-      viewport: snapshot('$ echo hi', 'hi'),
+      viewport: snapshot(['$ echo hi', 'hi']),
     })
     expect(s).toBe('idle')
   })
@@ -33,7 +34,7 @@ describe('AssistantStatusDetector', () => {
     const s = d.classify({
       assistant: 'claude',
       tabId: 't',
-      viewport: snapshot('✱ Thinking…', '  esc/ctrl+c to interrupt'),
+      viewport: snapshot(['✱ Thinking…', '  esc/ctrl+c to interrupt']),
     })
     expect(s).toBe('working')
   })
@@ -43,7 +44,7 @@ describe('AssistantStatusDetector', () => {
     const s = d.classify({
       assistant: 'claude',
       tabId: 't',
-      viewport: snapshot('Do you want to proceed?', '> 1. Yes  2. No'),
+      viewport: snapshot(['Do you want to proceed?', '> 1. Yes  2. No']),
     })
     expect(s).toBe('waiting-input')
   })
@@ -53,7 +54,7 @@ describe('AssistantStatusDetector', () => {
     const s = d.classify({
       assistant: 'claude',
       tabId: 't',
-      viewport: snapshot('❯ type your prompt'),
+      viewport: snapshot(['❯ type your prompt']),
     })
     expect(s).toBe('idle')
   })
@@ -64,14 +65,14 @@ describe('AssistantStatusDetector', () => {
       d.classify({
         assistant: 'codex',
         tabId: 't1',
-        viewport: snapshot('• Working (12s)', '  esc to interrupt'),
+        viewport: snapshot(['• Working (12s)', '  esc to interrupt']),
       })
     ).toBe('working')
     expect(
       d.classify({
         assistant: 'codex',
         tabId: 't2',
-        viewport: snapshot('Continue? [y/n]'),
+        viewport: snapshot(['Continue? [y/n]']),
       })
     ).toBe('waiting-input')
   })
@@ -81,7 +82,7 @@ describe('AssistantStatusDetector', () => {
     const s = d.classify({
       assistant: 'opencode',
       tabId: 't',
-      viewport: snapshot('△ Permission required to run command'),
+      viewport: snapshot(['△ Permission required to run command']),
     })
     expect(s).toBe('waiting-input')
   })
@@ -94,14 +95,14 @@ describe('AssistantStatusDetector', () => {
       command: '/bin/bash',
       now,
       tabId: 't',
-      viewport: snapshot('$ running something'),
+      viewport: snapshot(['$ running something']),
     })
     const s = d.classify({
       assistant: 'my-shell',
       command: '/bin/bash',
       now: now + 10,
       tabId: 't',
-      viewport: snapshot('$ different output'),
+      viewport: snapshot(['$ different output']),
     })
     expect(s).toBe('idle')
   })
@@ -112,9 +113,22 @@ describe('AssistantStatusDetector', () => {
       assistant: 'my-agent',
       command: 'my-agent',
       tabId: 't',
-      viewport: snapshot('Proceed with changes? (y/n)'),
+      viewport: snapshot(['Proceed with changes? (y/n)']),
     })
     expect(s).toBe('waiting-input')
+  })
+
+  test('uses true tail lines instead of the scrolled viewport bottom', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot(
+        ['old output', 'still scrolled up'],
+        ['✱ Thinking…', '  esc/ctrl+c to interrupt']
+      ),
+    })
+    expect(s).toBe('working')
   })
 
   test('custom CLI: tail changing → working, then stable → idle', () => {
@@ -125,7 +139,7 @@ describe('AssistantStatusDetector', () => {
       command: 'my-agent',
       now,
       tabId: 't',
-      viewport: snapshot('line A'),
+      viewport: snapshot(['line A']),
     })
     // Very shortly after, tail changed → should classify as working
     const working = d.classify({
@@ -133,7 +147,7 @@ describe('AssistantStatusDetector', () => {
       command: 'my-agent',
       now: now + 100,
       tabId: 't',
-      viewport: snapshot('line A', 'line B'),
+      viewport: snapshot(['line A', 'line B']),
     })
     expect(working).toBe('working')
 
@@ -143,7 +157,7 @@ describe('AssistantStatusDetector', () => {
       command: 'my-agent',
       now: now + 5_000,
       tabId: 't',
-      viewport: snapshot('line A', 'line B'),
+      viewport: snapshot(['line A', 'line B']),
     })
     expect(idle).toBe('idle')
   })

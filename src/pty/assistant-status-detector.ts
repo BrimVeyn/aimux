@@ -85,10 +85,10 @@ export class AssistantStatusDetector {
 }
 
 function extractTailText(viewport: TerminalSnapshot, lineCount: number): string {
+  const lines = viewport.tailLines ?? viewport.lines
   // Full-screen TUIs (claude, opencode) paint in the alternate buffer and
   // often leave the last rows blank, putting their status bar higher up.
   // Skip trailing blank rows before taking the last `lineCount`.
-  const lines = viewport.lines
   let end = lines.length
   while (end > 0) {
     const line = lines[end - 1]

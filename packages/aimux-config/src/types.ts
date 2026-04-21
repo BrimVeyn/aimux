@@ -65,6 +65,7 @@ export interface TerminalLine {
 
 export interface TerminalSnapshot {
   lines: TerminalLine[]
+  tailLines?: TerminalLine[]
   viewportY: number
   baseY: number
   cursorVisible: boolean
