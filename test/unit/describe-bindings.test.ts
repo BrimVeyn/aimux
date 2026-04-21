@@ -33,6 +33,67 @@ describe('describeBindings', () => {
     expect(userQuit).toBeDefined()
     expect(userQuit?.keysDisplay).toBe('Shift+Q')
   })
+
+  test('merges alternative bindings by description preserving first-seen order', () => {
+    const config = getDefaultKeymapConfig()
+    const results = describeBindings(config, 'modal.theme-picker.filtering', {
+      mergeAlternativesByDescription: true,
+      withDescriptionOnly: true,
+    })
+
+    expect(results.map((r) => r.description)).toEqual([
+      'Cancel',
+      'Next',
+      'Prev',
+      'Confirm',
+      'Toggle transparent',
+    ])
+    expect(results.find((r) => r.description === 'Next')?.keysDisplay).toBe('Ctrl+N / ↓')
+    expect(results.find((r) => r.description === 'Prev')?.keysDisplay).toBe('Ctrl+P / ↑')
+  })
+
+  test('dedupes duplicate merged alternatives by displayed key', () => {
+    const resolved = resolveConfig({
+      keymaps: (k) =>
+        k.mode('modal.theme-picker.filtering', (m) =>
+          m
+            .map('<Up>', actions.previewTheme(-1), 'Prev')
+            .map('<Up>', actions.previewTheme(-1), 'Prev')
+        ),
+    })
+
+    const results = describeBindings(resolved.keymaps, 'modal.theme-picker.filtering', {
+      mergeAlternativesByDescription: true,
+      withDescriptionOnly: true,
+    })
+
+    expect(results.find((r) => r.description === 'Prev')?.keysDisplay).toBe('Ctrl+P / ↑')
+  })
+
+  test('keeps legacy dedupe behavior when merge mode is disabled', () => {
+    const config = getDefaultKeymapConfig()
+    const results = describeBindings(config, 'modal.theme-picker.filtering', {
+      dedupeByDescription: true,
+      withDescriptionOnly: true,
+    })
+
+    expect(results.find((r) => r.description === 'Next')?.keysDisplay).toBe('Ctrl+N')
+    expect(results.find((r) => r.description === 'Prev')?.keysDisplay).toBe('Ctrl+P')
+  })
+
+  test('reflects user-config-added alternatives in merged results', () => {
+    const resolved = resolveConfig({
+      keymaps: (k) =>
+        k.mode('modal.theme-picker.filtering', (m) => m.map('k', actions.previewTheme(-1), 'Prev')),
+    })
+
+    const results = describeBindings(resolved.keymaps, 'modal.theme-picker.filtering', {
+      mergeAlternativesByDescription: true,
+      withDescriptionOnly: true,
+    })
+
+    expect(results.find((r) => r.description === 'Prev')?.keysDisplay).toBe('Ctrl+P / ↑ / k')
+  })
 })
 
 describe('groupDescribedBindings', () => {
