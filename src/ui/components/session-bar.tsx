@@ -13,7 +13,11 @@ import { moveIdToIdPosition, orderSessionsForDisplay } from '../session-ordering
 import { useBg, useTokens } from '../theme'
 import { ContextMenuBox } from './context-menu-box'
 
-export function SessionBar() {
+interface SessionBarProps {
+  forceVisible?: boolean
+}
+
+export function SessionBar({ forceVisible = false }: SessionBarProps) {
   const t = useTokens()
   const headerBg = useBg('elevated')
   const sessions = useAppStore((s) => s.sessions)
@@ -27,7 +31,7 @@ export function SessionBar() {
   const chipRefs = useRef(new Map<string, BoxRenderable>())
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
-  if (!bar.visible || ordered.length === 0) return null
+  if ((!bar.visible && !forceVisible) || ordered.length === 0) return null
 
   const visibleSessions =
     dragOrder !== null

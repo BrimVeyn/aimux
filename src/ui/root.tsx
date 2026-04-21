@@ -275,7 +275,9 @@ export function RootView({
   if (inGitMode) {
     return (
       <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
+        {sessionBarPosition === 'top' && <SessionBar forceVisible />}
         <GitView themeId={themeId} />
+        {sessionBarPosition === 'bottom' && <SessionBar forceVisible />}
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
