@@ -4,6 +4,8 @@ import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/type
 
 import { getCurrentTheme } from '../ui/theme'
 
+const SNAPSHOT_TAIL_LINE_COUNT = 10
+
 const ANSI_PALETTE = [
   '#000000',
   '#cd0000',
@@ -142,9 +144,11 @@ function buildLine(
 export function snapshotTerminal(terminal: Terminal, cursorVisible = true): TerminalSnapshot {
   const buffer = terminal.buffer.active
   const startLine = buffer.viewportY
+  const tailStartLine = Math.max(0, buffer.baseY + terminal.rows - SNAPSHOT_TAIL_LINE_COUNT)
   const cursorRow = buffer.cursorY
   const cursorColumn = Math.min(buffer.cursorX, Math.max(terminal.cols - 1, 0))
   const lines: TerminalLine[] = []
+  const tailLines: TerminalLine[] = []
 
   for (let row = 0; row < terminal.rows; row += 1) {
     lines.push(
@@ -152,10 +156,27 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
     )
   }
 
+  for (
+    let lineIndex = tailStartLine;
+    lineIndex <= buffer.baseY + terminal.rows - 1;
+    lineIndex += 1
+  ) {
+    const relativeCursorRow = lineIndex - buffer.baseY
+    tailLines.push(
+      buildLine(
+        terminal,
+        lineIndex,
+        relativeCursorRow === cursorRow ? cursorColumn : null,
+        cursorVisible
+      )
+    )
+  }
+
   return {
     baseY: buffer.baseY,
     cursorVisible,
     lines,
+    tailLines,
     viewportY: buffer.viewportY,
   }
 }
@@ -195,6 +216,13 @@ export function areTerminalSnapshotsEqual(
     return false
   }
 
+  const leftTailLines = left.tailLines ?? []
+  const rightTailLines = right.tailLines ?? []
+
+  if (leftTailLines.length !== rightTailLines.length) {
+    return false
+  }
+
   if (
     left.viewportY !== right.viewportY ||
     left.baseY !== right.baseY ||
@@ -203,8 +231,14 @@ export function areTerminalSnapshotsEqual(
     return false
   }
 
-  return left.lines.every((line, index) => {
-    const other = right.lines[index]
-    return other ? areLinesEqual(line, other) : false
-  })
+  return (
+    left.lines.every((line, index) => {
+      const other = right.lines[index]
+      return other ? areLinesEqual(line, other) : false
+    }) &&
+    leftTailLines.every((line, index) => {
+      const other = rightTailLines[index]
+      return other ? areLinesEqual(line, other) : false
+    })
+  )
 }

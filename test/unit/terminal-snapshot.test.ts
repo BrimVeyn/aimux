@@ -116,6 +116,36 @@ describe('snapshotTerminal', () => {
     terminal.dispose()
   })
 
+  test('captures buffer tail separately from the visible viewport', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4, scrollback: 100 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('1\r\n2\r\n3\r\n4\r\n5\r\n6', resolve)
+    })
+
+    terminal.scrollLines(-1)
+    const snapshot = snapshotTerminal(terminal)
+
+    expect(
+      snapshot.lines.map((line) =>
+        line.spans
+          .map((span) => span.text)
+          .join('')
+          .trim()
+      )
+    ).toEqual(['2', '3', '4', '5'])
+    expect(
+      snapshot.tailLines?.map((line) =>
+        line.spans
+          .map((span) => span.text)
+          .join('')
+          .trim()
+      )
+    ).toEqual(['1', '2', '3', '4', '5', '6'])
+
+    terminal.dispose()
+  })
+
   test('hides cursor highlight when cursor visibility is off', async () => {
     const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
 

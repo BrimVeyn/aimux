@@ -134,7 +134,8 @@ export function handleDeleteSessionEffect(
   state: AppState,
   backend: SessionBackend,
   dispatch: (action: AppAction) => void,
-  sessionId: string
+  sessionId: string,
+  options?: { openSessionPicker?: boolean }
 ): void {
   const remaining = deleteSessionRecords(state.sessions, sessionId)
   logInputDebug('app.session.delete', {
@@ -146,7 +147,11 @@ export function handleDeleteSessionEffect(
   if (sessionId === state.currentSessionId) {
     void backend.destroy(true)
   }
-  dispatch({ sessionId, type: 'delete-session-record' })
+  dispatch({
+    openSessionPicker: options?.openSessionPicker,
+    sessionId,
+    type: 'delete-session-record',
+  })
 }
 
 export function restartTabSession(

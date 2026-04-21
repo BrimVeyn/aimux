@@ -102,7 +102,9 @@ function handleSelectedSessionDelete(ctx: SideEffectContext): void {
   })
 
   if (selectedSession) {
-    handleDeleteSessionEffect(state, backend, dispatch, selectedSession.id)
+    handleDeleteSessionEffect(state, backend, dispatch, selectedSession.id, {
+      openSessionPicker: true,
+    })
   }
 }
 

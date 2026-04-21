@@ -53,27 +53,39 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         ),
       }
     case 'delete-session-record': {
+      const deletingCurrent = action.sessionId === state.currentSessionId
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId)
-      const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
-      const maxIndex = filteredNew.length
-      const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
       const nextStatuses = { ...state.sessionStatuses }
       delete nextStatuses[action.sessionId]
+      if (action.openSessionPicker) {
+        const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
+        const maxIndex = filteredNew.length
+        const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
+        return {
+          ...state,
+          activeTabId: deletingCurrent ? null : state.activeTabId,
+          currentSessionId: deletingCurrent ? null : state.currentSessionId,
+          focusMode: 'modal',
+          modal: {
+            editBuffer: null,
+            selectedIndex: clampedIndex,
+            sessionTargetId: null,
+            type: 'session-picker',
+          },
+          sessions: newSessions,
+          sessionStatuses: nextStatuses,
+          tabs: deletingCurrent ? [] : state.tabs,
+        }
+      }
       return {
         ...state,
-        activeTabId: action.sessionId === state.currentSessionId ? null : state.activeTabId,
-        currentSessionId:
-          action.sessionId === state.currentSessionId ? null : state.currentSessionId,
-        focusMode: 'modal',
-        modal: {
-          editBuffer: null,
-          selectedIndex: clampedIndex,
-          sessionTargetId: null,
-          type: 'session-picker',
-        },
+        activeTabId: deletingCurrent ? null : state.activeTabId,
+        currentSessionId: deletingCurrent ? null : state.currentSessionId,
+        focusMode: deletingCurrent ? 'navigation' : state.focusMode,
+        modal: deletingCurrent ? CLOSED_MODAL : state.modal,
         sessions: newSessions,
         sessionStatuses: nextStatuses,
-        tabs: action.sessionId === state.currentSessionId ? [] : state.tabs,
+        tabs: deletingCurrent ? [] : state.tabs,
       }
     }
     case 'reorder-sessions': {

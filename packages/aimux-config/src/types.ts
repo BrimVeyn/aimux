@@ -65,6 +65,7 @@ export interface TerminalLine {
 
 export interface TerminalSnapshot {
   lines: TerminalLine[]
+  tailLines?: TerminalLine[]
   viewportY: number
   baseY: number
   cursorVisible: boolean
@@ -412,7 +413,7 @@ export type SessionAction =
   | { type: 'set-sessions'; sessions: SessionRecord[] }
   | { type: 'create-session-record'; session: SessionRecord }
   | { type: 'rename-session-record'; sessionId: string; name: string }
-  | { type: 'delete-session-record'; sessionId: string }
+  | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
   | { type: 'reorder-sessions'; orderedIds: string[] }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
 
