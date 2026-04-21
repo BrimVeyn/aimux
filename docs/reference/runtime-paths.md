@@ -26,13 +26,13 @@ Active profile directory:
 
 ## Files Under the Active Profile Directory
 
-| Path                  | Purpose                                 |
-| --------------------- | --------------------------------------- |
-| `aimux.config.ts`     | preferred typed config file             |
-| `aimux.config.js`     | fallback typed config file              |
-| `aimux.json`          | app-managed runtime preferences         |
-| `aimux-sessions.json` | session catalog and workspace snapshots |
-| `aimux-snippets.json` | snippet catalog                         |
+| Path                  | Purpose                                   |
+| --------------------- | ----------------------------------------- |
+| `aimux.config.ts`     | preferred typed config file               |
+| `aimux.config.js`     | fallback typed config file                |
+| `aimux.json`          | app-managed runtime preferences           |
+| `aimux-sessions.json` | workspace catalog and workspace snapshots |
+| `aimux-snippets.json` | snippet catalog                           |
 
 ## Config Loader Search Order
 

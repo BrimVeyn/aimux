@@ -16,7 +16,7 @@ Starts the TUI.
 At startup the CLI:
 
 - resolves the active runtime profile
-- creates or connects to the session backend
+- creates or connects to the internal session backend that powers workspace state
 - loads user config from the active profile
 - renders the app
 
@@ -55,7 +55,7 @@ without killing the terminal manager.
 
 Restarts the long-lived terminal manager.
 
-This kills live sessions and should be treated as the destructive restart path.
+This kills live workspaces and should be treated as the destructive restart path.
 
 ## Hidden Internal Commands
 
@@ -84,7 +84,7 @@ Help aliases:
 Runtime-oriented commands use the active profile namespace. That affects:
 
 - config file resolution for the TUI startup path
-- session and snippet catalogs
+- workspace and snippet catalogs
 - daemon socket path
 - terminal-manager socket path
 

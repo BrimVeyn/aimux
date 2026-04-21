@@ -12,7 +12,7 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 
 - `../README.md` - product overview, installation, quick start
 - `../packages/aimux-config/README.md` - typed configuration quick start
-- `getting-started.md` - first-run setup and first session
+- `getting-started.md` - first-run setup and first workspace
 
 ## Concepts
 
@@ -23,7 +23,7 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 
 ## Guides
 
-- `guide/sessions.md` - session picker, project-bound sessions, persistence,
+- `guide/sessions.md` - workspace picker, project-bound workspaces, persistence,
   reordering, and reconnect behavior
 - `guide/keymaps.md` - key notation, modes, leader keys, multi-key sequences,
   help metadata, and override rules

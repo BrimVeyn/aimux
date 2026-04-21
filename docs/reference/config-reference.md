@@ -65,7 +65,7 @@ defineConfig({
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
 | `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
 | `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`   |
-| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI session usage indicator                  |
+| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                          |
 
 ## `defineConfig`
 
@@ -454,7 +454,7 @@ export default defineConfig({
 Common groups:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- sessions: `sessionPicker`, `switchSessionByIndex(n)` and session modal actions
+- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
 - snippets: `snippetPicker`, snippet filter and editor actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`

@@ -1,78 +1,82 @@
 ---
-title: Sessions
-description: Session picker, project-bound sessions, persistence, reorder, and reconnect behavior.
+title: Workspaces
+description: Workspace picker, project-bound workspaces, persistence, reorder, and reconnect behavior.
 ---
 
-# Sessions
+# Workspaces
 
-Sessions are the top-level workspace concept in `aimux`.
+Workspaces are the top-level user-facing concept in `aimux`.
 
-Each session can have:
+For compatibility, the runtime and persisted data still use `session` naming in
+places such as `aimux-sessions.json`, `sessionId`, and related config or API
+symbols.
+
+Each workspace can have:
 
 - a name
 - an optional `projectPath`
-- an order in the session list
+- an order in the workspace list
 - a persisted workspace snapshot
 
-That snapshot contains the session's tabs, layout, some sidebar state, and the
+That snapshot contains the workspace's tabs, layout, some sidebar state, and the
 last known terminal viewport / scroll anchor for each tab.
 
 ## Startup Flow
 
-`aimux` is session-first.
+`aimux` is workspace-first.
 
-On startup, the app loads the session catalog for the active profile and enters
-the session picker flow. Existing sessions appear there immediately, and the
-same flow also handles first-run session creation.
+On startup, the app loads the workspace catalog for the active profile and
+enters the workspace picker flow. Existing workspaces appear there immediately,
+and the same flow also handles first-run workspace creation.
 
 The default navigation shortcut for the picker is:
 
 - `Ctrl+G`
 
-## Session Picker
+## Workspace Picker
 
-The session picker lets you:
+The workspace picker lets you:
 
-- open a session
-- create a new session
-- rename the selected session
-- delete the selected session
-- filter the session list
+- open a workspace
+- create a new workspace
+- rename the selected workspace
+- delete the selected workspace
+- filter the workspace list
 
-Default keys inside the session picker:
+Default keys inside the workspace picker:
 
 - `j` / `k` - move selection
-- `Enter` - open selected session
-- `n` - create session
-- `r` - rename selected session
-- `d` - delete selected session
+- `Enter` - open selected workspace
+- `n` - create workspace
+- `r` - rename selected workspace
+- `d` - delete selected workspace
 - `/` - start filtering
 - `Esc` - close or return, depending on context
 
-## Creating a Session
+## Creating a Workspace
 
-The create-session modal supports both a name and an optional project path.
+The create workspace modal supports both a name and an optional project path.
 
 Important behavior:
 
 - `Tab` switches between the directory field and the name field
 - `Enter` confirms the current action
 - if a directory is selected, `aimux` can use the directory basename as the
-  session name seed
+  workspace name seed
 
-Project-bound sessions are useful when you want every new tab in that session to
+Project-bound workspaces are useful when you want every new tab in that workspace to
 start in the same repository or workspace.
 
 ## Project Directory Picker
 
 The runtime can search for repositories and worktrees from `$HOME` using `fzf`.
 
-That directory picker is part of the create-session workflow and is what powers
-project-bound sessions.
+That directory picker is part of the create-workspace workflow and is what powers
+project-bound workspaces.
 
-## Session Bar
+## Workspace Bar
 
-The session bar shows sessions as numbered chips.
+The workspace bar shows workspaces as numbered chips.
 
 It supports:
 
@@ -85,21 +89,21 @@ It supports:
 Default leader shortcuts available from both `navigation` and `terminal-input`
 mode:
 
-- `Leader+b` - toggle the session bar
-- `Leader+1` through `Leader+9` - switch to session index 1 through 9
+- `Leader+b` - toggle the workspace bar
+- `Leader+1` through `Leader+9` - switch to workspace index 1 through 9
 
 The shipped leader is `Ctrl+W`, so these are `Ctrl+W b`, `Ctrl+W 1`, and so on
 unless you override the leader.
 
 ## Persistence Model
 
-Session records live in:
+Workspace records live in:
 
 ```text
 ~/.config/aimux/<profile>/aimux-sessions.json
 ```
 
-Each session can store a `workspaceSnapshot`, which includes:
+Each workspace can store a `workspaceSnapshot`, which includes:
 
 - active tab
 - tabs and their metadata
@@ -119,7 +123,7 @@ When a workspace is restored:
 - saved sidebar width and visibility are restored safely
 - grouped tabs are restored as contiguous blocks in tab order
 
-When switching away from a live session and coming back later, `aimux` also
+When switching away from a live workspace and coming back later, `aimux` also
 tries to restore the previous scroll anchor for each tab instead of
 unconditionally following the bottom of the terminal.
 
@@ -128,14 +132,15 @@ terminal attachment until the backend reattaches it.
 
 ## Legacy Workspace Migration
 
-If the new session catalog does not exist but `aimux.json` still contains a
+If the new workspace catalog does not exist but `aimux.json` still contains a
 legacy `workspaceSnapshot`, the runtime migrates that snapshot into a synthetic
-session named `Last workspace`.
+workspace named `Last workspace`.
 
 ## Deleting and Reordering
 
-Session deletion and ordering are runtime-managed behaviors. The app normalizes
-session `order` values when loading the catalog so ordering stays stable.
+Workspace deletion and ordering are runtime-managed behaviors. The app
+normalizes workspace `order` values when loading the catalog so ordering stays
+stable.
 
 ## Restart Behavior
 
@@ -148,7 +153,7 @@ without killing live tabs.
 
 ### `aimux restart-terminal-manager`
 
-Restarts the long-lived terminal manager and kills live sessions.
+Restarts the long-lived terminal manager and kills live workspaces.
 
 This is the heavy reset path.
 

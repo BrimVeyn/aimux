@@ -33,7 +33,7 @@ function getTitle(
   focusMode: TerminalPaneProps['focusMode']
 ): string {
   if (!tab) {
-    return 'No active session'
+    return 'No active workspace'
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -107,7 +107,7 @@ const TerminalViewport = memo(function TerminalViewport({
   }
 
   return (
-    <text fg={t.palette.ink}>{buffer.length > 0 ? buffer : 'Waiting for session output...'}</text>
+    <text fg={t.palette.ink}>{buffer.length > 0 ? buffer : 'Waiting for workspace output...'}</text>
   )
 })
 
@@ -258,7 +258,9 @@ export function TerminalPane({
         )}
       </ContextMenuBox>
       {tab?.status === 'disconnected' ? (
-        <text fg={t.palette.warning}>Restored snapshot. Press Ctrl+r to restart this session.</text>
+        <text fg={t.palette.warning}>
+          Restored snapshot. Press Ctrl+r to restart this workspace.
+        </text>
       ) : null}
       {tab?.errorMessage ? <text fg={t.palette.error}>{tab.errorMessage}</text> : null}
     </box>

@@ -124,7 +124,7 @@ export function SessionBar() {
             onMouseDragEnd={cancelDrag}
             rightClickMenu={[
               [
-                'Rename',
+                'Rename workspace',
                 () =>
                   dispatchGlobal({
                     initialName: session.name,
@@ -134,7 +134,7 @@ export function SessionBar() {
                   }),
               ],
               [
-                'Close',
+                'Delete workspace',
                 () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
               ],
             ]}

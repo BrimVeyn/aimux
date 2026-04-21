@@ -52,7 +52,7 @@ if (command === 'terminal-manager') {
 
 if (command === '--help' || command === '-h') {
   process.stdout.write(
-    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                           Start aimux\n  aimux update                    Update to latest version\n  aimux doctor                    Diagnose setup issues\n  aimux restart-daemon            Restart IPC daemon\n  aimux restart-terminal-manager  Restart terminal-manager (kills live sessions)\n\n'
+    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                           Start aimux\n  aimux update                    Update to latest version\n  aimux doctor                    Diagnose setup issues\n  aimux restart-daemon            Restart IPC daemon\n  aimux restart-terminal-manager  Restart terminal-manager (kills live workspaces)\n\n'
   )
   process.exit(0)
 }

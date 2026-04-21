@@ -1,7 +1,7 @@
 # aimux
 
 A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode, and normal
-shell tabs side by side in one TUI with persistent sessions, split panes,
+shell tabs side by side in one TUI with persistent workspaces, split panes,
 snippets, themes, and fully configurable keymaps.
 
 ![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
@@ -12,10 +12,10 @@ snippets, themes, and fully configurable keymaps.
 
 ## Features
 
-- multi-session workflow with a dedicated session picker
+- multi-workspace workflow with a dedicated workspace picker
 - tabs for `claude`, `codex`, `opencode`, and `terminal`
 - split panes with pane focus and resize shortcuts
-- persistent sessions with saved layout and tab state
+- persistent workspaces with saved layout and tab state
 - profile-isolated config, catalogs, daemon sockets, and runtime state
 - typed keymap customization through `@brimveyn/aimux-config`
 - snippets catalog and snippet picker
@@ -56,7 +56,7 @@ export default defineConfig({
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
+    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
 })
 ```
 
@@ -71,7 +71,7 @@ Then start the app:
 aimux
 ```
 
-On first launch, use the session picker flow to create your first session.
+On first launch, use the workspace picker flow to create your first workspace.
 
 For the full setup path, see [`docs/getting-started.md`](docs/getting-started.md).
 
@@ -100,7 +100,7 @@ profile. See [`docs/concepts/profiles.md`](docs/concepts/profiles.md).
 
 - `aimux.config.ts` or `aimux.config.js` - typed user config
 - `aimux.json` - app-managed preferences and runtime state
-- `aimux-sessions.json` - session catalog and workspace snapshots
+- `aimux-sessions.json` - workspace catalog and workspace snapshots
 - `aimux-snippets.json` - snippet catalog
 
 Rule of thumb:
@@ -111,14 +111,15 @@ Rule of thumb:
 
 See [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md).
 
-### Sessions
+### Workspaces
 
-Sessions are named workspaces. A session can have:
+Workspaces are the top-level user-facing concept in `aimux`. Internally, the
+runtime still uses `session` naming for compatibility. A workspace can have:
 
 - a name
 - an optional project directory
 - a persisted workspace snapshot
-- an order in the session bar and session picker
+- an order in the workspace bar and workspace picker
 
 See [`docs/guide/sessions.md`](docs/guide/sessions.md).
 
@@ -139,13 +140,13 @@ See [`docs/guide/keymaps.md`](docs/guide/keymaps.md).
 - `i` - focus terminal
 - `Ctrl+Z` - leave terminal-input mode
 - `Ctrl+N` - open new-tab modal
-- `Ctrl+G` - open session picker
+- `Ctrl+G` - open workspace picker
 - `Ctrl+S` - open snippet picker
 - `Ctrl+T` - open theme picker
 - `Ctrl+B` - toggle sidebar
 - `Ctrl+D` - enter git mode
-- `Ctrl+W b` - toggle session bar
-- `Ctrl+W 1` through `Ctrl+W 9` - switch sessions by index
+- `Ctrl+W b` - toggle workspace bar
+- `Ctrl+W 1` through `Ctrl+W 9` - switch workspaces by index
 
 The help modal reflects the resolved keymap, so it includes your overrides.
 
@@ -215,7 +216,7 @@ not collide with a globally installed `aimux` instance.
   and the source of the bundled theme catalog.
 - [herdr](https://github.com/ogulcancelik/herdr) by @ogulcancelik — the
   per-CLI assistant status heuristics (working / waiting-input / idle)
-  used in the session bar are adapted from herdr's `detect.rs` rule tables.
+  used in the workspace bar are adapted from herdr's `detect.rs` rule tables.
 
 ## License
 
