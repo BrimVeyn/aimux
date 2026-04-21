@@ -40,7 +40,8 @@ export function computePace(opts: {
   const expected = Math.max(0, Math.min(100, (elapsed / windowSeconds) * 100))
   const actual = Math.max(0, Math.min(100, percent))
   const delta = actual - expected
-  const stage = stageFor(delta)
+  const rounded = Math.round(delta)
+  const stage = stageFor(rounded)
 
   let rightText: string | null = null
   if (elapsed > 0 && actual > 0) {
@@ -58,11 +59,10 @@ export function computePace(opts: {
     rightText = 'Lasts to reset'
   }
 
-  const rounded = Math.round(delta)
   let label: string
   if (stage === 'onTrack') {
     label = 'On pace'
-  } else if (delta > 0) {
+  } else if (rounded > 0) {
     label = `Behind (+${rounded}%)`
   } else {
     label = `Ahead (${rounded}%)`
