@@ -151,9 +151,12 @@ function orderWindows(
   session: WindowSnapshot | null | undefined
   weekly: WindowSnapshot | null | undefined
 } {
-  const SESSION_SECONDS = 18_000
-  const isSession = (w: WindowSnapshot | null | undefined): boolean =>
-    !!w && w.limit_window_seconds === SESSION_SECONDS
+  const SESSION_MIN_SECONDS = 3 * 3600
+  const SESSION_MAX_SECONDS = 8 * 3600
+  const isSession = (w: WindowSnapshot | null | undefined): boolean => {
+    const s = w?.limit_window_seconds
+    return typeof s === 'number' && s >= SESSION_MIN_SECONDS && s <= SESSION_MAX_SECONDS
+  }
   if (isSession(primary)) return { session: primary, weekly: secondary }
   if (isSession(secondary)) return { session: secondary, weekly: primary }
   return { session: primary, weekly: secondary }
