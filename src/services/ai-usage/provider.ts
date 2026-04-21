@@ -37,10 +37,12 @@ export function startAIUsageService(
     if (stopped) return
 
     const toFetch: AIUsageTool[] = []
+    let maxCachedAgeMs = 0
     for (const tool of tools) {
       const cached = loadCachedSnapshot(tool, pollMs)
       if (cached) {
-        onUpdate(cached)
+        onUpdate(cached.snapshot)
+        if (cached.ageMs > maxCachedAgeMs) maxCachedAgeMs = cached.ageMs
       } else {
         toFetch.push(tool)
       }
@@ -75,9 +77,12 @@ export function startAIUsageService(
     }
 
     if (!stopped) {
+      const minDelayMs = 5_000
+      const nextDelayMs =
+        toFetch.length > 0 ? pollMs : Math.max(minDelayMs, pollMs - maxCachedAgeMs)
       timer = setTimeout(() => {
         void tick()
-      }, pollMs)
+      }, nextDelayMs)
     }
   }
 

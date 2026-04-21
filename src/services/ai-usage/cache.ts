@@ -28,14 +28,20 @@ function readCacheFile(): CacheFile {
   }
 }
 
-export function loadCachedSnapshot(tool: AIUsageTool, maxAgeMs: number): UsageSnapshot | null {
+export interface CachedSnapshot {
+  snapshot: UsageSnapshot
+  ageMs: number
+}
+
+export function loadCachedSnapshot(tool: AIUsageTool, maxAgeMs: number): CachedSnapshot | null {
   const cache = readCacheFile()
   const entry = cache[tool]
   if (!entry) return null
   if (typeof entry.fetchedAt !== 'number') return null
-  if (Date.now() - entry.fetchedAt > maxAgeMs) return null
+  const ageMs = Date.now() - entry.fetchedAt
+  if (ageMs > maxAgeMs) return null
   if (!entry.snapshot || entry.snapshot.tool !== tool) return null
-  return entry.snapshot
+  return { ageMs, snapshot: entry.snapshot }
 }
 
 export function saveCachedSnapshot(snapshot: UsageSnapshot): void {
