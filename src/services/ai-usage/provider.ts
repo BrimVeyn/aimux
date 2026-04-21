@@ -4,6 +4,7 @@ import type { UsageSnapshot } from './types'
 
 import { fetchClaudeUsage } from './adapters/claude'
 import { fetchCodexUsage } from './adapters/codex'
+import { loadCachedSnapshot, saveCachedSnapshot } from './cache'
 
 const DEFAULT_POLL_SECONDS = 60
 const DEFAULT_TOOLS: AIUsageTool[] = ['claude', 'codex']
@@ -34,32 +35,54 @@ export function startAIUsageService(
 
   const tick = async (): Promise<void> => {
     if (stopped) return
-    const results = await Promise.allSettled(tools.map((t) => fetchFor(t, config)))
-    if (stopped) return
-    for (let i = 0; i < results.length; i++) {
-      const result = results[i]
-      const tool = tools[i]
-      if (!result || !tool) continue
-      if (result.status === 'fulfilled') {
-        onUpdate(result.value)
+
+    const toFetch: AIUsageTool[] = []
+    let maxCachedAgeMs = 0
+    for (const tool of tools) {
+      const cached = loadCachedSnapshot(tool, pollMs)
+      if (cached) {
+        onUpdate(cached.snapshot)
+        if (cached.ageMs > maxCachedAgeMs) maxCachedAgeMs = cached.ageMs
       } else {
-        onUpdate({
-          burnRatePerHour: null,
-          costUSD: null,
-          error: result.reason instanceof Error ? result.reason.message : String(result.reason),
-          lastUpdated: new Date().toISOString(),
-          percent: null,
-          resetAt: null,
-          timeRemaining: null,
-          tokens: { cache: 0, input: 0, output: 0, total: 0 },
-          tool,
-        })
+        toFetch.push(tool)
       }
     }
+
+    if (toFetch.length > 0) {
+      const results = await Promise.allSettled(toFetch.map((t) => fetchFor(t, config)))
+      if (stopped) return
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i]
+        const tool = toFetch[i]
+        if (!result || !tool) continue
+        if (result.status === 'fulfilled') {
+          saveCachedSnapshot(result.value)
+          onUpdate(result.value)
+        } else {
+          onUpdate({
+            burnRatePerHour: null,
+            costUSD: null,
+            error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+            lastUpdated: new Date().toISOString(),
+            percent: null,
+            planTier: null,
+            resetAt: null,
+            timeRemaining: null,
+            tokens: { cache: 0, input: 0, output: 0, total: 0 },
+            tool,
+            windows: [],
+          })
+        }
+      }
+    }
+
     if (!stopped) {
+      const minDelayMs = 5_000
+      const nextDelayMs =
+        toFetch.length > 0 ? pollMs : Math.max(minDelayMs, pollMs - maxCachedAgeMs)
       timer = setTimeout(() => {
         void tick()
-      }, pollMs)
+      }, nextDelayMs)
     }
   }
 
