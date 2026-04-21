@@ -26,14 +26,88 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
   return {
     autoCommit,
     backends: userConfig.backends ?? {},
-    gitPane: userConfig.gitPane ?? {},
+    gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
     keymaps,
-    sessionBar: userConfig.sessionBar ?? {},
+    sessionBar: resolveSessionBar(userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     statusBar: userConfig.statusBar ?? {},
-    theme: userConfig.theme,
+    theme: resolveTheme(userConfig.theme),
+  }
+}
+
+function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['theme'] {
+  if (!userConfig) return undefined
+  return {
+    initialMode: userConfig.initialMode ?? userConfig.mode,
+    paletteOverrides: userConfig.paletteOverrides,
+  }
+}
+
+function resolveSessionBar(
+  userConfig: AimuxUserConfig['sessionBar']
+): ResolvedConfig['sessionBar'] {
+  if (!userConfig) return {}
+  return {
+    initialPosition: userConfig.initialPosition ?? userConfig.position,
+    initialVisible: userConfig.initialVisible ?? userConfig.visible,
+  }
+}
+
+function resolvePaneInitialPosition(
+  userConfig: NonNullable<AimuxUserConfig['gitPane']>
+): 'left' | 'right' | undefined {
+  if (userConfig.initialPosition === 'left' || userConfig.initialPosition === 'right') {
+    return userConfig.initialPosition
+  }
+  if (userConfig.position === 'left' || userConfig.position === 'right') {
+    return userConfig.position
+  }
+  return undefined
+}
+
+function resolveEmbeddedInitialPosition(
+  userConfig: NonNullable<AimuxUserConfig['gitPane']>
+): 'top' | 'bottom' | undefined {
+  if (userConfig.initialPosition === 'top' || userConfig.initialPosition === 'bottom') {
+    return userConfig.initialPosition
+  }
+  if (userConfig.position === 'top' || userConfig.position === 'bottom') {
+    return userConfig.position
+  }
+  return undefined
+}
+
+function resolveGitPane(userConfig: AimuxUserConfig['gitPane']): ResolvedConfig['gitPane'] {
+  if (!userConfig) return {}
+
+  const initialMode = userConfig.initialMode ?? userConfig.mode
+  const paneInitialPosition = resolvePaneInitialPosition(userConfig)
+  const embeddedInitialPosition = resolveEmbeddedInitialPosition(userConfig)
+  const shared = {
+    diffCount: userConfig.diffCount,
+    initialDiffModeRatio: userConfig.initialDiffModeRatio ?? userConfig.diffModeRatio,
+    initialFileListMode: userConfig.initialFileListMode ?? userConfig.fileListMode,
+    initialRatio: userConfig.initialRatio ?? userConfig.ratio,
+    initialTreeCompaction: userConfig.initialTreeCompaction ?? userConfig.treeCompaction,
+    initialVisible: userConfig.initialVisible ?? userConfig.visible,
+    path: userConfig.path,
+    prefetchRadius: userConfig.prefetchRadius,
+  }
+
+  if (initialMode === 'pane') {
+    return {
+      ...shared,
+      initialMode: 'pane',
+      initialPosition: paneInitialPosition,
+    }
+  }
+
+  return {
+    ...shared,
+    ...(initialMode === 'embedded' ? { initialMode: 'embedded' as const } : {}),
+    initialPosition: embeddedInitialPosition,
   }
 }
 

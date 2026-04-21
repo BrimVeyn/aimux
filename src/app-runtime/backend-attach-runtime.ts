@@ -10,6 +10,7 @@ import {
   getSnapshotTrees,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { getSnapshotScrollIntents } from '../state/session-persistence'
 
 export function resizeSnapshotPanes(
   snapshot: WorkspaceSnapshotV1 | undefined,
@@ -21,13 +22,14 @@ export function resizeSnapshotPanes(
   }
 
   const trees = getSnapshotTrees(snapshot)
+  const intents = getSnapshotScrollIntents(snapshot)
   const bounds = createTerminalBounds(
     layoutRef.current.terminalCols,
     layoutRef.current.terminalRows
   )
   forEachSplitPaneRect(trees, bounds, (tabId, rect) => {
     const size = toTerminalContentSize(rect)
-    backend.resizeTab(tabId, size.cols, size.rows)
+    backend.resizeTab(tabId, size.cols, size.rows, intents.get(tabId))
   })
 }
 

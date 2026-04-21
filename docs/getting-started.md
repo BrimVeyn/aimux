@@ -64,8 +64,8 @@ import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
   sessionBar: {
-    position: 'top',
-    visible: true,
+    initialPosition: 'top',
+    initialVisible: true,
   },
 
   keymaps: (k) =>
@@ -74,6 +74,10 @@ export default defineConfig({
 ```
 
 This example stays inside the surfaces that are wired into the runtime today.
+
+Fields like `sessionBar.initialVisible` are startup overrides. They are applied
+again on every launch, while app-managed runtime changes persist in
+`aimux.json`.
 
 For a complete reference, see `reference/config-reference.md`.
 

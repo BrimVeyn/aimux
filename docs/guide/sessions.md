@@ -14,7 +14,8 @@ Each session can have:
 - an order in the session list
 - a persisted workspace snapshot
 
-That snapshot contains the session's tabs, layout, and some sidebar state.
+That snapshot contains the session's tabs, layout, some sidebar state, and the
+last known terminal viewport / scroll anchor for each tab.
 
 ## Startup Flow
 
@@ -102,6 +103,7 @@ Each session can store a `workspaceSnapshot`, which includes:
 
 - active tab
 - tabs and their metadata
+- per-tab terminal viewport and scroll position intent
 - layout tree or layout trees
 - split group information
 - sidebar visibility and width
@@ -113,8 +115,13 @@ When a workspace is restored:
 - tabs are recreated from the persisted snapshot
 - running or starting tabs are restored as `disconnected`
 - focus mode resets to `navigation`
+- each tab restores its saved scroll position as closely as possible
 - saved sidebar width and visibility are restored safely
 - grouped tabs are restored as contiguous blocks in tab order
+
+When switching away from a live session and coming back later, `aimux` also
+tries to restore the previous scroll anchor for each tab instead of
+unconditionally following the bottom of the terminal.
 
 This is intentional: a persisted workspace is not assumed to still have a live
 terminal attachment until the backend reattaches it.

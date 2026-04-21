@@ -75,7 +75,7 @@ export function App({
     const config = loadConfig()
     const persisted = config.themeId && isKnownThemeId(config.themeId) ? config.themeId : undefined
     const fromConfig: ThemeId =
-      resolvedConfig.theme?.mode === 'light' ? 'aimux-light' : 'aimux-dark'
+      resolvedConfig.theme?.initialMode === 'light' ? 'aimux-light' : 'aimux-dark'
     const initial: ThemeId = persisted ?? fromConfig
     applyTheme(initial, resolvedConfig.theme?.paletteOverrides)
     setTransparent(config.themeTransparent ?? false)
@@ -83,16 +83,19 @@ export function App({
   })
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
     const json = loadConfig()
-    const sessionBarVisible = resolvedConfig.sessionBar?.visible ?? json.sessionBarVisible ?? true
+    const sessionBarVisible =
+      resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
     const sessionBarPosition =
-      resolvedConfig.sessionBar?.position ?? json.sessionBarPosition ?? 'top'
+      resolvedConfig.sessionBar?.initialPosition ?? json.sessionBarPosition ?? 'top'
+    const sidebarOverrides = json.sidebar
 
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
     const userGitPane = resolvedConfig.gitPane
-    const fileListMode = userGitPane?.fileListMode ?? json.gitPane?.fileListMode ?? 'tree'
-    const diffModeRatio = userGitPane?.diffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
-    const treeCompaction = userGitPane?.treeCompaction ?? json.gitPane?.treeCompaction ?? true
+    const fileListMode = userGitPane?.initialFileListMode ?? json.gitPane?.fileListMode ?? 'tree'
+    const diffModeRatio = userGitPane?.initialDiffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
+    const treeCompaction =
+      userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true
     const prefetchRadius = userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5
     const persistedPaneRatio = json.gitPane?.paneRatio ?? json.gitPane?.ratio ?? 0.5
     const persistedEmbeddedRatio = json.gitPane?.embeddedRatio ?? json.gitPane?.ratio ?? 0.5
@@ -100,21 +103,23 @@ export function App({
       ...json.gitPane,
       diffModeRatio,
       embeddedRatio:
-        userGitPane?.mode === 'embedded' && userGitPane?.ratio !== undefined
-          ? userGitPane.ratio
+        userGitPane?.initialMode === 'embedded' && userGitPane?.initialRatio !== undefined
+          ? userGitPane.initialRatio
           : persistedEmbeddedRatio,
       fileListMode,
       paneRatio:
-        userGitPane?.mode === 'pane' && userGitPane?.ratio !== undefined
-          ? userGitPane.ratio
+        userGitPane?.initialMode === 'pane' && userGitPane?.initialRatio !== undefined
+          ? userGitPane.initialRatio
           : persistedPaneRatio,
       prefetchRadius,
       treeCompaction,
-      ...(userGitPane?.visible !== undefined ? { visible: userGitPane.visible } : {}),
-      ...(userGitPane?.mode !== undefined ? { mode: userGitPane.mode } : {}),
-      ...(userGitPane?.position !== undefined ? { position: userGitPane.position } : {}),
-      ...(userGitPane?.diffModeRatio !== undefined
-        ? { diffModeRatio: userGitPane.diffModeRatio }
+      ...(userGitPane?.initialVisible !== undefined ? { visible: userGitPane.initialVisible } : {}),
+      ...(userGitPane?.initialMode !== undefined ? { mode: userGitPane.initialMode } : {}),
+      ...(userGitPane?.initialPosition !== undefined
+        ? { position: userGitPane.initialPosition }
+        : {}),
+      ...(userGitPane?.initialDiffModeRatio !== undefined
+        ? { diffModeRatio: userGitPane.initialDiffModeRatio }
         : {}),
       ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
@@ -129,6 +134,7 @@ export function App({
         gitPane: gitPaneOverrides,
         sessionBarPosition,
         sessionBarVisible,
+        sidebar: sidebarOverrides,
       }
     )
   })

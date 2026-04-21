@@ -8,6 +8,27 @@ describe('initial state', () => {
     expect(state.focusMode).toBe('navigation')
     expect(state.modal.type).toBeNull()
   })
+
+  test('applies persisted sidebar overrides', () => {
+    const state = createInitialState({}, [], [], false, {
+      sidebar: { visible: false, width: 33 },
+    })
+
+    expect(state.sidebar.visible).toBe(false)
+    expect(state.sidebar.width).toBe(33)
+  })
+
+  test('clamps persisted sidebar width to valid bounds', () => {
+    const tooSmall = createInitialState({}, [], [], false, {
+      sidebar: { visible: true, width: 2 },
+    })
+    const tooLarge = createInitialState({}, [], [], false, {
+      sidebar: { visible: true, width: 200 },
+    })
+
+    expect(tooSmall.sidebar.width).toBe(18)
+    expect(tooLarge.sidebar.width).toBe(42)
+  })
 })
 
 function createTab(

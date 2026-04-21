@@ -89,6 +89,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         const existing = this.tabs.get(persisted.id)
         if (existing) {
           existing.title = persisted.title
+          existing.scrollIntent = persisted.scrollIntent ?? DEFAULT_SCROLL_INTENT
         }
       }
       if (snapshot.activeTabId && this.tabs.has(snapshot.activeTabId)) {

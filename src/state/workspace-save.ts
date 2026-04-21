@@ -35,6 +35,10 @@ export function saveCurrentWorkspace(state: AppState): void {
     },
     sessionBarPosition: state.sessionBar.position,
     sessionBarVisible: state.sessionBar.visible,
+    sidebar: {
+      visible: state.sidebar.visible,
+      width: state.sidebar.width,
+    },
   })
   saveSessionCatalog(
     buildSessionsWithCurrentSnapshot(state.sessions, state.currentSessionId, state)

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -157,5 +157,50 @@ describe('custom commands config validation', () => {
       expect(key.length).toBeGreaterThan(0)
       expect(typeof value).toBe('string')
     }
+  })
+})
+
+describe('sidebar config loading', () => {
+  test('loads valid persisted sidebar config', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-sidebar-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'sidebar-valid'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'sidebar-valid')
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        customCommands: {},
+        sidebar: { visible: false, width: 33 },
+        version: 2,
+      })
+    )
+
+    const { loadConfig } = await import(`../../src/config.ts?sidebar-valid=${Date.now()}`)
+    expect(loadConfig().sidebar).toEqual({ visible: false, width: 33 })
+  })
+
+  test('ignores invalid persisted sidebar config', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-sidebar-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'sidebar-invalid'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'sidebar-invalid')
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        customCommands: {},
+        sidebar: { visible: 'nope', width: -2 },
+        version: 2,
+      })
+    )
+
+    const { loadConfigResult } = await import(`../../src/config.ts?sidebar-invalid=${Date.now()}`)
+    const result = loadConfigResult()
+
+    expect(result.config.sidebar).toBeUndefined()
+    expect(result.issues).toContain('ignored invalid sidebar')
   })
 })

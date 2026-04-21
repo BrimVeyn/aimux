@@ -12,6 +12,7 @@ import {
   getSnapshotTrees,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { getSnapshotScrollIntents } from '../state/session-persistence'
 
 export class LocalSessionBackend
   extends EventEmitter<SessionBackendEvents>
@@ -66,15 +67,22 @@ export class LocalSessionBackend
     })
     this.currentSessionId = options.sessionId
     const trees = getSnapshotTrees(options.workspaceSnapshot)
+    const intents = getSnapshotScrollIntents(options.workspaceSnapshot)
     const splitTrees = trees.filter((t) => t.type === 'split')
     if (splitTrees.length > 0) {
       const bounds = createTerminalBounds(options.cols, options.rows)
       forEachSplitPaneRect(splitTrees, bounds, (tabId, rect) => {
         const size = toTerminalContentSize(rect)
-        this.sessionManager.resizeTab(options.sessionId, tabId, size.cols, size.rows)
+        this.sessionManager.resizeTab(
+          options.sessionId,
+          tabId,
+          size.cols,
+          size.rows,
+          intents.get(tabId)
+        )
       })
     } else {
-      this.sessionManager.resize(options.sessionId, options.cols, options.rows)
+      this.sessionManager.resize(options.sessionId, options.cols, options.rows, intents)
     }
     const attachResult = this.sessionManager.attachSession(
       options.sessionId,

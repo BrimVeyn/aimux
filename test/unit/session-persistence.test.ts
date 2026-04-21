@@ -69,7 +69,15 @@ describe('session persistence', () => {
   })
 
   test('drops legacy exited tabs from snapshots', () => {
-    const baseState = createInitialState()
+    const initialState = createInitialState()
+    const baseState = {
+      ...initialState,
+      sidebar: {
+        ...initialState.sidebar,
+        visible: true,
+        width: 31,
+      },
+    }
     const restored = restoreWorkspaceState(baseState, {
       activeTabId: 'tab-1',
       savedAt: new Date().toISOString(),
@@ -96,8 +104,8 @@ describe('session persistence', () => {
 
     expect(restored.tabs).toHaveLength(0)
     expect(restored.activeTabId).toBeNull()
-    expect(restored.sidebar.visible).toBe(false)
-    expect(restored.sidebar.width).toBe(22)
+    expect(restored.sidebar.visible).toBe(true)
+    expect(restored.sidebar.width).toBe(31)
     expect(restored.focusMode).toBe('navigation')
   })
 

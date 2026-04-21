@@ -51,14 +51,19 @@ import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
   sessionBar: {
-    position: 'top',
-    visible: true,
+    initialPosition: 'top',
+    initialVisible: true,
   },
 
   keymaps: (k) =>
     k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
 })
 ```
+
+Typed config is startup intent, not app-managed persisted state. Fields like
+`sessionBar.initialVisible` and `sessionBar.initialPosition` are reapplied on
+every launch, so runtime UI changes for those fields do not stick while the
+config entry remains set.
 
 Then start the app:
 
@@ -97,6 +102,12 @@ profile. See [`docs/concepts/profiles.md`](docs/concepts/profiles.md).
 - `aimux.json` - app-managed preferences and runtime state
 - `aimux-sessions.json` - session catalog and workspace snapshots
 - `aimux-snippets.json` - snippet catalog
+
+Rule of thumb:
+
+- `aimux.config.ts` declares startup intent
+- `aimux.json` stores app-managed runtime preferences
+- runtime actions never rewrite `aimux.config.ts`
 
 See [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md).
 

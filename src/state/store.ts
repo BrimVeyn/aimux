@@ -28,6 +28,7 @@ const DEFAULT_TERMINAL_ROWS = 24
 export interface InitialStateOverrides {
   gitMode?: Partial<GitModeState>
   gitPane?: Partial<GitPaneState>
+  sidebar?: Pick<AppState['sidebar'], 'visible' | 'width'>
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
 }
@@ -51,6 +52,10 @@ function resolveGitPanePosition(mode: GitPaneMode, position: GitPanePosition): G
     return position === 'top' || position === 'bottom' ? position : 'bottom'
   }
   return position === 'left' || position === 'right' ? position : 'left'
+}
+
+function clampSidebarWidth(width: number): number {
+  return Math.min(DEFAULT_SIDEBAR_MAX_WIDTH, Math.max(DEFAULT_SIDEBAR_MIN_WIDTH, width))
 }
 
 export function createInitialState(
@@ -103,8 +108,8 @@ export function createInitialState(
     sidebar: {
       maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
       minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,
-      visible: true,
-      width: DEFAULT_SIDEBAR_WIDTH,
+      visible: overrides.sidebar?.visible ?? true,
+      width: clampSidebarWidth(overrides.sidebar?.width ?? DEFAULT_SIDEBAR_WIDTH),
     },
     snippets,
     tabGroupMap: {},

@@ -2,6 +2,7 @@ import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './l
 import {
   type AppState,
   DEFAULT_SCROLL_INTENT,
+  type ScrollIntent,
   type TabSession,
   type TabStatus,
   type WorkspaceSnapshotV1,
@@ -80,6 +81,18 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
       title: tab.title,
       viewport: tab.viewport,
     }))
+}
+
+export function getSnapshotScrollIntents(
+  snapshot: WorkspaceSnapshotV1 | undefined
+): Map<string, ScrollIntent> {
+  if (!snapshot || snapshot.version !== 1) {
+    return new Map()
+  }
+
+  return new Map(
+    snapshot.tabs.map((tab) => [tab.id, tab.scrollIntent ?? DEFAULT_SCROLL_INTENT] as const)
+  )
 }
 
 export function restoreLayoutTrees(
@@ -192,11 +205,7 @@ export function restoreWorkspaceState(
     activeTabId,
     focusMode: 'navigation',
     layoutTrees,
-    sidebar: {
-      ...state.sidebar,
-      visible: workspaceSnapshot?.sidebar.visible ?? state.sidebar.visible,
-      width: workspaceSnapshot?.sidebar.width ?? state.sidebar.width,
-    },
+    sidebar: state.sidebar,
     tabGroupMap,
     tabs: orderedTabs,
   }

@@ -36,8 +36,10 @@ Additional export:
 
 ```ts
 defineConfig({
-  theme?: ThemeId
-  themes?: Record<string, NamedThemeDefinition>
+  theme?: {
+    initialMode?: 'light' | 'dark'
+    paletteOverrides?: Partial<AimuxPalette>
+  }
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
@@ -55,10 +57,9 @@ defineConfig({
 | Field        | Status             | Notes                                                                                     |
 | ------------ | ------------------ | ----------------------------------------------------------------------------------------- |
 | `keymaps`    | Supported          | Fully resolved and registered by the app                                                  |
-| `sessionBar` | Supported          | Used during app initialization; can override `aimux.json` values                          |
-| `gitPane`    | Supported          | Controls placement and rendering of the git file list (see below)                         |
-| `theme`      | Supported          | Initial theme id. Persisted `aimux.json.themeId` wins if present                          |
-| `themes`     | Supported          | User-defined themes; appear in the picker and power synthesized Shiki highlighting        |
+| `sessionBar` | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`     |
+| `gitPane`    | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately     |
+| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins      |
 | `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                    |
 | `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots |
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
@@ -121,8 +122,8 @@ Type:
 
 ```ts
 sessionBar?: {
-  visible?: boolean
-  position?: 'top' | 'bottom'
+  initialVisible?: boolean
+  initialPosition?: 'top' | 'bottom'
 }
 ```
 
@@ -131,14 +132,15 @@ Runtime behavior:
 - consumed during app initialization
 - used as a higher-priority source than `aimux.json.sessionBarVisible`
 - used as a higher-priority source than `aimux.json.sessionBarPosition`
+- reapplied on every launch while these config entries remain set
 
 Example:
 
 ```ts
 export default defineConfig({
   sessionBar: {
-    position: 'bottom',
-    visible: true,
+    initialPosition: 'bottom',
+    initialVisible: true,
   },
 })
 ```
@@ -152,24 +154,28 @@ Type (discriminated union on `mode`):
 ```ts
 type GitPaneConfig =
   | {
-      mode?: 'embedded' // default
-      position?: 'top' | 'bottom' // default 'bottom'
-      visible?: boolean
-      ratio?: number // 0..1, clamped to [0.2, 0.8]
-      diffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
-      fileListMode?: 'tree' | 'flat'
+      initialMode?: 'embedded'
+      initialPosition?: 'top' | 'bottom'
+      initialVisible?: boolean
+      initialRatio?: number // 0..1, clamped to [0.2, 0.8]
+      initialDiffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
+      initialFileListMode?: 'tree' | 'flat'
+      initialTreeCompaction?: boolean
       path?: GitPanePathConfig
       diffCount?: GitPaneDiffCountConfig
+      prefetchRadius?: number
     }
   | {
-      mode: 'pane'
-      position?: 'left' | 'right' // default 'left'
-      visible?: boolean
-      ratio?: number
-      diffModeRatio?: number
-      fileListMode?: 'tree' | 'flat'
+      initialMode: 'pane'
+      initialPosition?: 'left' | 'right'
+      initialVisible?: boolean
+      initialRatio?: number
+      initialDiffModeRatio?: number
+      initialFileListMode?: 'tree' | 'flat'
+      initialTreeCompaction?: boolean
       path?: GitPanePathConfig
       diffCount?: GitPaneDiffCountConfig
+      prefetchRadius?: number
     }
 
 type GitPanePathConfig = { enabled: false } | { enabled: true; pathFn?: (path: string) => string }
@@ -180,35 +186,41 @@ type GitPaneDiffCountConfig = { enabled: boolean }
 Runtime behavior:
 
 - `mode: 'embedded'` renders the git file list inside the sidebar, above or
-  below the tab list depending on `position`.
-- `mode: 'pane'` renders the git file list as a standalone pane next to the
-  sidebar (`left`) or on the far right of the main area (`right`).
-- `position` allowed values are constrained per `mode` at the type level —
-  `{ mode: 'embedded', position: 'left' }` is a type error.
-- `ratio` controls size: in `embedded` mode it's the vertical split ratio
-  against the tab list; in `pane` mode it maps to a column count in `[20, 80]`.
-- `diffModeRatio` controls the file-list width while you are in full-screen git
-  diff mode.
-- `fileListMode` controls whether the git file list renders as a folder tree or
-  as a flat list.
+- `initialMode: 'embedded'` renders the git file list inside the sidebar,
+  above or below the tab list depending on `initialPosition`.
+- `initialMode: 'pane'` renders the git file list as a standalone pane next to
+  the sidebar (`left`) or on the far right of the main area (`right`).
+- `initialPosition` allowed values are constrained per `initialMode` at the
+  type level.
+- `initialRatio` controls startup size: in `embedded` mode it's the vertical
+  split ratio against the tab list; in `pane` mode it maps to a column count in
+  `[20, 80]`.
+- `initialDiffModeRatio` controls the file-list width while you are in
+  full-screen git diff mode.
+- `initialFileListMode` controls whether the git file list renders as a folder
+  tree or as a flat list.
+- `initialTreeCompaction` controls whether tree mode collapses unary directory
+  chains at startup.
 - `path.enabled: false` hides the directory part of each file path, showing
   only the basename. When `enabled: true`, an optional `pathFn` rewrites the
   path before rendering (e.g. stripping a prefix).
 - `diffCount.enabled: false` hides the `+added / −removed` column.
-- `visible`, `ratio`, `diffModeRatio`, and `fileListMode` are persisted across
-  sessions in `aimux.json`. Programmatic config values take precedence over the
-  persisted values when both are present.
+- `prefetchRadius` is a regular config knob, not a persisted pane-state field.
+- The `initial*` fields are startup overrides. Current runtime pane state is
+  still persisted in `aimux.json`, but typed config values take precedence on
+  every launch when present.
 
 Example:
 
 ```ts
 export default defineConfig({
   gitPane: {
-    mode: 'pane',
-    position: 'right',
-    diffModeRatio: 0.3,
-    fileListMode: 'tree',
-    ratio: 0.35,
+    initialMode: 'pane',
+    initialPosition: 'right',
+    initialDiffModeRatio: 0.3,
+    initialFileListMode: 'tree',
+    initialRatio: 0.35,
+    initialTreeCompaction: true,
     path: {
       enabled: true,
       pathFn: (p) => p.replace(/^src\//, ''),
@@ -223,43 +235,44 @@ Legacy migration: config files written before `gitPane` existed stored
 are read once on load and converted to `{ mode: 'embedded', position: 'bottom',
 ratio, visible }`, then persisted under `gitPane` on the next save.
 
-## `theme` and `themes`
+## `theme`
 
 Type:
 
 ```ts
-theme?: ThemeId
-themes?: Record<string, NamedTheme | NamedThemeDefinition>
+theme?: {
+  initialMode?: 'light' | 'dark'
+  paletteOverrides?: Partial<AimuxPalette>
+}
 ```
 
-`theme` is the initial theme id applied at startup. It can be any shipped id
-(shiki catalog + house themes `aimux` and `dracula-at-night`) or any key from
-your own `themes` map.
+`theme.initialMode` picks the built-in light or dark family when there is no
+persisted `aimux.json.themeId`.
 
-`themes` declares user themes. Entries can be one of two shapes:
-
-- `NamedThemeDefinition` — palette shortcut built via `themes.define(name, base, overrides)`. Overrides use VSCode workbench color keys.
-- `NamedTheme` — full shiki-shape theme built via `themes.full({...})`. Use this to drop a VSCode theme JSON verbatim.
+`theme.paletteOverrides` customizes the active palette at startup and applies to
+the resolved runtime theme regardless of whether the base theme came from
+persisted state or from `initialMode`.
 
 ```ts
-import { defineConfig, themes } from '@brimveyn/aimux-config'
+import { defineConfig } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: 'my-neon',
-  themes: {
-    'my-neon': themes.define('My Neon', 'aimux', {
-      'textLink.foreground': '#ff00aa',
-      'terminal.ansiMagenta': '#00ffcc',
-    }),
+  theme: {
+    initialMode: 'dark',
+    paletteOverrides: {
+      primary: '#7dd3fc',
+      warning: '#fbbf24',
+    },
   },
 })
 ```
 
-See [`../guide/themes.md`](../guide/themes.md) for the full VSCode color key
-reference and the `themes.full` authoring form.
+See [`../guide/themes.md`](../guide/themes.md) for runtime picker behavior and
+palette override guidance.
 
-Precedence at startup: persisted `aimux.json.themeId` (if still known) → your
-`theme` field → fallback `aimux`.
+Precedence at startup: persisted `aimux.json.themeId` (if still known) →
+`theme.initialMode` → built-in dark fallback. `paletteOverrides` applies on top
+of the chosen base theme.
 
 ## `backends`
 
