@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { ScrollIntent, WorkspaceSnapshotV1 } from '../../src/state/types'
 
 import { SessionRegistry } from '../../src/daemon/session-registry'
 
@@ -8,13 +8,15 @@ function createSnapshotTab(
   id: string,
   title: string,
   assistant: 'claude' | 'codex' | 'terminal' = 'claude',
-  command = assistant === 'terminal' ? 'zsh' : assistant
+  command = assistant === 'terminal' ? 'zsh' : assistant,
+  scrollIntent?: ScrollIntent
 ) {
   return {
     assistant,
     buffer: title.toLowerCase(),
     command,
     id,
+    scrollIntent,
     status: 'running' as const,
     terminalModes: {
       alternateScrollMode: false,
@@ -96,5 +98,28 @@ describe('SessionRegistry', () => {
     )
 
     expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-c', 'tab-a', 'tab-b'])
+  })
+
+  test('reattach merges persisted scrollIntent into existing tabs', () => {
+    const registry = new SessionRegistry()
+
+    registry.attachFromSnapshot(createSnapshot())
+
+    const reattached = registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [
+          createSnapshotTab('tab-a', 'Alpha', 'claude', 'claude', {
+            absoluteLine: 12,
+            kind: 'anchor',
+          }),
+          createSnapshotTab('tab-b', 'Beta', 'codex', 'codex', { kind: 'bottom' }),
+        ],
+      })
+    )
+
+    expect(reattached.tabs.find((tab) => tab.id === 'tab-a')?.scrollIntent).toEqual({
+      absoluteLine: 12,
+      kind: 'anchor',
+    })
   })
 })

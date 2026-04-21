@@ -27,12 +27,18 @@ export interface PersistedGitPane {
   ratio?: number
 }
 
+export interface PersistedSidebar {
+  visible: boolean
+  width: number
+}
+
 export interface AimuxConfig {
   version: 2
   customCommands: Record<string, string>
   themeId?: ThemeId
   themeTransparent?: boolean
   gitPane?: PersistedGitPane
+  sidebar?: PersistedSidebar
   sessionBarVisible?: boolean
   sessionBarPosition?: SessionBarPosition
   workspaceSnapshot?: WorkspaceSnapshotV1
@@ -99,6 +105,17 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   return true
 }
 
+function isPersistedSidebar(value: unknown): value is PersistedSidebar {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.visible === 'boolean' &&
+    typeof v.width === 'number' &&
+    Number.isFinite(v.width) &&
+    v.width > 0
+  )
+}
+
 const DEFAULT_CONFIG: AimuxConfig = {
   customCommands: {},
   version: 2,
@@ -138,6 +155,7 @@ export function loadConfigResult(): ConfigLoadResult {
       themeId?: unknown
       themeTransparent?: unknown
       gitPane?: unknown
+      sidebar?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       sessionBarVisible?: unknown
@@ -169,6 +187,11 @@ export function loadConfigResult(): ConfigLoadResult {
     let validGitPane = isPersistedGitPane(parsed.gitPane) ? parsed.gitPane : undefined
     if (parsed.gitPane !== undefined && validGitPane === undefined) {
       issues.push('ignored invalid gitPane')
+    }
+
+    const validSidebar = isPersistedSidebar(parsed.sidebar) ? parsed.sidebar : undefined
+    if (parsed.sidebar !== undefined && validSidebar === undefined) {
+      issues.push('ignored invalid sidebar')
     }
 
     // Legacy migration: previous schema stored gitPanelVisible/gitPanelRatio at
@@ -235,6 +258,7 @@ export function loadConfigResult(): ConfigLoadResult {
         gitPane: validGitPane,
         sessionBarPosition: validSessionBarPosition,
         sessionBarVisible: validSessionBarVisible,
+        sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
         themeTransparent: validThemeTransparent,

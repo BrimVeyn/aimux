@@ -80,6 +80,7 @@ export function App({
     const sessionBarVisible = resolvedConfig.sessionBar?.visible ?? json.sessionBarVisible ?? true
     const sessionBarPosition =
       resolvedConfig.sessionBar?.position ?? json.sessionBarPosition ?? 'top'
+    const sidebarOverrides = json.sidebar
 
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
@@ -123,6 +124,7 @@ export function App({
         gitPane: gitPaneOverrides,
         sessionBarPosition,
         sessionBarVisible,
+        sidebar: sidebarOverrides,
       }
     )
   })

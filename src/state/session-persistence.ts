@@ -82,6 +82,18 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
     }))
 }
 
+export function getSnapshotScrollIntents(
+  snapshot: WorkspaceSnapshotV1 | undefined
+): Map<string, TabSession['scrollIntent']> {
+  if (!snapshot || snapshot.version !== 1) {
+    return new Map()
+  }
+
+  return new Map(
+    snapshot.tabs.map((tab) => [tab.id, tab.scrollIntent ?? DEFAULT_SCROLL_INTENT] as const)
+  )
+}
+
 export function restoreLayoutTrees(
   snapshot: WorkspaceSnapshotV1 | undefined,
   tabs: TabSession[]
@@ -192,11 +204,7 @@ export function restoreWorkspaceState(
     activeTabId,
     focusMode: 'navigation',
     layoutTrees,
-    sidebar: {
-      ...state.sidebar,
-      visible: workspaceSnapshot?.sidebar.visible ?? state.sidebar.visible,
-      width: workspaceSnapshot?.sidebar.width ?? state.sidebar.width,
-    },
+    sidebar: state.sidebar,
     tabGroupMap,
     tabs: orderedTabs,
   }
