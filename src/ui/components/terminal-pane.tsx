@@ -239,6 +239,19 @@ export function TerminalPane({
               <text fg={t.palette.primary}>Ctrl+n</text>
               <text fg={t.muted}> to launch an assistant</text>
             </box>
+            <box
+              flexDirection="row"
+              justifyContent="center"
+              marginTop={1}
+              paddingX={2}
+              backgroundColor={t.selected}
+              onMouseDown={(event) => {
+                event.stopPropagation()
+                dispatchGlobal({ type: 'open-new-tab-modal' })
+              }}
+            >
+              <text fg={t.palette.ink}>New assistant</text>
+            </box>
           </box>
         ) : (
           <box
