@@ -33,8 +33,8 @@ function createSnapshot(): WorkspaceSnapshotV1 {
 
 describe('LocalSessionBackend.attach', () => {
   test('passes persisted scroll intents to full-session resize during attach', async () => {
-    const backend = new LocalSessionBackend() as unknown as LocalSessionBackend & {
-      currentSessionId: string | null
+    const backend = new LocalSessionBackend()
+    const backendInternal = backend as unknown as {
       sessionManager: {
         attachSession: ReturnType<typeof mock>
         listTabs: ReturnType<typeof mock>
@@ -50,13 +50,13 @@ describe('LocalSessionBackend.attach', () => {
 
     const snapshot = createSnapshot()
     const attachTabs = snapshot.tabs as unknown as TabSession[]
-    backend.sessionManager = {
+    backendInternal.sessionManager = {
       attachSession: mock(() => ({ activeTabId: 'tab-a', tabs: attachTabs })),
       listTabs: mock(() => attachTabs),
       resize: mock(() => {}),
       resizeTab: mock(() => {}),
     }
-    backend.statusLoop = {
+    backendInternal.statusLoop = {
       classifyNow: mock(() => {}),
       getTabStatus: mock(() => undefined),
       snapshotSessions: mock(() => []),
@@ -69,11 +69,20 @@ describe('LocalSessionBackend.attach', () => {
       workspaceSnapshot: snapshot,
     })
 
-    const resizeArgs = backend.sessionManager.resize.mock.calls[0]
-    expect(resizeArgs?.[0]).toBe('session-a')
-    expect(resizeArgs?.[1]).toBe(80)
-    expect(resizeArgs?.[2]).toBe(24)
-    expect(resizeArgs?.[3]).toEqual(new Map([['tab-a', { absoluteLine: 11, kind: 'anchor' }]]))
-    expect(backend.sessionManager.resizeTab).not.toHaveBeenCalled()
+    const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as Array<
+      [
+        sessionId: string,
+        cols: number,
+        rows: number,
+        intents?: Map<string, WorkspaceSnapshotV1['tabs'][number]['scrollIntent']>,
+      ]
+    >
+    const firstResize = resizeArgs[0]
+    expect(firstResize).toBeDefined()
+    expect(firstResize?.[0]).toBe('session-a')
+    expect(firstResize?.[1]).toBe(80)
+    expect(firstResize?.[2]).toBe(24)
+    expect(firstResize?.[3]).toEqual(new Map([['tab-a', { absoluteLine: 11, kind: 'anchor' }]]))
+    expect(backendInternal.sessionManager.resizeTab).not.toHaveBeenCalled()
   })
 })

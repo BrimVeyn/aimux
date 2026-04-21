@@ -69,11 +69,22 @@ describe('resizeSnapshotPanes', () => {
 
     resizeSnapshotPanes(createSnapshot(), layoutRef, backend as unknown as SessionBackend)
 
-    const calls = backend.resizeTab.mock.calls
+    const calls = backend.resizeTab.mock.calls as unknown as Array<
+      [
+        tabId: string,
+        cols: number,
+        rows: number,
+        intent?: WorkspaceSnapshotV1['tabs'][number]['scrollIntent'],
+      ]
+    >
     expect(calls).toHaveLength(2)
-    expect(calls[0]?.[0]).toBe('tab-a')
-    expect(calls[0]?.[3]).toEqual({ absoluteLine: 9, kind: 'anchor' })
-    expect(calls[1]?.[0]).toBe('tab-b')
-    expect(calls[1]?.[3]).toEqual({ kind: 'bottom' })
+    const firstCall = calls[0]
+    const secondCall = calls[1]
+    expect(firstCall).toBeDefined()
+    expect(secondCall).toBeDefined()
+    expect(firstCall?.[0]).toBe('tab-a')
+    expect(firstCall?.[3]).toEqual({ absoluteLine: 9, kind: 'anchor' })
+    expect(secondCall?.[0]).toBe('tab-b')
+    expect(secondCall?.[3]).toEqual({ kind: 'bottom' })
   })
 })

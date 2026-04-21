@@ -2,6 +2,7 @@ import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './l
 import {
   type AppState,
   DEFAULT_SCROLL_INTENT,
+  type ScrollIntent,
   type TabSession,
   type TabStatus,
   type WorkspaceSnapshotV1,
@@ -84,7 +85,7 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
 
 export function getSnapshotScrollIntents(
   snapshot: WorkspaceSnapshotV1 | undefined
-): Map<string, TabSession['scrollIntent']> {
+): Map<string, ScrollIntent> {
   if (!snapshot || snapshot.version !== 1) {
     return new Map()
   }
