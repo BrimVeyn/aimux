@@ -8,7 +8,7 @@ import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
-import { AIUsagePopover } from './components/ai-usage-popover'
+import { AIUsageModal } from './components/ai-usage-modal'
 import { ContextMenuBox } from './components/context-menu-box'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
@@ -172,6 +172,8 @@ function renderModal(
           cursorPos={modal.cursorPos}
         />
       )
+    case 'ai-usage':
+      return <AIUsageModal />
     case 'git-commit': {
       const titleText =
         modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
@@ -279,7 +281,6 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
-        <AIUsagePopover />
         {renderModal(modal, {
           activeAssistant: activeTab?.assistant,
           createSessionFields,

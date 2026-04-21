@@ -54,6 +54,19 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-ai-usage-modal': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          cursorPos: 0,
+          editBuffer: '',
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'ai-usage',
+        },
+      }
+    }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null

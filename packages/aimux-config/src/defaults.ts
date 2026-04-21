@@ -75,6 +75,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode(['navigation', 'terminal-input'], (m) =>
       m
         .map('<Leader>b', actions.toggleSessionBar, 'Toggle session bar')
+        .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
         .map('<Leader>1', actions.switchSessionByIndex(1), 'Session 1')
         .map('<Leader>2', actions.switchSessionByIndex(2), 'Session 2')
         .map('<Leader>3', actions.switchSessionByIndex(3), 'Session 3')
@@ -145,6 +146,13 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<CR>', actions.confirmTheme, 'Confirm')
         .map('<C-t>', actions.toggleTransparent, 'Toggle transparent')
         .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: ai-usage (info-only)
+    // -----------------------------------------------------------------------
+    .mode('modal.ai-usage', (m) =>
+      m.map('<Esc>', actions.closeModal, 'Close').map('<Leader>u', actions.toggleAIUsage, 'Close')
     )
 
     // -----------------------------------------------------------------------

@@ -49,10 +49,12 @@ export function startAIUsageService(
           error: result.reason instanceof Error ? result.reason.message : String(result.reason),
           lastUpdated: new Date().toISOString(),
           percent: null,
+          planTier: null,
           resetAt: null,
           timeRemaining: null,
           tokens: { cache: 0, input: 0, output: 0, total: 0 },
           tool,
+          windows: [],
         })
       }
     }

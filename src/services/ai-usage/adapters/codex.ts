@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-import type { UsageSnapshot } from '../types'
+import type { UsageSnapshot, UsageWindow, UsageWindowKind } from '../types'
+
+import { computePace, formatTimeRemaining } from '../pace'
 
 interface CodexAuthFile {
   tokens?: {
@@ -101,39 +103,75 @@ async function loadAuth(): Promise<{ accessToken: string; accountId: string | nu
   }
 }
 
-function formatRemainingFromReset(resetAtSeconds: number | undefined): string | null {
-  if (!resetAtSeconds) return null
-  const diffMs = resetAtSeconds * 1000 - Date.now()
-  if (diffMs <= 0) return null
-  const totalMin = Math.round(diffMs / 60_000)
-  const h = Math.floor(totalMin / 60)
-  const m = totalMin % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}h`
+function normalizePlanTier(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const lower = trimmed.toLowerCase()
+  if (lower === 'pro') return 'Pro'
+  if (lower === 'plus') return 'Plus'
+  if (lower === 'free') return 'Free'
+  if (lower === 'team') return 'Team'
+  if (lower === 'business') return 'Business'
+  if (lower === 'enterprise') return 'Enterprise'
+  if (lower === 'edu' || lower === 'education') return 'Edu'
+  if (lower === 'go') return 'Go'
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
 
-function pickPrimaryWindow(rate: CodexUsageResponse['rate_limit']): WindowSnapshot | null {
-  if (!rate) return null
-  // Primary = 5h session window. Pick the one closest to 300 minutes (18000s),
-  // falling back to whichever is defined.
-  const windows = [rate.primary_window, rate.secondary_window].filter(
-    (w): w is WindowSnapshot => !!w
-  )
-  if (windows.length === 0) return null
-  const sessionWindow = windows.find((w) => w.limit_window_seconds === 18_000)
-  return sessionWindow ?? windows[0] ?? null
+function buildCodexWindow(
+  kind: UsageWindowKind,
+  label: string,
+  window: WindowSnapshot | null | undefined,
+  now: number
+): UsageWindow | null {
+  if (!window) return null
+  const percent =
+    typeof window.used_percent === 'number' ? Math.max(0, Math.min(100, window.used_percent)) : null
+  const resetAtMs = window.reset_at ? window.reset_at * 1000 : null
+  const resetAt = resetAtMs ? new Date(resetAtMs).toISOString() : null
+  const windowSeconds =
+    typeof window.limit_window_seconds === 'number' ? window.limit_window_seconds : null
+  if (percent === null && !resetAt) return null
+  return {
+    kind,
+    label,
+    pace: computePace({ now, percent, resetAtMs, windowSeconds }),
+    percent,
+    resetAt,
+    timeRemaining: formatTimeRemaining(resetAtMs, now),
+    windowSeconds,
+  }
+}
+
+function orderWindows(
+  primary: WindowSnapshot | null | undefined,
+  secondary: WindowSnapshot | null | undefined
+): {
+  session: WindowSnapshot | null | undefined
+  weekly: WindowSnapshot | null | undefined
+} {
+  const SESSION_SECONDS = 18_000
+  const isSession = (w: WindowSnapshot | null | undefined): boolean =>
+    !!w && w.limit_window_seconds === SESSION_SECONDS
+  if (isSession(primary)) return { session: primary, weekly: secondary }
+  if (isSession(secondary)) return { session: secondary, weekly: primary }
+  return { session: primary, weekly: secondary }
 }
 
 export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<UsageSnapshot> {
-  const now = new Date().toISOString()
+  const nowIso = new Date().toISOString()
   const base: UsageSnapshot = {
     burnRatePerHour: null,
     costUSD: null,
-    lastUpdated: now,
+    lastUpdated: nowIso,
     percent: null,
+    planTier: null,
     resetAt: null,
     timeRemaining: null,
     tokens: { cache: 0, input: 0, output: 0, total: 0 },
     tool: 'codex',
+    windows: [],
   }
 
   try {
@@ -164,23 +202,33 @@ export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<Usage
     }
 
     const parsed = (await response.json()) as CodexUsageResponse
-    const window = pickPrimaryWindow(parsed.rate_limit)
-    if (!window) {
-      return { ...base, error: 'no rate_limit data' }
+    const planTier = normalizePlanTier(parsed.plan_type)
+    const now = Date.now()
+    const { session, weekly } = orderWindows(
+      parsed.rate_limit?.primary_window,
+      parsed.rate_limit?.secondary_window
+    )
+
+    const windows: UsageWindow[] = []
+    const sessionWindow = buildCodexWindow('session', 'Session', session, now)
+    if (sessionWindow) windows.push(sessionWindow)
+    const weeklyWindow = buildCodexWindow('weekly', 'Weekly', weekly, now)
+    if (weeklyWindow) windows.push(weeklyWindow)
+
+    if (windows.length === 0) {
+      return { ...base, error: 'no rate_limit data', planTier }
     }
 
-    const percent =
-      typeof window.used_percent === 'number'
-        ? Math.max(0, Math.min(100, window.used_percent))
-        : null
-    const resetAt = window.reset_at ? new Date(window.reset_at * 1000).toISOString() : null
+    const summary = sessionWindow ?? weeklyWindow
 
     return {
       ...base,
-      percent,
-      resetAt,
-      timeRemaining: formatRemainingFromReset(window.reset_at),
+      percent: summary?.percent ?? null,
+      planTier,
+      resetAt: summary?.resetAt ?? null,
+      timeRemaining: summary?.timeRemaining ?? null,
       tool: 'codex',
+      windows,
     }
   } catch (error) {
     return {
