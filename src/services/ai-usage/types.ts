@@ -17,4 +17,5 @@ export interface UsageSnapshot {
   burnRatePerHour: number | null
   lastUpdated: string
   error?: string
+  stale?: boolean
 }

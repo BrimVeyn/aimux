@@ -28,7 +28,7 @@ function fmt(n: number): string {
 }
 
 function buildLines(snap: UsageSnapshot): string[] {
-  if (snap.error) {
+  if (snap.error && !snap.stale) {
     return [`error: ${snap.error.slice(0, 30)}`]
   }
   const lines: string[] = []

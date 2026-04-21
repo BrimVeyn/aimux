@@ -80,7 +80,7 @@ export function AIUsageIndicator() {
       {entries.map(({ snap, tool }) => {
         if (!snap) return null
         const icon = TOOL_ICON[tool]
-        if (snap.error) {
+        if (snap.error && !snap.stale) {
           return (
             <text key={tool} fg={t.palette.error} selectable={false}>
               {icon} —
