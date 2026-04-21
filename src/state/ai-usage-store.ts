@@ -21,9 +21,9 @@ export const aiUsageStore = createStore<AIUsageState>((set) => ({
     set((state) => {
       const prev = state.snapshots[snap.tool]
       const isFailure = Boolean(snap.error)
-      const hasPriorGood = prev && !prev.error && prev.percent !== null
+      const hasPriorValue = prev && prev.percent !== null
       const merged: UsageSnapshot =
-        isFailure && hasPriorGood && prev
+        isFailure && hasPriorValue && prev
           ? { ...prev, error: snap.error, lastUpdated: snap.lastUpdated, stale: true }
           : snap
       return { snapshots: { ...state.snapshots, [snap.tool]: merged } }
