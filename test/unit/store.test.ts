@@ -112,7 +112,53 @@ describe('appReducer', () => {
     expect(next.focusMode).toBe('navigation')
   })
 
-  test('deleting active session falls back to picker when none remain', () => {
+  test('deleting a non-current session keeps the current workspace and modal state', () => {
+    const initial = {
+      ...createInitialState({}, [
+        {
+          createdAt: '2024-01-01T00:00:00.000Z',
+          id: 'session-1',
+          lastOpenedAt: '2024-01-01T00:00:00.000Z',
+          name: 'Main',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          createdAt: '2024-01-01T00:00:00.000Z',
+          id: 'session-2',
+          lastOpenedAt: '2024-01-01T00:00:00.000Z',
+          name: 'Other',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ]),
+      activeTabId: 'tab-1',
+      currentSessionId: 'session-1',
+      focusMode: 'navigation' as const,
+      sessionStatuses: {
+        'session-1': { waiting: false, working: false },
+        'session-2': { waiting: true, working: false },
+      },
+      tabs: [
+        createTab({
+          assistant: 'claude',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running',
+          title: 'Claude',
+        }),
+      ],
+    }
+
+    const next = appReducer(initial, { sessionId: 'session-2', type: 'delete-session-record' })
+    expect(next.sessions.map((session) => session.id)).toEqual(['session-1'])
+    expect(next.currentSessionId).toBe('session-1')
+    expect(next.activeTabId).toBe('tab-1')
+    expect(next.tabs).toHaveLength(1)
+    expect(next.focusMode).toBe('navigation')
+    expect(next.modal.type).toBeNull()
+    expect(next.sessionStatuses['session-2']).toBeUndefined()
+  })
+
+  test('deleting active session from the session bar does not open the picker', () => {
     const initial = {
       ...createInitialState({}, [
         {
@@ -139,8 +185,53 @@ describe('appReducer', () => {
     const next = appReducer(initial, { sessionId: 'session-1', type: 'delete-session-record' })
     expect(next.sessions).toHaveLength(0)
     expect(next.currentSessionId).toBeNull()
+    expect(next.activeTabId).toBeNull()
+    expect(next.tabs).toHaveLength(0)
+    expect(next.focusMode).toBe('navigation')
+    expect(next.modal.type).toBeNull()
+  })
+
+  test('deleting active session from the picker keeps the picker open', () => {
+    const initial = {
+      ...createInitialState({}, [
+        {
+          createdAt: '2024-01-01T00:00:00.000Z',
+          id: 'session-1',
+          lastOpenedAt: '2024-01-01T00:00:00.000Z',
+          name: 'Main',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ]),
+      activeTabId: 'tab-1',
+      currentSessionId: 'session-1',
+      focusMode: 'modal' as const,
+      modal: {
+        editBuffer: null,
+        selectedIndex: 0,
+        sessionTargetId: null,
+        type: 'session-picker' as const,
+      },
+      tabs: [
+        createTab({
+          assistant: 'claude',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running',
+          title: 'Claude',
+        }),
+      ],
+    }
+
+    const next = appReducer(initial, {
+      openSessionPicker: true,
+      sessionId: 'session-1',
+      type: 'delete-session-record',
+    })
+    expect(next.sessions).toHaveLength(0)
+    expect(next.currentSessionId).toBeNull()
     expect(next.tabs).toHaveLength(0)
     expect(next.modal.type).toBe('session-picker')
+    expect(next.focusMode).toBe('modal')
   })
 
   test('opens and closes the new tab modal', () => {
