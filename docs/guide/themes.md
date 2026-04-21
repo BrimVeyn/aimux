@@ -1,3 +1,8 @@
+---
+title: Themes
+description: Built-in themes, the theme picker, and typed theme helpers.
+---
+
 # Themes
 
 aimux themes are [Shiki](https://shiki.style/themes) themes. The runtime works

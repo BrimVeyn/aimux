@@ -1,12 +1,13 @@
 import type {
   AimuxUserConfig,
+  AutoCommitConfig,
   ModeId,
   ModeKeymapDef,
   ResolvedConfig,
   ResolvedKeymapConfig,
 } from './types'
 
-import { getDefaultKeymapConfig } from './defaults'
+import { DEFAULT_AUTO_COMMIT_CONFIG, getDefaultKeymapConfig } from './defaults'
 import { KeymapBuilder } from './keymap-builder'
 
 /**
@@ -16,7 +17,14 @@ import { KeymapBuilder } from './keymap-builder'
 export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
   const keymaps = resolveKeymaps(userConfig)
 
+  const autoCommit: AutoCommitConfig = {
+    enabled: userConfig.autoCommit?.enabled ?? DEFAULT_AUTO_COMMIT_CONFIG.enabled,
+    models: { ...DEFAULT_AUTO_COMMIT_CONFIG.models, ...userConfig.autoCommit?.models },
+    timeoutMs: userConfig.autoCommit?.timeoutMs ?? DEFAULT_AUTO_COMMIT_CONFIG.timeoutMs,
+  }
+
   return {
+    autoCommit,
     backends: userConfig.backends ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
@@ -24,6 +32,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     sessionBar: resolveSessionBar(userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
+    statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
   }
 }

@@ -22,6 +22,7 @@ export { paletteToShikiTheme } from './palette-to-shiki'
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
+export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 
 // Type exports
 export type {
@@ -33,8 +34,11 @@ export type {
   AimuxThemeConfig,
   // User-facing config
   AimuxUserConfig,
+  AIUsageTool,
+  AIUsageToolConfig,
   AppAction,
   AppState,
+  AutoCommitConfig,
   BackendConfig,
   BindingDef,
   FocusMode,
@@ -68,6 +72,7 @@ export type {
   SnippetDef,
   SnippetRecord,
   SplitDirection,
+  StatusBarConfig,
   TabSession,
   Theme,
   ThemeId,

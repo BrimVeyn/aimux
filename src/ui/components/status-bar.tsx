@@ -5,6 +5,7 @@ import { useAppStore } from '../../state/app-store'
 import { useKeymap } from '../keymap-context'
 import { getStatusBarModel } from '../status-bar-model'
 import { getCurrentTokens, useBg, useTokens } from '../theme'
+import { AIUsageIndicator } from './ai-usage-indicator'
 
 function getModeColor(focusMode: AppState['focusMode']): string {
   const t = getCurrentTokens()
@@ -65,6 +66,7 @@ export function StatusBar() {
         <text fg={t.muted}>{model.right}</text>
         <box flexDirection="row" gap={2}>
           {model.help ? <text fg={t.muted}>{model.help}</text> : null}
+          <AIUsageIndicator />
           <text fg={t.hover}>v{APP_VERSION}</text>
         </box>
       </box>

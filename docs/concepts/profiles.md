@@ -1,3 +1,8 @@
+---
+title: Profiles
+description: Profile selection, env vars, directory layout, and runtime isolation.
+---
+
 # Profiles
 
 Profiles isolate `aimux` environments on the same machine.

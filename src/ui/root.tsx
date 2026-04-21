@@ -1,13 +1,14 @@
 import type { MouseEvent } from '@opentui/core'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
-import type { ModalState, SessionRecord, SnippetRecord } from '../state/types'
+import type { FocusMode, ModalState, SessionRecord, SnippetRecord } from '../state/types'
 import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
+import { AIUsagePopover } from './components/ai-usage-popover'
 import { ContextMenuBox } from './components/context-menu-box'
 import { ContextMenuOverlay } from './components/context-menu-overlay'
 import { CreateSessionModal } from './components/create-session-modal'
@@ -78,6 +79,9 @@ function renderModal(
     themeId: ThemeId
     createSessionFields: { directoryQuery: string; sessionName: string }
     snippetEditorFields: { snippetName: string; snippetContent: string }
+    focusMode: FocusMode
+    activeAssistant?: string
+    autoCommitModel?: string
   }
 ) {
   switch (modal.type) {
@@ -176,8 +180,11 @@ function renderModal(
       return (
         <GitCommitModal
           activeField={modal.activeField}
+          assistant={options.activeAssistant}
           body={bodyText}
           cursorPos={modal.cursorPos ?? (modal.editBuffer ?? '').length}
+          model={options.autoCommitModel}
+          stage={modal.stage}
           title={titleText}
         />
       )
@@ -272,11 +279,14 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
+        <AIUsagePopover />
         {renderModal(modal, {
+          activeAssistant: activeTab?.assistant,
           createSessionFields,
           currentSessionId,
           currentTabCount: tabs.length,
           customCommands,
+          focusMode,
           sessions,
           snippetEditorFields,
           snippets,
@@ -379,6 +389,7 @@ export function RootView({
         currentSessionId,
         currentTabCount: tabs.length,
         customCommands,
+        focusMode,
         sessions,
         snippetEditorFields,
         snippets,

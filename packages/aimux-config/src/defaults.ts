@@ -1,7 +1,16 @@
-import type { ResolvedKeymapConfig } from './types'
+import type { AutoCommitConfig, ResolvedKeymapConfig } from './types'
 
 import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
+
+export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
+  enabled: false,
+  models: {
+    claude: 'claude-haiku-4-5',
+    codex: 'gpt-5-mini',
+  },
+  timeoutMs: 60_000,
+}
 
 /**
  * Build the default keymap — 1:1 transcription of all existing handlers.
@@ -276,9 +285,29 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.gitCommitCancel, 'Cancel')
         .map('<C-CR>', actions.gitCommitSubmit, 'Commit')
+        .map('<C-a>', actions.gitCommitEnterConfirm, 'Auto-commit (stage all)')
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.gitCommitReturnKey, 'Newline / confirm')
         .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: git-commit confirm (auto-commit stage all + commit)
+    // -----------------------------------------------------------------------
+    .mode('modal.git-commit.confirm', (m) =>
+      m
+        .map('<Esc>', actions.gitCommitLeaveConfirm, 'Cancel auto-commit')
+        .map('<CR>', actions.gitCommitAutoAccept, 'Stage all + commit')
+        .map('<C-CR>', actions.gitCommitAutoAccept, 'Stage all + commit')
+        .map('<Tab>', actions.switchField, 'Next field')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: git-commit generating (waiting for LLM)
+    // -----------------------------------------------------------------------
+    .mode('modal.git-commit.generating', (m) =>
+      m.map('<Esc>', actions.gitCommitLeaveGenerating, 'Cancel generation')
     )
 
   return kb._build()

@@ -1,3 +1,8 @@
+---
+title: Runtime Paths
+description: Config paths, catalog paths, runtime directories, and socket files.
+---
+
 # Runtime Paths
 
 All paths below depend on the active profile.

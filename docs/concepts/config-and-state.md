@@ -1,3 +1,8 @@
+---
+title: Config and State
+description: Canonical split between aimux.config.ts, aimux.json, aimux-sessions.json, and aimux-snippets.json.
+---
+
 # Config and State
 
 `aimux` uses more than one file under the active profile. They do not all serve

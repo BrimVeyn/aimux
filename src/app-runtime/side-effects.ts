@@ -1,3 +1,4 @@
+import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { $ } from 'bun'
 
 import type { SideEffect } from '../input/modes/types'
@@ -38,6 +39,7 @@ import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
+import { triggerAutoCommitNow } from './auto-commit-ref'
 import {
   handleCreateSessionEffect,
   handleDeleteSessionEffect,
@@ -557,6 +559,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void enqueueGitOp(() => runGitCommit(ctx, title, body))
       return
     }
+    case 'git-commit-auto': {
+      if (!isAutoCommitEnabled()) return
+      const { body, title } = effect
+      void enqueueGitOp(() => runGitCommitAuto(ctx, title, body))
+      return
+    }
+    case 'generate-auto-commit-now': {
+      if (!isAutoCommitEnabled()) return
+      void runGenerateAutoCommitNow(ctx, effect.sessionId)
+      return
+    }
     case 'git-push': {
       void enqueueGitOp(() => runGitPush(ctx))
       return
@@ -684,7 +697,90 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     })
     return
   }
+  clearAutoCommitForCurrentSession(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+}
+
+async function runGitCommitAuto(
+  ctx: SideEffectContext,
+  title: string,
+  body: string
+): Promise<void> {
+  if (!title) {
+    ctx.dispatch({ message: 'empty commit title', type: 'git-mode-set-message' })
+    return
+  }
+  const cwd = ctx.getCurrentSessionProjectPath()
+  if (!cwd) return
+
+  // If the user has manually staged files, respect that intent and commit
+  // only the staged set — don't run `git add -A` which would sweep up
+  // unrelated unstaged/untracked changes. With nothing staged, `add -A`
+  // keeps the "commit everything" behaviour the user expects from auto-commit.
+  const hasStaged = ctx.state.gitPanel.files.some((f) => f.section === 'staged')
+  if (!hasStaged) {
+    const addArgs = ['add', '-A']
+    const addResult = await $`git -C ${cwd} ${addArgs}`.quiet().nothrow()
+    if (addResult.exitCode !== 0) {
+      ctx.dispatch({
+        message: addResult.stderr.toString().trim() || 'auto-commit: git add failed',
+        type: 'git-mode-set-message',
+      })
+      return
+    }
+  }
+
+  const commitResult = body
+    ? await $`git -C ${cwd} commit -m ${title} -m ${body}`.quiet().nothrow()
+    : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
+
+  if (commitResult.exitCode !== 0) {
+    ctx.dispatch({
+      message: commitResult.stderr.toString().trim() || 'auto-commit: commit failed',
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+
+  clearAutoCommitForCurrentSession(ctx)
+  ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+}
+
+function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
+  const sessionId = ctx.state.currentSessionId
+  if (!sessionId) return
+  ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+}
+
+async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: string): Promise<void> {
+  const session = ctx.state.sessions.find((s) => s.id === sessionId)
+  const panel = ctx.state.gitPanel
+  if (panel.error !== null) {
+    ctx.dispatch({ message: 'auto-commit: git panel unavailable', type: 'git-mode-set-message' })
+    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    return
+  }
+  const tab = ctx.activeTab
+  if (!tab) {
+    ctx.dispatch({
+      message: 'auto-commit: no active assistant tab — open a claude/codex session first',
+      type: 'git-mode-set-message',
+    })
+    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    return
+  }
+  await triggerAutoCommitNow({
+    assistant: tab.assistant,
+    git: {
+      ahead: panel.ahead,
+      behind: panel.behind,
+      branch: panel.branch,
+      files: panel.files,
+    },
+    projectPath: session?.projectPath,
+    sessionId,
+    tabId: tab.id,
+  })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {

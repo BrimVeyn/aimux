@@ -1,3 +1,8 @@
+---
+title: Git Mode
+description: In-app review, diff view, stage, commit, and push workflow.
+---
+
 # Git Mode
 
 Git mode is a dedicated in-app workflow for reviewing, staging, committing,
@@ -128,6 +133,90 @@ mode listed.
 cancels and returns to git mode.
 
 `p` pushes the current branch.
+
+## Auto-commit
+
+Auto-commit is an **opt-in** feature that uses an AI assistant (Claude
+Haiku by default) to write commit messages for you in the background.
+It is **disabled by default** — enable it in your config (see below).
+
+### What it does
+
+While auto-commit is enabled, the commit modal grows an extra
+**`[ Auto-commit ]`** button (also bound to `Ctrl+A` inside the modal).
+
+In parallel, a background driver watches your working tree and
+pre-generates a suggestion whenever the tree has been stable for ~2 s and
+there are changes to summarise. Reading the current `git diff`, the last
+five commits (for style), the branch name, and a tail of your assistant's
+terminal session, it asks the configured model for a structured
+`TITLE:` + `BODY:`. The result is cached for the current hash of your
+working tree.
+
+Clicking `[ Auto-commit ]` (or pressing `Ctrl+A`) in the commit modal:
+
+- with an **empty** title, **uses the cached suggestion** if one is
+  ready — no new request. If generation is still running, the loading
+  overlay takes over until it completes, then flips to confirmation with
+  the fields filled in.
+- with a title you've **typed yourself**, just jumps to the confirmation
+  step with your text.
+
+A small braille spinner (`⠋⠙⠹…`) appears next to the button label while
+a background generation is in flight.
+
+### Manual staging is respected
+
+If you have **already staged files** (via `git add` or `a` in git mode),
+auto-commit only looks at — and only commits — that staged set. The
+confirm step shows _"Commit will include the N staged file(s) only."_
+If **nothing is staged**, auto-commit runs `git add -A` before
+committing, matching the "just write a message for everything" intent.
+
+### Invalidation & re-generation
+
+The cached suggestion is keyed on a hash of your working tree that
+includes each file's path, status, line counts, **and** staged/unstaged
+section. Any of these changing (including `git add` / `git reset HEAD`)
+invalidates the suggestion and schedules a new generation after ~2 s of
+stability.
+
+### Enabling it
+
+In your `aimux.config.ts`:
+
+```ts
+import { defineConfig } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  autoCommit: {
+    enabled: true, // default: false
+    // optional — override the model per provider
+    models: {
+      claude: 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+    },
+    // optional — kill the headless call if it takes longer than this (ms)
+    timeoutMs: 60_000,
+  },
+})
+```
+
+When `enabled` is `false` (the default), the `[ Auto-commit ]` button is
+hidden, `Ctrl+A` surfaces a one-line status message pointing you to the
+config, no background requests run, and the regular commit flow
+(`Ctrl+Enter` to commit staged) still works as normal.
+
+### Supported providers
+
+Only assistants with a headless-CLI mode are supported:
+
+- `claude` (Claude Code CLI)
+- `codex` (Codex CLI)
+- `opencode`
+
+The active tab's assistant determines which CLI is called; if the
+assistant has no headless form, auto-commit stays silent.
 
 ## Status Bar
 

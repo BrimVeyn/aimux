@@ -1,3 +1,8 @@
+---
+title: CLI Reference
+description: Every aimux command and its behavior.
+---
+
 # CLI Reference
 
 The `aimux` CLI is implemented in `src/index.tsx`.
