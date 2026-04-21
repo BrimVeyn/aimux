@@ -48,7 +48,7 @@ export function CreateSessionModal({
 
   return (
     <ModalShell
-      title="Create session"
+      title="Create workspace"
       keybindsModeId="modal.create-session"
       width={uiTokens.modalWidth.xl}
     >
@@ -88,7 +88,7 @@ export function CreateSessionModal({
       </box>
 
       <box flexDirection="column">
-        <text fg={nameActive ? t.palette.ink : t.muted}>Session name</text>
+        <text fg={nameActive ? t.palette.ink : t.muted}>Workspace name</text>
         <InputField active={nameActive} value={sessionName} />
       </box>
     </ModalShell>

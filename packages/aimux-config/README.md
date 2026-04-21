@@ -49,7 +49,7 @@ export default defineConfig({
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
+    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
 })
 ```
 
@@ -140,7 +140,7 @@ explanation.
 Pre-built actions include:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- sessions: `sessionPicker`, `switchSessionByIndex(n)` and session modal actions
+- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
 - snippets: `snippetPicker`, snippet editor and filter actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`

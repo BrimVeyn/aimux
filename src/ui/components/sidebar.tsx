@@ -63,7 +63,9 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       <text fg={tokens.palette.primary}>
         <strong>aimux</strong>
       </text>
-      <text fg={tokens.accent}>{currentSession ? currentSession.name : 'No session selected'}</text>
+      <text fg={tokens.accent}>
+        {currentSession ? currentSession.name : 'No workspace selected'}
+      </text>
       {branch ? (
         <box flexDirection="row">
           <text fg={tokens.palette.primary}>{'\u{e702}'} </text>

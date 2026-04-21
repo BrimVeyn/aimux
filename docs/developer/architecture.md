@@ -52,7 +52,7 @@ The terminal manager owns:
 
 - PTYs
 - headless terminal emulators
-- live session state
+- live workspace state
 
 This is why a daemon restart does not need to kill live tabs.
 
@@ -82,16 +82,16 @@ Important nuance:
 - `src/config.ts`
 - file: `aimux.json`
 
-Stores UI/runtime preferences such as theme ID, session bar state, git panel
+Stores UI/runtime preferences such as theme ID, workspace bar state, git panel
 state, custom commands, and legacy workspace data.
 
-### Session catalog
+### Workspace catalog
 
 - `src/state/session-catalog.ts`
 - `src/state/session-persistence.ts`
 - file: `aimux-sessions.json`
 
-Stores named sessions and per-session workspace snapshots.
+Stores named workspaces and per-workspace workspace snapshots.
 
 ### Snippet catalog
 

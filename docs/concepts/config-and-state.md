@@ -22,12 +22,12 @@ See `profiles.md` for how `<profile>` is chosen.
 
 ## The Four Important Files
 
-| File                                   | Written by | Purpose                                           |
-| -------------------------------------- | ---------- | ------------------------------------------------- |
-| `aimux.config.ts` or `aimux.config.js` | You        | Typed user configuration loaded at startup        |
-| `aimux.json`                           | The app    | Runtime preferences and app-managed state         |
-| `aimux-sessions.json`                  | The app    | Session catalog and persisted workspace snapshots |
-| `aimux-snippets.json`                  | The app    | Snippet catalog                                   |
+| File                                   | Written by | Purpose                                             |
+| -------------------------------------- | ---------- | --------------------------------------------------- |
+| `aimux.config.ts` or `aimux.config.js` | You        | Typed user configuration loaded at startup          |
+| `aimux.json`                           | The app    | Runtime preferences and app-managed state           |
+| `aimux-sessions.json`                  | The app    | Workspace catalog and persisted workspace snapshots |
+| `aimux-snippets.json`                  | The app    | Snippet catalog                                     |
 
 ## `aimux.config.ts` and `aimux.config.js`
 
@@ -78,9 +78,9 @@ write back into `aimux.config.ts`.
 
 ## `aimux-sessions.json`
 
-This file stores the session catalog.
+This file stores the workspace catalog.
 
-Each session record can contain:
+Each workspace record can contain:
 
 - `id`
 - `name`
@@ -89,9 +89,9 @@ Each session record can contain:
 - `order`
 - a `workspaceSnapshot`
 
-The workspace snapshot stores tab and layout state for that session.
+The workspace snapshot stores tab and layout state for that workspace.
 
-That is why session persistence belongs to `aimux-sessions.json`, not to your
+That is why workspace persistence belongs to `aimux-sessions.json`, not to your
 typed config file.
 
 ## `aimux-snippets.json`
@@ -108,12 +108,12 @@ If it does not exist, `aimux` seeds it with built-in default snippets such as:
 
 ## Runtime Precedence and Interaction
 
-### Session Bar
+### Workspace Bar (`sessionBar`)
 
 `sessionBar` is one of the few top-level typed config fields that is wired into
 runtime initialization today.
 
-At startup, the app resolves session bar state like this:
+At startup, the app resolves workspace bar state like this:
 
 1. `resolvedConfig.sessionBar.initial*`
 2. `aimux.json`
@@ -143,9 +143,9 @@ The picker persists the confirmed `themeId` to `aimux.json`. On next launch the
 persisted id wins if it still resolves to a known theme, otherwise the typed
 `theme.initialMode` field is used to choose the built-in light or dark family.
 
-### Sessions
+### Workspaces
 
-Sessions are not authored in `aimux.config.ts`.
+Workspaces are not authored in `aimux.config.ts`.
 
 They are created, renamed, deleted, reordered, and persisted by the runtime in
 `aimux-sessions.json`.
@@ -160,7 +160,7 @@ runtime currently loads snippets from the catalog file.
 ## Legacy Migration
 
 If `aimux-sessions.json` does not exist but `aimux.json` still contains a legacy
-`workspaceSnapshot`, `aimux` migrates that snapshot into a new session called
+`workspaceSnapshot`, `aimux` migrates that snapshot into a new workspace called
 `Last workspace`, writes it to the session catalog, and clears the legacy field
 from `aimux.json`.
 
@@ -172,5 +172,5 @@ Use each file for what it is meant to control:
 
 - use `aimux.config.ts` for explicit startup intent and structural config
 - let `aimux.json` store app-managed preferences
-- let `aimux-sessions.json` own session persistence
+- let `aimux-sessions.json` own workspace persistence
 - let `aimux-snippets.json` own snippet persistence

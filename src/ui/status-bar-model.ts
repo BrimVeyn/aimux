@@ -61,7 +61,7 @@ export function getStatusBarModel(
   const currentSession = state.currentSessionId
     ? state.sessions.find((session) => session.id === state.currentSessionId)
     : undefined
-  const sessionName = currentSession?.name ?? 'no session'
+  const sessionName = currentSession?.name ?? 'no workspace'
   const sessionLabel = currentSession?.projectPath
     ? `${sessionName} (${abbreviatePath(currentSession.projectPath)})`
     : sessionName

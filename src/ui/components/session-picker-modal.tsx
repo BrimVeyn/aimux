@@ -31,8 +31,8 @@ function formatSessionLine(
 }
 
 function getEmptyStateMessage(hasFilter: boolean): string {
-  if (hasFilter) return 'No matching sessions.'
-  return 'No sessions yet. Press Enter or n to create your first session.'
+  if (hasFilter) return 'No matching workspaces.'
+  return 'No workspaces yet. Press Enter or n to create your first workspace.'
 }
 
 export function SessionPickerModal({
@@ -72,7 +72,7 @@ export function SessionPickerModal({
     onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
     title: (
       <text fg={selectedIndex === filtered.length ? t.palette.ink : t.muted}>
-        Create new session
+        Create new workspace
       </text>
     ),
   }
@@ -81,7 +81,7 @@ export function SessionPickerModal({
 
   return (
     <Picker
-      title="Sessions"
+      title="Workspaces"
       keybindsModeId="modal.session-picker.filtering"
       width={uiTokens.modalWidth.lg}
       gap={1}

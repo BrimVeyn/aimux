@@ -111,7 +111,7 @@ function renderModal(
     case 'session-name':
       return (
         <SessionNameModal
-          title={modal.sessionTargetId ? 'Rename session' : 'Create session'}
+          title={modal.sessionTargetId ? 'Rename workspace' : 'Create workspace'}
           value={modal.editBuffer ?? ''}
         />
       )

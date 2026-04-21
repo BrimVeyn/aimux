@@ -86,7 +86,7 @@ export default defineConfig({
       .timeout(300)
       .mode('navigation', (m) =>
         m
-          .map('<C-p>', actions.sessionPicker, 'Session picker')
+          .map('<C-p>', actions.sessionPicker, 'Workspace picker')
           .unmap('r')
           .group('<leader>t', 'tabs', (g) => g.map('n', actions.newTab, 'New tab'))
       )
@@ -170,7 +170,7 @@ Document your own configs accordingly.
 - `dd` - close tab
 - `Ctrl+N` - new tab
 - `Ctrl+R` - restart tab
-- `Ctrl+G` - session picker
+- `Ctrl+G` - workspace picker
 - `Ctrl+B` - toggle sidebar
 - `Ctrl+S` - snippet picker
 - `Ctrl+T` - theme picker
@@ -191,8 +191,8 @@ Document your own configs accordingly.
 
 ### Shared between `navigation` and `terminal-input`
 
-- `Leader+b` - toggle session bar
-- `Leader+1` through `Leader+9` - switch sessions by index
+- `Leader+b` - toggle workspace bar
+- `Leader+1` through `Leader+9` - switch workspaces by index
 
 ### `git-mode`
 
@@ -239,7 +239,7 @@ split / stacked toggle stay intact while the modal is visible.
 
 ### Universal selection alternates
 
-Every picker / modal that supports a selection (new tab, session picker,
+Every picker / modal that supports a selection (new tab, workspace picker,
 snippet picker, theme picker, split picker, update-available, help, and their
 filter sub-modes) accepts **all** of the following as equivalent prev / next
 shortcuts: `j` / `k` (where the mode isn't already bound), arrow `Up` /

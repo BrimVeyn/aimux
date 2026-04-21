@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: First-run setup, creating a profile, and your first session.
+description: First-run setup, creating a profile, and your first workspace.
 ---
 
 # Getting Started
@@ -69,7 +69,7 @@ export default defineConfig({
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Session picker')),
+    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
 })
 ```
 
@@ -91,24 +91,24 @@ On first launch, `aimux` loads:
 
 - `aimux.config.ts` or `aimux.config.js` from the active profile directory
 - `aimux.json` if it already exists
-- the session catalog and snippet catalog for the active profile
+- the workspace catalog and snippet catalog for the active profile
 
-The app starts in the session picker flow. Existing sessions are loaded into the
-picker, and if none exist yet you can create the first one there.
+The app starts in the workspace picker flow. Existing workspaces are loaded into
+the picker, and if none exist yet you can create the first one there.
 
-## 6. Create Your First Session
+## 6. Create Your First Workspace
 
-The session picker is the main entrypoint for workspace management.
+The workspace picker is the main entrypoint for workspace management.
 
 Typical first-run flow:
 
 1. Open `aimux`
-2. Create a session from the picker
+2. Create a workspace from the picker
 3. Optionally attach a project directory
 4. Open a tab for `claude`, `codex`, `opencode`, or `terminal`
 5. Use `i` to focus the terminal and `Ctrl+Z` to return to navigation mode
 
-See `guide/sessions.md` for the full session model.
+See `guide/sessions.md` for the full workspace model.
 
 ## 7. Learn the Default Keys
 
@@ -116,7 +116,7 @@ Important defaults:
 
 - `?` opens the help modal
 - `i` enters terminal-input mode
-- `Ctrl+G` opens the session picker
+- `Ctrl+G` opens the workspace picker
 - `Ctrl+N` opens the new-tab modal
 - `Ctrl+S` opens the snippet picker
 - `Ctrl+T` opens the theme picker
@@ -131,7 +131,7 @@ After you start using `aimux`, the profile directory may contain:
 
 - `aimux.config.ts` - your typed config
 - `aimux.json` - app-managed runtime preferences
-- `aimux-sessions.json` - session catalog and per-session snapshots
+- `aimux-sessions.json` - workspace catalog and per-workspace snapshots
 - `aimux-snippets.json` - snippet catalog
 
 See `concepts/config-and-state.md` for the exact ownership of each file.
