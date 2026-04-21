@@ -10,14 +10,8 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
-// v4 widens sessionStatus from a single status enum to independent
-// {working, waiting} flags so a chip can show both at once.
-// v5 folds initial tab activities and session statuses into attachResult so
-// the client applies them atomically with tab creation — previously they
-// arrived as separate events and could lose to the unknown-tab no-op in
-// the reducer.
-export const IPC_PROTOCOL_MIN_VERSION = 6
-export const IPC_PROTOCOL_VERSION = 6
+export const IPC_PROTOCOL_MIN_VERSION = 7
+export const IPC_PROTOCOL_VERSION = 7
 
 export interface ProtocolHelloRequest {
   minVersion: number

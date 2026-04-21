@@ -14,8 +14,8 @@ import {
   negotiateProtocolVersion,
 } from './protocol'
 
-export const MANAGER_PROTOCOL_MIN_VERSION = 2
-export const MANAGER_PROTOCOL_VERSION = 2
+export const MANAGER_PROTOCOL_MIN_VERSION = 3
+export const MANAGER_PROTOCOL_VERSION = 3
 
 export interface ManagerHelloRequest {
   minVersion: number
