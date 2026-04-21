@@ -1,3 +1,4 @@
+import { flushSync } from '@opentui/react'
 import { type MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
@@ -82,23 +83,30 @@ function runResizeCascade({
   stableTabIds,
   sync,
 }: RunResizeCascadeArgs): void {
-  dispatch({ cols, rows, type: 'set-terminal-size' })
-  resizingRef.current = true
-  if (resizingTimerRef.current) {
-    clearTimeout(resizingTimerRef.current)
-  }
   const trees = Object.values(layoutTrees)
   const hasSplits = trees.some((t) => t.type === 'split')
   const options = sync ? { sync: true } : undefined
-  if (hasSplits) {
-    resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, intents, options)
-  } else {
-    backend.resizeAll(cols, rows, intents, options)
+  const runCascade = () => {
+    dispatch({ cols, rows, type: 'set-terminal-size' })
+    resizingRef.current = true
+    if (resizingTimerRef.current) {
+      clearTimeout(resizingTimerRef.current)
+    }
+    if (hasSplits) {
+      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, intents, options)
+    } else {
+      backend.resizeAll(cols, rows, intents, options)
+    }
+    resizingTimerRef.current = setTimeout(() => {
+      resizingRef.current = false
+      resizingTimerRef.current = null
+    }, RESIZE_ACTIVITY_SETTLE_MS)
   }
-  resizingTimerRef.current = setTimeout(() => {
-    resizingRef.current = false
-    resizingTimerRef.current = null
-  }, RESIZE_ACTIVITY_SETTLE_MS)
+  if (sync) {
+    flushSync(runCascade)
+  } else {
+    runCascade()
+  }
 }
 
 export function useTerminalResize({
