@@ -605,7 +605,12 @@ function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void
     logInputDebug('app.sessionBar.switchOutOfRange', { index, total: ordered.length })
     return
   }
-  if (target.id === state.currentSessionId) return
+  if (target.id === state.currentSessionId) {
+    if (state.focusMode === 'git') {
+      dispatch({ type: 'exit-git-mode' })
+    }
+    return
+  }
   handleSwitchSessionEffect(state, backend, dispatch, target)
 }
 

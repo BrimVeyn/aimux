@@ -107,6 +107,7 @@ interface GitViewProps {
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const t = useTokens()
   const sidebarBg = useBg('elevated')
+  const actionBg = useBg('selected')
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
@@ -243,14 +244,43 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             selectedEntryKey={gitMode.selectedEntryKey}
           />
         </box>
-        <DiffStage
-          diff={diff}
-          diffKey={selectedDiffKey}
-          diffRef={diffRef}
-          loading={loading}
-          themeId={themeId}
-          view={gitMode.diffView}
-        />
+        <box flexDirection="column" flexGrow={1} overflow="hidden">
+          <box
+            flexDirection="row"
+            alignItems="center"
+            paddingLeft={1}
+            paddingRight={1}
+            backgroundColor={sidebarBg}
+          >
+            <box flexGrow={1}>
+              <text fg={selectedFile ? t.palette.ink : t.muted}>
+                {selectedFile ? selectedFile.path : 'Diff'}
+              </text>
+            </box>
+            <box
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={actionBg}
+              onMouseDown={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                dispatchGlobal({ type: 'exit-git-mode' })
+              }}
+            >
+              <text fg={t.palette.ink}>
+                <strong>Exit diff</strong>
+              </text>
+            </box>
+          </box>
+          <DiffStage
+            diff={diff}
+            diffKey={selectedDiffKey}
+            diffRef={diffRef}
+            loading={loading}
+            themeId={themeId}
+            view={gitMode.diffView}
+          />
+        </box>
       </box>
       {footerNode ? (
         <box paddingLeft={1} paddingRight={1} backgroundColor={sidebarBg} flexDirection="column">
