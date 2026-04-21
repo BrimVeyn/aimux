@@ -1,10 +1,8 @@
 # Themes
 
-aimux themes are [Shiki](https://shiki.style/themes) themes. The in-memory
-`theme` object, the object fed to `highlighter.loadTheme(...)` for diff
-highlighting, and the object a user drops into `aimux.config.ts` all share one
-shape — a VSCode-style theme JSON. No aimux-specific palette aliases, no
-translation layer.
+aimux themes are [Shiki](https://shiki.style/themes) themes. The runtime works
+with full theme objects internally, while `aimux.config.ts` exposes startup
+theme selection plus palette overrides for the chosen base theme.
 
 aimux ships:
 
@@ -51,59 +49,31 @@ interface Theme {
 `sideBar.background`, `textLink.foreground`, `terminal.ansiRed`, …). aimux's
 UI reads a documented subset directly from this map — no intermediate aliases.
 
-## Authoring user themes
+## Theme config
 
-Declare themes in `aimux.config.ts`. They appear in the picker next to the
-built-ins and power both UI chrome and code highlighting.
-
-### `themes.define(name, base, overrides)` — palette shortcut
-
-Patch a few VSCode color keys on top of an existing theme:
+`aimux.config.ts` exposes a small typed theme surface:
 
 ```ts
-import { defineConfig, themes } from '@brimveyn/aimux-config'
+import { defineConfig } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: 'my-neon',
-  themes: {
-    'my-neon': themes.define('My Neon', 'aimux', {
-      'textLink.foreground': '#ff00aa',
-      'terminal.ansiMagenta': '#00ffcc',
-    }),
+  theme: {
+    initialMode: 'dark',
+    paletteOverrides: {
+      primary: '#7dd3fc',
+      warning: '#fbbf24',
+    },
   },
 })
 ```
 
-Token settings (syntax highlighting rules) inherit from the base theme
-unchanged.
+- `theme.initialMode` is a startup override for the built-in light or dark
+  family.
+- `theme.paletteOverrides` customizes the active palette on top of whichever
+  base theme the runtime chooses.
 
-### `themes.full(theme)` — raw shiki theme
-
-Drop a VSCode theme JSON verbatim:
-
-```ts
-themes.full({
-  name: 'my-theme',
-  displayName: 'My Theme',
-  type: 'dark',
-  fg: '#eeeeee',
-  bg: '#1a1a1a',
-  colors: {
-    'editor.background': '#1a1a1a',
-    'editor.foreground': '#eeeeee',
-    'textLink.foreground': '#88c0d0',
-    // …
-  },
-  settings: [
-    { scope: ['comment'], settings: { foreground: '#666', fontStyle: 'italic' } },
-    { scope: ['keyword'], settings: { foreground: '#ff79c6', fontStyle: 'bold' } },
-    // …
-  ],
-})
-```
-
-Any valid VSCode theme works — paste from `https://github.com/...`, tweak,
-ship.
+This config does not replace the runtime theme picker. The picker still persists
+the selected theme id separately in `aimux.json`.
 
 ## Key reference
 
@@ -151,7 +121,8 @@ and the colors on code tokens come from the same theme object.
 ## Persistence & migration
 
 - Picker writes `themeId` to `aimux.json` on confirm.
-- On next launch: persisted id → `resolvedConfig.theme` → `aimux`.
+- On next launch: persisted id → `theme.initialMode` → built-in dark fallback.
+- `theme.paletteOverrides` applies on top of the chosen base theme.
 - Legacy ids renamed to shiki equivalents are auto-migrated:
 
 | old id         | resolves to         |

@@ -38,7 +38,7 @@ If neither file exists, `aimux` falls back to the package defaults.
 This file is meant for:
 
 - keymap customization
-- `sessionBar` defaults
+- startup overrides such as `sessionBar.initialVisible` or `gitPane.initialMode`
 - other exported config fields from `@brimveyn/aimux-config`
 
 Important: not every typed field exported by `@brimveyn/aimux-config` is fully
@@ -66,6 +66,10 @@ This file is created and updated by the app.
 
 You should think of it as persisted UI/runtime state, not as the primary place
 to author behavior.
+
+If a typed config field is wired into startup, it acts as a startup override:
+the value is re-applied on every launch, and runtime UI interactions do not
+write back into `aimux.config.ts`.
 
 ## `aimux-sessions.json`
 
@@ -106,34 +110,33 @@ runtime initialization today.
 
 At startup, the app resolves session bar state like this:
 
-1. `resolvedConfig.sessionBar`
+1. `resolvedConfig.sessionBar.initial*`
 2. `aimux.json`
 3. runtime defaults
 
-That means your typed config can override app-managed session bar preferences.
+That means your typed config can pin startup behavior while the runtime still
+persists the current UI state separately.
 
 ### Git Pane
 
 `gitPane` follows the same precedence pattern as `sessionBar`:
 
-1. `resolvedConfig.gitPane` (typed config)
+1. `resolvedConfig.gitPane.initial*` (typed config)
 2. `aimux.json.gitPane` (persisted state)
 3. built-in defaults (`{ mode: 'embedded', position: 'bottom', ratio: 0.5, diffModeRatio: 0.35, fileListMode: 'tree', ... }`)
 
-Fields you do not set in your typed config fall through to the persisted or
-default values, so users can still toggle and resize at runtime without losing
-their programmatic preferences.
+Fields you do not set in typed config fall through to the persisted or default
+values. Fields you do set are reapplied on every launch, so runtime toggles,
+mode changes, and resizes for those fields will not stick while the config
+entry remains present.
 
 ### Theme
 
-The typed config exposes `theme` (initial id) and `themes` (a map of
-user-defined theme definitions built with `themes.define()`). User themes are
-merged into the runtime registry at startup and appear in the picker alongside
-the shipped themes.
+The typed config exposes `theme.initialMode` and `theme.paletteOverrides`.
 
 The picker persists the confirmed `themeId` to `aimux.json`. On next launch the
 persisted id wins if it still resolves to a known theme, otherwise the typed
-`theme` field is used, otherwise `aimux`.
+`theme.initialMode` field is used to choose the built-in light or dark family.
 
 ### Sessions
 
@@ -162,7 +165,7 @@ This is one of the reasons the config and state files are documented separately.
 
 Use each file for what it is meant to control:
 
-- use `aimux.config.ts` for explicit, versioned user intent
+- use `aimux.config.ts` for explicit startup intent and structural config
 - let `aimux.json` store app-managed preferences
 - let `aimux-sessions.json` own session persistence
 - let `aimux-snippets.json` own snippet persistence

@@ -692,7 +692,13 @@ export interface KeymapBuilderApi {
 // ─── Top-level user config ────────────────────────────────────────────────────
 
 export interface SessionBarConfig {
+  /** Startup override for the session bar visibility. Reapplied on each launch. */
+  initialVisible?: boolean
+  /** Startup override for the session bar position. Reapplied on each launch. */
+  initialPosition?: SessionBarPosition
+  /** @deprecated Use `initialVisible` instead. */
   visible?: boolean
+  /** @deprecated Use `initialPosition` instead. */
   position?: SessionBarPosition
 }
 
@@ -705,32 +711,58 @@ export type GitPanePathConfig =
 export type GitPaneDiffCountConfig = { enabled: boolean }
 
 interface GitPaneBaseConfig {
-  visible?: boolean
-  ratio?: number
-  diffModeRatio?: number
-  fileListMode?: GitFileListMode
-  treeCompaction?: boolean
+  /** Startup override for git pane visibility. Reapplied on each launch. */
+  initialVisible?: boolean
+  /** Startup override for the pane split ratio. Reapplied on each launch. */
+  initialRatio?: number
+  /** Startup override for fullscreen diff ratio. Reapplied on each launch. */
+  initialDiffModeRatio?: number
+  /** Startup override for tree/flat file list mode. Reapplied on each launch. */
+  initialFileListMode?: GitFileListMode
+  /** Startup override for tree compaction. Reapplied on each launch. */
+  initialTreeCompaction?: boolean
   path?: GitPanePathConfig
   diffCount?: GitPaneDiffCountConfig
   /** Prefetch N neighbouring diffs around the cursor; 0 disables. */
   prefetchRadius?: number
+  /** @deprecated Use `initialVisible` instead. */
+  visible?: boolean
+  /** @deprecated Use `initialRatio` instead. */
+  ratio?: number
+  /** @deprecated Use `initialDiffModeRatio` instead. */
+  diffModeRatio?: number
+  /** @deprecated Use `initialFileListMode` instead. */
+  fileListMode?: GitFileListMode
+  /** @deprecated Use `initialTreeCompaction` instead. */
+  treeCompaction?: boolean
 }
 
 export interface GitPaneEmbeddedConfig extends GitPaneBaseConfig {
+  initialMode?: 'embedded'
+  initialPosition?: 'top' | 'bottom'
+  /** @deprecated Use `initialMode` instead. */
   mode?: 'embedded'
+  /** @deprecated Use `initialPosition` instead. */
   position?: 'top' | 'bottom'
 }
 
 export interface GitPanePaneConfig extends GitPaneBaseConfig {
+  initialMode: 'pane'
+  initialPosition?: 'left' | 'right'
+  /** @deprecated Use `initialMode` instead. */
   mode: 'pane'
+  /** @deprecated Use `initialPosition` instead. */
   position?: 'left' | 'right'
 }
 
 export type GitPaneConfig = GitPaneEmbeddedConfig | GitPanePaneConfig
 
 export interface AimuxThemeConfig {
-  mode?: ThemeMode
+  /** Startup override for light/dark theme family. Reapplied on each launch. */
+  initialMode?: ThemeMode
   paletteOverrides?: Partial<AimuxPalette>
+  /** @deprecated Use `initialMode` instead. */
+  mode?: ThemeMode
 }
 
 export interface AimuxUserConfig {
@@ -767,12 +799,44 @@ export interface ResolvedKeymapConfig {
 }
 
 export interface ResolvedConfig {
-  theme: AimuxThemeConfig | undefined
+  theme:
+    | {
+        initialMode?: ThemeMode
+        paletteOverrides?: Partial<AimuxPalette>
+      }
+    | undefined
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig
-  sessionBar: SessionBarConfig
-  gitPane: GitPaneConfig
+  sessionBar: {
+    initialVisible?: boolean
+    initialPosition?: SessionBarPosition
+  }
+  gitPane:
+    | {
+        initialMode?: 'embedded'
+        initialPosition?: 'top' | 'bottom'
+        initialVisible?: boolean
+        initialRatio?: number
+        initialDiffModeRatio?: number
+        initialFileListMode?: GitFileListMode
+        initialTreeCompaction?: boolean
+        path?: GitPanePathConfig
+        diffCount?: GitPaneDiffCountConfig
+        prefetchRadius?: number
+      }
+    | {
+        initialMode: 'pane'
+        initialPosition?: 'left' | 'right'
+        initialVisible?: boolean
+        initialRatio?: number
+        initialDiffModeRatio?: number
+        initialFileListMode?: GitFileListMode
+        initialTreeCompaction?: boolean
+        path?: GitPanePathConfig
+        diffCount?: GitPaneDiffCountConfig
+        prefetchRadius?: number
+      }
   hooks: HooksConfig
   snippets: SnippetDef[]
 }

@@ -44,8 +44,8 @@ import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
   sessionBar: {
-    position: 'top',
-    visible: true,
+    initialPosition: 'top',
+    initialVisible: true,
   },
 
   keymaps: (k) =>
@@ -54,6 +54,10 @@ export default defineConfig({
 ```
 
 This example only uses surfaces that are wired into the runtime today.
+
+Important: typed config expresses startup intent. Fields such as
+`sessionBar.initialVisible` or `gitPane.initialMode` are reapplied on every
+launch; runtime UI changes do not write back into `aimux.config.ts`.
 
 ## Key Notation
 
@@ -149,58 +153,44 @@ You can also bind a custom `ActionFn` for dynamic behavior.
 
 ## Themes
 
-aimux themes are [Shiki](https://shiki.style/themes) themes. Two house themes
-(`aimux`, `dracula-at-night`) ship alongside the full Shiki catalog — 67
-themes total. The same `Theme` object powers UI colors and code highlighting.
+`theme` is a startup override surface, not the persisted selected theme.
 
-Declare your own themes in config:
+Use it to choose the built-in light or dark family when there is no persisted
+`aimux.json.themeId`, and to apply palette overrides on top of the chosen base
+theme:
 
 ```ts
-import { defineConfig, themes } from '@brimveyn/aimux-config'
+import { defineConfig } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  theme: 'my-neon',
-  themes: {
-    // Palette shortcut — patch VSCode color keys on top of a base theme.
-    'my-neon': themes.define('My Neon', 'aimux', {
-      'textLink.foreground': '#ff00aa',
-      'terminal.ansiMagenta': '#00ffcc',
-    }),
-    // Or drop a full VSCode theme JSON verbatim:
-    'custom': themes.full({
-      name: 'custom',
-      displayName: 'Custom',
-      type: 'dark',
-      fg: '#eee',
-      bg: '#1a1a1a',
-      colors: {
-        /* VSCode workbench keys */
-      },
-      settings: [
-        /* TextMate token rules */
-      ],
-    }),
+  theme: {
+    initialMode: 'dark',
+    paletteOverrides: {
+      primary: '#7dd3fc',
+      warning: '#fbbf24',
+    },
   },
 })
 ```
 
-See [`../../docs/guide/themes.md`](../../docs/guide/themes.md) for picker
-shortcuts, the VSCode color key reference, and migration notes if you're
-coming from the old palette alias API.
+The runtime theme picker persists the selected theme id separately in
+`aimux.json`, and that persisted choice wins on restart. See
+[`../../docs/guide/themes.md`](../../docs/guide/themes.md) for picker behavior,
+palette guidance, and precedence details.
 
 ## Support Status
 
-| Surface      | Status             | Notes                                                                |
-| ------------ | ------------------ | -------------------------------------------------------------------- |
-| `keymaps`    | Supported          | Fully registered by the runtime                                      |
-| `sessionBar` | Supported          | Used during app initialization                                       |
-| `gitPane`    | Supported          | Placement and rendering of the git file list (see docs reference)    |
-| `theme`      | Supported          | Initial theme id; `aimux.json.themeId` wins if still known           |
-| `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting |
-| `backends`   | Typed surface only | Runtime wiring deferred                                              |
-| `sidebar`    | Typed surface only | Type exists, runtime not currently driven by this field              |
-| `hooks`      | Typed surface only | Type exists, runtime use not currently wired                         |
-| `snippets`   | Typed surface only | Runtime currently uses `aimux-snippets.json`                         |
+| Surface      | Status             | Notes                                                                                |
+| ------------ | ------------------ | ------------------------------------------------------------------------------------ |
+| `keymaps`    | Supported          | Fully registered by the runtime                                                      |
+| `sessionBar` | Supported          | Startup overrides; app-managed runtime state still persists separately               |
+| `gitPane`    | Supported          | Startup overrides for placement and rendering; runtime state persists separately     |
+| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins |
+| `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting                 |
+| `backends`   | Typed surface only | Runtime wiring deferred                                                              |
+| `sidebar`    | Typed surface only | Type exists, runtime not currently driven by this field                              |
+| `hooks`      | Typed surface only | Type exists, runtime use not currently wired                                         |
+| `snippets`   | Typed surface only | Runtime currently uses `aimux-snippets.json`                                         |
 
 ## Backends Subpath
 
