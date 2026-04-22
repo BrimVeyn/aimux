@@ -672,6 +672,13 @@ export interface AimuxTheme {
   palette: AimuxPalette
   fg: string
   bg: string
+  /**
+   * Upstream-supplied per-token overrides applied as a final flat-merge after
+   * `resolveThemeVariant` computes the base scale. Keys correspond to entries
+   * in `ResolvedToken` (see resolved-tokens.ts). Imported verbatim from the
+   * source opencode theme JSON.
+   */
+  overrides?: Record<string, string>
 }
 
 export type Theme = AimuxTheme

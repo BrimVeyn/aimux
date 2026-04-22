@@ -6,12 +6,15 @@ import {
 } from '../../packages/aimux-config/src/neutral-scale'
 import {
   blend,
+  generateAlphaScale,
+  generateScale,
   hexToOklch,
   hexToRgb,
   mixColors,
   oklchToHex,
   rgbToHex,
   shift,
+  withAlpha,
 } from '../../packages/aimux-config/src/oklch'
 import { computeSurfaces } from '../../packages/aimux-config/src/palette-utils'
 
@@ -118,6 +121,102 @@ describe('generateNeutralAlphaScale', () => {
     const bg = hexToOklch(neutral[0])
     const step1 = hexToOklch(alpha[1])
     expect(step1.l).toBeGreaterThan(bg.l)
+  })
+})
+
+describe('generateScale (opencode parity, pinned ff748b82ca55)', () => {
+  test('#88c0d0 dark produces the upstream-exact 12-step scale', () => {
+    expect(generateScale('#88c0d0', true)).toEqual([
+      '#00070a',
+      '#010b0f',
+      '#011217',
+      '#021a21',
+      '#02252e',
+      '#063540',
+      '#0e4a57',
+      '#036579',
+      '#369ab3',
+      '#41aac5',
+      '#8be3fb',
+      '#f2fcff',
+    ])
+  })
+
+  test('#ff6767 light produces the upstream-exact 12-step scale', () => {
+    expect(generateScale('#ff6767', false)).toEqual([
+      '#fffcfc',
+      '#fef8f7',
+      '#feeeed',
+      '#ffe2e0',
+      '#fcd5d2',
+      '#fec1bd',
+      '#ffa6a1',
+      '#ff7e7b',
+      '#fe6868',
+      '#fc4d53',
+      '#b60123',
+      '#4f010a',
+    ])
+  })
+
+  test('scale[8] dark uses clamp(base.l*0.825, 0.53, 0.705)', () => {
+    const base = hexToOklch('#88c0d0')
+    const [, , , , , , , , eighth] = generateScale('#88c0d0', true)
+    const expectedL = Math.max(0.53, Math.min(0.705, base.l * 0.825))
+    expect(hexToOklch(eighth ?? '#000000').l).toBeCloseTo(expectedL, 2)
+  })
+
+  test('scale[8] light = base.l (seed at index 8)', () => {
+    const base = hexToOklch('#ff6767')
+    const [, , , , , , , , eighth] = generateScale('#ff6767', false)
+    expect(hexToOklch(eighth ?? '#000000').l).toBeCloseTo(base.l, 2)
+  })
+})
+
+describe('generateAlphaScale (opencode parity, pinned ff748b82ca55)', () => {
+  test('#88c0d0 dark alpha scale matches upstream verbatim', () => {
+    const base = generateScale('#88c0d0', true)
+    expect(generateAlphaScale(base, true)).toEqual([
+      '#000000',
+      '#000001',
+      '#000102',
+      '#000304',
+      '#000607',
+      '#010b0d',
+      '#041317',
+      '#01242c',
+      '#18444f',
+      '#225866',
+      '#6aadbf',
+      '#e8f2f5',
+    ])
+  })
+
+  test('#ff6767 light alpha scale matches upstream verbatim', () => {
+    const base = generateScale('#ff6767', false)
+    expect(generateAlphaScale(base, false)).toEqual([
+      '#ffffff',
+      '#ffffff',
+      '#fffefe',
+      '#fffcfc',
+      '#fffafa',
+      '#fff6f5',
+      '#ffedec',
+      '#ffdbda',
+      '#ffb7b7',
+      '#fd9b9f',
+      '#d05c72',
+      '#641f27',
+    ])
+  })
+})
+
+describe('withAlpha', () => {
+  test('emits an rgba(...) string with rounded 0..255 channels', () => {
+    expect(withAlpha('#88c0d0', 0.3)).toBe('rgba(136, 192, 208, 0.3)')
+  })
+  test('passes alpha through verbatim', () => {
+    expect(withAlpha('#ff6767', 0.5)).toBe('rgba(255, 103, 103, 0.5)')
   })
 })
 

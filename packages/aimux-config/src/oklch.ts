@@ -1,6 +1,6 @@
 // OKLCH color helpers. Ported (and trimmed) from sst/opencode:
-// packages/ui/src/theme/color.ts — used by neutral-scale.ts to derive
-// aimux surface tokens from a palette seed.
+// packages/ui/src/theme/color.ts (pinned: ff748b82ca55) — used by
+// neutral-scale.ts and resolve.ts to derive aimux tokens from a palette seed.
 
 export interface OklchColor {
   l: number
@@ -161,4 +161,84 @@ export function blend(color: string, background: string, alpha: number): string 
     fg.g * alpha + bg.g * (1 - alpha),
     fg.b * alpha + bg.b * (1 - alpha)
   )
+}
+
+/** Translucent rgba(...) string from a hex + alpha; used by overlay-mode resolver. */
+export function withAlpha(color: string, alpha: number): string {
+  const { b, g, r } = hexToRgb(color)
+  return `rgba(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)}, ${alpha})`
+}
+
+/**
+ * 12-step brand/semantic scale from a seed. Mirrors opencode's `generateScale`
+ * verbatim (constants pinned to ff748b82ca55). Step 8 is the seed's natural
+ * tone; step 10 is used as the "base" foreground for semantic tokens.
+ */
+export function generateScale(seed: string, isDark: boolean): string[] {
+  const base = hexToOklch(seed)
+  const scale: string[] = []
+
+  const lightSteps = isDark
+    ? [
+        0.118,
+        0.138,
+        0.167,
+        0.202,
+        0.246,
+        0.304,
+        0.378,
+        0.468,
+        clamp(base.l * 0.825, 0.53, 0.705),
+        clamp(base.l * 0.89, 0.61, 0.79),
+        clamp(base.l + 0.033, 0.868, 0.943),
+        0.984,
+      ]
+    : [
+        0.993,
+        0.983,
+        0.962,
+        0.936,
+        0.906,
+        0.866,
+        0.811,
+        0.74,
+        base.l,
+        Math.max(0, base.l - 0.036),
+        0.49,
+        0.27,
+      ]
+
+  const chromaMultipliers = isDark
+    ? [0.52, 0.68, 0.86, 1.02, 1.14, 1.24, 1.36, 1.48, 1.56, 1.64, 1.62, 1.15]
+    : [0.12, 0.24, 0.46, 0.68, 0.84, 0.98, 1.08, 1.16, 1.22, 1.26, 1.18, 0.98]
+
+  for (let i = 0; i < 12; i++) {
+    scale.push(
+      oklchToHex({
+        c: base.c * (chromaMultipliers[i] ?? 0),
+        h: base.h,
+        l: lightSteps[i] ?? 0,
+      })
+    )
+  }
+
+  return scale
+}
+
+/**
+ * Pre-blend a 12-step scale against the implicit theme background
+ * (black for dark, white for light). Mirrors opencode's `generateAlphaScale`
+ * verbatim (alpha constants pinned to ff748b82ca55).
+ */
+export function generateAlphaScale(scale: string[], isDark: boolean): string[] {
+  const alphas = isDark
+    ? [0.02, 0.04, 0.08, 0.12, 0.16, 0.2, 0.26, 0.36, 0.44, 0.52, 0.76, 0.96]
+    : [0.01, 0.03, 0.06, 0.09, 0.12, 0.15, 0.2, 0.28, 0.48, 0.56, 0.64, 0.88]
+
+  return scale.map((hex, i) => {
+    const { b, g, r } = hexToRgb(hex)
+    const a = alphas[i] ?? 0
+    const bg = isDark ? 0 : 1
+    return rgbToHex(r * a + bg * (1 - a), g * a + bg * (1 - a), b * a + bg * (1 - a))
+  })
 }

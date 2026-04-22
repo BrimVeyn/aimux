@@ -29,6 +29,7 @@ type Token = RequiredToken | OptionalToken
 
 interface ThemeVariantJson {
   palette: Record<string, string>
+  overrides?: Record<string, string>
 }
 interface ThemeFileJson {
   id: string
@@ -84,11 +85,42 @@ function pickPalette(raw: Record<string, string>, slug: string, mode: string) {
   return out as Record<RequiredToken, string> & Partial<Record<OptionalToken, string>>
 }
 
+function pickOverrides(
+  raw: Record<string, string> | undefined,
+  slug: string,
+  mode: string
+): Record<string, string> {
+  if (!raw) return {}
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value !== 'string') continue
+    // Upstream allows hex or `var(--…)` refs; pass both through.
+    if (value.startsWith('var(')) {
+      out[key] = value
+      continue
+    }
+    try {
+      out[key] = normalizeHex(value)
+    } catch {
+      console.warn(`  ${slug} ${mode} override "${key}" unsupported value: ${value}`)
+    }
+  }
+  return out
+}
+
+function emitOverrides(overrides: Record<string, string>): string {
+  const keys = Object.keys(overrides).sort()
+  if (keys.length === 0) return ''
+  const lines = keys.map((k) => `      '${k}': '${overrides[k]}',`).join('\n')
+  return `\n    overrides: {\n${lines}\n    },`
+}
+
 function emitVariant(
   slug: string,
   mode: 'light' | 'dark',
   displayName: string,
-  palette: ReturnType<typeof pickPalette>
+  palette: ReturnType<typeof pickPalette>,
+  overrides: Record<string, string>
 ): string {
   const id = `${slug}-${mode}`
   const tokens = [
@@ -111,7 +143,7 @@ function emitVariant(
     displayName: '${displayName} ${mode === 'dark' ? 'Dark' : 'Light'}',
     fg: '${palette.ink}',
     mode: '${mode}',
-    name: 'opencode:${slug}',
+    name: 'opencode:${slug}',${emitOverrides(overrides)}
     palette: {
 ${tokens}
     },
@@ -144,7 +176,8 @@ async function main() {
       if (!variant?.palette) continue
       try {
         const palette = pickPalette(variant.palette, slug, mode)
-        entries.push(emitVariant(slug, mode, display, palette))
+        const overrides = pickOverrides(variant.overrides, slug, mode)
+        entries.push(emitVariant(slug, mode, display, palette, overrides))
         ids.push(`'${slug}-${mode}'`)
         imported++
       } catch (err) {
