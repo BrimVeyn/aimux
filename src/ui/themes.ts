@@ -13,6 +13,7 @@ export type {
 export {
   accent,
   border,
+  computeSurfaces,
   diffAddBg,
   diffDeleteBg,
   elevated,

@@ -8,6 +8,7 @@ export { OPENCODE_THEME_IDS, OPENCODE_THEMES } from './themes/opencode'
 export {
   accent,
   border,
+  computeSurfaces,
   diffAddBg,
   diffDeleteBg,
   elevated,
@@ -18,6 +19,7 @@ export {
   muted,
   selected,
 } from './palette-utils'
+export type { ResolvedSurfaces } from './palette-utils'
 export { paletteToShikiTheme } from './palette-to-shiki'
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'

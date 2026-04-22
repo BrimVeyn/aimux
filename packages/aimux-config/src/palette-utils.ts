@@ -1,4 +1,7 @@
-import type { AimuxPalette } from './types'
+import type { AimuxPalette, ThemeMode } from './types'
+
+import { generateNeutralAlphaScale, generateNeutralScale } from './neutral-scale'
+import { blend } from './oklch'
 
 function stripAlpha(hex: string): string {
   if (hex.length === 9) return hex.slice(0, 7)
@@ -89,4 +92,39 @@ export function extendPalette(
 ): AimuxPalette {
   if (!overrides) return base
   return { ...base, ...overrides }
+}
+
+/**
+ * Resolved surface colors derived from the OKLCH neutral scale. Prefer this
+ * over the standalone `muted`/`faint`/`elevated`/… helpers for runtime UI —
+ * those still exist for syntax-theme generation and callers that can't
+ * provide a mode.
+ */
+export interface ResolvedSurfaces {
+  bg: string
+  border: string
+  elevated: string
+  faint: string
+  hover: string
+  muted: string
+  selected: string
+}
+
+/** Compute surface tokens for a palette in a given mode. */
+export function computeSurfaces(palette: AimuxPalette, mode: ThemeMode): ResolvedSurfaces {
+  const isDark = mode === 'dark'
+  const neutral = generateNeutralScale(palette.neutral, isDark, palette.ink)
+  const alpha = generateNeutralAlphaScale(neutral, isDark)
+  // `selected` is a subtle primary-tinted surface, not the raw `palette.interactive`
+  // seed. In opencode themes `interactive` seeds an OKLCH scale we don't port;
+  // using it raw produces eye-bleeding accents (e.g. carbonfox `#0f62fe`).
+  return {
+    bg: neutral[0],
+    border: alpha[6],
+    elevated: alpha[1],
+    faint: neutral[7],
+    hover: alpha[2],
+    muted: neutral[8],
+    selected: blend(palette.primary, neutral[0], 0.18),
+  }
 }
