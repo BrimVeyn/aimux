@@ -66,7 +66,6 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
-  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({})
   const measuredHeightsRef = useRef<Record<string, number>>({})
   const commitFrameRef = useRef(0)
   const [measurementVersion, setMeasurementVersion] = useState(0)
@@ -82,14 +81,9 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
   )
 
   useEffect(() => {
-    measuredHeightsRef.current = measuredHeights
-  }, [measuredHeights])
-
-  useEffect(() => {
     cancelAnimationFrame(commitFrameRef.current)
     if (Object.keys(measuredHeightsRef.current).length === 0) return
     measuredHeightsRef.current = {}
-    setMeasuredHeights({})
     setMeasurementVersion((version) => version + 1)
   }, [contentWidth, file])
 
@@ -142,9 +136,6 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     measuredHeightsRef.current = next
     cancelAnimationFrame(commitFrameRef.current)
     commitFrameRef.current = requestAnimationFrame(() => {
-      setMeasuredHeights((current) =>
-        current === measuredHeightsRef.current ? current : measuredHeightsRef.current
-      )
       setMeasurementVersion((version) => version + 1)
     })
   }, [renderedSegments])

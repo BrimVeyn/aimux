@@ -1,6 +1,6 @@
 import type { ThemedToken } from 'shiki'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { DiffSegment } from './build-rows'
 
@@ -28,6 +28,7 @@ const EMPTY_PARSED: PreparedParsedDiff = {
   firstChangeOffset: -1,
   segments: [],
 }
+const MAX_HIGHLIGHT_SEGMENTS_PER_PASS = 8
 
 function applyHighlightPatches(
   source: { add: ThemedToken[][]; del: ThemedToken[][] },
@@ -74,6 +75,7 @@ export function useDiffPreparation(
   path: string,
   themeId: string
 ): DiffPreparation {
+  const requestOwner = `${cacheKey}|${themeId}|${diff}`
   const cachedParsed = useAppStore((s) => s.gitMode.parsedFiles[cacheKey])
   const highlightKey = `${cacheKey}|${themeId}`
   const cachedHighlights = useAppStore((s) => s.gitMode.highlights[highlightKey])
@@ -83,39 +85,54 @@ export function useDiffPreparation(
   const [localHighlights, setLocalHighlights] = useState(EMPTY_HIGHLIGHTS)
   const [localHash, setLocalHash] = useState<string | null>(null)
   const completedSegmentsRef = useRef(new Set<string>())
+  const currentOwnerRef = useRef(requestOwner)
   const pendingSegmentsRef = useRef(new Set<string>())
   const requestVersionRef = useRef(0)
+  const localOwnerMatches = currentOwnerRef.current === requestOwner
 
   const parsed = useMemo(() => {
-    return getParsedPayload<PreparedParsedDiff>(cachedParsed) ?? localParsed ?? EMPTY_PARSED
-  }, [cachedParsed, localParsed])
+    return (
+      getParsedPayload<PreparedParsedDiff>(cachedParsed) ??
+      (localOwnerMatches ? localParsed : null) ??
+      EMPTY_PARSED
+    )
+  }, [cachedParsed, localOwnerMatches, localParsed])
 
   const highlights = useMemo(() => {
     const cached = getHighlightsTokens(cachedHighlights)
     if (cached && cachedHighlights?.hash === cachedParsed?.hash) return cached
-    return localHighlights
-  }, [cachedHighlights, cachedParsed, localHighlights])
+    return localOwnerMatches ? localHighlights : EMPTY_HIGHLIGHTS
+  }, [cachedHighlights, cachedParsed, localHighlights, localOwnerMatches])
 
   const ready = !!parsed.file
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    currentOwnerRef.current = requestOwner
     requestVersionRef.current += 1
     completedSegmentsRef.current.clear()
     pendingSegmentsRef.current.clear()
     setLocalParsed(null)
     setLocalHighlights(EMPTY_HIGHLIGHTS)
     setLocalHash(null)
-  }, [cacheKey, diff, themeId])
+    setPreparing(false)
+  }, [cacheKey, diff, path, requestOwner, themeId])
 
   useEffect(() => {
-    const parsedOk = !!cachedParsed
-    if (parsedOk) return
+    if (cachedParsed) return
 
     const controller = new AbortController()
+    const owner = requestOwner
+    const version = requestVersionRef.current
     setPreparing(true)
     void prepareDiff(diff, path, { signal: controller.signal })
       .then((result) => {
-        if (controller.signal.aborted) return
+        if (
+          controller.signal.aborted ||
+          requestVersionRef.current !== version ||
+          currentOwnerRef.current !== owner
+        ) {
+          return
+        }
         setLocalParsed(result.parsed)
         setLocalHighlights(result.highlights)
         setLocalHash(result.hash)
@@ -126,25 +143,30 @@ export function useDiffPreparation(
           type: 'git-mode-set-parsed',
         })
       })
-      .catch((err: unknown) => {
-        if (err instanceof Error && err.name === 'AbortError') return
-      })
+      .catch(() => {})
       .finally(() => {
-        if (!controller.signal.aborted) setPreparing(false)
+        if (
+          !controller.signal.aborted &&
+          requestVersionRef.current === version &&
+          currentOwnerRef.current === owner
+        ) {
+          setPreparing(false)
+        }
       })
 
     return () => {
       controller.abort()
     }
-  }, [cacheKey, diff, path, cachedParsed])
+  }, [cacheKey, cachedParsed, diff, path, requestOwner, themeId])
 
   const requestSegmentHighlights = useCallback(
     (segments: readonly DiffSegment[]) => {
       const file = parsed.file
       const filetype = parsed.filetype
       if (!file || !filetype) return
+      const owner = requestOwner
       const version = requestVersionRef.current
-      const activeHash = cachedParsed?.hash ?? localHash
+      const activeHash = cachedParsed?.hash ?? (localOwnerMatches ? localHash : null)
       if (!activeHash) return
       const next = segments.filter(
         (segment) =>
@@ -153,25 +175,34 @@ export function useDiffPreparation(
           !pendingSegmentsRef.current.has(segment.id) &&
           !segmentHasHighlights(segment, highlights)
       )
-      if (next.length === 0) return
-      for (const segment of next) pendingSegmentsRef.current.add(segment.id)
+      const queue = next.slice(0, MAX_HIGHLIGHT_SEGMENTS_PER_PASS)
+      if (queue.length === 0) return
+      for (const segment of queue) pendingSegmentsRef.current.add(segment.id)
       void (async () => {
         const add: HighlightPatch[] = []
         const del: HighlightPatch[] = []
         try {
-          for (const segment of next) {
-            if (requestVersionRef.current !== version) return
+          for (const segment of queue) {
+            if (requestVersionRef.current !== version || currentOwnerRef.current !== owner) return
             const patch = await tokenizeSegment(file, segment, filetype)
             add.push(...patch.add)
             del.push(...patch.del)
           }
         } finally {
-          for (const segment of next) {
-            pendingSegmentsRef.current.delete(segment.id)
-            completedSegmentsRef.current.add(segment.id)
+          if (requestVersionRef.current === version && currentOwnerRef.current === owner) {
+            for (const segment of queue) {
+              pendingSegmentsRef.current.delete(segment.id)
+              completedSegmentsRef.current.add(segment.id)
+            }
           }
         }
-        if (requestVersionRef.current !== version || (add.length === 0 && del.length === 0)) return
+        if (
+          requestVersionRef.current !== version ||
+          currentOwnerRef.current !== owner ||
+          (add.length === 0 && del.length === 0)
+        ) {
+          return
+        }
         setLocalHighlights((current) => applyHighlightPatches(current, add, del))
         dispatchGlobal({
           add,
@@ -183,7 +214,17 @@ export function useDiffPreparation(
         })
       })()
     },
-    [cacheKey, cachedParsed?.hash, highlights, localHash, parsed.file, parsed.filetype, themeId]
+    [
+      cacheKey,
+      cachedParsed?.hash,
+      highlights,
+      localHash,
+      localOwnerMatches,
+      parsed.file,
+      parsed.filetype,
+      requestOwner,
+      themeId,
+    ]
   )
 
   return {

@@ -274,6 +274,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       }
     }
     case 'git-mode-set-parsed': {
+      const prevParsed = state.gitMode.parsedFiles[action.key]
+      if (prevParsed && prevParsed.hash === action.hash) return state
       return {
         ...state,
         gitMode: {
@@ -306,14 +308,35 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-merge-highlights': {
       const k = `${action.key}|${action.themeId}`
       const existing = state.gitMode.highlights[k]
-      const nextAdd =
-        existing && existing.hash === action.hash
-          ? ([...(existing.add as unknown[])] as unknown[])
-          : []
-      const nextDel =
-        existing && existing.hash === action.hash
-          ? ([...(existing.del as unknown[])] as unknown[])
-          : []
+      const sameContent = existing && existing.hash === action.hash
+      if (sameContent) {
+        const existingAdd = existing.add as unknown[]
+        const existingDel = existing.del as unknown[]
+        let changesAnything = false
+        outer: for (const patch of action.add) {
+          const tokens = patch.tokens as unknown[]
+          for (let i = 0; i < tokens.length; i++) {
+            if (existingAdd[patch.start + i] === undefined) {
+              changesAnything = true
+              break outer
+            }
+          }
+        }
+        if (!changesAnything) {
+          outer: for (const patch of action.del) {
+            const tokens = patch.tokens as unknown[]
+            for (let i = 0; i < tokens.length; i++) {
+              if (existingDel[patch.start + i] === undefined) {
+                changesAnything = true
+                break outer
+              }
+            }
+          }
+        }
+        if (!changesAnything) return state
+      }
+      const nextAdd = sameContent ? ([...(existing.add as unknown[])] as unknown[]) : []
+      const nextDel = sameContent ? ([...(existing.del as unknown[])] as unknown[]) : []
       for (const patch of action.add) {
         const tokens = patch.tokens as unknown[]
         for (let i = 0; i < tokens.length; i++) nextAdd[patch.start + i] = tokens[i]
