@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import { buildGitPaneContextMenu } from '../../src/ui/components/git-pane-context-menu'
+import { buildGitPaneContextMenu } from '../../src/ui/components/git/pane/git-pane-context-menu'
 
 test('git pane context menu includes toggle and omits active placement', () => {
   const calls: string[] = []

@@ -1,14 +1,6 @@
 import { type ResolvedConfig, setAutoCommitEnabled } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
@@ -32,11 +24,11 @@ import { type TerminalContentOrigin } from './input/raw-input-handler'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
 import { aiUsageStore } from './state/ai-usage-store'
-import { appStore } from './state/app-store'
+import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
-import { appReducer, createInitialState } from './state/store'
+import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import { applyTheme, setTransparent } from './ui/theme'
@@ -81,7 +73,10 @@ export function App({
     setTransparent(config.themeTransparent ?? false)
     return initial
   })
-  const [state, dispatch] = useReducer(appReducer, undefined, () => {
+  // Initialize zustand store with computed initial state on first render. Using
+  // useState's lazy initializer guarantees this runs exactly once before any
+  // selector reads. We discard the value — the store is the source of truth.
+  useState(() => {
     const json = loadConfig()
     const sessionBarVisible =
       resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
@@ -125,7 +120,7 @@ export function App({
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }
 
-    return createInitialState(
+    const initial = createInitialState(
       json.customCommands,
       loadSessionCatalog(),
       loadSnippetCatalog(),
@@ -137,11 +132,18 @@ export function App({
         sidebar: sidebarOverrides,
       }
     )
+    // Replace the module-level default with the fully-resolved initial state.
+    // Preserves the dispatch baked into the store by app-store.ts.
+    appStore.setState(initial)
+    return null
   })
 
-  useLayoutEffect(() => {
-    appStore.setState(state)
-  }, [state])
+  // Single source of truth: read state from zustand. The selector returns the
+  // entire store object, so this component re-renders on every dispatch (same
+  // cadence as the previous useReducer setup), but selectors elsewhere only
+  // re-render on the slices they actually subscribe to.
+  const state = useAppStore((s) => s)
+  const dispatch = state.dispatch
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
@@ -191,6 +193,8 @@ export function App({
     return () => {
       cancelled = true
     }
+    // dispatch is stable (same fn reference from the store) — safe to omit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const resizingRef = useRef(false)
