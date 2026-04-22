@@ -5,22 +5,20 @@ import {
   accent,
   type AimuxPalette,
   type AimuxTheme,
-  border,
+  computeSurfaces,
   diffAddBg,
   diffDeleteBg,
-  elevated,
   extendPalette,
-  faint,
-  hover,
-  muted,
-  selected,
   type ThemeId,
+  type ThemeMode,
   THEMES,
 } from './themes'
 
 export interface ThemeTokens {
   /** `accent` with `primary` fallback. */
   accent: string
+  /** App-level background surface (derived from palette.neutral seed via OKLCH). */
+  bg: string
   /** Subtle border between panels. */
   border: string
   /** Background tint for inserted diff lines. */
@@ -40,29 +38,33 @@ export interface ThemeTokens {
   selected: string
 }
 
-function computeTokens(palette: AimuxPalette): ThemeTokens {
+function computeTokens(palette: AimuxPalette, mode: ThemeMode): ThemeTokens {
+  const surfaces = computeSurfaces(palette, mode)
   return {
     accent: accent(palette),
-    border: border(palette),
+    bg: surfaces.bg,
+    border: surfaces.border,
     diffAddBg: diffAddBg(palette),
     diffDeleteBg: diffDeleteBg(palette),
-    elevated: elevated(palette),
-    faint: faint(palette),
-    hover: hover(palette),
-    muted: muted(palette),
+    elevated: surfaces.elevated,
+    faint: surfaces.faint,
+    hover: surfaces.hover,
+    muted: surfaces.muted,
     palette,
-    selected: selected(palette),
+    selected: surfaces.selected,
   }
 }
 
-// Memoize by palette reference so `useStore` selectors return stable objects.
+// Memoize by (palette, mode) so `useStore` selectors return stable objects.
 let cachedPalette: AimuxPalette | null = null
+let cachedMode: ThemeMode | null = null
 let cachedTokens: ThemeTokens | null = null
 
-function deriveTokens(palette: AimuxPalette): ThemeTokens {
-  if (cachedPalette === palette && cachedTokens) return cachedTokens
+function deriveTokens(palette: AimuxPalette, mode: ThemeMode): ThemeTokens {
+  if (cachedPalette === palette && cachedMode === mode && cachedTokens) return cachedTokens
   cachedPalette = palette
-  cachedTokens = computeTokens(palette)
+  cachedMode = mode
+  cachedTokens = computeTokens(palette, mode)
   return cachedTokens
 }
 
@@ -78,12 +80,13 @@ const themeStore = createStore<ThemeStore>(() => ({ theme: DEFAULT, transparent:
 
 /** Subscribe to the active palette plus precomputed derived shades. */
 export function useTokens(): ThemeTokens {
-  return useStore(themeStore, (s) => deriveTokens(s.theme.palette))
+  return useStore(themeStore, (s) => deriveTokens(s.theme.palette, s.theme.mode))
 }
 
 /** Synchronous tokens for non-React callers. */
 export function getCurrentTokens(): ThemeTokens {
-  return deriveTokens(themeStore.getState().theme.palette)
+  const s = themeStore.getState()
+  return deriveTokens(s.theme.palette, s.theme.mode)
 }
 
 /** Synchronous snapshot for non-React callers (reducers, side effects). */
@@ -121,18 +124,19 @@ export function setTransparent(value: boolean): void {
 
 export type SurfaceToken = 'base' | 'elevated' | 'hover' | 'selected' | 'border'
 
-function resolveSurface(palette: AimuxPalette, token: SurfaceToken): string {
+function resolveSurface(palette: AimuxPalette, mode: ThemeMode, token: SurfaceToken): string {
+  const surfaces = computeSurfaces(palette, mode)
   switch (token) {
     case 'base':
-      return palette.neutral
+      return surfaces.bg
     case 'elevated':
-      return elevated(palette)
+      return surfaces.elevated
     case 'hover':
-      return hover(palette)
+      return surfaces.hover
     case 'selected':
-      return selected(palette)
+      return surfaces.selected
     case 'border':
-      return border(palette)
+      return surfaces.border
   }
 }
 
@@ -144,6 +148,6 @@ function resolveSurface(palette: AimuxPalette, token: SurfaceToken): string {
 export function useBg(token: SurfaceToken): string | undefined {
   return useStore(themeStore, (s) => {
     if (s.transparent && token === 'base') return undefined
-    return resolveSurface(s.theme.palette, token)
+    return resolveSurface(s.theme.palette, s.theme.mode, token)
   })
 }

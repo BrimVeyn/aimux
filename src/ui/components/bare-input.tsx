@@ -9,7 +9,7 @@ interface BareInputProps {
 export function BareInput({ cursorPos, placeholder = '', value }: BareInputProps) {
   const t = useTokens()
   const fg = t.palette.ink
-  const bg = t.palette.neutral
+  const bg = t.bg
   const placeholderFg = t.faint
 
   if (!value) {

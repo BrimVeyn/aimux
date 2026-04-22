@@ -1,4 +1,5 @@
 import {
+  computeSurfaces,
   extendPalette,
   isKnownThemeId,
   migrateThemeId,
@@ -8,6 +9,7 @@ import {
 } from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
+import { hexToOklch } from '../../packages/aimux-config/src/oklch'
 import { filterThemeIds } from '../../src/ui/filter-themes'
 
 function requireTheme(id: string) {
@@ -46,6 +48,28 @@ describe('THEMES registry', () => {
         const value = palette[key]
         expect(typeof value).toBe('string')
         expect(value.startsWith('#')).toBe(true)
+      }
+    }
+  })
+})
+
+describe('computed bg luminance', () => {
+  // Main regression guard: make sure no imported theme ends up with a bg
+  // that's visibly wrong for its mode (e.g. a light theme rendering
+  // Windows-XP grey, or a dark theme rendering washed-out mid-grey).
+  // AMOLED dark legitimately resolves to L=0 and pure-white light themes
+  // approach L=1, so the tight side is only checked against the wrong end.
+  test('every theme resolves bg inside its mode window', () => {
+    for (const id of THEME_IDS) {
+      const theme = requireTheme(id)
+      const surfaces = computeSurfaces(theme.palette, theme.mode)
+      const { l } = hexToOklch(surfaces.bg)
+      if (theme.mode === 'dark') {
+        expect(l).toBeGreaterThanOrEqual(0)
+        expect(l).toBeLessThan(0.3)
+      } else {
+        expect(l).toBeGreaterThan(0.86)
+        expect(l).toBeLessThanOrEqual(1)
       }
     }
   })

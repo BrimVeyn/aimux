@@ -2,7 +2,7 @@ import type { Terminal } from '@xterm/headless'
 
 import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/types'
 
-import { getCurrentTheme } from '../ui/theme'
+import { getCurrentTokens } from '../ui/theme'
 
 const SNAPSHOT_TAIL_LINE_COUNT = 10
 
@@ -115,15 +115,17 @@ function buildLine(
     let bg = getColorHex(current.getBgColor(), bgMode)
 
     if (current.isInverse()) {
-      const resolvedFg = fg ?? getCurrentTheme().palette.ink
-      const resolvedBg = bg ?? getCurrentTheme().palette.neutral
+      const tokens = getCurrentTokens()
+      const resolvedFg = fg ?? tokens.palette.ink
+      const resolvedBg = bg ?? tokens.bg
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 
     const isCursorCell = cursorVisible && cursorColumn === column
     if (isCursorCell) {
-      const resolvedFg = fg ?? getCurrentTheme().palette.ink
-      const resolvedBg = bg ?? getCurrentTheme().palette.neutral
+      const tokens = getCurrentTokens()
+      const resolvedFg = fg ?? tokens.palette.ink
+      const resolvedBg = bg ?? tokens.bg
       ;[fg, bg] = [resolvedBg, resolvedFg]
     }
 

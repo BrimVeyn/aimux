@@ -32,7 +32,7 @@ export function InputField({ active, cursorPos, placeholder, value }: InputField
     <Surface tone="inputActive" padding={1}>
       <text fg={fg}>
         {before}
-        <span bg={t.palette.ink} fg={t.palette.neutral}>
+        <span bg={t.palette.ink} fg={t.bg}>
           {cursorDisplay}
         </span>
         {trailing}

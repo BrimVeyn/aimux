@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  generateNeutralAlphaScale,
+  generateNeutralScale,
+} from '../../packages/aimux-config/src/neutral-scale'
+import {
   blend,
   hexToOklch,
   hexToRgb,
@@ -9,6 +13,7 @@ import {
   rgbToHex,
   shift,
 } from '../../packages/aimux-config/src/oklch'
+import { computeSurfaces } from '../../packages/aimux-config/src/palette-utils'
 
 const CASES: string[] = ['#000000', '#ffffff', '#8e8e8e', '#2e3440', '#fdf6e3', '#393939']
 
@@ -69,5 +74,104 @@ describe('shift', () => {
     const base = hexToOklch('#393939')
     const out = hexToOklch(shifted)
     expect(out.l).toBeGreaterThan(base.l + 0.15)
+  })
+})
+
+describe('generateNeutralScale', () => {
+  test('carbonfox-light (#8e8e8e seed) produces a near-white bg', () => {
+    const scale = generateNeutralScale('#8e8e8e', false, '#161616')
+    expect(scale.length).toBe(12)
+    const bg = hexToOklch(scale[0])
+    expect(bg.l).toBeGreaterThan(0.9)
+    expect(bg.c).toBeLessThan(0.03)
+  })
+
+  test('nord-dark (#2e3440 seed) produces a darker bg than the seed', () => {
+    const scale = generateNeutralScale('#2e3440', true, '#e5e9f0')
+    const seed = hexToOklch('#2e3440')
+    const bg = hexToOklch(scale[0])
+    expect(bg.l).toBeLessThan(seed.l)
+    expect(bg.l).toBeGreaterThan(0.15)
+    expect(bg.l).toBeLessThan(0.28)
+  })
+
+  test('scale ends ink-dominated (step 11 ≈ ink)', () => {
+    const scale = generateNeutralScale('#2e3440', true, '#e5e9f0')
+    const top = hexToOklch(scale[11])
+    const ink = hexToOklch('#e5e9f0')
+    expect(Math.abs(top.l - ink.l)).toBeLessThan(0.05)
+  })
+
+  test('everforest-dark stays in the dark luminance window', () => {
+    const scale = generateNeutralScale('#2d353b', true, '#d3c6aa')
+    const bg = hexToOklch(scale[0])
+    expect(bg.l).toBeGreaterThan(0.13)
+    expect(bg.l).toBeLessThan(0.3)
+  })
+})
+
+describe('generateNeutralAlphaScale', () => {
+  test('returns 12 entries; step 1 is lighter than bg (moves toward ink)', () => {
+    const neutral = generateNeutralScale('#393939', true, '#f2f4f8')
+    const alpha = generateNeutralAlphaScale(neutral, true)
+    expect(alpha.length).toBe(12)
+    const bg = hexToOklch(neutral[0])
+    const step1 = hexToOklch(alpha[1])
+    expect(step1.l).toBeGreaterThan(bg.l)
+  })
+})
+
+describe('computeSurfaces', () => {
+  const carbonfoxLight = {
+    accent: '#da1e28',
+    error: '#da1e28',
+    info: '#0043ce',
+    ink: '#161616',
+    interactive: '#0f62fe',
+    neutral: '#8e8e8e',
+    primary: '#0072c3',
+    success: '#198038',
+    warning: '#f1c21b',
+  } as const
+
+  const nordDark = {
+    accent: '#d57780',
+    error: '#bf616a',
+    info: '#81a1c1',
+    ink: '#e5e9f0',
+    neutral: '#2e3440',
+    primary: '#88c0d0',
+    success: '#a3be8c',
+    warning: '#d08770',
+  } as const
+
+  test('carbonfox-light surfaces land in the light window', () => {
+    const s = computeSurfaces(carbonfoxLight, 'light')
+    const bg = hexToOklch(s.bg)
+    expect(bg.l).toBeGreaterThan(0.9)
+    expect(s.bg).not.toBe(carbonfoxLight.neutral)
+  })
+
+  test('nord-dark surfaces land in the dark window', () => {
+    const s = computeSurfaces(nordDark, 'dark')
+    const bg = hexToOklch(s.bg)
+    expect(bg.l).toBeGreaterThan(0.15)
+    expect(bg.l).toBeLessThan(0.28)
+  })
+
+  test('selected is a subtle primary tint over the computed bg (not raw interactive)', () => {
+    const s = computeSurfaces(carbonfoxLight, 'light')
+    // never the raw electric-blue interactive seed
+    expect(s.selected).not.toBe('#0f62fe')
+    // stays close to bg (18% primary tint)
+    const bg = hexToOklch(s.bg)
+    const sel = hexToOklch(s.selected)
+    expect(Math.abs(sel.l - bg.l)).toBeLessThan(0.25)
+  })
+
+  test('selected still produces a valid hex when interactive is absent', () => {
+    const s = computeSurfaces(nordDark, 'dark')
+    expect(s.selected.startsWith('#')).toBe(true)
+    expect(s.selected).not.toBe(nordDark.neutral)
   })
 })
