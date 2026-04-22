@@ -207,7 +207,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }
 
   return (
-    <box flexDirection="column" flexGrow={1}>
+    <box flexDirection="column" flexGrow={1} overflow="hidden">
       <box flexDirection="row" flexGrow={1}>
         <box
           width={fileBarWidth}
@@ -215,25 +215,28 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           backgroundColor={sidebarBg}
           padding={0}
           gap={0}
+          overflow="hidden"
         >
-          <text fg={t.palette.primary}>
-            <strong>aimux · git</strong>
-          </text>
-          {gitPanel.branch ? (
-            <box flexDirection="row">
-              <text fg={t.palette.primary}>{'\u{e702}'} </text>
-              <text fg={t.muted}>{gitPanel.branch}</text>
-            </box>
-          ) : null}
-          {gitMode.headOffset > 0 ? (
-            <box flexDirection="row" gap={1}>
-              <text fg={t.palette.warning}>
-                <strong>HEAD~{gitMode.headOffset}</strong>
-              </text>
-              <text fg={t.muted}>[ newer · ] older</text>
-            </box>
-          ) : null}
-          <text fg={t.hover}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          <box flexDirection="column" flexShrink={0}>
+            <text fg={t.palette.primary}>
+              <strong>aimux · git</strong>
+            </text>
+            {gitPanel.branch ? (
+              <box flexDirection="row">
+                <text fg={t.palette.primary}>{'\u{e702}'} </text>
+                <text fg={t.muted}>{gitPanel.branch}</text>
+              </box>
+            ) : null}
+            {gitMode.headOffset > 0 ? (
+              <box flexDirection="row" gap={1}>
+                <text fg={t.palette.warning}>
+                  <strong>HEAD~{gitMode.headOffset}</strong>
+                </text>
+                <text fg={t.muted}>[ newer · ] older</text>
+              </box>
+            ) : null}
+            <text fg={t.hover}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          </box>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
