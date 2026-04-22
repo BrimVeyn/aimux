@@ -27,6 +27,7 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
+  | 'modal.ai-usage'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -308,6 +309,10 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
+export interface ModalAIUsage extends ModalBase {
+  type: 'ai-usage'
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -322,6 +327,7 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
+  | ModalAIUsage
 
 export interface LayoutState {
   terminalCols: number
@@ -407,6 +413,7 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'open-ai-usage-modal' }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }

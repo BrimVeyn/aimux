@@ -1,8 +1,8 @@
 import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
-import { toggleAIUsagePopover } from '../../../ai-usage/controller'
-import { useTokens } from '../../../theme'
+import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import { useBg, useTokens } from '../../../theme'
 
 const TOOL_ICON: Record<AIUsageTool, string> = {
   claude: 'CC',
@@ -19,7 +19,7 @@ function formatTokens(total: number): string {
   return String(total)
 }
 
-function buildBar(percent: number): { filled: string; empty: string } {
+function buildBar(percent: number): { empty: string; filled: string } {
   let filledCount = 0
   for (let i = 0; i < BAR_SEGMENTS; i++) {
     if (percent > i * (100 / BAR_SEGMENTS)) filledCount++
@@ -48,6 +48,7 @@ function formatResetIn(snap: {
 
 export function AIUsageIndicator() {
   const t = useTokens()
+  const bg = useBg('elevated')
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
@@ -58,35 +59,49 @@ export function AIUsageIndicator() {
     .map((tool) => ({ snap: snapshots[tool], tool }))
     .filter((entry) => entry.snap !== undefined)
 
+  const openModal = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dispatchGlobal({ type: 'open-ai-usage-modal' })
+  }
+
   if (entries.length === 0) {
     return (
-      <box flexDirection="row" gap={1}>
+      <box
+        flexDirection="row"
+        paddingLeft={1}
+        paddingRight={1}
+        backgroundColor={bg}
+        onMouseDown={openModal}
+      >
         <text fg={t.muted}>…</text>
       </box>
     )
   }
 
   return (
-    <box
-      flexDirection="row"
-      gap={2}
-      onMouseDown={(e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (e.button !== 0) return
-        toggleAIUsagePopover(e.x, e.y)
-      }}
-    >
+    <box flexDirection="row" gap={1}>
       {entries.map(({ snap, tool }) => {
         if (!snap) return null
         const icon = TOOL_ICON[tool]
-        if (snap.error) {
+
+        if (snap.error && !snap.stale) {
           return (
-            <text key={tool} fg={t.palette.error} selectable={false}>
-              {icon} —
-            </text>
+            <box
+              key={tool}
+              flexDirection="row"
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={bg}
+              onMouseDown={openModal}
+            >
+              <text fg={t.palette.error} selectable={false}>
+                {`${icon} —`}
+              </text>
+            </box>
           )
         }
+
         if (snap.percent !== null) {
           const p = Math.round(snap.percent)
           let color = t.palette.success
@@ -99,9 +114,16 @@ export function AIUsageIndicator() {
           const reset = formatResetIn(snap)
           const pctText = `${String(p).padStart(2, ' ')}%`
           return (
-            <box key={tool} flexDirection="row">
+            <box
+              key={tool}
+              flexDirection="row"
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={bg}
+              onMouseDown={openModal}
+            >
               <text fg={color} selectable={false}>
-                {icon}{' '}
+                {`${icon} `}
               </text>
               <text fg={color} selectable={false}>
                 {filled}
@@ -120,10 +142,20 @@ export function AIUsageIndicator() {
             </box>
           )
         }
+
         return (
-          <text key={tool} fg={t.muted} selectable={false}>
-            {icon} {formatTokens(snap.tokens.total)}
-          </text>
+          <box
+            key={tool}
+            flexDirection="row"
+            paddingLeft={1}
+            paddingRight={1}
+            backgroundColor={bg}
+            onMouseDown={openModal}
+          >
+            <text fg={t.muted} selectable={false}>
+              {`${icon} ${formatTokens(snap.tokens.total)}`}
+            </text>
+          </box>
         )
       })}
     </box>

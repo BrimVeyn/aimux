@@ -209,6 +209,7 @@ function SessionChip({
   const idleColor = t.palette.success
   const workingColor = t.palette.primary
   const waitingColor = t.palette.warning
+  const [hovered, setHovered] = useState(false)
 
   return (
     <ContextMenuBox
@@ -218,6 +219,8 @@ function SessionChip({
       paddingRight={1}
       backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
+      onMouseOver={() => setHovered(true)}
+      onMouseOut={() => setHovered(false)}
       onMouseDown={(e) => {
         e.preventDefault()
         onMouseDown(e)
@@ -251,9 +254,24 @@ function SessionChip({
       <text fg={labelColor} selectable={false}>
         [{index}] {session.name}
       </text>
-      <text fg={t.hover} selectable={false}>
-        {' '}
-      </text>
+      {hovered ? (
+        <box
+          paddingLeft={1}
+          onMouseDown={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' })
+          }}
+        >
+          <text fg={t.muted} selectable={false}>
+            ×
+          </text>
+        </box>
+      ) : (
+        <text fg={t.hover} selectable={false}>
+          {' '}
+        </text>
+      )}
     </ContextMenuBox>
   )
 }

@@ -48,6 +48,12 @@ export function helpModal(scope?: ModeId): KeyResult {
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
 export const toggleGitPane: KeyResult = r([{ type: 'toggle-git-pane' }])
 export const toggleSessionBar: KeyResult = r([{ type: 'toggle-session-bar' }])
+export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'ai-usage') {
+    return r([{ type: 'close-modal' }], [], 'navigation')
+  }
+  return r([{ type: 'open-ai-usage-modal' }], [], 'modal.ai-usage')
+}
 
 export function setGitPaneMode(mode: 'embedded' | 'pane'): KeyResult {
   return r([{ mode, type: 'set-git-pane-mode' }])

@@ -42,6 +42,7 @@ export type ModalType =
   | 'split-picker'
   | 'git-commit'
   | 'update-available'
+  | 'ai-usage'
   | null
 
 export interface TerminalSpan {
@@ -345,6 +346,10 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
+export interface ModalAIUsage extends ModalBase {
+  type: 'ai-usage'
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -366,6 +371,7 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
+  | ModalAIUsage
 
 export interface LayoutState {
   terminalCols: number
@@ -431,6 +437,7 @@ export type ModalAction =
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
+  | { type: 'open-ai-usage-modal' }
 
 // -- Session actions --
 export type SessionAction =

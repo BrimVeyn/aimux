@@ -16,6 +16,7 @@ import { Sidebar } from './components/layout/sidebar/sidebar'
 import { SplitLayout } from './components/layout/split-layout'
 import { StatusBar } from './components/layout/status-bar'
 import { TerminalPane } from './components/layout/terminal-pane'
+import { AIUsageModal } from './components/modals/app/ai-usage-modal'
 import { HelpModal } from './components/modals/app/help-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
 import { GitCommitModal } from './components/modals/git/git-commit-modal'
@@ -26,7 +27,6 @@ import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
-import { AIUsagePopover } from './components/overlays/ai-usage/ai-usage-popover'
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
@@ -172,6 +172,8 @@ function renderModal(
           cursorPos={modal.cursorPos}
         />
       )
+    case 'ai-usage':
+      return <AIUsageModal />
     case 'git-commit': {
       const titleText =
         modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
@@ -281,7 +283,6 @@ export function RootView({
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
-        <AIUsagePopover />
         {renderModal(modal, {
           activeAssistant: activeTab?.assistant,
           createSessionFields,
