@@ -303,6 +303,41 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         },
       }
     }
+    case 'git-mode-merge-highlights': {
+      const k = `${action.key}|${action.themeId}`
+      const existing = state.gitMode.highlights[k]
+      const nextAdd =
+        existing && existing.hash === action.hash
+          ? ([...(existing.add as unknown[])] as unknown[])
+          : []
+      const nextDel =
+        existing && existing.hash === action.hash
+          ? ([...(existing.del as unknown[])] as unknown[])
+          : []
+      for (const patch of action.add) {
+        const tokens = patch.tokens as unknown[]
+        for (let i = 0; i < tokens.length; i++) nextAdd[patch.start + i] = tokens[i]
+      }
+      for (const patch of action.del) {
+        const tokens = patch.tokens as unknown[]
+        for (let i = 0; i < tokens.length; i++) nextDel[patch.start + i] = tokens[i]
+      }
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          highlights: {
+            ...state.gitMode.highlights,
+            [k]: {
+              add: nextAdd,
+              del: nextDel,
+              hash: action.hash,
+              themeId: action.themeId,
+            },
+          },
+        },
+      }
+    }
     case 'git-mode-invalidate-diffs': {
       if (action.paths.length === 0) return state
       return clearDiffCacheForPaths(state, new Set(action.paths))

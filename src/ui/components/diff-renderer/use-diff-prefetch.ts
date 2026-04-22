@@ -94,7 +94,7 @@ export function useDiffPrefetch(
 
   const queueRef = useRef<PrefetchQueue | null>(null)
 
-  const { enabled, headOffset, projectPath, themeId } = opts
+  const { enabled, headOffset, projectPath } = opts
   const runTaskRef = useRef<(task: Task) => Promise<void>>(async () => {})
 
   // Keep a ref to the execute function so the queue keeps the latest closure
@@ -111,18 +111,10 @@ export function useDiffPrefetch(
       })
       if (task.controller.signal.aborted) return
       dispatchGlobal({
-        file: prep.file,
+        file: prep.parsed,
         hash: prep.hash,
         key: task.key,
         type: 'git-mode-set-parsed',
-      })
-      dispatchGlobal({
-        add: prep.highlights.add,
-        del: prep.highlights.del,
-        hash: prep.hash,
-        key: task.key,
-        themeId,
-        type: 'git-mode-set-highlights',
       })
     } catch {
       // Prefetch errors are non-fatal; the foreground fetch will retry on focus.
@@ -179,7 +171,6 @@ export function useDiffPrefetch(
     parsed,
     loading,
     headOffset,
-    themeId,
   ])
 
   useEffect(() => {

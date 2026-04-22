@@ -9,7 +9,7 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { type FoldState } from '../../../state/types'
 import { useTokens } from '../../theme'
-import { buildSplitRows, buildUnifiedRows, firstChangeRowOffset, gutterWidth } from './build-rows'
+import { buildDiffSegments, firstChangeSegmentOffset, gutterWidth } from './build-rows'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
 import { useDiffPreparation } from './use-diff-preparation'
@@ -62,6 +62,10 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   }, [file, view, terminalCols, sidebarWidth])
 
   const folds = useAppStore((s) => s.gitMode.folds[cacheKey]) ?? EMPTY_FOLDS
+  const segments = useMemo(
+    () => (file ? buildDiffSegments(file, folds).segments : []),
+    [file, folds]
+  )
   const foldDispatch = useMemo<FoldDispatch>(
     () => ({
       adjust: (foldId, side, delta) =>
@@ -74,6 +78,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
 
   const splitRef = useRef<SplitViewHandle | null>(null)
   const stackedRef = useRef<StackedViewHandle | null>(null)
+  const autoScrollKeyRef = useRef<string | null>(null)
 
   useImperativeHandle(
     ref,
@@ -92,11 +97,10 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
 
   useEffect(() => {
     if (!file) return
-    const rows =
-      view === 'split'
-        ? buildSplitRows(file, EMPTY_FOLDS, contentWidth)
-        : buildUnifiedRows(file, EMPTY_FOLDS, contentWidth)
-    const offset = firstChangeRowOffset(rows)
+    const autoScrollKey = `${cacheKey}:${view}`
+    if (autoScrollKeyRef.current === autoScrollKey) return
+    autoScrollKeyRef.current = autoScrollKey
+    const offset = firstChangeSegmentOffset(file, EMPTY_FOLDS, contentWidth, view)
     if (offset < 0) return
     const target = Math.max(0, offset - 2)
     const apply = (): void => {
@@ -110,9 +114,11 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
         if (node) node.scrollTop = target
       }
     }
-    const raf = requestAnimationFrame(apply)
+    let raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(apply)
+    })
     return () => cancelAnimationFrame(raf)
-  }, [cacheKey, file, view, contentWidth])
+  }, [cacheKey, contentWidth, file, view])
 
   if (!file) {
     return (
@@ -131,8 +137,9 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
         contentWidth={contentWidth}
         file={file}
         foldDispatch={foldDispatch}
-        folds={folds}
         highlights={highlights}
+        requestSegmentHighlights={preparation.requestSegmentHighlights}
+        segments={segments}
       />
     )
   }
@@ -142,8 +149,9 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
       contentWidth={contentWidth}
       file={file}
       foldDispatch={foldDispatch}
-      folds={folds}
       highlights={highlights}
+      requestSegmentHighlights={preparation.requestSegmentHighlights}
+      segments={segments}
     />
   )
 })

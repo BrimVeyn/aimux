@@ -5,20 +5,34 @@ import {
   type ScrollBoxRenderable,
   TextAttributes,
 } from '@opentui/core'
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
-import type { FoldState } from '../../../state/types'
 import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
 import { useBg, useTokens, useTransparent } from '../../theme'
-import { buildUnifiedRows, gutterWidth, type UnifiedRowOrHeader } from './build-rows'
+import {
+  type DiffSegment,
+  estimatedSegmentHeight,
+  expandUnifiedSegment,
+  gutterWidth,
+  type UnifiedRowOrHeader,
+} from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
+import { useSegmentVirtualization } from './use-segment-virtualization'
 
-const LARGE_ROW_CAP = 5000
+const OVERSCAN = 24
 
 export interface StackedViewHandle {
   scroll: ScrollBoxRenderable | null
@@ -27,9 +41,16 @@ export interface StackedViewHandle {
 interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
-  folds: Record<string, FoldState>
   foldDispatch: FoldDispatch
   contentWidth: number
+  requestSegmentHighlights: (segments: readonly DiffSegment[]) => void
+  segments: DiffSegment[]
+}
+
+interface RenderedSegment {
+  exactHeight: number
+  rows: UnifiedRowOrHeader[]
+  segment: DiffSegment
 }
 
 function handleScroll(e: OtuiMouseEvent): void {
@@ -41,10 +62,14 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { contentWidth, file, foldDispatch, folds, highlights },
+  { contentWidth, file, foldDispatch, highlights, requestSegmentHighlights, segments },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({})
+  const measuredHeightsRef = useRef<Record<string, number>>({})
+  const commitFrameRef = useRef(0)
+  const [measurementVersion, setMeasurementVersion] = useState(0)
 
   useImperativeHandle(
     ref,
@@ -56,13 +81,75 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     []
   )
 
-  const rows = useMemo(
-    () => buildUnifiedRows(file, folds, contentWidth),
-    [file, folds, contentWidth]
+  useEffect(() => {
+    measuredHeightsRef.current = measuredHeights
+  }, [measuredHeights])
+
+  useEffect(() => {
+    cancelAnimationFrame(commitFrameRef.current)
+    if (Object.keys(measuredHeightsRef.current).length === 0) return
+    measuredHeightsRef.current = {}
+    setMeasuredHeights({})
+    setMeasurementVersion((version) => version + 1)
+  }, [contentWidth, file])
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(commitFrameRef.current)
+  }, [])
+
+  const estimateHeight = useCallback(
+    (segment: DiffSegment) =>
+      measuredHeightsRef.current[segment.id] ?? estimatedSegmentHeight(segment, 'stacked'),
+    []
   )
+
+  const visibleWindow = useSegmentVirtualization({
+    estimateHeight,
+    overscan: OVERSCAN,
+    scrollRef,
+    segments,
+    version: measurementVersion,
+  })
+
+  const renderedSegments = useMemo<RenderedSegment[]>(() => {
+    return visibleWindow.visible.map((segment) => {
+      const rows = expandUnifiedSegment(file, segment, contentWidth)
+      return {
+        exactHeight: rows.reduce(
+          (sum, row) => sum + (row.type === 'hunk-header' || row.type === 'fold' ? 1 : row.height),
+          0
+        ),
+        rows,
+        segment,
+      }
+    })
+  }, [contentWidth, file, visibleWindow.visible])
+
+  useEffect(() => {
+    requestSegmentHighlights(visibleWindow.visible)
+  }, [requestSegmentHighlights, visibleWindow.visible])
+
+  useEffect(() => {
+    if (renderedSegments.length === 0) return
+    let changed = false
+    const next = { ...measuredHeightsRef.current }
+    for (const rendered of renderedSegments) {
+      if (next[rendered.segment.id] === rendered.exactHeight) continue
+      next[rendered.segment.id] = rendered.exactHeight
+      changed = true
+    }
+    if (!changed) return
+    measuredHeightsRef.current = next
+    cancelAnimationFrame(commitFrameRef.current)
+    commitFrameRef.current = requestAnimationFrame(() => {
+      setMeasuredHeights((current) =>
+        current === measuredHeightsRef.current ? current : measuredHeightsRef.current
+      )
+      setMeasurementVersion((version) => version + 1)
+    })
+  }, [renderedSegments])
+
   const gw = useMemo(() => gutterWidth(file), [file])
-  const truncated = rows.length > LARGE_ROW_CAP
-  const displayRows = truncated ? rows.slice(0, LARGE_ROW_CAP) : rows
 
   return (
     <scrollbox
@@ -73,29 +160,22 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
       contentOptions={{ flexDirection: 'column', gap: 0 }}
       onMouseScroll={handleScroll}
     >
-      {displayRows.map((row, i) => (
-        <UnifiedRowRender
-          key={i}
-          foldDispatch={foldDispatch}
-          gw={gw}
-          highlights={highlights}
-          row={row}
-        />
-      ))}
-      {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
+      {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
+      {renderedSegments.map((rendered) =>
+        rendered.rows.map((row, i) => (
+          <UnifiedRowRender
+            key={`${rendered.segment.id}:${i}`}
+            foldDispatch={foldDispatch}
+            gw={gw}
+            highlights={highlights}
+            row={row}
+          />
+        ))
+      )}
+      {visibleWindow.bottomSpacer > 0 ? <box height={visibleWindow.bottomSpacer} /> : null}
     </scrollbox>
   )
 })
-
-function TruncationNotice({ hidden }: { hidden: number }) {
-  const t = useTokens()
-  const headerBg = useBg('elevated')
-  return (
-    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={t.palette.warning}>…diff truncated — {hidden} more rows hidden</text>
-    </box>
-  )
-}
 
 function UnifiedRowRender({
   foldDispatch,

@@ -5,20 +5,35 @@ import {
   type ScrollBoxRenderable,
   TextAttributes,
 } from '@opentui/core'
-import { forwardRef, useImperativeHandle, useMemo, useRef } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import type { FileDiffMetadata } from '../../../diff-parser'
-import type { FoldState } from '../../../state/types'
 import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../git-view-controls'
 import { useBg, useTokens, useTransparent } from '../../theme'
-import { buildSplitRows, gutterWidth, type SplitCell, type SplitRowOrHeader } from './build-rows'
+import {
+  type DiffSegment,
+  estimatedSegmentHeight,
+  expandSplitSegment,
+  gutterWidth,
+  type SplitCell,
+  type SplitRowOrHeader,
+} from './build-rows'
 import { FoldStrip } from './fold-strip'
 import { tokenToSpan } from './highlight'
+import { useSegmentVirtualization } from './use-segment-virtualization'
 
-const LARGE_ROW_CAP = 5000
+const OVERSCAN = 24
 
 export interface SplitViewHandle {
   leftScroll: ScrollBoxRenderable | null
@@ -28,9 +43,16 @@ export interface SplitViewHandle {
 interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
-  folds: Record<string, FoldState>
   foldDispatch: FoldDispatch
   contentWidth: number
+  requestSegmentHighlights: (segments: readonly DiffSegment[]) => void
+  segments: DiffSegment[]
+}
+
+interface RenderedSegment {
+  exactHeight: number
+  rows: SplitRowOrHeader[]
+  segment: DiffSegment
 }
 
 function handleScroll(e: OtuiMouseEvent): void {
@@ -42,12 +64,16 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
-  { contentWidth, file, foldDispatch, folds, highlights },
+  { contentWidth, file, foldDispatch, highlights, requestSegmentHighlights, segments },
   ref
 ) {
   const separatorBg = useBg('base')
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
+  const [measuredHeights, setMeasuredHeights] = useState<Record<string, number>>({})
+  const measuredHeightsRef = useRef<Record<string, number>>({})
+  const commitFrameRef = useRef(0)
+  const [measurementVersion, setMeasurementVersion] = useState(0)
 
   useImperativeHandle(
     ref,
@@ -62,10 +88,72 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
     []
   )
 
-  const rows = useMemo(() => buildSplitRows(file, folds, contentWidth), [file, folds, contentWidth])
+  useEffect(() => {
+    measuredHeightsRef.current = measuredHeights
+  }, [measuredHeights])
+
+  useEffect(() => {
+    cancelAnimationFrame(commitFrameRef.current)
+    if (Object.keys(measuredHeightsRef.current).length === 0) return
+    measuredHeightsRef.current = {}
+    setMeasuredHeights({})
+    setMeasurementVersion((version) => version + 1)
+  }, [contentWidth, file])
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(commitFrameRef.current)
+  }, [])
+
+  const estimateHeight = useCallback(
+    (segment: DiffSegment) =>
+      measuredHeightsRef.current[segment.id] ?? estimatedSegmentHeight(segment, 'split'),
+    []
+  )
+
+  const visibleWindow = useSegmentVirtualization({
+    estimateHeight,
+    overscan: OVERSCAN,
+    scrollRef: leftRef,
+    segments,
+    version: measurementVersion,
+  })
+
+  const renderedSegments = useMemo<RenderedSegment[]>(() => {
+    return visibleWindow.visible.map((segment) => {
+      const rows = expandSplitSegment(file, segment, contentWidth)
+      return {
+        exactHeight: rows.reduce((sum, row) => sum + (row.type === 'row' ? row.height : 1), 0),
+        rows,
+        segment,
+      }
+    })
+  }, [contentWidth, file, visibleWindow.visible])
+
+  useEffect(() => {
+    requestSegmentHighlights(visibleWindow.visible)
+  }, [requestSegmentHighlights, visibleWindow.visible])
+
+  useEffect(() => {
+    if (renderedSegments.length === 0) return
+    let changed = false
+    const next = { ...measuredHeightsRef.current }
+    for (const rendered of renderedSegments) {
+      if (next[rendered.segment.id] === rendered.exactHeight) continue
+      next[rendered.segment.id] = rendered.exactHeight
+      changed = true
+    }
+    if (!changed) return
+    measuredHeightsRef.current = next
+    cancelAnimationFrame(commitFrameRef.current)
+    commitFrameRef.current = requestAnimationFrame(() => {
+      setMeasuredHeights((current) =>
+        current === measuredHeightsRef.current ? current : measuredHeightsRef.current
+      )
+      setMeasurementVersion((version) => version + 1)
+    })
+  }, [renderedSegments])
+
   const gw = useMemo(() => gutterWidth(file), [file])
-  const truncated = rows.length > LARGE_ROW_CAP
-  const displayRows = truncated ? rows.slice(0, LARGE_ROW_CAP) : rows
 
   return (
     <box flexDirection="row" flexGrow={1} overflow="hidden" onMouseScroll={handleScroll}>
@@ -78,18 +166,21 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         verticalScrollbarOptions={{ visible: false }}
         onMouseScroll={handleScroll}
       >
-        {displayRows.map((row, i) => (
-          <SideRow
-            key={i}
-            cell={row.type === 'row' ? row.left : null}
-            foldDispatch={foldDispatch}
-            gw={gw}
-            header={row.type === 'hunk-header' ? row : null}
-            rowHeight={row.type === 'row' ? row.height : 1}
-            tokens={highlights.del}
-          />
-        ))}
-        {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
+        {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
+        {renderedSegments.map((rendered) =>
+          rendered.rows.map((row, i) => (
+            <SideRow
+              key={`${rendered.segment.id}:left:${i}`}
+              cell={row.type === 'row' ? row.left : null}
+              foldDispatch={foldDispatch}
+              gw={gw}
+              header={row.type === 'hunk-header' ? row : null}
+              rowHeight={row.type === 'row' ? row.height : 1}
+              tokens={highlights.del}
+            />
+          ))
+        )}
+        {visibleWindow.bottomSpacer > 0 ? <box height={visibleWindow.bottomSpacer} /> : null}
       </scrollbox>
       <box width={1} backgroundColor={separatorBg} />
       <scrollbox
@@ -100,32 +191,25 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         contentOptions={{ flexDirection: 'column', gap: 0 }}
         onMouseScroll={handleScroll}
       >
-        {displayRows.map((row, i) => (
-          <SideRow
-            key={i}
-            cell={row.type === 'row' ? row.right : null}
-            foldDispatch={foldDispatch}
-            gw={gw}
-            header={row.type === 'hunk-header' ? row : null}
-            rowHeight={row.type === 'row' ? row.height : 1}
-            tokens={highlights.add}
-          />
-        ))}
-        {truncated ? <TruncationNotice hidden={rows.length - displayRows.length} /> : null}
+        {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
+        {renderedSegments.map((rendered) =>
+          rendered.rows.map((row, i) => (
+            <SideRow
+              key={`${rendered.segment.id}:right:${i}`}
+              cell={row.type === 'row' ? row.right : null}
+              foldDispatch={foldDispatch}
+              gw={gw}
+              header={row.type === 'hunk-header' ? row : null}
+              rowHeight={row.type === 'row' ? row.height : 1}
+              tokens={highlights.add}
+            />
+          ))
+        )}
+        {visibleWindow.bottomSpacer > 0 ? <box height={visibleWindow.bottomSpacer} /> : null}
       </scrollbox>
     </box>
   )
 })
-
-function TruncationNotice({ hidden }: { hidden: number }) {
-  const t = useTokens()
-  const headerBg = useBg('elevated')
-  return (
-    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={t.palette.warning}>…diff truncated — {hidden} more rows hidden</text>
-    </box>
-  )
-}
 
 function SideRow({
   cell,

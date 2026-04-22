@@ -1,4 +1,4 @@
-import type { FileDiffMetadata, Hunk, HunkContent } from '../../../diff-parser'
+import type { FileDiffMetadata, HunkContent } from '../../../diff-parser'
 import type { FoldState } from '../../../state/types'
 
 export const KEEP_CONTEXT = 3
@@ -55,6 +55,55 @@ export type UnifiedRowOrHeader = HunkHeader | UnifiedRow
 
 export type FoldMap = Record<string, FoldState>
 
+interface ContextSlice {
+  leadingVisible: number
+  fold: { length: number; offset: number } | null
+  trailingVisible: number
+}
+
+interface SegmentBase {
+  estimatedHeight: number
+  id: string
+  offset: number
+}
+
+export interface HunkHeaderSegment extends SegmentBase {
+  kind: 'hunk-header'
+  context?: string
+  spec: string
+}
+
+export interface FoldSegment extends SegmentBase {
+  kind: 'fold'
+  fold: FoldInfo
+}
+
+export interface ContextSegment extends SegmentBase {
+  kind: 'context'
+  addLineNumberStart: number
+  addStart: number
+  count: number
+  delLineNumberStart: number
+  delStart: number
+}
+
+export interface ChangeSegment extends SegmentBase {
+  kind: 'change'
+  addLineNumberStart: number
+  addStart: number
+  additions: number
+  delLineNumberStart: number
+  delStart: number
+  deletions: number
+}
+
+export type DiffSegment = HunkHeaderSegment | FoldSegment | ContextSegment | ChangeSegment
+
+export interface DiffSegmentBuild {
+  firstChangeOffset: number
+  segments: DiffSegment[]
+}
+
 function wrapCount(content: string, width: number): number {
   if (width <= 0) return 1
   return Math.max(1, Math.ceil(content.length / width))
@@ -64,11 +113,16 @@ function cellWraps(content: string, width: number): number {
   return wrapCount(content, width)
 }
 
-interface ContextSlice {
-  // which file-line indices (relative to content start) to show, and which to fold
-  leadingVisible: number
-  fold: { length: number; offset: number } | null
-  trailingVisible: number
+function pairHeight(l: SplitCell, r: SplitCell, contentWidth: number): number {
+  const lh =
+    l.type === 'context' || l.type === 'addition' || l.type === 'deletion'
+      ? cellWraps(l.content, contentWidth)
+      : 1
+  const rh =
+    r.type === 'context' || r.type === 'addition' || r.type === 'deletion'
+      ? cellWraps(r.content, contentWidth)
+      : 1
+  return Math.max(lh, rh)
 }
 
 function sliceContext(
@@ -125,25 +179,20 @@ function contextNeighbors(
   return { hasChangeAfter, hasChangeBefore }
 }
 
-export function buildSplitRows(
-  file: FileDiffMetadata,
-  folds: FoldMap = {},
-  contentWidth = 0
-): SplitRowOrHeader[] {
-  const rows: SplitRowOrHeader[] = []
-  const pairHeight = (l: SplitCell, r: SplitCell): number => {
-    const lh =
-      l.type === 'context' || l.type === 'addition' || l.type === 'deletion'
-        ? cellWraps(l.content, contentWidth)
-        : 1
-    const rh =
-      r.type === 'context' || r.type === 'addition' || r.type === 'deletion'
-        ? cellWraps(r.content, contentWidth)
-        : 1
-    return Math.max(lh, rh)
-  }
+export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): DiffSegmentBuild {
+  const segments: DiffSegment[] = []
+  let offset = 0
+  let firstChangeOffset = -1
   for (const [hIdx, hunk] of file.hunks.entries()) {
-    rows.push(makeHeader(hunk))
+    segments.push({
+      context: hunk.hunkContext,
+      estimatedHeight: 1,
+      id: `${hIdx}:header`,
+      kind: 'hunk-header',
+      offset,
+      spec: `@@ -${hunk.deletionStart},${hunk.deletionCount} +${hunk.additionStart},${hunk.additionCount} @@`,
+    })
+    offset += 1
     let delLine = hunk.deletionStart
     let addLine = hunk.additionStart
     for (const [cIdx, content] of hunk.hunkContent.entries()) {
@@ -152,145 +201,194 @@ export function buildSplitRows(
         const { hasChangeAfter, hasChangeBefore } = contextNeighbors(hunk.hunkContent, cIdx)
         const foldState = folds[foldId] ?? { bottom: 0, top: 0 }
         const slice = sliceContext(content.lines, hasChangeBefore, hasChangeAfter, foldState)
-
-        const pushContext = (start: number, count: number): void => {
-          for (let i = 0; i < count; i++) {
-            const offset = start + i
-            const addIdx = content.additionLineIndex + offset
-            const delIdx = content.deletionLineIndex + offset
-            const text = stripNewline(file.additionLines[addIdx] ?? '')
-            const left: SplitCell = {
-              content: text,
-              lineIdx: delIdx,
-              lineNumber: delLine++,
-              type: 'context',
-            }
-            const right: SplitCell = {
-              content: text,
-              lineIdx: addIdx,
-              lineNumber: addLine++,
-              type: 'context',
-            }
-            rows.push({ height: pairHeight(left, right), left, right, type: 'row' })
-          }
+        if (slice.leadingVisible > 0) {
+          segments.push({
+            addLineNumberStart: addLine,
+            addStart: content.additionLineIndex,
+            count: slice.leadingVisible,
+            delLineNumberStart: delLine,
+            delStart: content.deletionLineIndex,
+            estimatedHeight: slice.leadingVisible,
+            id: `${hIdx}:${cIdx}:context:0:${slice.leadingVisible}`,
+            kind: 'context',
+            offset,
+          })
+          addLine += slice.leadingVisible
+          delLine += slice.leadingVisible
+          offset += slice.leadingVisible
         }
-
-        pushContext(0, slice.leadingVisible)
         if (slice.fold) {
           const preKeep = hasChangeBefore ? Math.min(KEEP_CONTEXT, content.lines) : 0
           const postKeep = hasChangeAfter ? Math.min(KEEP_CONTEXT, content.lines - preKeep) : 0
           const middle = content.lines - preKeep - postKeep
           const info = makeFoldInfo(foldId, middle, foldState, slice.fold.length)
-          rows.push({
-            height: 1,
-            left: { fold: info, type: 'fold' },
-            right: { fold: info, type: 'fold' },
-            type: 'row',
+          segments.push({
+            estimatedHeight: 1,
+            fold: info,
+            id: `${hIdx}:${cIdx}:fold`,
+            kind: 'fold',
+            offset,
           })
-          delLine += slice.fold.length
           addLine += slice.fold.length
-          pushContext(slice.fold.offset + slice.fold.length, slice.trailingVisible)
+          delLine += slice.fold.length
+          offset += 1
+          if (slice.trailingVisible > 0) {
+            const start = slice.fold.offset + slice.fold.length
+            segments.push({
+              addLineNumberStart: addLine,
+              addStart: content.additionLineIndex + start,
+              count: slice.trailingVisible,
+              delLineNumberStart: delLine,
+              delStart: content.deletionLineIndex + start,
+              estimatedHeight: slice.trailingVisible,
+              id: `${hIdx}:${cIdx}:context:${start}:${slice.trailingVisible}`,
+              kind: 'context',
+              offset,
+            })
+            addLine += slice.trailingVisible
+            delLine += slice.trailingVisible
+            offset += slice.trailingVisible
+          }
         }
       } else {
-        const max = Math.max(content.additions, content.deletions)
-        for (let i = 0; i < max; i++) {
-          const delIdx = content.deletionLineIndex + i
-          const addIdx = content.additionLineIndex + i
-          const left: SplitCell =
-            i < content.deletions
-              ? {
-                  content: stripNewline(file.deletionLines[delIdx] ?? ''),
-                  lineIdx: delIdx,
-                  lineNumber: delLine++,
-                  type: 'deletion',
-                }
-              : { type: 'filler' }
-          const right: SplitCell =
-            i < content.additions
-              ? {
-                  content: stripNewline(file.additionLines[addIdx] ?? ''),
-                  lineIdx: addIdx,
-                  lineNumber: addLine++,
-                  type: 'addition',
-                }
-              : { type: 'filler' }
-          rows.push({ height: pairHeight(left, right), left, right, type: 'row' })
-        }
+        const estimatedHeight = Math.max(content.additions, content.deletions)
+        if (firstChangeOffset < 0) firstChangeOffset = offset
+        segments.push({
+          additions: content.additions,
+          addLineNumberStart: addLine,
+          addStart: content.additionLineIndex,
+          deletions: content.deletions,
+          delLineNumberStart: delLine,
+          delStart: content.deletionLineIndex,
+          estimatedHeight,
+          id: `${hIdx}:${cIdx}:change`,
+          kind: 'change',
+          offset,
+        })
+        addLine += content.additions
+        delLine += content.deletions
+        offset += estimatedHeight
       }
     }
+  }
+  return { firstChangeOffset, segments }
+}
+
+export function expandSplitSegment(
+  file: FileDiffMetadata,
+  segment: DiffSegment,
+  contentWidth = 0
+): SplitRowOrHeader[] {
+  if (segment.kind === 'hunk-header') {
+    return [{ context: segment.context, spec: segment.spec, type: 'hunk-header' }]
+  }
+  if (segment.kind === 'fold') {
+    return [
+      {
+        height: 1,
+        left: { fold: segment.fold, type: 'fold' },
+        right: { fold: segment.fold, type: 'fold' },
+        type: 'row',
+      },
+    ]
+  }
+  if (segment.kind === 'context') {
+    const rows: SplitRowOrHeader[] = []
+    for (let i = 0; i < segment.count; i++) {
+      const addIdx = segment.addStart + i
+      const delIdx = segment.delStart + i
+      const text = stripNewline(file.additionLines[addIdx] ?? '')
+      const left: SplitCell = {
+        content: text,
+        lineIdx: delIdx,
+        lineNumber: segment.delLineNumberStart + i,
+        type: 'context',
+      }
+      const right: SplitCell = {
+        content: text,
+        lineIdx: addIdx,
+        lineNumber: segment.addLineNumberStart + i,
+        type: 'context',
+      }
+      rows.push({ height: pairHeight(left, right, contentWidth), left, right, type: 'row' })
+    }
+    return rows
+  }
+  const rows: SplitRowOrHeader[] = []
+  const max = Math.max(segment.additions, segment.deletions)
+  for (let i = 0; i < max; i++) {
+    const delIdx = segment.delStart + i
+    const addIdx = segment.addStart + i
+    const left: SplitCell =
+      i < segment.deletions
+        ? {
+            content: stripNewline(file.deletionLines[delIdx] ?? ''),
+            lineIdx: delIdx,
+            lineNumber: segment.delLineNumberStart + i,
+            type: 'deletion',
+          }
+        : { type: 'filler' }
+    const right: SplitCell =
+      i < segment.additions
+        ? {
+            content: stripNewline(file.additionLines[addIdx] ?? ''),
+            lineIdx: addIdx,
+            lineNumber: segment.addLineNumberStart + i,
+            type: 'addition',
+          }
+        : { type: 'filler' }
+    rows.push({ height: pairHeight(left, right, contentWidth), left, right, type: 'row' })
   }
   return rows
 }
 
-export function buildUnifiedRows(
+export function expandUnifiedSegment(
   file: FileDiffMetadata,
-  folds: FoldMap = {},
+  segment: DiffSegment,
   contentWidth = 0
 ): UnifiedRowOrHeader[] {
-  const rows: UnifiedRowOrHeader[] = []
-  for (const [hIdx, hunk] of file.hunks.entries()) {
-    rows.push(makeHeader(hunk))
-    let delLine = hunk.deletionStart
-    let addLine = hunk.additionStart
-    for (const [cIdx, content] of hunk.hunkContent.entries()) {
-      if (content.type === 'context') {
-        const foldId = `${hIdx}:${cIdx}`
-        const { hasChangeAfter, hasChangeBefore } = contextNeighbors(hunk.hunkContent, cIdx)
-        const foldState = folds[foldId] ?? { bottom: 0, top: 0 }
-        const slice = sliceContext(content.lines, hasChangeBefore, hasChangeAfter, foldState)
-
-        const pushContext = (start: number, count: number): void => {
-          for (let i = 0; i < count; i++) {
-            const offset = start + i
-            const addIdx = content.additionLineIndex + offset
-            const text = stripNewline(file.additionLines[addIdx] ?? '')
-            rows.push({
-              addLineNumber: addLine++,
-              content: text,
-              delLineNumber: delLine++,
-              height: cellWraps(text, contentWidth),
-              lineIdx: addIdx,
-              type: 'context',
-            })
-          }
-        }
-
-        pushContext(0, slice.leadingVisible)
-        if (slice.fold) {
-          const preKeep = hasChangeBefore ? Math.min(KEEP_CONTEXT, content.lines) : 0
-          const postKeep = hasChangeAfter ? Math.min(KEEP_CONTEXT, content.lines - preKeep) : 0
-          const middle = content.lines - preKeep - postKeep
-          const info = makeFoldInfo(foldId, middle, foldState, slice.fold.length)
-          rows.push({ fold: info, type: 'fold' })
-          delLine += slice.fold.length
-          addLine += slice.fold.length
-          pushContext(slice.fold.offset + slice.fold.length, slice.trailingVisible)
-        }
-      } else {
-        for (let i = 0; i < content.deletions; i++) {
-          const delIdx = content.deletionLineIndex + i
-          const text = stripNewline(file.deletionLines[delIdx] ?? '')
-          rows.push({
-            content: text,
-            height: cellWraps(text, contentWidth),
-            lineIdx: delIdx,
-            lineNumber: delLine++,
-            type: 'deletion',
-          })
-        }
-        for (let i = 0; i < content.additions; i++) {
-          const addIdx = content.additionLineIndex + i
-          const text = stripNewline(file.additionLines[addIdx] ?? '')
-          rows.push({
-            content: text,
-            height: cellWraps(text, contentWidth),
-            lineIdx: addIdx,
-            lineNumber: addLine++,
-            type: 'addition',
-          })
-        }
-      }
+  if (segment.kind === 'hunk-header') {
+    return [{ context: segment.context, spec: segment.spec, type: 'hunk-header' }]
+  }
+  if (segment.kind === 'fold') return [{ fold: segment.fold, type: 'fold' }]
+  if (segment.kind === 'context') {
+    const rows: UnifiedRowOrHeader[] = []
+    for (let i = 0; i < segment.count; i++) {
+      const addIdx = segment.addStart + i
+      const text = stripNewline(file.additionLines[addIdx] ?? '')
+      rows.push({
+        addLineNumber: segment.addLineNumberStart + i,
+        content: text,
+        delLineNumber: segment.delLineNumberStart + i,
+        height: cellWraps(text, contentWidth),
+        lineIdx: addIdx,
+        type: 'context',
+      })
     }
+    return rows
+  }
+  const rows: UnifiedRowOrHeader[] = []
+  for (let i = 0; i < segment.deletions; i++) {
+    const delIdx = segment.delStart + i
+    const text = stripNewline(file.deletionLines[delIdx] ?? '')
+    rows.push({
+      content: text,
+      height: cellWraps(text, contentWidth),
+      lineIdx: delIdx,
+      lineNumber: segment.delLineNumberStart + i,
+      type: 'deletion',
+    })
+  }
+  for (let i = 0; i < segment.additions; i++) {
+    const addIdx = segment.addStart + i
+    const text = stripNewline(file.additionLines[addIdx] ?? '')
+    rows.push({
+      content: text,
+      height: cellWraps(text, contentWidth),
+      lineIdx: addIdx,
+      lineNumber: segment.addLineNumberStart + i,
+      type: 'addition',
+    })
   }
   return rows
 }
@@ -302,38 +400,37 @@ function rowHeight(row: SplitRowOrHeader | UnifiedRowOrHeader): number {
   return row.height
 }
 
-function isChangeRow(row: SplitRowOrHeader | UnifiedRowOrHeader): boolean {
-  if (row.type === 'row') {
-    return (
-      row.left.type === 'addition' ||
-      row.left.type === 'deletion' ||
-      row.right.type === 'addition' ||
-      row.right.type === 'deletion'
-    )
-  }
-  return row.type === 'addition' || row.type === 'deletion'
-}
-
-export function firstChangeRowOffset(
-  rows: readonly (SplitRowOrHeader | UnifiedRowOrHeader)[]
-): number {
-  let offset = 0
-  for (const row of rows) {
-    if (isChangeRow(row)) return offset
-    offset += rowHeight(row)
-  }
-  return -1
-}
-
-function makeHeader(hunk: Hunk): HunkHeader {
-  const spec = `@@ -${hunk.deletionStart},${hunk.deletionCount} +${hunk.additionStart},${hunk.additionCount} @@`
-  return { context: hunk.hunkContext, spec, type: 'hunk-header' }
-}
-
 function stripNewline(s: string): string {
   if (s.endsWith('\r\n')) return s.slice(0, -2)
   if (s.endsWith('\n')) return s.slice(0, -1)
   return s
+}
+
+export function estimatedSegmentHeight(segment: DiffSegment, view: 'split' | 'stacked'): number {
+  if (segment.kind === 'hunk-header' || segment.kind === 'fold') return 1
+  if (segment.kind === 'context') return segment.count
+  return view === 'split'
+    ? Math.max(segment.additions, segment.deletions)
+    : segment.additions + segment.deletions
+}
+
+export function firstChangeSegmentOffset(
+  file: FileDiffMetadata,
+  folds: FoldMap,
+  contentWidth: number,
+  view: 'split' | 'stacked'
+): number {
+  const { segments } = buildDiffSegments(file, folds)
+  let offset = 0
+  for (const segment of segments) {
+    if (segment.kind === 'change') return offset
+    const rows =
+      view === 'split'
+        ? expandSplitSegment(file, segment, contentWidth)
+        : expandUnifiedSegment(file, segment, contentWidth)
+    for (const row of rows) offset += rowHeight(row)
+  }
+  return -1
 }
 
 export function gutterWidth(file: FileDiffMetadata): number {

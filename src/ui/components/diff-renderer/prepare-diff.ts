@@ -2,23 +2,25 @@ import type { ThemedToken } from 'shiki'
 
 import { type FileDiffMetadata, parsePatchFiles } from '../../../diff-parser'
 import { diffHash } from '../../../git/diff-hash'
+import { buildDiffSegments, type DiffSegment } from './build-rows'
 import { filetypeFromPath } from './filetype'
-import { tokenizeSide } from './highlight'
+
+export interface PreparedParsedDiff {
+  file: FileDiffMetadata | null
+  filetype: string | null
+  firstChangeOffset: number
+  segments: DiffSegment[]
+}
 
 export interface PreparedDiff {
   hash: string
-  file: FileDiffMetadata | null
-  filetype: string | null
+  parsed: PreparedParsedDiff
   highlights: { add: ThemedToken[][]; del: ThemedToken[][] }
 }
 
 interface PrepareOptions {
   signal?: AbortSignal
-  /** Skip Shiki for big files to keep prepare under a few tens of ms. */
-  skipHighlightThreshold?: number
 }
-
-const DEFAULT_SKIP_HIGHLIGHT = 2000
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => {
@@ -30,9 +32,9 @@ function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
 }
 
-// Lifts the hot path (parse → tokenize) off the synchronous render tree. The
-// parser still blocks briefly on very large diffs, but yielding between parse
-// and each tokenize side keeps other UI updates responsive.
+// Lifts diff parsing off the synchronous render tree and returns a segmented
+// model immediately. Syntax highlighting is requested later for visible
+// segments so first paint is not blocked on full-file tokenization.
 export async function prepareDiff(
   diff: string,
   path: string,
@@ -40,26 +42,21 @@ export async function prepareDiff(
 ): Promise<PreparedDiff> {
   const hash = diffHash(diff)
   throwIfAborted(opts.signal)
+  await yieldToEventLoop()
+  throwIfAborted(opts.signal)
   const patches = parsePatchFiles(diff)
-  const file = patches[0]?.files[0] ?? null
+  const files = patches.flatMap((patch) => patch.files)
+  const file = files.length === 1 ? (files[0] ?? null) : null
   const filetype = file ? (filetypeFromPath(path) ?? null) : null
-
-  const skipThreshold = opts.skipHighlightThreshold ?? DEFAULT_SKIP_HIGHLIGHT
-  const totalLines = file ? file.additionLines.length + file.deletionLines.length : 0
-  const shouldHighlight = !!file && !!filetype && totalLines <= skipThreshold
-
-  if (!shouldHighlight) {
-    return { file, filetype, hash, highlights: { add: [], del: [] } }
+  const segmented = file ? buildDiffSegments(file) : { firstChangeOffset: -1, segments: [] }
+  return {
+    hash,
+    highlights: { add: [], del: [] },
+    parsed: {
+      file,
+      filetype,
+      firstChangeOffset: segmented.firstChangeOffset,
+      segments: segmented.segments,
+    },
   }
-
-  await yieldToEventLoop()
-  throwIfAborted(opts.signal)
-  const add = await tokenizeSide(file.additionLines, filetype)
-  throwIfAborted(opts.signal)
-  await yieldToEventLoop()
-  throwIfAborted(opts.signal)
-  const del = await tokenizeSide(file.deletionLines, filetype)
-  throwIfAborted(opts.signal)
-
-  return { file, filetype, hash, highlights: { add, del } }
 }
