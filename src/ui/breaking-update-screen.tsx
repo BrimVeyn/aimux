@@ -1,7 +1,7 @@
 import { useKeyboard } from '@opentui/react'
 
-import { ListItem } from './components/list-item'
-import { ModalShell } from './components/modal-shell'
+import { ModalShell } from './components/modals/shared/modal-shell'
+import { ListItem } from './components/primitives/list-item'
 import { uiTokens } from './ui-tokens'
 
 interface BreakingUpdateScreenProps {

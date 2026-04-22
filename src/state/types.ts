@@ -1,8 +1,6 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
-import type { FileDiffMetadata } from '../diff-parser'
-
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
@@ -224,8 +222,7 @@ export interface FoldState {
 
 export interface ParsedDiffEntry {
   hash: string
-  // Stored as unknown at the state boundary; concrete type is FileDiffMetadata
-  // | null, narrowed at read sites via getParsedFile().
+  // Stored as unknown at the state boundary and narrowed at read sites.
   file: unknown
 }
 
@@ -237,9 +234,9 @@ export interface HighlightsEntry {
   del: unknown
 }
 
-export function getParsedFile(entry: ParsedDiffEntry | undefined): FileDiffMetadata | null {
+export function getParsedPayload<T>(entry: ParsedDiffEntry | undefined): T | null {
   if (!entry) return null
-  return entry.file as FileDiffMetadata | null
+  return entry.file as T | null
 }
 
 export function getHighlightsTokens(entry: HighlightsEntry | undefined): {
@@ -607,6 +604,14 @@ export type GitModeAction =
       themeId: string
       add: unknown
       del: unknown
+    }
+  | {
+      type: 'git-mode-merge-highlights'
+      key: string
+      hash: string
+      themeId: string
+      add: Array<{ start: number; tokens: unknown }>
+      del: Array<{ start: number; tokens: unknown }>
     }
   | { type: 'git-mode-invalidate-diffs'; paths: string[] }
   | { type: 'git-mode-set-loading'; key: string; loading: boolean }
