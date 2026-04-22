@@ -1,0 +1,298 @@
+import type { ThemedToken } from 'shiki'
+
+import {
+  type MouseEvent as OtuiMouseEvent,
+  type ScrollBoxRenderable,
+  TextAttributes,
+} from '@opentui/core'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
+
+import type { FileDiffMetadata } from '../../../../diff-parser'
+import type { DiffHighlights, FoldDispatch } from './pierre-diff'
+
+import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
+import { scrollGitDiff } from '../../../git-view-controls'
+import { useBg, useTokens, useTransparent } from '../../../theme'
+import {
+  type DiffSegment,
+  estimatedSegmentHeight,
+  expandSplitSegment,
+  gutterWidth,
+  type SplitCell,
+  type SplitRowOrHeader,
+} from './build-rows'
+import { FoldStrip } from './fold-strip'
+import { tokenToSpan } from './highlight'
+import { useSegmentVirtualization } from './use-segment-virtualization'
+
+const OVERSCAN = 24
+
+export interface SplitViewHandle {
+  leftScroll: ScrollBoxRenderable | null
+  rightScroll: ScrollBoxRenderable | null
+}
+
+interface Props {
+  file: FileDiffMetadata
+  highlights: DiffHighlights
+  foldDispatch: FoldDispatch
+  contentWidth: number
+  requestSegmentHighlights: (segments: readonly DiffSegment[]) => void
+  segments: DiffSegment[]
+}
+
+interface RenderedSegment {
+  exactHeight: number
+  rows: SplitRowOrHeader[]
+  segment: DiffSegment
+}
+
+function handleScroll(e: OtuiMouseEvent): void {
+  const delta = getScrollViewportDelta(e)
+  if (delta === null) return
+  e.preventDefault()
+  e.stopPropagation()
+  scrollGitDiff(delta)
+}
+
+export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
+  { contentWidth, file, foldDispatch, highlights, requestSegmentHighlights, segments },
+  ref
+) {
+  const separatorBg = useBg('base')
+  const leftRef = useRef<ScrollBoxRenderable | null>(null)
+  const rightRef = useRef<ScrollBoxRenderable | null>(null)
+  const measuredHeightsRef = useRef<Record<string, number>>({})
+  const commitFrameRef = useRef(0)
+  const [measurementVersion, setMeasurementVersion] = useState(0)
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      get leftScroll() {
+        return leftRef.current
+      },
+      get rightScroll() {
+        return rightRef.current
+      },
+    }),
+    []
+  )
+
+  useEffect(() => {
+    cancelAnimationFrame(commitFrameRef.current)
+    if (Object.keys(measuredHeightsRef.current).length === 0) return
+    measuredHeightsRef.current = {}
+    setMeasurementVersion((version) => version + 1)
+  }, [contentWidth, file])
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(commitFrameRef.current)
+  }, [])
+
+  const estimateHeight = useCallback(
+    (segment: DiffSegment) =>
+      measuredHeightsRef.current[segment.id] ?? estimatedSegmentHeight(segment, 'split'),
+    []
+  )
+
+  const visibleWindow = useSegmentVirtualization({
+    estimateHeight,
+    overscan: OVERSCAN,
+    scrollRef: leftRef,
+    segments,
+    version: measurementVersion,
+  })
+
+  const renderedSegments = useMemo<RenderedSegment[]>(() => {
+    return visibleWindow.visible.map((segment) => {
+      const rows = expandSplitSegment(file, segment, contentWidth)
+      return {
+        exactHeight: rows.reduce((sum, row) => sum + (row.type === 'row' ? row.height : 1), 0),
+        rows,
+        segment,
+      }
+    })
+  }, [contentWidth, file, visibleWindow.visible])
+
+  useEffect(() => {
+    requestSegmentHighlights(visibleWindow.visible)
+  }, [requestSegmentHighlights, visibleWindow.visible])
+
+  useEffect(() => {
+    if (renderedSegments.length === 0) return
+    let changed = false
+    const next = { ...measuredHeightsRef.current }
+    for (const rendered of renderedSegments) {
+      if (next[rendered.segment.id] === rendered.exactHeight) continue
+      next[rendered.segment.id] = rendered.exactHeight
+      changed = true
+    }
+    if (!changed) return
+    measuredHeightsRef.current = next
+    cancelAnimationFrame(commitFrameRef.current)
+    commitFrameRef.current = requestAnimationFrame(() => {
+      setMeasurementVersion((version) => version + 1)
+    })
+  }, [renderedSegments])
+
+  const gw = useMemo(() => gutterWidth(file), [file])
+
+  return (
+    <box flexDirection="row" flexGrow={1} overflow="hidden" onMouseScroll={handleScroll}>
+      <scrollbox
+        ref={leftRef}
+        flexGrow={1}
+        scrollY
+        viewportCulling
+        contentOptions={{ flexDirection: 'column', gap: 0 }}
+        verticalScrollbarOptions={{ visible: false }}
+        onMouseScroll={handleScroll}
+      >
+        {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
+        {renderedSegments.map((rendered) =>
+          rendered.rows.map((row, i) => (
+            <SideRow
+              key={`${rendered.segment.id}:left:${i}`}
+              cell={row.type === 'row' ? row.left : null}
+              foldDispatch={foldDispatch}
+              gw={gw}
+              header={row.type === 'hunk-header' ? row : null}
+              rowHeight={row.type === 'row' ? row.height : 1}
+              tokens={highlights.del}
+            />
+          ))
+        )}
+        {visibleWindow.bottomSpacer > 0 ? <box height={visibleWindow.bottomSpacer} /> : null}
+      </scrollbox>
+      <box width={1} backgroundColor={separatorBg} />
+      <scrollbox
+        ref={rightRef}
+        flexGrow={1}
+        scrollY
+        viewportCulling
+        contentOptions={{ flexDirection: 'column', gap: 0 }}
+        onMouseScroll={handleScroll}
+      >
+        {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
+        {renderedSegments.map((rendered) =>
+          rendered.rows.map((row, i) => (
+            <SideRow
+              key={`${rendered.segment.id}:right:${i}`}
+              cell={row.type === 'row' ? row.right : null}
+              foldDispatch={foldDispatch}
+              gw={gw}
+              header={row.type === 'hunk-header' ? row : null}
+              rowHeight={row.type === 'row' ? row.height : 1}
+              tokens={highlights.add}
+            />
+          ))
+        )}
+        {visibleWindow.bottomSpacer > 0 ? <box height={visibleWindow.bottomSpacer} /> : null}
+      </scrollbox>
+    </box>
+  )
+})
+
+function SideRow({
+  cell,
+  foldDispatch,
+  gw,
+  header,
+  rowHeight,
+  tokens,
+}: {
+  cell: SplitCell | null
+  foldDispatch: FoldDispatch
+  gw: number
+  header: Extract<SplitRowOrHeader, { type: 'hunk-header' }> | null
+  rowHeight: number
+  tokens: ThemedToken[][]
+}) {
+  if (header) return <HunkHeaderRow row={header} />
+  if (!cell) return null
+  if (cell.type === 'fold') return <FoldStrip dispatch={foldDispatch} fold={cell.fold} />
+  return <HalfRow cell={cell} gw={gw} height={rowHeight} tokens={tokens} />
+}
+
+function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
+  const t = useTokens()
+  const headerBg = useBg('elevated')
+  return (
+    <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
+      <text fg={t.muted}>{row.spec}</text>
+      {row.context ? <text fg={t.hover}> {row.context}</text> : null}
+    </box>
+  )
+}
+
+function HalfRow({
+  cell,
+  gw,
+  height,
+  tokens,
+}: {
+  cell: Exclude<SplitCell, { type: 'fold' }>
+  gw: number
+  height: number
+  tokens: ThemedToken[][]
+}) {
+  const t = useTokens()
+  const headerBg = useBg('elevated')
+  const transparent = useTransparent()
+  if (cell.type === 'filler') {
+    return <box backgroundColor={headerBg} height={height} />
+  }
+  let bg: string | undefined
+  let sign = ' '
+  let signColor = t.muted
+  if (cell.type === 'addition') {
+    bg = t.diffAddBg
+    sign = '+'
+    signColor = t.palette.success
+  } else if (cell.type === 'deletion') {
+    bg = t.diffDeleteBg
+    sign = '-'
+    signColor = t.palette.error
+  }
+  const num = String(cell.lineNumber).padStart(gw, ' ')
+  const lineTokens = tokens[cell.lineIdx]
+  return (
+    <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={height}>
+      <text fg={t.muted}>{` ${num} `}</text>
+      <text fg={signColor}>{`${sign} `}</text>
+      <LineContent content={cell.content} tokens={lineTokens} />
+    </box>
+  )
+}
+
+function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
+  const t = useTokens()
+  if (!tokens || tokens.length === 0) {
+    return <text fg={t.palette.ink}>{content}</text>
+  }
+  return (
+    <text>
+      {tokens.map((tok, i) => {
+        const s = tokenToSpan(tok)
+        let attributes = 0
+        if (s.bold) attributes |= TextAttributes.BOLD
+        if (s.italic) attributes |= TextAttributes.ITALIC
+        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        return (
+          <span key={i} fg={s.fg ?? t.palette.ink} attributes={attributes}>
+            {s.text}
+          </span>
+        )
+      })}
+    </text>
+  )
+}

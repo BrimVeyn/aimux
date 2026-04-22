@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { getSidebarScrollTarget } from '../../src/ui/components/sidebar-scroll'
+import { getSidebarScrollTarget } from '../../src/ui/components/layout/sidebar/sidebar-scroll'
 
 describe('getSidebarScrollTarget', () => {
   test('does nothing when there is no active tab', () => {
