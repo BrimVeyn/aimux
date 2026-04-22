@@ -348,7 +348,7 @@ export const GitPanel = memo(function GitPanel({
   }, [selectedEntryKey, tree.visibleRows])
 
   return (
-    <box flexDirection="column" flexGrow={1} gap={0}>
+    <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden" gap={0}>
       {hasRemoteTracking ? (
         <text fg={t.muted}>
           ↑{gitPanel.ahead} ↓{gitPanel.behind}

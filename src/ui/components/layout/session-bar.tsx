@@ -107,6 +107,7 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
     <box
       width="100%"
       flexDirection="row"
+      flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={headerBg}
