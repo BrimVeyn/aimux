@@ -4,6 +4,8 @@ import type { FoldState } from '../../../../state/types'
 export const KEEP_CONTEXT = 3
 export const MIN_FOLD_SIZE = 3
 export const FOLD_STEP = 5
+export const CONTEXT_SEGMENT_CHUNK_LINES = 64
+export const CHANGE_SEGMENT_CHUNK_LINES = 64
 
 export interface FoldInfo {
   foldId: string
@@ -202,17 +204,22 @@ export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): 
         const foldState = folds[foldId] ?? { bottom: 0, top: 0 }
         const slice = sliceContext(content.lines, hasChangeBefore, hasChangeAfter, foldState)
         if (slice.leadingVisible > 0) {
-          segments.push({
-            addLineNumberStart: addLine,
-            addStart: content.additionLineIndex,
-            count: slice.leadingVisible,
-            delLineNumberStart: delLine,
-            delStart: content.deletionLineIndex,
-            estimatedHeight: slice.leadingVisible,
-            id: `${hIdx}:${cIdx}:context:0:${slice.leadingVisible}`,
-            kind: 'context',
-            offset,
-          })
+          let consumed = 0
+          while (consumed < slice.leadingVisible) {
+            const count = Math.min(CONTEXT_SEGMENT_CHUNK_LINES, slice.leadingVisible - consumed)
+            segments.push({
+              addLineNumberStart: addLine + consumed,
+              addStart: content.additionLineIndex + consumed,
+              count,
+              delLineNumberStart: delLine + consumed,
+              delStart: content.deletionLineIndex + consumed,
+              estimatedHeight: count,
+              id: `${hIdx}:${cIdx}:context:${consumed}:${count}`,
+              kind: 'context',
+              offset: offset + consumed,
+            })
+            consumed += count
+          }
           addLine += slice.leadingVisible
           delLine += slice.leadingVisible
           offset += slice.leadingVisible
@@ -234,40 +241,54 @@ export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): 
           offset += 1
           if (slice.trailingVisible > 0) {
             const start = slice.fold.offset + slice.fold.length
-            segments.push({
-              addLineNumberStart: addLine,
-              addStart: content.additionLineIndex + start,
-              count: slice.trailingVisible,
-              delLineNumberStart: delLine,
-              delStart: content.deletionLineIndex + start,
-              estimatedHeight: slice.trailingVisible,
-              id: `${hIdx}:${cIdx}:context:${start}:${slice.trailingVisible}`,
-              kind: 'context',
-              offset,
-            })
+            let consumed = 0
+            while (consumed < slice.trailingVisible) {
+              const count = Math.min(CONTEXT_SEGMENT_CHUNK_LINES, slice.trailingVisible - consumed)
+              segments.push({
+                addLineNumberStart: addLine + consumed,
+                addStart: content.additionLineIndex + start + consumed,
+                count,
+                delLineNumberStart: delLine + consumed,
+                delStart: content.deletionLineIndex + start + consumed,
+                estimatedHeight: count,
+                id: `${hIdx}:${cIdx}:context:${start + consumed}:${count}`,
+                kind: 'context',
+                offset: offset + consumed,
+              })
+              consumed += count
+            }
             addLine += slice.trailingVisible
             delLine += slice.trailingVisible
             offset += slice.trailingVisible
           }
         }
       } else {
-        const estimatedHeight = Math.max(content.additions, content.deletions)
+        const totalHeight = Math.max(content.additions, content.deletions)
         if (firstChangeOffset < 0) firstChangeOffset = offset
-        segments.push({
-          additions: content.additions,
-          addLineNumberStart: addLine,
-          addStart: content.additionLineIndex,
-          deletions: content.deletions,
-          delLineNumberStart: delLine,
-          delStart: content.deletionLineIndex,
-          estimatedHeight,
-          id: `${hIdx}:${cIdx}:change`,
-          kind: 'change',
-          offset,
-        })
+        let consumedHeight = 0
+        let chunkIdx = 0
+        while (consumedHeight < totalHeight) {
+          const take = Math.min(CHANGE_SEGMENT_CHUNK_LINES, totalHeight - consumedHeight)
+          const chunkAdditions = Math.min(take, Math.max(0, content.additions - consumedHeight))
+          const chunkDeletions = Math.min(take, Math.max(0, content.deletions - consumedHeight))
+          segments.push({
+            additions: chunkAdditions,
+            addLineNumberStart: addLine + consumedHeight,
+            addStart: content.additionLineIndex + consumedHeight,
+            deletions: chunkDeletions,
+            delLineNumberStart: delLine + consumedHeight,
+            delStart: content.deletionLineIndex + consumedHeight,
+            estimatedHeight: take,
+            id: `${hIdx}:${cIdx}:change:${chunkIdx}`,
+            kind: 'change',
+            offset: offset + consumedHeight,
+          })
+          consumedHeight += take
+          chunkIdx += 1
+        }
         addLine += content.additions
         delLine += content.deletions
-        offset += estimatedHeight
+        offset += totalHeight
       }
     }
   }
