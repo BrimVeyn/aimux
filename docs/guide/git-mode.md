@@ -159,6 +159,7 @@ them automatically and aggregates their status into a single git panel.
 
   If the session's top-level directory is itself a repo, its files have no
   prefix and appear first.
+
 - **Tree** mode keeps the normal path hierarchy — the sub-repo folders
   naturally group their files, so no extra prefix is shown.
 

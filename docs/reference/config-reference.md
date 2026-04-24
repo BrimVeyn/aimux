@@ -55,19 +55,19 @@ defineConfig({
 
 ## Support Matrix
 
-| Field        | Status             | Notes                                                                                     |
-| ------------ | ------------------ | ----------------------------------------------------------------------------------------- |
-| `keymaps`    | Supported          | Fully resolved and registered by the app                                                  |
-| `sessionBar` | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`     |
-| `gitPane`    | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately     |
-| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins      |
-| `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                    |
-| `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots |
-| `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
-| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
-| `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`   |
+| Field        | Status             | Notes                                                                                                                |
+| ------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `keymaps`    | Supported          | Fully resolved and registered by the app                                                                             |
+| `sessionBar` | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                |
+| `gitPane`    | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately                                |
+| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins                                 |
+| `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                               |
+| `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                            |
+| `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                                                      |
+| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                                            |
+| `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                              |
 | `multiRepo`  | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces` |
-| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                          |
+| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                     |
 
 ## `defineConfig`
 
