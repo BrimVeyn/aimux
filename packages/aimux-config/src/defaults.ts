@@ -318,5 +318,18 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m.map('<Esc>', actions.gitCommitLeaveGenerating, 'Cancel generation')
     )
 
+    // -----------------------------------------------------------------------
+    // Modal: git-commit-error (pre-commit hook rejected the commit)
+    // -----------------------------------------------------------------------
+    .mode('modal.git-commit-error', (m) =>
+      m
+        .map('a', actions.commitErrorAskAgent, 'Ask agent to fix')
+        .map('<Esc>', actions.commitErrorDismiss, 'Dismiss')
+        .map('<Down>', actions.commitErrorScrollDown, 'Scroll down')
+        .map('<Up>', actions.commitErrorScrollUp, 'Scroll up')
+        .map('j', actions.commitErrorScrollDown, 'Scroll down')
+        .map('k', actions.commitErrorScrollUp, 'Scroll up')
+    )
+
   return kb._build()
 }

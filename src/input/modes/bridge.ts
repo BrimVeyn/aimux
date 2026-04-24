@@ -25,6 +25,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'ai-usage': 'modal.ai-usage',
+  'git-commit-error': 'modal.git-commit-error',
   'update-available': 'modal.update-available',
 }
 

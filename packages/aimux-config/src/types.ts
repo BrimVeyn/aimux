@@ -26,6 +26,7 @@ export type ModeId =
   | 'modal.git-commit'
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
+  | 'modal.git-commit-error'
   | 'modal.update-available'
   | 'modal.ai-usage'
 
@@ -238,6 +239,7 @@ export interface GitModeState {
   diffView: GitDiffView
   folds: Record<string, Record<string, FoldState>>
   headOffset: number
+  linterFixTabId: string | null
 }
 
 interface ModalBase {
@@ -297,6 +299,13 @@ export interface ModalGitCommit extends ModalBase {
   contentBuffer: string
   stage: 'edit' | 'generating' | 'confirm'
 }
+export interface ModalGitCommitError extends ModalBase {
+  type: 'git-commit-error'
+  stderr: string
+  commitTitle: string
+  commitBody: string
+  scrollOffset: number
+}
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
   activeField: 'name' | 'content'
@@ -326,6 +335,7 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
+  | ModalGitCommitError
   | ModalUpdateAvailable
   | ModalAIUsage
 
@@ -414,6 +424,13 @@ export type ModalAction =
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'open-ai-usage-modal' }
+  | {
+      type: 'open-commit-error-modal'
+      stderr: string
+      commitTitle: string
+      commitBody: string
+    }
+  | { type: 'commit-error-scroll'; delta: number }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
@@ -542,6 +559,8 @@ export type GitModeAction =
   | { type: 'git-commit-leave-confirm' }
   | { type: 'git-commit-enter-generating'; sessionId: string }
   | { type: 'git-commit-leave-generating' }
+  | { type: 'git-mode-attach-linter-fix-tab'; tab: TabSession }
+  | { type: 'git-mode-detach-linter-fix-tab' }
 
 export type DataAction =
   | { type: 'set-snippets'; snippets: SnippetRecord[] }
@@ -617,6 +636,8 @@ export type SideEffect =
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
+  | { type: 'open-commit-error-fix-session' }
+  | { type: 'dismiss-commit-error-fix-session' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

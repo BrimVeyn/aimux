@@ -230,6 +230,32 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-commit-error-modal': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          commitBody: action.commitBody,
+          commitTitle: action.commitTitle,
+          cursorPos: 0,
+          editBuffer: null,
+          scrollOffset: 0,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          stderr: action.stderr,
+          type: 'git-commit-error',
+        },
+      }
+    }
+    case 'commit-error-scroll': {
+      if (state.modal.type !== 'git-commit-error') return state
+      const nextOffset = Math.max(0, state.modal.scrollOffset + action.delta)
+      if (nextOffset === state.modal.scrollOffset) return state
+      return {
+        ...state,
+        modal: { ...state.modal, scrollOffset: nextOffset },
+      }
+    }
     case 'git-commit-enter-confirm': {
       if (state.modal.type !== 'git-commit') return state
       return {
@@ -361,7 +387,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (closingType === 'help') {
         return { ...state, modal: emptyModal() }
       }
-      const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
+      const backToGit = closingType === 'git-commit' || closingType === 'git-commit-error'
+      const nextFocus: AppState['focusMode'] = backToGit ? 'git' : 'navigation'
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {

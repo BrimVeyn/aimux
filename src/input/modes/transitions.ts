@@ -1,12 +1,23 @@
 import type { ModeId } from './types'
 
 const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
-  'git-mode': ['navigation', 'modal.git-commit'],
+  'git-mode': ['navigation', 'modal.git-commit', 'modal.git-commit-error'],
   'modal.ai-usage': ['navigation', 'terminal-input'],
   'modal.create-session': ['navigation', 'modal.session-picker.filtering'],
-  'modal.git-commit': ['git-mode', 'modal.git-commit.confirm', 'modal.git-commit.generating'],
-  'modal.git-commit.confirm': ['modal.git-commit', 'git-mode'],
-  'modal.git-commit.generating': ['modal.git-commit', 'modal.git-commit.confirm', 'git-mode'],
+  'modal.git-commit': [
+    'git-mode',
+    'modal.git-commit.confirm',
+    'modal.git-commit.generating',
+    'modal.git-commit-error',
+  ],
+  'modal.git-commit-error': ['git-mode', 'modal.git-commit'],
+  'modal.git-commit.confirm': ['modal.git-commit', 'git-mode', 'modal.git-commit-error'],
+  'modal.git-commit.generating': [
+    'modal.git-commit',
+    'modal.git-commit.confirm',
+    'git-mode',
+    'modal.git-commit-error',
+  ],
   'modal.help.filtering': ['navigation'],
   'modal.new-tab.command-edit': ['navigation', 'modal.new-tab.editing-command'],
   'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],

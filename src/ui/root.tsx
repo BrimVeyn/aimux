@@ -19,6 +19,7 @@ import { TerminalPane } from './components/layout/terminal-pane'
 import { AIUsageModal } from './components/modals/app/ai-usage-modal'
 import { HelpModal } from './components/modals/app/help-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
+import { CommitErrorModal } from './components/modals/git/commit-error-modal'
 import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateSessionModal } from './components/modals/sessions/create-session-modal'
 import { SessionNameModal } from './components/modals/sessions/session-name-modal'
@@ -191,6 +192,14 @@ function renderModal(
         />
       )
     }
+    case 'git-commit-error':
+      return (
+        <CommitErrorModal
+          commitTitle={modal.commitTitle}
+          scrollOffset={modal.scrollOffset}
+          stderr={modal.stderr}
+        />
+      )
     case null:
       return null
     default:
@@ -273,7 +282,8 @@ export function RootView({
   const snippetEditorFields = getSnippetEditorFields(modal)
   const splitChrome = PANE_BORDER * 2
 
-  const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
+  const inGitMode =
+    focusMode === 'git' || modal.type === 'git-commit' || modal.type === 'git-commit-error'
   if (inGitMode) {
     return (
       <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>

@@ -1,6 +1,7 @@
 import { useTerminalDimensions } from '@opentui/react'
 import { memo, useEffect, useRef } from 'react'
 
+import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
@@ -8,13 +9,16 @@ import { diffHash } from '../../../git/diff-hash'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
 import { useAppStore } from '../../../state/app-store'
-import { dispatchGlobal } from '../../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useBg, useTokens } from '../../theme'
+import { TerminalPane } from '../layout/terminal-pane'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
+
+const EMBEDDED_CONTENT_ORIGIN: TerminalContentOrigin = { cols: 80, rows: 24, x: 0, y: 0 }
 
 interface DiffStageProps {
   diff: DiffData | undefined
@@ -115,6 +119,10 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const focusMode = useAppStore((s) => s.focusMode)
+  const tabs = useAppStore((s) => s.tabs)
+  const linterFixTab = gitMode.linterFixTabId
+    ? tabs.find((tab) => tab.id === gitMode.linterFixTabId)
+    : undefined
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
   const currentSession = currentSessionId
@@ -191,6 +199,16 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       : 'press d again to discard changes'
   }
   const actionMessage = gitMode.actionMessage
+  const pickHeaderColor = (): string => {
+    if (linterFixTab) return t.palette.primary
+    if (selectedFile) return t.palette.ink
+    return t.muted
+  }
+  const pickHeaderLabel = (): string => {
+    if (linterFixTab) return `🤖 fix-linter · ${linterFixTab.status}`
+    if (selectedFile) return selectedFile.path
+    return 'Diff'
+  }
   let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
@@ -256,33 +274,61 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             backgroundColor={sidebarBg}
           >
             <box flexGrow={1}>
-              <text fg={selectedFile ? t.palette.ink : t.muted}>
-                {selectedFile ? selectedFile.path : 'Diff'}
-              </text>
+              <text fg={pickHeaderColor()}>{pickHeaderLabel()}</text>
             </box>
-            <box
-              paddingLeft={1}
-              paddingRight={1}
-              backgroundColor={actionBg}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                dispatchGlobal({ type: 'exit-git-mode' })
-              }}
-            >
-              <text fg={t.palette.ink}>
-                <strong>Exit diff</strong>
-              </text>
-            </box>
+            {linterFixTab ? (
+              <box
+                paddingLeft={1}
+                paddingRight={1}
+                backgroundColor={actionBg}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  runSideEffectGlobal({ type: 'dismiss-commit-error-fix-session' })
+                }}
+              >
+                <text fg={t.palette.ink}>
+                  <strong>Close fix</strong>
+                </text>
+              </box>
+            ) : (
+              <box
+                paddingLeft={1}
+                paddingRight={1}
+                backgroundColor={actionBg}
+                onMouseDown={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  dispatchGlobal({ type: 'exit-git-mode' })
+                }}
+              >
+                <text fg={t.palette.ink}>
+                  <strong>Exit diff</strong>
+                </text>
+              </box>
+            )}
           </box>
-          <DiffStage
-            diff={diff}
-            diffKey={selectedDiffKey}
-            diffRef={diffRef}
-            loading={loading}
-            themeId={themeId}
-            view={gitMode.diffView}
-          />
+          {linterFixTab ? (
+            <TerminalPane
+              tab={linterFixTab}
+              tabId={linterFixTab.id}
+              focusMode={focusMode}
+              contentOrigin={EMBEDDED_CONTENT_ORIGIN}
+              mouseForwardingEnabled={false}
+              localScrollbackEnabled={false}
+              onTerminalMouseEvent={() => {}}
+              onTerminalScrollEvent={() => {}}
+            />
+          ) : (
+            <DiffStage
+              diff={diff}
+              diffKey={selectedDiffKey}
+              diffRef={diffRef}
+              loading={loading}
+              themeId={themeId}
+              view={gitMode.diffView}
+            />
+          )}
         </box>
       </box>
       {footerNode ? (

@@ -20,6 +20,7 @@ export type ModeId =
   | 'modal.git-commit'
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
+  | 'modal.git-commit-error'
   | 'modal.update-available'
   | 'modal.ai-usage'
 
@@ -65,6 +66,8 @@ export type SideEffect =
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
+  | { type: 'open-commit-error-fix-session' }
+  | { type: 'dismiss-commit-error-fix-session' }
 
 export interface KeyResult {
   actions: AppAction[]

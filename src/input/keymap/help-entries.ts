@@ -12,6 +12,7 @@ export const HELP_MODE_LABELS: { modeId: ModeId; label: string }[] = [
   { label: 'Terminal input', modeId: 'terminal-input' },
   { label: 'Git mode', modeId: 'git-mode' },
   { label: 'Git commit', modeId: 'modal.git-commit' },
+  { label: 'Commit error', modeId: 'modal.git-commit-error' },
   { label: 'New tab', modeId: 'modal.new-tab.command-edit' },
   { label: 'New tab — command', modeId: 'modal.new-tab.command-edit' },
   { label: 'Workspace picker', modeId: 'modal.session-picker.filtering' },

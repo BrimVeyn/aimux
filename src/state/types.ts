@@ -41,6 +41,7 @@ export type ModalType =
   | 'help'
   | 'split-picker'
   | 'git-commit'
+  | 'git-commit-error'
   | 'update-available'
   | 'ai-usage'
   | null
@@ -265,6 +266,8 @@ export interface GitModeState {
   folds: Record<string, Record<string, FoldState>>
   /** Working-tree-vs-HEAD~N offset. 0 = working tree vs HEAD (default). */
   headOffset: number
+  /** Background tab id that owns the Claude "fix commit error" session embedded in the diff pane. */
+  linterFixTabId: string | null
 }
 
 interface ModalBase {
@@ -325,6 +328,14 @@ export interface ModalGitCommit extends ModalBase {
   stage: 'edit' | 'generating' | 'confirm'
 }
 
+export interface ModalGitCommitError extends ModalBase {
+  type: 'git-commit-error'
+  stderr: string
+  commitTitle: string
+  commitBody: string
+  scrollOffset: number
+}
+
 export interface ModalCreateSession extends ModalBase {
   type: 'create-session'
   directoryResults: DirectoryResult[]
@@ -370,6 +381,7 @@ export type ModalState =
   | ModalCreateSession
   | ModalSnippetEditor
   | ModalGitCommit
+  | ModalGitCommitError
   | ModalUpdateAvailable
   | ModalAIUsage
 
@@ -438,6 +450,13 @@ export type ModalAction =
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
+  | {
+      type: 'open-commit-error-modal'
+      stderr: string
+      commitTitle: string
+      commitBody: string
+    }
+  | { type: 'commit-error-scroll'; delta: number }
 
 // -- Session actions --
 export type SessionAction =
@@ -641,6 +660,8 @@ export type GitModeAction =
   | { type: 'git-commit-enter-generating'; sessionId: string }
   | { type: 'git-commit-leave-generating' }
   | { type: 'git-commit-use-background-suggestion'; sessionId: string }
+  | { type: 'git-mode-attach-linter-fix-tab'; tab: TabSession }
+  | { type: 'git-mode-detach-linter-fix-tab' }
 
 // -- Data actions --
 export type DataAction =

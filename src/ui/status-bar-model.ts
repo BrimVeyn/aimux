@@ -117,6 +117,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.help.filtering'
     case 'new-tab':
       return 'modal.new-tab.command-edit'
+    case 'git-commit-error':
+      return 'modal.git-commit-error'
     case 'session-picker':
       return 'modal.session-picker.filtering'
     case 'snippet-picker':

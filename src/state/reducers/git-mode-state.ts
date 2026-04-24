@@ -38,6 +38,7 @@ export function emptyGitMode(): GitModeState {
     folds: {},
     headOffset: 0,
     highlights: {},
+    linterFixTabId: null,
     loading: {},
     parsedFiles: {},
     pendingDeletePath: null,
@@ -438,6 +439,27 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       const top = Math.max(0, action.top)
       const bottom = Math.max(0, action.bottom)
       return applyFold(state, action.key, action.foldId, { bottom, top })
+    }
+    case 'git-mode-attach-linter-fix-tab': {
+      // If a fix tab already exists, drop it from the tab list — the caller is
+      // responsible for disposing the backend PTY via the close-tab side effect
+      // before dispatching this action.
+      const prevId = state.gitMode.linterFixTabId
+      const nextTabs = prevId !== null ? state.tabs.filter((t) => t.id !== prevId) : state.tabs
+      return {
+        ...state,
+        gitMode: { ...state.gitMode, linterFixTabId: action.tab.id },
+        tabs: [...nextTabs, { ...action.tab, activity: action.tab.activity ?? 'idle' }],
+      }
+    }
+    case 'git-mode-detach-linter-fix-tab': {
+      const id = state.gitMode.linterFixTabId
+      if (id === null) return state
+      return {
+        ...state,
+        gitMode: { ...state.gitMode, linterFixTabId: null },
+        tabs: state.tabs.filter((t) => t.id !== id),
+      }
     }
     case 'git-mode-optimistic-move': {
       const currentKey = state.gitMode.selectedEntryKey
