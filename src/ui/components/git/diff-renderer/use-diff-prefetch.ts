@@ -102,7 +102,7 @@ export function useDiffPrefetch(
   runTaskRef.current = async (task: Task) => {
     if (!projectPath) return
     try {
-      const diff = await fetchDiff(projectPath, task.file, headOffset)
+      const diff = await fetchDiff(task.file.repoPath ?? projectPath, task.file, headOffset)
       if (task.controller.signal.aborted) return
       const hash = diffHash(diff.rawDiff)
       dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })

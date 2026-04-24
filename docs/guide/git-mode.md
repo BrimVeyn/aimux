@@ -134,6 +134,71 @@ cancels and returns to git mode.
 
 `p` pushes the current branch.
 
+## Multi-repo Workspaces
+
+When a session's `projectPath` contains nested git repositories — for
+example a workspace folder holding several sibling repos — aimux discovers
+them automatically and aggregates their status into a single git panel.
+
+### What you see
+
+- Every changed file from every discovered repo is listed inside the same
+  Staged / Changes / Untracked sections.
+- Within each section, files are grouped by repo first and by path second,
+  so all of `api/`'s changes stay together before `web/`'s.
+- In **flat** list mode (`t`), each file gets a short disambiguating prefix
+  between the status letter and the path. Prefixes use just the first
+  letter of the sub-repo name, extended to 2 or 3 letters only when needed
+  to stay unique:
+
+  ```text
+  M a src/server.ts          ← from `api/`
+  M a src/middleware.ts      ← from `api/`
+  M w src/app.tsx            ← from `web/`
+  ```
+
+  If the session's top-level directory is itself a repo, its files have no
+  prefix and appear first.
+
+- **Tree** mode keeps the normal path hierarchy — the sub-repo folders
+  naturally group their files, so no extra prefix is shown.
+
+### What it changes
+
+- Stage / unstage / discard / commit / diff all route to the right repo
+  for the selected file — no manual `cd` required.
+- The branch label above the panel reflects the root repo's branch (or the
+  first discovered sub-repo when the root isn't a repo).
+- Walking history with `]` / `[` targets the root/fallback repo: `HEAD~N`
+  across disparate repos doesn't compose cleanly, so history view reverts
+  to a single-repo view while the offset is non-zero.
+
+### Configuration
+
+Multi-repo is **enabled by default** with a depth of 1. To change the depth
+or turn it off, set `multiRepo` in `aimux.config.ts`:
+
+```ts
+import { defineConfig } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  multiRepo: {
+    enabled: true, // default: true
+    maxDepth: 1, // default: 1 (direct children only)
+  },
+})
+```
+
+- `maxDepth: 1` scans the direct children of `projectPath`. Use `2` (or
+  more) to descend further for deeply nested layouts.
+- Discovery is performed **once per session** (cached by `projectPath` +
+  `maxDepth`) so opening a workspace with many repos remains cheap.
+- Directory names starting with `.` and common build directories
+  (`node_modules`, `target`, `dist`, `build`) are skipped.
+
+Set `enabled: false` to fall back to the single-repo behaviour: only
+`projectPath` itself is polled, no prefix is shown, no discovery runs.
+
 ## Auto-commit
 
 Auto-commit is an **opt-in** feature that uses an AI assistant (Claude

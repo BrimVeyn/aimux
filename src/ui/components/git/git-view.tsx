@@ -7,6 +7,7 @@ import type { ThemeId } from '../../themes'
 import { diffHash } from '../../../git/diff-hash'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
+import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
@@ -122,6 +123,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     : undefined
   const projectPath = currentSession?.projectPath
 
+  useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
@@ -165,7 +167,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (!selectedDiffKey) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(projectPath, selectedFile, gitMode.headOffset)
+    void fetchDiff(selectedFile.repoPath ?? projectPath, selectedFile, gitMode.headOffset)
       .then((d) =>
         dispatchGlobal({
           diff: d,

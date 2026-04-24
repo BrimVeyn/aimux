@@ -188,6 +188,8 @@ export interface GitFileEntry {
   status: GitFileStatus
   added: number | null
   removed: number | null
+  /** Absolute path to the originating git repo. Set when the entry comes from a sub-repo. */
+  repoPath?: string
 }
 
 export type GitPanelError = 'not-a-repo' | 'unknown'
@@ -384,6 +386,24 @@ export interface SnippetRecord {
   content: string
 }
 
+export interface DiscoveredRepo {
+  /** Absolute path to the repo. */
+  path: string
+  /** Label shown in UI (relative to the workspace root or repo basename). */
+  name: string
+  /** True when the repo is the session's projectPath itself. */
+  isRoot: boolean
+}
+
+export interface MultiRepoState {
+  /** Discovered sub-repos, ordered so root (if any) comes first. */
+  repos: DiscoveredRepo[]
+  /** Precomputed disambiguating prefix per repo path — empty string for the root repo. */
+  prefixes: Record<string, string>
+}
+
+export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] }
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -403,6 +423,7 @@ export interface AppState {
   gitPanel: GitPanelState
   gitMode: GitModeState
   autoCommit: AutoCommitState
+  multiRepo: MultiRepoState
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
@@ -648,6 +669,11 @@ export type DataAction =
   | { type: 'delete-snippet'; snippetId: string }
   | { type: 'set-custom-commands'; customCommands: Record<AssistantId, string> }
 
+// -- Multi-repo actions --
+export type MultiRepoAction =
+  | { type: 'multi-repo-set-repos'; repos: DiscoveredRepo[] }
+  | { type: 'multi-repo-clear' }
+
 export type AppAction =
   | ModalAction
   | SessionAction
@@ -658,3 +684,4 @@ export type AppAction =
   | GitPanelAction
   | GitModeAction
   | AutoCommitAction
+  | MultiRepoAction

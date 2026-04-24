@@ -3,6 +3,7 @@ import { memo, useRef } from 'react'
 import type { GitPanelState } from '../../../../state/types'
 
 import { useGitPanelPolling } from '../../../../git/git-poller'
+import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
 import { GitPanel } from '../git-panel'
 
@@ -24,6 +25,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
     : undefined
   const projectPath = currentSession?.projectPath
 
+  useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })
 
   const lastGoodRef = useRef<GitPanelState | null>(null)

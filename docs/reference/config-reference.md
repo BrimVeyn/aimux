@@ -48,24 +48,26 @@ defineConfig({
   hooks?: HooksConfig
   snippets?: SnippetDef[]
   autoCommit?: Partial<AutoCommitConfig>
+  multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
 })
 ```
 
 ## Support Matrix
 
-| Field        | Status             | Notes                                                                                     |
-| ------------ | ------------------ | ----------------------------------------------------------------------------------------- |
-| `keymaps`    | Supported          | Fully resolved and registered by the app                                                  |
-| `sessionBar` | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`     |
-| `gitPane`    | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately     |
-| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins      |
-| `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                    |
-| `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots |
-| `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                           |
-| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                 |
-| `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`   |
-| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                          |
+| Field        | Status             | Notes                                                                                                                |
+| ------------ | ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `keymaps`    | Supported          | Fully resolved and registered by the app                                                                             |
+| `sessionBar` | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                |
+| `gitPane`    | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately                                |
+| `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins                                 |
+| `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                               |
+| `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                            |
+| `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                                                      |
+| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                                            |
+| `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                              |
+| `multiRepo`  | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces` |
+| `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                     |
 
 ## `defineConfig`
 
@@ -398,6 +400,51 @@ export default defineConfig({
 
 See [`../guide/git-mode.md#auto-commit`](../guide/git-mode.md#auto-commit)
 for the full user-facing walkthrough.
+
+## `multiRepo`
+
+Status: `Supported`
+
+Type:
+
+```ts
+multiRepo?: {
+  enabled?: boolean // default: true
+  maxDepth?: number // default: 1 (direct children only)
+}
+```
+
+When a session's `projectPath` contains nested git repositories, aimux scans
+for them once per session and merges their status into a single aggregated
+git panel. In flat list mode each file is tagged with a short disambiguating
+prefix (1, 2, or more letters — extended only where names collide) so you can
+tell at a glance which sub-repo a file belongs to; in tree mode the regular
+path hierarchy is preserved. Within each section (staged / unstaged /
+untracked), files are grouped by repo before being sorted by path.
+
+- `enabled: true` (default) turns discovery on.
+- `maxDepth: 1` scans the direct children of `projectPath`. Set `2` to also
+  descend one level further for deeply nested layouts.
+- Discovery results are cached per `(projectPath, maxDepth)` — the scan runs
+  once per session.
+- Sub-repo commands (stage / unstage / discard / diff) are routed to each
+  file's originating repository automatically.
+- If `projectPath` is itself a git repo, its files appear first (no prefix)
+  and sub-repo files follow.
+
+Example:
+
+```ts
+export default defineConfig({
+  multiRepo: {
+    enabled: true,
+    maxDepth: 1,
+  },
+})
+```
+
+Set `enabled: false` to fall back to single-repo behaviour (no discovery, no
+prefix).
 
 ## `statusBar`
 

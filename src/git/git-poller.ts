@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 
+import type { DiscoveredRepo, GitFileEntry, GitRefreshPayload } from '../state/types'
+
+import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
-import { collectGitStatus } from './git-status'
+import { collectGitStatus, type GitCollectResult } from './git-status'
 
 const BASE_INTERVAL_MS = 1000
 const MAX_INTERVAL_MS = 30_000
@@ -12,7 +15,54 @@ interface Options {
   headOffset: number
 }
 
+function tagFiles(files: GitFileEntry[], repoPath: string): GitFileEntry[] {
+  return files.map((f) => ({ ...f, repoPath }))
+}
+
+async function collectAggregated(
+  repos: DiscoveredRepo[],
+  fallbackCwd: string,
+  headOffset: number
+): Promise<GitCollectResult> {
+  // Historical walking (HEAD~N) is per-repo and doesn't compose; fall back to
+  // the root/fallback repo when offset > 0 to preserve existing behaviour.
+  if (headOffset > 0) return collectGitStatus(fallbackCwd, { headOffset })
+
+  const results = await Promise.all(repos.map((r) => collectGitStatus(r.path, { headOffset: 0 })))
+  const files: GitFileEntry[] = []
+  let branch: string | null = null
+  let ahead = 0
+  let behind = 0
+  let anyOk = false
+  for (let i = 0; i < repos.length; i++) {
+    const res = results[i]
+    const repo = repos[i]
+    if (res?.kind !== 'ok' || !repo) continue
+    anyOk = true
+    if (repo.isRoot) {
+      branch = res.payload.branch
+      ahead = res.payload.ahead
+      behind = res.payload.behind
+    }
+    files.push(...tagFiles(res.payload.files, repo.path))
+  }
+  if (!anyOk) return { error: 'not-a-repo', kind: 'error' }
+  // If there was no root repo, surface the first discovered repo's branch label.
+  if (branch === null) {
+    const firstOk = results.find(
+      (r): r is Extract<GitCollectResult, { kind: 'ok' }> => r?.kind === 'ok'
+    )
+    if (firstOk) branch = firstOk.payload.branch
+  }
+  const payload: GitRefreshPayload = { ahead, behind, branch, files }
+  return { kind: 'ok', payload }
+}
+
 export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options): void {
+  // Read repos from the store imperatively — changes trigger a fresh effect run
+  // because the repos identity is stable across ticks until set-repos fires.
+  const repos = useAppStore((s) => s.multiRepo.repos)
+
   useEffect(() => {
     if (!enabled || !projectPath) return undefined
 
@@ -28,7 +78,10 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
     }
 
     const tick = async () => {
-      const result = await collectGitStatus(projectPath, { headOffset })
+      const result =
+        repos.length > 0
+          ? await collectAggregated(repos, projectPath, headOffset)
+          : await collectGitStatus(projectPath, { headOffset })
       if (cancelled) return
       if (result.kind === 'ok') {
         dispatchGlobal({ payload: result.payload, type: 'git-refresh-success' })
@@ -53,5 +106,5 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [enabled, projectPath, headOffset])
+  }, [enabled, projectPath, headOffset, repos])
 }

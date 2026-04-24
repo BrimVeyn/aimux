@@ -3,11 +3,16 @@ import type {
   AutoCommitConfig,
   ModeId,
   ModeKeymapDef,
+  MultiRepoConfig,
   ResolvedConfig,
   ResolvedKeymapConfig,
 } from './types'
 
-import { DEFAULT_AUTO_COMMIT_CONFIG, getDefaultKeymapConfig } from './defaults'
+import {
+  DEFAULT_AUTO_COMMIT_CONFIG,
+  DEFAULT_MULTI_REPO_CONFIG,
+  getDefaultKeymapConfig,
+} from './defaults'
 import { KeymapBuilder } from './keymap-builder'
 
 /**
@@ -23,12 +28,18 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     timeoutMs: userConfig.autoCommit?.timeoutMs ?? DEFAULT_AUTO_COMMIT_CONFIG.timeoutMs,
   }
 
+  const multiRepo: MultiRepoConfig = {
+    enabled: userConfig.multiRepo?.enabled ?? DEFAULT_MULTI_REPO_CONFIG.enabled,
+    maxDepth: Math.max(1, userConfig.multiRepo?.maxDepth ?? DEFAULT_MULTI_REPO_CONFIG.maxDepth),
+  }
+
   return {
     autoCommit,
     backends: userConfig.backends ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
     keymaps,
+    multiRepo,
     sessionBar: resolveSessionBar(userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
