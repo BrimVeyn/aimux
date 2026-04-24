@@ -15,6 +15,7 @@ export type {
 
 export {
   extendPalette,
+  flattenRgba,
   isKnownThemeId,
   migrateThemeId,
   paletteToShikiTheme,

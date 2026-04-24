@@ -3,6 +3,7 @@
 // `getCurrentTheme()` / `getCurrentResolved()`.
 
 export type { ResolvedToken, ResolvedTokens } from './themes'
+export { flattenRgba } from './themes'
 export {
   applyTheme,
   getCurrentPalette,
@@ -10,7 +11,6 @@ export {
   getCurrentTheme,
   getTransparent,
   setTransparent,
-  usePalette,
   useTheme,
   useTransparent,
 } from './theme-store'

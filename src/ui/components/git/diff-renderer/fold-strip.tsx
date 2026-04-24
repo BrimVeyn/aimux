@@ -1,4 +1,4 @@
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { FOLD_STEP, type FoldInfo } from './build-rows'
 import { type FoldDispatch } from './pierre-diff'
 
@@ -9,11 +9,10 @@ interface Props {
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
   const t = useTheme()
-  const p = usePalette()
   const bg = t['surface-diff-hidden-weak']
   return (
     <box paddingLeft={1} paddingRight={1} backgroundColor={bg} onMouseDown={onPress}>
-      <text fg={p.primary}>{label}</text>
+      <text fg={t['text-interactive-base']}>{label}</text>
     </box>
   )
 }

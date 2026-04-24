@@ -10,12 +10,12 @@ interface InputFieldProps {
 
 export function InputField({ active, cursorPos, placeholder, value }: InputFieldProps) {
   const t = useTheme()
-  const fg = active ? t['text-base'] : t['text-weak']
+  const fg = active ? t['text-strong'] : t['text-weak']
   if (!active) {
     const showPlaceholder = !value && !!placeholder
     return (
       <Surface tone="input" padding={1}>
-        <text fg={showPlaceholder ? t['text-weaker'] : fg}>
+        <text fg={showPlaceholder ? t['text-weak'] : fg}>
           {showPlaceholder ? placeholder : value}
         </text>
       </Surface>
@@ -34,7 +34,7 @@ export function InputField({ active, cursorPos, placeholder, value }: InputField
     <Surface tone="inputActive" padding={1}>
       <text fg={fg}>
         {before}
-        <span bg={t['text-base']} fg={t['background-base']}>
+        <span bg={t['text-strong']} fg={t['background-base']}>
           {cursorDisplay}
         </span>
         {trailing}

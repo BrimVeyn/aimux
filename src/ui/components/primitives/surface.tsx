@@ -11,14 +11,14 @@ function toneToToken(tone: SurfaceTone): ResolvedToken {
     case 'elevated':
       return 'surface-raised-base'
     case 'selected':
-      return 'surface-base-active'
+      return 'surface-raised-base-hover'
     case 'input':
       return 'input-base'
     case 'inputActive':
-      return 'input-active'
+      return 'input-base'
     case 'muted':
     default:
-      return 'surface-weak'
+      return 'background-stronger'
   }
 }
 

@@ -3,7 +3,7 @@ import type { AssistantId } from '../../../../state/types'
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterAssistants } from '../../../../state/selectors'
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -26,7 +26,6 @@ export function NewTabModal({
   selectedIndex,
 }: NewTabModalProps) {
   const t = useTheme()
-  const p = usePalette()
 
   if (editingCommand !== null) {
     const option =
@@ -62,7 +61,7 @@ export function NewTabModal({
       subtitle: (
         <box flexDirection="column">
           <text fg={t['text-weak']}>{option.description}</text>
-          {customCmd ? <text fg={p.primary}>{customCmd}</text> : null}
+          {customCmd ? <text fg={t['text-interactive-base']}>{customCmd}</text> : null}
         </box>
       ),
       title: <text fg={active ? t['text-base'] : t['text-weak']}>{option.label}</text>,

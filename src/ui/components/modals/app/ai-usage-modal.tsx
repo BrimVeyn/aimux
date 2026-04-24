@@ -8,7 +8,7 @@ import type {
 } from '../../../../services/ai-usage/types'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ModalShell } from '../shared/modal-shell'
 
@@ -93,14 +93,13 @@ interface ToolSectionProps {
 
 function ToolSection({ snap, tool }: ToolSectionProps) {
   const t = useTheme()
-  const p = usePalette()
   const isHardError = Boolean(snap.error) && !snap.stale
   const relative = formatRelative(snap.lastUpdated)
 
   let body: ReactNode
   if (isHardError) {
     body = (
-      <text fg={p.error} selectable={false}>
+      <text fg={t['icon-critical-base']} selectable={false}>
         {`error: ${snap.error ?? ''}`}
       </text>
     )
@@ -136,14 +135,13 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
 
 function WindowRow({ window }: { window: UsageWindow }) {
   const t = useTheme()
-  const p = usePalette()
   const percent = window.percent
   const { empty, filled } = buildBar(percent)
 
-  let barColor = p.success
+  let barColor = t['icon-success-base']
   if (percent !== null) {
-    if (percent >= 85) barColor = p.error
-    else if (percent >= 60) barColor = p.warning
+    if (percent >= 85) barColor = t['icon-critical-base']
+    else if (percent >= 60) barColor = t['icon-warning-base']
   }
 
   const pctText = percent === null ? '—' : `${Math.round(percent)}% used`
@@ -179,10 +177,9 @@ function WindowRow({ window }: { window: UsageWindow }) {
 
 function PaceLine({ pace }: { pace: NonNullable<UsageWindow['pace']> }) {
   const t = useTheme()
-  const p = usePalette()
   let color = t['text-weak']
-  if (paceStageIsBehind(pace.stage)) color = p.warning
-  else if (paceStageIsAhead(pace.stage)) color = p.success
+  if (paceStageIsBehind(pace.stage)) color = t['icon-warning-base']
+  else if (paceStageIsAhead(pace.stage)) color = t['icon-success-base']
 
   const suffix = pace.rightText ? ` · ${pace.rightText}` : ''
   return (

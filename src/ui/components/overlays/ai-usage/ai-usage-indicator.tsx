@@ -2,7 +2,7 @@ import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 
 const TOOL_ICON: Record<AIUsageTool, string> = {
   claude: 'CC',
@@ -48,8 +48,7 @@ function formatResetIn(snap: {
 
 export function AIUsageIndicator() {
   const t = useTheme()
-  const pal = usePalette()
-  const bg = t['surface-weak']
+  const bg = t['background-stronger']
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
@@ -96,7 +95,7 @@ export function AIUsageIndicator() {
               backgroundColor={bg}
               onMouseDown={openModal}
             >
-              <text fg={pal.error} selectable={false}>
+              <text fg={t['icon-critical-base']} selectable={false}>
                 {`${icon} —`}
               </text>
             </box>
@@ -105,11 +104,11 @@ export function AIUsageIndicator() {
 
         if (snap.percent !== null) {
           const p = Math.round(snap.percent)
-          let color = pal.success
+          let color = t['icon-success-base']
           if (p >= 85) {
-            color = pal.error
+            color = t['icon-critical-base']
           } else if (p >= 60) {
-            color = pal.warning
+            color = t['icon-warning-base']
           }
           const { empty, filled } = buildBar(snap.percent)
           const reset = formatResetIn(snap)

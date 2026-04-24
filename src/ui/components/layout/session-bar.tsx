@@ -10,7 +10,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref
 import { IDLE_SESSION_STATUS } from '../../../state/types'
 import { useBusySpinner } from '../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../session-ordering'
-import { usePalette, useTheme } from '../../theme'
+import { useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
 interface SessionBarProps {
@@ -19,7 +19,7 @@ interface SessionBarProps {
 
 export function SessionBar({ forceVisible = false }: SessionBarProps) {
   const t = useTheme()
-  const headerBg = t['surface-weak']
+  const headerBg = t['background-stronger']
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -156,7 +156,7 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
           dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
         }}
       >
-        <text fg={t['text-base']} selectable={false}>
+        <text fg={t['text-strong']} selectable={false}>
           + New
         </text>
       </box>
@@ -200,16 +200,15 @@ function SessionChip({
   status,
 }: SessionChipProps) {
   const t = useTheme()
-  const p = usePalette()
   const selectionBg = t['surface-base-active']
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
   const labelColor = active ? t['text-base'] : t['text-weak']
   const bgColor = dragging || active ? selectionBg : undefined
-  const idleColor = p.success
-  const workingColor = p.primary
-  const waitingColor = p.warning
+  const idleColor = t['icon-success-base']
+  const workingColor = t['text-interactive-base']
+  const waitingColor = t['icon-warning-base']
   const [hovered, setHovered] = useState(false)
 
   return (

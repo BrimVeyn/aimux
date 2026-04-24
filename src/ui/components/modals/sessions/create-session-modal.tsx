@@ -1,7 +1,7 @@
 import type { DirectoryResult } from '../../../../state/types'
 
 import { abbreviatePath } from '../../../path-format'
-import { getCurrentPalette, useTheme } from '../../../theme'
+import { getCurrentResolved, useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 
@@ -14,10 +14,10 @@ function getDirectoryResultIcon(result: DirectoryResult): string {
 }
 
 function getDirectoryResultColor(result: DirectoryResult): string {
-  const p = getCurrentPalette()
-  if (result.type === 'worktree') return p.warning
-  if (result.type === 'workspace') return p.info
-  return p.primary
+  const t = getCurrentResolved()
+  if (result.type === 'worktree') return t['icon-warning-base']
+  if (result.type === 'workspace') return t['icon-info-base']
+  return t['icon-base']
 }
 
 interface CreateSessionModalProps {

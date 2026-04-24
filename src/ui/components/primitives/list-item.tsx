@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { usePalette, useTheme } from '../../theme'
+import { useTheme } from '../../theme'
 import { Surface } from './surface'
 
 export type ListItemDirection = 'row' | 'column'
@@ -29,7 +29,6 @@ export function ListItem({
   trailing,
 }: ListItemProps) {
   const t = useTheme()
-  const p = usePalette()
   const isRow = direction === 'row'
   return (
     <box id={id} onMouseOver={onHover} onMouseDown={onClick}>
@@ -42,7 +41,9 @@ export function ListItem({
           <box flexDirection="row">
             {isRow ? null : (
               <>
-                <text fg={active ? p.primary : t['text-weaker']}>{active ? '›' : '·'}</text>
+                <text fg={active ? t['text-interactive-base'] : t['text-weaker']}>
+                  {active ? '›' : '·'}
+                </text>
                 <text> </text>
               </>
             )}

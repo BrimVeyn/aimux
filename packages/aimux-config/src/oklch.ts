@@ -170,6 +170,26 @@ export function withAlpha(color: string, alpha: number): string {
 }
 
 /**
+ * Flatten an `rgba(r, g, b, a)` value against a solid hex background. Parses the
+ * rgba channels back to 0..1, then delegates to `blend()`. Returns `value`
+ * unchanged when it isn't an rgba string (already hex, `var(--…)`, etc.).
+ * Used at consumer sites for opencode tokens defined as rgba (e.g.
+ * `border-selected`) which the terminal renderer can't alpha-blend at paint
+ * time.
+ */
+export function flattenRgba(value: string, background: string): string {
+  const m = /^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([\d.]+)\s*\)$/.exec(value)
+  if (!m) return value
+  const [, rs, gs, bs, as] = m
+  const r = Number(rs ?? '0') / 255
+  const g = Number(gs ?? '0') / 255
+  const b = Number(bs ?? '0') / 255
+  const alpha = Number(as ?? '0')
+  const hex = rgbToHex(r, g, b)
+  return blend(hex, background, alpha)
+}
+
+/**
  * 12-step brand/semantic scale from a seed. Mirrors opencode's `generateScale`
  * verbatim (constants pinned to ff748b82ca55). Step 8 is the seed's natural
  * tone; step 10 is used as the "base" foreground for semantic tokens.

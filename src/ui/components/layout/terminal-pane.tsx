@@ -8,7 +8,7 @@ import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/
 import { logInputDebug } from '../../../debug/input-log'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
-import { getCurrentPalette, getCurrentResolved, usePalette, useTheme } from '../../theme'
+import { getCurrentPalette, getCurrentResolved, useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
 interface TerminalPaneProps {
@@ -77,7 +77,7 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
   }
 
   return (
-    <span key={key} fg={span.fg ?? getCurrentResolved()['text-base']} bg={span.bg}>
+    <span key={key} fg={span.fg ?? getCurrentResolved()['text-strong']} bg={span.bg}>
       {node}
     </span>
   )
@@ -130,7 +130,6 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const t = useTheme()
-  const p = usePalette()
   const editorBg = t['background-base']
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
@@ -240,7 +239,7 @@ export function TerminalPane({
             <text fg={t['text-weak']}> </text>
             <box flexDirection="row">
               <text fg={t['text-weak']}>Press </text>
-              <text fg={p.primary}>Ctrl+n</text>
+              <text fg={t['text-interactive-base']}>Ctrl+n</text>
               <text fg={t['text-weak']}> to launch an assistant</text>
             </box>
             <box
@@ -275,9 +274,11 @@ export function TerminalPane({
         )}
       </ContextMenuBox>
       {tab?.status === 'disconnected' ? (
-        <text fg={p.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
+        <text fg={t['icon-warning-base']}>
+          Restored snapshot. Press Ctrl+r to restart this workspace.
+        </text>
       ) : null}
-      {tab?.errorMessage ? <text fg={p.error}>{tab.errorMessage}</text> : null}
+      {tab?.errorMessage ? <text fg={t['icon-critical-base']}>{tab.errorMessage}</text> : null}
     </box>
   )
 }

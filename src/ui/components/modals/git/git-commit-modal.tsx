@@ -5,7 +5,7 @@ import type { ModeId } from '../../../../input/modes/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { InputField } from '../../primitives/input-field'
 import { ModalShell } from '../shared/modal-shell'
@@ -50,7 +50,6 @@ function pickShellTitle(stage: 'edit' | 'generating' | 'confirm'): string {
 
 function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: string }) {
   const t = useTheme()
-  const p = usePalette()
   const frame = useSpinnerFrame(true)
   const providerLabel = [assistant, model].filter(Boolean).join(' · ') || 'configured provider'
   return (
@@ -61,9 +60,9 @@ function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: s
       paddingTop={2}
       paddingBottom={2}
     >
-      <text fg={p.primary}>🪄</text>
+      <text fg={t['text-interactive-base']}>🪄</text>
       <box marginTop={1} flexDirection="row" gap={1}>
-        <text fg={p.primary}>{frame}</text>
+        <text fg={t['text-interactive-base']}>{frame}</text>
         <text fg={t['text-base']}>Generating commit message</text>
       </box>
       <text fg={t['text-weak']}>via {providerLabel}</text>
@@ -84,7 +83,6 @@ export function GitCommitModal({
   title,
 }: GitCommitModalProps) {
   const t = useTheme()
-  const p = usePalette()
   const titleActive = activeField === 'title'
   const bodyActive = activeField === 'body'
   const isConfirm = stage === 'confirm'
@@ -127,11 +125,11 @@ export function GitCommitModal({
       {isConfirm ? (
         <box flexDirection="column">
           {stagedCount > 0 ? (
-            <text fg={p.warning}>
+            <text fg={t['icon-warning-base']}>
               Commit will include the <strong>{stagedCount} staged file(s)</strong> only.
             </text>
           ) : (
-            <text fg={p.warning}>
+            <text fg={t['icon-warning-base']}>
               <strong>git add -A</strong> will stage every change before committing.
             </text>
           )}
@@ -167,7 +165,7 @@ export function GitCommitModal({
         <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
           <box
             border
-            borderColor={p.primary}
+            borderColor={t['border-weak-base']}
             paddingLeft={1}
             paddingRight={1}
             flexDirection="row"
@@ -179,8 +177,8 @@ export function GitCommitModal({
               onAutoCommitClick()
             }}
           >
-            {showBgSpinner ? <text fg={p.primary}>{bgSpinnerFrame}</text> : null}
-            <text fg={p.primary}>
+            {showBgSpinner ? <text fg={t['text-interactive-base']}>{bgSpinnerFrame}</text> : null}
+            <text fg={t['text-strong']}>
               <strong>Auto-commit</strong>
             </text>
           </box>

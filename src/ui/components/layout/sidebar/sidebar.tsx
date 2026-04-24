@@ -7,7 +7,7 @@ import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { getCurrentResolved, type ResolvedTokens, usePalette, useTheme } from '../../../theme'
+import { getCurrentResolved, type ResolvedTokens, useTheme } from '../../../theme'
 import { buildGitPaneContextMenu } from '../../git/pane/git-pane-context-menu'
 import { GitPaneWidget } from '../../git/pane/git-pane-widget'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
@@ -44,13 +44,12 @@ function getRowBackground({
   t: ResolvedTokens
 }): string | undefined {
   if (isActive) return t['surface-base-active']
-  if (alternate) return t['surface-base-hover']
+  if (alternate) return t['surface-raised-base-hover']
   return undefined
 }
 
 const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: number }) {
   const t = useTheme()
-  const p = usePalette()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const currentSession = currentSessionId
@@ -61,7 +60,7 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
-      <text fg={p.primary}>
+      <text fg={t['icon-strong-base']}>
         <strong>aimux</strong>
       </text>
       <text fg={t['text-strong']}>
@@ -69,8 +68,8 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       </text>
       {branch ? (
         <box flexDirection="row">
-          <text fg={p.primary}>{'\u{e702}'} </text>
-          <text fg={t['text-weak']}>{branch}</text>
+          <text fg={t['icon-base']}>{'\u{e702}'} </text>
+          <text fg={t['text-base']}>{branch}</text>
         </box>
       ) : null}
       <box
@@ -188,7 +187,7 @@ export function Sidebar({
   onTabActivate,
 }: SidebarProps) {
   const t = useTheme()
-  const sidebarBg = t['surface-weak']
+  const sidebarBg = t['background-base']
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)

@@ -11,7 +11,7 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
 import { setGitDiffScroller } from '../../git-view-controls'
-import { usePalette, useTheme } from '../../theme'
+import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
@@ -48,7 +48,6 @@ const DiffStage = memo(function DiffStage({
   view,
 }: DiffStageProps) {
   const t = useTheme()
-  const p = usePalette()
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
@@ -66,7 +65,7 @@ const DiffStage = memo(function DiffStage({
   if (diff.errorMessage) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={p.error}>{diff.errorMessage}</text>
+        <text fg={t['icon-critical-base']}>{diff.errorMessage}</text>
       </box>
     )
   }
@@ -107,9 +106,8 @@ interface GitViewProps {
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const t = useTheme()
-  const p = usePalette()
-  const sidebarBg = t['surface-weak']
-  const actionBg = t['surface-base-active']
+  const sidebarBg = t['background-base']
+  const actionBg = t['surface-raised-base-hover']
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
@@ -196,13 +194,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
-      <text fg={p.warning}>
+      <text fg={t['icon-warning-base']}>
         <strong>{pendingHint}</strong>
       </text>
     )
   } else if (actionMessage) {
     footerNode = actionMessage.split('\n').map((line, idx) => (
-      <text key={idx} fg={p.primary}>
+      <text key={idx} fg={t['text-interactive-base']}>
         {line}
       </text>
     ))
@@ -218,18 +216,18 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           padding={0}
           gap={0}
         >
-          <text fg={p.primary}>
+          <text fg={t['icon-strong-base']}>
             <strong>aimux · git</strong>
           </text>
           {gitPanel.branch ? (
             <box flexDirection="row">
-              <text fg={p.primary}>{'\u{e702}'} </text>
-              <text fg={t['text-weak']}>{gitPanel.branch}</text>
+              <text fg={t['icon-base']}>{'\u{e702}'} </text>
+              <text fg={t['text-base']}>{gitPanel.branch}</text>
             </box>
           ) : null}
           {gitMode.headOffset > 0 ? (
             <box flexDirection="row" gap={1}>
-              <text fg={p.warning}>
+              <text fg={t['icon-warning-base']}>
                 <strong>HEAD~{gitMode.headOffset}</strong>
               </text>
               <text fg={t['text-weak']}>[ newer · ] older</text>

@@ -20,7 +20,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../../git-view-controls'
-import { usePalette, useTheme, useTransparent } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
 import {
   type DiffSegment,
   estimatedSegmentHeight,
@@ -180,13 +180,12 @@ function UnifiedRowRender({
   row: UnifiedRowOrHeader
 }) {
   const t = useTheme()
-  const p = usePalette()
-  const headerBg = t['surface-weak']
+  const headerBg = t['surface-diff-hidden-base']
   const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-        <text fg={p.primary}>{row.spec}</text>
+        <text fg={t['text-base']}>{row.spec}</text>
         {row.context ? <text fg={t['text-weaker']}> {row.context}</text> : null}
       </box>
     )
@@ -206,9 +205,9 @@ function UnifiedRowRender({
       </box>
     )
   }
-  const bg = row.type === 'addition' ? t['surface-diff-add-weak'] : t['surface-diff-delete-weak']
+  const bg = row.type === 'addition' ? t['surface-diff-add-base'] : t['surface-diff-delete-base']
   const sign = row.type === 'addition' ? '+' : '-'
-  const signColor = row.type === 'addition' ? p.success : p.error
+  const signColor = row.type === 'addition' ? t['syntax-diff-add'] : t['syntax-diff-delete']
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]

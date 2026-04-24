@@ -4,7 +4,7 @@ import type { TabSession } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
-import { getCurrentPalette, getCurrentResolved, usePalette, useTheme } from '../../../theme'
+import { getCurrentResolved, useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface TabItemProps {
@@ -16,16 +16,16 @@ interface TabItemProps {
 }
 
 function getStatusColor(status: TabSession['status']): string {
-  const p = getCurrentPalette()
+  const t = getCurrentResolved()
   switch (status) {
     case 'running':
-      return p.success
+      return t['icon-success-base']
     case 'disconnected':
-      return p.warning
+      return t['icon-warning-base']
     case 'error':
-      return p.error
+      return t['icon-critical-base']
     default:
-      return getCurrentResolved()['text-weak']
+      return t['text-weak']
   }
 }
 
@@ -39,33 +39,32 @@ function getIndicator(active: boolean, focused: boolean, inLayout: boolean): str
 
 function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean): string {
   const t = getCurrentResolved()
-  const p = getCurrentPalette()
   if (active) {
-    return focused ? p.primary : t['text-strong']
+    return focused ? t['text-interactive-base'] : t['text-strong']
   }
 
   return inLayout ? t['text-weak'] : t['text-weaker']
 }
 
 function BusyIndicator() {
-  const p = usePalette()
+  const t = useTheme()
   const frame = useBusySpinner()
-  return <text fg={p.primary}>{frame} working</text>
+  return <text fg={t['text-interactive-base']}>{frame} working</text>
 }
 
 function WaitingIndicator() {
-  const p = usePalette()
-  return <text fg={p.warning}>? waiting</text>
+  const t = useTheme()
+  return <text fg={t['icon-warning-base']}>? waiting</text>
 }
 
 function ActivityIndicator({ tab }: { tab: TabSession }) {
-  const p = usePalette()
+  const t = useTheme()
   if (tab.status === 'error') {
-    return <text fg={p.error}>✗ error</text>
+    return <text fg={t['icon-critical-base']}>✗ error</text>
   }
 
   if (tab.status === 'disconnected') {
-    return <text fg={p.warning}>⏸ restore</text>
+    return <text fg={t['icon-warning-base']}>⏸ restore</text>
   }
 
   if (tab.activity === 'working') {
@@ -77,7 +76,7 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   }
 
   if (tab.activity === 'idle') {
-    return <text fg={p.success}>● idle</text>
+    return <text fg={t['icon-success-base']}>● idle</text>
   }
 
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>

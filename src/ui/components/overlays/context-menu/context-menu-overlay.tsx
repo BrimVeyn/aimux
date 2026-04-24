@@ -79,8 +79,8 @@ export function ContextMenuOverlay() {
         width={width}
         flexDirection="column"
         border
-        borderColor={t['border-base']}
-        backgroundColor={t['surface-float-base']}
+        borderColor={t['border-weak-base']}
+        backgroundColor={t['surface-raised-stronger-non-alpha']}
         onMouseDown={(e) => {
           e.stopPropagation()
         }}
@@ -94,7 +94,7 @@ export function ContextMenuOverlay() {
               flexShrink={0}
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={active ? t['surface-base-active'] : undefined}
+              backgroundColor={active ? t['surface-raised-base-hover'] : undefined}
               onMouseOver={() => setSelected(index)}
               onMouseDown={(e) => {
                 e.preventDefault()

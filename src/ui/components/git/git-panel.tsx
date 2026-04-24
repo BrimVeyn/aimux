@@ -17,13 +17,7 @@ import {
   type GitTreeFileRow,
   type GitTreeFolderRow,
 } from '../../../state/git-tree'
-import {
-  getCurrentPalette,
-  getCurrentResolved,
-  getTransparent,
-  useTheme,
-  useTransparent,
-} from '../../theme'
+import { getCurrentResolved, getTransparent, useTheme, useTransparent } from '../../theme'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -54,20 +48,20 @@ const BASE_SECTION_ORDER: GitFileSection[] = ['staged', 'unstaged', 'untracked']
 const HISTORICAL_SECTION_ORDER: GitFileSection[] = ['historical', 'untracked']
 
 function statusColor(status: GitFileEntry['status']): string {
-  const p = getCurrentPalette()
+  const t = getCurrentResolved()
   switch (status) {
     case '?':
-      return p.info
+      return t['icon-base']
     case 'A':
-      return p.success
+      return t['icon-diff-add-base']
     case 'C':
     case 'R':
-      return p.primary
+      return t['icon-base']
     case 'D':
     case 'U':
-      return p.error
+      return t['icon-diff-delete-base']
     case 'M':
-      return p.warning
+      return t['icon-diff-modified-base']
   }
 }
 
@@ -152,11 +146,17 @@ function renderDiffCount(
   }
   return (
     <box flexDirection="row" flexShrink={0}>
-      <text fg={getCurrentPalette().success} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
+      <text
+        fg={getCurrentResolved()['icon-diff-add-base']}
+        bg={bg}
+      >{`+${padRight(file.added, addedW)}`}</text>
       <text fg={t['text-weaker']} bg={bg}>
         {' '}
       </text>
-      <text fg={getCurrentPalette().error} bg={bg}>{`−${padRight(file.removed, removedW)}`}</text>
+      <text
+        fg={getCurrentResolved()['icon-diff-delete-base']}
+        bg={bg}
+      >{`−${padRight(file.removed, removedW)}`}</text>
     </box>
   )
 }
@@ -177,10 +177,10 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
           <text fg={t['text-weak']} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={getCurrentPalette().primary} bg={bg}>
+          <text fg={getCurrentResolved()['icon-weak-base']} bg={bg}>
             {row.isCollapsed ? '\uf07b' : '\uf07c'}
           </text>
-          <text fg={t['text-interactive-base']} bg={bg} wrapMode="none">
+          <text fg={t['text-weak']} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -251,11 +251,11 @@ function renderTreeSection(
         </text>
         {showListModeToggle ? (
           <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
-            <text fg={fileListMode === 'tree' ? getCurrentPalette().primary : t2['text-weak']}>
+            <text fg={fileListMode === 'tree' ? t2['text-interactive-base'] : t2['text-weak']}>
               tree
             </text>
             <text fg={t2['text-weak']}>|</text>
-            <text fg={fileListMode === 'flat' ? getCurrentPalette().primary : t2['text-weak']}>
+            <text fg={fileListMode === 'flat' ? t2['text-interactive-base'] : t2['text-weak']}>
               flat
             </text>
           </box>
@@ -305,7 +305,7 @@ function computeStatusPlaceholder(
     return { label: 'Not a git repository', labelColor: t['text-weak'] }
   }
   if (gitPanel.error === 'unknown') {
-    return { label: 'Git error', labelColor: getCurrentPalette().error }
+    return { label: 'Git error', labelColor: t['icon-critical-base'] }
   }
   if (gitPanel.files.length === 0) {
     return { label: 'Working tree clean', labelColor: t['text-weak'] }

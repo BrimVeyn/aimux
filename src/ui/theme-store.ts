@@ -60,15 +60,6 @@ export function getCurrentResolved(): ResolvedTokens {
   return deriveResolved(themeStore.getState().theme)
 }
 
-/**
- * Subscribe to the raw palette seeds for the active theme. Prefer this over
- * `useTheme()` when you want the original hex (`palette.primary`, `palette.accent`,
- * `palette.success`, …) rather than an OKLCH-derived ramp step.
- */
-export function usePalette(): AimuxPalette {
-  return useStore(themeStore, (s) => s.theme.palette)
-}
-
 /** Synchronous snapshot of the raw palette for non-React callers. */
 export function getCurrentPalette(): AimuxPalette {
   return themeStore.getState().theme.palette

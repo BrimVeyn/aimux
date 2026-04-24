@@ -20,7 +20,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../../git-view-controls'
-import { usePalette, useTheme, useTransparent } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
 import {
   type DiffSegment,
   estimatedSegmentHeight,
@@ -226,11 +226,10 @@ function SideRow({
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
   const t = useTheme()
-  const p = usePalette()
-  const headerBg = t['surface-weak']
+  const headerBg = t['surface-diff-hidden-base']
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={p.primary}>{row.spec}</text>
+      <text fg={t['text-base']}>{row.spec}</text>
       {row.context ? <text fg={t['text-weaker']}> {row.context}</text> : null}
     </box>
   )
@@ -248,8 +247,7 @@ function HalfRow({
   tokens: ThemedToken[][]
 }) {
   const t = useTheme()
-  const p = usePalette()
-  const headerBg = t['surface-weak']
+  const headerBg = t['surface-diff-hidden-base']
   const transparent = useTransparent()
   if (cell.type === 'filler') {
     return <box backgroundColor={headerBg} height={height} />
@@ -258,13 +256,13 @@ function HalfRow({
   let sign = ' '
   let signColor = t['text-weak']
   if (cell.type === 'addition') {
-    bg = t['surface-diff-add-weak']
+    bg = t['surface-diff-add-base']
     sign = '+'
-    signColor = p.success
+    signColor = t['syntax-diff-add']
   } else if (cell.type === 'deletion') {
-    bg = t['surface-diff-delete-weak']
+    bg = t['surface-diff-delete-base']
     sign = '-'
-    signColor = p.error
+    signColor = t['syntax-diff-delete']
   }
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]

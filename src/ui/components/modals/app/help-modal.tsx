@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo } from 'react'
 import { collectHelpEntries, HELP_MODE_LABELS } from '../../../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useKeymap } from '../../../keymap-context'
-import { usePalette, useTheme } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
 
@@ -24,7 +24,6 @@ function matchesFilter(needle: string, ...fields: (string | undefined)[]): boole
 
 export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModalProps) {
   const t = useTheme()
-  const p = usePalette()
   const config = useKeymap()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
   const scoped = useMemo(
@@ -54,12 +53,12 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       group: entry.modeLabel,
       key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
-        <text fg={t['text-weak']} wrapMode="none">
+        <text fg={t['text-weaker']} wrapMode="none">
           {entry.description ?? ''}
         </text>
       ),
       trailing: (
-        <text fg={p.primary} wrapMode="none">
+        <text fg={t['text-weak']} wrapMode="none">
           {entry.keysDisplay}
         </text>
       ),

@@ -4,22 +4,22 @@ import { version as APP_VERSION } from '../../../../package.json'
 import { useAppStore } from '../../../state/app-store'
 import { useKeymap } from '../../keymap-context'
 import { getStatusBarModel } from '../../status-bar-model'
-import { getCurrentPalette, getCurrentResolved, useTheme } from '../../theme'
+import { getCurrentResolved, useTheme } from '../../theme'
 import { AIUsageIndicator } from '../overlays/ai-usage/ai-usage-indicator'
 
 function getModeColor(focusMode: AppState['focusMode']): string {
-  const p = getCurrentPalette()
+  const t = getCurrentResolved()
   switch (focusMode) {
     case 'terminal-input':
-      return p.primary
+      return t['text-interactive-base']
     case 'modal':
     case 'command-edit':
-      return p.warning
+      return t['icon-warning-base']
     case 'git':
-      return p.success
+      return t['icon-success-base']
     case 'navigation':
     default:
-      return getCurrentResolved()['text-strong']
+      return t['text-strong']
   }
 }
 
@@ -41,7 +41,7 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
 
 export function StatusBar() {
   const t = useTheme()
-  const headerBg = t['surface-weak']
+  const headerBg = t['background-stronger']
   const state = useAppStore((s) => s)
   const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
   const config = useKeymap()

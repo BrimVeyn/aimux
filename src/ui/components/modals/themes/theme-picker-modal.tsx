@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo } from 'react'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterThemeIds } from '../../../filter-themes'
-import { usePalette, useTheme, useTransparent } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
 import { type ThemeId, THEMES } from '../../../themes'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -26,7 +26,6 @@ export function ThemePickerModal({
   selectedIndex,
 }: ThemePickerModalProps) {
   const t = useTheme()
-  const p = usePalette()
   const transparent = useTransparent()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -49,7 +48,7 @@ export function ThemePickerModal({
           runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
         },
         title: <text fg={active ? t['text-base'] : t['text-weak']}>{entry.displayName}</text>,
-        trailing: isCurrent ? <text fg={p.primary}>current</text> : undefined,
+        trailing: isCurrent ? <text fg={t['text-interactive-base']}>current</text> : undefined,
       },
     ]
   })
