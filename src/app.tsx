@@ -1,4 +1,8 @@
-import { type ResolvedConfig, setAutoCommitEnabled } from '@brimveyn/aimux-config'
+import {
+  type ResolvedConfig,
+  setAutoCommitEnabled,
+  setMultiRepoConfig,
+} from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
@@ -51,6 +55,7 @@ export function App({
   // Publish the auto-commit enabled flag before any children render so
   // actions (which live outside React) can read it synchronously.
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+  setMultiRepoConfig(resolvedConfig.multiRepo)
 
   const keymapHandlers = useMemo(
     () => {

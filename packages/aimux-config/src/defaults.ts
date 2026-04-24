@@ -1,4 +1,4 @@
-import type { AutoCommitConfig, ResolvedKeymapConfig } from './types'
+import type { AutoCommitConfig, MultiRepoConfig, ResolvedKeymapConfig } from './types'
 
 import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
@@ -10,6 +10,11 @@ export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
     codex: 'gpt-5-mini',
   },
   timeoutMs: 60_000,
+}
+
+export const DEFAULT_MULTI_REPO_CONFIG: MultiRepoConfig = {
+  enabled: true,
+  maxDepth: 1,
 }
 
 /**

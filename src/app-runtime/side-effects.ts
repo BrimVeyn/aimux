@@ -652,7 +652,11 @@ async function runGitAction(
   args: string[],
   pathToInvalidate?: string
 ): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const fallback = ctx.getCurrentSessionProjectPath()
+  const repoPath = pathToInvalidate
+    ? ctx.state.gitPanel.files.find((f) => f.path === pathToInvalidate)?.repoPath
+    : undefined
+  const cwd = repoPath ?? fallback
   if (!cwd) return
   const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
   if (result.exitCode !== 0) {
@@ -667,7 +671,8 @@ async function runGitAction(
 }
 
 async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const repoPath = ctx.state.gitPanel.files.find((f) => f.path === path)?.repoPath
+  const cwd = repoPath ?? ctx.getCurrentSessionProjectPath()
   if (!cwd) return
   const absolute = `${cwd}/${path}`
   try {
