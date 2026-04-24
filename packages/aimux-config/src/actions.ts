@@ -671,3 +671,18 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   }
   return r([{ type: 'switch-create-session-field' }])
 }
+
+// ---------------------------------------------------------------------------
+// Modal: git-commit-error
+// ---------------------------------------------------------------------------
+
+export const commitErrorAskAgent: KeyResult = r(
+  [],
+  [{ type: 'open-commit-error-fix-session' }],
+  'git-mode'
+)
+
+export const commitErrorDismiss: KeyResult = r([{ type: 'close-modal' }], [], 'git-mode')
+
+export const commitErrorScrollDown: KeyResult = r([{ delta: 1, type: 'commit-error-scroll' }])
+export const commitErrorScrollUp: KeyResult = r([{ delta: -1, type: 'commit-error-scroll' }])

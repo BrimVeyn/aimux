@@ -40,6 +40,7 @@ import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
 import { triggerAutoCommitNow } from './auto-commit-ref'
+import { writePasteToTab } from './pty-write'
 import {
   handleCreateSessionEffect,
   handleDeleteSessionEffect,
@@ -590,9 +591,73 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       saveConfig({ ...loadConfig(), themeTransparent: next })
       return
     }
+    case 'open-commit-error-fix-session': {
+      openLinterFixSession(ctx)
+      return
+    }
+    case 'dismiss-commit-error-fix-session': {
+      disposeLinterFixTab(ctx)
+      return
+    }
     default:
       effect satisfies never
   }
+}
+
+function disposeLinterFixTab(ctx: SideEffectContext): void {
+  const tabId = ctx.state.gitMode.linterFixTabId
+  if (!tabId) return
+  ctx.clearIdleTimer(tabId)
+  ctx.clearStartupGrace(tabId)
+  ctx.backend.disposeSession(tabId)
+  ctx.dispatch({ type: 'git-mode-detach-linter-fix-tab' })
+}
+
+const LINTER_FIX_PROMPT_HEADER =
+  'The last `git commit` failed because of a pre-commit hook (linter/formatter).\nPlease fix the issues below so the commit can succeed, then stop.\n\n--- stderr ---\n'
+const LINTER_FIX_PROMPT_FOOTER = '\n---\n'
+
+function openLinterFixSession(ctx: SideEffectContext): void {
+  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
+  if (state.modal.type !== 'git-commit-error') return
+
+  const stderr = state.modal.stderr
+  const cwd = ctx.getCurrentSessionProjectPath()
+  if (!cwd) {
+    dispatch({ message: 'no project path for fix session', type: 'git-mode-set-message' })
+    dispatch({ type: 'close-modal' })
+    return
+  }
+
+  // If a previous fix tab is still around (user triggered fix twice without
+  // committing), dispose it first so we don't leak a PTY.
+  disposeLinterFixTab(ctx)
+
+  const assistant: AssistantId = 'claude'
+  const customCommand = state.customCommands[assistant]
+  const tab = createTabSession(assistant, customCommand, state.customCommands)
+
+  // Close the modal, focus git mode, attach the tab as the fix session.
+  dispatch({ type: 'close-modal' })
+  dispatch({ tab, type: 'git-mode-attach-linter-fix-tab' })
+
+  startTabSession(
+    backend,
+    dispatch,
+    clearStartupGrace,
+    (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
+    tab,
+    state.layout.terminalCols,
+    state.layout.terminalRows,
+    cwd
+  )
+
+  const prompt = `${LINTER_FIX_PROMPT_HEADER}${stderr}${LINTER_FIX_PROMPT_FOOTER}`
+  // The PTY needs a beat to come up before we paste. A short timeout matches
+  // the snippet-paste-after-launch pattern used elsewhere.
+  setTimeout(() => {
+    writePasteToTab(backend, tab.id, tab, prompt, dispatch)
+  }, 600)
 }
 
 function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void {
@@ -697,14 +762,17 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     ? await $`git -C ${cwd} commit -m ${title} -m ${body}`.quiet().nothrow()
     : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
   if (result.exitCode !== 0) {
-    const stderr = result.stderr.toString().trim()
+    const stderr = buildCommitErrorOutput(result)
     ctx.dispatch({
-      message: stderr || 'commit failed',
-      type: 'git-mode-set-message',
+      commitBody: body,
+      commitTitle: title,
+      stderr,
+      type: 'open-commit-error-modal',
     })
     return
   }
   clearAutoCommitForCurrentSession(ctx)
+  disposeLinterFixTab(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
 }
 
@@ -742,15 +810,34 @@ async function runGitCommitAuto(
     : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
 
   if (commitResult.exitCode !== 0) {
+    const stderr = buildCommitErrorOutput(commitResult)
     ctx.dispatch({
-      message: commitResult.stderr.toString().trim() || 'auto-commit: commit failed',
-      type: 'git-mode-set-message',
+      commitBody: body,
+      commitTitle: title,
+      stderr,
+      type: 'open-commit-error-modal',
     })
     return
   }
 
   clearAutoCommitForCurrentSession(ctx)
+  disposeLinterFixTab(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+}
+
+function buildCommitErrorOutput(result: {
+  exitCode: number | null
+  stderr: { toString(): string }
+  stdout: { toString(): string }
+}): string {
+  // Pre-commit hooks (lefthook + oxlint/oxfmt) write their violations to stdout
+  // in practice, so we concatenate both streams to avoid losing the linter
+  // output. Trim trailing whitespace but keep internal blank lines intact.
+  const err = result.stderr.toString()
+  const out = result.stdout.toString()
+  const merged = [out, err].filter((s) => s.trim().length > 0).join('\n')
+  const trimmed = merged.replace(/\s+$/g, '')
+  return trimmed.length > 0 ? trimmed : `commit failed (exit ${result.exitCode ?? 'unknown'})`
 }
 
 function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
