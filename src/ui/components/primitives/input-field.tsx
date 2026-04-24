@@ -1,4 +1,4 @@
-import { useTokens } from '../../theme'
+import { useTheme } from '../../theme'
 import { Surface } from './surface'
 
 interface InputFieldProps {
@@ -9,13 +9,15 @@ interface InputFieldProps {
 }
 
 export function InputField({ active, cursorPos, placeholder, value }: InputFieldProps) {
-  const t = useTokens()
-  const fg = active ? t.palette.ink : t.muted
+  const t = useTheme()
+  const fg = active ? t['text-base'] : t['text-weak']
   if (!active) {
     const showPlaceholder = !value && !!placeholder
     return (
       <Surface tone="input" padding={1}>
-        <text fg={showPlaceholder ? t.faint : fg}>{showPlaceholder ? placeholder : value}</text>
+        <text fg={showPlaceholder ? t['text-weaker'] : fg}>
+          {showPlaceholder ? placeholder : value}
+        </text>
       </Surface>
     )
   }
@@ -32,7 +34,7 @@ export function InputField({ active, cursorPos, placeholder, value }: InputField
     <Surface tone="inputActive" padding={1}>
       <text fg={fg}>
         {before}
-        <span bg={t.palette.ink} fg={t.bg}>
+        <span bg={t['text-base']} fg={t['background-base']}>
           {cursorDisplay}
         </span>
         {trailing}

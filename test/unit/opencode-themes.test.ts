@@ -1,4 +1,9 @@
-import { OPENCODE_THEME_IDS, OPENCODE_THEMES, paletteToShikiTheme } from '@brimveyn/aimux-config'
+import {
+  OPENCODE_THEME_IDS,
+  OPENCODE_THEMES,
+  paletteToShikiTheme,
+  resolveTheme,
+} from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
 const REQUIRED_KEYS = ['neutral', 'ink', 'primary', 'success', 'warning', 'error', 'info'] as const
@@ -28,9 +33,8 @@ describe('opencode theme catalog', () => {
     for (const id of OPENCODE_THEME_IDS) {
       const theme = OPENCODE_THEMES[id]
       if (!theme) throw new Error(`missing ${id}`)
-      expect(() =>
-        paletteToShikiTheme({ mode: theme.mode, name: id, palette: theme.palette })
-      ).not.toThrow()
+      const tokens = resolveTheme(theme.palette, theme.mode, theme.overrides as never)
+      expect(() => paletteToShikiTheme({ mode: theme.mode, name: id, tokens })).not.toThrow()
     }
   })
 

@@ -1,4 +1,4 @@
-import { useBg, useTokens } from '../../../theme'
+import { usePalette, useTheme } from '../../../theme'
 import { FOLD_STEP, type FoldInfo } from './build-rows'
 import { type FoldDispatch } from './pierre-diff'
 
@@ -8,11 +8,12 @@ interface Props {
 }
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
-  const t = useTokens()
-  const bg = useBg('elevated')
+  const t = useTheme()
+  const p = usePalette()
+  const bg = t['surface-diff-hidden-weak']
   return (
     <box paddingLeft={1} paddingRight={1} backgroundColor={bg} onMouseDown={onPress}>
-      <text fg={t.palette.primary}>{label}</text>
+      <text fg={p.primary}>{label}</text>
     </box>
   )
 }
@@ -22,8 +23,8 @@ function Spacer() {
 }
 
 export function FoldStrip({ dispatch, fold }: Props) {
-  const t = useTokens()
-  const headerBg = useBg('elevated')
+  const t = useTheme()
+  const headerBg = t['surface-diff-hidden-weak']
   const { bottomExpanded, foldId, hidden, topExpanded, total } = fold
   const stepUp = Math.min(FOLD_STEP, hidden)
   const stepDown = Math.min(FOLD_STEP, hidden)
@@ -71,7 +72,7 @@ export function FoldStrip({ dispatch, fold }: Props) {
 
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={t.muted}>{`⋯ ${hidden} hidden `}</text>
+      <text fg={t['text-weak']}>{`⋯ ${hidden} hidden `}</text>
       {controls}
     </box>
   )

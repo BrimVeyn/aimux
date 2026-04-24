@@ -8,7 +8,7 @@ import type {
 } from '../../../../services/ai-usage/types'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
-import { useTokens } from '../../../theme'
+import { usePalette, useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ModalShell } from '../shared/modal-shell'
 
@@ -56,7 +56,7 @@ function paceStageIsBehind(stage: UsagePaceStage): boolean {
 }
 
 export function AIUsageModal() {
-  const t = useTokens()
+  const t = useTheme()
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
   const tools: AIUsageTool[] = ['claude', 'codex']
@@ -72,7 +72,7 @@ export function AIUsageModal() {
       listGap={1}
     >
       {sections.length === 0 ? (
-        <text fg={t.muted} selectable={false}>
+        <text fg={t['text-weak']} selectable={false}>
           no data yet — collecting…
         </text>
       ) : (
@@ -92,20 +92,21 @@ interface ToolSectionProps {
 }
 
 function ToolSection({ snap, tool }: ToolSectionProps) {
-  const t = useTokens()
+  const t = useTheme()
+  const p = usePalette()
   const isHardError = Boolean(snap.error) && !snap.stale
   const relative = formatRelative(snap.lastUpdated)
 
   let body: ReactNode
   if (isHardError) {
     body = (
-      <text fg={t.palette.error} selectable={false}>
+      <text fg={p.error} selectable={false}>
         {`error: ${snap.error ?? ''}`}
       </text>
     )
   } else if (snap.windows.length === 0) {
     body = (
-      <text fg={t.muted} selectable={false}>
+      <text fg={t['text-weak']} selectable={false}>
         no window data
       </text>
     )
@@ -116,16 +117,16 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
   return (
     <box flexDirection="column">
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t.accent} selectable={false}>
+        <text fg={t['text-strong']} selectable={false}>
           {TOOL_TITLE[tool]}
         </text>
         {snap.planTier ? (
-          <text fg={t.muted} selectable={false}>
+          <text fg={t['text-weak']} selectable={false}>
             {snap.planTier}
           </text>
         ) : null}
       </box>
-      <text fg={t.muted} selectable={false}>
+      <text fg={t['text-weak']} selectable={false}>
         {`Updated ${relative}`}
       </text>
       {body}
@@ -134,14 +135,15 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
 }
 
 function WindowRow({ window }: { window: UsageWindow }) {
-  const t = useTokens()
+  const t = useTheme()
+  const p = usePalette()
   const percent = window.percent
   const { empty, filled } = buildBar(percent)
 
-  let barColor = t.palette.success
+  let barColor = p.success
   if (percent !== null) {
-    if (percent >= 85) barColor = t.palette.error
-    else if (percent >= 60) barColor = t.palette.warning
+    if (percent >= 85) barColor = p.error
+    else if (percent >= 60) barColor = p.warning
   }
 
   const pctText = percent === null ? '—' : `${Math.round(percent)}% used`
@@ -149,23 +151,23 @@ function WindowRow({ window }: { window: UsageWindow }) {
 
   return (
     <box flexDirection="column" paddingTop={1}>
-      <text fg={t.palette.ink} selectable={false}>
+      <text fg={t['text-base']} selectable={false}>
         {window.label}
       </text>
       <box flexDirection="row">
         <text fg={barColor} selectable={false}>
           {filled}
         </text>
-        <text fg={t.muted} selectable={false}>
+        <text fg={t['text-weak']} selectable={false}>
           {empty}
         </text>
       </box>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t.muted} selectable={false}>
+        <text fg={t['text-weak']} selectable={false}>
           {pctText}
         </text>
         {resetText ? (
-          <text fg={t.muted} selectable={false}>
+          <text fg={t['text-weak']} selectable={false}>
             {resetText}
           </text>
         ) : null}
@@ -176,10 +178,11 @@ function WindowRow({ window }: { window: UsageWindow }) {
 }
 
 function PaceLine({ pace }: { pace: NonNullable<UsageWindow['pace']> }) {
-  const t = useTokens()
-  let color = t.muted
-  if (paceStageIsBehind(pace.stage)) color = t.palette.warning
-  else if (paceStageIsAhead(pace.stage)) color = t.palette.success
+  const t = useTheme()
+  const p = usePalette()
+  let color = t['text-weak']
+  if (paceStageIsBehind(pace.stage)) color = p.warning
+  else if (paceStageIsAhead(pace.stage)) color = p.success
 
   const suffix = pace.rightText ? ` · ${pace.rightText}` : ''
   return (

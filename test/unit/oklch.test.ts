@@ -16,7 +16,6 @@ import {
   shift,
   withAlpha,
 } from '../../packages/aimux-config/src/oklch'
-import { computeSurfaces } from '../../packages/aimux-config/src/palette-utils'
 
 const CASES: string[] = ['#000000', '#ffffff', '#8e8e8e', '#2e3440', '#fdf6e3', '#393939']
 
@@ -217,60 +216,5 @@ describe('withAlpha', () => {
   })
   test('passes alpha through verbatim', () => {
     expect(withAlpha('#ff6767', 0.5)).toBe('rgba(255, 103, 103, 0.5)')
-  })
-})
-
-describe('computeSurfaces', () => {
-  const carbonfoxLight = {
-    accent: '#da1e28',
-    error: '#da1e28',
-    info: '#0043ce',
-    ink: '#161616',
-    interactive: '#0f62fe',
-    neutral: '#8e8e8e',
-    primary: '#0072c3',
-    success: '#198038',
-    warning: '#f1c21b',
-  } as const
-
-  const nordDark = {
-    accent: '#d57780',
-    error: '#bf616a',
-    info: '#81a1c1',
-    ink: '#e5e9f0',
-    neutral: '#2e3440',
-    primary: '#88c0d0',
-    success: '#a3be8c',
-    warning: '#d08770',
-  } as const
-
-  test('carbonfox-light surfaces land in the light window', () => {
-    const s = computeSurfaces(carbonfoxLight, 'light')
-    const bg = hexToOklch(s.bg)
-    expect(bg.l).toBeGreaterThan(0.9)
-    expect(s.bg).not.toBe(carbonfoxLight.neutral)
-  })
-
-  test('nord-dark surfaces land in the dark window', () => {
-    const s = computeSurfaces(nordDark, 'dark')
-    const bg = hexToOklch(s.bg)
-    expect(bg.l).toBeGreaterThan(0.15)
-    expect(bg.l).toBeLessThan(0.28)
-  })
-
-  test('selected is a subtle primary tint over the computed bg (not raw interactive)', () => {
-    const s = computeSurfaces(carbonfoxLight, 'light')
-    // never the raw electric-blue interactive seed
-    expect(s.selected).not.toBe('#0f62fe')
-    // stays close to bg (18% primary tint)
-    const bg = hexToOklch(s.bg)
-    const sel = hexToOklch(s.selected)
-    expect(Math.abs(sel.l - bg.l)).toBeLessThan(0.25)
-  })
-
-  test('selected still produces a valid hex when interactive is absent', () => {
-    const s = computeSurfaces(nordDark, 'dark')
-    expect(s.selected.startsWith('#')).toBe(true)
-    expect(s.selected).not.toBe(nordDark.neutral)
   })
 })

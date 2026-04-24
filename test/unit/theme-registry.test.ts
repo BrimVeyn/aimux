@@ -1,5 +1,4 @@
 import {
-  computeSurfaces,
   extendPalette,
   isKnownThemeId,
   migrateThemeId,
@@ -82,8 +81,8 @@ describe('computed bg luminance', () => {
   test('every theme resolves bg inside its mode window', () => {
     for (const id of THEME_IDS) {
       const theme = requireTheme(id)
-      const surfaces = computeSurfaces(theme.palette, theme.mode)
-      const { l } = hexToOklch(surfaces.bg)
+      const tokens = resolveTheme(theme.palette, theme.mode)
+      const { l } = hexToOklch(tokens['background-base'])
       if (theme.mode === 'dark') {
         expect(l).toBeGreaterThanOrEqual(0)
         expect(l).toBeLessThan(0.3)
@@ -178,14 +177,15 @@ describe('extendPalette', () => {
 })
 
 describe('paletteToShikiTheme', () => {
-  test('produces a shiki theme matching the active palette mode/colors', () => {
+  test('produces a shiki theme matching the resolved tokens for the active mode', () => {
     const dark = requireTheme('aimux-dark')
-    const out = paletteToShikiTheme({ mode: dark.mode, name: 'aimux-dark', palette: dark.palette })
+    const tokens = resolveTheme(dark.palette, dark.mode)
+    const out = paletteToShikiTheme({ mode: dark.mode, name: 'aimux-dark', tokens })
     expect(out.name).toBe('aimux-dark')
     expect(out.type).toBe('dark')
-    expect(out.bg).toBe(dark.palette.neutral)
-    expect(out.fg).toBe(dark.palette.ink)
-    expect(out.colors?.['editor.background']).toBe(dark.palette.neutral)
+    expect(out.bg).toBe(tokens['background-base'])
+    expect(out.fg).toBe(tokens['text-base'])
+    expect(out.colors?.['editor.background']).toBe(tokens['background-base'])
     expect((out.settings ?? []).length).toBeGreaterThan(5)
   })
 })

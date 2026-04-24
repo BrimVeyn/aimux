@@ -1,31 +1,24 @@
-// Thin runtime re-export. Theme data, types, palette utilities, and the
-// palette-to-Shiki generator all live in `@brimveyn/aimux-config`.
+// Thin runtime re-export. Theme data, types, and the palette-to-Shiki generator
+// all live in `@brimveyn/aimux-config`.
 
 export type {
   AimuxPalette,
   AimuxTheme,
   AimuxThemeConfig,
+  ResolvedToken,
+  ResolvedTokens,
   Theme,
   ThemeId,
   ThemeMode,
+  ThemeVariantOverrides,
 } from '@brimveyn/aimux-config'
 
 export {
-  accent,
-  border,
-  computeSurfaces,
-  diffAddBg,
-  diffDeleteBg,
-  elevated,
   extendPalette,
-  faint,
-  hover,
   isKnownThemeId,
   migrateThemeId,
-  mix,
-  muted,
   paletteToShikiTheme,
-  selected,
+  resolveTheme,
   THEME_IDS,
   THEMES,
 } from '@brimveyn/aimux-config'

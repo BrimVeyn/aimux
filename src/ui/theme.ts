@@ -1,16 +1,16 @@
 // Back-compat shim: the theme singleton has been replaced with a Zustand store.
-// React components use `useTokens` for derived shades; non-React callers use
-// `getCurrentTheme()` / `getCurrentTokens()`.
+// React components use `useTheme` for resolved tokens; non-React callers use
+// `getCurrentTheme()` / `getCurrentResolved()`.
 
+export type { ResolvedToken, ResolvedTokens } from './themes'
 export {
   applyTheme,
+  getCurrentPalette,
+  getCurrentResolved,
   getCurrentTheme,
-  getCurrentTokens,
   getTransparent,
   setTransparent,
-  type SurfaceToken,
-  type ThemeTokens,
-  useBg,
-  useTokens,
+  usePalette,
+  useTheme,
   useTransparent,
 } from './theme-store'

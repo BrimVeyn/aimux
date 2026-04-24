@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo } from 'react'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterThemeIds } from '../../../filter-themes'
-import { useTokens, useTransparent } from '../../../theme'
+import { usePalette, useTheme, useTransparent } from '../../../theme'
 import { type ThemeId, THEMES } from '../../../themes'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -25,7 +25,8 @@ export function ThemePickerModal({
   filter,
   selectedIndex,
 }: ThemePickerModalProps) {
-  const t = useTokens()
+  const t = useTheme()
+  const p = usePalette()
   const transparent = useTransparent()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -47,8 +48,8 @@ export function ThemePickerModal({
           dispatchGlobal({ type: 'close-modal' })
           runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
         },
-        title: <text fg={active ? t.palette.ink : t.muted}>{entry.displayName}</text>,
-        trailing: isCurrent ? <text fg={t.palette.primary}>current</text> : undefined,
+        title: <text fg={active ? t['text-base'] : t['text-weak']}>{entry.displayName}</text>,
+        trailing: isCurrent ? <text fg={p.primary}>current</text> : undefined,
       },
     ]
   })
@@ -62,15 +63,15 @@ export function ThemePickerModal({
       cursorPos={cursorPos}
       footer={
         <box flexDirection="column" gap={0}>
-          <text fg={t.hover}>
+          <text fg={t['text-weaker']}>
             {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
           </text>
-          <text fg={t.muted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
+          <text fg={t['text-weak']}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
         </box>
       }
       items={items}
       selectedIndex={effectiveIndex}
-      emptyState={<text fg={t.muted}>No themes available.</text>}
+      emptyState={<text fg={t['text-weak']}>No themes available.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

@@ -5,13 +5,16 @@ import {
   type ThemeRegistrationRaw,
 } from 'shiki'
 
-import { getCurrentTheme } from './theme-store'
+import { getCurrentResolved, getCurrentTheme } from './theme-store'
 import { paletteToShikiTheme } from './themes'
 
 function buildActiveTheme(): { id: string; raw: ThemeRegistrationRaw } {
   const theme = getCurrentTheme()
   const id = `${theme.name}-${theme.mode}`
-  return { id, raw: paletteToShikiTheme({ mode: theme.mode, name: id, palette: theme.palette }) }
+  return {
+    id,
+    raw: paletteToShikiTheme({ mode: theme.mode, name: id, tokens: getCurrentResolved() }),
+  }
 }
 
 let highlighterPromise: Promise<Highlighter> | null = null

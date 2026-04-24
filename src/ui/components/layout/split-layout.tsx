@@ -11,7 +11,7 @@ import {
   type PaneRect,
   type SplitDirection,
 } from '../../../state/layout-tree'
-import { useTokens } from '../../theme'
+import { useTheme } from '../../theme'
 import { TerminalPane } from './terminal-pane'
 
 const PANE_CHROME = PANE_BORDER
@@ -58,7 +58,7 @@ export function SplitLayout({
   onTerminalScrollEvent,
   tabs,
 }: SplitLayoutProps) {
-  const t = useTokens()
+  const t = useTheme()
   if (node.type === 'leaf') {
     const tab = tabs.find((t) => t.id === node.tabId)
     const isActive = node.tabId === activeTabId
@@ -135,7 +135,7 @@ export function SplitLayout({
       <box
         minWidth={node.direction === 'vertical' ? 1 : undefined}
         minHeight={node.direction === 'horizontal' ? 1 : undefined}
-        backgroundColor={t.border}
+        backgroundColor={t['border-weak-base']}
         onMouseDown={(e: OtuiMouseEvent) => {
           e.preventDefault()
           if (!onSeparatorDragStart) return

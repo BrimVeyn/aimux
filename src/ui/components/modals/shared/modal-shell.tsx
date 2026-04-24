@@ -3,7 +3,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 import { type BoxRenderable, type OptimizedBuffer, RGBA } from '@opentui/core'
 import { type ReactNode } from 'react'
 
-import { useTokens, useTransparent } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 
 interface ModalShellProps {
@@ -57,9 +57,9 @@ export function ModalShell({
   title,
   width,
 }: ModalShellProps) {
-  const t = useTokens()
+  const t = useTheme()
   const transparent = useTransparent()
-  const bg = transparent ? 'transparent' : t.elevated
+  const bg = transparent ? 'transparent' : t['surface-float-base']
   return (
     <box
       position="absolute"
@@ -72,7 +72,7 @@ export function ModalShell({
     >
       <box
         border
-        borderColor={t.palette.primary}
+        borderColor={t['border-base']}
         backgroundColor={bg}
         padding={1}
         width={width}
@@ -80,8 +80,8 @@ export function ModalShell({
       >
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
-            <text fg={t.accent}>{title}</text>
-            {subtitle ? <text fg={t.muted}>{subtitle}</text> : null}
+            <text fg={t['text-strong']}>{title}</text>
+            {subtitle ? <text fg={t['text-weak']}>{subtitle}</text> : null}
           </box>
           {children}
           {footer ? <box>{footer}</box> : null}

@@ -11,7 +11,7 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
 import { setGitDiffScroller } from '../../git-view-controls'
-import { useBg, useTokens } from '../../theme'
+import { usePalette, useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
@@ -47,25 +47,26 @@ const DiffStage = memo(function DiffStage({
   themeId,
   view,
 }: DiffStageProps) {
-  const t = useTokens()
+  const t = useTheme()
+  const p = usePalette()
   if (loading && !diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t.muted}>Loading diff…</text>
+        <text fg={t['text-weak']}>Loading diff…</text>
       </box>
     )
   }
   if (!diff) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t.muted}>Select a file.</text>
+        <text fg={t['text-weak']}>Select a file.</text>
       </box>
     )
   }
   if (diff.errorMessage) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t.palette.error}>{diff.errorMessage}</text>
+        <text fg={p.error}>{diff.errorMessage}</text>
       </box>
     )
   }
@@ -74,7 +75,7 @@ const DiffStage = memo(function DiffStage({
   if (placeholder) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t.muted}>{placeholder}</text>
+        <text fg={t['text-weak']}>{placeholder}</text>
       </box>
     )
   }
@@ -83,7 +84,7 @@ const DiffStage = memo(function DiffStage({
     <box flexDirection="column" flexGrow={1} overflow="hidden">
       {diff.oldPath ? (
         <box paddingLeft={1} paddingRight={1}>
-          <text fg={t.muted}>
+          <text fg={t['text-weak']}>
             renamed: {diff.oldPath} → {diff.path}
           </text>
         </box>
@@ -105,9 +106,10 @@ interface GitViewProps {
 }
 
 export const GitView = memo(function GitView({ themeId }: GitViewProps) {
-  const t = useTokens()
-  const sidebarBg = useBg('elevated')
-  const actionBg = useBg('selected')
+  const t = useTheme()
+  const p = usePalette()
+  const sidebarBg = t['surface-weak']
+  const actionBg = t['surface-base-active']
   const dimensions = useTerminalDimensions()
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
@@ -194,13 +196,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   let footerNode: React.ReactNode = null
   if (pendingHint) {
     footerNode = (
-      <text fg={t.palette.warning}>
+      <text fg={p.warning}>
         <strong>{pendingHint}</strong>
       </text>
     )
   } else if (actionMessage) {
     footerNode = actionMessage.split('\n').map((line, idx) => (
-      <text key={idx} fg={t.palette.primary}>
+      <text key={idx} fg={p.primary}>
         {line}
       </text>
     ))
@@ -216,24 +218,24 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           padding={0}
           gap={0}
         >
-          <text fg={t.palette.primary}>
+          <text fg={p.primary}>
             <strong>aimux · git</strong>
           </text>
           {gitPanel.branch ? (
             <box flexDirection="row">
-              <text fg={t.palette.primary}>{'\u{e702}'} </text>
-              <text fg={t.muted}>{gitPanel.branch}</text>
+              <text fg={p.primary}>{'\u{e702}'} </text>
+              <text fg={t['text-weak']}>{gitPanel.branch}</text>
             </box>
           ) : null}
           {gitMode.headOffset > 0 ? (
             <box flexDirection="row" gap={1}>
-              <text fg={t.palette.warning}>
+              <text fg={p.warning}>
                 <strong>HEAD~{gitMode.headOffset}</strong>
               </text>
-              <text fg={t.muted}>[ newer · ] older</text>
+              <text fg={t['text-weak']}>[ newer · ] older</text>
             </box>
           ) : null}
-          <text fg={t.hover}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          <text fg={t['text-weaker']}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
@@ -253,7 +255,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             backgroundColor={sidebarBg}
           >
             <box flexGrow={1}>
-              <text fg={selectedFile ? t.palette.ink : t.muted}>
+              <text fg={selectedFile ? t['text-base'] : t['text-weak']}>
                 {selectedFile ? selectedFile.path : 'Diff'}
               </text>
             </box>
@@ -267,7 +269,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
                 dispatchGlobal({ type: 'exit-git-mode' })
               }}
             >
-              <text fg={t.palette.ink}>
+              <text fg={t['text-base']}>
                 <strong>Exit diff</strong>
               </text>
             </box>

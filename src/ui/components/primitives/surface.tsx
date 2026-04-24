@@ -1,21 +1,24 @@
 import type { ReactNode } from 'react'
 
-import { type SurfaceToken, useBg } from '../../theme'
+import type { ResolvedToken } from '../../themes'
+
+import { useTheme } from '../../theme'
 
 type SurfaceTone = 'muted' | 'elevated' | 'selected' | 'input' | 'inputActive'
 
-function toneToToken(tone: SurfaceTone): SurfaceToken {
+function toneToToken(tone: SurfaceTone): ResolvedToken {
   switch (tone) {
     case 'elevated':
-      return 'elevated'
+      return 'surface-raised-base'
     case 'selected':
-    case 'inputActive':
-      return 'selected'
+      return 'surface-base-active'
     case 'input':
-      return 'base'
+      return 'input-base'
+    case 'inputActive':
+      return 'input-active'
     case 'muted':
     default:
-      return 'elevated'
+      return 'surface-weak'
   }
 }
 
@@ -44,10 +47,10 @@ export function Surface({
   tone = 'muted',
   width,
 }: SurfaceProps) {
-  const bg = useBg(toneToToken(tone))
+  const t = useTheme()
   return (
     <box
-      backgroundColor={bg}
+      backgroundColor={t[toneToToken(tone)]}
       flexDirection={flexDirection}
       gap={gap}
       padding={padding}

@@ -1,4 +1,4 @@
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'
 import { ModalShell } from '../shared/modal-shell'
@@ -19,7 +19,7 @@ export function UpdateAvailableModal({
   latestVersion,
   selectedIndex,
 }: UpdateAvailableModalProps) {
-  const t = useTokens()
+  const t = useTheme()
   return (
     <ModalShell
       title="Update available"
@@ -36,7 +36,7 @@ export function UpdateAvailableModal({
               key={option.label}
               active={active}
               direction="row"
-              title={<text fg={active ? t.palette.ink : t.muted}>{option.label}</text>}
+              title={<text fg={active ? t['text-base'] : t['text-weak']}>{option.label}</text>}
             />
           )
         })}

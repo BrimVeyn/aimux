@@ -5,21 +5,7 @@ export * as actions from './actions'
 export { isKnownThemeId, migrateThemeId, THEME_IDS, THEMES } from './themes'
 export { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
 export { OPENCODE_THEME_IDS, OPENCODE_THEMES } from './themes/opencode'
-export {
-  accent,
-  border,
-  computeSurfaces,
-  diffAddBg,
-  diffDeleteBg,
-  elevated,
-  extendPalette,
-  faint,
-  hover,
-  mix,
-  muted,
-  selected,
-} from './palette-utils'
-export type { ResolvedSurfaces } from './palette-utils'
+export { extendPalette } from './palette-utils'
 export { paletteToShikiTheme } from './palette-to-shiki'
 export { resolveTheme, resolveThemeVariant } from './resolve'
 export type { ThemeSeedColors, ThemeVariant, ThemeVariantOverrides } from './resolve'
