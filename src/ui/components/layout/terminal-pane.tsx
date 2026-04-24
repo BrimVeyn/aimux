@@ -55,7 +55,7 @@ function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMo
   }
 
   if (isActive) {
-    return t['border-strong-base']
+    return p.accent ?? p.primary
   }
 
   return t['border-weak-base']

@@ -50,17 +50,16 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
   }, [filtered.length])
 
   const items: PickerItem[] = filtered.map((entry, index) => {
-    const active = index === selectedIndex
     return {
       group: entry.modeLabel,
       key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
-        <text fg={active ? t['text-base'] : t['text-weak']} wrapMode="none">
+        <text fg={t['text-weak']} wrapMode="none">
           {entry.description ?? ''}
         </text>
       ),
       trailing: (
-        <text fg={active ? p.primary : t['text-weaker']} wrapMode="none">
+        <text fg={p.primary} wrapMode="none">
           {entry.keysDisplay}
         </text>
       ),
