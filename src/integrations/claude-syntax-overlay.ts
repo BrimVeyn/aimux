@@ -169,19 +169,35 @@ function tokenize(code: string, lang: string): ShikiToken[][] {
   }
 }
 
+// Calm palette: only color tokens that carry semantic weight (keywords,
+// strings, comments, numbers, types). Operators / punctuation / variables /
+// function-call sites fall back to plain `text` so we don't end up with a
+// rainbow where every identifier and brace is its own color.
+function buildAccentSet(): Set<string> {
+  const t = getCurrentTheme()
+  return new Set(
+    [t.syntaxKeyword, t.syntaxString, t.syntaxComment, t.syntaxNumber, t.syntaxType]
+      .filter((c): c is string => typeof c === 'string')
+      .map((c) => c.toLowerCase())
+  )
+}
+
 function buildSpans(
   tokens: ShikiToken[],
   bg: string | undefined,
-  fallbackFg: string
+  fallbackFg: string,
+  accents: Set<string>
 ): TerminalSpan[] {
   const spans: TerminalSpan[] = []
   for (const tok of tokens) {
     if (!tok.content) continue
     const fs = tok.fontStyle ?? 0
+    const tokColor = tok.color?.toLowerCase()
+    const fg = tokColor && accents.has(tokColor) ? tok.color : fallbackFg
     spans.push({
       bg,
       bold: (fs & 2) !== 0 || undefined,
-      fg: tok.color ?? fallbackFg,
+      fg,
       italic: (fs & 1) !== 0 || undefined,
       text: tok.content,
       underline: (fs & 4) !== 0 || undefined,
@@ -194,7 +210,8 @@ function rebuildLine(
   line: TerminalLine,
   prefix: string,
   tokens: ShikiToken[],
-  fallbackFg: string
+  fallbackFg: string,
+  accents: Set<string>
 ): TerminalLine {
   const bg = dominantBg(line)
   const out: TerminalSpan[] = []
@@ -204,7 +221,7 @@ function rebuildLine(
     const prefixSpans = sliceLeading(line.spans, prefix.length)
     out.push(...prefixSpans)
   }
-  out.push(...buildSpans(tokens, bg, fallbackFg))
+  out.push(...buildSpans(tokens, bg, fallbackFg, accents))
   return { spans: out }
 }
 
@@ -235,7 +252,12 @@ interface BlockContext {
   lineRefs: TerminalLine[]
 }
 
-function flushBlock(block: BlockContext, lines: TerminalLine[], fallbackFg: string): void {
+function flushBlock(
+  block: BlockContext,
+  lines: TerminalLine[],
+  fallbackFg: string,
+  accents: Set<string>
+): void {
   if (block.codes.length === 0) return
   const joined = block.codes.join('\n')
   const tokenLines = tokenize(joined, block.lang)
@@ -246,12 +268,17 @@ function flushBlock(block: BlockContext, lines: TerminalLine[], fallbackFg: stri
     const lineRef = block.lineRefs[i]
     const prefix = block.prefixes[i]
     if (!lineRef || prefix === undefined) continue
-    const newLine = rebuildLine(lineRef, prefix, tokens, fallbackFg)
+    const newLine = rebuildLine(lineRef, prefix, tokens, fallbackFg, accents)
     lines[block.startIndex + i] = newLine
   }
 }
 
-function processLines(lines: TerminalLine[], tabId: string, fallbackFg: string): TerminalLine[] {
+function processLines(
+  lines: TerminalLine[],
+  tabId: string,
+  fallbackFg: string,
+  accents: Set<string>
+): TerminalLine[] {
   const out = lines.slice()
   let block: BlockContext | null = null
 
@@ -287,12 +314,12 @@ function processLines(lines: TerminalLine[], tabId: string, fallbackFg: string):
     }
 
     if (block) {
-      flushBlock(block, out, fallbackFg)
+      flushBlock(block, out, fallbackFg, accents)
       block = null
     }
   }
 
-  if (block) flushBlock(block, out, fallbackFg)
+  if (block) flushBlock(block, out, fallbackFg, accents)
   return out
 }
 
@@ -301,10 +328,11 @@ export function highlightSnapshot(snapshot: TerminalSnapshot, tabId: string): Te
 
   const theme = getCurrentTheme()
   const fallbackFg = theme.text
+  const accents = buildAccentSet()
 
-  const nextLines = processLines(snapshot.lines, tabId, fallbackFg)
+  const nextLines = processLines(snapshot.lines, tabId, fallbackFg, accents)
   const nextTail = snapshot.tailLines
-    ? processLines(snapshot.tailLines, tabId, fallbackFg)
+    ? processLines(snapshot.tailLines, tabId, fallbackFg, accents)
     : snapshot.tailLines
   return { ...snapshot, lines: nextLines, tailLines: nextTail }
 }
