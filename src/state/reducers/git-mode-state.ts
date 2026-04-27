@@ -1,5 +1,6 @@
-import type { AppAction, AppState, FoldState, GitFileEntry, GitModeState } from '../types'
+import type { FileDiffMetadata } from '../../diff-parser'
 
+import { collectFoldables } from '../../ui/components/git/diff-renderer/build-rows'
 import {
   getSelectedGitRow,
   gitFileKey,
@@ -7,6 +8,14 @@ import {
   moveGitSelection,
   reconcileSelectedGitEntryKey,
 } from '../git-tree'
+import {
+  type AppAction,
+  type AppState,
+  type FoldState,
+  getParsedPayload,
+  type GitFileEntry,
+  type GitModeState,
+} from '../types'
 import { clearDiffCacheForPath, clearDiffCacheForPaths } from './diff-cache'
 import { sortFilesBySection } from './git-panel-state'
 
@@ -438,6 +447,28 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       const top = Math.max(0, action.top)
       const bottom = Math.max(0, action.bottom)
       return applyFold(state, action.key, action.foldId, { bottom, top })
+    }
+    case 'git-mode-fold-toggle-all': {
+      const file = getParsedPayload<FileDiffMetadata>(state.gitMode.parsedFiles[action.key])
+      if (!file) return state
+      const foldables = collectFoldables(file)
+      if (foldables.length === 0) return state
+      const current = state.gitMode.folds[action.key] ?? {}
+      const allExpanded = foldables.every(({ foldId, middle }) => {
+        const fs = current[foldId] ?? { bottom: 0, top: 0 }
+        return fs.top + fs.bottom >= middle
+      })
+      const nextFolds = { ...state.gitMode.folds }
+      if (allExpanded) {
+        delete nextFolds[action.key]
+      } else {
+        const perPath: Record<string, FoldState> = {}
+        for (const { foldId, middle } of foldables) {
+          perPath[foldId] = { bottom: 0, top: middle }
+        }
+        nextFolds[action.key] = perPath
+      }
+      return { ...state, gitMode: { ...state.gitMode, folds: nextFolds } }
     }
     case 'git-mode-optimistic-move': {
       const currentKey = state.gitMode.selectedEntryKey

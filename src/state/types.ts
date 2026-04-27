@@ -629,6 +629,7 @@ export type GitModeAction =
       delta: number
     }
   | { type: 'git-mode-fold-set'; key: string; foldId: string; top: number; bottom: number }
+  | { type: 'git-mode-fold-toggle-all'; key: string }
   | {
       type: 'git-mode-optimistic-move'
       path: string

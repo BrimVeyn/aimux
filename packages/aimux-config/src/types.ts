@@ -531,6 +531,7 @@ export type GitModeAction =
       delta: number
     }
   | { type: 'git-mode-fold-set'; key: string; foldId: string; top: number; bottom: number }
+  | { type: 'git-mode-fold-toggle-all'; key: string }
   | {
       type: 'git-mode-optimistic-move'
       path: string
@@ -607,6 +608,8 @@ export type SideEffect =
   | { type: 'persist-git-tree-compaction'; enabled: boolean }
   | { type: 'git-stage'; path: string }
   | { type: 'git-unstage'; path: string }
+  | { type: 'git-stage-all' }
+  | { type: 'git-unstage-all' }
   | { type: 'git-restore'; path: string }
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
