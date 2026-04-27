@@ -20,7 +20,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../../git-view-controls'
-import { useBg, useTokens, useTransparent } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
 import {
   type DiffSegment,
   estimatedSegmentHeight,
@@ -179,14 +179,14 @@ function UnifiedRowRender({
   highlights: DiffHighlights
   row: UnifiedRowOrHeader
 }) {
-  const t = useTokens()
-  const headerBg = useBg('elevated')
+  const t = useTheme()
+  const headerBg = t.diffContextBg
   const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-        <text fg={t.muted}>{row.spec}</text>
-        {row.context ? <text fg={t.hover}> {row.context}</text> : null}
+        <text fg={t.text}>{row.spec}</text>
+        {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
       </box>
     )
   }
@@ -199,21 +199,21 @@ function UnifiedRowRender({
     const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row" height={row.height}>
-        <text fg={t.muted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={t.palette.ink}> </text>
+        <text fg={t.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
+        <text fg={t.text}> </text>
         <LineContent content={row.content} tokens={tokens} />
       </box>
     )
   }
-  const bg = row.type === 'addition' ? t.diffAddBg : t.diffDeleteBg
+  const bg = row.type === 'addition' ? t.diffAddedBg : t.diffRemovedBg
   const sign = row.type === 'addition' ? '+' : '-'
-  const signColor = row.type === 'addition' ? t.palette.success : t.palette.error
+  const signColor = row.type === 'addition' ? t.diffAdded : t.diffRemoved
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={row.height}>
-      <text fg={t.muted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
+      <text fg={t.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
     </box>
@@ -221,9 +221,9 @@ function UnifiedRowRender({
 }
 
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
-  const t = useTokens()
+  const t = useTheme()
   if (!tokens || tokens.length === 0) {
-    return <text fg={t.palette.ink}>{content}</text>
+    return <text fg={t.text}>{content}</text>
   }
   return (
     <text>
@@ -234,7 +234,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? t.palette.ink} attributes={attributes}>
+          <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}
           </span>
         )

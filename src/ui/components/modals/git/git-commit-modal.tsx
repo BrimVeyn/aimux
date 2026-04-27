@@ -5,7 +5,7 @@ import type { ModeId } from '../../../../input/modes/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { InputField } from '../../primitives/input-field'
 import { ModalShell } from '../shared/modal-shell'
@@ -49,7 +49,7 @@ function pickShellTitle(stage: 'edit' | 'generating' | 'confirm'): string {
 }
 
 function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: string }) {
-  const t = useTokens()
+  const t = useTheme()
   const frame = useSpinnerFrame(true)
   const providerLabel = [assistant, model].filter(Boolean).join(' · ') || 'configured provider'
   return (
@@ -60,14 +60,14 @@ function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: s
       paddingTop={2}
       paddingBottom={2}
     >
-      <text fg={t.palette.primary}>🪄</text>
+      <text fg={t.primary}>🪄</text>
       <box marginTop={1} flexDirection="row" gap={1}>
-        <text fg={t.palette.primary}>{frame}</text>
-        <text fg={t.palette.ink}>Generating commit message</text>
+        <text fg={t.primary}>{frame}</text>
+        <text fg={t.text}>Generating commit message</text>
       </box>
-      <text fg={t.muted}>via {providerLabel}</text>
+      <text fg={t.textMuted}>via {providerLabel}</text>
       <box marginTop={1}>
-        <text fg={t.muted}>Esc to cancel</text>
+        <text fg={t.textMuted}>Esc to cancel</text>
       </box>
     </box>
   )
@@ -82,7 +82,7 @@ export function GitCommitModal({
   stage,
   title,
 }: GitCommitModalProps) {
-  const t = useTokens()
+  const t = useTheme()
   const titleActive = activeField === 'title'
   const bodyActive = activeField === 'body'
   const isConfirm = stage === 'confirm'
@@ -125,22 +125,22 @@ export function GitCommitModal({
       {isConfirm ? (
         <box flexDirection="column">
           {stagedCount > 0 ? (
-            <text fg={t.palette.warning}>
+            <text fg={t.warning}>
               Commit will include the <strong>{stagedCount} staged file(s)</strong> only.
             </text>
           ) : (
-            <text fg={t.palette.warning}>
+            <text fg={t.warning}>
               <strong>git add -A</strong> will stage every change before committing.
             </text>
           )}
-          <text fg={t.muted}>Enter to confirm · Esc to cancel · edits below still apply.</text>
+          <text fg={t.textMuted}>Enter to confirm · Esc to cancel · edits below still apply.</text>
         </box>
       ) : null}
 
       {isGenerating ? null : (
         <>
           <box flexDirection="column">
-            <text fg={titleActive ? t.palette.ink : t.muted}>Title</text>
+            <text fg={titleActive ? t.text : t.textMuted}>Title</text>
             <InputField
               active={titleActive}
               cursorPos={titleActive ? cursorPos : undefined}
@@ -149,7 +149,7 @@ export function GitCommitModal({
           </box>
 
           <box flexDirection="column">
-            <text fg={bodyActive ? t.palette.ink : t.muted}>Body (optional)</text>
+            <text fg={bodyActive ? t.text : t.textMuted}>Body (optional)</text>
             <InputField
               active={bodyActive}
               cursorPos={bodyActive ? cursorPos : undefined}
@@ -163,7 +163,7 @@ export function GitCommitModal({
         <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
           <box
             border
-            borderColor={t.palette.primary}
+            borderColor={t.border}
             paddingLeft={1}
             paddingRight={1}
             flexDirection="row"
@@ -175,12 +175,12 @@ export function GitCommitModal({
               onAutoCommitClick()
             }}
           >
-            {showBgSpinner ? <text fg={t.palette.primary}>{bgSpinnerFrame}</text> : null}
-            <text fg={t.palette.primary}>
+            {showBgSpinner ? <text fg={t.primary}>{bgSpinnerFrame}</text> : null}
+            <text fg={t.text}>
               <strong>Auto-commit</strong>
             </text>
           </box>
-          <text fg={t.muted}>C-a · stages all changes (AI-suggests message if empty)</text>
+          <text fg={t.textMuted}>C-a · stages all changes (AI-suggests message if empty)</text>
         </box>
       )}
     </ModalShell>

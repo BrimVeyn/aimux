@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo } from 'react'
 import { collectHelpEntries, HELP_MODE_LABELS } from '../../../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useKeymap } from '../../../keymap-context'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
 
@@ -23,7 +23,7 @@ function matchesFilter(needle: string, ...fields: (string | undefined)[]): boole
 }
 
 export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModalProps) {
-  const t = useTokens()
+  const t = useTheme()
   const config = useKeymap()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
   const scoped = useMemo(
@@ -49,17 +49,16 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
   }, [filtered.length])
 
   const items: PickerItem[] = filtered.map((entry, index) => {
-    const active = index === selectedIndex
     return {
       group: entry.modeLabel,
       key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
-        <text fg={active ? t.palette.ink : t.muted} wrapMode="none">
+        <text fg={t.textMuted} wrapMode="none">
           {entry.description ?? ''}
         </text>
       ),
       trailing: (
-        <text fg={active ? t.palette.primary : t.accent} wrapMode="none">
+        <text fg={t.textMuted} wrapMode="none">
           {entry.keysDisplay}
         </text>
       ),
@@ -76,7 +75,7 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={t.muted}>{filter ? 'No matching bindings.' : 'No bindings registered.'}</text>
+        <text fg={t.textMuted}>{filter ? 'No matching bindings.' : 'No bindings registered.'}</text>
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />

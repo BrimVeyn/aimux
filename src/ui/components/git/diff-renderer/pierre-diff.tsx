@@ -8,7 +8,7 @@ import type { ThemeId } from '../../../themes'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { type FoldState } from '../../../../state/types'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { buildDiffSegments, firstChangeSegmentOffset, gutterWidth } from './build-rows'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
@@ -45,7 +45,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   { cacheKey, diff, path, themeId, view },
   ref
 ) {
-  const t = useTokens()
+  const t = useTheme()
   const preparation = useDiffPreparation(cacheKey, diff, path, themeId)
   const file = preparation.file ?? undefined
   const highlights: DiffHighlights = preparation.highlights
@@ -123,7 +123,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   if (!file) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t.muted}>
+        <text fg={t.textMuted}>
           {preparation.preparing ? 'Preparing diff…' : '(could not parse diff)'}
         </text>
       </box>

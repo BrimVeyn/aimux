@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-import { useTokens } from '../../theme'
+import { useTheme } from '../../theme'
 import { Surface } from './surface'
 
 export type ListItemDirection = 'row' | 'column'
@@ -28,31 +28,36 @@ export function ListItem({
   title,
   trailing,
 }: ListItemProps) {
-  const t = useTokens()
+  const t = useTheme()
   const isRow = direction === 'row'
+  const inner = (
+    <box flexDirection="column">
+      <box flexDirection="row">
+        {isRow ? null : (
+          <>
+            <text fg={active ? t.primary : t.textMuted}>{active ? '›' : '·'}</text>
+            <text> </text>
+          </>
+        )}
+        {leading}
+        {leading ? <text> </text> : null}
+        <box flexGrow={isRow ? 0 : 1}>{title}</box>
+        {trailing ? <box>{trailing}</box> : null}
+      </box>
+      {subtitle ? <box paddingLeft={2}>{subtitle}</box> : null}
+    </box>
+  )
   return (
     <box id={id} onMouseOver={onHover} onMouseDown={onClick}>
-      <Surface
-        tone={active ? 'selected' : 'elevated'}
-        paddingLeft={isRow ? 2 : 1}
-        paddingRight={isRow ? 2 : 1}
-      >
-        <box flexDirection="column">
-          <box flexDirection="row">
-            {isRow ? null : (
-              <>
-                <text fg={active ? t.palette.primary : t.hover}>{active ? '›' : '·'}</text>
-                <text> </text>
-              </>
-            )}
-            {leading}
-            {leading ? <text> </text> : null}
-            <box flexGrow={isRow ? 0 : 1}>{title}</box>
-            {trailing ? <box>{trailing}</box> : null}
-          </box>
-          {subtitle ? <box paddingLeft={2}>{subtitle}</box> : null}
+      {active ? (
+        <Surface tone="selected" paddingLeft={isRow ? 2 : 1} paddingRight={isRow ? 2 : 1}>
+          {inner}
+        </Surface>
+      ) : (
+        <box paddingLeft={isRow ? 2 : 1} paddingRight={isRow ? 2 : 1}>
+          {inner}
         </box>
-      </Surface>
+      )}
     </box>
   )
 }

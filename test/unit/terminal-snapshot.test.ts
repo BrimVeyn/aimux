@@ -34,9 +34,8 @@ describe('snapshotTerminal', () => {
     const firstLine = snapshot.lines[0]
 
     expect(firstLine?.spans[0]?.text.trim()).toBe('rev')
-    // inverse video: fg ← computed bg (aimux-dark OKLCH-derived, not raw palette.neutral),
-    // bg ← raw palette.ink (foreground seed).
-    expect(firstLine?.spans[0]?.fg).toBe('#070b10')
+    // inverse video: fg ← resolved `background`, bg ← resolved `text`.
+    expect(firstLine?.spans[0]?.fg).toBe('#11151b')
     expect(firstLine?.spans[0]?.bg).toBe('#edf4ff')
 
     terminal.dispose()

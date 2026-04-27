@@ -2,7 +2,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 
 import { type ReactNode } from 'react'
 
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { InputField } from '../../primitives/input-field'
 import { ListItem } from '../../primitives/list-item'
 import { ModalShell } from './modal-shell'
@@ -81,11 +81,11 @@ export function Form({
 }
 
 export function FieldLabel({ active = false, children, description }: FieldLabelProps) {
-  const t = useTokens()
+  const t = useTheme()
   return (
     <box flexDirection="column">
-      {children ? <text fg={active ? t.palette.ink : t.muted}>{children}</text> : null}
-      {description ? <text fg={t.muted}>{description}</text> : null}
+      {children ? <text fg={active ? t.text : t.textMuted}>{children}</text> : null}
+      {description ? <text fg={t.textMuted}>{description}</text> : null}
     </box>
   )
 }
