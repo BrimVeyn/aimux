@@ -52,7 +52,10 @@ function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['the
   if (!userConfig) return undefined
   return {
     beta: userConfig.beta
-      ? { harmonizeClaudeTheme: userConfig.beta.harmonizeClaudeTheme === true }
+      ? {
+          experimentalSyntaxHighlight: userConfig.beta.experimentalSyntaxHighlight === true,
+          harmonizeClaudeTheme: userConfig.beta.harmonizeClaudeTheme === true,
+        }
       : undefined,
     initialId: userConfig.initialId,
     initialMode: userConfig.initialMode ?? userConfig.mode,

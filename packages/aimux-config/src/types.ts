@@ -829,6 +829,13 @@ export interface AimuxThemeConfig {
    */
   beta?: {
     harmonizeClaudeTheme?: boolean
+    /**
+     * Disable Claude Code's built-in syntax highlighting and re-color diff
+     * lines from the aimux theme via shiki. Sets
+     * `CLAUDE_CODE_SYNTAX_HIGHLIGHT=false` for child PTYs and post-processes
+     * the terminal snapshot in the app.
+     */
+    experimentalSyntaxHighlight?: boolean
   }
 }
 
@@ -889,6 +896,7 @@ export interface ResolvedConfig {
         initialMode?: ThemeMode
         beta?: {
           harmonizeClaudeTheme?: boolean
+          experimentalSyntaxHighlight?: boolean
         }
       }
     | undefined

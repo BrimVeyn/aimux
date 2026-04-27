@@ -16,6 +16,7 @@ interface BackendRuntimeOptions {
   layoutRef: MutableRefObject<LayoutState>
   resizingRef: MutableRefObject<boolean>
   currentSessionWorkspaceSnapshot: Parameters<SessionBackend['attach']>[0]['workspaceSnapshot']
+  syntaxOverlayEnabled: () => boolean
 }
 
 export interface TabRuntimeControls {
@@ -33,6 +34,7 @@ export function useBackendRuntime({
   dispatch,
   layoutRef,
   resizingRef,
+  syntaxOverlayEnabled,
 }: BackendRuntimeOptions): TabRuntimeControls {
   const attachRequestIdRef = useRef(0)
   const timeouts = useTabRuntimeTimeouts(dispatch)
@@ -70,13 +72,22 @@ export function useBackendRuntime({
       backend,
       dispatch,
       resizingRef,
+      syntaxOverlayEnabled,
       timeouts: {
         clearAllTimers,
         clearIdleTimer,
         clearStartupGrace,
       },
     })
-  }, [backend, clearAllTimers, clearIdleTimer, clearStartupGrace, dispatch, resizingRef])
+  }, [
+    backend,
+    clearAllTimers,
+    clearIdleTimer,
+    clearStartupGrace,
+    dispatch,
+    resizingRef,
+    syntaxOverlayEnabled,
+  ])
 
   return {
     clearIdleTimer,

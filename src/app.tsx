@@ -25,6 +25,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
+import { warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
@@ -249,6 +250,16 @@ export function App({
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
 
+  const syntaxOverlayFlag = resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true
+  const syntaxOverlayFlagRef = useRef(syntaxOverlayFlag)
+  syntaxOverlayFlagRef.current = syntaxOverlayFlag
+  const syntaxOverlayEnabled = useCallback(() => syntaxOverlayFlagRef.current, [])
+
+  useEffect(() => {
+    if (!syntaxOverlayFlag) return
+    void warmClaudeSyntaxOverlay()
+  }, [syntaxOverlayFlag])
+
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
     activeTabId: state.activeTabId,
     activeTabScrollIntentRef,
@@ -258,6 +269,7 @@ export function App({
     dispatch,
     layoutRef,
     resizingRef,
+    syntaxOverlayEnabled,
   })
 
   useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
