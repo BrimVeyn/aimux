@@ -25,7 +25,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
-import { warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
+import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
@@ -257,8 +257,29 @@ export function App({
 
   useEffect(() => {
     if (!syntaxOverlayFlag) return
-    void warmClaudeSyntaxOverlay()
-  }, [syntaxOverlayFlag])
+    let cancelled = false
+    void (async () => {
+      await warmClaudeSyntaxOverlay()
+      if (cancelled) return
+      // Re-apply the overlay to viewports that were dispatched before shiki
+      // finished loading, so colors appear without waiting for the next
+      // PTY data event.
+      const snapshot = appStore.getState()
+      for (const tab of snapshot.tabs) {
+        if (!tab.viewport) continue
+        dispatch({
+          source: 'data',
+          tabId: tab.id,
+          terminalModes: tab.terminalModes,
+          type: 'replace-tab-viewport',
+          viewport: highlightSnapshot(tab.viewport, tab.id),
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [dispatch, syntaxOverlayFlag])
 
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
     activeTabId: state.activeTabId,
