@@ -102,15 +102,14 @@ function resolveColorRgba(
 }
 
 function rgbaToCss(c: RGBA): string {
-  const r = Math.max(0, Math.min(255, Math.round(c.r)))
-  const g = Math.max(0, Math.min(255, Math.round(c.g)))
-  const b = Math.max(0, Math.min(255, Math.round(c.b)))
-  const a = Math.max(0, Math.min(255, Math.round(c.a)))
-  if (a === 255) {
-    const hex = (v: number) => v.toString(16).padStart(2, '0')
-    return `#${hex(r)}${hex(g)}${hex(b)}`
-  }
-  return `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)))
+  const hex = (v: number) => clamp(v).toString(16).padStart(2, '0')
+  const r = hex(c.r)
+  const g = hex(c.g)
+  const b = hex(c.b)
+  // opentui only parses hex strings (#rrggbb / #rrggbbaa) — `rgba(...)` falls
+  // back to magenta. Always emit hex; append alpha byte when not fully opaque.
+  return clamp(c.a) === 255 ? `#${r}${g}${b}` : `#${r}${g}${b}${hex(c.a)}`
 }
 
 /**
