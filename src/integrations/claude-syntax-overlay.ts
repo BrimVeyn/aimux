@@ -115,11 +115,13 @@ export async function warmClaudeSyntaxOverlay(): Promise<void> {
 const TOOL_HEADER_RE = /\b(?:Read|Update|Edit|Write|MultiEdit|Create|NotebookEdit)\(([^)]+)\)/
 
 // Code-line prefix used by Claude in tool output: ` <n>  ` optionally
-// followed by `+ ` / `- ` for diff lines. The `<n>` is right-aligned in
-// a few-char gutter, so leading spaces are normal. Group 2 captures the
-// diff marker so we can keep the diff bg as-is and only repaint
-// non-diff code blocks.
-const PREFIX_RE = /^(\s*\d+\s+([+-]\s+)?)/
+// followed by `+ ` / `- ` for diff lines.
+//   Group 1 = leading whitespace before the number (kept on the outer
+//             dark bg so the diff strip starts at the line number).
+//   Group 2 = the digits + spaces + optional diff marker (the gutter that
+//             carries the diff bg for `+`/`-` lines).
+//   Group 3 = the diff marker itself, present only on `+`/`-` rows.
+const PREFIX_RE = /^(\s*)(\d+\s+([+-]\s+)?)/
 
 interface ShikiToken {
   content: string
@@ -217,38 +219,74 @@ function buildSpans(
 
 function rebuildLine(
   line: TerminalLine,
-  prefix: string,
+  leading: string,
+  gutter: string,
   isDiff: boolean,
   tokens: ShikiToken[],
   fallbackFg: string,
   codeBlockBg: string,
   accents: Set<string>
 ): TerminalLine {
-  // Diff lines reuse Claude's emitted bg (diffAddedBg/diffRemovedBg);
-  // non-diff code lines use the theme's backgroundElement. Either way, the
-  // bg is applied uniformly across the gutter, the code, and the trailing
-  // padding so the row reads as a single rectangle.
-  const targetBg = isDiff ? (dominantBg(line) ?? codeBlockBg) : codeBlockBg
+  // Two zones per row:
+  //   - leading whitespace before the line number → outer code-block bg.
+  //   - gutter + code + right padding → strip bg (diff color for `+`/`-`
+  //     lines, code-block bg otherwise).
+  // For non-diff lines both zones use the same bg so the row reads as a
+  // single rectangle.
+  const stripBg = isDiff ? (dominantBg(line) ?? codeBlockBg) : codeBlockBg
 
   const out: TerminalSpan[] = []
-  if (prefix.length > 0) {
-    // Keep the gutter's fg/bold/italic (line numbers + `+`/`-` markers
-    // carry meaning), but force the bg so the rectangle is unbroken.
-    const prefixSpans = sliceLeading(line.spans, prefix.length)
-    for (const span of prefixSpans) {
-      out.push({ ...span, bg: targetBg })
+  let consumed = 0
+  if (leading.length > 0) {
+    const leadingSpans = sliceLeading(line.spans, leading.length)
+    for (const span of leadingSpans) {
+      out.push({ ...span, bg: codeBlockBg })
     }
+    consumed += leading.length
   }
-  out.push(...buildSpans(tokens, targetBg, fallbackFg, accents))
+  if (gutter.length > 0) {
+    const gutterSpans = sliceRange(line.spans, consumed, gutter.length)
+    for (const span of gutterSpans) {
+      // Preserve fg / bold / italic (line numbers + diff markers carry
+      // meaning); force bg to the strip color.
+      out.push({ ...span, bg: stripBg })
+    }
+    consumed += gutter.length
+  }
+  out.push(...buildSpans(tokens, stripBg, fallbackFg, accents))
 
-  // Pad the right edge with the target bg so the zone fills the whole row.
+  // Pad the right edge with the strip bg so the strip fills to the row's
+  // original width.
   const written = out.reduce((acc, span) => acc + span.text.length, 0)
   const total = line.spans.reduce((acc, span) => acc + span.text.length, 0)
   if (total > written) {
-    out.push({ bg: targetBg, fg: fallbackFg, text: ' '.repeat(total - written) })
+    out.push({ bg: stripBg, fg: fallbackFg, text: ' '.repeat(total - written) })
   }
 
   return { spans: out }
+}
+
+// Return a shallow copy of the spans covering [start, start+count) chars,
+// splitting boundary spans as needed.
+function sliceRange(spans: TerminalSpan[], start: number, count: number): TerminalSpan[] {
+  const out: TerminalSpan[] = []
+  let cursor = 0
+  let remaining = count
+  for (const span of spans) {
+    if (remaining <= 0) break
+    const next = cursor + span.text.length
+    if (next <= start) {
+      cursor = next
+      continue
+    }
+    const localStart = Math.max(0, start - cursor)
+    const available = span.text.length - localStart
+    const take = Math.min(available, remaining)
+    out.push({ ...span, text: span.text.slice(localStart, localStart + take) })
+    remaining -= take
+    cursor = next
+  }
+  return out
 }
 
 // Take spans from the start of `spans` totalling `count` characters,
@@ -273,7 +311,8 @@ function sliceLeading(spans: TerminalSpan[], count: number): TerminalSpan[] {
 interface BlockContext {
   lang: string
   startIndex: number
-  prefixes: string[]
+  leadings: string[]
+  gutters: string[]
   isDiff: boolean[]
   codes: string[]
   lineRefs: TerminalLine[]
@@ -294,10 +333,22 @@ function flushBlock(
     const tokens = tokenLines[i]
     if (!tokens) continue
     const lineRef = block.lineRefs[i]
-    const prefix = block.prefixes[i]
+    const leading = block.leadings[i]
+    const gutter = block.gutters[i]
     const isDiff = block.isDiff[i]
-    if (!lineRef || prefix === undefined || isDiff === undefined) continue
-    const newLine = rebuildLine(lineRef, prefix, isDiff, tokens, fallbackFg, codeBlockBg, accents)
+    if (!lineRef || leading === undefined || gutter === undefined || isDiff === undefined) {
+      continue
+    }
+    const newLine = rebuildLine(
+      lineRef,
+      leading,
+      gutter,
+      isDiff,
+      tokens,
+      fallbackFg,
+      codeBlockBg,
+      accents
+    )
     lines[block.startIndex + i] = newLine
   }
 }
@@ -326,20 +377,23 @@ function processLines(
 
     const prefixMatch = text.match(PREFIX_RE)
     if (prefixMatch) {
-      const prefix = prefixMatch[0]
-      const diffMarker = prefixMatch[2] ?? ''
-      const code = text.slice(prefix.length)
+      const leading = prefixMatch[1] ?? ''
+      const gutter = prefixMatch[2] ?? ''
+      const diffMarker = prefixMatch[3] ?? ''
+      const code = text.slice(leading.length + gutter.length)
       if (!block) {
         block = {
           codes: [],
+          gutters: [],
           isDiff: [],
           lang: tabLang.get(tabId) ?? DEFAULT_LANG,
+          leadings: [],
           lineRefs: [],
-          prefixes: [],
           startIndex: i,
         }
       }
-      block.prefixes.push(prefix)
+      block.leadings.push(leading)
+      block.gutters.push(gutter)
       block.isDiff.push(diffMarker.length > 0)
       block.codes.push(code)
       block.lineRefs.push(line)
