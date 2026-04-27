@@ -224,28 +224,28 @@ function rebuildLine(
   codeBlockBg: string,
   accents: Set<string>
 ): TerminalLine {
-  // For diff lines we trust the bg Claude emitted (diffAddedBg/diffRemovedBg);
-  // for non-diff code lines we paint the whole row with codeBlockBg to give
-  // the tool output a clear darker zone.
-  const dominantOriginal = dominantBg(line)
-  const targetBg = isDiff ? dominantOriginal : codeBlockBg
+  // Diff lines reuse Claude's emitted bg (diffAddedBg/diffRemovedBg);
+  // non-diff code lines use the theme's backgroundElement. Either way, the
+  // bg is applied uniformly across the gutter, the code, and the trailing
+  // padding so the row reads as a single rectangle.
+  const targetBg = isDiff ? (dominantBg(line) ?? codeBlockBg) : codeBlockBg
 
   const out: TerminalSpan[] = []
   if (prefix.length > 0) {
+    // Keep the gutter's fg/bold/italic (line numbers + `+`/`-` markers
+    // carry meaning), but force the bg so the rectangle is unbroken.
     const prefixSpans = sliceLeading(line.spans, prefix.length)
     for (const span of prefixSpans) {
-      out.push(isDiff ? span : { ...span, bg: targetBg })
+      out.push({ ...span, bg: targetBg })
     }
   }
   out.push(...buildSpans(tokens, targetBg, fallbackFg, accents))
 
   // Pad the right edge with the target bg so the zone fills the whole row.
-  if (!isDiff) {
-    const written = out.reduce((acc, span) => acc + span.text.length, 0)
-    const total = line.spans.reduce((acc, span) => acc + span.text.length, 0)
-    if (total > written) {
-      out.push({ bg: targetBg, fg: fallbackFg, text: ' '.repeat(total - written) })
-    }
+  const written = out.reduce((acc, span) => acc + span.text.length, 0)
+  const total = line.spans.reduce((acc, span) => acc + span.text.length, 0)
+  if (total > written) {
+    out.push({ bg: targetBg, fg: fallbackFg, text: ' '.repeat(total - written) })
   }
 
   return { spans: out }
