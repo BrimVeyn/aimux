@@ -234,7 +234,7 @@ export function TerminalPane({
               justifyContent="center"
               marginTop={1}
               paddingX={2}
-              backgroundColor={t.backgroundElement}
+              backgroundColor={t.backgroundPanel}
               onMouseDown={(event) => {
                 event.stopPropagation()
                 dispatchGlobal({ type: 'open-new-tab-modal' })

@@ -30,29 +30,34 @@ export function ListItem({
 }: ListItemProps) {
   const t = useTheme()
   const isRow = direction === 'row'
+  const inner = (
+    <box flexDirection="column">
+      <box flexDirection="row">
+        {isRow ? null : (
+          <>
+            <text fg={active ? t.primary : t.textMuted}>{active ? '›' : '·'}</text>
+            <text> </text>
+          </>
+        )}
+        {leading}
+        {leading ? <text> </text> : null}
+        <box flexGrow={isRow ? 0 : 1}>{title}</box>
+        {trailing ? <box>{trailing}</box> : null}
+      </box>
+      {subtitle ? <box paddingLeft={2}>{subtitle}</box> : null}
+    </box>
+  )
   return (
     <box id={id} onMouseOver={onHover} onMouseDown={onClick}>
-      <Surface
-        tone={active ? 'selected' : 'elevated'}
-        paddingLeft={isRow ? 2 : 1}
-        paddingRight={isRow ? 2 : 1}
-      >
-        <box flexDirection="column">
-          <box flexDirection="row">
-            {isRow ? null : (
-              <>
-                <text fg={active ? t.primary : t.textMuted}>{active ? '›' : '·'}</text>
-                <text> </text>
-              </>
-            )}
-            {leading}
-            {leading ? <text> </text> : null}
-            <box flexGrow={isRow ? 0 : 1}>{title}</box>
-            {trailing ? <box>{trailing}</box> : null}
-          </box>
-          {subtitle ? <box paddingLeft={2}>{subtitle}</box> : null}
+      {active ? (
+        <Surface tone="selected" paddingLeft={isRow ? 2 : 1} paddingRight={isRow ? 2 : 1}>
+          {inner}
+        </Surface>
+      ) : (
+        <box paddingLeft={isRow ? 2 : 1} paddingRight={isRow ? 2 : 1}>
+          {inner}
         </box>
-      </Surface>
+      )}
     </box>
   )
 }

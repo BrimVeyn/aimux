@@ -44,8 +44,8 @@ function getRowBackground({
   t: ResolvedTuiTheme
 }): string | undefined {
   if (isActive) return t.backgroundElement
-  if (alternate) return t.backgroundElement
-  return undefined
+  if (alternate) return t.backgroundPanel
+  return t.backgroundPanel
 }
 
 const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: number }) {
@@ -73,7 +73,7 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       <box
         flexDirection="row"
         paddingY={1}
-        backgroundColor={t.backgroundElement}
+        backgroundColor={t.backgroundPanel}
         justifyContent="center"
         marginTop={1}
         onMouseDown={(e) => {
