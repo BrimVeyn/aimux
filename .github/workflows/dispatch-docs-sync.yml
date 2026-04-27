@@ -1,0 +1,32 @@
+name: Dispatch docs sync
+
+# When docs/ changes land on main, nudge aimux-docs to regenerate
+# content/docs via its own `sync-docs` workflow. The other repo does
+# the actual work — this job just fires the event.
+#
+# Requires a repo secret `AIMUX_DOCS_PAT`: a PAT (fine-grained or
+# classic `repo` scope) with write access on BrimVeyn/aimux-docs.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify aimux-docs
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.AIMUX_DOCS_PAT }}
+          repository: BrimVeyn/aimux-docs
+          event-type: aimux-docs-update
+          client-payload: |
+            {
+              "sha": "${{ github.sha }}",
+              "ref": "${{ github.ref }}",
+              "actor": "${{ github.actor }}"
+            }
