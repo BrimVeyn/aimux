@@ -1,30 +1,37 @@
-// Public API — this is what users import from '@brimveyn/aimux-config'
+// Public API — what users import from '@brimveyn/aimux-config'.
 
 export { defineConfig } from './define-config'
 export * as actions from './actions'
-export { isKnownThemeId, migrateThemeId, THEME_IDS, THEMES } from './themes'
-export { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
-export { OPENCODE_THEME_IDS, OPENCODE_THEMES } from './themes/opencode'
-export { extendPalette } from './palette-utils'
-export { flattenRgba } from './oklch'
-export { paletteToShikiTheme } from './palette-to-shiki'
-export { resolveTheme, resolveThemeVariant } from './resolve'
-export type { ThemeSeedColors, ThemeVariant, ThemeVariantOverrides } from './resolve'
-export type { ResolvedToken, ResolvedTokens, ResolvedTokenValue } from './resolved-tokens'
+
+// TUI theme system (1:1 port of opencode TUI).
+export {
+  isKnownThemeId,
+  migrateThemeId,
+  type ResolvedTuiTheme,
+  resolveTuiTheme,
+  type RGBA,
+  THEME_IDS,
+  type ThemeId,
+  type ThemeMode,
+  TUI_COLOR_TOKENS,
+  TUI_THEMES,
+  type TuiColorToken,
+  type TuiColorValue,
+  type TuiShikiOptions,
+  type TuiThemeJson,
+  tuiThemeToShiki,
+} from './tui'
+
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 
-// Type exports
+// User-facing config types (keymap/backends/sessions/etc.).
 export type {
-  // Action types
   Action,
   ActionFn,
-  AimuxPalette,
-  AimuxTheme,
   AimuxThemeConfig,
-  // User-facing config
   AimuxUserConfig,
   AIUsageTool,
   AIUsageToolConfig,
@@ -44,18 +51,14 @@ export type {
   GroupBuilderApi,
   HooksConfig,
   KeyInput,
-  // Keymap builder API (type surface)
   KeymapBuilderApi,
   KeyResult,
-  // Layout
   LayoutNode,
   ModalState,
   ModeBindingBuilderApi,
   ModeContext,
-  // Mode / state
   ModeId,
   ModeKeymapDef,
-  // Resolved config (internal, but exported for tooling)
   ResolvedConfig,
   ResolvedKeymapConfig,
   SessionRecord,
@@ -66,7 +69,4 @@ export type {
   SplitDirection,
   StatusBarConfig,
   TabSession,
-  Theme,
-  ThemeId,
-  ThemeMode,
 } from './types'

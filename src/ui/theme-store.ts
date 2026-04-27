@@ -1,90 +1,74 @@
+import {
+  migrateThemeId,
+  type ResolvedTuiTheme,
+  resolveTuiTheme,
+  type ThemeId,
+  type ThemeMode,
+  TUI_THEMES,
+} from '@brimveyn/aimux-config'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import {
-  type AimuxPalette,
-  type AimuxTheme,
-  extendPalette,
-  type ResolvedTokens,
-  resolveTheme,
-  type ThemeId,
-  type ThemeMode,
-  THEMES,
-  type ThemeVariantOverrides,
-} from './themes'
-
-// Memoize `resolveTheme(palette, mode, overrides)` by identity so
-// `useStore` selectors return stable references across renders.
-let cachedPalette: AimuxPalette | null = null
-let cachedMode: ThemeMode | null = null
-let cachedOverrides: AimuxTheme['overrides'] | null = null
-let cachedResolved: ResolvedTokens | null = null
-
-function deriveResolved(theme: AimuxTheme): ResolvedTokens {
-  if (
-    cachedPalette === theme.palette &&
-    cachedMode === theme.mode &&
-    cachedOverrides === theme.overrides &&
-    cachedResolved
-  ) {
-    return cachedResolved
-  }
-  cachedPalette = theme.palette
-  cachedMode = theme.mode
-  cachedOverrides = theme.overrides
-  cachedResolved = resolveTheme(
-    theme.palette,
-    theme.mode,
-    theme.overrides as ThemeVariantOverrides | undefined
-  )
-  return cachedResolved
-}
+const DEFAULT_ID: ThemeId = 'aimux'
 
 interface ThemeStore {
-  theme: AimuxTheme
+  id: ThemeId
+  mode: ThemeMode
   transparent: boolean
 }
 
-const DEFAULT = THEMES['aimux-dark']
-if (!DEFAULT) throw new Error('default theme missing')
+const themeStore = createStore<ThemeStore>(() => ({
+  id: DEFAULT_ID,
+  mode: 'dark',
+  transparent: false,
+}))
 
-const themeStore = createStore<ThemeStore>(() => ({ theme: DEFAULT, transparent: false }))
+let cachedId: ThemeId | null = null
+let cachedMode: ThemeMode | null = null
+let cachedResolved: ResolvedTuiTheme | null = null
 
-/** Subscribe to the full opencode-resolved token map for the active theme. */
-export function useTheme(): ResolvedTokens {
-  return useStore(themeStore, (s) => deriveResolved(s.theme))
+function derive(id: ThemeId, mode: ThemeMode): ResolvedTuiTheme {
+  if (cachedResolved && cachedId === id && cachedMode === mode) return cachedResolved
+  cachedId = id
+  cachedMode = mode
+  const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
+  if (!json) throw new Error(`No theme JSON for ${id}`)
+  cachedResolved = resolveTuiTheme(json, mode)
+  return cachedResolved
 }
 
-/** Synchronous snapshot of the resolved token map for non-React callers. */
-export function getCurrentResolved(): ResolvedTokens {
-  return deriveResolved(themeStore.getState().theme)
+/** Subscribe to the resolved TUI theme for the active id+mode. */
+export function useTheme(): ResolvedTuiTheme {
+  return useStore(themeStore, (s) => derive(s.id, s.mode))
 }
 
-/** Synchronous snapshot of the raw palette for non-React callers. */
-export function getCurrentPalette(): AimuxPalette {
-  return themeStore.getState().theme.palette
+/** Synchronous snapshot of the resolved theme for non-React callers. */
+export function getCurrentTheme(): ResolvedTuiTheme {
+  const s = themeStore.getState()
+  return derive(s.id, s.mode)
 }
 
-/** Synchronous snapshot of the full theme object for non-React callers. */
-export function getCurrentTheme(): AimuxTheme {
-  return themeStore.getState().theme
+export function getCurrentThemeId(): ThemeId {
+  return themeStore.getState().id
 }
 
-/** Swap the active theme by id, optionally merging palette overrides. */
-export function applyTheme(id: ThemeId, paletteOverrides?: Partial<AimuxPalette>): void {
-  const entry = THEMES[id]
-  if (!entry) return
-  const palette = extendPalette(entry.palette, paletteOverrides)
-  const merged: AimuxTheme = {
-    ...entry,
-    bg: palette.neutral,
-    fg: palette.ink,
-    palette,
-  }
-  themeStore.setState({ theme: merged })
+export function getCurrentMode(): ThemeMode {
+  return themeStore.getState().mode
 }
 
-/** Subscribe to the transparent-mode flag. */
+/** Swap the active theme by id. Falls back via migrateThemeId for legacy ids. */
+export function applyTheme(id: string): void {
+  const next = migrateThemeId(id)
+  if (themeStore.getState().id === next) return
+  themeStore.setState({ id: next })
+}
+
+/** Toggle between dark and light. Plumbed but not yet wired to UI controls. */
+export function setMode(mode: ThemeMode): void {
+  if (themeStore.getState().mode === mode) return
+  themeStore.setState({ mode })
+}
+
 export function useTransparent(): boolean {
   return useStore(themeStore, (s) => s.transparent)
 }

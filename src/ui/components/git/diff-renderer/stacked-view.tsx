@@ -180,13 +180,13 @@ function UnifiedRowRender({
   row: UnifiedRowOrHeader
 }) {
   const t = useTheme()
-  const headerBg = t['surface-diff-hidden-base']
+  const headerBg = t.diffContextBg
   const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-        <text fg={t['text-base']}>{row.spec}</text>
-        {row.context ? <text fg={t['text-weaker']}> {row.context}</text> : null}
+        <text fg={t.text}>{row.spec}</text>
+        {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
       </box>
     )
   }
@@ -199,21 +199,21 @@ function UnifiedRowRender({
     const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row" height={row.height}>
-        <text fg={t['text-weaker']}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={t['text-base']}> </text>
+        <text fg={t.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
+        <text fg={t.text}> </text>
         <LineContent content={row.content} tokens={tokens} />
       </box>
     )
   }
-  const bg = row.type === 'addition' ? t['surface-diff-add-base'] : t['surface-diff-delete-base']
+  const bg = row.type === 'addition' ? t.diffAddedBg : t.diffRemovedBg
   const sign = row.type === 'addition' ? '+' : '-'
-  const signColor = row.type === 'addition' ? t['syntax-diff-add'] : t['syntax-diff-delete']
+  const signColor = row.type === 'addition' ? t.diffAdded : t.diffRemoved
   const delNum = row.type === 'deletion' ? row.lineNumber : undefined
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={row.height}>
-      <text fg={t['text-weaker']}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
+      <text fg={t.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />
     </box>
@@ -223,7 +223,7 @@ function UnifiedRowRender({
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
   const t = useTheme()
   if (!tokens || tokens.length === 0) {
-    return <text fg={t['text-base']}>{content}</text>
+    return <text fg={t.text}>{content}</text>
   }
   return (
     <text>
@@ -234,7 +234,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? t['text-base']} attributes={attributes}>
+          <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}
           </span>
         )

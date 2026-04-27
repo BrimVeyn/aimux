@@ -84,8 +84,8 @@ export function FieldLabel({ active = false, children, description }: FieldLabel
   const t = useTheme()
   return (
     <box flexDirection="column">
-      {children ? <text fg={active ? t['text-base'] : t['text-weak']}>{children}</text> : null}
-      {description ? <text fg={t['text-weak']}>{description}</text> : null}
+      {children ? <text fg={active ? t.text : t.textMuted}>{children}</text> : null}
+      {description ? <text fg={t.textMuted}>{description}</text> : null}
     </box>
   )
 }

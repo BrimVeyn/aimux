@@ -40,8 +40,8 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['theme'] {
   if (!userConfig) return undefined
   return {
+    initialId: userConfig.initialId,
     initialMode: userConfig.initialMode ?? userConfig.mode,
-    paletteOverrides: userConfig.paletteOverrides,
   }
 }
 

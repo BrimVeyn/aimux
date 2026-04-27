@@ -20,9 +20,9 @@ export function PendingChordOverlay() {
     <box position="absolute" bottom={modalOpen ? 10 : 2} right={1}>
       <Surface tone="elevated" paddingLeft={1} paddingRight={1}>
         <box flexDirection="row">
-          <text fg={t['text-weak']}>pending: </text>
-          <text fg={t['text-interactive-base']}>{display}</text>
-          <text fg={t['text-weak']}> …</text>
+          <text fg={t.textMuted}>pending: </text>
+          <text fg={t.primary}>{display}</text>
+          <text fg={t.textMuted}> …</text>
         </box>
       </Surface>
     </box>

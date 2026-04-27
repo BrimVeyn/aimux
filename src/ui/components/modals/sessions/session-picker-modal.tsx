@@ -57,10 +57,10 @@ export function SessionPickerModal({
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
       subtitle: session.projectPath ? (
-        <text fg={t['text-weak']}>{abbreviatePath(session.projectPath)}</text>
+        <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
       ) : undefined,
       title: (
-        <text fg={active ? t['text-base'] : t['text-weak']}>
+        <text fg={active ? t.text : t.textMuted}>
           {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
         </text>
       ),
@@ -71,7 +71,7 @@ export function SessionPickerModal({
     key: '__create-new__',
     onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
     title: (
-      <text fg={selectedIndex === filtered.length ? t['text-base'] : t['text-weak']}>
+      <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
         Create new workspace
       </text>
     ),
@@ -91,7 +91,7 @@ export function SessionPickerModal({
       selectedIndex={selectedIndex}
       emptyState={
         filtered.length === 0 ? (
-          <text fg={t['text-weak']}>{getEmptyStateMessage(hasFilter)}</text>
+          <text fg={t.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
         ) : undefined
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}

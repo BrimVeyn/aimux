@@ -641,47 +641,10 @@ export interface ModeContext {
 
 // ─── Themes ───────────────────────────────────────────────────────────────────
 
-/**
- * Compact opencode-style semantic palette. Required tokens cover every UI role;
- * optional tokens fall back via helpers in `palette-utils.ts`.
- */
-export interface AimuxPalette {
-  // required
-  neutral: string
-  ink: string
-  primary: string
-  success: string
-  warning: string
-  error: string
-  info: string
-  // optional
-  accent?: string
-  interactive?: string
-  diffAdd?: string
-  diffDelete?: string
-}
+// Theme types now live in `./tui` (1:1 port of opencode TUI). The aliases
+// below preserve internal type wiring for the user-facing config API.
 
 export type ThemeMode = 'light' | 'dark'
-// eslint-disable-next-line typescript/no-redundant-type-constituents
-export type ThemeId = 'aimux-light' | 'aimux-dark' | (string & {})
-
-export interface AimuxTheme {
-  name: string
-  mode: ThemeMode
-  displayName: string
-  palette: AimuxPalette
-  fg: string
-  bg: string
-  /**
-   * Upstream-supplied per-token overrides applied as a final flat-merge after
-   * `resolveThemeVariant` computes the base scale. Keys correspond to entries
-   * in `ResolvedToken` (see resolved-tokens.ts). Imported verbatim from the
-   * source opencode theme JSON.
-   */
-  overrides?: Record<string, string>
-}
-
-export type Theme = AimuxTheme
 
 // ─── Backend config (stub) ────────────────────────────────────────────────────
 
@@ -831,9 +794,10 @@ export interface AutoCommitConfig {
 }
 
 export interface AimuxThemeConfig {
-  /** Startup override for light/dark theme family. Reapplied on each launch. */
+  /** Startup theme id (one of `THEME_IDS` from `@brimveyn/aimux-config`). */
+  initialId?: string
+  /** Startup override for light/dark mode. Reapplied on each launch. */
   initialMode?: ThemeMode
-  paletteOverrides?: Partial<AimuxPalette>
   /** @deprecated Use `initialMode` instead. */
   mode?: ThemeMode
 }
@@ -890,8 +854,8 @@ export interface ResolvedKeymapConfig {
 export interface ResolvedConfig {
   theme:
     | {
+        initialId?: string
         initialMode?: ThemeMode
-        paletteOverrides?: Partial<AimuxPalette>
       }
     | undefined
   keymaps: ResolvedKeymapConfig

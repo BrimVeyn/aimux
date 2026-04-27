@@ -9,10 +9,10 @@ interface Props {
 
 function Button({ label, onPress }: { label: string; onPress: () => void }) {
   const t = useTheme()
-  const bg = t['surface-diff-hidden-weak']
+  const bg = t.diffContextBg
   return (
     <box paddingLeft={1} paddingRight={1} backgroundColor={bg} onMouseDown={onPress}>
-      <text fg={t['text-interactive-base']}>{label}</text>
+      <text fg={t.primary}>{label}</text>
     </box>
   )
 }
@@ -23,7 +23,7 @@ function Spacer() {
 
 export function FoldStrip({ dispatch, fold }: Props) {
   const t = useTheme()
-  const headerBg = t['surface-diff-hidden-weak']
+  const headerBg = t.diffContextBg
   const { bottomExpanded, foldId, hidden, topExpanded, total } = fold
   const stepUp = Math.min(FOLD_STEP, hidden)
   const stepDown = Math.min(FOLD_STEP, hidden)
@@ -71,7 +71,7 @@ export function FoldStrip({ dispatch, fold }: Props) {
 
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={t['text-weak']}>{`⋯ ${hidden} hidden `}</text>
+      <text fg={t.textMuted}>{`⋯ ${hidden} hidden `}</text>
       {controls}
     </box>
   )

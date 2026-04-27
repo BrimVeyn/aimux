@@ -1,24 +1,24 @@
 import type { ReactNode } from 'react'
 
-import type { ResolvedToken } from '../../themes'
+import type { TuiColorToken } from '../../themes'
 
 import { useTheme } from '../../theme'
 
 type SurfaceTone = 'muted' | 'elevated' | 'selected' | 'input' | 'inputActive'
 
-function toneToToken(tone: SurfaceTone): ResolvedToken {
+function toneToToken(tone: SurfaceTone): TuiColorToken {
   switch (tone) {
     case 'elevated':
-      return 'surface-raised-base'
+      return 'backgroundElement'
     case 'selected':
-      return 'surface-raised-base-hover'
+      return 'backgroundElement'
     case 'input':
-      return 'input-base'
+      return 'backgroundElement'
     case 'inputActive':
-      return 'input-base'
+      return 'backgroundElement'
     case 'muted':
     default:
-      return 'background-stronger'
+      return 'backgroundPanel'
   }
 }
 

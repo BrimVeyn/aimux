@@ -60,11 +60,11 @@ export function NewTabModal({
       onEdit: () => dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
       subtitle: (
         <box flexDirection="column">
-          <text fg={t['text-weak']}>{option.description}</text>
-          {customCmd ? <text fg={t['text-interactive-base']}>{customCmd}</text> : null}
+          <text fg={t.textMuted}>{option.description}</text>
+          {customCmd ? <text fg={t.primary}>{customCmd}</text> : null}
         </box>
       ),
-      title: <text fg={active ? t['text-base'] : t['text-weak']}>{option.label}</text>,
+      title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
     }
   })
 
@@ -78,7 +78,7 @@ export function NewTabModal({
       cursorPos={cursorPos}
       items={items}
       selectedIndex={selectedIndex}
-      emptyState={<text fg={t['text-weak']}>No matching assistants.</text>}
+      emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

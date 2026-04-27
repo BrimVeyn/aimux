@@ -59,7 +59,7 @@ export function ModalShell({
 }: ModalShellProps) {
   const t = useTheme()
   const transparent = useTransparent()
-  const bg = transparent ? 'transparent' : t['surface-raised-stronger-non-alpha']
+  const bg = transparent ? 'transparent' : t.backgroundPanel
   return (
     <box
       position="absolute"
@@ -72,7 +72,7 @@ export function ModalShell({
     >
       <box
         border
-        borderColor={t['border-weak-base']}
+        borderColor={t.border}
         backgroundColor={bg}
         padding={1}
         width={width}
@@ -80,8 +80,8 @@ export function ModalShell({
       >
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
-            <text fg={t['text-strong']}>{title}</text>
-            {subtitle ? <text fg={t['text-weak']}>{subtitle}</text> : null}
+            <text fg={t.text}>{title}</text>
+            {subtitle ? <text fg={t.textMuted}>{subtitle}</text> : null}
           </box>
           {children}
           {footer ? <box>{footer}</box> : null}

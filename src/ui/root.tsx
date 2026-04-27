@@ -251,7 +251,7 @@ export function RootView({
   themeId,
 }: RootViewProps) {
   const t = useTheme()
-  const editorBg = t['background-base']
+  const editorBg = t.background
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
@@ -417,7 +417,7 @@ function GitPaneInPaneMode({
   }) => void
 }) {
   const tokens = useTheme()
-  const bg = tokens['surface-raised-base']
+  const bg = tokens.backgroundPanel
   const gitPane = useAppStore((s) => s.gitPane)
   const width = getGitPaneWidthFromRatio(ratio)
   const contentWidth = Math.max(1, width - 1)
@@ -433,7 +433,7 @@ function GitPaneInPaneMode({
     <box
       width={1}
       flexShrink={0}
-      backgroundColor={tokens['border-weak-base']}
+      backgroundColor={tokens.border}
       onMouseDown={(event) => {
         event.preventDefault()
         event.stopPropagation()

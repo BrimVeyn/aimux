@@ -1,7 +1,7 @@
 import type { DirectoryResult } from '../../../../state/types'
 
 import { abbreviatePath } from '../../../path-format'
-import { getCurrentResolved, useTheme } from '../../../theme'
+import { getCurrentTheme, useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 
@@ -14,10 +14,10 @@ function getDirectoryResultIcon(result: DirectoryResult): string {
 }
 
 function getDirectoryResultColor(result: DirectoryResult): string {
-  const t = getCurrentResolved()
-  if (result.type === 'worktree') return t['icon-warning-base']
-  if (result.type === 'workspace') return t['icon-info-base']
-  return t['icon-base']
+  const t = getCurrentTheme()
+  if (result.type === 'worktree') return t.warning
+  if (result.type === 'workspace') return t.info
+  return t.text
 }
 
 interface CreateSessionModalProps {
@@ -46,7 +46,7 @@ export function CreateSessionModal({
       key: result.path,
       leading: <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>,
       title: (active) => (
-        <text fg={active ? t['text-base'] : t['text-weak']}>{abbreviatePath(result.path)}</text>
+        <text fg={active ? t.text : t.textMuted}>{abbreviatePath(result.path)}</text>
       ),
     }
   })
@@ -67,7 +67,7 @@ export function CreateSessionModal({
         selectedIndex={selectedIndex}
         maxVisibleRows={VISIBLE_ROWS}
         emptyState={
-          <text fg={t['text-weak']}>
+          <text fg={t.textMuted}>
             {directoryQuery.length > 0 ? 'No matches' : 'Type a project name to search...'}
           </text>
         }

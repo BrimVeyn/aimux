@@ -48,7 +48,7 @@ function formatResetIn(snap: {
 
 export function AIUsageIndicator() {
   const t = useTheme()
-  const bg = t['background-stronger']
+  const bg = t.backgroundPanel
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
@@ -74,7 +74,7 @@ export function AIUsageIndicator() {
         backgroundColor={bg}
         onMouseDown={openModal}
       >
-        <text fg={t['text-weak']}>…</text>
+        <text fg={t.textMuted}>…</text>
       </box>
     )
   }
@@ -95,7 +95,7 @@ export function AIUsageIndicator() {
               backgroundColor={bg}
               onMouseDown={openModal}
             >
-              <text fg={t['icon-critical-base']} selectable={false}>
+              <text fg={t.error} selectable={false}>
                 {`${icon} —`}
               </text>
             </box>
@@ -104,11 +104,11 @@ export function AIUsageIndicator() {
 
         if (snap.percent !== null) {
           const p = Math.round(snap.percent)
-          let color = t['icon-success-base']
+          let color = t.success
           if (p >= 85) {
-            color = t['icon-critical-base']
+            color = t.error
           } else if (p >= 60) {
-            color = t['icon-warning-base']
+            color = t.warning
           }
           const { empty, filled } = buildBar(snap.percent)
           const reset = formatResetIn(snap)
@@ -128,14 +128,14 @@ export function AIUsageIndicator() {
               <text fg={color} selectable={false}>
                 {filled}
               </text>
-              <text fg={t['text-weak']} selectable={false}>
+              <text fg={t.textMuted} selectable={false}>
                 {empty}
               </text>
-              <text fg={t['text-base']} selectable={false}>
+              <text fg={t.text} selectable={false}>
                 {` ${pctText}`}
               </text>
               {reset ? (
-                <text fg={t['text-weak']} selectable={false}>
+                <text fg={t.textMuted} selectable={false}>
                   {` · ${reset}`}
                 </text>
               ) : null}
@@ -152,7 +152,7 @@ export function AIUsageIndicator() {
             backgroundColor={bg}
             onMouseDown={openModal}
           >
-            <text fg={t['text-weak']} selectable={false}>
+            <text fg={t.textMuted} selectable={false}>
               {`${icon} ${formatTokens(snap.tokens.total)}`}
             </text>
           </box>

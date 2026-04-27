@@ -60,14 +60,14 @@ function GeneratingOverlay({ assistant, model }: { assistant?: string; model?: s
       paddingTop={2}
       paddingBottom={2}
     >
-      <text fg={t['text-interactive-base']}>🪄</text>
+      <text fg={t.primary}>🪄</text>
       <box marginTop={1} flexDirection="row" gap={1}>
-        <text fg={t['text-interactive-base']}>{frame}</text>
-        <text fg={t['text-base']}>Generating commit message</text>
+        <text fg={t.primary}>{frame}</text>
+        <text fg={t.text}>Generating commit message</text>
       </box>
-      <text fg={t['text-weak']}>via {providerLabel}</text>
+      <text fg={t.textMuted}>via {providerLabel}</text>
       <box marginTop={1}>
-        <text fg={t['text-weak']}>Esc to cancel</text>
+        <text fg={t.textMuted}>Esc to cancel</text>
       </box>
     </box>
   )
@@ -125,24 +125,22 @@ export function GitCommitModal({
       {isConfirm ? (
         <box flexDirection="column">
           {stagedCount > 0 ? (
-            <text fg={t['icon-warning-base']}>
+            <text fg={t.warning}>
               Commit will include the <strong>{stagedCount} staged file(s)</strong> only.
             </text>
           ) : (
-            <text fg={t['icon-warning-base']}>
+            <text fg={t.warning}>
               <strong>git add -A</strong> will stage every change before committing.
             </text>
           )}
-          <text fg={t['text-weak']}>
-            Enter to confirm · Esc to cancel · edits below still apply.
-          </text>
+          <text fg={t.textMuted}>Enter to confirm · Esc to cancel · edits below still apply.</text>
         </box>
       ) : null}
 
       {isGenerating ? null : (
         <>
           <box flexDirection="column">
-            <text fg={titleActive ? t['text-base'] : t['text-weak']}>Title</text>
+            <text fg={titleActive ? t.text : t.textMuted}>Title</text>
             <InputField
               active={titleActive}
               cursorPos={titleActive ? cursorPos : undefined}
@@ -151,7 +149,7 @@ export function GitCommitModal({
           </box>
 
           <box flexDirection="column">
-            <text fg={bodyActive ? t['text-base'] : t['text-weak']}>Body (optional)</text>
+            <text fg={bodyActive ? t.text : t.textMuted}>Body (optional)</text>
             <InputField
               active={bodyActive}
               cursorPos={bodyActive ? cursorPos : undefined}
@@ -165,7 +163,7 @@ export function GitCommitModal({
         <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
           <box
             border
-            borderColor={t['border-weak-base']}
+            borderColor={t.border}
             paddingLeft={1}
             paddingRight={1}
             flexDirection="row"
@@ -177,12 +175,12 @@ export function GitCommitModal({
               onAutoCommitClick()
             }}
           >
-            {showBgSpinner ? <text fg={t['text-interactive-base']}>{bgSpinnerFrame}</text> : null}
-            <text fg={t['text-strong']}>
+            {showBgSpinner ? <text fg={t.primary}>{bgSpinnerFrame}</text> : null}
+            <text fg={t.text}>
               <strong>Auto-commit</strong>
             </text>
           </box>
-          <text fg={t['text-weak']}>C-a · stages all changes (AI-suggests message if empty)</text>
+          <text fg={t.textMuted}>C-a · stages all changes (AI-suggests message if empty)</text>
         </box>
       )}
     </ModalShell>

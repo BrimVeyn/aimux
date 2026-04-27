@@ -31,7 +31,7 @@ import { loadSnippetCatalog } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
-import { applyTheme, setTransparent } from './ui/theme'
+import { applyTheme, setMode, setTransparent } from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
 import {
   fetchLatestNpmVersion,
@@ -66,10 +66,9 @@ export function App({
   const [themeId, setThemeId] = useState<ThemeId>(() => {
     const config = loadConfig()
     const persisted = config.themeId && isKnownThemeId(config.themeId) ? config.themeId : undefined
-    const fromConfig: ThemeId =
-      resolvedConfig.theme?.initialMode === 'light' ? 'aimux-light' : 'aimux-dark'
-    const initial: ThemeId = persisted ?? fromConfig
-    applyTheme(initial, resolvedConfig.theme?.paletteOverrides)
+    const initial: ThemeId = persisted ?? resolvedConfig.theme?.initialId ?? 'aimux'
+    applyTheme(initial)
+    if (resolvedConfig.theme?.initialMode) setMode(resolvedConfig.theme.initialMode)
     setTransparent(config.themeTransparent ?? false)
     return initial
   })

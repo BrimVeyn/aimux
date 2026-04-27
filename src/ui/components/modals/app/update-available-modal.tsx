@@ -36,7 +36,7 @@ export function UpdateAvailableModal({
               key={option.label}
               active={active}
               direction="row"
-              title={<text fg={active ? t['text-base'] : t['text-weak']}>{option.label}</text>}
+              title={<text fg={active ? t.text : t.textMuted}>{option.label}</text>}
             />
           )
         })}

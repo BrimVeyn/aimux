@@ -29,9 +29,9 @@ export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProp
         {entries.map((binding) => (
           <box key={binding.description ?? binding.keys} flexDirection="row">
             <box width={KEYS_COLUMN_WIDTH}>
-              <text fg={t['text-weak']}>{binding.keysDisplay}</text>
+              <text fg={t.textMuted}>{binding.keysDisplay}</text>
             </box>
-            <text fg={t['text-weaker']}>{binding.description ?? ''}</text>
+            <text fg={t.textMuted}>{binding.description ?? ''}</text>
           </box>
         ))}
       </Surface>

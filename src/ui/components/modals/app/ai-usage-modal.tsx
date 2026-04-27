@@ -72,7 +72,7 @@ export function AIUsageModal() {
       listGap={1}
     >
       {sections.length === 0 ? (
-        <text fg={t['text-weak']} selectable={false}>
+        <text fg={t.textMuted} selectable={false}>
           no data yet — collecting…
         </text>
       ) : (
@@ -99,13 +99,13 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
   let body: ReactNode
   if (isHardError) {
     body = (
-      <text fg={t['icon-critical-base']} selectable={false}>
+      <text fg={t.error} selectable={false}>
         {`error: ${snap.error ?? ''}`}
       </text>
     )
   } else if (snap.windows.length === 0) {
     body = (
-      <text fg={t['text-weak']} selectable={false}>
+      <text fg={t.textMuted} selectable={false}>
         no window data
       </text>
     )
@@ -116,16 +116,16 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
   return (
     <box flexDirection="column">
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t['text-strong']} selectable={false}>
+        <text fg={t.text} selectable={false}>
           {TOOL_TITLE[tool]}
         </text>
         {snap.planTier ? (
-          <text fg={t['text-weak']} selectable={false}>
+          <text fg={t.textMuted} selectable={false}>
             {snap.planTier}
           </text>
         ) : null}
       </box>
-      <text fg={t['text-weak']} selectable={false}>
+      <text fg={t.textMuted} selectable={false}>
         {`Updated ${relative}`}
       </text>
       {body}
@@ -138,10 +138,10 @@ function WindowRow({ window }: { window: UsageWindow }) {
   const percent = window.percent
   const { empty, filled } = buildBar(percent)
 
-  let barColor = t['icon-success-base']
+  let barColor = t.success
   if (percent !== null) {
-    if (percent >= 85) barColor = t['icon-critical-base']
-    else if (percent >= 60) barColor = t['icon-warning-base']
+    if (percent >= 85) barColor = t.error
+    else if (percent >= 60) barColor = t.warning
   }
 
   const pctText = percent === null ? '—' : `${Math.round(percent)}% used`
@@ -149,23 +149,23 @@ function WindowRow({ window }: { window: UsageWindow }) {
 
   return (
     <box flexDirection="column" paddingTop={1}>
-      <text fg={t['text-base']} selectable={false}>
+      <text fg={t.text} selectable={false}>
         {window.label}
       </text>
       <box flexDirection="row">
         <text fg={barColor} selectable={false}>
           {filled}
         </text>
-        <text fg={t['text-weak']} selectable={false}>
+        <text fg={t.textMuted} selectable={false}>
           {empty}
         </text>
       </box>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t['text-weak']} selectable={false}>
+        <text fg={t.textMuted} selectable={false}>
           {pctText}
         </text>
         {resetText ? (
-          <text fg={t['text-weak']} selectable={false}>
+          <text fg={t.textMuted} selectable={false}>
             {resetText}
           </text>
         ) : null}
@@ -177,9 +177,9 @@ function WindowRow({ window }: { window: UsageWindow }) {
 
 function PaceLine({ pace }: { pace: NonNullable<UsageWindow['pace']> }) {
   const t = useTheme()
-  let color = t['text-weak']
-  if (paceStageIsBehind(pace.stage)) color = t['icon-warning-base']
-  else if (paceStageIsAhead(pace.stage)) color = t['icon-success-base']
+  let color = t.textMuted
+  if (paceStageIsBehind(pace.stage)) color = t.warning
+  else if (paceStageIsAhead(pace.stage)) color = t.success
 
   const suffix = pace.rightText ? ` · ${pace.rightText}` : ''
   return (

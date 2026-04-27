@@ -8,9 +8,9 @@ interface BareInputProps {
 
 export function BareInput({ cursorPos, placeholder = '', value }: BareInputProps) {
   const t = useTheme()
-  const fg = t['text-strong']
-  const bg = t['background-base']
-  const placeholderFg = t['text-weak']
+  const fg = t.text
+  const bg = t.background
+  const placeholderFg = t.textMuted
 
   if (!value) {
     const firstChar = placeholder.charAt(0) || ' '

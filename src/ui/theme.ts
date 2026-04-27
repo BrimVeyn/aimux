@@ -1,15 +1,15 @@
-// Back-compat shim: the theme singleton has been replaced with a Zustand store.
-// React components use `useTheme` for resolved tokens; non-React callers use
-// `getCurrentTheme()` / `getCurrentResolved()`.
+// Back-compat shim: the theme singleton lives in `theme-store.ts`. React
+// components use `useTheme` for the resolved TUI token map; non-React callers
+// use `getCurrentTheme()`.
 
-export type { ResolvedToken, ResolvedTokens } from './themes'
-export { flattenRgba } from './themes'
+export type { ResolvedTuiTheme, TuiColorToken } from './themes'
 export {
   applyTheme,
-  getCurrentPalette,
-  getCurrentResolved,
+  getCurrentMode,
   getCurrentTheme,
+  getCurrentThemeId,
   getTransparent,
+  setMode,
   setTransparent,
   useTheme,
   useTransparent,

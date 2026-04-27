@@ -40,9 +40,9 @@ export function SnippetPickerModal({
       },
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
       onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
-      subtitle: <text fg={t['text-weak']}>{truncateContent(snippet.content)}</text>,
+      subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
       title: (
-        <text fg={active ? t['text-base'] : t['text-weak']}>
+        <text fg={active ? t.text : t.textMuted}>
           <strong>{snippet.name}</strong>
         </text>
       ),
@@ -60,7 +60,7 @@ export function SnippetPickerModal({
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={t['text-weak']}>
+        <text fg={t.textMuted}>
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
       }

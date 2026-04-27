@@ -49,7 +49,7 @@ function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: 
             onEdit()
           }}
         >
-          <text fg={t['text-interactive-base']}>[edit]</text>
+          <text fg={t.primary}>[edit]</text>
         </box>
       ) : null}
       {onDelete ? (
@@ -59,7 +59,7 @@ function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: 
             onDelete()
           }}
         >
-          <text fg={t['icon-critical-base']}>[del]</text>
+          <text fg={t.error}>[del]</text>
         </box>
       ) : null}
     </box>
@@ -140,7 +140,7 @@ export function Picker({
             if (item.group && item.group !== prevGroup) {
               nodes.push(
                 <box key={`group::${item.group}`} paddingLeft={1} paddingTop={index === 0 ? 0 : 1}>
-                  <text fg={t['text-weak']} wrapMode="none">
+                  <text fg={t.textMuted} wrapMode="none">
                     {item.group}
                   </text>
                 </box>

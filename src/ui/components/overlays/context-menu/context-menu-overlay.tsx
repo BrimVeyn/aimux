@@ -79,8 +79,8 @@ export function ContextMenuOverlay() {
         width={width}
         flexDirection="column"
         border
-        borderColor={t['border-weak-base']}
-        backgroundColor={t['surface-raised-stronger-non-alpha']}
+        borderColor={t.border}
+        backgroundColor={t.backgroundPanel}
         onMouseDown={(e) => {
           e.stopPropagation()
         }}
@@ -94,7 +94,7 @@ export function ContextMenuOverlay() {
               flexShrink={0}
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={active ? t['surface-raised-base-hover'] : undefined}
+              backgroundColor={active ? t.backgroundElement : undefined}
               onMouseOver={() => setSelected(index)}
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -104,7 +104,7 @@ export function ContextMenuOverlay() {
                 onSelect()
               }}
             >
-              <text fg={active ? t['text-base'] : t['text-weak']} selectable={false}>
+              <text fg={active ? t.text : t.textMuted} selectable={false}>
                 {label}
               </text>
             </box>

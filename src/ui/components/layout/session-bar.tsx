@@ -19,7 +19,7 @@ interface SessionBarProps {
 
 export function SessionBar({ forceVisible = false }: SessionBarProps) {
   const t = useTheme()
-  const headerBg = t['background-stronger']
+  const headerBg = t.backgroundPanel
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -150,13 +150,13 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
         flexDirection="row"
         paddingLeft={1}
         paddingRight={1}
-        backgroundColor={t['surface-base-active']}
+        backgroundColor={t.backgroundElement}
         onMouseDown={(e) => {
           e.stopPropagation()
           dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
         }}
       >
-        <text fg={t['text-strong']} selectable={false}>
+        <text fg={t.text} selectable={false}>
           + New
         </text>
       </box>
@@ -200,15 +200,15 @@ function SessionChip({
   status,
 }: SessionChipProps) {
   const t = useTheme()
-  const selectionBg = t['surface-base-active']
+  const selectionBg = t.backgroundElement
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const labelColor = active ? t['text-base'] : t['text-weak']
+  const labelColor = active ? t.text : t.textMuted
   const bgColor = dragging || active ? selectionBg : undefined
-  const idleColor = t['icon-success-base']
-  const workingColor = t['text-interactive-base']
-  const waitingColor = t['icon-warning-base']
+  const idleColor = t.success
+  const workingColor = t.primary
+  const waitingColor = t.warning
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -263,12 +263,12 @@ function SessionChip({
             runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' })
           }}
         >
-          <text fg={t['text-weak']} selectable={false}>
+          <text fg={t.textMuted} selectable={false}>
             ×
           </text>
         </box>
       ) : (
-        <text fg={t['text-weaker']} selectable={false}>
+        <text fg={t.textMuted} selectable={false}>
           {' '}
         </text>
       )}

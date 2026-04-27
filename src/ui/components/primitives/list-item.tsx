@@ -41,9 +41,7 @@ export function ListItem({
           <box flexDirection="row">
             {isRow ? null : (
               <>
-                <text fg={active ? t['text-interactive-base'] : t['text-weaker']}>
-                  {active ? '›' : '·'}
-                </text>
+                <text fg={active ? t.primary : t.textMuted}>{active ? '›' : '·'}</text>
                 <text> </text>
               </>
             )}

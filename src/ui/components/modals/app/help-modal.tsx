@@ -53,12 +53,12 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       group: entry.modeLabel,
       key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
       title: (
-        <text fg={t['text-weaker']} wrapMode="none">
+        <text fg={t.textMuted} wrapMode="none">
           {entry.description ?? ''}
         </text>
       ),
       trailing: (
-        <text fg={t['text-weak']} wrapMode="none">
+        <text fg={t.textMuted} wrapMode="none">
           {entry.keysDisplay}
         </text>
       ),
@@ -75,9 +75,7 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={t['text-weak']}>
-          {filter ? 'No matching bindings.' : 'No bindings registered.'}
-        </text>
+        <text fg={t.textMuted}>{filter ? 'No matching bindings.' : 'No bindings registered.'}</text>
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />

@@ -123,7 +123,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   if (!file) {
     return (
       <box flexGrow={1} padding={1}>
-        <text fg={t['text-weak']}>
+        <text fg={t.textMuted}>
           {preparation.preparing ? 'Preparing diff…' : '(could not parse diff)'}
         </text>
       </box>

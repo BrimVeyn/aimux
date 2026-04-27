@@ -4,7 +4,7 @@ import type { TabSession } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
-import { getCurrentResolved, useTheme } from '../../../theme'
+import { getCurrentTheme, useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface TabItemProps {
@@ -16,16 +16,16 @@ interface TabItemProps {
 }
 
 function getStatusColor(status: TabSession['status']): string {
-  const t = getCurrentResolved()
+  const t = getCurrentTheme()
   switch (status) {
     case 'running':
-      return t['icon-success-base']
+      return t.success
     case 'disconnected':
-      return t['icon-warning-base']
+      return t.warning
     case 'error':
-      return t['icon-critical-base']
+      return t.error
     default:
-      return t['text-weak']
+      return t.textMuted
   }
 }
 
@@ -38,33 +38,33 @@ function getIndicator(active: boolean, focused: boolean, inLayout: boolean): str
 }
 
 function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean): string {
-  const t = getCurrentResolved()
+  const t = getCurrentTheme()
   if (active) {
-    return focused ? t['text-interactive-base'] : t['text-strong']
+    return focused ? t.primary : t.text
   }
 
-  return inLayout ? t['text-weak'] : t['text-weaker']
+  return inLayout ? t.textMuted : t.textMuted
 }
 
 function BusyIndicator() {
   const t = useTheme()
   const frame = useBusySpinner()
-  return <text fg={t['text-interactive-base']}>{frame} working</text>
+  return <text fg={t.primary}>{frame} working</text>
 }
 
 function WaitingIndicator() {
   const t = useTheme()
-  return <text fg={t['icon-warning-base']}>? waiting</text>
+  return <text fg={t.warning}>? waiting</text>
 }
 
 function ActivityIndicator({ tab }: { tab: TabSession }) {
   const t = useTheme()
   if (tab.status === 'error') {
-    return <text fg={t['icon-critical-base']}>✗ error</text>
+    return <text fg={t.error}>✗ error</text>
   }
 
   if (tab.status === 'disconnected') {
-    return <text fg={t['icon-warning-base']}>⏸ restore</text>
+    return <text fg={t.warning}>⏸ restore</text>
   }
 
   if (tab.activity === 'working') {
@@ -76,7 +76,7 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   }
 
   if (tab.activity === 'idle') {
-    return <text fg={t['icon-success-base']}>● idle</text>
+    return <text fg={t.success}>● idle</text>
   }
 
   return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
@@ -135,7 +135,7 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       <box flexDirection="row" alignItems="center">
         <text fg={indicatorColor}>{indicator} </text>
         <box flexGrow={1}>
-          <text fg={active ? t['text-base'] : t['text-weak']}>{tab.title}</text>
+          <text fg={active ? t.text : t.textMuted}>{tab.title}</text>
         </box>
         {hovered ? (
           <box
@@ -145,12 +145,12 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
               runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
             }}
           >
-            <text fg={t['text-weak']}>×</text>
+            <text fg={t.textMuted}>×</text>
           </box>
         ) : null}
       </box>
       <box flexDirection="row">
-        <text fg={t['text-weak']}> {label} </text>
+        <text fg={t.textMuted}> {label} </text>
         <ActivityIndicator tab={tab} />
       </box>
     </ContextMenuBox>

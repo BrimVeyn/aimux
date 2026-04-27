@@ -1,3 +1,4 @@
+import { tuiThemeToShiki } from '@brimveyn/aimux-config'
 import {
   type BundledLanguage,
   createHighlighter,
@@ -5,15 +6,13 @@ import {
   type ThemeRegistrationRaw,
 } from 'shiki'
 
-import { getCurrentResolved, getCurrentTheme } from './theme-store'
-import { paletteToShikiTheme } from './themes'
+import { getCurrentMode, getCurrentTheme, getCurrentThemeId } from './theme-store'
 
 function buildActiveTheme(): { id: string; raw: ThemeRegistrationRaw } {
-  const theme = getCurrentTheme()
-  const id = `${theme.name}-${theme.mode}`
+  const id = `${getCurrentThemeId()}-${getCurrentMode()}`
   return {
     id,
-    raw: paletteToShikiTheme({ mode: theme.mode, name: id, tokens: getCurrentResolved() }),
+    raw: tuiThemeToShiki({ mode: getCurrentMode(), name: id, theme: getCurrentTheme() }),
   }
 }
 
@@ -42,11 +41,6 @@ export async function ensureShikiLang(h: Highlighter, lang: string): Promise<boo
   }
 }
 
-/**
- * Make sure the active aimux theme (light or dark, with any palette overrides)
- * is loaded into the highlighter. Returns the registered theme name so the
- * caller can pass it to `codeToTokens`.
- */
 export async function ensureActiveShikiTheme(h: Highlighter): Promise<string> {
   const { id, raw } = buildActiveTheme()
   if (id === activeThemeId) return id
@@ -54,7 +48,7 @@ export async function ensureActiveShikiTheme(h: Highlighter): Promise<string> {
     await h.loadTheme(raw)
     activeThemeId = id
   } catch {
-    // Reloading the theme is best-effort; on failure we keep using the prior id.
+    // best-effort
   }
   return activeThemeId ?? id
 }

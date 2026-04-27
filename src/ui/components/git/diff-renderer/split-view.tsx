@@ -68,7 +68,7 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
   ref
 ) {
   const t = useTheme()
-  const separatorBg = t['background-base']
+  const separatorBg = t.background
   const leftRef = useRef<ScrollBoxRenderable | null>(null)
   const rightRef = useRef<ScrollBoxRenderable | null>(null)
   const measuredHeightsRef = useRef<Record<string, number>>({})
@@ -226,11 +226,11 @@ function SideRow({
 
 function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-header' }> }) {
   const t = useTheme()
-  const headerBg = t['surface-diff-hidden-base']
+  const headerBg = t.diffContextBg
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
-      <text fg={t['text-base']}>{row.spec}</text>
-      {row.context ? <text fg={t['text-weaker']}> {row.context}</text> : null}
+      <text fg={t.text}>{row.spec}</text>
+      {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
     </box>
   )
 }
@@ -247,28 +247,28 @@ function HalfRow({
   tokens: ThemedToken[][]
 }) {
   const t = useTheme()
-  const headerBg = t['surface-diff-hidden-base']
+  const headerBg = t.diffContextBg
   const transparent = useTransparent()
   if (cell.type === 'filler') {
     return <box backgroundColor={headerBg} height={height} />
   }
   let bg: string | undefined
   let sign = ' '
-  let signColor = t['text-weak']
+  let signColor = t.textMuted
   if (cell.type === 'addition') {
-    bg = t['surface-diff-add-base']
+    bg = t.diffAddedBg
     sign = '+'
-    signColor = t['syntax-diff-add']
+    signColor = t.diffAdded
   } else if (cell.type === 'deletion') {
-    bg = t['surface-diff-delete-base']
+    bg = t.diffRemovedBg
     sign = '-'
-    signColor = t['syntax-diff-delete']
+    signColor = t.diffRemoved
   }
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={height}>
-      <text fg={t['text-weaker']}>{` ${num} `}</text>
+      <text fg={t.textMuted}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />
     </box>
@@ -278,7 +278,7 @@ function HalfRow({
 function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
   const t = useTheme()
   if (!tokens || tokens.length === 0) {
-    return <text fg={t['text-base']}>{content}</text>
+    return <text fg={t.text}>{content}</text>
   }
   return (
     <text>
@@ -289,7 +289,7 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
         if (s.italic) attributes |= TextAttributes.ITALIC
         if (s.underline) attributes |= TextAttributes.UNDERLINE
         return (
-          <span key={i} fg={s.fg ?? t['text-base']} attributes={attributes}>
+          <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}
           </span>
         )
