@@ -51,7 +51,7 @@ export function bindBackendRuntimeEvents({
       viewportY: viewport.viewportY,
     })
 
-    const transformed = syntaxOverlayEnabled() ? highlightSnapshot(viewport) : viewport
+    const transformed = syntaxOverlayEnabled() ? highlightSnapshot(viewport, tabId) : viewport
 
     dispatch({
       source: resizingRef.current ? 'resize' : 'data',
