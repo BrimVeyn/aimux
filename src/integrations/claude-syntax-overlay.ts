@@ -170,13 +170,20 @@ function tokenize(code: string, lang: string): ShikiToken[][] {
 }
 
 // Calm palette: only color tokens that carry semantic weight (keywords,
-// strings, comments, numbers, types). Operators / punctuation / variables /
-// function-call sites fall back to plain `text` so we don't end up with a
-// rainbow where every identifier and brace is its own color.
+// strings, comments, numbers, types, function names). Operators /
+// punctuation / variables fall back to plain `text` so we don't end up
+// with a rainbow where every identifier and brace is its own color.
 function buildAccentSet(): Set<string> {
   const t = getCurrentTheme()
   return new Set(
-    [t.syntaxKeyword, t.syntaxString, t.syntaxComment, t.syntaxNumber, t.syntaxType]
+    [
+      t.syntaxKeyword,
+      t.syntaxString,
+      t.syntaxComment,
+      t.syntaxNumber,
+      t.syntaxType,
+      t.syntaxFunction,
+    ]
       .filter((c): c is string => typeof c === 'string')
       .map((c) => c.toLowerCase())
   )
