@@ -1,31 +1,20 @@
-// Thin runtime re-export. Theme data, types, palette utilities, and the
-// palette-to-Shiki generator all live in `@brimveyn/aimux-config`.
+// Thin runtime re-export of the TUI theme namespace.
 
 export type {
-  AimuxPalette,
-  AimuxTheme,
-  AimuxThemeConfig,
-  Theme,
+  ResolvedTuiTheme,
+  RGBA,
   ThemeId,
   ThemeMode,
+  TuiColorToken,
+  TuiColorValue,
+  TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
 export {
-  accent,
-  border,
-  computeSurfaces,
-  diffAddBg,
-  diffDeleteBg,
-  elevated,
-  extendPalette,
-  faint,
-  hover,
   isKnownThemeId,
   migrateThemeId,
-  mix,
-  muted,
-  paletteToShikiTheme,
-  selected,
+  resolveTuiTheme,
   THEME_IDS,
-  THEMES,
+  TUI_COLOR_TOKENS,
+  TUI_THEMES,
 } from '@brimveyn/aimux-config'

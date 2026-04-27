@@ -30,7 +30,7 @@ import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
-import { useBg, useTokens } from './theme'
+import { useTheme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -250,7 +250,8 @@ export function RootView({
   terminalRows,
   themeId,
 }: RootViewProps) {
-  const editorBg = useBg('base')
+  const t = useTheme()
+  const editorBg = t.background
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
@@ -415,8 +416,8 @@ function GitPaneInPaneMode({
     side: 'left' | 'right'
   }) => void
 }) {
-  const bg = useBg('elevated')
-  const tokens = useTokens()
+  const tokens = useTheme()
+  const bg = tokens.backgroundPanel
   const gitPane = useAppStore((s) => s.gitPane)
   const width = getGitPaneWidthFromRatio(ratio)
   const contentWidth = Math.max(1, width - 1)

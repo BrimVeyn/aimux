@@ -2,7 +2,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 
 import { describeBindings } from '../../../../input/keymap/describe-bindings'
 import { useKeymap } from '../../../keymap-context'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { Surface } from '../../primitives/surface'
 
 const KEYS_COLUMN_WIDTH = 12
@@ -13,7 +13,7 @@ interface ModalKeybindsOverlayProps {
 }
 
 export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProps) {
-  const t = useTokens()
+  const t = useTheme()
   const config = useKeymap()
   const bindings = describeBindings(config, modeId, {
     mergeAlternativesByDescription: true,
@@ -29,9 +29,9 @@ export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProp
         {entries.map((binding) => (
           <box key={binding.description ?? binding.keys} flexDirection="row">
             <box width={KEYS_COLUMN_WIDTH}>
-              <text fg={t.accent}>{binding.keysDisplay}</text>
+              <text fg={t.textMuted}>{binding.keysDisplay}</text>
             </box>
-            <text fg={t.muted}>{binding.description ?? ''}</text>
+            <text fg={t.textMuted}>{binding.description ?? ''}</text>
           </box>
         ))}
       </Surface>

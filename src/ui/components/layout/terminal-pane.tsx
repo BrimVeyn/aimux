@@ -8,7 +8,7 @@ import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/
 import { logInputDebug } from '../../../debug/input-log'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
-import { getCurrentTokens, useBg, useTokens } from '../../theme'
+import { getCurrentTheme, useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
 interface TerminalPaneProps {
@@ -47,17 +47,9 @@ function getTitle(
   return `${tab.title} · ${tab.status}`
 }
 
-function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
-  const t = getCurrentTokens()
-  if (isActive && focusMode === 'terminal-input') {
-    return t.palette.primary
-  }
-
-  if (isActive) {
-    return t.accent
-  }
-
-  return t.hover
+function getBorderColor(isActive: boolean, _focusMode: TerminalPaneProps['focusMode']): string {
+  const t = getCurrentTheme()
+  return isActive ? t.borderActive : t.border
 }
 
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
@@ -76,7 +68,7 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
   }
 
   return (
-    <span key={key} fg={span.fg ?? getCurrentTokens().palette.ink} bg={span.bg}>
+    <span key={key} fg={span.fg ?? getCurrentTheme().text} bg={span.bg}>
       {node}
     </span>
   )
@@ -91,11 +83,11 @@ const TerminalViewport = memo(function TerminalViewport({
   buffer,
   viewport,
 }: TerminalViewportProps) {
-  const t = useTokens()
+  const t = useTheme()
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
     return (
-      <text fg={t.palette.ink}>
+      <text fg={t.text}>
         {lines.map((line, lineIndex) => (
           <span key={`line-${lineIndex}`}>
             {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`))}
@@ -106,9 +98,7 @@ const TerminalViewport = memo(function TerminalViewport({
     )
   }
 
-  return (
-    <text fg={t.palette.ink}>{buffer.length > 0 ? buffer : 'Waiting for workspace output...'}</text>
-  )
+  return <text fg={t.text}>{buffer.length > 0 ? buffer : 'Waiting for workspace output...'}</text>
 })
 
 export function TerminalPane({
@@ -126,8 +116,8 @@ export function TerminalPane({
   tab,
   tabId,
 }: TerminalPaneProps) {
-  const t = useTokens()
-  const editorBg = useBg('base')
+  const t = useTheme()
+  const editorBg = t.background
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
@@ -232,25 +222,25 @@ export function TerminalPane({
       >
         {!tab ? (
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
-            <text fg={t.hover}>· · ·</text>
-            <text fg={t.muted}> </text>
+            <text fg={t.textMuted}>· · ·</text>
+            <text fg={t.textMuted}> </text>
             <box flexDirection="row">
-              <text fg={t.muted}>Press </text>
-              <text fg={t.palette.primary}>Ctrl+n</text>
-              <text fg={t.muted}> to launch an assistant</text>
+              <text fg={t.textMuted}>Press </text>
+              <text fg={t.primary}>Ctrl+n</text>
+              <text fg={t.textMuted}> to launch an assistant</text>
             </box>
             <box
               flexDirection="row"
               justifyContent="center"
               marginTop={1}
               paddingX={2}
-              backgroundColor={t.selected}
+              backgroundColor={t.backgroundPanel}
               onMouseDown={(event) => {
                 event.stopPropagation()
                 dispatchGlobal({ type: 'open-new-tab-modal' })
               }}
             >
-              <text fg={t.palette.ink}>New assistant</text>
+              <text fg={t.text}>New assistant</text>
             </box>
           </box>
         ) : (
@@ -271,11 +261,9 @@ export function TerminalPane({
         )}
       </ContextMenuBox>
       {tab?.status === 'disconnected' ? (
-        <text fg={t.palette.warning}>
-          Restored snapshot. Press Ctrl+r to restart this workspace.
-        </text>
+        <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
       ) : null}
-      {tab?.errorMessage ? <text fg={t.palette.error}>{tab.errorMessage}</text> : null}
+      {tab?.errorMessage ? <text fg={t.error}>{tab.errorMessage}</text> : null}
     </box>
   )
 }

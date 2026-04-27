@@ -3,7 +3,7 @@ import type { AssistantId } from '../../../../state/types'
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterAssistants } from '../../../../state/selectors'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -25,7 +25,7 @@ export function NewTabModal({
   filter,
   selectedIndex,
 }: NewTabModalProps) {
-  const t = useTokens()
+  const t = useTheme()
 
   if (editingCommand !== null) {
     const option =
@@ -60,11 +60,11 @@ export function NewTabModal({
       onEdit: () => dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
       subtitle: (
         <box flexDirection="column">
-          <text fg={t.muted}>{option.description}</text>
-          {customCmd ? <text fg={t.palette.primary}>{customCmd}</text> : null}
+          <text fg={t.textMuted}>{option.description}</text>
+          {customCmd ? <text fg={t.primary}>{customCmd}</text> : null}
         </box>
       ),
-      title: <text fg={active ? t.palette.ink : t.muted}>{option.label}</text>,
+      title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
     }
   })
 
@@ -78,7 +78,7 @@ export function NewTabModal({
       cursorPos={cursorPos}
       items={items}
       selectedIndex={selectedIndex}
-      emptyState={<text fg={t.muted}>No matching assistants.</text>}
+      emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

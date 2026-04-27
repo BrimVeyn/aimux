@@ -7,7 +7,7 @@ import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { getCurrentTokens, type ThemeTokens, useBg, useTokens } from '../../../theme'
+import { getCurrentTheme, type ResolvedTuiTheme, useTheme } from '../../../theme'
 import { buildGitPaneContextMenu } from '../../git/pane/git-pane-context-menu'
 import { GitPaneWidget } from '../../git/pane/git-pane-widget'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
@@ -37,19 +37,19 @@ const RESIZE_HANDLE = '│'
 function getRowBackground({
   alternate,
   isActive,
-  tokens,
+  t,
 }: {
   isActive: boolean
   alternate: boolean
-  tokens: ThemeTokens
+  t: ResolvedTuiTheme
 }): string | undefined {
-  if (isActive) return tokens.selected
-  if (alternate) return tokens.hover
-  return undefined
+  if (isActive) return t.backgroundElement
+  if (alternate) return t.backgroundPanel
+  return t.backgroundPanel
 }
 
 const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: number }) {
-  const tokens = useTokens()
+  const t = useTheme()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const currentSession = currentSessionId
@@ -60,22 +60,20 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
-      <text fg={tokens.palette.primary}>
+      <text fg={t.text}>
         <strong>aimux</strong>
       </text>
-      <text fg={tokens.accent}>
-        {currentSession ? currentSession.name : 'No workspace selected'}
-      </text>
+      <text fg={t.text}>{currentSession ? currentSession.name : 'No workspace selected'}</text>
       {branch ? (
         <box flexDirection="row">
-          <text fg={tokens.palette.primary}>{'\u{e702}'} </text>
-          <text fg={tokens.muted}>{branch}</text>
+          <text fg={t.text}>{'\u{e702}'} </text>
+          <text fg={t.text}>{branch}</text>
         </box>
       ) : null}
       <box
         flexDirection="row"
         paddingY={1}
-        backgroundColor={tokens.selected}
+        backgroundColor={t.backgroundPanel}
         justifyContent="center"
         marginTop={1}
         onMouseDown={(e) => {
@@ -83,22 +81,22 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
           dispatchGlobal({ type: 'open-new-tab-modal' })
         }}
       >
-        <text fg={tokens.palette.ink}>+ New assistant</text>
+        <text fg={t.text}>+ New assistant</text>
       </box>
-      <text fg={tokens.hover}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
+      <text fg={t.textMuted}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
     </box>
   )
 })
 
 function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGroupEnd: boolean) {
-  const t = getCurrentTokens()
+  const t = getCurrentTheme()
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text fg={t.accent}>
+      <text fg={t.border}>
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text fg={t.accent}>{isGroupEnd ? GUTTER_END : GUTTER_PAD}</text>
+      <text fg={t.border}>{isGroupEnd ? GUTTER_END : GUTTER_PAD}</text>
     </box>
   )
 }
@@ -108,7 +106,7 @@ interface TabsBodyProps {
 }
 
 const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
-  const tokens = useTokens()
+  const t = useTheme()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const focusMode = useAppStore((s) => s.focusMode)
@@ -138,7 +136,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
-          <text fg={tokens.muted}>No tabs yet. Press Ctrl+n.</text>
+          <text fg={t.textMuted}>No tabs yet. Press Ctrl+n.</text>
         </box>
       ) : (
         tabs.map((tab, index) => {
@@ -154,7 +152,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           return (
             <box
               key={tab.id}
-              backgroundColor={getRowBackground({ alternate, isActive, tokens })}
+              backgroundColor={getRowBackground({ alternate, isActive, t })}
               flexDirection="row"
               onMouseDown={(event) => {
                 event.stopPropagation()
@@ -186,8 +184,8 @@ export function Sidebar({
   onSidebarResizeStart,
   onTabActivate,
 }: SidebarProps) {
-  const tokens = useTokens()
-  const sidebarBg = useBg('elevated')
+  const t = useTheme()
+  const sidebarBg = t.background
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const sidebarWidth = useAppStore((s) => s.sidebar.width)
   const gitPane = useAppStore((s) => s.gitPane)
@@ -215,7 +213,7 @@ export function Sidebar({
   const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.embeddedRatio) * 100)) : 1
   const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.embeddedRatio * 100)) : 0
 
-  const separator = <text fg={tokens.hover}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
+  const separator = <text fg={t.textMuted}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
   const gitBody = gitEmbedded ? (
     <ContextMenuBox
       flexDirection="column"
@@ -232,7 +230,7 @@ export function Sidebar({
     <box
       minHeight={1}
       flexShrink={0}
-      backgroundColor={tokens.border}
+      backgroundColor={t.border}
       onMouseDown={(event) => {
         const body = bodyRef.current
         if (!body) return
@@ -245,7 +243,7 @@ export function Sidebar({
         })
       }}
     >
-      <text fg={tokens.border}>{RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}</text>
+      <text fg={t.border}>{RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}</text>
     </box>
   ) : null
 
@@ -315,7 +313,7 @@ export function Sidebar({
           height="100%"
           width={1}
           flexShrink={0}
-          backgroundColor={tokens.border}
+          backgroundColor={t.border}
           onMouseDown={(event) => {
             event.preventDefault()
             event.stopPropagation()

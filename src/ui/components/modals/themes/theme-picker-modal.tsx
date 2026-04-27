@@ -1,9 +1,10 @@
 import { useLayoutEffect, useMemo } from 'react'
 
+import type { ThemeId } from '../../../themes'
+
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterThemeIds } from '../../../filter-themes'
-import { useTokens, useTransparent } from '../../../theme'
-import { type ThemeId, THEMES } from '../../../themes'
+import { filterThemeIds, themeDisplayName } from '../../../filter-themes'
+import { useTheme, useTransparent } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
 
@@ -25,7 +26,7 @@ export function ThemePickerModal({
   filter,
   selectedIndex,
 }: ThemePickerModalProps) {
-  const t = useTokens()
+  const t = useTheme()
   const transparent = useTransparent()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
@@ -35,22 +36,18 @@ export function ThemePickerModal({
 
   const effectiveIndex = clampSelection(selectedIndex, filtered.length)
 
-  const items: PickerItem[] = filtered.flatMap((id, rowIndex) => {
-    const entry = THEMES[id]
-    if (!entry) return []
+  const items: PickerItem[] = filtered.map((id, rowIndex) => {
     const active = rowIndex === effectiveIndex
     const isCurrent = id === currentThemeId
-    return [
-      {
-        key: id,
-        onClick: () => {
-          dispatchGlobal({ type: 'close-modal' })
-          runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
-        },
-        title: <text fg={active ? t.palette.ink : t.muted}>{entry.displayName}</text>,
-        trailing: isCurrent ? <text fg={t.palette.primary}>current</text> : undefined,
+    return {
+      key: id,
+      onClick: () => {
+        dispatchGlobal({ type: 'close-modal' })
+        runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
       },
-    ]
+      title: <text fg={active ? t.text : t.textMuted}>{themeDisplayName(id)}</text>,
+      trailing: isCurrent ? <text fg={t.primary}>current</text> : undefined,
+    }
   })
 
   return (
@@ -62,15 +59,15 @@ export function ThemePickerModal({
       cursorPos={cursorPos}
       footer={
         <box flexDirection="column" gap={0}>
-          <text fg={t.hover}>
+          <text fg={t.textMuted}>
             {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
           </text>
-          <text fg={t.muted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
+          <text fg={t.textMuted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
         </box>
       }
       items={items}
       selectedIndex={effectiveIndex}
-      emptyState={<text fg={t.muted}>No themes available.</text>}
+      emptyState={<text fg={t.textMuted}>No themes available.</text>}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

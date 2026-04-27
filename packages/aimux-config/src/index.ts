@@ -1,26 +1,27 @@
-// Public API — this is what users import from '@brimveyn/aimux-config'
+// Public API — what users import from '@brimveyn/aimux-config'.
 
 export { defineConfig } from './define-config'
 export * as actions from './actions'
-export { isKnownThemeId, migrateThemeId, THEME_IDS, THEMES } from './themes'
-export { HOUSE_THEME_IDS, HOUSE_THEMES } from './house-themes'
-export { OPENCODE_THEME_IDS, OPENCODE_THEMES } from './themes/opencode'
+
+// TUI theme system (1:1 port of opencode TUI).
 export {
-  accent,
-  border,
-  computeSurfaces,
-  diffAddBg,
-  diffDeleteBg,
-  elevated,
-  extendPalette,
-  faint,
-  hover,
-  mix,
-  muted,
-  selected,
-} from './palette-utils'
-export type { ResolvedSurfaces } from './palette-utils'
-export { paletteToShikiTheme } from './palette-to-shiki'
+  isKnownThemeId,
+  migrateThemeId,
+  type ResolvedTuiTheme,
+  resolveTuiTheme,
+  type RGBA,
+  THEME_IDS,
+  type ThemeId,
+  type ThemeMode,
+  TUI_COLOR_TOKENS,
+  TUI_THEMES,
+  type TuiColorToken,
+  type TuiColorValue,
+  type TuiShikiOptions,
+  type TuiThemeJson,
+  tuiThemeToShiki,
+} from './tui'
+
 export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builder'
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
@@ -28,15 +29,11 @@ export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime
 export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
-// Type exports
+// User-facing config types (keymap/backends/sessions/etc.).
 export type {
-  // Action types
   Action,
   ActionFn,
-  AimuxPalette,
-  AimuxTheme,
   AimuxThemeConfig,
-  // User-facing config
   AimuxUserConfig,
   AIUsageTool,
   AIUsageToolConfig,
@@ -57,20 +54,16 @@ export type {
   GroupBuilderApi,
   HooksConfig,
   KeyInput,
-  // Keymap builder API (type surface)
   KeymapBuilderApi,
   KeyResult,
-  // Layout
   LayoutNode,
   ModalState,
   ModeBindingBuilderApi,
   ModeContext,
-  // Mode / state
   ModeId,
   ModeKeymapDef,
   MultiRepoConfig,
   MultiRepoState,
-  // Resolved config (internal, but exported for tooling)
   ResolvedConfig,
   ResolvedKeymapConfig,
   SessionRecord,
@@ -81,7 +74,4 @@ export type {
   SplitDirection,
   StatusBarConfig,
   TabSession,
-  Theme,
-  ThemeId,
-  ThemeMode,
 } from './types'

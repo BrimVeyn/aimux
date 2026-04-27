@@ -4,7 +4,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-
 import { filterSessions } from '../../../../state/selectors'
 import { abbreviatePath } from '../../../path-format'
 import { orderSessionsForDisplay } from '../../../session-ordering'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
 
@@ -43,7 +43,7 @@ export function SessionPickerModal({
   selectedIndex,
   sessions,
 }: SessionPickerModalProps) {
-  const t = useTokens()
+  const t = useTheme()
   const ordered = orderSessionsForDisplay(sessions)
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
@@ -57,10 +57,10 @@ export function SessionPickerModal({
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
       subtitle: session.projectPath ? (
-        <text fg={t.muted}>{abbreviatePath(session.projectPath)}</text>
+        <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
       ) : undefined,
       title: (
-        <text fg={active ? t.palette.ink : t.muted}>
+        <text fg={active ? t.text : t.textMuted}>
           {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
         </text>
       ),
@@ -71,7 +71,7 @@ export function SessionPickerModal({
     key: '__create-new__',
     onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
     title: (
-      <text fg={selectedIndex === filtered.length ? t.palette.ink : t.muted}>
+      <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
         Create new workspace
       </text>
     ),
@@ -91,7 +91,7 @@ export function SessionPickerModal({
       selectedIndex={selectedIndex}
       emptyState={
         filtered.length === 0 ? (
-          <text fg={t.muted}>{getEmptyStateMessage(hasFilter)}</text>
+          <text fg={t.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
         ) : undefined
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}

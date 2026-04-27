@@ -2,7 +2,7 @@ import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { useBg, useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 
 const TOOL_ICON: Record<AIUsageTool, string> = {
   claude: 'CC',
@@ -47,8 +47,8 @@ function formatResetIn(snap: {
 }
 
 export function AIUsageIndicator() {
-  const t = useTokens()
-  const bg = useBg('elevated')
+  const t = useTheme()
+  const bg = t.backgroundPanel
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
@@ -74,7 +74,7 @@ export function AIUsageIndicator() {
         backgroundColor={bg}
         onMouseDown={openModal}
       >
-        <text fg={t.muted}>…</text>
+        <text fg={t.textMuted}>…</text>
       </box>
     )
   }
@@ -95,7 +95,7 @@ export function AIUsageIndicator() {
               backgroundColor={bg}
               onMouseDown={openModal}
             >
-              <text fg={t.palette.error} selectable={false}>
+              <text fg={t.error} selectable={false}>
                 {`${icon} —`}
               </text>
             </box>
@@ -104,11 +104,11 @@ export function AIUsageIndicator() {
 
         if (snap.percent !== null) {
           const p = Math.round(snap.percent)
-          let color = t.palette.success
+          let color = t.success
           if (p >= 85) {
-            color = t.palette.error
+            color = t.error
           } else if (p >= 60) {
-            color = t.palette.warning
+            color = t.warning
           }
           const { empty, filled } = buildBar(snap.percent)
           const reset = formatResetIn(snap)
@@ -128,14 +128,14 @@ export function AIUsageIndicator() {
               <text fg={color} selectable={false}>
                 {filled}
               </text>
-              <text fg={t.muted} selectable={false}>
+              <text fg={t.textMuted} selectable={false}>
                 {empty}
               </text>
-              <text fg={t.palette.ink} selectable={false}>
+              <text fg={t.text} selectable={false}>
                 {` ${pctText}`}
               </text>
               {reset ? (
-                <text fg={t.muted} selectable={false}>
+                <text fg={t.textMuted} selectable={false}>
                   {` · ${reset}`}
                 </text>
               ) : null}
@@ -152,7 +152,7 @@ export function AIUsageIndicator() {
             backgroundColor={bg}
             onMouseDown={openModal}
           >
-            <text fg={t.muted} selectable={false}>
+            <text fg={t.textMuted} selectable={false}>
               {`${icon} ${formatTokens(snap.tokens.total)}`}
             </text>
           </box>

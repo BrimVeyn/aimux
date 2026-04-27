@@ -4,7 +4,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { useTerminalDimensions } from '@opentui/react'
 import { type ReactNode, useLayoutEffect, useRef } from 'react'
 
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { BareInput } from '../../primitives/bare-input'
 import { ListItem } from '../../primitives/list-item'
 import { ModalShell } from './modal-shell'
@@ -39,7 +39,7 @@ const VIEWPORT_HEIGHT_RATIO = 0.6
 const MODAL_CHROME_ROWS = 6
 
 function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: () => void }) {
-  const t = useTokens()
+  const t = useTheme()
   return (
     <box flexDirection="row" gap={1}>
       {onEdit ? (
@@ -49,7 +49,7 @@ function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: 
             onEdit()
           }}
         >
-          <text fg={t.palette.primary}>[edit]</text>
+          <text fg={t.primary}>[edit]</text>
         </box>
       ) : null}
       {onDelete ? (
@@ -59,7 +59,7 @@ function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: 
             onDelete()
           }}
         >
-          <text fg={t.palette.error}>[del]</text>
+          <text fg={t.error}>[del]</text>
         </box>
       ) : null}
     </box>
@@ -80,7 +80,7 @@ export function Picker({
   title,
   width,
 }: PickerProps) {
-  const t = useTokens()
+  const t = useTheme()
   const dimensions = useTerminalDimensions()
   const maxHeight = Math.max(6, Math.floor(dimensions.height * VIEWPORT_HEIGHT_RATIO))
   const listHeight = Math.max(1, maxHeight - MODAL_CHROME_ROWS)
@@ -140,7 +140,7 @@ export function Picker({
             if (item.group && item.group !== prevGroup) {
               nodes.push(
                 <box key={`group::${item.group}`} paddingLeft={1} paddingTop={index === 0 ? 0 : 1}>
-                  <text fg={t.palette.warning} wrapMode="none">
+                  <text fg={t.textMuted} wrapMode="none">
                     {item.group}
                   </text>
                 </box>

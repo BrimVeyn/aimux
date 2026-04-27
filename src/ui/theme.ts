@@ -1,16 +1,16 @@
-// Back-compat shim: the theme singleton has been replaced with a Zustand store.
-// React components use `useTokens` for derived shades; non-React callers use
-// `getCurrentTheme()` / `getCurrentTokens()`.
+// Back-compat shim: the theme singleton lives in `theme-store.ts`. React
+// components use `useTheme` for the resolved TUI token map; non-React callers
+// use `getCurrentTheme()`.
 
+export type { ResolvedTuiTheme, TuiColorToken } from './themes'
 export {
   applyTheme,
+  getCurrentMode,
   getCurrentTheme,
-  getCurrentTokens,
+  getCurrentThemeId,
   getTransparent,
+  setMode,
   setTransparent,
-  type SurfaceToken,
-  type ThemeTokens,
-  useBg,
-  useTokens,
+  useTheme,
   useTransparent,
 } from './theme-store'

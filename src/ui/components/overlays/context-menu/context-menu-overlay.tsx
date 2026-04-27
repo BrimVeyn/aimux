@@ -7,12 +7,12 @@ import {
   type ContextMenuState,
   subscribeContextMenu,
 } from '../../../context-menu/controller'
-import { useTokens } from '../../../theme'
+import { useTheme } from '../../../theme'
 
 export function ContextMenuOverlay() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [selected, setSelected] = useState(0)
-  const t = useTokens()
+  const t = useTheme()
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
   const terminalRows = useAppStore((s) => s.layout.terminalRows)
 
@@ -79,8 +79,8 @@ export function ContextMenuOverlay() {
         width={width}
         flexDirection="column"
         border
-        borderColor={t.palette.primary}
-        backgroundColor={t.elevated}
+        borderColor={t.border}
+        backgroundColor={t.backgroundPanel}
         onMouseDown={(e) => {
           e.stopPropagation()
         }}
@@ -94,7 +94,7 @@ export function ContextMenuOverlay() {
               flexShrink={0}
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={active ? t.selected : undefined}
+              backgroundColor={active ? t.backgroundElement : undefined}
               onMouseOver={() => setSelected(index)}
               onMouseDown={(e) => {
                 e.preventDefault()
@@ -104,7 +104,7 @@ export function ContextMenuOverlay() {
                 onSelect()
               }}
             >
-              <text fg={active ? t.palette.ink : t.muted} selectable={false}>
+              <text fg={active ? t.text : t.textMuted} selectable={false}>
                 {label}
               </text>
             </box>

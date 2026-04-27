@@ -18,7 +18,7 @@ import {
   type GitTreeFileRow,
   type GitTreeFolderRow,
 } from '../../../state/git-tree'
-import { getCurrentTokens, getTransparent, useTokens, useTransparent } from '../../theme'
+import { getCurrentTheme, getTransparent, useTheme, useTransparent } from '../../theme'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -49,19 +49,20 @@ const BASE_SECTION_ORDER: GitFileSection[] = ['staged', 'unstaged', 'untracked']
 const HISTORICAL_SECTION_ORDER: GitFileSection[] = ['historical', 'untracked']
 
 function statusColor(status: GitFileEntry['status']): string {
-  const t = getCurrentTokens()
+  const t = getCurrentTheme()
   switch (status) {
     case '?':
+      return t.text
     case 'A':
-      return t.palette.success
+      return t.diffAdded
     case 'C':
     case 'R':
-      return t.palette.primary
+      return t.text
     case 'D':
     case 'U':
-      return t.palette.error
+      return t.diffRemoved
     case 'M':
-      return t.palette.warning
+      return t.warning
   }
 }
 
@@ -99,7 +100,7 @@ function renderFileLabel(
   pathConfig: GitPanePathConfig,
   fileListMode: GitFileListMode
 ): ReactNode {
-  const t = getCurrentTokens()
+  const t = getCurrentTheme()
   const transform = pathConfig.enabled ? pathConfig.pathFn : undefined
   const displayPath = transform ? transform(file.path) : file.path
   const { basename, prefix } = splitPath(displayPath)
@@ -108,8 +109,8 @@ function renderFileLabel(
   if (!file.renamedFrom) {
     return (
       <text wrapMode="none">
-        <span fg={t.palette.ink}>{basename}</span>
-        {showDir ? <span fg={t.muted}> {dir}</span> : null}
+        <span fg={t.text}>{basename}</span>
+        {showDir ? <span fg={t.textMuted}> {dir}</span> : null}
       </text>
     )
   }
@@ -118,11 +119,11 @@ function renderFileLabel(
   const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
     <text wrapMode="none">
-      <span fg={t.muted}>{renamed.basename}</span>
-      {showDir && renamedDir ? <span fg={t.muted}> {renamedDir}</span> : null}
-      <span fg={t.muted}> → </span>
-      <span fg={t.palette.ink}>{basename}</span>
-      {showDir ? <span fg={t.muted}> {dir}</span> : null}
+      <span fg={t.textMuted}>{renamed.basename}</span>
+      {showDir && renamedDir ? <span fg={t.textMuted}> {renamedDir}</span> : null}
+      <span fg={t.textMuted}> → </span>
+      <span fg={t.text}>{basename}</span>
+      {showDir ? <span fg={t.textMuted}> {dir}</span> : null}
     </text>
   )
 }
@@ -136,28 +137,31 @@ function renderDiffCount(
   hasNumstat: boolean
 ): ReactNode {
   if (!diffCountConfig.enabled) return null
-  const t = getCurrentTokens()
+  const t = getCurrentTheme()
   if (!hasNumstat) {
     return (
-      <text fg={t.muted} bg={bg} flexShrink={0}>
+      <text fg={t.textMuted} bg={bg} flexShrink={0}>
         —
       </text>
     )
   }
   return (
     <box flexDirection="row" flexShrink={0}>
-      <text fg={t.palette.success} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
-      <text fg={t.hover} bg={bg}>
+      <text fg={getCurrentTheme().diffAdded} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
+      <text fg={t.textMuted} bg={bg}>
         {' '}
       </text>
-      <text fg={t.palette.error} bg={bg}>{`−${padRight(file.removed, removedW)}`}</text>
+      <text
+        fg={getCurrentTheme().diffRemoved}
+        bg={bg}
+      >{`−${padRight(file.removed, removedW)}`}</text>
     </box>
   )
 }
 
 function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
-  const t = getCurrentTokens()
-  const bg = isSelected && !getTransparent() ? t.selected : undefined
+  const t = getCurrentTheme()
+  const bg = isSelected && !getTransparent() ? t.backgroundElement : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -168,13 +172,13 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
-          <text fg={t.muted} bg={bg}>
+          <text fg={t.textMuted} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={t.palette.primary} bg={bg}>
+          <text fg={getCurrentTheme().textMuted} bg={bg}>
             {row.isCollapsed ? '\uf07b' : '\uf07c'}
           </text>
-          <text fg={t.palette.primary} bg={bg} wrapMode="none">
+          <text fg={t.textMuted} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -193,10 +197,9 @@ function renderFileRow(
   diffCountConfig: GitPaneDiffCountConfig,
   repoPrefixes: Record<string, string>
 ): ReactNode {
-  const t = getCurrentTokens()
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected && !getTransparent() ? t.selected : undefined
+  const bg = isSelected && !getTransparent() ? getCurrentTheme().backgroundElement : undefined
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
@@ -213,7 +216,7 @@ function renderFileRow(
       </box>
       {repoTag ? (
         <box flexShrink={0}>
-          <text fg={t.palette.primary} bg={bg}>
+          <text fg={getCurrentTheme().primary} bg={bg}>
             <strong>{repoTag}</strong>
           </text>
         </box>
@@ -242,7 +245,7 @@ function renderTreeSection(
   repoPrefixes: Record<string, string>
 ): ReactNode {
   if (files.length === 0) return null
-  const t = getCurrentTokens()
+  const t2 = getCurrentTheme()
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
   const toggleListMode = (): void => {
     dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
@@ -251,16 +254,16 @@ function renderTreeSection(
   return (
     <box key={section} flexDirection="column" marginTop={marginTop}>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t.accent}>
+        <text fg={t2.text}>
           <strong>
             {title} ({files.length})
           </strong>
         </text>
         {showListModeToggle ? (
           <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
-            <text fg={fileListMode === 'tree' ? t.palette.primary : t.muted}>tree</text>
-            <text fg={t.muted}>|</text>
-            <text fg={fileListMode === 'flat' ? t.palette.primary : t.muted}>flat</text>
+            <text fg={fileListMode === 'tree' ? t2.primary : t2.textMuted}>tree</text>
+            <text fg={t2.textMuted}>|</text>
+            <text fg={fileListMode === 'flat' ? t2.primary : t2.textMuted}>flat</text>
           </box>
         ) : null}
       </box>
@@ -301,18 +304,18 @@ function computeStatusPlaceholder(
   gitPanel: GitPanelState,
   hasProjectPath: boolean
 ): StatusPlaceholder | null {
-  const t = getCurrentTokens()
+  const t = getCurrentTheme()
   if (!hasProjectPath) {
-    return { label: 'No active session', labelColor: t.muted }
+    return { label: 'No active session', labelColor: t.textMuted }
   }
   if (gitPanel.error === 'not-a-repo') {
-    return { label: 'Not a git repository', labelColor: t.muted }
+    return { label: 'Not a git repository', labelColor: t.textMuted }
   }
   if (gitPanel.error === 'unknown') {
-    return { label: 'Git error', labelColor: t.palette.error }
+    return { label: 'Git error', labelColor: t.error }
   }
   if (gitPanel.files.length === 0) {
-    return { label: 'Working tree clean', labelColor: t.muted }
+    return { label: 'Working tree clean', labelColor: t.textMuted }
   }
   return null
 }
@@ -331,7 +334,7 @@ export const GitPanel = memo(function GitPanel({
   projectPath,
   selectedEntryKey,
 }: GitPanelProps) {
-  const t = useTokens()
+  const t = useTheme()
   useTransparent()
   const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
@@ -367,7 +370,7 @@ export const GitPanel = memo(function GitPanel({
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden" gap={0}>
       {hasRemoteTracking ? (
-        <text fg={t.muted}>
+        <text fg={t.textMuted}>
           ↑{gitPanel.ahead} ↓{gitPanel.behind}
         </text>
       ) : null}

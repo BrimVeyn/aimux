@@ -14,7 +14,7 @@ describe('resolveConfig startup override aliases', () => {
       },
     })
 
-    expect(config.theme).toEqual({ initialMode: 'light', paletteOverrides: undefined })
+    expect(config.theme).toEqual({ initialId: undefined, initialMode: 'light' })
     expect(config.sessionBar).toEqual({
       initialPosition: 'bottom',
       initialVisible: false,

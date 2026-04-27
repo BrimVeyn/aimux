@@ -10,7 +10,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref
 import { IDLE_SESSION_STATUS } from '../../../state/types'
 import { useBusySpinner } from '../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../session-ordering'
-import { useBg, useTokens } from '../../theme'
+import { useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
 interface SessionBarProps {
@@ -18,8 +18,8 @@ interface SessionBarProps {
 }
 
 export function SessionBar({ forceVisible = false }: SessionBarProps) {
-  const t = useTokens()
-  const headerBg = useBg('elevated')
+  const t = useTheme()
+  const headerBg = t.backgroundPanel
   const sessions = useAppStore((s) => s.sessions)
   const currentId = useAppStore((s) => s.currentSessionId)
   const bar = useAppStore((s) => s.sessionBar)
@@ -151,13 +151,13 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
         flexDirection="row"
         paddingLeft={1}
         paddingRight={1}
-        backgroundColor={t.selected}
+        backgroundColor={t.backgroundElement}
         onMouseDown={(e) => {
           e.stopPropagation()
           dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
         }}
       >
-        <text fg={t.palette.ink} selectable={false}>
+        <text fg={t.text} selectable={false}>
           + New
         </text>
       </box>
@@ -200,16 +200,16 @@ function SessionChip({
   session,
   status,
 }: SessionChipProps) {
-  const t = useTokens()
-  const selectionBg = useBg('selected')
+  const t = useTheme()
+  const selectionBg = t.backgroundElement
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const labelColor = active ? t.palette.ink : t.muted
+  const labelColor = active ? t.text : t.textMuted
   const bgColor = dragging || active ? selectionBg : undefined
-  const idleColor = t.palette.success
-  const workingColor = t.palette.primary
-  const waitingColor = t.palette.warning
+  const idleColor = t.success
+  const workingColor = t.primary
+  const waitingColor = t.warning
   const [hovered, setHovered] = useState(false)
 
   return (
@@ -264,12 +264,12 @@ function SessionChip({
             runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' })
           }}
         >
-          <text fg={t.muted} selectable={false}>
+          <text fg={t.textMuted} selectable={false}>
             ×
           </text>
         </box>
       ) : (
-        <text fg={t.hover} selectable={false}>
+        <text fg={t.textMuted} selectable={false}>
           {' '}
         </text>
       )}
