@@ -5,7 +5,7 @@ import type { GitFileListMode, SessionBarPosition, WorkspaceSnapshotV1 } from '.
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
 import { isWorkspaceSnapshotV1 } from './state/validation'
-import { migrateThemeId as resolveLegacyThemeId, type ThemeId } from './ui/themes'
+import { migrateThemeId as resolveLegacyThemeId, type ThemeId, type ThemeMode } from './ui/themes'
 
 function migrateThemeId(value: unknown): ThemeId | undefined {
   if (typeof value !== 'string') return undefined
@@ -37,6 +37,7 @@ export interface AimuxConfig {
   customCommands: Record<string, string>
   themeId?: ThemeId
   themeTransparent?: boolean
+  themeMode?: ThemeMode
   gitPane?: PersistedGitPane
   sidebar?: PersistedSidebar
   sessionBarVisible?: boolean
@@ -154,6 +155,7 @@ export function loadConfigResult(): ConfigLoadResult {
       customCommands?: unknown
       themeId?: unknown
       themeTransparent?: unknown
+      themeMode?: unknown
       gitPane?: unknown
       sidebar?: unknown
       gitPanelVisible?: unknown
@@ -182,6 +184,12 @@ export function loadConfigResult(): ConfigLoadResult {
       typeof parsed.themeTransparent === 'boolean' ? parsed.themeTransparent : undefined
     if (parsed.themeTransparent !== undefined && validThemeTransparent === undefined) {
       issues.push('ignored invalid themeTransparent')
+    }
+
+    const validThemeMode: ThemeMode | undefined =
+      parsed.themeMode === 'dark' || parsed.themeMode === 'light' ? parsed.themeMode : undefined
+    if (parsed.themeMode !== undefined && validThemeMode === undefined) {
+      issues.push('ignored invalid themeMode')
     }
 
     let validGitPane = isPersistedGitPane(parsed.gitPane) ? parsed.gitPane : undefined
@@ -261,6 +269,7 @@ export function loadConfigResult(): ConfigLoadResult {
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
+        themeMode: validThemeMode,
         themeTransparent: validThemeTransparent,
         version: 2,
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)

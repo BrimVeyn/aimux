@@ -236,6 +236,7 @@ export function previewTheme(delta: 1 | -1): KeyResult {
 }
 
 export const toggleTransparent: KeyResult = r([], [{ type: 'toggle-transparent' }])
+export const toggleMode: KeyResult = r([], [{ type: 'toggle-mode' }])
 
 export const switchField: KeyResult = r([{ type: 'switch-create-session-field' }])
 export const selectDirectory: KeyResult = r([{ type: 'select-directory' }])

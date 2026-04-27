@@ -47,6 +47,7 @@ describe('describeBindings', () => {
       'Prev',
       'Confirm',
       'Toggle transparent',
+      'Toggle light/dark',
     ])
     expect(results.find((r) => r.description === 'Next')?.keysDisplay).toBe('Ctrl+N / ↓')
     expect(results.find((r) => r.description === 'Prev')?.keysDisplay).toBe('Ctrl+P / ↑')

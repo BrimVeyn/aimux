@@ -632,6 +632,7 @@ export type SideEffect =
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
+  | { type: 'toggle-mode' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

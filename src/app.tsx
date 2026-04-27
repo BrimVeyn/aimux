@@ -83,6 +83,7 @@ export function App({
     const initial: ThemeId = persisted ?? resolvedConfig.theme?.initialId ?? 'aimux'
     applyTheme(initial)
     if (resolvedConfig.theme?.initialMode) setMode(resolvedConfig.theme.initialMode)
+    if (config.themeMode) setMode(config.themeMode)
     setTransparent(config.themeTransparent ?? false)
     return initial
   })

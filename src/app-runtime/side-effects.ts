@@ -37,7 +37,7 @@ import {
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
-import { applyTheme, getTransparent, setTransparent } from '../ui/theme'
+import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
 import { type ThemeId } from '../ui/themes'
 import { triggerAutoCommitNow } from './auto-commit-ref'
 import {
@@ -598,6 +598,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       const next = !getTransparent()
       setTransparent(next)
       saveConfig({ ...loadConfig(), themeTransparent: next })
+      return
+    }
+    case 'toggle-mode': {
+      const next = getCurrentMode() === 'dark' ? 'light' : 'dark'
+      setMode(next)
+      saveConfig({ ...loadConfig(), themeMode: next })
       return
     }
     default:
