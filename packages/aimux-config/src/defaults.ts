@@ -153,6 +153,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Up>', actions.previewTheme(-1))
         .map('<CR>', actions.confirmTheme, 'Confirm')
         .map('<C-t>', actions.toggleTransparent, 'Toggle transparent')
+        .map('<C-l>', actions.toggleMode, 'Toggle light/dark')
         .passthrough()
     )
 

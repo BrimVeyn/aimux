@@ -4,7 +4,7 @@ import type { ThemeId } from '../../../themes'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterThemeIds, themeDisplayName } from '../../../filter-themes'
-import { useTheme, useTransparent } from '../../../theme'
+import { useMode, useTheme, useTransparent } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
 
@@ -28,6 +28,7 @@ export function ThemePickerModal({
 }: ThemePickerModalProps) {
   const t = useTheme()
   const transparent = useTransparent()
+  const mode = useMode()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
 
   useLayoutEffect(() => {
@@ -63,6 +64,7 @@ export function ThemePickerModal({
             {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
           </text>
           <text fg={t.textMuted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
+          <text fg={t.textMuted}>{` mode: ${mode} (ctrl-l)`}</text>
         </box>
       }
       items={items}
