@@ -10,7 +10,7 @@ import type {
 } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
-import { highlightSnapshot } from '../integrations/claude-syntax-overlay'
+import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 interface BindBackendRuntimeEventsOptions {
@@ -67,12 +67,14 @@ export function bindBackendRuntimeEvents({
   const handleExit = (tabId: string, exitCode: number) => {
     logInputDebug('app.backend.event.exit', { exitCode, tabId })
     clearTabRuntimeState(timeouts, tabId)
+    clearTabSyntaxState(tabId)
     dispatch({ tabId, type: 'close-tab' })
   }
 
   const handleError = (tabId: string, message: string) => {
     logInputDebug('app.backend.event.error', { message, tabId })
     clearTabRuntimeState(timeouts, tabId)
+    clearTabSyntaxState(tabId)
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 

@@ -202,6 +202,11 @@ escapes (24-bit hex) bypass the theme — those colors stay native.
 To revert: turn the flag off and either delete `~/.claude/themes/aimux.json`
 or pick a different theme via Claude's `/theme` command.
 
+> **Note**: while the flag is on, aimux re-asserts `theme: "custom:aimux"`
+> in `~/.claude/settings.json` on every launch. Picking a different theme
+> via Claude's `/theme` command will be reverted next time aimux starts.
+> Disable the flag first if you want to use Claude's own theme picker.
+
 ## Beta — Re-tokenize Claude code blocks (experimental)
 
 Claude Code's syntax highlighting (Monokai-Extended) is hardcoded and

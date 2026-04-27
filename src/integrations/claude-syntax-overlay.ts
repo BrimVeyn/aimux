@@ -15,6 +15,7 @@
 
 import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/types'
 
+import { logDebug } from '../debug/input-log'
 import { ensureActiveShikiTheme, ensureShikiLang, getShikiHighlighter } from '../ui/shiki'
 import { getCurrentTheme } from '../ui/theme'
 
@@ -104,9 +105,14 @@ export async function warmClaudeSyntaxOverlay(): Promise<void> {
     activeThemeName = themeName
     await Promise.all(PRELOAD_LANGS.map((lang) => ensureShikiLang(h, lang)))
     ready = true
-  } catch {
-    // best-effort
+  } catch (err) {
+    logDebug('claude-syntax-overlay:warm-failed', { err: String(err) })
   }
+}
+
+/** Free the per-tab language cache when a tab is closed. */
+export function clearTabSyntaxState(tabId: string): void {
+  tabLang.delete(tabId)
 }
 
 // `⏺ Update(path/to/file.ts)`, `⏺ Read(path)`, `Edit(path)`, `Write(path)`...
