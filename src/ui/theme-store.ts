@@ -73,6 +73,10 @@ export function useTransparent(): boolean {
   return useStore(themeStore, (s) => s.transparent)
 }
 
+export function useMode(): ThemeMode {
+  return useStore(themeStore, (s) => s.mode)
+}
+
 export function getTransparent(): boolean {
   return themeStore.getState().transparent
 }
