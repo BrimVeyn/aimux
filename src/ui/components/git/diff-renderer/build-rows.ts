@@ -181,6 +181,27 @@ function contextNeighbors(
   return { hasChangeAfter, hasChangeBefore }
 }
 
+export interface Foldable {
+  foldId: string
+  middle: number
+}
+
+export function collectFoldables(file: FileDiffMetadata): Foldable[] {
+  const result: Foldable[] = []
+  for (const [hIdx, hunk] of file.hunks.entries()) {
+    for (const [cIdx, content] of hunk.hunkContent.entries()) {
+      if (content.type !== 'context') continue
+      const { hasChangeAfter, hasChangeBefore } = contextNeighbors(hunk.hunkContent, cIdx)
+      const preKeep = hasChangeBefore ? Math.min(KEEP_CONTEXT, content.lines) : 0
+      const postKeep = hasChangeAfter ? Math.min(KEEP_CONTEXT, content.lines - preKeep) : 0
+      const middle = content.lines - preKeep - postKeep
+      if (middle < MIN_FOLD_SIZE) continue
+      result.push({ foldId: `${hIdx}:${cIdx}`, middle })
+    }
+  }
+  return result
+}
+
 export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): DiffSegmentBuild {
   const segments: DiffSegment[] = []
   let offset = 0
