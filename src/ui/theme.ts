@@ -11,6 +11,7 @@ export {
   getTransparent,
   setMode,
   setTransparent,
+  subscribeThemeChanges,
   useTheme,
   useTransparent,
 } from './theme-store'

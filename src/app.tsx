@@ -25,6 +25,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { type TerminalContentOrigin } from './input/raw-input-handler'
+import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -35,7 +36,14 @@ import { loadSnippetCatalog } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
-import { applyTheme, setMode, setTransparent } from './ui/theme'
+import {
+  applyTheme,
+  getCurrentMode,
+  getCurrentTheme,
+  setMode,
+  setTransparent,
+  subscribeThemeChanges,
+} from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
 import {
   fetchLatestNpmVersion,
@@ -156,6 +164,15 @@ export function App({
       setActiveSideEffectRunner(null)
     }
   }, [dispatch])
+
+  useEffect(() => {
+    if (!resolvedConfig.theme?.beta?.harmonizeClaudeTheme) return
+    ensureClaudeSettingsThemePref()
+    syncClaudeTheme(getCurrentTheme(), getCurrentMode())
+    return subscribeThemeChanges((resolved, mode) => {
+      syncClaudeTheme(resolved, mode)
+    })
+  }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
 
   useEffect(() => {
     const aiUsage = resolvedConfig.statusBar?.aiUsage

@@ -822,6 +822,14 @@ export interface AimuxThemeConfig {
   initialMode?: ThemeMode
   /** @deprecated Use `initialMode` instead. */
   mode?: ThemeMode
+  /**
+   * Beta — bridge the active aimux theme into Claude Code by writing
+   * `~/.claude/themes/aimux.json` and selecting it in `~/.claude/settings.json`.
+   * Off by default. Requires Claude Code v2.1.118 or later.
+   */
+  beta?: {
+    harmonizeClaudeTheme?: boolean
+  }
 }
 
 export type AIUsageTool = 'claude' | 'codex'
@@ -879,6 +887,9 @@ export interface ResolvedConfig {
     | {
         initialId?: string
         initialMode?: ThemeMode
+        beta?: {
+          harmonizeClaudeTheme?: boolean
+        }
       }
     | undefined
   keymaps: ResolvedKeymapConfig
