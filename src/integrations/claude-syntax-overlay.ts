@@ -116,8 +116,10 @@ const TOOL_HEADER_RE = /\b(?:Read|Update|Edit|Write|MultiEdit|Create|NotebookEdi
 
 // Code-line prefix used by Claude in tool output: ` <n>  ` optionally
 // followed by `+ ` / `- ` for diff lines. The `<n>` is right-aligned in
-// a few-char gutter, so leading spaces are normal.
-const PREFIX_RE = /^(\s*\d+\s+(?:[+-]\s+)?)/
+// a few-char gutter, so leading spaces are normal. Group 2 captures the
+// diff marker so we can keep the diff bg as-is and only repaint
+// non-diff code blocks.
+const PREFIX_RE = /^(\s*\d+\s+([+-]\s+)?)/
 
 interface ShikiToken {
   content: string
@@ -216,19 +218,36 @@ function buildSpans(
 function rebuildLine(
   line: TerminalLine,
   prefix: string,
+  isDiff: boolean,
   tokens: ShikiToken[],
   fallbackFg: string,
+  codeBlockBg: string,
   accents: Set<string>
 ): TerminalLine {
-  const bg = dominantBg(line)
+  // For diff lines we trust the bg Claude emitted (diffAddedBg/diffRemovedBg);
+  // for non-diff code lines we paint the whole row with codeBlockBg to give
+  // the tool output a clear darker zone.
+  const dominantOriginal = dominantBg(line)
+  const targetBg = isDiff ? dominantOriginal : codeBlockBg
+
   const out: TerminalSpan[] = []
   if (prefix.length > 0) {
-    // Preserve whatever fg/bg/style the prefix already had so line numbers
-    // and `+`/`-` markers keep their gutter coloring from Claude.
     const prefixSpans = sliceLeading(line.spans, prefix.length)
-    out.push(...prefixSpans)
+    for (const span of prefixSpans) {
+      out.push(isDiff ? span : { ...span, bg: targetBg })
+    }
   }
-  out.push(...buildSpans(tokens, bg, fallbackFg, accents))
+  out.push(...buildSpans(tokens, targetBg, fallbackFg, accents))
+
+  // Pad the right edge with the target bg so the zone fills the whole row.
+  if (!isDiff) {
+    const written = out.reduce((acc, span) => acc + span.text.length, 0)
+    const total = line.spans.reduce((acc, span) => acc + span.text.length, 0)
+    if (total > written) {
+      out.push({ bg: targetBg, fg: fallbackFg, text: ' '.repeat(total - written) })
+    }
+  }
+
   return { spans: out }
 }
 
@@ -255,6 +274,7 @@ interface BlockContext {
   lang: string
   startIndex: number
   prefixes: string[]
+  isDiff: boolean[]
   codes: string[]
   lineRefs: TerminalLine[]
 }
@@ -263,6 +283,7 @@ function flushBlock(
   block: BlockContext,
   lines: TerminalLine[],
   fallbackFg: string,
+  codeBlockBg: string,
   accents: Set<string>
 ): void {
   if (block.codes.length === 0) return
@@ -274,8 +295,9 @@ function flushBlock(
     if (!tokens) continue
     const lineRef = block.lineRefs[i]
     const prefix = block.prefixes[i]
-    if (!lineRef || prefix === undefined) continue
-    const newLine = rebuildLine(lineRef, prefix, tokens, fallbackFg, accents)
+    const isDiff = block.isDiff[i]
+    if (!lineRef || prefix === undefined || isDiff === undefined) continue
+    const newLine = rebuildLine(lineRef, prefix, isDiff, tokens, fallbackFg, codeBlockBg, accents)
     lines[block.startIndex + i] = newLine
   }
 }
@@ -284,6 +306,7 @@ function processLines(
   lines: TerminalLine[],
   tabId: string,
   fallbackFg: string,
+  codeBlockBg: string,
   accents: Set<string>
 ): TerminalLine[] {
   const out = lines.slice()
@@ -304,10 +327,12 @@ function processLines(
     const prefixMatch = text.match(PREFIX_RE)
     if (prefixMatch) {
       const prefix = prefixMatch[0]
+      const diffMarker = prefixMatch[2] ?? ''
       const code = text.slice(prefix.length)
       if (!block) {
         block = {
           codes: [],
+          isDiff: [],
           lang: tabLang.get(tabId) ?? DEFAULT_LANG,
           lineRefs: [],
           prefixes: [],
@@ -315,18 +340,19 @@ function processLines(
         }
       }
       block.prefixes.push(prefix)
+      block.isDiff.push(diffMarker.length > 0)
       block.codes.push(code)
       block.lineRefs.push(line)
       continue
     }
 
     if (block) {
-      flushBlock(block, out, fallbackFg, accents)
+      flushBlock(block, out, fallbackFg, codeBlockBg, accents)
       block = null
     }
   }
 
-  if (block) flushBlock(block, out, fallbackFg, accents)
+  if (block) flushBlock(block, out, fallbackFg, codeBlockBg, accents)
   return out
 }
 
@@ -335,11 +361,12 @@ export function highlightSnapshot(snapshot: TerminalSnapshot, tabId: string): Te
 
   const theme = getCurrentTheme()
   const fallbackFg = theme.text
+  const codeBlockBg = theme.backgroundElement
   const accents = buildAccentSet()
 
-  const nextLines = processLines(snapshot.lines, tabId, fallbackFg, accents)
+  const nextLines = processLines(snapshot.lines, tabId, fallbackFg, codeBlockBg, accents)
   const nextTail = snapshot.tailLines
-    ? processLines(snapshot.tailLines, tabId, fallbackFg, accents)
+    ? processLines(snapshot.tailLines, tabId, fallbackFg, codeBlockBg, accents)
     : snapshot.tailLines
   return { ...snapshot, lines: nextLines, tailLines: nextTail }
 }
