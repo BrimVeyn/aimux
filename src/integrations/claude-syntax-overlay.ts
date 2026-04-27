@@ -225,7 +225,8 @@ function rebuildLine(
   tokens: ShikiToken[],
   fallbackFg: string,
   codeBlockBg: string,
-  accents: Set<string>
+  accents: Set<string>,
+  targetWidth: number
 ): TerminalLine {
   // Two zones per row:
   //   - leading whitespace before the line number → outer code-block bg.
@@ -255,12 +256,13 @@ function rebuildLine(
   }
   out.push(...buildSpans(tokens, stripBg, fallbackFg, accents))
 
-  // Pad the right edge with the strip bg so the strip fills to the row's
-  // original width.
+  // Pad the right edge with the strip bg out to `targetWidth`. We use the
+  // snapshot's max line width rather than this row's own span length:
+  // after a window grow, xterm hasn't yet filled the new columns on
+  // existing lines, so per-row width undershoots the viewport width.
   const written = out.reduce((acc, span) => acc + span.text.length, 0)
-  const total = line.spans.reduce((acc, span) => acc + span.text.length, 0)
-  if (total > written) {
-    out.push({ bg: stripBg, fg: fallbackFg, text: ' '.repeat(total - written) })
+  if (targetWidth > written) {
+    out.push({ bg: stripBg, fg: fallbackFg, text: ' '.repeat(targetWidth - written) })
   }
 
   return { spans: out }
@@ -323,7 +325,8 @@ function flushBlock(
   lines: TerminalLine[],
   fallbackFg: string,
   codeBlockBg: string,
-  accents: Set<string>
+  accents: Set<string>,
+  targetWidth: number
 ): void {
   if (block.codes.length === 0) return
   const joined = block.codes.join('\n')
@@ -347,10 +350,21 @@ function flushBlock(
       tokens,
       fallbackFg,
       codeBlockBg,
-      accents
+      accents,
+      targetWidth
     )
     lines[block.startIndex + i] = newLine
   }
+}
+
+function maxLineWidth(lines: TerminalLine[]): number {
+  let max = 0
+  for (const line of lines) {
+    let w = 0
+    for (const span of line.spans) w += span.text.length
+    if (w > max) max = w
+  }
+  return max
 }
 
 function processLines(
@@ -358,7 +372,8 @@ function processLines(
   tabId: string,
   fallbackFg: string,
   codeBlockBg: string,
-  accents: Set<string>
+  accents: Set<string>,
+  targetWidth: number
 ): TerminalLine[] {
   const out = lines.slice()
   let block: BlockContext | null = null
@@ -401,12 +416,12 @@ function processLines(
     }
 
     if (block) {
-      flushBlock(block, out, fallbackFg, codeBlockBg, accents)
+      flushBlock(block, out, fallbackFg, codeBlockBg, accents, targetWidth)
       block = null
     }
   }
 
-  if (block) flushBlock(block, out, fallbackFg, codeBlockBg, accents)
+  if (block) flushBlock(block, out, fallbackFg, codeBlockBg, accents, targetWidth)
   return out
 }
 
@@ -418,9 +433,22 @@ export function highlightSnapshot(snapshot: TerminalSnapshot, tabId: string): Te
   const codeBlockBg = theme.backgroundElement
   const accents = buildAccentSet()
 
-  const nextLines = processLines(snapshot.lines, tabId, fallbackFg, codeBlockBg, accents)
+  // Use the longest non-empty row in the snapshot as the target width.
+  // Falls back to a sensible minimum if no row is wide enough yet (very
+  // early in render).
+  const targetWidth = Math.max(maxLineWidth(snapshot.lines), maxLineWidth(snapshot.tailLines ?? []))
+  if (targetWidth === 0) return snapshot
+
+  const nextLines = processLines(
+    snapshot.lines,
+    tabId,
+    fallbackFg,
+    codeBlockBg,
+    accents,
+    targetWidth
+  )
   const nextTail = snapshot.tailLines
-    ? processLines(snapshot.tailLines, tabId, fallbackFg, codeBlockBg, accents)
+    ? processLines(snapshot.tailLines, tabId, fallbackFg, codeBlockBg, accents, targetWidth)
     : snapshot.tailLines
   return { ...snapshot, lines: nextLines, tailLines: nextTail }
 }
