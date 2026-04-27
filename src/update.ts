@@ -39,7 +39,8 @@ export async function runUpdate(): Promise<number> {
   })
   await remove.exited
 
-  const install = Bun.spawn(['bun', 'install', '-g', `github:${REPO}#${latest}`], {
+  const version = latest.startsWith('v') ? latest.slice(1) : latest
+  const install = Bun.spawn(['bun', 'install', '-g', `@brimveyn/aimux@${version}`], {
     stderr: 'inherit',
     stdout: 'inherit',
   })
