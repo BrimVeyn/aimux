@@ -473,11 +473,13 @@ describe('mouse passthrough integration', () => {
       readyText: 'READY',
     })
 
-    await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, 'up')
-
+    const expected = `[<64;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`
     await waitFor(
-      app.renderOnce,
-      () => app.captureCharFrame().includes(`[<64;${EXPECTED_PTY_X};${EXPECTED_PTY_Y}`),
+      async () => {
+        await app.mockMouse.scroll(TERMINAL_CLICK_X, TERMINAL_CLICK_Y, 'up')
+        await app.renderOnce()
+      },
+      () => app.captureCharFrame().includes(expected),
       app.captureCharFrame
     )
   }, 15_000)
