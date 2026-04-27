@@ -11,6 +11,7 @@ export {
   getTransparent,
   setMode,
   setTransparent,
+  subscribeThemeChanges,
   useMode,
   useTheme,
   useTransparent,

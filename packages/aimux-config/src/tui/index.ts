@@ -1,5 +1,5 @@
 export { isKnownThemeId, migrateThemeId, THEME_IDS, type ThemeId, TUI_THEMES } from './registry'
-export { resolveTuiTheme } from './resolve'
+export { type ClaudeThemeFile, resolveClaudeTheme, resolveTuiTheme } from './resolve'
 export { type TuiShikiOptions, tuiThemeToShiki } from './shiki'
 export { TUI_COLOR_TOKENS, type TuiColorToken } from './tokens'
 export type { ResolvedTuiTheme, RGBA, ThemeMode, TuiColorValue, TuiThemeJson } from './types'

@@ -153,3 +153,54 @@ export function resolveTuiTheme(theme: TuiThemeJson, mode: ThemeMode): ResolvedT
     thinkingOpacity: theme.theme.thinkingOpacity ?? 0.6,
   }
 }
+
+// -----------------------------------------------------------------------------
+// Claude Code custom theme bridge (beta).
+// Maps an aimux ResolvedTuiTheme to the JSON shape expected by Claude Code
+// at ~/.claude/themes/<slug>.json. Spec: https://code.claude.com/docs/en/terminal-config#create-a-custom-theme
+// -----------------------------------------------------------------------------
+
+export interface ClaudeThemeFile {
+  name: string
+  base: 'dark' | 'light'
+  overrides: Record<string, string>
+}
+
+/**
+ * Build a Claude Code custom-theme JSON from a resolved aimux theme.
+ * `mode` selects the `base` preset Claude falls through to for tokens we
+ * don't override (Shimmer variants, dim diffs, subagent colors).
+ */
+export function resolveClaudeTheme(
+  resolved: ResolvedTuiTheme,
+  mode: ThemeMode,
+  name = 'aimux (synced)'
+): ClaudeThemeFile {
+  const overrides: Record<string, string> = {
+    autoAccept: resolved.success,
+    bashBorder: resolved.warning,
+    claude: resolved.accent,
+    diffAdded: resolved.diffAddedBg,
+    diffAddedWord: resolved.diffAdded,
+    diffRemoved: resolved.diffRemovedBg,
+    diffRemovedWord: resolved.diffRemoved,
+    error: resolved.error,
+    fastMode: resolved.accent,
+    ide: resolved.info,
+    inactive: resolved.textMuted,
+    inverseText: resolved.background,
+    merged: resolved.success,
+    permission: resolved.borderActive,
+    planMode: resolved.info,
+    promptBorder: resolved.border,
+    remember: resolved.info,
+    selectionBg: resolved.borderActive,
+    subtle: resolved.borderSubtle,
+    success: resolved.success,
+    text: resolved.text,
+    userMessageBackground: resolved.backgroundPanel,
+    warning: resolved.warning,
+  }
+
+  return { base: mode, name, overrides }
+}

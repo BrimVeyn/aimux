@@ -51,6 +51,12 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['theme'] {
   if (!userConfig) return undefined
   return {
+    beta: userConfig.beta
+      ? {
+          experimentalSyntaxHighlight: userConfig.beta.experimentalSyntaxHighlight === true,
+          harmonizeClaudeTheme: userConfig.beta.harmonizeClaudeTheme === true,
+        }
+      : undefined,
     initialId: userConfig.initialId,
     initialMode: userConfig.initialMode ?? userConfig.mode,
   }

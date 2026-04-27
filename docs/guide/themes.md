@@ -162,3 +162,108 @@ VSCode keys:
 | `success`        | `gitDecoration.addedResourceForeground` |
 | `diffAddBg`      | `diffEditor.insertedLineBackground`     |
 | `diffRemoveBg`   | `diffEditor.removedLineBackground`      |
+
+## Beta — Harmonize Claude Code colors
+
+Aimux can push the active theme into Claude Code itself so the assistant's
+output matches the rest of the app. Off by default.
+
+```ts
+// aimux.config.ts
+export default defineConfig({
+  theme: {
+    initialId: 'aimux',
+    beta: {
+      harmonizeClaudeTheme: true,
+    },
+  },
+})
+```
+
+When the flag is on:
+
+- aimux writes `~/.claude/themes/aimux.json` from the resolved aimux palette.
+- aimux sets `"theme": "custom:aimux"` in `~/.claude/settings.json` (other
+  fields preserved, write is atomic).
+- Switching theme inside aimux rewrites the file. Claude Code watches its
+  themes dir and repaints live without restarting the session.
+
+Mapping (Claude token → aimux token): `claude` → `accent`, `error` → `error`,
+`success` → `success`, `warning` → `warning`, `planMode` → `info`,
+`bashBorder` → `warning`, `promptBorder` → `border`, `diffAdded` →
+`diffAddedBg`, `diffRemoved` → `diffRemovedBg`,
+`userMessageBackground` → `backgroundPanel`, `text` → `text`,
+`inactive` → `textMuted`. Tokens we don't override (Shimmer variants, dim
+diffs, subagent colors) fall through to Claude's `dark`/`light` preset.
+
+Requirements: Claude Code v2.1.118 or later. Limits: Claude's truecolor
+escapes (24-bit hex) bypass the theme — those colors stay native.
+
+To revert: turn the flag off and either delete `~/.claude/themes/aimux.json`
+or pick a different theme via Claude's `/theme` command.
+
+> **Note**: while the flag is on, aimux re-asserts `theme: "custom:aimux"`
+> in `~/.claude/settings.json` on every launch. Picking a different theme
+> via Claude's `/theme` command will be reverted next time aimux starts.
+> Disable the flag first if you want to use Claude's own theme picker.
+
+## Beta — Re-tokenize Claude code blocks (experimental)
+
+Claude Code's syntax highlighting (Monokai-Extended) is hardcoded and
+not exposed by the custom-theme API
+([anthropics/claude-code#48636](https://github.com/anthropics/claude-code/issues/48636)),
+so colored code on diff lines and Read/Edit listings shadows the aimux
+diff backgrounds. This flag disables Claude's built-in highlighting and
+re-colors code blocks with the active aimux theme via shiki.
+
+```ts
+theme: {
+  beta: {
+    harmonizeClaudeTheme: true,
+    experimentalSyntaxHighlight: true,
+  },
+},
+```
+
+When the flag is on:
+
+- `CLAUDE_CODE_SYNTAX_HIGHLIGHT=false` is exported to child processes
+  before the daemon spawns, so Claude emits plain code (no embedded
+  Monokai escapes).
+- Aimux pre-warms shiki with ~25 common languages.
+- Tool headers (`Update(src/foo.ts)`, `Read(...)`, `Edit(...)`,
+  `Write(...)`, `MultiEdit(...)`, `Create(...)`, `NotebookEdit(...)`)
+  are parsed to infer the language from the file extension. Per-tab
+  cache means blocks whose header scrolled out of the viewport still
+  get colored correctly.
+- Code lines (any line whose prefix matches `^\s*\d+\s+([+-]\s+)?`) are
+  detected, the gutter (line number + diff marker) is preserved, and
+  the code text is replaced with shiki tokens.
+- The whole row is repainted with a strip background (the active
+  theme's `diffAddedBg` / `diffRemovedBg` for diff lines, or
+  `backgroundElement` for non-diff Read/Edit context). The strip starts
+  at the line number — leading whitespace before the gutter stays on
+  `backgroundElement` to match the surrounding tool zone. The strip
+  pads to the snapshot's max line width so window resizes don't leave
+  ragged ends.
+- Only semantically meaningful tokens get a color (keyword, string,
+  comment, number, type, function name). Operators / punctuation /
+  variables fall back to plain `text` so the highlight stays calm
+  instead of rainbow.
+
+Requirements: same as above (Claude Code v2.1.118+). Toggling the flag
+requires a full aimux restart (and `aimux restart-daemon` if a previous
+daemon is still running with the old env).
+
+Limits — this is a POC:
+
+- Language inference relies on the tool header being visible at least
+  once per tab; before the first header, blocks fall back to TypeScript.
+- Extensions outside the supported set (e.g. `.zig`, `.elm`) fall back
+  to TypeScript tokenization, which produces best-effort coloring.
+- The overlay runs on every tab, not just `claude` ones — `bash`/`sh`
+  tabs that print numbered lines (`ls -1`, `cat -n`) will also get
+  recolored.
+- Fragile against Claude UI changes: if Claude alters its tool header
+  format or line-number gutter, detection breaks silently and the
+  overlay becomes a no-op.

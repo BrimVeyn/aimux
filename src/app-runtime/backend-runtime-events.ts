@@ -10,6 +10,7 @@ import type {
 } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
+import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 interface BindBackendRuntimeEventsOptions {
@@ -17,6 +18,7 @@ interface BindBackendRuntimeEventsOptions {
   dispatch: (action: AppAction) => void
   resizingRef: MutableRefObject<boolean>
   timeouts: Pick<TabRuntimeTimeouts, 'clearIdleTimer' | 'clearStartupGrace' | 'clearAllTimers'>
+  syntaxOverlayEnabled: () => boolean
 }
 
 function clearTabRuntimeState(
@@ -31,6 +33,7 @@ export function bindBackendRuntimeEvents({
   backend,
   dispatch,
   resizingRef,
+  syntaxOverlayEnabled,
   timeouts,
 }: BindBackendRuntimeEventsOptions): () => void {
   const handleRender = (
@@ -48,12 +51,14 @@ export function bindBackendRuntimeEvents({
       viewportY: viewport.viewportY,
     })
 
+    const transformed = syntaxOverlayEnabled() ? highlightSnapshot(viewport, tabId) : viewport
+
     dispatch({
       source: resizingRef.current ? 'resize' : 'data',
       tabId,
       terminalModes,
       type: 'replace-tab-viewport',
-      viewport,
+      viewport: transformed,
     })
     // Per-tab activity is driven by the backend's status-detection loop via
     // the `tabActivity` event — no client-side idle timer needed.
@@ -62,12 +67,14 @@ export function bindBackendRuntimeEvents({
   const handleExit = (tabId: string, exitCode: number) => {
     logInputDebug('app.backend.event.exit', { exitCode, tabId })
     clearTabRuntimeState(timeouts, tabId)
+    clearTabSyntaxState(tabId)
     dispatch({ tabId, type: 'close-tab' })
   }
 
   const handleError = (tabId: string, message: string) => {
     logInputDebug('app.backend.event.error', { message, tabId })
     clearTabRuntimeState(timeouts, tabId)
+    clearTabSyntaxState(tabId)
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 

@@ -85,3 +85,17 @@ export function setTransparent(value: boolean): void {
   if (themeStore.getState().transparent === value) return
   themeStore.setState({ transparent: value })
 }
+
+/** Subscribe to theme id/mode changes for non-React side-effects. */
+export function subscribeThemeChanges(
+  listener: (resolved: ResolvedTuiTheme, mode: ThemeMode) => void
+): () => void {
+  let lastId: ThemeId | null = null
+  let lastMode: ThemeMode | null = null
+  return themeStore.subscribe((s) => {
+    if (s.id === lastId && s.mode === lastMode) return
+    lastId = s.id
+    lastMode = s.mode
+    listener(derive(s.id, s.mode), s.mode)
+  })
+}

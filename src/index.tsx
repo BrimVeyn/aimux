@@ -67,6 +67,20 @@ const renderer = await createCliRenderer({
 
 const root = createRoot(renderer)
 
+const resolvedConfig = await loadUserConfig()
+logDebug('index.userConfigLoaded', {
+  leader: resolvedConfig.keymaps.leader,
+  modeCount: resolvedConfig.keymaps.modes.size,
+})
+
+// Beta — when experimental syntax highlight is on, ask Claude Code to emit
+// plain code so we can re-tokenize on the snapshot. Set on process.env
+// before backend bootstrap so the spawned daemon (and its child PTYs)
+// inherit it.
+if (resolvedConfig.theme?.beta?.experimentalSyntaxHighlight) {
+  process.env.CLAUDE_CODE_SYNTAX_HIGHLIGHT = 'false'
+}
+
 const backend = await createSessionBackend({
   onBreakingUpdateRequired: () =>
     new Promise<void>((resolve) => {
@@ -74,11 +88,5 @@ const backend = await createSessionBackend({
     }),
 })
 logDebug('index.backendReady', { backend: backend.constructor.name, runtimeProfile })
-
-const resolvedConfig = await loadUserConfig()
-logDebug('index.userConfigLoaded', {
-  leader: resolvedConfig.keymaps.leader,
-  modeCount: resolvedConfig.keymaps.modes.size,
-})
 
 root.render(<App backend={backend} resolvedConfig={resolvedConfig} />)

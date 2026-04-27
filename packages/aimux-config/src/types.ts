@@ -823,6 +823,21 @@ export interface AimuxThemeConfig {
   initialMode?: ThemeMode
   /** @deprecated Use `initialMode` instead. */
   mode?: ThemeMode
+  /**
+   * Beta — bridge the active aimux theme into Claude Code by writing
+   * `~/.claude/themes/aimux.json` and selecting it in `~/.claude/settings.json`.
+   * Off by default. Requires Claude Code v2.1.118 or later.
+   */
+  beta?: {
+    harmonizeClaudeTheme?: boolean
+    /**
+     * Disable Claude Code's built-in syntax highlighting and re-color diff
+     * lines from the aimux theme via shiki. Sets
+     * `CLAUDE_CODE_SYNTAX_HIGHLIGHT=false` for child PTYs and post-processes
+     * the terminal snapshot in the app.
+     */
+    experimentalSyntaxHighlight?: boolean
+  }
 }
 
 export type AIUsageTool = 'claude' | 'codex'
@@ -880,6 +895,10 @@ export interface ResolvedConfig {
     | {
         initialId?: string
         initialMode?: ThemeMode
+        beta?: {
+          harmonizeClaudeTheme?: boolean
+          experimentalSyntaxHighlight?: boolean
+        }
       }
     | undefined
   keymaps: ResolvedKeymapConfig
