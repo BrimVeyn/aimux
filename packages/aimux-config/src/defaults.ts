@@ -1,4 +1,4 @@
-import type { AutoCommitConfig, ResolvedKeymapConfig } from './types'
+import type { AutoCommitConfig, MultiRepoConfig, ResolvedKeymapConfig } from './types'
 
 import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
@@ -10,6 +10,11 @@ export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
     codex: 'gpt-5-mini',
   },
   timeoutMs: 60_000,
+}
+
+export const DEFAULT_MULTI_REPO_CONFIG: MultiRepoConfig = {
+  enabled: true,
+  maxDepth: 1,
 }
 
 /**
@@ -93,7 +98,10 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('git-mode', (m) =>
       m
         .map('a', actions.gitStageSelected, 'Stage')
+        .map('A', actions.gitStageAll, 'Stage all')
         .map('d', actions.gitDestructiveSelected, 'Unstage/delete')
+        .map('D', actions.gitUnstageAll, 'Unstage all')
+        .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('c', actions.gitCommitOpen, 'Commit')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')

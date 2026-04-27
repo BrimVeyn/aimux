@@ -7,6 +7,7 @@ import type { ThemeId } from '../../themes'
 import { diffHash } from '../../../git/diff-hash'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
+import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
@@ -122,6 +123,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     : undefined
   const projectPath = currentSession?.projectPath
 
+  useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
@@ -165,7 +167,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (!selectedDiffKey) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(projectPath, selectedFile, gitMode.headOffset)
+    void fetchDiff(selectedFile.repoPath ?? projectPath, selectedFile, gitMode.headOffset)
       .then((d) =>
         dispatchGlobal({
           diff: d,
@@ -207,7 +209,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }
 
   return (
-    <box flexDirection="column" flexGrow={1}>
+    <box flexDirection="column" flexGrow={1} overflow="hidden">
       <box flexDirection="row" flexGrow={1}>
         <box
           width={fileBarWidth}
@@ -215,25 +217,28 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           backgroundColor={sidebarBg}
           padding={0}
           gap={0}
+          overflow="hidden"
         >
-          <text fg={t.text}>
-            <strong>aimux · git</strong>
-          </text>
-          {gitPanel.branch ? (
-            <box flexDirection="row">
-              <text fg={t.text}>{'\u{e702}'} </text>
-              <text fg={t.text}>{gitPanel.branch}</text>
-            </box>
-          ) : null}
-          {gitMode.headOffset > 0 ? (
-            <box flexDirection="row" gap={1}>
-              <text fg={t.warning}>
-                <strong>HEAD~{gitMode.headOffset}</strong>
-              </text>
-              <text fg={t.textMuted}>[ newer · ] older</text>
-            </box>
-          ) : null}
-          <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          <box flexDirection="column" flexShrink={0}>
+            <text fg={t.text}>
+              <strong>aimux · git</strong>
+            </text>
+            {gitPanel.branch ? (
+              <box flexDirection="row">
+                <text fg={t.text}>{'\u{e702}'} </text>
+                <text fg={t.text}>{gitPanel.branch}</text>
+              </box>
+            ) : null}
+            {gitMode.headOffset > 0 ? (
+              <box flexDirection="row" gap={1}>
+                <text fg={t.warning}>
+                  <strong>HEAD~{gitMode.headOffset}</strong>
+                </text>
+                <text fg={t.textMuted}>[ newer · ] older</text>
+              </box>
+            ) : null}
+            <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
+          </box>
           <GitPanel
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}

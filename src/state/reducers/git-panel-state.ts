@@ -16,6 +16,9 @@ export function sortFilesBySection(files: GitFileEntry[]): GitFileEntry[] {
     const sa = SECTION_RANK[a.section]
     const sb = SECTION_RANK[b.section]
     if (sa !== sb) return sa - sb
+    const ra = a.repoPath ?? ''
+    const rb = b.repoPath ?? ''
+    if (ra !== rb) return ra.localeCompare(rb)
     return a.path.localeCompare(b.path)
   })
 }

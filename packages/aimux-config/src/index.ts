@@ -26,6 +26,8 @@ export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builde
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
+export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
+export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
 // User-facing config types (keymap/backends/sessions/etc.).
 export type {
@@ -40,6 +42,7 @@ export type {
   AutoCommitConfig,
   BackendConfig,
   BindingDef,
+  DiscoveredRepo,
   FocusMode,
   GitFileListMode,
   GitPaneConfig,
@@ -59,6 +62,8 @@ export type {
   ModeContext,
   ModeId,
   ModeKeymapDef,
+  MultiRepoConfig,
+  MultiRepoState,
   ResolvedConfig,
   ResolvedKeymapConfig,
   SessionRecord,

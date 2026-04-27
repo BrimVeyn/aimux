@@ -548,6 +548,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       )
       return
     }
+    case 'git-stage-all': {
+      const paths = ctx.state.gitPanel.files.map((f) => f.path)
+      void enqueueGitOp(() => runGitActionAll(ctx, ['add', '-A'], paths))
+      return
+    }
+    case 'git-unstage-all': {
+      const paths = ctx.state.gitPanel.files.map((f) => f.path)
+      void enqueueGitOp(() => runGitActionAll(ctx, ['reset'], paths))
+      return
+    }
     case 'git-restore': {
       void enqueueGitOp(() => runGitAction(ctx, ['restore', '--', effect.path], effect.path))
       return
@@ -652,7 +662,11 @@ async function runGitAction(
   args: string[],
   pathToInvalidate?: string
 ): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const fallback = ctx.getCurrentSessionProjectPath()
+  const repoPath = pathToInvalidate
+    ? ctx.state.gitPanel.files.find((f) => f.path === pathToInvalidate)?.repoPath
+    : undefined
+  const cwd = repoPath ?? fallback
   if (!cwd) return
   const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
   if (result.exitCode !== 0) {
@@ -666,8 +680,28 @@ async function runGitAction(
   }
 }
 
-async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
+async function runGitActionAll(
+  ctx: SideEffectContext,
+  args: string[],
+  pathsToInvalidate: string[]
+): Promise<void> {
   const cwd = ctx.getCurrentSessionProjectPath()
+  if (!cwd) return
+  const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
+  if (result.exitCode !== 0) {
+    const stderr = result.stderr.toString().trim()
+    ctx.dispatch({ message: stderr || 'git action failed', type: 'git-mode-set-message' })
+    return
+  }
+  ctx.dispatch({ message: null, type: 'git-mode-set-message' })
+  if (pathsToInvalidate.length > 0) {
+    ctx.dispatch({ paths: pathsToInvalidate, type: 'git-mode-invalidate-diffs' })
+  }
+}
+
+async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
+  const repoPath = ctx.state.gitPanel.files.find((f) => f.path === path)?.repoPath
+  const cwd = repoPath ?? ctx.getCurrentSessionProjectPath()
   if (!cwd) return
   const absolute = `${cwd}/${path}`
   try {

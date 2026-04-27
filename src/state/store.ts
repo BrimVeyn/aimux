@@ -2,6 +2,7 @@ import { reduceAutoCommit } from './reducers/auto-commit-state'
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
+import { reduceMultiRepoState } from './reducers/multi-repo-state'
 import { reduceSessionState } from './reducers/session-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
@@ -10,6 +11,7 @@ import {
   type AppAction,
   type AppState,
   EMPTY_AUTO_COMMIT_STATE,
+  EMPTY_MULTI_REPO_STATE,
   type GitModeState,
   type GitPaneMode,
   type GitPanePosition,
@@ -98,6 +100,7 @@ export function createInitialState(
           type: 'session-picker',
         }
       : emptyModal(),
+    multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
     sessionBar: {
       position: overrides.sessionBarPosition ?? 'top',
@@ -138,6 +141,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const autoCommitState = reduceAutoCommit(state, action)
   if (autoCommitState) return autoCommitState
+
+  const multiRepoState = reduceMultiRepoState(state, action)
+  if (multiRepoState) return multiRepoState
 
   switch (action.type) {
     case 'set-snippets':

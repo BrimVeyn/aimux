@@ -11,6 +11,7 @@ import type {
   GitPanePathConfig,
 } from '../../../state/types'
 
+import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import {
   buildGitTreeRows,
@@ -193,7 +194,8 @@ function renderFileRow(
   isSelected: boolean,
   fileListMode: GitFileListMode,
   pathConfig: GitPanePathConfig,
-  diffCountConfig: GitPaneDiffCountConfig
+  diffCountConfig: GitPaneDiffCountConfig,
+  repoPrefixes: Record<string, string>
 ): ReactNode {
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
@@ -201,6 +203,10 @@ function renderFileRow(
   const onSelect = (): void => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }
+  // Repo disambiguation prefix: only in flat mode, only when the file came
+  // from a sub-repo (root repo files get an empty prefix).
+  const repoTag =
+    fileListMode === 'flat' && file.repoPath ? (repoPrefixes[file.repoPath] ?? '') : ''
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
@@ -208,6 +214,13 @@ function renderFileRow(
           <strong>{displayStatus(file)}</strong>
         </text>
       </box>
+      {repoTag ? (
+        <box flexShrink={0}>
+          <text fg={getCurrentTheme().primary} bg={bg}>
+            <strong>{repoTag}</strong>
+          </text>
+        </box>
+      ) : null}
       <box flexGrow={1} overflow="hidden" paddingLeft={fileListMode === 'tree' ? row.depth * 2 : 0}>
         {renderFileLabel(file, pathConfig, fileListMode)}
       </box>
@@ -228,7 +241,8 @@ function renderTreeSection(
   showListModeToggle: boolean,
   pathConfig: GitPanePathConfig,
   diffCountConfig: GitPaneDiffCountConfig,
-  marginTop: number
+  marginTop: number,
+  repoPrefixes: Record<string, string>
 ): ReactNode {
   if (files.length === 0) return null
   const t2 = getCurrentTheme()
@@ -263,7 +277,8 @@ function renderTreeSection(
               row.key === selectedEntryKey,
               fileListMode,
               pathConfig,
-              diffCountConfig
+              diffCountConfig,
+              repoPrefixes
             )
       )}
     </box>
@@ -321,6 +336,7 @@ export const GitPanel = memo(function GitPanel({
 }: GitPanelProps) {
   const t = useTheme()
   useTransparent()
+  const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
   const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
@@ -352,7 +368,7 @@ export const GitPanel = memo(function GitPanel({
   }, [selectedEntryKey, tree.visibleRows])
 
   return (
-    <box flexDirection="column" flexGrow={1} gap={0}>
+    <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden" gap={0}>
       {hasRemoteTracking ? (
         <text fg={t.textMuted}>
           ↑{gitPanel.ahead} ↓{gitPanel.behind}
@@ -384,7 +400,8 @@ export const GitPanel = memo(function GitPanel({
               key === toggleSection,
               pathConfig,
               diffCountConfig,
-              priorHasFiles ? 1 : 0
+              priorHasFiles ? 1 : 0,
+              repoPrefixes
             )
           })}
         </scrollbox>
