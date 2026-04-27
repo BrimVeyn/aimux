@@ -554,7 +554,7 @@ export const gitToggleFoldAll: ActionFn = (ctx: ModeContext) => {
   return r([{ key, type: 'git-mode-fold-toggle-all' }])
 }
 
-export const gitToggleStageAll: ActionFn = (ctx: ModeContext) => {
+export const gitStageAll: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.gitMode.headOffset > 0) {
     return r([
       {
@@ -566,20 +566,32 @@ export const gitToggleStageAll: ActionFn = (ctx: ModeContext) => {
   const files = ctx.state.gitPanel.files
   const pending = clearPendingDelete(ctx)
   if (files.length === 0) return r(pending)
-  const hasUnstaged = files.some((f) => f.section === 'unstaged' || f.section === 'untracked')
   const actions: AppAction[] = [...pending]
-  if (hasUnstaged) {
-    for (const f of files) {
-      if (f.section === 'staged') continue
-      actions.push({
-        fromSection: f.section,
-        path: f.path,
-        toSection: 'staged',
-        type: 'git-mode-optimistic-move',
-      })
-    }
-    return r(actions, [{ type: 'git-stage-all' }])
+  for (const f of files) {
+    if (f.section === 'staged') continue
+    actions.push({
+      fromSection: f.section,
+      path: f.path,
+      toSection: 'staged',
+      type: 'git-mode-optimistic-move',
+    })
   }
+  return r(actions, [{ type: 'git-stage-all' }])
+}
+
+export const gitUnstageAll: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
+  const files = ctx.state.gitPanel.files
+  const pending = clearPendingDelete(ctx)
+  if (files.length === 0) return r(pending)
+  const actions: AppAction[] = [...pending]
   for (const f of files) {
     if (f.section !== 'staged') continue
     const toSection = f.status === 'A' ? 'untracked' : 'unstaged'

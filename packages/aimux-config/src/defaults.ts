@@ -93,8 +93,9 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode('git-mode', (m) =>
       m
         .map('a', actions.gitStageSelected, 'Stage')
-        .map('A', actions.gitToggleStageAll, 'Stage all / unstage all')
+        .map('A', actions.gitStageAll, 'Stage all')
         .map('d', actions.gitDestructiveSelected, 'Unstage/delete')
+        .map('D', actions.gitUnstageAll, 'Unstage all')
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('c', actions.gitCommitOpen, 'Commit')
         .map('p', actions.gitPush, 'Push')

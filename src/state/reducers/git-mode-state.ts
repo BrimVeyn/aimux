@@ -1,4 +1,4 @@
-import type { FileDiffMetadata } from '../../diff-parser'
+import type { PreparedParsedDiff } from '../../ui/components/git/diff-renderer/prepare-diff'
 
 import { collectFoldables } from '../../ui/components/git/diff-renderer/build-rows'
 import {
@@ -449,8 +449,9 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       return applyFold(state, action.key, action.foldId, { bottom, top })
     }
     case 'git-mode-fold-toggle-all': {
-      const file = getParsedPayload<FileDiffMetadata>(state.gitMode.parsedFiles[action.key])
-      if (!file) return state
+      const parsed = getParsedPayload<PreparedParsedDiff>(state.gitMode.parsedFiles[action.key])
+      const file = parsed?.file
+      if (!file || !Array.isArray(file.hunks)) return state
       const foldables = collectFoldables(file)
       if (foldables.length === 0) return state
       const current = state.gitMode.folds[action.key] ?? {}
