@@ -47,9 +47,10 @@ function getTitle(
   return `${tab.title} · ${tab.status}`
 }
 
-function getBorderColor(isActive: boolean, _focusMode: TerminalPaneProps['focusMode']): string {
+function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
   const t = getCurrentTheme()
-  return isActive ? t.borderActive : t.border
+  if (!isActive) return t.border
+  return focusMode === 'terminal-input' ? t.accent : t.primary
 }
 
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
