@@ -88,6 +88,8 @@ export const closeModal: KeyResult = r([{ type: 'close-modal' }], [], 'navigatio
 
 export const closeOverlayModal: KeyResult = r([{ type: 'close-modal' }])
 
+export const cancelNewTabModal: KeyResult = r([{ type: 'cancel-command-edit' }])
+
 // ---------------------------------------------------------------------------
 // Dynamic actions (need ctx at runtime — ActionFn)
 // ---------------------------------------------------------------------------
@@ -173,7 +175,45 @@ export function moveModalSelectionWithPreview(
 // Modal-specific actions
 // ---------------------------------------------------------------------------
 
-export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
+export const launchSelectedAssistant: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'assistant') {
+    return r([{ type: 'select-new-tab-assistant' }])
+  }
+  if (
+    ctx.state.modal.type === 'new-tab' &&
+    ctx.state.modal.step === 'worktree' &&
+    ctx.state.modal.createWorktree
+  ) {
+    return r([{ type: 'enter-new-tab-worktree-create' }])
+  }
+  return r([], [{ type: 'launch-selected-assistant' }])
+}
+
+export const toggleNewTabWorktree: KeyResult = r([{ type: 'toggle-new-tab-worktree' }])
+
+export const deleteSelectedWorktree: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const sessionId = ctx.state.currentSessionId
+  if (modal.type !== 'new-tab' || modal.step !== 'worktree' || modal.createWorktree) return null
+  if (!sessionId) return null
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const worktree = session?.worktrees?.[modal.selectedIndex]
+  if (!worktree) return null
+  return r(
+    [
+      { index: modal.selectedIndex, type: 'set-modal-selection-index' },
+      { message: null, type: 'set-new-tab-worktree-delete-state' },
+    ],
+    [
+      {
+        force: modal.worktreeDeleteConfirmId === worktree.id,
+        sessionId,
+        type: 'delete-worktree',
+        worktreeId: worktree.id,
+      },
+    ]
+  )
+}
 
 export const cancelCommandEdit = (returnTo: KeyResult['transition']): KeyResult =>
   r([{ type: 'cancel-command-edit' }], [], returnTo)
@@ -420,15 +460,17 @@ function clearPendingDelete(ctx: ModeContext): AppAction[] {
   return [{ path: null, type: 'git-mode-set-pending-delete' }]
 }
 
-function gitFileKey(section: string, path: string): string {
-  return `${section}:${path}`
+function gitFileKey(section: string, path: string, repoPath?: string): string {
+  return repoPath ? `${section}:${repoPath}:${path}` : `${section}:${path}`
 }
 
 function selectedGitFile(ctx: ModeContext) {
   const key = ctx.state.gitMode.selectedEntryKey
   if (!key) return null
   return (
-    ctx.state.gitPanel.files.find((file) => gitFileKey(file.section, file.path) === key) ?? null
+    ctx.state.gitPanel.files.find(
+      (file) => gitFileKey(file.section, file.path, file.repoPath) === key
+    ) ?? null
   )
 }
 
@@ -561,7 +603,7 @@ export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
 export const gitToggleFoldAll: ActionFn = (ctx: ModeContext) => {
   const file = selectedGitFile(ctx)
   if (!file) return r([])
-  const key = gitFileKey(file.section, file.path)
+  const key = gitFileKey(file.section, file.path, file.repoPath)
   return r([{ key, type: 'git-mode-fold-toggle-all' }])
 }
 
@@ -738,6 +780,12 @@ export const gitCommitSubmit: ActionFn = (ctx: ModeContext) => {
     'git-mode'
   )
 }
+
+export const saveWorktreeScripts: ActionFn = () => {
+  return r([], [{ type: 'save-worktree-scripts' }], 'navigation')
+}
+
+export const selectScriptFile: KeyResult = r([{ type: 'select-script-file' }])
 
 export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal

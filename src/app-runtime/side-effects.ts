@@ -7,7 +7,8 @@ import {
 import { type CliRenderer } from '@opentui/core'
 import { $ } from 'bun'
 import { existsSync } from 'node:fs'
-import { join as joinPath, resolve as resolvePath } from 'node:path'
+import { mkdir } from 'node:fs/promises'
+import { dirname, join as joinPath, resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
@@ -15,7 +16,21 @@ import type { SessionBackend } from '../session-backend/types'
 import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
+import {
+  createGitWorktree,
+  getCurrentBranch,
+  getHeadSha,
+  getRepoRoot,
+  listGitWorktrees,
+  removeGitWorktree,
+} from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
+import {
+  assertSafeAimuxWorktreePath,
+  isInsideAimuxWorktreeRoot,
+  makeWorktreePath,
+  sanitizePathSegment,
+} from '../platform/worktree-paths'
 import { getProfileConfigDir } from '../profile-paths'
 import {
   getAllAssistantOptions,
@@ -35,6 +50,8 @@ import {
   splitNode,
 } from '../state/layout-tree'
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
+import { saveSessionCatalog } from '../state/session-catalog'
+import { getActiveWorktree, getSessionProjectPath } from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import {
@@ -43,6 +60,7 @@ import {
   type AssistantId,
   DEFAULT_SCROLL_INTENT,
   type TabSession,
+  type WorktreeRecord,
 } from '../state/types'
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
@@ -76,11 +94,16 @@ export interface SideEffectContext {
   clearIdleTimer: (tabId: string) => void
   clearStartupGrace: (tabId: string) => void
   startStartupGrace: (tabId: string, timeoutMs: number) => void
+  getState: () => AppState
   getCurrentSessionProjectPath: () => string | undefined
 }
 
 function getSelectedAssistantOption(state: AppState) {
   const all = getAllAssistantOptions(state.customCommands)
+  if (state.modal.type === 'new-tab' && state.modal.selectedAssistantId) {
+    const selectedAssistantId = state.modal.selectedAssistantId
+    return all.find((entry) => entry.id === selectedAssistantId) ?? getAssistantOption(0)
+  }
   const filter = state.modal.type === 'new-tab' ? state.modal.editBuffer : null
   const list = filterAssistants(all, filter)
   return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
@@ -223,7 +246,16 @@ function confirmSplitSelection(ctx: SideEffectContext): void {
   const option = getSelectedAssistantOption(state)
   const direction = state.modal.type === 'split-picker' ? state.modal.splitDirection : 'vertical'
   const customCommand = state.customCommands[option.id]
-  const tab = createTabSession(option.id, customCommand, state.customCommands)
+  const tab = createTabSession(
+    option.id,
+    customCommand,
+    state.customCommands,
+    getActiveWorktree(
+      state.currentSessionId
+        ? state.sessions.find((s) => s.id === state.currentSessionId)
+        : undefined
+    )?.id
+  )
   dispatch({ type: 'close-modal' })
   executeSplitPane(ctx, direction, tab)
   dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
@@ -246,7 +278,8 @@ function getSelectedSnippet(state: AppState) {
 export function createTabSession(
   assistant: AssistantId,
   customCommand?: string,
-  customCommands?: Record<string, string>
+  customCommands?: Record<string, string>,
+  worktreeId?: string
 ): TabSession {
   const allOptions = getAllAssistantOptions(customCommands ?? {})
   const option = allOptions.find((o) => o.id === assistant) ?? getAssistantOption(0)
@@ -261,6 +294,7 @@ export function createTabSession(
     status: 'starting',
     terminalModes: createDefaultTerminalModes(),
     title: option.label,
+    worktreeId,
   }
 }
 
@@ -308,10 +342,35 @@ export function startTabSession(
   })
 }
 
-function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
+function getNewTabTargetWorktreeId(state: AppState): string | undefined {
+  if (state.modal.type !== 'new-tab' || !state.currentSessionId) {
+    return undefined
+  }
+  const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+  const index = state.modal.createWorktree
+    ? state.modal.targetWorktreeIndex
+    : state.modal.selectedIndex
+  return session?.worktrees?.[index]?.id
+}
+
+function launchAssistant(
+  ctx: SideEffectContext,
+  assistant: AssistantId,
+  worktreeId?: string
+): void {
   const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const customCommand = state.customCommands[assistant]
-  const tab = createTabSession(assistant, customCommand, state.customCommands)
+  const tab = createTabSession(
+    assistant,
+    customCommand,
+    state.customCommands,
+    worktreeId ??
+      getActiveWorktree(
+        state.currentSessionId
+          ? state.sessions.find((s) => s.id === state.currentSessionId)
+          : undefined
+      )?.id
+  )
   logInputDebug('app.launchAssistant', {
     assistant,
     command: tab.command,
@@ -327,8 +386,59 @@ function launchAssistant(ctx: SideEffectContext, assistant: AssistantId): void {
     tab,
     state.layout.terminalCols,
     state.layout.terminalRows,
-    ctx.getCurrentSessionProjectPath()
+    getTabProjectPath(ctx, tab)
   )
+}
+
+async function launchAssistantInNewWorktree(
+  ctx: SideEffectContext,
+  assistant: AssistantId,
+  worktreeName: string,
+  branchName?: string,
+  sourceWorktreeId?: string,
+  scripts?: { sanitize?: string; setup?: string }
+): Promise<void> {
+  const sessionId = ctx.state.currentSessionId
+  if (!sessionId) return
+  const worktree = await createAimuxTempWorktree(
+    ctx,
+    sessionId,
+    worktreeName,
+    branchName,
+    undefined,
+    sourceWorktreeId,
+    scripts
+  )
+  if (!worktree) return
+  const customCommand = ctx.state.customCommands[assistant]
+  const tab = createTabSession(assistant, customCommand, ctx.state.customCommands, worktree.id)
+  ctx.dispatch({ tab, type: 'add-tab' })
+  ctx.dispatch({ type: 'close-modal' })
+  ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
+  startTabSession(
+    ctx.backend,
+    ctx.dispatch,
+    ctx.clearStartupGrace,
+    (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
+    tab,
+    ctx.state.layout.terminalCols,
+    ctx.state.layout.terminalRows,
+    worktree.path
+  )
+}
+
+function getTabProjectPath(
+  ctx: SideEffectContext,
+  tab: Pick<TabSession, 'worktreeId'>
+): string | undefined {
+  const session = ctx.state.currentSessionId
+    ? ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+    : undefined
+  if (tab.worktreeId) {
+    const worktree = session?.worktrees?.find((entry) => entry.id === tab.worktreeId)
+    if (worktree) return worktree.path
+  }
+  return ctx.getCurrentSessionProjectPath()
 }
 
 function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
@@ -341,7 +451,7 @@ function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
     tab,
     state.layout.terminalCols,
     state.layout.terminalRows,
-    ctx.getCurrentSessionProjectPath()
+    getTabProjectPath(ctx, tab)
   )
 }
 
@@ -371,7 +481,7 @@ function executeSplitPane(
     tab,
     Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
     Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
-    ctx.getCurrentSessionProjectPath()
+    getTabProjectPath(ctx, tab)
   )
 }
 
@@ -388,7 +498,29 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'launch-selected-assistant': {
       const option = getSelectedAssistantOption(state)
-      launchAssistant(ctx, option.id)
+      if (state.modal.type === 'new-tab' && state.modal.createWorktree) {
+        const worktreeName = state.modal.worktreeName
+        const branchName = state.modal.branchName
+        const sourceWorktreeId = getNewTabTargetWorktreeId(state)
+        const scripts = { sanitize: state.modal.sanitizeScript, setup: state.modal.setupScript }
+        void enqueueGitOp(() =>
+          launchAssistantInNewWorktree(
+            ctx,
+            option.id,
+            worktreeName,
+            branchName,
+            sourceWorktreeId,
+            scripts
+          )
+        ).catch((error) =>
+          ctx.dispatch({
+            message: error instanceof Error ? error.message : String(error),
+            type: 'git-mode-set-message',
+          })
+        )
+        return
+      }
+      launchAssistant(ctx, option.id, getNewTabTargetWorktreeId(state))
       return
     }
     case 'edit-selected-assistant': {
@@ -406,6 +538,54 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'delete-session': {
       handleDeleteSessionEffect(state, backend, dispatch, effect.sessionId)
+      return
+    }
+    case 'switch-worktree': {
+      handleSwitchWorktree(ctx, effect.sessionId, effect.worktreeId)
+      return
+    }
+    case 'fork-worktree': {
+      void enqueueGitOp(() =>
+        runForkWorktree(ctx, effect.sessionId, effect.branchName, effect.baseRef)
+      ).catch((error) =>
+        ctx.dispatch({
+          message: error instanceof Error ? error.message : String(error),
+          type: 'git-mode-set-message',
+        })
+      )
+      return
+    }
+    case 'delete-worktree': {
+      void enqueueGitOp(() =>
+        runDeleteWorktree(
+          { ...ctx, state: ctx.getState() },
+          effect.sessionId,
+          effect.worktreeId,
+          !!effect.force
+        )
+      ).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        const forceable = isForceableWorktreeDeleteError(message)
+        const latest = ctx.getState()
+        if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
+          const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
+          const selected = session?.worktrees?.[latest.modal.selectedIndex]
+          if (selected && selected.id !== effect.worktreeId) {
+            ctx.dispatch({ message, type: 'git-mode-set-message' })
+            return
+          }
+        }
+        ctx.dispatch({
+          confirmWorktreeId: forceable ? effect.worktreeId : null,
+          message: forceable ? message : `Could not delete worktree: ${message}`,
+          type: 'set-new-tab-worktree-delete-state',
+        })
+        ctx.dispatch({ message, type: 'git-mode-set-message' })
+      })
+      return
+    }
+    case 'save-worktree-scripts': {
+      handleSaveWorktreeScripts(ctx)
       return
     }
     case 'open-rename-selected-session': {
@@ -481,7 +661,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         : undefined
       const assistant = sourceTab?.assistant ?? 'terminal'
       const customCommand = state.customCommands[assistant]
-      const tab = createTabSession(assistant, customCommand, state.customCommands)
+      const tab = createTabSession(
+        assistant,
+        customCommand,
+        state.customCommands,
+        sourceTab?.worktreeId
+      )
       executeSplitPane(ctx, effect.direction, tab)
       return
     }
@@ -876,6 +1061,247 @@ function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void
     return
   }
   handleSwitchSessionEffect(state, backend, dispatch, target)
+}
+
+function replaceSession(
+  state: AppState,
+  sessionId: string,
+  next: (session: AppState['sessions'][number]) => AppState['sessions'][number]
+): AppState['sessions'] {
+  return state.sessions.map((session) => (session.id === sessionId ? next(session) : session))
+}
+
+function handleSwitchWorktree(ctx: SideEffectContext, sessionId: string, worktreeId: string): void {
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
+  if (!session || !worktree) return
+  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+    ...entry,
+    activeWorktreeId: worktreeId,
+    projectPath: worktree.path,
+    updatedAt: new Date().toISOString(),
+  }))
+  saveSessionCatalog(sessions)
+  ctx.dispatch({ sessions, type: 'set-sessions' })
+}
+
+async function runForkWorktree(
+  ctx: SideEffectContext,
+  sessionId: string,
+  requestedBranchName?: string,
+  requestedBaseRef?: string
+): Promise<void> {
+  await createAimuxTempWorktree(ctx, sessionId, requestedBranchName, undefined, requestedBaseRef)
+}
+
+function normalizeBranchName(branch: string | undefined): string | undefined {
+  return branch?.replace(/^refs\/heads\//, '').trim()
+}
+
+async function createAimuxTempWorktree(
+  ctx: SideEffectContext,
+  sessionId: string,
+  requestedName?: string,
+  requestedBranchName?: string,
+  requestedBaseRef?: string,
+  sourceWorktreeId?: string,
+  scripts?: { sanitize?: string; setup?: string }
+): Promise<WorktreeRecord | undefined> {
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const source =
+    session?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(session)
+  const sourcePath = source?.path ?? getSessionProjectPath(session)
+  if (!session || !sourcePath) return undefined
+
+  const repoRoot = (await getRepoRoot(sourcePath)) ?? source?.repoRoot ?? sourcePath
+  const baseBranch = (await getCurrentBranch(sourcePath)) ?? source?.branch ?? 'HEAD'
+  const baseRef = requestedBaseRef ?? baseBranch
+  const worktreeId = createPrefixedId('worktree')
+  const worktreeName = requestedName?.trim() || `wt-${sanitizePathSegment(session.name, 12)}`
+  const branchName =
+    requestedBranchName?.trim() ||
+    `aimux/${sanitizePathSegment(worktreeName, 40)}-${Date.now().toString(36)}`
+  const targetPath = makeWorktreePath({ repoRoot, worktreeId, worktreeName })
+
+  const existingWorktree = (await listGitWorktrees(repoRoot)).find(
+    (entry) => normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
+  )
+  if (existingWorktree) {
+    ctx.dispatch({
+      message: `Branch already checked out in another worktree: ${existingWorktree.path}`,
+      type: 'set-new-tab-branch-error',
+    })
+    return undefined
+  }
+
+  await mkdir(dirname(targetPath), { recursive: true })
+  await assertSafeAimuxWorktreePath(targetPath)
+  await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
+  const now = new Date().toISOString()
+  const sanitize = scripts?.sanitize?.trim()
+  const setup = scripts?.setup?.trim()
+  const sanitizeScript = sanitize
+    ? { command: sanitize, configuredAt: now }
+    : session.repoSanitizeScript
+  const setupScript = setup ? { command: setup, configuredAt: now } : session.repoSetupScript
+  try {
+    await runWorktreeScript(targetPath, sanitizeScript?.command)
+    await runWorktreeScript(targetPath, setupScript?.command)
+  } catch (error) {
+    ctx.dispatch({
+      message: error instanceof Error ? error.message : String(error),
+      type: 'git-mode-set-message',
+    })
+  }
+
+  const worktree: WorktreeRecord = {
+    baseRef,
+    branch: branchName,
+    commitSha: await getHeadSha(targetPath),
+    createdAt: now,
+    createdByAimux: true,
+    id: worktreeId,
+    name: worktreeName,
+    path: targetPath,
+    repoRoot,
+    sanitizeScript: sanitizeScript
+      ? { ...sanitizeScript, inheritedFromRepo: !sanitize }
+      : undefined,
+    setupScript: setupScript ? { ...setupScript, inheritedFromRepo: !setup } : undefined,
+    source: 'aimux-temp',
+    updatedAt: now,
+  }
+  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+    ...entry,
+    activeWorktreeId: worktree.id,
+    projectPath: worktree.path,
+    updatedAt: now,
+    worktrees: [...(entry.worktrees ?? []), worktree],
+  }))
+  saveSessionCatalog(sessions)
+  ctx.dispatch({ sessions, type: 'set-sessions' })
+  ctx.dispatch({ message: `created worktree ${branchName}`, type: 'git-mode-set-message' })
+  return worktree
+}
+
+async function runDeleteWorktree(
+  ctx: SideEffectContext,
+  sessionId: string,
+  worktreeId: string,
+  force: boolean
+): Promise<void> {
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
+  if (!session) throw new Error('session not found')
+  if (!worktree) throw new Error('worktree not found')
+  if ((session.worktrees?.length ?? 0) <= 1) throw new Error('at least one worktree must remain')
+  if (worktree.source === 'primary') throw new Error('root worktree cannot be deleted')
+
+  const tabsInWorktree = ctx.state.tabs.filter((tab) => tab.worktreeId === worktreeId)
+  if (tabsInWorktree.length > 0 && !force) {
+    throw new ActiveWorktreeTabsError(tabsInWorktree.length)
+  }
+  if (tabsInWorktree.length > 0) {
+    for (const tab of tabsInWorktree) {
+      ctx.clearIdleTimer(tab.id)
+      ctx.clearStartupGrace(tab.id)
+      ctx.backend.disposeSession(tab.id)
+      ctx.dispatch({ tabId: tab.id, type: 'close-tab' })
+    }
+  }
+
+  if (
+    worktree.source === 'aimux-temp' &&
+    worktree.createdByAimux &&
+    isInsideAimuxWorktreeRoot(worktree.path) &&
+    !existsSync(worktree.path)
+  ) {
+    removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
+    return
+  }
+
+  if (
+    worktree.source === 'aimux-temp' &&
+    worktree.createdByAimux &&
+    isInsideAimuxWorktreeRoot(worktree.path)
+  ) {
+    await assertSafeAimuxWorktreePath(worktree.path)
+    await removeGitWorktree({ force, repoPath: worktree.repoRoot, targetPath: worktree.path })
+  } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
+    throw new Error(`refusing unsafe worktree delete: ${worktree.path}`)
+  }
+
+  removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
+}
+
+function removeWorktreeRecordFromSession(
+  ctx: SideEffectContext,
+  sessionId: string,
+  session: NonNullable<SideEffectContext['state']['sessions'][number]>,
+  worktreeId: string
+): void {
+  const remaining = (session.worktrees ?? []).filter((entry) => entry.id !== worktreeId)
+  const nextActive =
+    session.activeWorktreeId === worktreeId ? remaining[0] : getActiveWorktree(session)
+  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+    ...entry,
+    activeWorktreeId: nextActive?.id,
+    projectPath: nextActive?.path ?? entry.projectPath,
+    updatedAt: new Date().toISOString(),
+    worktrees: remaining,
+  }))
+  saveSessionCatalog(sessions)
+  ctx.dispatch({ sessions, type: 'set-sessions' })
+  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'worktree') {
+    ctx.dispatch({
+      index: Math.min(ctx.state.modal.selectedIndex, Math.max(0, remaining.length - 1)),
+      type: 'set-modal-selection-index',
+    })
+  }
+  ctx.dispatch({ message: null, type: 'set-new-tab-worktree-delete-state' })
+}
+
+function isForceableWorktreeDeleteError(message: string): boolean {
+  return /active assistant tabs|dirty|uncommitted|modified|untracked|not clean|contains.*changes/i.test(
+    message
+  )
+}
+
+class ActiveWorktreeTabsError extends Error {
+  constructor(tabCount: number) {
+    super(
+      `active assistant tabs are using this worktree (${tabCount}). Click [del] again to close them and delete the worktree.`
+    )
+  }
+}
+
+function runWorktreeScript(cwd: string, command: string | undefined): Promise<void> {
+  if (!command?.trim()) return Promise.resolve()
+  const proc = Bun.spawn(['bash', '-lc', command], { cwd, stderr: 'pipe', stdout: 'pipe' })
+  return proc.exited.then(async (code) => {
+    if (code === 0) return
+    const stderr = await new Response(proc.stderr).text()
+    throw new Error(stderr.trim() || `worktree script failed with exit code ${code}`)
+  })
+}
+
+function handleSaveWorktreeScripts(ctx: SideEffectContext): void {
+  const modal = ctx.state.modal
+  if (modal.type !== 'worktree-scripts' || !modal.sessionTargetId) return
+  const now = new Date().toISOString()
+  const setup = (modal.activeField === 'setup' ? modal.editBuffer : modal.contentBuffer)?.trim()
+  const sanitize = (
+    modal.activeField === 'sanitize' ? modal.editBuffer : modal.contentBuffer
+  )?.trim()
+  const sessions = replaceSession(ctx.state, modal.sessionTargetId, (session) => ({
+    ...session,
+    repoSanitizeScript: sanitize ? { command: sanitize, configuredAt: now } : undefined,
+    repoSetupScript: setup ? { command: setup, configuredAt: now } : undefined,
+    updatedAt: now,
+  }))
+  saveSessionCatalog(sessions)
+  ctx.dispatch({ sessions, type: 'set-sessions' })
+  ctx.dispatch({ type: 'close-modal' })
 }
 
 function handleConfirmUpdateSelection(ctx: SideEffectContext): void {

@@ -197,8 +197,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.new-tab.command-edit', (m) =>
       m
-        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<Esc>', actions.cancelNewTabModal, 'Cancel')
         .map('<CR>', actions.launchSelectedAssistant, 'Launch')
+        .map('<C-w>', actions.toggleNewTabWorktree, 'WT')
+        .map('<C-d>', actions.deleteSelectedWorktree, 'Delete WT')
+        .map('<Tab>', actions.switchField, 'Next field')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -277,6 +280,22 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.backToSnippetPicker, 'Cancel')
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.saveSnippetEditor, 'Save')
+        .map('<C-n>', actions.moveModalSelection(1), 'Next')
+        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: worktree scripts
+    // -----------------------------------------------------------------------
+    .mode('modal.worktree-scripts', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<Tab>', actions.switchField, 'Next field')
+        .map('<CR>', actions.saveWorktreeScripts, 'Save')
+        .map('<C-y>', actions.selectScriptFile, 'Use file')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
