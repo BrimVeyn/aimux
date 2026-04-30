@@ -7,6 +7,13 @@ import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import {
+  getActiveWorktree,
+  getRenderedTabWorktreeId,
+  getSessionProjectPath,
+  getWorktreeColor,
+  orderTabsByWorktree,
+} from '../../../../state/session-worktrees'
 import { getCurrentTheme, type ResolvedTuiTheme, useTheme } from '../../../theme'
 import { buildGitPaneContextMenu } from '../../git/pane/git-pane-context-menu'
 import { GitPaneWidget } from '../../git/pane/git-pane-widget'
@@ -54,7 +61,8 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
   const currentSession = currentSessionId
     ? sessions.find((s) => s.id === currentSessionId)
     : undefined
-  const projectPath = currentSession?.projectPath
+  const activeWorktree = getActiveWorktree(currentSession)
+  const projectPath = getSessionProjectPath(currentSession)
   const branch = useSidebarBranch(projectPath)
 
   return (
@@ -65,14 +73,20 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       <text fg={t.text} selectable={false}>
         {currentSession ? currentSession.name : 'No workspace selected'}
       </text>
-      {branch ? (
+      {branch || activeWorktree ? (
         <box flexDirection="row">
           <text fg={t.text} selectable={false}>
             {'\u{e702}'}{' '}
           </text>
           <text fg={t.text} selectable={false}>
-            {branch}
+            {branch ?? activeWorktree?.branch ?? activeWorktree?.name}
           </text>
+          {activeWorktree?.source === 'aimux-temp' ? (
+            <text fg={t.textMuted} selectable={false}>
+              {' '}
+              tmp
+            </text>
+          ) : null}
         </box>
       ) : null}
       <box
@@ -123,16 +137,42 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
   const focusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
+  const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const sessions = useAppStore((s) => s.sessions)
+  const currentSession = currentSessionId
+    ? sessions.find((s) => s.id === currentSessionId)
+    : undefined
+  const worktrees = useMemo(() => currentSession?.worktrees ?? [], [currentSession?.worktrees])
+  const worktreeById = useMemo(
+    () => new Map(worktrees.map((worktree) => [worktree.id, worktree])),
+    [worktrees]
+  )
+  const groupedTabs = useMemo(() => {
+    return orderTabsByWorktree(tabs, currentSession)
+  }, [currentSession, tabs])
+  const showWorktreeSeparators = useMemo(() => {
+    const ids = new Set<string>()
+    for (const tab of groupedTabs) {
+      ids.add(getRenderedTabWorktreeId(tab, worktrees))
+    }
+    const activeWorktreeId =
+      currentSession?.activeWorktreeId ?? getActiveWorktree(currentSession)?.id
+    if (activeWorktreeId) ids.add(activeWorktreeId)
+    return ids.size >= 2
+  }, [currentSession, groupedTabs, worktrees])
 
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
-  const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId)
-  const tabGroupInfo = useMemo(() => buildTabGroupInfo(layoutTrees, tabs), [layoutTrees, tabs])
+  const activeIndex = groupedTabs.findIndex((tab) => tab.id === activeTabId)
+  const tabGroupInfo = useMemo(
+    () => buildTabGroupInfo(layoutTrees, groupedTabs),
+    [layoutTrees, groupedTabs]
+  )
 
   useSidebarAutoScroll({
     activeIndex,
     activeTabId,
     scrollRef,
-    tabCount: tabs.length,
+    tabCount: groupedTabs.length,
     visible: sidebarVisible,
   })
 
@@ -152,7 +192,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           </text>
         </box>
       ) : (
-        tabs.map((tab, index) => {
+        groupedTabs.map((tab, index) => {
           const isActive = tab.id === activeTabId
           const alternate = index % 2 === 1
           const info = tabGroupInfo.get(tab.id)
@@ -161,26 +201,46 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           const isGroupStart = info ? index === info.groupStart : false
           const isGroupEnd = info ? index === info.groupEnd : false
           const isGroupMiddle = inGroup && !isGroupStart && !isGroupEnd
+          let tabWorktree = tab.worktreeId ? worktreeById.get(tab.worktreeId) : undefined
+          if (!tabWorktree && worktrees.length > 1) {
+            tabWorktree = worktrees[0]
+          }
+          const prevTab = groupedTabs[index - 1]
+          const startsWorktreeGroup =
+            getRenderedTabWorktreeId(prevTab ?? {}, worktrees) !==
+            getRenderedTabWorktreeId(tab, worktrees)
+          const worktreeColor = tabWorktree
+            ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
+            : t.textMuted
+          const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
 
           return (
-            <box
-              key={tab.id}
-              backgroundColor={getRowBackground({ alternate, isActive, t })}
-              flexDirection="row"
-              onMouseDown={(event) => {
-                event.stopPropagation()
-                onTabActivate?.(tab.id)
-              }}
-            >
-              {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
-              <box flexGrow={1}>
-                <TabItem
-                  id={`sidebar-tab-${tab.id}`}
-                  tab={tab}
-                  active={isActive}
-                  focused={focusMode === 'navigation'}
-                  inLayout={inLayout}
-                />
+            <box key={tab.id} flexDirection="column">
+              {showWorktreeSeparators && startsWorktreeGroup ? (
+                <box flexDirection="row" paddingTop={index === 0 ? 0 : 1} paddingLeft={1}>
+                  <text fg={worktreeColor}>┃ </text>
+                  <text fg={worktreeColor}>{worktreeLabel}</text>
+                  <text fg={t.textMuted}> {'─'.repeat(12)}</text>
+                </box>
+              ) : null}
+              <box
+                backgroundColor={getRowBackground({ alternate, isActive, t })}
+                flexDirection="row"
+                onMouseDown={(event) => {
+                  event.stopPropagation()
+                  onTabActivate?.(tab.id)
+                }}
+              >
+                {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
+                <box flexGrow={1}>
+                  <TabItem
+                    id={`sidebar-tab-${tab.id}`}
+                    tab={tab}
+                    active={isActive}
+                    focused={focusMode === 'navigation'}
+                    inLayout={inLayout}
+                  />
+                </box>
               </box>
             </box>
           )

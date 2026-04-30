@@ -24,6 +24,7 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateSessionModal } from './components/modals/sessions/create-session-modal'
 import { SessionNameModal } from './components/modals/sessions/session-name-modal'
 import { SessionPickerModal } from './components/modals/sessions/session-picker-modal'
+import { WorktreeScriptsModal } from './components/modals/sessions/worktree-scripts-modal'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
@@ -89,8 +90,27 @@ function renderModal(
           customCommands={options.customCommands}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
+          currentSessionId={options.currentSessionId}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
+          activeField={modal.type === 'new-tab' ? modal.activeField : 'assistant'}
+          branchError={modal.type === 'new-tab' ? modal.branchError : null}
+          branchName={modal.type === 'new-tab' ? modal.branchName : ''}
+          createWorktree={modal.type === 'new-tab' ? modal.createWorktree : false}
+          sanitizeScript={modal.type === 'new-tab' ? modal.sanitizeScript : ''}
+          scriptResults={modal.type === 'new-tab' ? modal.scriptResults : []}
+          selectedAssistantId={modal.type === 'new-tab' ? modal.selectedAssistantId : null}
+          setupScript={modal.type === 'new-tab' ? modal.setupScript : ''}
+          step={modal.type === 'new-tab' ? modal.step : 'assistant'}
+          worktreeDeleteConfirmId={modal.type === 'new-tab' ? modal.worktreeDeleteConfirmId : null}
+          worktreeDeleteMessage={modal.type === 'new-tab' ? modal.worktreeDeleteMessage : null}
+          worktrees={
+            options.currentSessionId
+              ? (options.sessions.find((session) => session.id === options.currentSessionId)
+                  ?.worktrees ?? [])
+              : []
+          }
+          worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
         />
       )
     case 'session-picker':
@@ -186,6 +206,22 @@ function renderModal(
           model={options.autoCommitModel}
           stage={modal.stage}
           title={titleText}
+        />
+      )
+    }
+    case 'worktree-scripts': {
+      const setupScript =
+        modal.activeField === 'setup' ? (modal.editBuffer ?? '') : modal.contentBuffer
+      const sanitizeScript =
+        modal.activeField === 'sanitize' ? (modal.editBuffer ?? '') : modal.contentBuffer
+      return (
+        <WorktreeScriptsModal
+          activeField={modal.activeField}
+          cursorPos={modal.cursorPos}
+          setupScript={setupScript}
+          sanitizeScript={sanitizeScript}
+          scriptResults={modal.scriptResults}
+          selectedIndex={modal.selectedIndex}
         />
       )
     }

@@ -3,6 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState, TabSession } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
+import { getSessionProjectPath } from '../state/session-worktrees'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
@@ -62,9 +63,8 @@ export function getStatusBarModel(
     ? state.sessions.find((session) => session.id === state.currentSessionId)
     : undefined
   const sessionName = currentSession?.name ?? 'no workspace'
-  const sessionLabel = currentSession?.projectPath
-    ? `${sessionName} (${abbreviatePath(currentSession.projectPath)})`
-    : sessionName
+  const sessionPath = getSessionProjectPath(currentSession)
+  const sessionLabel = sessionPath ? `${sessionName} (${abbreviatePath(sessionPath)})` : sessionName
 
   // \u{f0b1} = nf-fa-briefcase (session icon)
   const sessionIcon = '\u{f0b1}'
@@ -148,6 +148,8 @@ function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId |
       return 'modal.session-picker.filtering'
     case 'snippet-editor':
       return 'modal.snippet-editor'
+    case 'worktree-scripts':
+      return 'modal.worktree-scripts'
     case 'snippet-picker':
       return 'modal.snippet-picker.filtering'
     default:

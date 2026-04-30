@@ -34,6 +34,7 @@ test('switch-session-by-index exits git mode when clicking the active session', 
         dispatched.push(action)
       },
       getCurrentSessionProjectPath: () => undefined,
+      getState: () => state,
       renderer: { destroy() {} } as never,
       setThemeId: () => {},
       startStartupGrace: () => {},

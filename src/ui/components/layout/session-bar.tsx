@@ -6,6 +6,7 @@ import type { SessionRecord, SessionStatus } from '../../../state/types'
 
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
+import { getActiveWorktree } from '../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../state/types'
 import { useBusySpinner } from '../../hooks/use-busy-spinner'
@@ -128,6 +129,7 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
             onMouseUp={commitDrop}
             onMouseDragEnd={cancelDrag}
             rightClickMenu={[
+              ...buildWorktreeMenu(session),
               [
                 'Rename workspace',
                 () =>
@@ -163,6 +165,45 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
       </box>
     </box>
   )
+}
+
+function buildWorktreeMenu(session: SessionRecord): Array<[string, () => void]> {
+  const items: Array<[string, () => void]> = []
+  const worktrees = session.worktrees ?? []
+  for (const worktree of worktrees) {
+    items.push([
+      `Switch: ${worktree.branch ?? worktree.name}`,
+      () =>
+        runSideEffectGlobal({
+          sessionId: session.id,
+          type: 'switch-worktree',
+          worktreeId: worktree.id,
+        }),
+    ])
+  }
+  if (items.length > 0) {
+    items.push([
+      'Fork active worktree',
+      () => runSideEffectGlobal({ sessionId: session.id, type: 'fork-worktree' }),
+    ])
+    items.push([
+      'Configure worktree scripts',
+      () => dispatchGlobal({ sessionId: session.id, type: 'open-worktree-scripts-modal' }),
+    ])
+    const active = getActiveWorktree(session)
+    if (active && worktrees.length > 1) {
+      items.push([
+        active.source === 'aimux-temp' ? 'Delete active temp worktree' : 'Remove active worktree',
+        () =>
+          runSideEffectGlobal({
+            sessionId: session.id,
+            type: 'delete-worktree',
+            worktreeId: active.id,
+          }),
+      ])
+    }
+  }
+  return items
 }
 
 function arraysEqual(a: string[], b: string[]): boolean {

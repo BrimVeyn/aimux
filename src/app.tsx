@@ -18,6 +18,7 @@ import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
+import { useScriptFileSearch } from './app-runtime/use-script-file-search'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
 import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
 import { loadConfig } from './config'
@@ -34,6 +35,7 @@ import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
+import { getSessionProjectPath } from './state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
@@ -315,6 +317,7 @@ export function App({
 
   useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
+  useScriptFileSearch(state.modal, getSessionProjectPath(currentSession), dispatch)
   useAutoCommitDriver({
     config: resolvedConfig.autoCommit,
     dispatch,
@@ -396,8 +399,9 @@ export function App({
     dispatch,
     getCurrentSessionProjectPath: () => {
       if (!state.currentSessionId) return undefined
-      return state.sessions.find((s) => s.id === state.currentSessionId)?.projectPath
+      return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
     },
+    getState: () => stateRef.current,
     renderer,
     setThemeId,
     startStartupGrace,
