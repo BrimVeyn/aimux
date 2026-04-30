@@ -22,6 +22,7 @@ export type ModeId =
   | 'modal.git-commit.generating'
   | 'modal.update-available'
   | 'modal.ai-usage'
+  | 'modal.worktree-scripts'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -66,6 +67,10 @@ export type SideEffect =
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
+  | { type: 'switch-worktree'; sessionId: string; worktreeId: string }
+  | { type: 'fork-worktree'; sessionId: string; branchName?: string; baseRef?: string }
+  | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | { type: 'save-worktree-scripts' }
   | { type: 'toggle-transparent' }
 
 export interface KeyResult {

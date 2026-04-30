@@ -11,7 +11,9 @@
     "show",
     "status",
     "printf",
-    "branch"
+    "branch",
+    "worktree",
+    "ls-files"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {

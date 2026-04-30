@@ -6,6 +6,7 @@ import type { SessionRecord } from './types'
 import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
+import { ensureSessionWorktrees } from './session-worktrees'
 import { isSessionRecord } from './validation'
 
 interface SessionCatalogFile {
@@ -46,7 +47,11 @@ export function loadSessionCatalog(): SessionRecord[] {
   const { file, issue } = readCatalogFile()
   if (file) {
     logDebug('sessions.catalog.load', { sessionCount: file.sessions.length })
-    return normalizeOrder(file.sessions)
+    const normalized = normalizeSessions(file.sessions)
+    if (JSON.stringify(normalized) !== JSON.stringify(file.sessions)) {
+      saveSessionCatalog(normalized)
+    }
+    return normalized
   }
 
   if (issue) {
@@ -69,13 +74,14 @@ export function loadSessionCatalog(): SessionRecord[] {
     workspaceSnapshot: config.workspaceSnapshot,
   }
 
-  saveSessionCatalog([migrated])
+  const normalized = normalizeSessions([migrated])
+  saveSessionCatalog(normalized)
   saveConfig({ ...config, workspaceSnapshot: undefined })
   logDebug('sessions.catalog.migrateLegacyWorkspace', {
     migratedSessionId: migrated.id,
     tabCount: migrated.workspaceSnapshot?.tabs.length ?? 0,
   })
-  return [migrated]
+  return normalized
 }
 
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
@@ -115,4 +121,8 @@ function normalizeOrder(sessions: SessionRecord[]): SessionRecord[] {
   withoutOrder.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const merged = [...withOrder, ...withoutOrder]
   return merged.map((s, i) => (s.order === i ? s : { ...s, order: i }))
+}
+
+function normalizeSessions(sessions: SessionRecord[]): SessionRecord[] {
+  return normalizeOrder(sessions).map((session) => ensureSessionWorktrees(session))
 }
