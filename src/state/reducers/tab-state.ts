@@ -12,6 +12,7 @@ import {
   splitNode,
 } from '../layout-tree'
 import { normalizeGroupedTabOrder } from '../session-persistence'
+import { orderTabsByWorktree, withActiveWorktree } from '../session-worktrees'
 import { createDefaultTerminalModes } from '../terminal-modes'
 import {
   type AppAction,
@@ -194,6 +195,25 @@ function getActiveIndex(state: AppState): number {
   return state.tabs.findIndex((tab) => tab.id === state.activeTabId)
 }
 
+function getCurrentSession(state: AppState) {
+  return state.currentSessionId
+    ? state.sessions.find((session) => session.id === state.currentSessionId)
+    : undefined
+}
+
+function withActiveTabWorktree(state: AppState, tabId: string | null): AppState {
+  if (!tabId || !state.currentSessionId) return state
+  const tab = state.tabs.find((entry) => entry.id === tabId)
+  if (!tab?.worktreeId) return state
+  const worktreeId = tab.worktreeId
+  return {
+    ...state,
+    sessions: state.sessions.map((session) =>
+      session.id === state.currentSessionId ? withActiveWorktree(session, worktreeId) : session
+    ),
+  }
+}
+
 function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
   if (indexToClose < 0 || indexToClose >= state.tabs.length) {
     return state
@@ -239,27 +259,33 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
     }
   }
 
-  return {
-    ...state,
-    activeTabId: nextActiveTabId,
-    focusMode: tabs.length === 0 ? 'navigation' : state.focusMode,
-    layoutTrees: newLayoutTrees,
-    tabGroupMap: newTabGroupMap,
-    tabs,
-  }
+  return withActiveTabWorktree(
+    {
+      ...state,
+      activeTabId: nextActiveTabId,
+      focusMode: tabs.length === 0 ? 'navigation' : state.focusMode,
+      layoutTrees: newLayoutTrees,
+      tabGroupMap: newTabGroupMap,
+      tabs,
+    },
+    nextActiveTabId
+  )
 }
 
 export function reduceTabState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
     case 'add-tab': {
       const newTab = { ...action.tab, activity: action.tab.activity ?? 'idle' }
-      return {
-        ...state,
-        activeTabId: newTab.id,
-        focusMode: 'navigation',
-        modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: null },
-        tabs: [...state.tabs, newTab],
-      }
+      return withActiveTabWorktree(
+        {
+          ...state,
+          activeTabId: newTab.id,
+          focusMode: 'navigation',
+          modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: null },
+          tabs: [...state.tabs, newTab],
+        },
+        newTab.id
+      )
     }
     case 'hydrate-workspace': {
       const hydratedActiveTabId =
@@ -296,14 +322,17 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         }
       }
 
-      return {
-        ...state,
-        activeTabId: hydratedActiveTabId,
-        focusMode: 'navigation',
-        layoutTrees: hydratedTrees,
-        tabGroupMap: hydratedGroupMap,
-        tabs: normalizeGroupedTabOrder(action.tabs, hydratedTrees, hydratedGroupMap),
-      }
+      return withActiveTabWorktree(
+        {
+          ...state,
+          activeTabId: hydratedActiveTabId,
+          focusMode: 'navigation',
+          layoutTrees: hydratedTrees,
+          tabGroupMap: hydratedGroupMap,
+          tabs: normalizeGroupedTabOrder(action.tabs, hydratedTrees, hydratedGroupMap),
+        },
+        hydratedActiveTabId
+      )
     }
     case 'close-tab':
       return closeTabAtIndex(
@@ -313,18 +342,19 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
     case 'close-active-tab':
       return closeTabAtIndex(state, getActiveIndex(state))
     case 'set-active-tab':
-      return { ...state, activeTabId: action.tabId }
+      return withActiveTabWorktree({ ...state, activeTabId: action.tabId }, action.tabId)
     case 'move-active-tab': {
       if (state.tabs.length === 0) {
         return state
       }
-      const currentIndex = state.tabs.findIndex((tab) => tab.id === state.activeTabId)
+      const orderedTabs = orderTabsByWorktree(state.tabs, getCurrentSession(state))
+      const currentIndex = orderedTabs.findIndex((tab) => tab.id === state.activeTabId)
       const safeIndex = currentIndex === -1 ? 0 : currentIndex
-      const nextIndex = (safeIndex + action.delta + state.tabs.length) % state.tabs.length
-      const nextTabId = state.tabs[nextIndex]?.id
+      const nextIndex = (safeIndex + action.delta + orderedTabs.length) % orderedTabs.length
+      const nextTabId = orderedTabs[nextIndex]?.id
       return !nextTabId || nextTabId === state.activeTabId
         ? state
-        : { ...state, activeTabId: nextTabId }
+        : withActiveTabWorktree({ ...state, activeTabId: nextTabId }, nextTabId)
     }
     case 'reorder-active-tab': {
       const activeIndex = getActiveIndex(state)
@@ -380,22 +410,25 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       return { ...state, tabs }
     }
     case 'reset-tab-session':
-      return {
-        ...state,
-        activeTabId: action.tabId,
-        focusMode: 'navigation',
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
-          ...tab,
-          activity: 'idle',
-          buffer: '',
-          errorMessage: undefined,
-          exitCode: undefined,
-          scrollIntent: DEFAULT_SCROLL_INTENT,
-          status: 'starting',
-          terminalModes: createDefaultTerminalModes(),
-          viewport: undefined,
-        })),
-      }
+      return withActiveTabWorktree(
+        {
+          ...state,
+          activeTabId: action.tabId,
+          focusMode: 'navigation',
+          tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+            ...tab,
+            activity: 'idle',
+            buffer: '',
+            errorMessage: undefined,
+            exitCode: undefined,
+            scrollIntent: DEFAULT_SCROLL_INTENT,
+            status: 'starting',
+            terminalModes: createDefaultTerminalModes(),
+            viewport: undefined,
+          })),
+        },
+        action.tabId
+      )
     case 'append-tab-buffer':
       return {
         ...state,
@@ -479,17 +512,20 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       }
       const tabs = [...state.tabs.slice(0, insertIndex), newTab, ...state.tabs.slice(insertIndex)]
 
-      return {
-        ...state,
-        activeTabId: newTab.id,
-        layoutTrees: { ...state.layoutTrees, [groupId]: newTree },
-        tabGroupMap: {
-          ...state.tabGroupMap,
-          [newTab.id]: groupId,
-          [state.activeTabId]: groupId,
+      return withActiveTabWorktree(
+        {
+          ...state,
+          activeTabId: newTab.id,
+          layoutTrees: { ...state.layoutTrees, [groupId]: newTree },
+          tabGroupMap: {
+            ...state.tabGroupMap,
+            [newTab.id]: groupId,
+            [state.activeTabId]: groupId,
+          },
+          tabs,
         },
-        tabs,
-      }
+        newTab.id
+      )
     }
     case 'close-pane': {
       const idx = state.tabs.findIndex((tab) => tab.id === action.tabId)
@@ -507,7 +543,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       if (!neighbor) {
         return state
       }
-      return { ...state, activeTabId: neighbor }
+      return withActiveTabWorktree({ ...state, activeTabId: neighbor }, neighbor)
     }
     case 'resize-pane': {
       const resizeGroupId = getGroupIdForTab(state.tabGroupMap, action.tabId)

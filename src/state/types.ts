@@ -43,6 +43,7 @@ export type ModalType =
   | 'git-commit'
   | 'update-available'
   | 'ai-usage'
+  | 'worktree-scripts'
   | null
 
 export interface TerminalSpan {
@@ -97,6 +98,7 @@ export interface PersistedTabSnapshot {
   scrollIntent?: ScrollIntent
   errorMessage?: string
   exitCode?: number
+  worktreeId?: string
 }
 
 export interface WorkspaceSnapshotV1 {
@@ -113,6 +115,31 @@ export interface WorkspaceSnapshotV1 {
   tabGroupMap?: Record<string, string>
 }
 
+export type WorktreeSource = 'primary' | 'aimux-temp' | 'external'
+
+export interface WorktreeScriptConfig {
+  command: string
+  configuredAt: string
+  inheritedFromRepo?: boolean
+}
+
+export interface WorktreeRecord {
+  id: string
+  name: string
+  path: string
+  repoRoot: string
+  branch?: string
+  baseRef?: string
+  commitSha?: string
+  source: WorktreeSource
+  createdByAimux: boolean
+  color?: string
+  setupScript?: WorktreeScriptConfig
+  sanitizeScript?: WorktreeScriptConfig
+  createdAt: string
+  updatedAt: string
+}
+
 export interface SessionRecord {
   id: string
   name: string
@@ -122,6 +149,10 @@ export interface SessionRecord {
   lastOpenedAt: string
   order?: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+  worktrees?: WorktreeRecord[]
+  activeWorktreeId?: string
+  repoSetupScript?: WorktreeScriptConfig
+  repoSanitizeScript?: WorktreeScriptConfig
 }
 
 export type SessionBarPosition = 'top' | 'bottom'
@@ -144,6 +175,7 @@ export interface TabSession {
   command: string
   errorMessage?: string
   exitCode?: number
+  worktreeId?: string
 }
 
 export interface SidebarState {
@@ -289,6 +321,25 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
+  activeField:
+    | 'assistant'
+    | 'branch-name'
+    | 'sanitize-script'
+    | 'setup-script'
+    | 'target-worktree'
+    | 'worktree-name'
+  branchError: string | null
+  branchName: string
+  createWorktree: boolean
+  sanitizeScript: string
+  scriptResults: ScriptFileResult[]
+  selectedAssistantId: AssistantId | null
+  setupScript: string
+  step: 'assistant' | 'worktree' | 'worktree-create'
+  targetWorktreeIndex: number
+  worktreeDeleteConfirmId: string | null
+  worktreeDeleteMessage: string | null
+  worktreeName: string
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -366,6 +417,17 @@ export interface ModalAIUsage extends ModalBase {
   type: 'ai-usage'
 }
 
+export interface ModalWorktreeScripts extends ModalBase {
+  type: 'worktree-scripts'
+  activeField: 'sanitize' | 'setup'
+  contentBuffer: string
+  scriptResults: ScriptFileResult[]
+}
+
+export interface ScriptFileResult {
+  path: string
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -388,6 +450,7 @@ export type ModalState =
   | ModalGitCommit
   | ModalUpdateAvailable
   | ModalAIUsage
+  | ModalWorktreeScripts
 
 export interface LayoutState {
   terminalCols: number
@@ -448,6 +511,15 @@ export interface AppState {
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
+  | { type: 'set-new-tab-branch-error'; message: string | null }
+  | {
+      type: 'set-new-tab-worktree-delete-state'
+      confirmWorktreeId?: string | null
+      message: string | null
+    }
+  | { type: 'enter-new-tab-worktree-create' }
+  | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
+  | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
@@ -464,6 +536,8 @@ export type ModalAction =
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
+  | { type: 'set-script-file-results'; results: ScriptFileResult[] }
+  | { type: 'select-script-file' }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }
   | { type: 'open-rename-tab-modal' }
@@ -475,6 +549,7 @@ export type ModalAction =
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
+  | { type: 'open-worktree-scripts-modal'; sessionId: string }
 
 // -- Session actions --
 export type SessionAction =
@@ -485,6 +560,21 @@ export type SessionAction =
   | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
   | { type: 'reorder-sessions'; orderedIds: string[] }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
+  | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
+  | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
+  | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
+  | {
+      type: 'update-worktree-record'
+      sessionId: string
+      worktreeId: string
+      patch: Partial<WorktreeRecord>
+    }
+  | {
+      type: 'set-session-repo-scripts'
+      sessionId: string
+      setupScript?: WorktreeScriptConfig
+      sanitizeScript?: WorktreeScriptConfig
+    }
 
 // -- Tab actions --
 export type TabAction =

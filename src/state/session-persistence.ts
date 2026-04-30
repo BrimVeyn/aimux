@@ -52,6 +52,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      worktreeId: tab.worktreeId,
     })),
     version: 1,
   }
@@ -80,6 +81,7 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      worktreeId: tab.worktreeId,
     }))
 }
 

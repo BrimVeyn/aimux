@@ -12,7 +12,9 @@
     "status",
     "printf",
     "branch",
-    "cat-file"
+    "cat-file",
+    "worktree",
+    "ls-files"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {

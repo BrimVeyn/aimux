@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState, WorkspaceSnapshotV1 } from '../state/types'
+import type { AppAction, LayoutState, TabSession, WorkspaceSnapshotV1 } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import {
@@ -33,6 +33,20 @@ export function resizeSnapshotPanes(
   })
 }
 
+function mergeSnapshotTabMetadata(
+  tabs: TabSession[],
+  workspaceSnapshot: WorkspaceSnapshotV1 | undefined
+): TabSession[] {
+  if (!workspaceSnapshot) return tabs
+  const persistedById = new Map(workspaceSnapshot.tabs.map((tab) => [tab.id, tab]))
+  return tabs.map((tab) => {
+    const persisted = persistedById.get(tab.id)
+    return persisted?.worktreeId && !tab.worktreeId
+      ? { ...tab, worktreeId: persisted.worktreeId }
+      : tab
+  })
+}
+
 function hydrateAttachedSession(
   dispatch: (action: AppAction) => void,
   sessionId: string,
@@ -47,7 +61,7 @@ function hydrateAttachedSession(
       layoutTree: workspaceSnapshot?.layoutTree,
       layoutTrees: workspaceSnapshot?.layoutTrees,
       tabGroupMap: workspaceSnapshot?.tabGroupMap,
-      tabs: result.tabs,
+      tabs: mergeSnapshotTabMetadata(result.tabs, workspaceSnapshot),
       type: 'hydrate-workspace',
     })
     // Dispatch the session-status snapshot *after* hydrate-workspace so

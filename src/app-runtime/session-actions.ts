@@ -5,6 +5,7 @@ import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import { saveSessionCatalog } from '../state/session-catalog'
 import { createEmptyWorkspaceSnapshot, serializeWorkspace } from '../state/session-persistence'
+import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-worktrees'
 import { buildSessionsWithCurrentSnapshot } from '../state/workspace-save'
 
 export function createSessionFromCurrentState(
@@ -18,6 +19,7 @@ export function createSessionFromCurrentState(
       ? createEmptyWorkspaceSnapshot()
       : serializeWorkspace(state)
   const session: SessionRecord = {
+    activeWorktreeId: undefined,
     createdAt: now,
     id: createPrefixedId('session'),
     lastOpenedAt: now,
@@ -25,6 +27,12 @@ export function createSessionFromCurrentState(
     projectPath,
     updatedAt: now,
     workspaceSnapshot,
+    worktrees: undefined,
+  }
+  if (projectPath) {
+    const worktree = createPrimaryWorktree(projectPath, now)
+    session.activeWorktreeId = worktree.id
+    session.worktrees = [worktree]
   }
 
   let updatedSessions = state.sessions
@@ -39,7 +47,7 @@ export function createSessionFromCurrentState(
 
   return {
     session,
-    sessions: [...updatedSessions, session],
+    sessions: [...updatedSessions, ensureSessionWorktrees(session)],
   }
 }
 

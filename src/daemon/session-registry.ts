@@ -90,6 +90,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         if (existing) {
           existing.title = persisted.title
           existing.scrollIntent = persisted.scrollIntent ?? DEFAULT_SCROLL_INTENT
+          existing.worktreeId = persisted.worktreeId
         }
       }
       if (snapshot.activeTabId && this.tabs.has(snapshot.activeTabId)) {
