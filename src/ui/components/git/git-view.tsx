@@ -11,6 +11,7 @@ import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
+import { getSessionProjectPath } from '../../../state/session-worktrees'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
@@ -121,7 +122,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const currentSession = currentSessionId
     ? sessions.find((s) => s.id === currentSessionId)
     : undefined
-  const projectPath = currentSession?.projectPath
+  const projectPath = getSessionProjectPath(currentSession)
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })

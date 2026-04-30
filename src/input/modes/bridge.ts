@@ -21,6 +21,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'snippet-picker': 'modal.snippet-picker.filtering',
   'split-picker': 'modal.split-picker',
   'theme-picker': 'modal.theme-picker.filtering',
+  'worktree-scripts': 'modal.worktree-scripts',
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {

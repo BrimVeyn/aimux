@@ -15,6 +15,7 @@ export function useRepoDiscovery(projectPath: string | undefined): void {
       dispatchGlobal({ type: 'multi-repo-clear' })
       return
     }
+    dispatchGlobal({ type: 'multi-repo-clear' })
     let cancelled = false
     void (async () => {
       const repos = await discoverRepos(projectPath, cfg.maxDepth)

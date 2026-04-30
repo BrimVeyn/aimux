@@ -18,6 +18,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.split-picker': ['navigation', 'terminal-input'],
   'modal.theme-picker.filtering': ['navigation'],
   'modal.update-available': ['navigation'],
+  'modal.worktree-scripts': ['navigation'],
   'navigation': [
     'terminal-input',
     'modal.new-tab.command-edit',
@@ -29,6 +30,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.rename-tab',
     'modal.update-available',
     'modal.ai-usage',
+    'modal.worktree-scripts',
     'git-mode',
   ],
   'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage'],

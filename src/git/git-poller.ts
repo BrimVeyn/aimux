@@ -26,7 +26,14 @@ async function collectAggregated(
 ): Promise<GitCollectResult> {
   // Historical walking (HEAD~N) is per-repo and doesn't compose; fall back to
   // the root/fallback repo when offset > 0 to preserve existing behaviour.
-  if (headOffset > 0) return collectGitStatus(fallbackCwd, { headOffset })
+  if (headOffset > 0) {
+    const result = await collectGitStatus(fallbackCwd, { headOffset })
+    if (result.kind !== 'ok') return result
+    return {
+      kind: 'ok',
+      payload: { ...result.payload, files: tagFiles(result.payload.files, fallbackCwd) },
+    }
+  }
 
   const results = await Promise.all(repos.map((r) => collectGitStatus(r.path, { headOffset: 0 })))
   const files: GitFileEntry[] = []
@@ -84,7 +91,11 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
           : await collectGitStatus(projectPath, { headOffset })
       if (cancelled) return
       if (result.kind === 'ok') {
-        dispatchGlobal({ payload: result.payload, type: 'git-refresh-success' })
+        const payload =
+          repos.length === 0
+            ? { ...result.payload, files: tagFiles(result.payload.files, projectPath) }
+            : result.payload
+        dispatchGlobal({ payload, type: 'git-refresh-success' })
         delay = BASE_INTERVAL_MS
       } else if (result.kind === 'out-of-range') {
         dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })

@@ -42,8 +42,12 @@ export interface GitTreeRows {
   visibleRows: GitTreeRow[]
 }
 
-export function gitFileKey(file: Pick<GitFileEntry, 'path' | 'section'>): string {
-  return `${file.section}:${file.path}`
+export function gitFileKey(
+  file: Pick<GitFileEntry, 'path' | 'section'> & { repoPath?: string }
+): string {
+  return file.repoPath
+    ? `${file.section}:${file.repoPath}:${file.path}`
+    : `${file.section}:${file.path}`
 }
 
 export function gitFolderKey(section: GitFileSection, folderPath: string): string {
