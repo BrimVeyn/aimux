@@ -25,21 +25,157 @@ function clampCursor(value: number, max: number): number {
   return Math.max(0, Math.min(max, value))
 }
 
+function getCurrentWorktreeCount(state: AppState): number {
+  if (!state.currentSessionId) return 0
+  return state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees?.length ?? 0
+}
+
+function getCurrentWorktreeIndex(state: AppState): number {
+  if (!state.currentSessionId) return 0
+  const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+  return Math.max(
+    0,
+    (session?.worktrees ?? []).findIndex((worktree) => worktree.id === session?.activeWorktreeId)
+  )
+}
+
+function getSelectedNewTabAssistant(state: AppState, assistantId?: string) {
+  if (assistantId) {
+    return getAllAssistantOptions(state.customCommands).find((entry) => entry.id === assistantId)
+  }
+  if (state.modal.type !== 'new-tab') return undefined
+  return filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)[
+    state.modal.selectedIndex
+  ]
+}
+
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
-    case 'open-new-tab-modal':
+    case 'open-new-tab-modal': {
+      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
+          activeField: 'assistant',
+          branchError: null,
+          branchName: '',
+          createWorktree: false,
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
+          sanitizeScript: '',
+          scriptResults: [],
+          selectedAssistantId: null,
           selectedIndex: 0,
           sessionTargetId: null,
+          setupScript: '',
+          step: 'assistant',
+          targetWorktreeIndex,
           type: 'new-tab',
+          worktreeDeleteConfirmId: null,
+          worktreeDeleteMessage: null,
+          worktreeName: '',
         },
       }
+    }
+    case 'enter-new-tab-worktree-create': {
+      if (state.modal.type !== 'new-tab') return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: 'worktree-name',
+          createWorktree: true,
+          cursorPos: state.modal.worktreeName.length,
+          selectedIndex: 0,
+          step: 'worktree-create',
+        },
+      }
+    }
+    case 'set-new-tab-worktree-delete-state': {
+      if (state.modal.type !== 'new-tab') return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          worktreeDeleteConfirmId: action.confirmWorktreeId ?? null,
+          worktreeDeleteMessage: action.message,
+        },
+      }
+    }
+    case 'set-new-tab-branch-error': {
+      if (state.modal.type !== 'new-tab') return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: 'branch-name',
+          branchError: action.message,
+          cursorPos: state.modal.branchName.length,
+        },
+      }
+    }
+    case 'select-new-tab-assistant': {
+      if (state.modal.type !== 'new-tab' || state.modal.editingCommand !== null) return state
+      const option = getSelectedNewTabAssistant(state, action.assistantId)
+      if (!option) return state
+      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
+      const worktreeCount = getCurrentWorktreeCount(state)
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: 'target-worktree',
+          branchError: null,
+          createWorktree: worktreeCount === 0,
+          cursorPos: 0,
+          selectedAssistantId: option.id,
+          selectedIndex: worktreeCount === 0 ? 0 : targetWorktreeIndex,
+          step: 'worktree',
+          targetWorktreeIndex,
+          worktreeDeleteConfirmId: null,
+          worktreeDeleteMessage: null,
+          worktreeName: state.modal.worktreeName || `wt-${option.label}`,
+        },
+      }
+    }
+    case 'toggle-new-tab-worktree': {
+      if (state.modal.type !== 'new-tab' || state.modal.editingCommand !== null) return state
+      const createWorktree = !state.modal.createWorktree
+      const option = getSelectedNewTabAssistant(state, action.assistantId)
+      const defaultName = state.modal.worktreeName || `wt-${option?.label ?? 'assistant'}`
+      const worktreeCount = getCurrentWorktreeCount(state)
+      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
+      let activeField = state.modal.activeField
+      if (createWorktree) {
+        activeField = state.modal.step === 'worktree' || option ? 'target-worktree' : activeField
+      } else if (activeField === 'worktree-name') {
+        activeField = 'target-worktree'
+      }
+      const cursorPos =
+        createWorktree && worktreeCount <= 0
+          ? defaultName.length
+          : (state.modal.editBuffer?.length ?? 0)
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField,
+          createWorktree,
+          cursorPos,
+          selectedAssistantId: option?.id ?? state.modal.selectedAssistantId,
+          selectedIndex: createWorktree
+            ? worktreeCount
+            : Math.min(state.modal.selectedIndex, Math.max(0, worktreeCount - 1)),
+          step: option && createWorktree ? 'worktree' : state.modal.step,
+          targetWorktreeIndex,
+          worktreeDeleteConfirmId: null,
+          worktreeDeleteMessage: null,
+          worktreeName: defaultName,
+        },
+      }
+    }
     case 'open-edit-custom-command': {
       if (state.modal.type !== 'new-tab') return state
       const current = state.customCommands[action.assistantId] ?? ''
@@ -64,6 +200,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           selectedIndex: 0,
           sessionTargetId: null,
           type: 'ai-usage',
+        },
+      }
+    }
+    case 'open-worktree-scripts-modal': {
+      const session = state.sessions.find((entry) => entry.id === action.sessionId)
+      const setup = session?.repoSetupScript?.command ?? ''
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          activeField: 'setup',
+          contentBuffer: session?.repoSanitizeScript?.command ?? '',
+          cursorPos: setup.length,
+          editBuffer: setup,
+          scriptResults: [],
+          selectedIndex: 0,
+          sessionTargetId: action.sessionId,
+          type: 'worktree-scripts',
         },
       }
     }
@@ -153,6 +307,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           directoryResults: action.results,
           selectedIndex: 0,
         },
+      }
+    }
+    case 'set-script-file-results': {
+      if (state.modal.type !== 'worktree-scripts' && state.modal.type !== 'new-tab') return state
+      return {
+        ...state,
+        modal: { ...state.modal, scriptResults: action.results, selectedIndex: 0 },
       }
     }
     case 'open-snippet-picker':
@@ -379,6 +540,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
+        state.modal.type !== 'worktree-scripts' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available'
       ) {
@@ -387,16 +549,36 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'create-session' && state.modal.activeField !== 'directory') {
         return state
       }
+      if (state.modal.type === 'worktree-scripts' && state.modal.scriptResults.length === 0) {
+        return state
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.step === 'worktree-create' &&
+        state.modal.activeField !== 'setup-script' &&
+        state.modal.activeField !== 'sanitize-script'
+      ) {
+        return state
+      }
       let optionCount: number
       if (state.modal.type === 'new-tab') {
-        optionCount = filterAssistants(
-          getAllAssistantOptions(state.customCommands),
-          state.modal.editBuffer
-        ).length
+        if (state.modal.step === 'worktree-create') {
+          optionCount = state.modal.scriptResults.length
+        } else if (state.modal.step === 'worktree') {
+          if (state.modal.activeField === 'worktree-name') return state
+          optionCount = getCurrentWorktreeCount(state) + 1
+        } else {
+          optionCount = filterAssistants(
+            getAllAssistantOptions(state.customCommands),
+            state.modal.editBuffer
+          ).length
+        }
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
       } else if (state.modal.type === 'create-session') {
         optionCount = state.modal.directoryResults.length
+      } else if (state.modal.type === 'worktree-scripts') {
+        optionCount = state.modal.scriptResults.length
       } else if (state.modal.type === 'snippet-picker') {
         const filtered = filterSnippets(state.snippets, state.modal.editBuffer)
         optionCount = filtered.length
@@ -416,6 +598,15 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           ...state.modal,
           selectedIndex: (state.modal.selectedIndex + action.delta + optionCount) % optionCount,
+          ...(state.modal.type === 'new-tab' && state.modal.step === 'worktree'
+            ? {
+                createWorktree:
+                  (state.modal.selectedIndex + action.delta + optionCount) % optionCount ===
+                  optionCount - 1,
+                worktreeDeleteConfirmId: null,
+                worktreeDeleteMessage: null,
+              }
+            : null),
         },
       }
     }
@@ -426,6 +617,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
+        state.modal.type !== 'worktree-scripts' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
         state.modal.type !== 'help'
@@ -436,14 +628,23 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'help') {
         optionCount = state.modal.entryCount
       } else if (state.modal.type === 'new-tab') {
-        optionCount = filterAssistants(
-          getAllAssistantOptions(state.customCommands),
-          state.modal.editBuffer
-        ).length
+        if (state.modal.step === 'worktree-create') {
+          optionCount = state.modal.scriptResults.length
+        } else {
+          optionCount =
+            state.modal.step === 'worktree'
+              ? getCurrentWorktreeCount(state) + 1
+              : filterAssistants(
+                  getAllAssistantOptions(state.customCommands),
+                  state.modal.editBuffer
+                ).length
+        }
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
       } else if (state.modal.type === 'create-session') {
         optionCount = state.modal.directoryResults.length
+      } else if (state.modal.type === 'worktree-scripts') {
+        optionCount = state.modal.scriptResults.length
       } else if (state.modal.type === 'snippet-picker') {
         optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
       } else if (state.modal.type === 'theme-picker') {
@@ -455,12 +656,49 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       if (optionCount === 0) return state
       const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
+      if (state.modal.type === 'new-tab' && state.modal.step === 'worktree') {
+        if (clamped === state.modal.selectedIndex) return state
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            createWorktree: clamped === optionCount - 1,
+            selectedIndex: clamped,
+            worktreeDeleteConfirmId: null,
+            worktreeDeleteMessage: null,
+          },
+        }
+      }
+      if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
+        if (clamped === state.modal.selectedIndex) return state
+        return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
+      }
       if (clamped === state.modal.selectedIndex) return state
       return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
     }
     case 'move-modal-cursor': {
       if (state.modal.editBuffer === null) return state
-      const len = state.modal.editBuffer.length
+      let editableValue = state.modal.editBuffer
+      if (state.modal.type === 'new-tab' && state.modal.editingCommand === null) {
+        if (state.modal.activeField === 'worktree-name') {
+          editableValue = state.modal.worktreeName
+        } else if (state.modal.activeField === 'branch-name') {
+          editableValue = state.modal.branchName
+        } else if (state.modal.activeField === 'setup-script') {
+          editableValue = state.modal.setupScript
+        } else if (state.modal.activeField === 'sanitize-script') {
+          editableValue = state.modal.sanitizeScript
+        }
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        state.modal.step === 'worktree' &&
+        state.modal.activeField === 'target-worktree'
+      ) {
+        return state
+      }
+      const len = editableValue.length
       const current = state.modal.cursorPos ?? len
       let next = current
       if (action.to === 'home') next = 0
@@ -474,7 +712,26 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.editBuffer === null) {
         return state
       }
-      const buffer = state.modal.editBuffer
+      let buffer = state.modal.editBuffer
+      if (state.modal.type === 'new-tab' && state.modal.editingCommand === null) {
+        if (state.modal.activeField === 'worktree-name') {
+          buffer = state.modal.worktreeName
+        } else if (state.modal.activeField === 'branch-name') {
+          buffer = state.modal.branchName
+        } else if (state.modal.activeField === 'setup-script') {
+          buffer = state.modal.setupScript
+        } else if (state.modal.activeField === 'sanitize-script') {
+          buffer = state.modal.sanitizeScript
+        }
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        state.modal.step === 'worktree' &&
+        state.modal.activeField === 'target-worktree'
+      ) {
+        return state
+      }
       const cursor = clampCursor(state.modal.cursorPos ?? buffer.length, buffer.length)
       let nextBuffer: string
       let nextCursor: number
@@ -487,6 +744,54 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         nextCursor = cursor + action.char.length
       }
       const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        state.modal.activeField === 'worktree-name'
+      ) {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: nextCursor,
+            worktreeName: nextBuffer,
+          },
+        }
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        state.modal.activeField === 'branch-name'
+      ) {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            branchError: null,
+            branchName: nextBuffer,
+            cursorPos: nextCursor,
+          },
+        }
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        (state.modal.activeField === 'setup-script' ||
+          state.modal.activeField === 'sanitize-script')
+      ) {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: nextCursor,
+            scriptResults: [],
+            selectedIndex: 0,
+            ...(state.modal.activeField === 'setup-script'
+              ? { setupScript: nextBuffer }
+              : { sanitizeScript: nextBuffer }),
+          },
+        }
+      }
       const resetIndex =
         !isNewTabEditing &&
         (state.modal.type === 'session-picker' ||
@@ -518,7 +823,55 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
+      if (state.modal.type === 'new-tab') {
+        if (state.modal.step === 'worktree-create') {
+          const optionCount = getCurrentWorktreeCount(state) + 1
+          return {
+            ...state,
+            modal: {
+              ...state.modal,
+              activeField: 'target-worktree',
+              branchError: null,
+              createWorktree: false,
+              cursorPos: 0,
+              selectedIndex: Math.min(
+                state.modal.targetWorktreeIndex,
+                Math.max(0, optionCount - 1)
+              ),
+              step: 'worktree',
+            },
+          }
+        }
+        if (state.modal.step === 'worktree') {
+          const selectedAssistantId = state.modal.selectedAssistantId
+          const assistants = filterAssistants(
+            getAllAssistantOptions(state.customCommands),
+            state.modal.editBuffer
+          )
+          const assistantIndex = assistants.findIndex(
+            (assistant) => assistant.id === selectedAssistantId
+          )
+          return {
+            ...state,
+            modal: {
+              ...state.modal,
+              activeField: 'assistant',
+              createWorktree: false,
+              cursorPos: state.modal.editBuffer?.length ?? 0,
+              selectedIndex: Math.max(0, assistantIndex),
+              step: 'assistant',
+              worktreeDeleteConfirmId: null,
+              worktreeDeleteMessage: null,
+            },
+          }
+        }
+        return { ...state, focusMode: 'navigation', modal: emptyModal() }
+      }
+      if (
+        state.modal.type === 'create-session' ||
+        state.modal.type === 'snippet-editor' ||
+        state.modal.type === 'worktree-scripts'
+      ) {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
       // Pickers and overlays with auto-filter — Esc closes the modal entirely.
@@ -526,7 +879,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type === 'session-picker' ||
         state.modal.type === 'snippet-picker' ||
         state.modal.type === 'theme-picker' ||
-        state.modal.type === 'new-tab' ||
         state.modal.type === 'help'
       ) {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
@@ -580,6 +932,62 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
+      if (state.modal.type === 'worktree-scripts') {
+        const nextField = state.modal.activeField === 'setup' ? 'sanitize' : 'setup'
+        const nextEdit = state.modal.contentBuffer
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            activeField: nextField,
+            contentBuffer: state.modal.editBuffer ?? '',
+            cursorPos: nextEdit.length,
+            editBuffer: nextEdit,
+            selectedIndex: 0,
+          },
+        }
+      }
+      if (state.modal.type === 'new-tab') {
+        if (state.modal.step === 'assistant') return state
+        if (state.modal.step === 'worktree-create') {
+          let nextField: typeof state.modal.activeField = 'worktree-name'
+          if (state.modal.activeField === 'worktree-name') nextField = 'branch-name'
+          else if (state.modal.activeField === 'branch-name') nextField = 'sanitize-script'
+          else if (state.modal.activeField === 'sanitize-script') nextField = 'setup-script'
+          let nextValue = state.modal.worktreeName
+          if (nextField === 'branch-name') {
+            nextValue = state.modal.branchName
+          } else if (nextField === 'setup-script') {
+            nextValue = state.modal.setupScript
+          } else if (nextField === 'sanitize-script') {
+            nextValue = state.modal.sanitizeScript
+          }
+          return {
+            ...state,
+            modal: {
+              ...state.modal,
+              activeField: nextField,
+              cursorPos: nextValue.length,
+              scriptResults: [],
+              selectedIndex: 0,
+            },
+          }
+        }
+        let nextField: typeof state.modal.activeField = 'target-worktree'
+        if (state.modal.activeField === 'target-worktree' && state.modal.createWorktree) {
+          nextField = 'worktree-name'
+        }
+        const nextValue =
+          nextField === 'worktree-name' ? state.modal.worktreeName : (state.modal.editBuffer ?? '')
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            activeField: nextField,
+            cursorPos: nextValue.length,
+          },
+        }
+      }
       return state
     }
     case 'select-directory': {
@@ -607,6 +1015,49 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
               ? (state.modal.editBuffer ?? '')
               : state.modal.nameBuffer,
           pendingProjectPath: selected.path,
+        },
+      }
+    }
+    case 'select-script-file': {
+      if (state.modal.type !== 'worktree-scripts' && state.modal.type !== 'new-tab') return state
+      const selected = state.modal.scriptResults[state.modal.selectedIndex]
+      if (!selected) return state
+      if (state.modal.type === 'new-tab') {
+        if (
+          state.modal.activeField !== 'setup-script' &&
+          state.modal.activeField !== 'sanitize-script'
+        ) {
+          return state
+        }
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: selected.path.length,
+            scriptResults: [],
+            selectedIndex: 0,
+            ...(state.modal.activeField === 'setup-script'
+              ? { setupScript: selected.path }
+              : { sanitizeScript: selected.path }),
+          },
+        }
+      }
+      if (state.modal.activeField === 'setup') {
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            cursorPos: selected.path.length,
+            editBuffer: selected.path,
+          },
+        }
+      }
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          contentBuffer: selected.path,
+          cursorPos: selected.path.length,
         },
       }
     }

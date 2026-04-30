@@ -11,11 +11,11 @@ registerAllModes(getDefaultKeymapConfig())
 
 function key(
   name: string,
-  opts: { ctrl?: boolean; shift?: boolean; sequence?: string } = {}
+  opts: { ctrl?: boolean; meta?: boolean; shift?: boolean; sequence?: string } = {}
 ): KeyInput {
   return {
     ctrl: opts.ctrl ?? false,
-    meta: false,
+    meta: opts.meta ?? false,
     name,
     sequence: opts.sequence ?? name,
     shift: opts.shift ?? false,
@@ -122,6 +122,19 @@ describe('mode handlers', () => {
     )
     expect(result.actions).toEqual([{ type: 'open-session-picker' }])
     expect(result.transition).toBe('modal.session-picker.filtering')
+  })
+
+  test('new-tab modal: Ctrl+W toggles worktree mode', () => {
+    const handler = requireValue(
+      getHandler('modal.new-tab.command-edit'),
+      'Missing new-tab handler'
+    )
+    const result = requireValue(
+      handler.handleKey(key('w', { ctrl: true }), ctx()),
+      'Expected WT result'
+    )
+
+    expect(result.actions).toEqual([{ type: 'toggle-new-tab-worktree' }])
   })
 
   test('navigation: Shift+J reorders tab', () => {
