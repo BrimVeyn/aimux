@@ -42,10 +42,10 @@
     "border-dark": "#b4b7c81f",
     "border-dark-subtle": "#b4b7c814",
 
-    "diff-added-light": "#1885541a",
-    "diff-removed-light": "#d032751a",
-    "diff-added-dark": "#77c59933",
-    "diff-removed-dark": "#fc92b433"
+    "diff-added-light": "#0895561a",
+    "diff-removed-light": "#e81a711a",
+    "diff-added-dark": "#6bd19733",
+    "diff-removed-dark": "#ff8fb333"
   },
   "theme": {
     "primary": {
@@ -141,8 +141,8 @@
       "dark": "diff-removed-dark"
     },
     "diffContextBg": {
-      "light": "neutral-050",
-      "dark": "neutral-900"
+      "light": "#fbfcfd",
+      "dark": "#1c1c2c"
     },
     "diffLineNumber": {
       "light": "neutral-600",

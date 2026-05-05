@@ -99,15 +99,15 @@
       "light": "vesperError"
     },
     "diffAddedBg": {
-      "dark": "#0d2818",
-      "light": "#e8f5e8"
+      "dark": "#092c17",
+      "light": "#e6f7e6"
     },
     "diffRemovedBg": {
-      "dark": "#281a1a",
-      "light": "#f5e8e8"
+      "dark": "#2a1818",
+      "light": "#f7e6e6"
     },
     "diffContextBg": {
-      "dark": "vesperBg",
+      "dark": "#101010",
       "light": "#F8F8F8"
     },
     "diffLineNumber": {
@@ -115,12 +115,12 @@
       "light": "#6a6a6a"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#0d2818",
-      "light": "#e8f5e8"
+      "dark": "#092c17",
+      "light": "#e6f7e6"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#281a1a",
-      "light": "#f5e8e8"
+      "dark": "#2a1818",
+      "light": "#f7e6e6"
     },
     "markdownText": {
       "dark": "vesperFg",
