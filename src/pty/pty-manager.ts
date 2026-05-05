@@ -87,11 +87,44 @@ function envInt(name: string, fallback: number): number {
 }
 
 const RENDER_COALESCE_MS = 16
-const DATA_DEBOUNCE_MS = envInt('AIMUX_RENDER_DEBOUNCE_MS', 0)
+const DATA_DEBOUNCE_MS = envInt('AIMUX_RENDER_DEBOUNCE_MS', 8)
 
 export class PtyManager extends EventEmitter<PtyManagerEvents> {
   private sessions = new Map<string, SessionHandle>()
   private pendingFlushes = new Map<string, ReturnType<typeof setTimeout>>()
+  /**
+   * When false, snapshot+emit work is suppressed because no UI client is
+   * watching. xterm.write still runs (the buffer must stay correct) — only
+   * the projection cost is gated. Re-enable triggers a full flush per session.
+   */
+  private broadcastEnabled = true
+
+  setBroadcastEnabled(enabled: boolean): void {
+    if (enabled === this.broadcastEnabled) return
+    this.broadcastEnabled = enabled
+    logDebug('ptyManager.setBroadcastEnabled', { enabled, sessions: this.sessions.size })
+    if (enabled) {
+      // Force-flush every session: lastSnapshot is stale (or unset) so the
+      // change check inside emitRenderIfChanged will fire and the daemon
+      // gets the current viewport for each tab on resume.
+      for (const session of this.sessions.values()) {
+        this.flushRenderNow(session)
+      }
+    } else {
+      // Drop pending timers — they would do snapshot work nobody is watching.
+      // Iterate values() first then clear; Map deletion during iteration is
+      // defined behaviour but capturing the timers up-front keeps it obvious.
+      for (const timer of this.pendingFlushes.values()) {
+        clearTimeout(timer)
+      }
+      this.pendingFlushes.clear()
+    }
+  }
+
+  /** True iff there's at least one live PTY session. Used by lifecycle gates. */
+  hasSessions(): boolean {
+    return this.sessions.size > 0
+  }
 
   private clearTimers(tabId: string): void {
     const flush = this.pendingFlushes.get(tabId)
@@ -102,6 +135,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
   }
 
   private scheduleRender(session: SessionHandle): void {
+    if (!this.broadcastEnabled) return
     if (this.pendingFlushes.has(session.tabId)) {
       return
     }
@@ -116,6 +150,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
   }
 
   private scheduleDataRender(session: SessionHandle): void {
+    if (!this.broadcastEnabled) return
     if (this.pendingFlushes.has(session.tabId)) {
       return
     }
@@ -139,6 +174,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
   }
 
   private emitRenderIfChanged(session: SessionHandle): void {
+    if (!this.broadcastEnabled) return
     const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible)
     const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode)
     const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot)

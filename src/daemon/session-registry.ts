@@ -208,6 +208,14 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     }
   }
 
+  setBroadcastEnabled(enabled: boolean): void {
+    this.ptyManager.setBroadcastEnabled(enabled)
+  }
+
+  hasSessions(): boolean {
+    return this.ptyManager.hasSessions()
+  }
+
   closeTab(tabId: string): void {
     logDebug('daemon.registry.closeTab', { tabId })
     this.ptyManager.disposeSession(tabId)

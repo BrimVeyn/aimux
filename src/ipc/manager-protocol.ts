@@ -15,7 +15,13 @@ import {
 } from './protocol'
 
 export const MANAGER_PROTOCOL_MIN_VERSION = 3
-export const MANAGER_PROTOCOL_VERSION = 3
+export const MANAGER_PROTOCOL_VERSION = 4
+/**
+ * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
+ * not understand the message; the daemon must check the negotiated version
+ * before sending and fall back to always-on broadcast.
+ */
+export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
 
 export interface ManagerHelloRequest {
   minVersion: number
@@ -102,6 +108,7 @@ export type ManagerRequest =
   | { id: string; type: 'closeTab'; payload: { sessionId: string; tabId: string } }
   | { id: string; type: 'disposeSession'; payload: { sessionId: string } }
   | { id: string; type: 'ping'; payload: Record<string, never> }
+  | { id: string; type: 'setBroadcastEnabled'; payload: { enabled: boolean } }
 
 export type ManagerResponse =
   | { id: string; type: 'helloResult'; payload: ManagerHelloResult }
@@ -340,6 +347,12 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(isString(value.payload.sessionId), 'disposeSession.sessionId must be a string')
       return value as ManagerRequest
     case 'ping':
+      return value as ManagerRequest
+    case 'setBroadcastEnabled':
+      assert(
+        typeof value.payload.enabled === 'boolean',
+        'setBroadcastEnabled.enabled must be a boolean'
+      )
       return value as ManagerRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
