@@ -40,8 +40,8 @@
     "warning": "#f1c21b",
     "diffGreen": "#50fa7b",
     "diffRed": "#ff6b6b",
-    "diffGreenBg": "#0f2418",
-    "diffRedBg": "#2a1216"
+    "diffGreenBg": "#0c2718",
+    "diffRedBg": "#2e0e14"
   },
   "theme": {
     "primary": {
@@ -130,15 +130,15 @@
     },
     "diffAddedBg": {
       "dark": "diffGreenBg",
-      "light": "#defbe6"
+      "light": "#daffe4"
     },
     "diffRemovedBg": {
       "dark": "diffRedBg",
       "light": "#fff1f1"
     },
     "diffContextBg": {
-      "dark": "bg1",
-      "light": "lbg1"
+      "dark": "#161616",
+      "light": "#f4f4f4"
     },
     "diffLineNumber": {
       "dark": "#808792",
@@ -146,7 +146,7 @@
     },
     "diffAddedLineNumberBg": {
       "dark": "diffGreenBg",
-      "light": "#defbe6"
+      "light": "#daffe4"
     },
     "diffRemovedLineNumberBg": {
       "dark": "diffRedBg",

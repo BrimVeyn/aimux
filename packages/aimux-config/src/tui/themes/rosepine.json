@@ -115,28 +115,28 @@
       "light": "#b4637a"
     },
     "diffAddedBg": {
-      "dark": "#1f2d3a",
-      "light": "#e5f2f3"
+      "dark": "#1b2d3e",
+      "light": "#e3f4f5"
     },
     "diffRemovedBg": {
-      "dark": "#3a1f2d",
-      "light": "#fce5e8"
+      "dark": "#3e1b2d",
+      "light": "#ffe2e6"
     },
     "diffContextBg": {
-      "dark": "surface",
-      "light": "dawnSurface"
+      "dark": "#1d1a31",
+      "light": "#fffaf3"
     },
     "diffLineNumber": {
       "dark": "#9491a6",
       "light": "#6c6875"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#1f2d3a",
-      "light": "#e5f2f3"
+      "dark": "#1b2d3e",
+      "light": "#e3f4f5"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#3a1f2d",
-      "light": "#fce5e8"
+      "dark": "#3e1b2d",
+      "light": "#ffe2e6"
     },
     "markdownText": {
       "dark": "#e0def4",

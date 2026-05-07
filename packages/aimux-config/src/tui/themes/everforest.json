@@ -122,28 +122,28 @@
       "light": "#f52a65"
     },
     "diffAddedBg": {
-      "dark": "#20303b",
-      "light": "#d5e5d5"
+      "dark": "#1c313f",
+      "light": "#d3e7d3"
     },
     "diffRemovedBg": {
-      "dark": "#37222c",
-      "light": "#f7d8db"
+      "dark": "#3a1f2c",
+      "light": "#fcd3d7"
     },
     "diffContextBg": {
-      "dark": "darkStep2",
-      "light": "lightStep2"
+      "dark": "#313c45",
+      "light": "#f3eed0"
     },
     "diffLineNumber": {
       "dark": "#a0a5a7",
       "light": "#5b5951"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#1b2b34",
-      "light": "#c5d5c5"
+      "dark": "#172c38",
+      "light": "#c3d7c3"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#2d1f26",
-      "light": "#e7c8cb"
+      "dark": "#2f1d26",
+      "light": "#ecc3c7"
     },
     "markdownText": {
       "dark": "darkStep12",

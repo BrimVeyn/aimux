@@ -102,28 +102,28 @@
       "light": "nightOwlRed"
     },
     "diffAddedBg": {
-      "dark": "#0a2e1a",
-      "light": "#0a2e1a"
+      "dark": "#053319",
+      "light": "#053319"
     },
     "diffRemovedBg": {
-      "dark": "#2d1b1b",
-      "light": "#2d1b1b"
+      "dark": "#301818",
+      "light": "#301818"
     },
     "diffContextBg": {
-      "dark": "nightOwlPanel",
-      "light": "nightOwlPanel"
+      "dark": "#042641",
+      "light": "#042641"
     },
     "diffLineNumber": {
       "dark": "#7791a6",
       "light": "#7791a6"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#0a2e1a",
-      "light": "#0a2e1a"
+      "dark": "#053319",
+      "light": "#053319"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#2d1b1b",
-      "light": "#2d1b1b"
+      "dark": "#301818",
+      "light": "#301818"
     },
     "markdownText": {
       "dark": "nightOwlFg",
