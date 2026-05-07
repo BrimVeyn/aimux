@@ -8,6 +8,13 @@ import {
 } from '../../src/ipc/manager-protocol'
 
 describe('manager protocol', () => {
+  test('rejects v3 TMs (broadcast-gate fix is breaking at v4)', () => {
+    // A pre-fix TM offers max=3, min=3. A post-fix daemon offers min=4 — they
+    // do not overlap, so handshake fails. This is intentional: the breaking
+    // update flow then fires to kill+respawn the TM at v4.
+    expect(selectManagerProtocolVersion({ maxVersion: 3, minVersion: 3 })).toBe(null)
+  })
+
   test('selects highest mutually supported version', () => {
     expect(
       selectManagerProtocolVersion({

@@ -14,14 +14,16 @@ import {
   negotiateProtocolVersion,
 } from './protocol'
 
-export const MANAGER_PROTOCOL_MIN_VERSION = 3
-export const MANAGER_PROTOCOL_VERSION = 4
 /**
- * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
- * not understand the message; the daemon must check the negotiated version
- * before sending and fall back to always-on broadcast.
+ * Bumped to 4 alongside the broadcast-gate fix. v3 TMs (e.g. zombie processes
+ * left running across an `aimux update`) can no longer handshake — that's
+ * intentional: a v4 daemon talking to a v3 TM would silently lose the perf
+ * fix. The handshake failure surfaces via the existing breaking-update flow
+ * (BreakingUpdateScreen -> stopTerminalManager -> restart), so the user gets
+ * a consent dialog before sessions are killed instead of a silent regression.
  */
-export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
+export const MANAGER_PROTOCOL_MIN_VERSION = 4
+export const MANAGER_PROTOCOL_VERSION = 4
 
 export interface ManagerHelloRequest {
   minVersion: number

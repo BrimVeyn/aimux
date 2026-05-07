@@ -59,21 +59,21 @@ export async function runUpdate(): Promise<number> {
     await runRestartDaemon()
   }
 
-  // The terminal-manager is intentionally NOT restarted here: doing so kills
-  // live AI sessions. The flip side: the running TM keeps executing the
-  // previous version's code path, so any TM-side fix (perf, lifecycle) only
-  // takes effect after a manual restart. Surface that explicitly so users
-  // aren't silently stuck on stale behaviour.
+  // The terminal-manager is intentionally NOT restarted here, since doing so
+  // kills live AI sessions. With the manager-protocol MIN bumped to 4, a v3
+  // TM (zombie from a previous install) will refuse the daemon's handshake
+  // on the next `aimux` launch — the client's probe surfaces that as a
+  // BreakingUpdateScreen, where the user explicitly consents to losing
+  // sessions before the TM is restarted. We just remind them.
   const tmPid = await findTerminalManagerPid()
   if (tmPid !== null) {
     process.stdout.write(
       [
         '',
         `Note: terminal-manager (pid ${tmPid}) is still running the previous version.`,
-        'TM-side fixes in this update apply to new TMs only — the running one',
-        'keeps its old behaviour until restarted.',
-        'Run `aimux restart-terminal-manager` when you can afford to lose your',
-        'current PTY sessions to upgrade it.',
+        'This update bumps the manager protocol — on the next `aimux` launch,',
+        'you will see a "Breaking update" prompt to restart it (which kills',
+        'any live PTY sessions). Confirm when ready.',
         '',
       ].join('\n')
     )

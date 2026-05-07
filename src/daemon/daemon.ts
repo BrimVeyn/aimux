@@ -159,7 +159,19 @@ export async function runDaemon(): Promise<void> {
   removeDaemonSocketIfExists()
 
   const manager = new TerminalManagerClient()
-  await ensureTerminalManagerReady(manager)
+  // Tolerate manager handshake failure at startup — happens when an old TM
+  // (e.g. surviving an `aimux update` because we deliberately don't restart
+  // it) advertises a manager protocol version below MIN. The daemon stays
+  // up and lets attach calls fail with a propagated error; the client's
+  // probeDaemonProtocolCompatibility then sees the error and triggers the
+  // BreakingUpdateScreen, which kills the TM and restarts the daemon.
+  try {
+    await ensureTerminalManagerReady(manager)
+  } catch (error) {
+    logDebug('daemon.start.terminalManagerUnavailable', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
 
   const sockets = new Set<Socket>()
   const attachedSessions = new Map<Socket, string>()
