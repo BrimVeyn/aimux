@@ -282,9 +282,33 @@ export async function runDaemon(): Promise<void> {
     },
   })
 
+  /**
+   * Tell the TM whether to bother snapshotting + broadcasting. Toggled on
+   * 0↔1 transitions of the client socket count: when no UI is watching, the
+   * TM can skip per-chunk viewport diff/projection work entirely. The TM
+   * flushes a fresh snapshot per session on re-enable, so reattaching gives
+   * the client a current viewport.
+   *
+   * Fire-and-forget: failure to send isn't fatal (TM will just keep its
+   * previous broadcast state, matching pre-fix behaviour).
+   */
+  const updateTmBroadcastForClientCount = (count: number): void => {
+    void manager.setBroadcastEnabled(count > 0).catch((error) => {
+      logDebug('daemon.setBroadcastEnabled.error', {
+        count,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    })
+  }
+
+  // Initial state: no clients yet, ask the TM to suspend broadcast.
+  updateTmBroadcastForClientCount(0)
+
   const server = createServer((socket) => {
     logDebug('daemon.client.connected')
+    const wasEmpty = sockets.size === 0
     sockets.add(socket)
+    if (wasEmpty) updateTmBroadcastForClientCount(sockets.size)
     const decoder = new MessageDecoder<ClientRequest>(parseClientRequest)
     // Serialize chunk processing per socket. Each async iteration crosses a
     // microtask boundary, so without chaining, concurrent `data` callbacks
@@ -540,12 +564,14 @@ export async function runDaemon(): Promise<void> {
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
+      if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
     socket.on('error', () => {
       logDebug('daemon.client.error', { sessionId: attachedSessions.get(socket) ?? null })
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
+      if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
   })
 

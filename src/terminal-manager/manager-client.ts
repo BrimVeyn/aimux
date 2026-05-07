@@ -12,6 +12,7 @@ import { getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
+  MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
   type ManagerAttachResult,
@@ -375,6 +376,30 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       id: crypto.randomUUID(),
       payload: { sessionId },
       type: 'disposeSession',
+    })
+  }
+
+  /**
+   * Tell the TM whether to bother snapshotting and broadcasting renders.
+   * No-ops on TMs that negotiated a protocol version without the feature
+   * (older builds): the worst case is the daemon keeps receiving renders it
+   * doesn't strictly need, which matches the pre-fix behaviour.
+   */
+  async setBroadcastEnabled(enabled: boolean): Promise<void> {
+    if (
+      this.selectedProtocolVersion === null ||
+      this.selectedProtocolVersion < MANAGER_PROTOCOL_BROADCAST_GATE_VERSION
+    ) {
+      logDebug('managerClient.setBroadcastEnabled.skipped', {
+        enabled,
+        selectedVersion: this.selectedProtocolVersion,
+      })
+      return
+    }
+    await this.sendExpectOk({
+      id: crypto.randomUUID(),
+      payload: { enabled },
+      type: 'setBroadcastEnabled',
     })
   }
 

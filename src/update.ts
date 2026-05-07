@@ -1,5 +1,5 @@
 import { getDaemonSocketPath } from './daemon/runtime-paths'
-import { findIpcDaemonPid } from './platform/daemon-control'
+import { findIpcDaemonPid, findTerminalManagerPid } from './platform/daemon-control'
 import { runRestartDaemon } from './restart-daemon'
 
 const REPO = 'BrimVeyn/aimux'
@@ -57,6 +57,26 @@ export async function runUpdate(): Promise<number> {
   if (pid !== null) {
     process.stdout.write(`Restarting IPC daemon at ${getDaemonSocketPath()}...\n`)
     await runRestartDaemon()
+  }
+
+  // The terminal-manager is intentionally NOT restarted here: doing so kills
+  // live AI sessions. The flip side: the running TM keeps executing the
+  // previous version's code path, so any TM-side fix (perf, lifecycle) only
+  // takes effect after a manual restart. Surface that explicitly so users
+  // aren't silently stuck on stale behaviour.
+  const tmPid = await findTerminalManagerPid()
+  if (tmPid !== null) {
+    process.stdout.write(
+      [
+        '',
+        `Note: terminal-manager (pid ${tmPid}) is still running the previous version.`,
+        'TM-side fixes in this update apply to new TMs only — the running one',
+        'keeps its old behaviour until restarted.',
+        'Run `aimux restart-terminal-manager` when you can afford to lose your',
+        'current PTY sessions to upgrade it.',
+        '',
+      ].join('\n')
+    )
   }
 
   return 0

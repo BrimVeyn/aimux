@@ -423,4 +423,124 @@ describe('PtyManager', () => {
 
     manager.disposeAll()
   })
+
+  test('setBroadcastEnabled(false) suppresses renders during streaming', async () => {
+    const manager = new PtyManager()
+    let renderCount = 0
+    manager.on('render', () => {
+      renderCount += 1
+    })
+
+    manager.setBroadcastEnabled(false)
+    expect(manager.hasSessions()).toBe(false)
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5_000)
+      manager.on('error', (_id, msg) => {
+        clearTimeout(timeout)
+        reject(new Error(msg))
+      })
+      manager.on('exit', (_id, code) => {
+        clearTimeout(timeout)
+        resolve(code)
+      })
+      manager.createSession({
+        cols: 80,
+        command: '/bin/sh',
+        cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-broadcast-off',
+      })
+      setTimeout(() => {
+        manager.write('tab-broadcast-off', "printf 'hello\\nworld\\n'; exit\r")
+      }, 50)
+    })
+
+    expect(exitCode).toBe(0)
+    expect(renderCount).toBe(0)
+    manager.disposeAll()
+  })
+
+  test('hasSessions reflects createSession / dispose lifecycle', async () => {
+    const manager = new PtyManager()
+    expect(manager.hasSessions()).toBe(false)
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5_000)
+      manager.on('error', (_id, msg) => {
+        clearTimeout(timeout)
+        reject(new Error(msg))
+      })
+      manager.on('exit', (_id, code) => {
+        clearTimeout(timeout)
+        resolve(code)
+      })
+      manager.createSession({
+        cols: 80,
+        command: '/bin/sh',
+        cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-has-sessions',
+      })
+      expect(manager.hasSessions()).toBe(true)
+      setTimeout(() => manager.write('tab-has-sessions', 'exit\r'), 50)
+    })
+
+    expect(exitCode).toBe(0)
+    // After 'exit' event, the session is removed from the registry.
+    expect(manager.hasSessions()).toBe(false)
+    manager.disposeAll()
+  })
+
+  test('re-enabling broadcast flushes a fresh viewport per active session', async () => {
+    const manager = new PtyManager()
+    const renderViewports: string[] = []
+    manager.on('render', (_id, viewport) => {
+      renderViewports.push(
+        viewport.lines.map((line) => line.spans.map((s) => s.text).join('')).join('\n')
+      )
+    })
+
+    // Disable BEFORE the session is created so no renders fire while data flows.
+    manager.setBroadcastEnabled(false)
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('timed out')), 5_000)
+      manager.on('error', (_id, msg) => {
+        clearTimeout(timeout)
+        reject(new Error(msg))
+      })
+
+      manager.createSession({
+        cols: 80,
+        command: '/bin/sh',
+        cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-flush',
+      })
+
+      // Stream some output while broadcast is off, then re-enable, then exit.
+      setTimeout(() => {
+        manager.write('tab-flush', "printf 'broadcast-off-marker'\r")
+      }, 50)
+      setTimeout(() => {
+        expect(renderViewports.length).toBe(0)
+        manager.setBroadcastEnabled(true)
+      }, 200)
+      setTimeout(() => {
+        manager.write('tab-flush', 'exit\r')
+      }, 300)
+
+      manager.on('exit', (_id, code) => {
+        clearTimeout(timeout)
+        resolve(code)
+      })
+    })
+
+    expect(exitCode).toBe(0)
+    // Re-enable should have produced at least one render carrying the marker.
+    expect(renderViewports.length).toBeGreaterThan(0)
+    expect(renderViewports.some((text) => text.includes('broadcast-off-marker'))).toBe(true)
+    manager.disposeAll()
+  })
 })

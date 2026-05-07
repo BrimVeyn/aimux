@@ -52,6 +52,49 @@ export async function runTerminalManager(): Promise<void> {
   const sockets = new Set<Socket>()
   const negotiatedVersions = new Map<Socket, number>()
 
+  /**
+   * Auto-exit when fully idle: no clients connected AND no live PTY sessions.
+   * Prevents the "zombie TM" pattern where a stale terminal-manager from an
+   * older install keeps consuming CPU after the user has closed everything.
+   * The grace window allows brief reconnects (e.g. daemon restart during
+   * `aimux update`) without killing the process.
+   *
+   * Set AIMUX_TM_IDLE_EXIT_MS=0 to disable.
+   */
+  const idleExitMs = (() => {
+    const raw = process.env.AIMUX_TM_IDLE_EXIT_MS
+    if (raw === undefined) return 60_000
+    const parsed = Number(raw)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 60_000
+  })()
+  let idleExitTimer: ReturnType<typeof setTimeout> | null = null
+  const scheduleIdleExitIfApplicable = (): void => {
+    if (idleExitMs === 0) return
+    if (idleExitTimer !== null) return
+    if (sockets.size > 0) return
+    if (sessionManager.hasAnySessions()) return
+    logDebug('terminalManager.idleExit.schedule', { idleExitMs })
+    idleExitTimer = setTimeout(() => {
+      idleExitTimer = null
+      if (sockets.size > 0 || sessionManager.hasAnySessions()) {
+        logDebug('terminalManager.idleExit.cancelled')
+        return
+      }
+      logDebug('terminalManager.idleExit.fire')
+      sessionManager.disposeAll()
+      // Graceful: drop the listening socket so the file is unlinked, matching
+      // SIGTERM/SIGINT shutdown. Bail-out timer guards against close() hanging
+      // on a bad socket.
+      server.close(() => process.exit(0))
+      setTimeout(() => process.exit(0), 1_000).unref?.()
+    }, idleExitMs)
+    idleExitTimer.unref?.()
+  }
+
+  // A session can exit naturally (PTY child finishes) while no client is
+  // attached — re-evaluate idle state in that case too.
+  sessionManager.on('exit', () => scheduleIdleExitIfApplicable())
+
   sessionManager.on('render', (sessionId, tabId, viewport, terminalModes) => {
     const event: ManagerEvent = {
       payload: { sessionId, tabId, terminalModes, viewport },
@@ -233,6 +276,11 @@ export async function runTerminalManager(): Promise<void> {
               case 'ping':
                 sendOk(socket, message.id)
                 break
+              case 'setBroadcastEnabled':
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                sessionManager.setBroadcastEnabled(message.payload.enabled)
+                sendOk(socket, message.id)
+                break
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
@@ -256,11 +304,13 @@ export async function runTerminalManager(): Promise<void> {
       logDebug('terminalManager.client.close')
       sockets.delete(socket)
       negotiatedVersions.delete(socket)
+      scheduleIdleExitIfApplicable()
     })
     socket.on('error', () => {
       logDebug('terminalManager.client.error')
       sockets.delete(socket)
       negotiatedVersions.delete(socket)
+      scheduleIdleExitIfApplicable()
     })
   })
 
@@ -270,8 +320,12 @@ export async function runTerminalManager(): Promise<void> {
   })
   tightenSocketPermissions(socketPath)
 
+  // First idle eval: if no client connects within idleExitMs of startup, exit.
+  scheduleIdleExitIfApplicable()
+
   const gracefulShutdown = (signal: string) => {
     logDebug(`terminalManager.${signal}`)
+    if (idleExitTimer) clearTimeout(idleExitTimer)
     sessionManager.disposeAll()
     server.close()
     process.exit(0)

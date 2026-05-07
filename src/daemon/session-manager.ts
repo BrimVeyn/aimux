@@ -130,6 +130,19 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     this.registries.clear()
   }
 
+  setBroadcastEnabled(enabled: boolean): void {
+    for (const registry of this.registries.values()) {
+      registry.setBroadcastEnabled(enabled)
+    }
+  }
+
+  hasAnySessions(): boolean {
+    for (const registry of this.registries.values()) {
+      if (registry.hasSessions()) return true
+    }
+    return false
+  }
+
   listSessionIds(): string[] {
     return [...this.registries.keys()]
   }
