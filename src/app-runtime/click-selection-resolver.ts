@@ -62,6 +62,19 @@ export function getViewportAnchor(event: OtuiMouseEvent): ViewportAnchor | null 
   }
 }
 
+export function computeRangeFromLineText(
+  lineText: string,
+  col: number,
+  mode: MultiClickMode
+): MultiClickRange | null {
+  if (mode === 'line') {
+    return { endCol: lineText.length, lineLength: lineText.length, startCol: 0 }
+  }
+  const word = getWordAtColumn(lineText, col)
+  if (word.text.length === 0) return null
+  return { endCol: word.endCol, lineLength: lineText.length, startCol: word.startCol }
+}
+
 export function computeMultiClickRange(
   tab: TabSession | undefined,
   row: number,
@@ -70,15 +83,7 @@ export function computeMultiClickRange(
 ): MultiClickRange | null {
   const line = tab?.viewport?.lines[row]
   if (!line) return null
-
-  const lineText = getLineText(line)
-  if (mode === 'line') {
-    return { endCol: lineText.length, lineLength: lineText.length, startCol: 0 }
-  }
-
-  const word = getWordAtColumn(lineText, col)
-  if (word.text.length === 0) return null
-  return { endCol: word.endCol, lineLength: lineText.length, startCol: word.startCol }
+  return computeRangeFromLineText(getLineText(line), col, mode)
 }
 
 export function resolveClickSelection(
