@@ -184,6 +184,28 @@ export function useMouseHandlers({
     }, AUTO_SCROLL_INTERVAL_MS)
   }
 
+  // Unmount safety: never leave a setInterval running past the hook's life.
+  useEffect(
+    () => () => {
+      const drag = multiClickDragRef.current
+      if (drag) clearAutoScroll(drag)
+      multiClickDragRef.current = null
+    },
+    []
+  )
+
+  // Abort the drag (and its auto-scroll loop) when the user switches to a
+  // different tab mid-drag: the original tab is no longer visible and we'd
+  // otherwise keep pumping scroll commands into a background buffer.
+  useEffect(() => {
+    const drag = multiClickDragRef.current
+    if (!drag) return
+    if (drag.tabId !== state.activeTabId) {
+      clearAutoScroll(drag)
+      multiClickDragRef.current = null
+    }
+  }, [state.activeTabId])
+
   // Re-extend selection and recapture viewport lines on every snapshot change
   // while a multi-click drag is in progress. This is what lets auto-scroll
   // grow the selection even when the mouse hasn't moved.
@@ -240,6 +262,14 @@ export function useMouseHandlers({
   const handleTerminalScrollEvent = (event: OtuiMouseEvent) => {
     const targetTabId = getTargetTerminalTabId(state.focusMode, state.activeTabId, true)
     if (!targetTabId || activeMouseForwardingEnabled || !activeLocalScrollbackEnabled) {
+      return
+    }
+
+    // Wheel scrolls can jump several lines at once and race with the
+    // captured-lines map, leaving gaps that produce blank rows in the final
+    // clipboard. Ignore them while a multi-click drag is being held — the
+    // dedicated auto-scroll loop is what's expected to drive the viewport.
+    if (multiClickDragRef.current) {
       return
     }
 
@@ -492,8 +522,26 @@ export function useMouseHandlers({
     const startAbs = Math.min(drag.anchorAbsRow, drag.focusAbsRow)
     const endAbs = Math.max(drag.anchorAbsRow, drag.focusAbsRow)
     const lines: TerminalLine[] = []
+    let missingRows = 0
     for (let abs = startAbs; abs <= endAbs; abs++) {
-      lines.push(drag.capturedLines.get(abs) ?? { spans: [] })
+      const line = drag.capturedLines.get(abs)
+      if (line) {
+        lines.push(line)
+      } else {
+        missingRows += 1
+        lines.push({ spans: [] })
+      }
+    }
+    if (missingRows > 0) {
+      // Snapshot coalescing (remote backend, fast scroll bursts) can let the
+      // selection cover rows we never captured. The output gets blank lines
+      // here — surface it for debugging instead of silently corrupting paste.
+      logInputDebug('multiclick.clipboardGap', {
+        endAbs,
+        missingRows,
+        startAbs,
+        totalRows: endAbs - startAbs + 1,
+      })
     }
     const anchorIdx = drag.anchorAbsRow - startAbs
     const focusIdx = drag.focusAbsRow - startAbs

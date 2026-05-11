@@ -316,7 +316,11 @@ export function RootView({
           event.stopPropagation()
         }
       }}
-      onMouseUp={() => {
+      onMouseUp={(event) => {
+        // Catch releases that land outside any TerminalPane (sidebar, gap,
+        // status bar, …) so an in-flight multi-click drag — and its
+        // auto-scroll interval — is always finalised.
+        onTerminalMouseUp?.(event)
         onSeparatorDragEnd?.()
       }}
     >
