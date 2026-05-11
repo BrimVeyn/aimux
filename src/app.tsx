@@ -323,7 +323,9 @@ export function App({
     handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
+    handleTerminalDrag,
     handleTerminalMouseEvent,
+    handleTerminalMouseUp,
     handleTerminalScrollEvent,
   } = useMouseHandlers({
     activeLocalScrollbackEnabled,
@@ -455,6 +457,8 @@ export function App({
         onTerminalMouseEvent={handleTerminalMouseEvent}
         onTerminalScrollEvent={handleTerminalScrollEvent}
         onTerminalClick={handleTerminalClick}
+        onTerminalDrag={handleTerminalDrag}
+        onTerminalMouseUp={handleTerminalMouseUp}
         onPaneActivate={handlePaneActivate}
         onSplitResize={handleSplitResize}
         onEmbeddedGitResizeStart={handleEmbeddedGitResizeStart}

@@ -22,6 +22,8 @@ interface TerminalPaneProps {
   onTerminalMouseEvent: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void
   onTerminalScrollEvent: (event: OtuiMouseEvent) => void
   onTerminalClick?: (event: OtuiMouseEvent, origin: TerminalContentOrigin, tabId?: string) => void
+  onTerminalDrag?: (event: OtuiMouseEvent, origin: TerminalContentOrigin, tabId?: string) => boolean
+  onTerminalMouseUp?: (event: OtuiMouseEvent) => boolean
   onPaneActivate?: (tabId: string) => void
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
@@ -112,7 +114,9 @@ export function TerminalPane({
   onSeparatorDrag,
   onSeparatorDragEnd,
   onTerminalClick,
+  onTerminalDrag,
   onTerminalMouseEvent,
+  onTerminalMouseUp,
   onTerminalScrollEvent,
   tab,
   tabId,
@@ -169,11 +173,20 @@ export function TerminalPane({
         y: event.y,
       })
     }
-    if (event.type === 'drag' && onSeparatorDrag?.(event)) {
-      event.preventDefault()
-      return
+    if (event.type === 'drag') {
+      if (onTerminalDrag?.(event, contentOrigin, tabId)) {
+        event.preventDefault()
+        return
+      }
+      if (onSeparatorDrag?.(event)) {
+        event.preventDefault()
+        return
+      }
     }
     if (event.type === 'up') {
+      if (onTerminalMouseUp?.(event)) {
+        event.preventDefault()
+      }
       onSeparatorDragEnd?.()
     }
     if (tabId && onPaneActivate && event.type === 'down') {

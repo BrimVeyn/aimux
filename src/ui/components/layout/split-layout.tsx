@@ -26,6 +26,8 @@ interface SplitLayoutProps {
   onTerminalMouseEvent: (event: OtuiMouseEvent, origin: TerminalContentOrigin) => void
   onTerminalScrollEvent: (event: OtuiMouseEvent) => void
   onTerminalClick?: (event: OtuiMouseEvent, origin: TerminalContentOrigin, tabId?: string) => void
+  onTerminalDrag?: (event: OtuiMouseEvent, origin: TerminalContentOrigin, tabId?: string) => boolean
+  onTerminalMouseUp?: (event: OtuiMouseEvent) => boolean
   onPaneActivate?: (tabId: string) => void
   onSplitResize?: (tabId: string, ratio: number, axis: SplitDirection) => void
   onSeparatorDragStart?: (info: {
@@ -54,7 +56,9 @@ export function SplitLayout({
   onSeparatorDragStart,
   onSplitResize,
   onTerminalClick,
+  onTerminalDrag,
   onTerminalMouseEvent,
+  onTerminalMouseUp,
   onTerminalScrollEvent,
   tabs,
 }: SplitLayoutProps) {
@@ -92,6 +96,8 @@ export function SplitLayout({
         onTerminalMouseEvent={onTerminalMouseEvent}
         onTerminalScrollEvent={onTerminalScrollEvent}
         onTerminalClick={onTerminalClick}
+        onTerminalDrag={onTerminalDrag}
+        onTerminalMouseUp={onTerminalMouseUp}
         onPaneActivate={onPaneActivate}
         onSeparatorDrag={onSeparatorDrag}
         onSeparatorDragEnd={onSeparatorDragEnd}
@@ -123,6 +129,8 @@ export function SplitLayout({
           onTerminalMouseEvent={onTerminalMouseEvent}
           onTerminalScrollEvent={onTerminalScrollEvent}
           onTerminalClick={onTerminalClick}
+          onTerminalDrag={onTerminalDrag}
+          onTerminalMouseUp={onTerminalMouseUp}
           onPaneActivate={onPaneActivate}
           onSplitResize={onSplitResize}
           onSeparatorDragStart={onSeparatorDragStart}
@@ -163,6 +171,8 @@ export function SplitLayout({
           onTerminalMouseEvent={onTerminalMouseEvent}
           onTerminalScrollEvent={onTerminalScrollEvent}
           onTerminalClick={onTerminalClick}
+          onTerminalDrag={onTerminalDrag}
+          onTerminalMouseUp={onTerminalMouseUp}
           onPaneActivate={onPaneActivate}
           onSplitResize={onSplitResize}
           onSeparatorDragStart={onSeparatorDragStart}

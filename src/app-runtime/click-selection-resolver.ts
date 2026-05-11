@@ -13,6 +13,8 @@ interface PositionedNode {
   y: number
 }
 
+export type MultiClickMode = 'word' | 'line'
+
 export interface ClickSelectionResult {
   selectedText: string
   startCol: number
@@ -20,6 +22,22 @@ export interface ClickSelectionResult {
   baseX: number
   eventY: number
   target: unknown
+  row: number
+  mode: MultiClickMode
+}
+
+export interface ViewportAnchor {
+  target: PositionedNode
+  baseX: number
+  baseY: number
+  col: number
+  row: number
+}
+
+export interface MultiClickRange {
+  startCol: number
+  endCol: number
+  lineLength: number
 }
 
 export function isPositionedNode(value: unknown): value is PositionedNode {
@@ -31,100 +49,116 @@ export function isPositionedNode(value: unknown): value is PositionedNode {
   )
 }
 
+export function getViewportAnchor(event: OtuiMouseEvent): ViewportAnchor | null {
+  if (!event.target || !isPositionedNode(event.target)) return null
+  const baseX = event.target.x
+  const baseY = event.target.y
+  return {
+    baseX,
+    baseY,
+    col: event.x - baseX,
+    row: event.y - baseY,
+    target: event.target,
+  }
+}
+
+export function computeRangeFromLineText(
+  lineText: string,
+  col: number,
+  mode: MultiClickMode
+): MultiClickRange | null {
+  if (mode === 'line') {
+    return { endCol: lineText.length, lineLength: lineText.length, startCol: 0 }
+  }
+  const word = getWordAtColumn(lineText, col)
+  if (word.text.length === 0) return null
+  return { endCol: word.endCol, lineLength: lineText.length, startCol: word.startCol }
+}
+
+export function computeMultiClickRange(
+  tab: TabSession | undefined,
+  row: number,
+  col: number,
+  mode: MultiClickMode
+): MultiClickRange | null {
+  const line = tab?.viewport?.lines[row]
+  if (!line) return null
+  return computeRangeFromLineText(getLineText(line), col, mode)
+}
+
 export function resolveClickSelection(
   event: OtuiMouseEvent,
   targetTabId: string,
   tab: TabSession | undefined,
   clickCount: number
 ): ClickSelectionResult | null {
-  if (!event.target) {
-    return null
-  }
+  const anchor = getViewportAnchor(event)
+  if (!anchor) return null
 
-  const viewportText = event.target
-  if (!isPositionedNode(viewportText)) {
-    return null
-  }
-
-  const col = event.x - viewportText.x
-  const row = event.y - viewportText.y
-  const baseX = viewportText.x
+  const mode: MultiClickMode = clickCount === 2 ? 'word' : 'line'
 
   logInputDebug('click.detect', {
     clickCount,
-    col,
+    col: anchor.col,
     eventX: event.x,
     eventY: event.y,
-    row,
-    targetId: event.target.id,
-    viewportX: viewportText.x,
-    viewportY: viewportText.y,
+    row: anchor.row,
+    targetId: anchor.target.id,
+    viewportX: anchor.baseX,
+    viewportY: anchor.baseY,
   })
 
-  if (!tab?.viewport?.lines[row]) {
+  if (!tab?.viewport?.lines[anchor.row]) {
     logInputDebug('click.noViewportLine', {
       hasViewport: !!tab?.viewport,
       lineCount: tab?.viewport?.lines.length ?? 0,
-      row,
+      row: anchor.row,
       tabFound: !!tab,
       targetTabId,
     })
     return null
   }
 
-  const line = tab.viewport.lines[row]
-  const lineText = getLineText(line)
-
-  let selectedText: string
-  let startCol: number
-  let endCol: number
-
-  if (clickCount === 2) {
-    const word = getWordAtColumn(lineText, col)
-    if (word.text.length === 0) {
+  const range = computeMultiClickRange(tab, anchor.row, anchor.col, mode)
+  if (!range) {
+    if (mode === 'word') {
+      const line = tab.viewport.lines[anchor.row]
+      const lineText = line ? getLineText(line) : ''
       logInputDebug('click.emptyWord', {
-        charAtCol: lineText[col] ?? 'OOB',
-        col,
+        charAtCol: lineText[anchor.col] ?? 'OOB',
+        col: anchor.col,
         lineText,
-        row,
+        row: anchor.row,
       })
-      return null
     }
-
-    selectedText = word.text
-    startCol = word.startCol
-    endCol = word.endCol
-  } else {
-    selectedText = lineText
-    startCol = 0
-    endCol = lineText.length
+    return null
   }
 
+  const line = tab.viewport.lines[anchor.row]
+  const lineText = line ? getLineText(line) : ''
+  const selectedText = lineText.slice(range.startCol, range.endCol)
+
   logInputDebug('click.selection', {
-    baseX,
+    baseX: anchor.baseX,
     clickCount,
-    endCol,
-    endX: baseX + endCol,
+    endCol: range.endCol,
+    endX: anchor.baseX + range.endCol,
     lineText,
+    mode,
     selectedText,
-    spanCount: line.spans.length,
-    spanStyles: line.spans.map((span) => ({
-      bold: span.bold,
-      italic: span.italic,
-      underline: span.underline,
-    })),
-    spanTexts: line.spans.map((span) => span.text),
-    startCol,
-    startX: baseX + startCol,
+    startCol: range.startCol,
+    startX: anchor.baseX + range.startCol,
     y: event.y,
   })
 
   return {
-    baseX,
-    endCol,
+    baseX: anchor.baseX,
+    endCol: range.endCol,
     eventY: event.y,
+    mode,
+    row: anchor.row,
     selectedText,
-    startCol,
-    target: event.target,
+    startCol: range.startCol,
+    target: anchor.target,
   }
 }

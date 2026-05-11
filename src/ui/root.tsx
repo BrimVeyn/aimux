@@ -206,6 +206,8 @@ interface RootViewProps {
   onTerminalMouseEvent: (event: MouseEvent, origin: TerminalContentOrigin) => void
   onTerminalScrollEvent: (event: MouseEvent) => void
   onTerminalClick?: (event: MouseEvent, origin: TerminalContentOrigin, tabId?: string) => void
+  onTerminalDrag?: (event: MouseEvent, origin: TerminalContentOrigin, tabId?: string) => boolean
+  onTerminalMouseUp?: (event: MouseEvent) => boolean
   onPaneActivate?: (tabId: string) => void
   onSplitResize?: (tabId: string, ratio: number, axis: SplitDirection) => void
   onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
@@ -244,7 +246,9 @@ export function RootView({
   onSidebarResizeStart,
   onSplitResize,
   onTerminalClick,
+  onTerminalDrag,
   onTerminalMouseEvent,
+  onTerminalMouseUp,
   onTerminalScrollEvent,
   terminalCols,
   terminalRows,
@@ -312,7 +316,11 @@ export function RootView({
           event.stopPropagation()
         }
       }}
-      onMouseUp={() => {
+      onMouseUp={(event) => {
+        // Catch releases that land outside any TerminalPane (sidebar, gap,
+        // status bar, …) so an in-flight multi-click drag — and its
+        // auto-scroll interval — is always finalised.
+        onTerminalMouseUp?.(event)
         onSeparatorDragEnd?.()
       }}
     >
@@ -349,6 +357,8 @@ export function RootView({
             onTerminalMouseEvent={onTerminalMouseEvent}
             onTerminalScrollEvent={onTerminalScrollEvent}
             onTerminalClick={onTerminalClick}
+            onTerminalDrag={onTerminalDrag}
+            onTerminalMouseUp={onTerminalMouseUp}
             onPaneActivate={onPaneActivate}
             onSplitResize={onSplitResize}
             onSeparatorDragStart={onSeparatorDragStart}
@@ -373,6 +383,8 @@ export function RootView({
             onTerminalMouseEvent={onTerminalMouseEvent}
             onTerminalScrollEvent={onTerminalScrollEvent}
             onTerminalClick={onTerminalClick}
+            onTerminalDrag={onTerminalDrag}
+            onTerminalMouseUp={onTerminalMouseUp}
             onPaneActivate={onPaneActivate}
           />
         )}
