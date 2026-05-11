@@ -265,14 +265,6 @@ export function useMouseHandlers({
       return
     }
 
-    // Wheel scrolls can jump several lines at once and race with the
-    // captured-lines map, leaving gaps that produce blank rows in the final
-    // clipboard. Ignore them while a multi-click drag is being held — the
-    // dedicated auto-scroll loop is what's expected to drive the viewport.
-    if (multiClickDragRef.current) {
-      return
-    }
-
     const delta = getScrollViewportDelta(event)
     if (delta === null) {
       return
