@@ -9,10 +9,14 @@ import type { AppAction, AppState, TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { MultiClickDetector } from '../input/multi-click-detector'
+import { extractStreamText } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
 import {
   type ClickSelectionResult,
+  computeMultiClickRange,
+  getViewportAnchor,
   isPositionedNode,
+  type MultiClickMode,
   resolveClickSelection,
 } from './click-selection-resolver'
 import { requestRenderUpTree } from './render-invalidation'
@@ -31,6 +35,21 @@ type ResizeDragState =
   | ({ initialWidth: number; kind: 'sidebar' } & AxisDragState)
   | ({ initialWidth: number; kind: 'git-pane'; side: 'left' | 'right' } & AxisDragState)
   | ({ kind: 'embedded-git'; position: 'top' | 'bottom' } & AnchoredRatioDragState)
+
+interface MultiClickDragState {
+  mode: MultiClickMode
+  tabId: string
+  target: unknown
+  baseX: number
+  baseY: number
+  anchorRow: number
+  anchorStartCol: number
+  anchorEndCol: number
+  // Tracks the last extended (focus) row/col so mouseUp can build the final
+  // clipboard text without re-querying the pointer.
+  focusRow: number
+  focusCol: number
+}
 
 interface UseMouseHandlersOptions {
   state: AppState
@@ -60,14 +79,16 @@ function getTargetTerminalTabId(
   return activeTabId
 }
 
-function applyResolvedSelection(
+function applyMultiClickSelection(
   renderer: UseMouseHandlersOptions['renderer'],
   selection: ClickSelectionResult
 ): void {
   renderer.clearSelection()
   renderer.startSelection(selection.target, selection.baseX + selection.startCol, selection.eventY)
+  // finishDragging:false keeps the renderer in drag mode so subsequent
+  // mouse-drag events can extend the selection through our drag handler.
   renderer.updateSelection(selection.target, selection.baseX + selection.endCol, selection.eventY, {
-    finishDragging: true,
+    finishDragging: false,
   })
   requestRenderUpTree(selection.target)
   copyToSystemClipboard(selection.selectedText)
@@ -83,6 +104,11 @@ export function useMouseHandlers({
 }: UseMouseHandlersOptions) {
   const separatorDragRef = useRef<ResizeDragState | null>(null)
   const multiClickRef = useRef(new MultiClickDetector())
+  const multiClickDragRef = useRef<MultiClickDragState | null>(null)
+  // State is captured by reference in the React closure; we need a ref so
+  // drag/up handlers see the freshest tab viewport for clipboard extraction.
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const handleTerminalMouseEvent = (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
     const targetTabId = getTargetTerminalTabId(
@@ -237,6 +263,9 @@ export function useMouseHandlers({
 
     const clickCount = multiClickRef.current.track(event.x, event.y)
     if (clickCount < MIN_MULTI_CLICK_SELECTION_COUNT) {
+      // Single-click: clear any stale multi-click drag state so a fresh
+      // char-level drag from opentui's default handler isn't extended by us.
+      multiClickDragRef.current = null
       return
     }
 
@@ -247,12 +276,104 @@ export function useMouseHandlers({
     }
 
     event.preventDefault()
-    applyResolvedSelection(renderer, selection)
+    applyMultiClickSelection(renderer, selection)
+
+    const anchor = getViewportAnchor(event)
+    if (anchor) {
+      multiClickDragRef.current = {
+        anchorEndCol: selection.endCol,
+        anchorRow: selection.row,
+        anchorStartCol: selection.startCol,
+        baseX: anchor.baseX,
+        baseY: anchor.baseY,
+        focusCol: selection.endCol,
+        focusRow: selection.row,
+        mode: selection.mode,
+        tabId: targetTabId,
+        target: selection.target,
+      }
+    }
 
     logInputDebug('click.done', {
       hasSelection: !!renderer.hasSelection,
+      mode: selection.mode,
       targetSelectable: isPositionedNode(event.target) ? !!event.target.selectable : false,
     })
+  }
+
+  const handleTerminalDrag = (
+    event: OtuiMouseEvent,
+    _origin: TerminalContentOrigin,
+    _tabId?: string
+  ): boolean => {
+    const drag = multiClickDragRef.current
+    if (!drag) return false
+
+    const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
+    if (!tab?.viewport) return true
+
+    // Use the anchor's target/origin so dragging across pane boundaries
+    // doesn't snap the selection to a different viewport.
+    const dragCol = event.x - drag.baseX
+    const rawRow = event.y - drag.baseY
+    const maxRow = Math.max(0, tab.viewport.lines.length - 1)
+    const dragRow = Math.max(0, Math.min(maxRow, rawRow))
+
+    const focusRange = computeMultiClickRange(tab, dragRow, dragCol, drag.mode)
+    // Word mode on whitespace: fall back to the exact column so the selection
+    // still extends to the cursor instead of getting stuck on the last word.
+    const focusStart = focusRange?.startCol ?? Math.max(0, dragCol)
+    const focusEnd = focusRange?.endCol ?? Math.max(0, dragCol)
+
+    const isForward =
+      dragRow > drag.anchorRow || (dragRow === drag.anchorRow && focusEnd >= drag.anchorEndCol)
+
+    const anchorCol = isForward ? drag.anchorStartCol : drag.anchorEndCol
+    const focusCol = isForward ? focusEnd : focusStart
+
+    drag.focusRow = dragRow
+    drag.focusCol = focusCol
+
+    renderer.startSelection(drag.target, drag.baseX + anchorCol, drag.baseY + drag.anchorRow)
+    renderer.updateSelection(drag.target, drag.baseX + focusCol, drag.baseY + dragRow, {
+      finishDragging: false,
+    })
+    requestRenderUpTree(drag.target)
+
+    return true
+  }
+
+  const handleTerminalMouseUp = (_event: OtuiMouseEvent): boolean => {
+    const drag = multiClickDragRef.current
+    if (!drag) return false
+
+    const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
+    const isForward =
+      drag.focusRow > drag.anchorRow ||
+      (drag.focusRow === drag.anchorRow && drag.focusCol >= drag.anchorEndCol)
+
+    const anchorCol = isForward ? drag.anchorStartCol : drag.anchorEndCol
+
+    renderer.updateSelection(drag.target, drag.baseX + drag.focusCol, drag.baseY + drag.focusRow, {
+      finishDragging: true,
+    })
+    requestRenderUpTree(drag.target)
+
+    if (tab?.viewport?.lines.length) {
+      const text = extractStreamText(
+        tab.viewport.lines,
+        drag.anchorRow,
+        anchorCol,
+        drag.focusRow,
+        drag.focusCol
+      )
+      if (text.length > 0) {
+        copyToSystemClipboard(text)
+      }
+    }
+
+    multiClickDragRef.current = null
+    return true
   }
 
   return {
@@ -265,7 +386,9 @@ export function useMouseHandlers({
     handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
+    handleTerminalDrag,
     handleTerminalMouseEvent,
+    handleTerminalMouseUp,
     handleTerminalScrollEvent,
   }
 }
