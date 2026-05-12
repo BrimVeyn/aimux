@@ -32,7 +32,7 @@ import { startAIUsageService } from './services/ai-usage/provider'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
-import { loadSessionCatalog } from './state/session-catalog'
+import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
 import { loadSnippetCatalog } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
@@ -134,11 +134,12 @@ export function App({
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }
 
+    const sessionCatalog = loadSessionCatalog()
     const initial = createInitialState(
       json.customCommands,
-      loadSessionCatalog(),
+      sessionCatalog,
       loadSnippetCatalog(),
-      true,
+      sessionCatalog.length === 0,
       {
         gitPane: gitPaneOverrides,
         sessionBarPosition,
@@ -149,6 +150,14 @@ export function App({
     // Replace the module-level default with the fully-resolved initial state.
     // Preserves the dispatch baked into the store by app-store.ts.
     appStore.setState(initial)
+    const mostRecent = findMostRecentSession(sessionCatalog)
+    if (mostRecent) {
+      appStore.getState().dispatch({
+        sessionId: mostRecent.id,
+        type: 'load-session',
+        workspaceSnapshot: mostRecent.workspaceSnapshot,
+      })
+    }
     return null
   })
 

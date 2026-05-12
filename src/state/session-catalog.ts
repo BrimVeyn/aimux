@@ -96,6 +96,16 @@ export function getSessionCatalogPath(): string {
   return SESSIONS_PATH
 }
 
+export function findMostRecentSession(sessions: SessionRecord[]): SessionRecord | undefined {
+  let best: SessionRecord | undefined
+  for (const candidate of sessions) {
+    if (!best || candidate.lastOpenedAt.localeCompare(best.lastOpenedAt) > 0) {
+      best = candidate
+    }
+  }
+  return best
+}
+
 /**
  * Assign a stable `order` to every session. Records with an existing numeric
  * `order` keep their slot (sorted ascending); the rest are appended by
