@@ -36,6 +36,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
   return {
     autoCommit,
     backends: userConfig.backends ?? {},
+    externalEditor: userConfig.externalEditor ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
     keymaps,

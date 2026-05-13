@@ -102,6 +102,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('d', actions.gitDestructiveSelected, 'Unstage/delete')
         .map('D', actions.gitUnstageAll, 'Unstage all')
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
+        .map('o', actions.openSelectedGitFileInEditor, 'Open in editor')
         .map('c', actions.gitCommitOpen, 'Commit')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')

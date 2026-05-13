@@ -635,6 +635,12 @@ export const gitPush: ActionFn = (ctx: ModeContext) => {
   return r(clearPendingDelete(ctx), [{ type: 'git-push' }])
 }
 
+export const openSelectedGitFileInEditor: ActionFn = (ctx: ModeContext) => {
+  const file = selectedGitFile(ctx)
+  if (!file) return r([])
+  return r([], [{ path: file.path, type: 'open-file-in-editor' }])
+}
+
 // ---------------------------------------------------------------------------
 // Modal: git-commit
 // ---------------------------------------------------------------------------
