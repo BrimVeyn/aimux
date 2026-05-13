@@ -767,9 +767,9 @@ async function openEditorInline(
   cwd: string
 ): Promise<void> {
   const { renderer } = ctx
-  renderer.suspend()
-  renderer.currentRenderBuffer.clear()
   try {
+    renderer.suspend()
+    renderer.currentRenderBuffer.clear()
     const proc = Bun.spawn([executable, ...args], {
       cwd,
       stderr: 'inherit',
