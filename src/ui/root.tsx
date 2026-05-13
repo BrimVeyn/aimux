@@ -271,6 +271,17 @@ export function RootView({
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
   const gitPanePosition = useAppStore((s) => s.gitPane.position)
   const gitPaneRatio = useAppStore((s) => s.gitPane.paneRatio)
+  const sidebarWidth = useAppStore((s) => s.sidebar.width)
+  const sidebarVisible = useAppStore((s) => s.sidebar.visible)
+
+  const gitPaneInPaneOnLeft = gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left'
+  const handleTerminalLeftEdgeMouseDown =
+    sidebarVisible && !gitPaneInPaneOnLeft && onSidebarResizeStart
+      ? (event: MouseEvent) => {
+          onSidebarResizeStart({ initialWidth: sidebarWidth, screenStart: event.x })
+          return true
+        }
+      : undefined
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
   const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
@@ -331,7 +342,6 @@ export function RootView({
           onEmbeddedGitResizeStart={onEmbeddedGitResizeStart}
           onResizeDrag={onSeparatorDrag}
           onResizeDragEnd={onSeparatorDragEnd}
-          onSidebarResizeStart={onSidebarResizeStart}
         />
         {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
           <GitPaneInPaneMode
@@ -364,6 +374,7 @@ export function RootView({
             onSeparatorDragStart={onSeparatorDragStart}
             onSeparatorDrag={onSeparatorDrag}
             onSeparatorDragEnd={onSeparatorDragEnd}
+            onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
             bounds={{
               cols: terminalCols + splitChrome,
               rows: terminalRows + splitChrome,
@@ -386,6 +397,7 @@ export function RootView({
             onTerminalDrag={onTerminalDrag}
             onTerminalMouseUp={onTerminalMouseUp}
             onPaneActivate={onPaneActivate}
+            onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
           />
         )}
         {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (

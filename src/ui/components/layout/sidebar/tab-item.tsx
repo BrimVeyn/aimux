@@ -49,22 +49,38 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
 function BusyIndicator() {
   const t = useTheme()
   const frame = useBusySpinner()
-  return <text fg={t.primary}>{frame} working</text>
+  return (
+    <text fg={t.primary} selectable={false}>
+      {frame} working
+    </text>
+  )
 }
 
 function WaitingIndicator() {
   const t = useTheme()
-  return <text fg={t.warning}>? waiting</text>
+  return (
+    <text fg={t.warning} selectable={false}>
+      ? waiting
+    </text>
+  )
 }
 
 function ActivityIndicator({ tab }: { tab: TabSession }) {
   const t = useTheme()
   if (tab.status === 'error') {
-    return <text fg={t.error}>✗ error</text>
+    return (
+      <text fg={t.error} selectable={false}>
+        ✗ error
+      </text>
+    )
   }
 
   if (tab.status === 'disconnected') {
-    return <text fg={t.warning}>⏸ restore</text>
+    return (
+      <text fg={t.warning} selectable={false}>
+        ⏸ restore
+      </text>
+    )
   }
 
   if (tab.activity === 'working') {
@@ -76,10 +92,18 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   }
 
   if (tab.activity === 'idle') {
-    return <text fg={t.success}>● idle</text>
+    return (
+      <text fg={t.success} selectable={false}>
+        ● idle
+      </text>
+    )
   }
 
-  return <text fg={getStatusColor(tab.status)}>{tab.status}</text>
+  return (
+    <text fg={getStatusColor(tab.status)} selectable={false}>
+      {tab.status}
+    </text>
+  )
 }
 
 export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
@@ -133,9 +157,13 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
       onMouseOut={() => setHovered(false)}
     >
       <box flexDirection="row" alignItems="center">
-        <text fg={indicatorColor}>{indicator} </text>
+        <text fg={indicatorColor} selectable={false}>
+          {indicator}{' '}
+        </text>
         <box flexGrow={1}>
-          <text fg={active ? t.text : t.textMuted}>{tab.title}</text>
+          <text fg={active ? t.text : t.textMuted} selectable={false}>
+            {tab.title}
+          </text>
         </box>
         {hovered ? (
           <box
@@ -145,12 +173,17 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
               runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
             }}
           >
-            <text fg={t.textMuted}>×</text>
+            <text fg={t.textMuted} selectable={false}>
+              ×
+            </text>
           </box>
         ) : null}
       </box>
       <box flexDirection="row">
-        <text fg={t.textMuted}> {label} </text>
+        <text fg={t.textMuted} selectable={false}>
+          {' '}
+          {label}{' '}
+        </text>
         <ActivityIndicator tab={tab} />
       </box>
     </ContextMenuBox>

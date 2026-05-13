@@ -108,7 +108,7 @@ function renderFileLabel(
   const showDir = fileListMode === 'flat' && pathConfig.enabled && dir
   if (!file.renamedFrom) {
     return (
-      <text wrapMode="none">
+      <text selectable={false} wrapMode="none">
         <span fg={t.text}>{basename}</span>
         {showDir ? <span fg={t.textMuted}> {dir}</span> : null}
       </text>
@@ -118,7 +118,7 @@ function renderFileLabel(
   const renamed = splitPath(renamedDisplay)
   const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
-    <text wrapMode="none">
+    <text selectable={false} wrapMode="none">
       <span fg={t.textMuted}>{renamed.basename}</span>
       {showDir && renamedDir ? <span fg={t.textMuted}> {renamedDir}</span> : null}
       <span fg={t.textMuted}> → </span>
@@ -140,18 +140,23 @@ function renderDiffCount(
   const t = getCurrentTheme()
   if (!hasNumstat) {
     return (
-      <text fg={t.textMuted} bg={bg} flexShrink={0}>
+      <text selectable={false} fg={t.textMuted} bg={bg} flexShrink={0}>
         —
       </text>
     )
   }
   return (
     <box flexDirection="row" flexShrink={0}>
-      <text fg={getCurrentTheme().diffAdded} bg={bg}>{`+${padRight(file.added, addedW)}`}</text>
-      <text fg={t.textMuted} bg={bg}>
+      <text
+        selectable={false}
+        fg={getCurrentTheme().diffAdded}
+        bg={bg}
+      >{`+${padRight(file.added, addedW)}`}</text>
+      <text selectable={false} fg={t.textMuted} bg={bg}>
         {' '}
       </text>
       <text
+        selectable={false}
         fg={getCurrentTheme().diffRemoved}
         bg={bg}
       >{`−${padRight(file.removed, removedW)}`}</text>
@@ -172,13 +177,13 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
-          <text fg={t.textMuted} bg={bg}>
+          <text selectable={false} fg={t.textMuted} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text fg={getCurrentTheme().textMuted} bg={bg}>
+          <text selectable={false} fg={getCurrentTheme().textMuted} bg={bg}>
             {row.isCollapsed ? '\uf07b' : '\uf07c'}
           </text>
-          <text fg={t.textMuted} bg={bg} wrapMode="none">
+          <text selectable={false} fg={t.textMuted} bg={bg} wrapMode="none">
             {row.name}
           </text>
         </box>
@@ -210,13 +215,13 @@ function renderFileRow(
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
-        <text fg={statusColor(file.status)} bg={bg}>
+        <text selectable={false} fg={statusColor(file.status)} bg={bg}>
           <strong>{displayStatus(file)}</strong>
         </text>
       </box>
       {repoTag ? (
         <box flexShrink={0}>
-          <text fg={getCurrentTheme().primary} bg={bg}>
+          <text selectable={false} fg={getCurrentTheme().primary} bg={bg}>
             <strong>{repoTag}</strong>
           </text>
         </box>
@@ -254,16 +259,22 @@ function renderTreeSection(
   return (
     <box key={section} flexDirection="column" marginTop={marginTop}>
       <box flexDirection="row" justifyContent="space-between">
-        <text fg={t2.text}>
+        <text selectable={false} fg={t2.text}>
           <strong>
             {title} ({files.length})
           </strong>
         </text>
         {showListModeToggle ? (
           <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
-            <text fg={fileListMode === 'tree' ? t2.primary : t2.textMuted}>tree</text>
-            <text fg={t2.textMuted}>|</text>
-            <text fg={fileListMode === 'flat' ? t2.primary : t2.textMuted}>flat</text>
+            <text selectable={false} fg={fileListMode === 'tree' ? t2.primary : t2.textMuted}>
+              tree
+            </text>
+            <text selectable={false} fg={t2.textMuted}>
+              |
+            </text>
+            <text selectable={false} fg={fileListMode === 'flat' ? t2.primary : t2.textMuted}>
+              flat
+            </text>
           </box>
         ) : null}
       </box>
@@ -295,7 +306,9 @@ function renderStatus(gitPanel: GitPanelState, hasProjectPath: boolean): ReactNo
   if (!placeholder) return null
   return (
     <box flexGrow={1} flexDirection="column" alignItems="center" paddingTop={1}>
-      <text fg={placeholder.labelColor}>{placeholder.label}</text>
+      <text selectable={false} fg={placeholder.labelColor}>
+        {placeholder.label}
+      </text>
     </box>
   )
 }
@@ -370,7 +383,7 @@ export const GitPanel = memo(function GitPanel({
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden" gap={0}>
       {hasRemoteTracking ? (
-        <text fg={t.textMuted}>
+        <text selectable={false} fg={t.textMuted}>
           ↑{gitPanel.ahead} ↓{gitPanel.behind}
         </text>
       ) : null}

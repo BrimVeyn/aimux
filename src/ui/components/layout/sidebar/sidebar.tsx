@@ -20,7 +20,6 @@ interface SidebarProps {
   onTabActivate?: (tabId: string) => void
   onResizeDrag?: (event: OtuiMouseEvent) => boolean
   onResizeDragEnd?: () => void
-  onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
   onEmbeddedGitResizeStart?: (info: {
     containerStart: number
     position: 'top' | 'bottom'
@@ -32,7 +31,7 @@ const GUTTER_START = '╭'
 const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
-const RESIZE_HANDLE = '│'
+const RESIZE_HANDLE = '─'
 
 function getRowBackground({
   alternate,
@@ -60,14 +59,20 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
-      <text fg={t.text}>
+      <text fg={t.text} selectable={false}>
         <strong>aimux</strong>
       </text>
-      <text fg={t.text}>{currentSession ? currentSession.name : 'No workspace selected'}</text>
+      <text fg={t.text} selectable={false}>
+        {currentSession ? currentSession.name : 'No workspace selected'}
+      </text>
       {branch ? (
         <box flexDirection="row">
-          <text fg={t.text}>{'\u{e702}'} </text>
-          <text fg={t.text}>{branch}</text>
+          <text fg={t.text} selectable={false}>
+            {'\u{e702}'}{' '}
+          </text>
+          <text fg={t.text} selectable={false}>
+            {branch}
+          </text>
         </box>
       ) : null}
       <box
@@ -81,9 +86,13 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
           dispatchGlobal({ type: 'open-new-tab-modal' })
         }}
       >
-        <text fg={t.text}>+ New assistant</text>
+        <text fg={t.text} selectable={false}>
+          + New assistant
+        </text>
       </box>
-      <text fg={t.textMuted}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
+      <text fg={t.textMuted} selectable={false}>
+        {'·'.repeat(Math.max(0, contentWidth - 2))}
+      </text>
     </box>
   )
 })
@@ -92,11 +101,13 @@ function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGrou
   const t = getCurrentTheme()
   return (
     <box flexDirection="column" width={1} overflow="hidden">
-      <text fg={t.border}>
+      <text fg={t.border} selectable={false}>
         {/* oxlint-disable-next-line no-nested-ternary */}
         {isGroupStart ? GUTTER_START : isGroupMiddle ? GUTTER_MIDDLE : GUTTER_PAD}
       </text>
-      <text fg={t.border}>{isGroupEnd ? GUTTER_END : GUTTER_PAD}</text>
+      <text fg={t.border} selectable={false}>
+        {isGroupEnd ? GUTTER_END : GUTTER_PAD}
+      </text>
     </box>
   )
 }
@@ -136,7 +147,9 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
-          <text fg={t.textMuted}>No tabs yet. Press Ctrl+n.</text>
+          <text fg={t.textMuted} selectable={false}>
+            No tabs yet. Press Ctrl+n.
+          </text>
         </box>
       ) : (
         tabs.map((tab, index) => {
@@ -181,7 +194,6 @@ export function Sidebar({
   onEmbeddedGitResizeStart,
   onResizeDrag,
   onResizeDragEnd,
-  onSidebarResizeStart,
   onTabActivate,
 }: SidebarProps) {
   const t = useTheme()
@@ -213,7 +225,11 @@ export function Sidebar({
   const tabsGrow = gitEmbedded ? Math.max(1, Math.round((1 - gitPane.embeddedRatio) * 100)) : 1
   const gitGrow = gitEmbedded ? Math.max(1, Math.round(gitPane.embeddedRatio * 100)) : 0
 
-  const separator = <text fg={t.textMuted}>{'·'.repeat(Math.max(0, contentWidth - 2))}</text>
+  const separator = (
+    <text fg={t.textMuted} selectable={false}>
+      {'·'.repeat(Math.max(0, contentWidth - 2))}
+    </text>
+  )
   const gitBody = gitEmbedded ? (
     <ContextMenuBox
       flexDirection="column"
@@ -230,7 +246,6 @@ export function Sidebar({
     <box
       minHeight={1}
       flexShrink={0}
-      backgroundColor={t.border}
       onMouseDown={(event) => {
         const body = bodyRef.current
         if (!body) return
@@ -243,7 +258,9 @@ export function Sidebar({
         })
       }}
     >
-      <text fg={t.border}>{RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}</text>
+      <text fg={t.border} selectable={false}>
+        {RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}
+      </text>
     </box>
   ) : null
 
@@ -309,17 +326,6 @@ export function Sidebar({
           </box>
           {!gitEmbedded ? separator : null}
         </box>
-        <box
-          height="100%"
-          width={1}
-          flexShrink={0}
-          backgroundColor={t.border}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onSidebarResizeStart?.({ initialWidth: sidebarWidth, screenStart: event.x })
-          }}
-        />
       </box>
     </ContextMenuBox>
   )

@@ -27,6 +27,7 @@ interface TerminalPaneProps {
   onPaneActivate?: (tabId: string) => void
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
+  onLeftEdgeMouseDown?: (event: OtuiMouseEvent) => boolean
 }
 
 function getTitle(
@@ -110,6 +111,7 @@ export function TerminalPane({
   isActive,
   localScrollbackEnabled,
   mouseForwardingEnabled,
+  onLeftEdgeMouseDown,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
@@ -155,11 +157,37 @@ export function TerminalPane({
         ],
       ]
     : undefined
+  const isOnPaneBorder = (event: OtuiMouseEvent) =>
+    event.x === contentOrigin.x - 1 ||
+    event.x === contentOrigin.x + contentOrigin.cols ||
+    event.y === contentOrigin.y - 1 ||
+    event.y === contentOrigin.y + contentOrigin.rows
   const forwardMouseEvent = (event: OtuiMouseEvent) => {
     if (event.type === 'down' && event.button === 2 && rightClickMenu) {
       event.preventDefault()
       event.stopPropagation()
       openContextMenu(event.x, event.y, rightClickMenu)
+      return
+    }
+    if (
+      event.type === 'down' &&
+      event.button === 0 &&
+      onLeftEdgeMouseDown &&
+      event.x === contentOrigin.x - 1
+    ) {
+      if (onLeftEdgeMouseDown(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        return
+      }
+    }
+    // Absorb left-button clicks on pane borders — they should not focus the
+    // pane or be forwarded to the terminal. This keeps borders available for
+    // resize actions (split separators, sidebar edge) without conflicting
+    // with focus-on-click behavior in the content area.
+    if (event.type === 'down' && event.button === 0 && isOnPaneBorder(event)) {
+      event.preventDefault()
+      event.stopPropagation()
       return
     }
     if (event.type === 'down') {
