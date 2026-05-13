@@ -12,6 +12,8 @@ interface FormProps {
   footer?: ReactNode
   keybindsModeId?: ModeId
   listGap?: number
+  sidePanel?: ReactNode
+  sidePanelWidth?: number
   subtitle?: string
   title: string
   width: number | `${number}%`
@@ -62,6 +64,8 @@ export function Form({
   footer,
   keybindsModeId,
   listGap,
+  sidePanel,
+  sidePanelWidth,
   subtitle,
   title,
   width,
@@ -74,6 +78,8 @@ export function Form({
       keybindsModeId={keybindsModeId}
       listGap={listGap}
       footer={footer}
+      sidePanel={sidePanel}
+      sidePanelWidth={sidePanelWidth}
     >
       {children}
     </ModalShell>

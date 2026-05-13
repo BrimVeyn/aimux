@@ -10,6 +10,9 @@ interface ModalShellProps {
   children: ReactNode
   footer?: ReactNode
   listGap?: number
+  sidePanel?: ReactNode
+  sidePanelGap?: number
+  sidePanelWidth?: number
   subtitle?: string
   keybindsModeId?: ModeId
   title: string
@@ -48,11 +51,38 @@ function fillModalInteriorWithSpaces(this: BoxRenderable, buffer: OptimizedBuffe
   }
 }
 
+export function ModalErrorPanel({
+  children,
+  tone = 'error',
+}: {
+  children: ReactNode
+  tone?: 'error' | 'muted'
+}) {
+  const t = useTheme()
+  const transparent = useTransparent()
+  const color = tone === 'error' ? t.error : t.textMuted
+  return (
+    <box
+      border
+      borderColor={color}
+      backgroundColor={transparent ? 'transparent' : t.backgroundPanel}
+      padding={1}
+      width="100%"
+      flexDirection="column"
+    >
+      <text fg={color}>{children}</text>
+    </box>
+  )
+}
+
 export function ModalShell({
   children,
   footer,
   keybindsModeId,
   listGap = 1,
+  sidePanel,
+  sidePanelGap = 1,
+  sidePanelWidth = 36,
   subtitle,
   title,
   width,
@@ -70,22 +100,29 @@ export function ModalShell({
       justifyContent="center"
       alignItems="center"
     >
-      <box
-        border
-        borderColor={t.border}
-        backgroundColor={bg}
-        padding={1}
-        width={width}
-        renderAfter={transparent ? fillModalInteriorWithSpaces : undefined}
-      >
-        <box width="100%" flexDirection="column" gap={listGap}>
-          <box flexDirection="column">
-            <text fg={t.text}>{title}</text>
-            {subtitle ? <text fg={t.textMuted}>{subtitle}</text> : null}
+      <box position="relative" width={width}>
+        <box
+          border
+          borderColor={t.border}
+          backgroundColor={bg}
+          padding={1}
+          width={width}
+          renderAfter={transparent ? fillModalInteriorWithSpaces : undefined}
+        >
+          <box width="100%" flexDirection="column" gap={listGap}>
+            <box flexDirection="column">
+              <text fg={t.text}>{title}</text>
+              {subtitle ? <text fg={t.textMuted}>{subtitle}</text> : null}
+            </box>
+            {children}
+            {footer ? <box>{footer}</box> : null}
           </box>
-          {children}
-          {footer ? <box>{footer}</box> : null}
         </box>
+        {sidePanel && typeof width === 'number' ? (
+          <box position="absolute" top={0} left={width + sidePanelGap} width={sidePanelWidth}>
+            {sidePanel}
+          </box>
+        ) : null}
       </box>
       {keybindsModeId ? <ModalKeybindsOverlay modeId={keybindsModeId} /> : null}
     </box>

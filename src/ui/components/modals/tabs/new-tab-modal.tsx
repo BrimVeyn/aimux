@@ -6,6 +6,7 @@ import { filterAssistants } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
+import { ModalErrorPanel } from '../shared/modal-shell'
 import { Picker, type PickerItem } from '../shared/picker'
 
 interface NewTabModalProps {
@@ -117,6 +118,7 @@ export function NewTabModal({
         title={`New worktree: ${selectedAssistant?.label ?? 'assistant'}`}
         keybindsModeId="modal.new-tab.command-edit"
         width={uiTokens.modalWidth.xl}
+        sidePanel={branchError ? <ModalErrorPanel>{branchError}</ModalErrorPanel> : undefined}
       >
         <box flexDirection="column" gap={1}>
           <TextField
@@ -126,16 +128,13 @@ export function NewTabModal({
             cursorPos={activeField === 'worktree-name' ? cursorPos : undefined}
             placeholder="my-feature"
           />
-          <box flexDirection="column">
-            <TextField
-              active={activeField === 'branch-name'}
-              label="Branch name"
-              value={branchName}
-              cursorPos={activeField === 'branch-name' ? cursorPos : undefined}
-              placeholder="aimux/my-feature"
-            />
-            {branchError ? <text fg={t.error}>{branchError}</text> : null}
-          </box>
+          <TextField
+            active={activeField === 'branch-name'}
+            label="Branch name"
+            value={branchName}
+            cursorPos={activeField === 'branch-name' ? cursorPos : undefined}
+            placeholder="aimux/my-feature"
+          />
           <AutoComplete
             active={activeField === 'sanitize-script'}
             cursorPos={activeField === 'sanitize-script' ? cursorPos : undefined}
@@ -215,6 +214,7 @@ export function NewTabModal({
         title: <text fg={createWorktree ? t.text : t.textMuted}>Create new worktree</text>,
       },
     ]
+    const sideMessage = worktreeDeleteMessage ?? deleteBlockedReason
     return (
       <Picker
         title={`New assistant: ${selectedAssistant?.label ?? 'assistant'}`}
@@ -224,15 +224,17 @@ export function NewTabModal({
         filter={null}
         items={worktreeItems}
         selectedIndex={selectedIndex}
+        sidePanel={
+          sideMessage ? (
+            <ModalErrorPanel tone={worktreeDeleteMessage ? 'error' : 'muted'}>
+              {sideMessage}
+            </ModalErrorPanel>
+          ) : undefined
+        }
         emptyState={<text fg={t.textMuted}>No worktrees.</text>}
         onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
         footer={
           <box flexDirection="column">
-            {worktreeDeleteMessage || deleteBlockedReason ? (
-              <text fg={worktreeDeleteMessage ? t.error : t.textMuted}>
-                {worktreeDeleteMessage ?? deleteBlockedReason}
-              </text>
-            ) : null}
             <text fg={t.textMuted}>Step 2/2: choose worktree</text>
             <text fg={t.textMuted}>Enter launches, Ctrl+d deletes selected worktree</text>
           </box>

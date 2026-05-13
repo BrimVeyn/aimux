@@ -30,6 +30,8 @@ interface PickerProps {
   footer?: ReactNode
   items: PickerItem[]
   selectedIndex: number
+  sidePanel?: ReactNode
+  sidePanelWidth?: number
   emptyState?: ReactNode
   onHover: (index: number) => void
   filter: string | null
@@ -96,6 +98,8 @@ export function Picker({
   listGap,
   onHover,
   selectedIndex,
+  sidePanel,
+  sidePanelWidth,
   title,
   width,
 }: PickerProps) {
@@ -137,6 +141,8 @@ export function Picker({
       keybindsModeId={keybindsModeId}
       listGap={listGap}
       footer={footer}
+      sidePanel={sidePanel}
+      sidePanelWidth={sidePanelWidth}
     >
       <BareInput value={filter ?? ''} cursorPos={cursorPos} placeholder="Type to filter..." />
       {items.length === 0 ? (emptyState ?? null) : null}
