@@ -29,6 +29,12 @@ export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
+export {
+  DEFAULT_EDITOR_ARGS,
+  getExternalEditorConfig,
+  KNOWN_GUI_EDITORS,
+  setExternalEditorConfig,
+} from './external-editor-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
 // User-facing config types (keymap/backends/sessions/etc.).
@@ -45,6 +51,7 @@ export type {
   BackendConfig,
   BindingDef,
   DiscoveredRepo,
+  ExternalEditorConfig,
   FocusMode,
   GitFileListMode,
   GitPaneConfig,

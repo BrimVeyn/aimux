@@ -1,6 +1,7 @@
 import {
   type ResolvedConfig,
   setAutoCommitEnabled,
+  setExternalEditorConfig,
   setMultiRepoConfig,
 } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
@@ -65,6 +66,7 @@ export function App({
   // actions (which live outside React) can read it synchronously.
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
   setMultiRepoConfig(resolvedConfig.multiRepo)
+  setExternalEditorConfig(resolvedConfig.externalEditor)
 
   const keymapHandlers = useMemo(
     () => {

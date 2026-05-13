@@ -68,6 +68,7 @@ export type SideEffect =
   | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
+  | { type: 'open-file-in-editor'; path: string }
 
 export interface KeyResult {
   actions: AppAction[]

@@ -1,4 +1,10 @@
-import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
+import {
+  DEFAULT_EDITOR_ARGS,
+  getExternalEditorConfig,
+  isAutoCommitEnabled,
+  KNOWN_GUI_EDITORS,
+} from '@brimveyn/aimux-config'
+import { type CliRenderer } from '@opentui/core'
 import { $ } from 'bun'
 
 import type { SideEffect } from '../input/modes/types'
@@ -59,7 +65,7 @@ export interface SideEffectContext {
   state: AppState
   dispatch: (action: AppAction) => void
   backend: SessionBackend
-  renderer: { destroy(): void }
+  renderer: CliRenderer
   themeId: ThemeId
   setThemeId: (id: ThemeId) => void
   activeTab: TabSession | undefined
@@ -606,8 +612,140 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       saveConfig({ ...loadConfig(), themeMode: next })
       return
     }
+    case 'open-file-in-editor': {
+      openFileInEditor(ctx, effect.path)
+      return
+    }
     default:
       effect satisfies never
+  }
+}
+
+function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
+  const config = getExternalEditorConfig()
+  const rawCommand = config.command ?? process.env.VISUAL ?? process.env.EDITOR
+  if (!rawCommand || rawCommand.trim() === '') {
+    ctx.dispatch({
+      message: 'no $EDITOR/$VISUAL set — configure externalEditor in aimux.config.ts',
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+
+  const fileEntry = ctx.state.gitPanel.files.find((f) => f.path === relPath)
+  const cwd = fileEntry?.repoPath ?? ctx.getCurrentSessionProjectPath()
+  if (!cwd) {
+    ctx.dispatch({ message: 'no working directory', type: 'git-mode-set-message' })
+    return
+  }
+  const absolutePath = relPath.startsWith('/') ? relPath : `${cwd}/${relPath}`
+
+  const cmdParts = rawCommand.trim().split(/\s+/).filter(Boolean)
+  const executable = cmdParts[0]
+  if (!executable) {
+    ctx.dispatch({ message: 'invalid editor command', type: 'git-mode-set-message' })
+    return
+  }
+  const baseName = executable.split('/').pop() ?? executable
+  const extraCmdArgs = cmdParts.slice(1)
+
+  const kind: 'gui' | 'tui' = config.kind ?? (KNOWN_GUI_EDITORS.has(baseName) ? 'gui' : 'tui')
+
+  const templateArgs = config.args ?? DEFAULT_EDITOR_ARGS[baseName] ?? ['{file}']
+  const resolvedArgs = [
+    ...extraCmdArgs,
+    ...templateArgs.map((a) => a.replaceAll('{file}', absolutePath).replaceAll('{line}', '1')),
+  ]
+
+  if (!isCommandAvailable(executable)) {
+    ctx.dispatch({
+      message: `editor not found in PATH: ${executable}`,
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+
+  if (kind === 'gui') {
+    spawnDetached(ctx, [executable, ...resolvedArgs], cwd)
+    return
+  }
+
+  // TUI editor — if the user explicitly configured `terminal`, spawn a new
+  // terminal window with their template. Otherwise default to inline shellout:
+  // suspend the renderer, hand the TTY to the editor, resume on exit.
+  if (config.terminal && config.terminal.length > 0) {
+    const shellCmd = buildShellCmd(cwd, executable, resolvedArgs)
+    const argv = config.terminal.map((a) =>
+      a.replaceAll('{cmd}', shellCmd).replaceAll('{cwd}', cwd)
+    )
+    spawnDetached(ctx, argv, cwd)
+    return
+  }
+
+  void openEditorInline(ctx, executable, resolvedArgs, cwd)
+}
+
+function shellQuote(s: string): string {
+  return `'${s.replaceAll("'", `'\\''`)}'`
+}
+
+function buildShellCmd(cwd: string, executable: string, args: string[]): string {
+  const quoted = [executable, ...args].map(shellQuote).join(' ')
+  return `cd ${shellQuote(cwd)} && ${quoted}`
+}
+
+function spawnDetached(ctx: SideEffectContext, argv: string[], cwd?: string): void {
+  try {
+    const child = Bun.spawn(argv, {
+      cwd,
+      stderr: 'pipe',
+      stdin: 'ignore',
+      stdout: 'ignore',
+    })
+    void (async () => {
+      const stderr = await new Response(child.stderr).text()
+      const code = await child.exited
+      if (code !== 0) {
+        const firstLine = stderr.trim().split('\n')[0] || `exit ${code}`
+        ctx.dispatch({ message: `editor: ${firstLine}`, type: 'git-mode-set-message' })
+      }
+    })()
+    child.unref()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'failed to spawn'
+    ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
+  }
+}
+
+/**
+ * Suspend the opentui renderer, hand the TTY to the editor (inheriting
+ * stdin/stdout/stderr), then resume and force a redraw on exit. Matches the
+ * shellout pattern used by opencode (packages/opencode/src/cli/cmd/tui/util/editor.ts).
+ */
+async function openEditorInline(
+  ctx: SideEffectContext,
+  executable: string,
+  args: string[],
+  cwd: string
+): Promise<void> {
+  const { renderer } = ctx
+  renderer.suspend()
+  renderer.currentRenderBuffer.clear()
+  try {
+    const proc = Bun.spawn([executable, ...args], {
+      cwd,
+      stderr: 'inherit',
+      stdin: 'inherit',
+      stdout: 'inherit',
+    })
+    await proc.exited
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'failed to spawn editor'
+    ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
+  } finally {
+    renderer.currentRenderBuffer.clear()
+    renderer.resume()
+    renderer.requestRender()
   }
 }
 

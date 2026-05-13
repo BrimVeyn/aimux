@@ -633,6 +633,7 @@ export type SideEffect =
   | { type: 'delete-session'; sessionId: string }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
+  | { type: 'open-file-in-editor'; path: string }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 
@@ -854,6 +855,26 @@ export interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
 }
 
+export interface ExternalEditorConfig {
+  /** Override `$VISUAL` / `$EDITOR`. */
+  command?: string
+  /**
+   * Force GUI (detached spawn — for vscode/cursor/etc.) or TUI (inline shellout
+   * that hands the TTY to the editor). Defaults: GUI for editors in a built-in
+   * allowlist (`code`, `cursor`, `subl`, JetBrains, …), TUI otherwise.
+   */
+  kind?: 'gui' | 'tui'
+  /** Argv passed to the editor. Placeholders: `{file}`, `{line}`. Sensible defaults per known editor. */
+  args?: string[]
+  /**
+   * Opt-in escape hatch: when set, TUI editors are launched in a new terminal
+   * window using this argv template instead of the default inline shellout.
+   * Placeholders: `{cmd}` (shell-quoted `cd <cwd> && <editor> <args>`), `{cwd}`.
+   * Example: `['wezterm', 'start', '--cwd', '{cwd}', '--', 'sh', '-c', '{cmd}']`.
+   */
+  terminal?: string[]
+}
+
 export interface AimuxUserConfig {
   theme?: AimuxThemeConfig
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
@@ -866,6 +887,7 @@ export interface AimuxUserConfig {
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
+  externalEditor?: ExternalEditorConfig
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -938,4 +960,5 @@ export interface ResolvedConfig {
   autoCommit: AutoCommitConfig
   multiRepo: MultiRepoConfig
   statusBar: StatusBarConfig
+  externalEditor: ExternalEditorConfig
 }
