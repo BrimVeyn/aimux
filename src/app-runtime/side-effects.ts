@@ -640,7 +640,7 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   }
   const absolutePath = relPath.startsWith('/') ? relPath : `${cwd}/${relPath}`
 
-  const cmdParts = rawCommand.trim().split(/\s+/).filter(Boolean)
+  const cmdParts = shellSplit(rawCommand)
   const executable = cmdParts[0]
   if (!executable) {
     ctx.dispatch({ message: 'invalid editor command', type: 'git-mode-set-message' })
@@ -687,6 +687,43 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
 
 function shellQuote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`
+}
+
+/**
+ * Minimal POSIX shell-word splitter — respects single/double quotes and
+ * backslash escapes so values like `EDITOR='/Applications/My Editor/bin/code'`
+ * or `EDITOR="code --user-data-dir \"/tmp/foo bar\""` tokenize correctly.
+ * Does not expand variables or globs.
+ */
+function shellSplit(input: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let inSingle = false
+  let inDouble = false
+  let hasToken = false
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i] ?? ''
+    if (!inSingle && !inDouble && /\s/.test(c)) {
+      if (hasToken) {
+        out.push(current)
+        current = ''
+        hasToken = false
+      }
+      continue
+    }
+    hasToken = true
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle
+    } else if (c === '"' && !inSingle) {
+      inDouble = !inDouble
+    } else if (c === '\\' && !inSingle && i + 1 < input.length) {
+      current += input[++i]
+    } else {
+      current += c
+    }
+  }
+  if (hasToken) out.push(current)
+  return out
 }
 
 function buildShellCmd(cwd: string, executable: string, args: string[]): string {
