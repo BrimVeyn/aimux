@@ -867,8 +867,11 @@ export interface ExternalEditorConfig {
   /** Argv passed to the editor. Placeholders: `{file}`, `{line}`. Sensible defaults per known editor. */
   args?: string[]
   /**
-   * Opt-in escape hatch: when set, TUI editors are launched in a new terminal
-   * window using this argv template instead of the default inline shellout.
+   * Opt-in escape hatch for TUI editors only: when set, the TUI editor is
+   * launched in a new terminal window using this argv template instead of the
+   * default inline shellout. Ignored when `kind` resolves to `'gui'` — GUI
+   * editors always spawn detached into their own app window.
+   *
    * Placeholders: `{cmd}` (shell-quoted `cd <cwd> && <editor> <args>`), `{cwd}`.
    * Example: `['wezterm', 'start', '--cwd', '{cwd}', '--', 'sh', '-c', '{cmd}']`.
    */
