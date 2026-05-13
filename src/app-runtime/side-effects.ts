@@ -653,10 +653,10 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   const kind: 'gui' | 'tui' = config.kind ?? (KNOWN_GUI_EDITORS.has(baseName) ? 'gui' : 'tui')
 
   const templateArgs = config.args ?? DEFAULT_EDITOR_ARGS[baseName] ?? ['{file}']
-  const resolvedArgs = [
-    ...extraCmdArgs,
-    ...templateArgs.map((a) => a.replaceAll('{file}', absolutePath).replaceAll('{line}', '1')),
-  ]
+  // git mode does not track a cursor line within the diff yet, so pass undefined
+  // and let the substitution strip `{line}` placeholders cleanly — preserves
+  // editor-side "restore last cursor position" behavior (e.g. vscode).
+  const resolvedArgs = [...extraCmdArgs, ...substituteEditorArgs(templateArgs, absolutePath)]
 
   if (!isCommandAvailable(executable)) {
     ctx.dispatch({
@@ -684,6 +684,37 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   }
 
   void openEditorInline(ctx, executable, resolvedArgs, cwd)
+}
+
+/**
+ * Substitute `{file}` and `{line}` placeholders in an editor-arg template.
+ *
+ * When `line` is `undefined` we drop the line bits cleanly so we don't pass a
+ * misleading `:1` / `+1` that would defeat the editor's "restore last cursor
+ * position" feature:
+ *   `['--line', '{line}', '{file}']` → `['{file}']`
+ *   `['+{line}', '{file}']`          → `['{file}']`
+ *   `['-g', '{file}:{line}']`        → `['-g', '{file}']`
+ *   `['{file}:{line}']`              → `['{file}']`
+ */
+function substituteEditorArgs(template: string[], file: string, line?: string): string[] {
+  if (line !== undefined) {
+    return template.map((a) => a.replaceAll('{file}', file).replaceAll('{line}', line))
+  }
+  const out: string[] = []
+  for (let i = 0; i < template.length; i++) {
+    const arg = template[i] ?? ''
+    // Drop a flag immediately followed by a bare `{line}` arg (--line, -line, etc.).
+    if (template[i + 1] === '{line}') {
+      i++
+      continue
+    }
+    // Drop standalone line tokens like `{line}`, `+{line}`, `:{line}`.
+    if (/^[+:]?\{line\}$/.test(arg)) continue
+    // Strip trailing `:{line}` or `+{line}` from compound tokens like `{file}:{line}`.
+    out.push(arg.replace(/[:+]\{line\}/g, '').replaceAll('{file}', file))
+  }
+  return out
 }
 
 function shellQuote(s: string): string {
