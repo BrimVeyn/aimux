@@ -6,6 +6,7 @@ import {
 } from '@brimveyn/aimux-config'
 import { type CliRenderer } from '@opentui/core'
 import { $ } from 'bun'
+import { resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
@@ -638,7 +639,7 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
     ctx.dispatch({ message: 'no working directory', type: 'git-mode-set-message' })
     return
   }
-  const absolutePath = relPath.startsWith('/') ? relPath : `${cwd}/${relPath}`
+  const absolutePath = resolvePath(cwd, relPath)
 
   const cmdParts = shellSplit(rawCommand)
   const executable = cmdParts[0]
