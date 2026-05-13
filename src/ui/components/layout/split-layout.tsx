@@ -38,6 +38,7 @@ interface SplitLayoutProps {
   }) => void
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
+  onLeftEdgeMouseDown?: (event: OtuiMouseEvent) => boolean
   contentOrigin: TerminalContentOrigin
   bounds: PaneRect
 }
@@ -50,6 +51,7 @@ export function SplitLayout({
   localScrollbackEnabled,
   mouseForwardingEnabled,
   node,
+  onLeftEdgeMouseDown,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
@@ -101,6 +103,7 @@ export function SplitLayout({
         onPaneActivate={onPaneActivate}
         onSeparatorDrag={onSeparatorDrag}
         onSeparatorDragEnd={onSeparatorDragEnd}
+        onLeftEdgeMouseDown={onLeftEdgeMouseDown}
       />
     )
   }
@@ -115,6 +118,10 @@ export function SplitLayout({
   // Compute the bounding rect for each subtree
   const firstBounds = subtreeBounds(node.first, rects, bounds)
   const secondBounds = subtreeBounds(node.second, rects, bounds)
+
+  // For vertical splits only the first subtree is leftmost; for horizontal
+  // splits both first and second start at the same x.
+  const secondLeftEdgeMouseDown = node.direction === 'horizontal' ? onLeftEdgeMouseDown : undefined
 
   return (
     <box flexDirection={flexDir} flexGrow={1} gap={0}>
@@ -136,6 +143,7 @@ export function SplitLayout({
           onSeparatorDragStart={onSeparatorDragStart}
           onSeparatorDrag={onSeparatorDrag}
           onSeparatorDragEnd={onSeparatorDragEnd}
+          onLeftEdgeMouseDown={onLeftEdgeMouseDown}
           contentOrigin={contentOrigin}
           bounds={firstBounds}
         />
@@ -178,6 +186,7 @@ export function SplitLayout({
           onSeparatorDragStart={onSeparatorDragStart}
           onSeparatorDrag={onSeparatorDrag}
           onSeparatorDragEnd={onSeparatorDragEnd}
+          onLeftEdgeMouseDown={secondLeftEdgeMouseDown}
           contentOrigin={contentOrigin}
           bounds={secondBounds}
         />

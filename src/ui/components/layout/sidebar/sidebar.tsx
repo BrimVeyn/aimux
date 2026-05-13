@@ -20,7 +20,6 @@ interface SidebarProps {
   onTabActivate?: (tabId: string) => void
   onResizeDrag?: (event: OtuiMouseEvent) => boolean
   onResizeDragEnd?: () => void
-  onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
   onEmbeddedGitResizeStart?: (info: {
     containerStart: number
     position: 'top' | 'bottom'
@@ -32,7 +31,7 @@ const GUTTER_START = '╭'
 const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
-const RESIZE_HANDLE = '│'
+const RESIZE_HANDLE = '─'
 
 function getRowBackground({
   alternate,
@@ -181,7 +180,6 @@ export function Sidebar({
   onEmbeddedGitResizeStart,
   onResizeDrag,
   onResizeDragEnd,
-  onSidebarResizeStart,
   onTabActivate,
 }: SidebarProps) {
   const t = useTheme()
@@ -230,7 +228,6 @@ export function Sidebar({
     <box
       minHeight={1}
       flexShrink={0}
-      backgroundColor={t.border}
       onMouseDown={(event) => {
         const body = bodyRef.current
         if (!body) return
@@ -309,17 +306,6 @@ export function Sidebar({
           </box>
           {!gitEmbedded ? separator : null}
         </box>
-        <box
-          height="100%"
-          width={1}
-          flexShrink={0}
-          backgroundColor={t.border}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onSidebarResizeStart?.({ initialWidth: sidebarWidth, screenStart: event.x })
-          }}
-        />
       </box>
     </ContextMenuBox>
   )

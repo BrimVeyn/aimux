@@ -140,7 +140,7 @@ export function useTerminalResize({
 
   const gitPaneInPaneMode = state.gitPane.mode === 'pane' && state.gitPane.visible
   const terminalSize = useMemo(() => {
-    const sidebarWidth = state.sidebar.visible ? state.sidebar.width + 1 : 0
+    const sidebarWidth = state.sidebar.visible ? state.sidebar.width : 0
     const sessionBarRows = state.sessionBar.visible ? 1 : 0
     const sessionBarTopOffset =
       state.sessionBar.visible && state.sessionBar.position === 'top' ? 1 : 0
