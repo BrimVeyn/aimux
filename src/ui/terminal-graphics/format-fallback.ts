@@ -1,7 +1,12 @@
-// Convert non-PNG/JPEG image bytes to PNG using whichever system tool is
-// available. Result cached per-byte-source so we don't reconvert on every render.
+// Convert non-PNG image bytes to PNG. SVGs go through @resvg/resvg-wasm
+// (zero-install). Everything else tries the system converter chain. Results
+// are cached per byte-source so we don't retry on every render.
 
-const cache = new Map<string, Uint8Array | null>()
+import { isSvg, renderSvgToPng } from './svg-render'
+
+export type ConvertResult = { kind: 'ok'; png: Uint8Array } | { kind: 'error'; reason: string }
+
+const cache = new Map<string, ConvertResult>()
 
 function cacheKey(bytes: Uint8Array): string {
   return new Bun.CryptoHasher('sha1').update(bytes).digest('hex')
@@ -64,43 +69,63 @@ async function trySips(bytes: Uint8Array): Promise<Uint8Array | null> {
   }
 }
 
-export async function convertToPng(bytes: Uint8Array): Promise<Uint8Array | null> {
+function mimeLabel(mime: string): string {
+  const slash = mime.indexOf('/')
+  if (slash < 0) return mime
+  return mime.slice(slash + 1).toUpperCase()
+}
+
+export async function convertToPng(bytes: Uint8Array, mime: string): Promise<ConvertResult> {
   const key = cacheKey(bytes)
   const hit = cache.get(key)
   if (hit !== undefined) return hit
 
-  const attempts: Array<() => Promise<Uint8Array | null>> = [
-    () => tryConverter(['magick', '-', 'png:-'], bytes, 1500),
-    () => tryConverter(['convert', '-', 'png:-'], bytes, 1500),
-    () => trySips(bytes),
-    () =>
-      tryConverter(
-        [
-          'ffmpeg',
-          '-loglevel',
-          'error',
-          '-i',
-          'pipe:0',
-          '-f',
-          'image2',
-          '-vcodec',
-          'png',
-          'pipe:1',
-        ],
-        bytes,
-        2500
-      ),
-  ]
+  let result: ConvertResult
+  if (isSvg(bytes)) {
+    const png = await renderSvgToPng(bytes)
+    result = png ? { kind: 'ok', png } : { kind: 'error', reason: 'failed to render SVG' }
+  } else {
+    const attempts: Array<() => Promise<Uint8Array | null>> = [
+      () => tryConverter(['magick', '-', 'png:-'], bytes, 1500),
+      () => tryConverter(['convert', '-', 'png:-'], bytes, 1500),
+      () => trySips(bytes),
+      () =>
+        tryConverter(
+          [
+            'ffmpeg',
+            '-loglevel',
+            'error',
+            '-i',
+            'pipe:0',
+            '-f',
+            'image2',
+            '-vcodec',
+            'png',
+            'pipe:1',
+          ],
+          bytes,
+          2500
+        ),
+    ]
 
-  for (const attempt of attempts) {
-    const result = await attempt()
-    if (result && result.byteLength > 0) {
-      cache.set(key, result)
-      return result
+    let converted: Uint8Array | null = null
+    for (const attempt of attempts) {
+      const out = await attempt()
+      if (out && out.byteLength > 0) {
+        converted = out
+        break
+      }
     }
+    result = converted
+      ? { kind: 'ok', png: converted }
+      : {
+          kind: 'error',
+          reason: `no converter could decode this ${mimeLabel(mime)} (install ImageMagick or cwebp)`,
+        }
   }
-  cache.set(key, null)
-  return null
+
+  cache.set(key, result)
+  return result
 }
 
 export function isPng(bytes: Uint8Array): boolean {

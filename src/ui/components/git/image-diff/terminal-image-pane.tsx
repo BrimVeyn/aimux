@@ -1,5 +1,5 @@
 import { type BoxRenderable } from '@opentui/core'
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import { convertToPng, isPng } from '../../../terminal-graphics/format-fallback'
 import {
@@ -9,6 +9,7 @@ import {
   uploadPngEscape,
   writeRaw,
 } from '../../../terminal-graphics/kitty'
+import { useTheme } from '../../../theme'
 
 interface TerminalImagePaneProps {
   bytes: Uint8Array
@@ -38,17 +39,26 @@ export const TerminalImagePane = memo(function TerminalImagePane({
   bytes,
   mime,
 }: TerminalImagePaneProps) {
+  const t = useTheme()
   const stateRef = useRef<PaneState>({ imageId: null, lastKey: null, uploaded: false })
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     stateRef.current = { imageId: null, lastKey: null, uploaded: false }
+    setError(null)
     ;(async () => {
       let pngBytes: Uint8Array | null = null
       if (mime === 'image/png' || isPng(bytes)) {
         pngBytes = bytes
       } else {
-        pngBytes = await convertToPng(bytes)
+        const result = await convertToPng(bytes, mime)
+        if (cancelled) return
+        if (result.kind === 'error') {
+          setError(result.reason)
+          return
+        }
+        pngBytes = result.png
       }
       if (cancelled || !pngBytes) return
       const id = nextImageId()
@@ -65,6 +75,14 @@ export const TerminalImagePane = memo(function TerminalImagePane({
       stateRef.current = { imageId: null, lastKey: null, uploaded: false }
     }
   }, [bytes, mime])
+
+  if (error) {
+    return (
+      <box flexGrow={1} alignItems="center" justifyContent="center" padding={1}>
+        <text fg={t.warning}>({error})</text>
+      </box>
+    )
+  }
 
   function renderAfter(this: BoxRenderable): void {
     const state = stateRef.current
