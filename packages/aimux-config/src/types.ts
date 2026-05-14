@@ -204,7 +204,7 @@ export interface GitPanelState {
   error: GitPanelError | null
 }
 
-export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed'
+export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed' | 'image'
 
 export interface DiffData {
   path: string
@@ -214,6 +214,10 @@ export interface DiffData {
   binarySizeBefore?: number
   binarySizeAfter?: number
   errorMessage?: string
+  imageBytesBefore?: Uint8Array
+  imageBytesAfter?: Uint8Array
+  imageMime?: string
+  imageFormatLabel?: string
 }
 
 export type GitDiffView = 'split' | 'stacked'

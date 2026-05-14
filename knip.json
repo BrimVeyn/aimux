@@ -11,7 +11,8 @@
     "show",
     "status",
     "printf",
-    "branch"
+    "branch",
+    "cat-file"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {

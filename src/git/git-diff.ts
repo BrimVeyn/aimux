@@ -2,6 +2,8 @@ import { $ } from 'bun'
 
 import type { DiffData, DiffFileStatus, GitFileEntry } from '../state/types'
 
+import { imageFormatLabel, imageMimeFromPath, isImagePath } from './image-detect'
+
 function resolveStatus(entry: GitFileEntry): { status: DiffFileStatus; oldPath?: string } {
   if (entry.renamedFrom) return { oldPath: entry.renamedFrom, status: 'renamed' }
   if (entry.section === 'untracked' || entry.status === '?') return { status: 'new' }
@@ -33,6 +35,28 @@ async function readWorkingSize(cwd: string, path: string): Promise<number> {
     if (await file.exists()) return file.size
   } catch {}
   return 0
+}
+
+async function readHeadBlob(
+  cwd: string,
+  ref: string,
+  path: string
+): Promise<Uint8Array | undefined> {
+  // `git cat-file blob` writes raw bytes to stdout — binary-safe, unlike `git show`.
+  const result = await $`git -C ${cwd} cat-file blob ${ref}:${path}`.quiet().nothrow()
+  if (result.exitCode !== 0) return undefined
+  const bytes = result.stdout
+  return bytes.byteLength > 0 ? new Uint8Array(bytes) : undefined
+}
+
+async function readWorkingBytes(cwd: string, path: string): Promise<Uint8Array | undefined> {
+  try {
+    const file = Bun.file(`${cwd}/${path}`)
+    if (!(await file.exists())) return undefined
+    return await file.bytes()
+  } catch {
+    return undefined
+  }
 }
 
 async function rawUnifiedDiff(
@@ -68,6 +92,29 @@ export async function fetchDiff(
 ): Promise<DiffData> {
   const { oldPath, status } = resolveStatus(file)
   const ref = headOffset > 0 ? `HEAD~${headOffset}` : 'HEAD'
+
+  if (isImagePath(file.path)) {
+    const headPath = oldPath ?? file.path
+    const wantsBefore = status !== 'new'
+    const wantsAfter = status !== 'deleted'
+    const [imageBytesBefore, imageBytesAfter] = await Promise.all([
+      wantsBefore ? readHeadBlob(cwd, ref, headPath) : Promise.resolve(undefined),
+      wantsAfter ? readWorkingBytes(cwd, file.path) : Promise.resolve(undefined),
+    ])
+    const data: DiffData = {
+      binarySizeAfter: imageBytesAfter?.byteLength ?? 0,
+      binarySizeBefore: imageBytesBefore?.byteLength ?? 0,
+      imageFormatLabel: imageFormatLabel(file.path),
+      imageMime: imageMimeFromPath(file.path),
+      path: file.path,
+      rawDiff: '',
+      status: 'image',
+    }
+    if (imageBytesBefore) data.imageBytesBefore = imageBytesBefore
+    if (imageBytesAfter) data.imageBytesAfter = imageBytesAfter
+    if (oldPath) data.oldPath = oldPath
+    return data
+  }
 
   if (await isBinary(cwd, ref, file.path)) {
     const [binarySizeBefore, binarySizeAfter] = await Promise.all([

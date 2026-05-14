@@ -16,6 +16,7 @@ import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
+import { ImageDiffView } from './image-diff'
 
 interface DiffStageProps {
   diff: DiffData | undefined
@@ -69,6 +70,10 @@ const DiffStage = memo(function DiffStage({
         <text fg={t.error}>{diff.errorMessage}</text>
       </box>
     )
+  }
+
+  if (diff.status === 'image') {
+    return <ImageDiffView diff={diff} />
   }
 
   const placeholder = placeholderText(diff)
