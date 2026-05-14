@@ -75,7 +75,7 @@ export const ImageDiffView = memo(function ImageDiffView({ diff }: ImageDiffView
 
   const showBoth = before && after
   return (
-    <box flexDirection="column" flexGrow={1} overflow="hidden">
+    <box flexDirection="column" flexGrow={1} overflow="hidden" backgroundColor={t.background}>
       {diff.oldPath ? (
         <box paddingLeft={1} paddingRight={1}>
           <text fg={t.textMuted}>
