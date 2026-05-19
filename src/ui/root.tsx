@@ -130,6 +130,7 @@ function renderModal(
           selectedIndex={modal.selectedIndex}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
+          actionMessage={modal.actionMessage}
         />
       )
     case 'snippet-editor':

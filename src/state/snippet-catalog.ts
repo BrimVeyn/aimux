@@ -1,4 +1,4 @@
-import type { SnippetDef } from '@brimveyn/aimux-config'
+import type { SnippetDef, SnippetVar } from '@brimveyn/aimux-config'
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,9 +12,14 @@ export interface SnippetRecord {
   name: string
   content: string
   trigger?: string
+  vars?: Record<string, SnippetVar>
 }
 
-const SNIPPETS_PATH = join(getProfileConfigDir(), 'aimux-snippets.json')
+export function getSnippetsCatalogPath(): string {
+  return join(getProfileConfigDir(), 'aimux-snippets.json')
+}
+
+const SNIPPETS_PATH = getSnippetsCatalogPath()
 
 const DEFAULT_SNIPPETS: SnippetRecord[] = [
   {
@@ -69,7 +74,7 @@ export function loadSnippetCatalog(): SnippetRecord[] {
       })
       return []
     }
-    return parsed.snippets
+    return parsed.snippets.map(stripUserVars)
   } catch (error) {
     logDebug('snippets.catalog.loadIssue', {
       issue: error instanceof Error ? error.message : String(error),
@@ -84,7 +89,7 @@ export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
     mkdirSync(getProfileConfigDir(), { recursive: true })
     // Persist only user-owned snippets. Config-pinned entries are reapplied
     // at boot from `aimux.config.ts`.
-    const userSnippets = snippets.filter((s) => !isConfigSnippetId(s.id))
+    const userSnippets = snippets.filter((s) => !isConfigSnippetId(s.id)).map(stripUserVars)
     writeFileSync(
       SNIPPETS_PATH,
       `${JSON.stringify({ snippets: userSnippets, version: 2 }, null, 2)}\n`
@@ -105,6 +110,23 @@ export function isConfigSnippetId(id: string): boolean {
 }
 
 /**
+ * Shell `vars` are only authorized on config-pinned snippets (those defined in
+ * `aimux.config.ts`). If they ever appear on a user-edited JSON snippet — by
+ * hand edit, restore, or import — strip them. This keeps shell execution
+ * gated by the user's TypeScript config file.
+ *
+ * Exported for testing; called at both load and save time.
+ */
+export function stripUserVars(snippet: SnippetRecord): SnippetRecord {
+  if (snippet.vars === undefined) return snippet
+  if (isConfigSnippetId(snippet.id)) return snippet
+  logDebug('snippets.catalog.strippedVars', { id: snippet.id, name: snippet.name })
+  const { vars, ...clean } = snippet
+  void vars
+  return clean
+}
+
+/**
  * Merge config-defined snippets with user-edited snippets.
  * Config-pinned snippets ("sticky") get a stable id `config:${name}` and win
  * over a user-edited snippet with the same id (they're read-only in the UI).
@@ -118,6 +140,7 @@ export function mergeConfigSnippets(
     id: `${CONFIG_SNIPPET_ID_PREFIX}${s.name}`,
     name: s.name,
     trigger: s.trigger,
+    vars: s.vars,
   }))
   const configIds = new Set(fromConfig.map((s) => s.id))
   const userKept = userSnippets.filter((s) => !configIds.has(s.id))

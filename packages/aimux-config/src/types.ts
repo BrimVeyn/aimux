@@ -151,6 +151,7 @@ export interface SnippetRecord {
   name: string
   content: string
   trigger?: string
+  vars?: Record<string, SnippetVar>
 }
 
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
@@ -274,6 +275,7 @@ export interface ModalRenameTab extends ModalBase {
 }
 export interface ModalSnippetPicker extends ModalBase {
   type: 'snippet-picker'
+  actionMessage?: string | null
 }
 export interface ModalThemePicker extends ModalBase {
   type: 'theme-picker'
@@ -539,6 +541,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
+  | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }
@@ -641,6 +644,7 @@ export type SideEffect =
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
+  | { type: 'open-selected-snippet-source-in-editor' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 
@@ -692,10 +696,30 @@ export interface HooksConfig {
 
 // ─── Snippet config (stub) ────────────────────────────────────────────────────
 
+/**
+ * A snippet variable resolved at expansion time. The shape is a tagged union
+ * discriminated by which key is present (`sh` for now; future: `env`, `date`, …).
+ */
+export interface SnippetShellVar {
+  /** Shell command run via `sh -c`. The trimmed stdout is interpolated. */
+  sh: string
+  /** Kill the process after this many ms. Default 5000. */
+  timeout?: number
+  /** Trim trailing whitespace from stdout. Default true. */
+  trim?: boolean
+}
+
+export type SnippetVar = SnippetShellVar
+
 export interface SnippetDef {
   name: string
   trigger?: string
   text: string
+  /**
+   * Optional named variables. Reference them in `text` as `{{name}}`.
+   * The key is the variable name; the value declares how to resolve it.
+   */
+  vars?: Record<string, SnippetVar>
 }
 
 // ─── Macros config ────────────────────────────────────────────────────────────

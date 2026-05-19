@@ -1,4 +1,4 @@
-import type { ModeId } from '@brimveyn/aimux-config'
+import type { ModeId, SnippetVar } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
@@ -306,6 +306,11 @@ export interface ModalRenameTab extends ModalBase {
 
 export interface ModalSnippetPicker extends ModalBase {
   type: 'snippet-picker'
+  /**
+   * Transient status line shown at the bottom of the picker (e.g. error from
+   * an open-in-editor attempt). Cleared automatically when the modal closes.
+   */
+  actionMessage?: string | null
 }
 
 export interface ModalThemePicker extends ModalBase {
@@ -394,6 +399,7 @@ export interface SnippetRecord {
   name: string
   content: string
   trigger?: string
+  vars?: Record<string, SnippetVar>
 }
 
 export interface DiscoveredRepo {
@@ -649,6 +655,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-pending-delete'; path: string | null }
   | { type: 'git-mode-clear-diff-cache'; path: string }
   | { type: 'git-mode-set-message'; message: string | null }
+  | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }

@@ -4,11 +4,13 @@ import {
   contentNeedsClipboard,
   expandSnippet,
   expandSnippetSync,
+  requiresAsyncExpansion,
   type SyncExpansionContext,
 } from '../../src/snippets/expand-variables'
 
 const baseCtx: SyncExpansionContext = {
   branch: 'main',
+  customVars: new Map(),
   cwd: '/tmp/work',
   now: new Date('2026-05-19T14:32:07Z'),
 }
@@ -93,5 +95,68 @@ describe('contentNeedsClipboard', () => {
     expect(contentNeedsClipboard('hi {{clipboard}}')).toBe(true)
     expect(contentNeedsClipboard('hi {{ clipboard }}')).toBe(true)
     expect(contentNeedsClipboard('hi')).toBe(false)
+  })
+})
+
+describe('customVars', () => {
+  test('snippet var resolves like a built-in', () => {
+    const result = expandSnippetSync('hello {{who}}', {
+      ...baseCtx,
+      customVars: new Map([['who', 'Nathan']]),
+    })
+    expect(result.text).toBe('hello Nathan')
+  })
+
+  test('snippet var shadows built-in on name collision', () => {
+    const result = expandSnippetSync('{{date}}', {
+      ...baseCtx,
+      customVars: new Map([['date', 'OVERRIDE']]),
+    })
+    expect(result.text).toBe('OVERRIDE')
+  })
+
+  test('multiple snippet vars in the same template', () => {
+    const result = expandSnippetSync('{{a}}+{{b}}', {
+      ...baseCtx,
+      customVars: new Map([
+        ['a', '1'],
+        ['b', '2'],
+      ]),
+    })
+    expect(result.text).toBe('1+2')
+  })
+
+  test('async path uses customVars too', async () => {
+    const result = await expandSnippet('hi {{who}}', {
+      ...baseCtx,
+      clipboard: async () => '',
+      customVars: new Map([['who', 'Async']]),
+    })
+    expect(result.text).toBe('hi Async')
+  })
+})
+
+describe('requiresAsyncExpansion', () => {
+  test('true when snippet has vars', () => {
+    expect(
+      requiresAsyncExpansion({
+        content: 'plain',
+        id: 's',
+        name: 's',
+        vars: { x: { sh: 'echo' } },
+      })
+    ).toBe(true)
+  })
+
+  test('true when content references {{clipboard}}', () => {
+    expect(requiresAsyncExpansion({ content: '{{clipboard}}', id: 's', name: 's' })).toBe(true)
+  })
+
+  test('false for plain snippet without vars or clipboard', () => {
+    expect(requiresAsyncExpansion({ content: 'hi {{date}}', id: 's', name: 's' })).toBe(false)
+  })
+
+  test('false when vars is an empty object', () => {
+    expect(requiresAsyncExpansion({ content: 'plain', id: 's', name: 's', vars: {} })).toBe(false)
   })
 })

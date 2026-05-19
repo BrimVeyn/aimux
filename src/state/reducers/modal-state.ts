@@ -160,6 +160,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
+          actionMessage: null,
           cursorPos: 0,
           editBuffer: '',
           selectedIndex: 0,
@@ -167,6 +168,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'snippet-picker',
         },
       }
+    case 'snippet-picker-set-message': {
+      if (state.modal.type !== 'snippet-picker') return state
+      if (state.modal.actionMessage === action.message) return state
+      return { ...state, modal: { ...state.modal, actionMessage: action.message } }
+    }
     case 'open-snippet-editor': {
       const snippet = action.snippetId
         ? state.snippets.find((s) => s.id === action.snippetId)

@@ -9,10 +9,11 @@ import { INPUT_DEBUG_LOG_PATH, logInputDebug } from '../debug/input-log'
 import { createRawInputHandler } from '../input/raw-input-handler'
 import { copyToSystemClipboard, readFromSystemClipboard } from '../platform/clipboard'
 import {
-  contentNeedsClipboard,
   expandSnippet,
   expandSnippetSync,
+  requiresAsyncExpansion,
 } from '../snippets/expand-variables'
+import { runShellVar } from '../snippets/run-shell-var'
 import {
   createTriggerDetector,
   type TriggerDetector,
@@ -89,12 +90,29 @@ export function useRendererBindings({
 
     const expandMacroForTab = (tabId: string, match: TriggerMatch): void => {
       const tab = activeTabRef.current
-      const content = match.snippet.content
+      const snippet = match.snippet
       const branch = branchRef.current
       const cwd = process.cwd()
       const now = new Date()
 
-      const performWrite = (text: string, cursorOffset: number) => {
+      const registerUndo = (text: string, cursorOffset: number) => {
+        // Undo window: only meaningful for short inline expansions where
+        // cursor positions stay predictable in raw mode.
+        if (!text.includes('\n')) {
+          pendingMacroUndoRef.current.set(tabId, {
+            fullLength: text.length,
+            suffixLength: text.length - cursorOffset,
+          })
+        }
+      }
+
+      if (!requiresAsyncExpansion(snippet)) {
+        const { cursorOffset, text } = expandSnippetSync(snippet.content, {
+          branch,
+          customVars: new Map(),
+          cwd,
+          now,
+        })
         writeMacroExpansionToTab(
           backend,
           tabId,
@@ -104,29 +122,31 @@ export function useRendererBindings({
           cursorOffset,
           dispatch
         )
-        // Register an undo window: the next keystroke can erase the whole
-        // expansion if it's a backspace. Only meaningful for short inline
-        // expansions where cursor positions are predictable in raw mode.
-        if (!text.includes('\n')) {
-          pendingMacroUndoRef.current.set(tabId, {
-            fullLength: text.length,
-            suffixLength: text.length - cursorOffset,
-          })
-        }
-      }
-
-      if (contentNeedsClipboard(content)) {
-        void expandSnippet(content, {
-          branch,
-          clipboard: readFromSystemClipboard,
-          cwd,
-          now,
-        }).then(({ cursorOffset, text }) => performWrite(text, cursorOffset))
+        registerUndo(text, cursorOffset)
         return
       }
 
-      const { cursorOffset, text } = expandSnippetSync(content, { branch, cwd, now })
-      performWrite(text, cursorOffset)
+      // Eager erase: drop the typed trigger from the PTY immediately so the
+      // user doesn't stare at `:prfull ` while shell vars resolve.
+      backend.write(tabId, '\x7f'.repeat(match.triggerText.length))
+
+      void (async () => {
+        const varEntries = Object.entries(snippet.vars ?? {})
+        const resolved = await Promise.all(
+          varEntries.map(async ([name, v]) => [name, await runShellVar(name, v)] as const)
+        )
+        const customVars = new Map(resolved)
+        const { cursorOffset, text } = await expandSnippet(snippet.content, {
+          branch,
+          clipboard: readFromSystemClipboard,
+          customVars,
+          cwd,
+          now,
+        })
+        // Trigger already erased above; eraseCount = 0 here.
+        writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset, dispatch)
+        registerUndo(text, cursorOffset)
+      })()
     }
 
     const tryConsumeMacroUndo = (tabId: string, sequence: string): boolean => {

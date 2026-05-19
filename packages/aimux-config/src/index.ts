@@ -82,6 +82,8 @@ export type {
   SideEffect,
   SnippetDef,
   SnippetRecord,
+  SnippetShellVar,
+  SnippetVar,
   SplitDirection,
   StatusBarConfig,
   TabSession,

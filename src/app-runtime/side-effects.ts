@@ -6,7 +6,8 @@ import {
 } from '@brimveyn/aimux-config'
 import { type CliRenderer } from '@opentui/core'
 import { $ } from 'bun'
-import { resolve as resolvePath } from 'node:path'
+import { existsSync } from 'node:fs'
+import { join as joinPath, resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
@@ -15,6 +16,7 @@ import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { createPrefixedId } from '../platform/id'
+import { getProfileConfigDir } from '../profile-paths'
 import {
   getAllAssistantOptions,
   getAssistantOption,
@@ -33,6 +35,7 @@ import {
   splitNode,
 } from '../state/layout-tree'
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
+import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import {
   type AppAction,
@@ -617,22 +620,45 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       openFileInEditor(ctx, effect.path)
       return
     }
+    case 'open-selected-snippet-source-in-editor': {
+      openSelectedSnippetSourceInEditor(ctx)
+      return
+    }
     default:
       effect satisfies never
   }
 }
 
-function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
-  const config = getExternalEditorConfig()
-  const rawCommand = config.command ?? process.env.VISUAL ?? process.env.EDITOR
-  if (!rawCommand || rawCommand.trim() === '') {
-    ctx.dispatch({
-      message: 'no $EDITOR/$VISUAL set — configure externalEditor in aimux.config.ts',
-      type: 'git-mode-set-message',
-    })
-    return
+/**
+ * Open the file backing the currently selected snippet in the user's editor.
+ * Config-pinned snippets (id starts with `config:`) live in `aimux.config.ts`
+ * (or `.js`); user-edited snippets live in `aimux-snippets.json`.
+ *
+ * On error (no editor, editor not in PATH) the failure is silent: there is no
+ * snippet-picker status line. The user can check the debug log.
+ */
+function openSelectedSnippetSourceInEditor(ctx: SideEffectContext): void {
+  const snippet = getSelectedSnippet(ctx.state)
+  if (!snippet) return
+
+  const configDir = getProfileConfigDir()
+  let absolutePath: string
+
+  if (isConfigSnippetId(snippet.id)) {
+    const tsPath = joinPath(configDir, 'aimux.config.ts')
+    const jsPath = joinPath(configDir, 'aimux.config.js')
+    absolutePath = existsSync(jsPath) && !existsSync(tsPath) ? jsPath : tsPath
+  } else {
+    absolutePath = getSnippetsCatalogPath()
   }
 
+  launchEditorOnFile(ctx, absolutePath, configDir, (message) => {
+    logInputDebug('snippets.openInEditor.error', { message, path: absolutePath })
+    ctx.dispatch({ message, type: 'snippet-picker-set-message' })
+  })
+}
+
+function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   const fileEntry = ctx.state.gitPanel.files.find((f) => f.path === relPath)
   const cwd = fileEntry?.repoPath ?? ctx.getCurrentSessionProjectPath()
   if (!cwd) {
@@ -640,11 +666,28 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
     return
   }
   const absolutePath = resolvePath(cwd, relPath)
+  launchEditorOnFile(ctx, absolutePath, cwd, (message) =>
+    ctx.dispatch({ message, type: 'git-mode-set-message' })
+  )
+}
+
+function launchEditorOnFile(
+  ctx: SideEffectContext,
+  absolutePath: string,
+  cwd: string,
+  onError: (message: string) => void
+): void {
+  const config = getExternalEditorConfig()
+  const rawCommand = config.command ?? process.env.VISUAL ?? process.env.EDITOR
+  if (!rawCommand || rawCommand.trim() === '') {
+    onError('no $EDITOR/$VISUAL set — configure externalEditor in aimux.config.ts')
+    return
+  }
 
   const cmdParts = shellSplit(rawCommand)
   const executable = cmdParts[0]
   if (!executable) {
-    ctx.dispatch({ message: 'invalid editor command', type: 'git-mode-set-message' })
+    onError('invalid editor command')
     return
   }
   const baseName = executable.split('/').pop() ?? executable
@@ -653,16 +696,12 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   const kind: 'gui' | 'tui' = config.kind ?? (KNOWN_GUI_EDITORS.has(baseName) ? 'gui' : 'tui')
 
   const templateArgs = config.args ?? DEFAULT_EDITOR_ARGS[baseName] ?? ['{file}']
-  // git mode does not track a cursor line within the diff yet, so pass undefined
-  // and let the substitution strip `{line}` placeholders cleanly — preserves
-  // editor-side "restore last cursor position" behavior (e.g. vscode).
+  // No line target — let substitution strip `{line}` placeholders so we don't
+  // defeat the editor's "restore last cursor position" feature.
   const resolvedArgs = [...extraCmdArgs, ...substituteEditorArgs(templateArgs, absolutePath)]
 
   if (!isCommandAvailable(executable)) {
-    ctx.dispatch({
-      message: `editor not found in PATH: ${executable}`,
-      type: 'git-mode-set-message',
-    })
+    onError(`editor not found in PATH: ${executable}`)
     return
   }
 
@@ -671,9 +710,6 @@ function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
     return
   }
 
-  // TUI editor — if the user explicitly configured `terminal`, spawn a new
-  // terminal window with their template. Otherwise default to inline shellout:
-  // suspend the renderer, hand the TTY to the editor, resume on exit.
   if (config.terminal && config.terminal.length > 0) {
     const shellCmd = buildShellCmd(cwd, executable, resolvedArgs)
     const argv = config.terminal.map((a) =>

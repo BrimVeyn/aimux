@@ -1,7 +1,11 @@
+import type { SnippetRecord } from '../state/types'
+
 /**
  * Snippet/macro content expander.
  *
  * Supports:
+ *  - Custom (per-snippet) variables resolved upstream and passed via `customVars`.
+ *    These shadow built-ins on name collision.
  *  - `{{date}}`, `{{date:FORMAT}}` with tokens YYYY MM DD HH mm ss
  *  - `{{cwd}}` (resolved from context)
  *  - `{{branch}}` (resolved from context; empty string when null)
@@ -14,6 +18,7 @@ export interface ExpansionContext {
   cwd: string
   branch: string | null
   now: Date
+  customVars: ReadonlyMap<string, string>
   clipboard: () => Promise<string>
 }
 
@@ -42,6 +47,8 @@ function formatDate(date: Date, format?: string): string {
 }
 
 function resolveSyncVariable(name: string, ctx: SyncExpansionContext): string | null {
+  const custom = ctx.customVars.get(name)
+  if (custom !== undefined) return custom
   if (name === 'date') return formatDate(ctx.now)
   if (name.startsWith('date:')) return formatDate(ctx.now, name.slice('date:'.length))
   if (name === 'cwd') return ctx.cwd
@@ -71,6 +78,11 @@ export function contentNeedsClipboard(content: string): boolean {
   return /\{\{\s*clipboard\s*\}\}/.test(content)
 }
 
+export function requiresAsyncExpansion(snippet: SnippetRecord): boolean {
+  const hasVars = snippet.vars !== undefined && Object.keys(snippet.vars).length > 0
+  return hasVars || contentNeedsClipboard(snippet.content)
+}
+
 export function expandSnippetSync(content: string, ctx: SyncExpansionContext): ExpansionResult {
   const replaced = content.replace(VAR_RE, (match, rawName: string) => {
     const name = rawName.trim()
@@ -86,13 +98,13 @@ export async function expandSnippet(
   ctx: ExpansionContext
 ): Promise<ExpansionResult> {
   let clipboardValue: string | null = null
-  const needsClipboard = contentNeedsClipboard(content)
+  const needsClipboard = contentNeedsClipboard(content) && !ctx.customVars.has('clipboard')
   if (needsClipboard) {
     clipboardValue = await ctx.clipboard()
   }
   const replaced = content.replace(VAR_RE, (match, rawName: string) => {
     const name = rawName.trim()
-    if (name === 'clipboard') return clipboardValue ?? ''
+    if (name === 'clipboard' && clipboardValue !== null) return clipboardValue
     const resolved = resolveSyncVariable(name, ctx)
     return resolved ?? match
   })

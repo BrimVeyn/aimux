@@ -9,7 +9,7 @@ import {
   pasteSnippetToTab,
   saveSnippetEditorState,
 } from '../../src/app-runtime/snippet-actions'
-import { mergeConfigSnippets } from '../../src/state/snippet-catalog'
+import { mergeConfigSnippets, stripUserVars } from '../../src/state/snippet-catalog'
 import { createInitialState } from '../../src/state/store'
 import { createDefaultTerminalModes } from '../../src/state/terminal-modes'
 
@@ -191,5 +191,33 @@ describe('session and snippet actions', () => {
     expect(deleteSnippetState(snippets, 'u1')).toEqual([
       { content: 'config', id: 'config:foo', name: 'foo' },
     ])
+  })
+
+  test('mergeConfigSnippets propagates vars from config snippets', () => {
+    const cfg = [{ name: 'pr', text: 'url={{u}}', trigger: 'pr', vars: { u: { sh: 'echo X' } } }]
+    const merged = mergeConfigSnippets([], cfg)
+    expect(merged[0]?.vars).toEqual({ u: { sh: 'echo X' } })
+  })
+
+  test('stripUserVars removes vars from non-config snippets only', () => {
+    const userWithVars = {
+      content: 'x',
+      id: 'u1',
+      name: 'u',
+      vars: { x: { sh: 'echo evil' } },
+    }
+    const stripped = stripUserVars(userWithVars)
+    expect(stripped).toEqual({ content: 'x', id: 'u1', name: 'u' })
+    expect('vars' in stripped).toBe(false)
+  })
+
+  test('stripUserVars preserves vars on config-pinned snippets', () => {
+    const configWithVars = {
+      content: 'x',
+      id: 'config:foo',
+      name: 'foo',
+      vars: { x: { sh: 'echo ok' } },
+    }
+    expect(stripUserVars(configWithVars)).toEqual(configWithVars)
   })
 })

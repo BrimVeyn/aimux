@@ -12,6 +12,7 @@ interface SnippetPickerModalProps {
   selectedIndex: number
   filter: string | null
   cursorPos?: number
+  actionMessage?: string | null
 }
 
 const MAX_PREVIEW_LENGTH = 60
@@ -23,6 +24,7 @@ function truncateContent(content: string): string {
 }
 
 export function SnippetPickerModal({
+  actionMessage,
   cursorPos,
   filter,
   selectedIndex,
@@ -46,11 +48,13 @@ export function SnippetPickerModal({
       onEdit: fromConfig ? undefined : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
       subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
       title: (
-        <text fg={active ? t.text : t.textMuted}>
-          <strong>{snippet.name}</strong>
-          {snippet.trigger ? <text fg={t.textMuted}> :{snippet.trigger}</text> : null}
-          {fromConfig ? <text fg={t.textMuted}> [config]</text> : null}
-        </text>
+        <box flexDirection="row">
+          <text fg={active ? t.text : t.textMuted}>
+            <strong>{snippet.name}</strong>
+          </text>
+          {snippet.trigger ? <text fg={t.textMuted}>{` :${snippet.trigger}`}</text> : null}
+          {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
+        </box>
       ),
     }
   })
@@ -70,6 +74,7 @@ export function SnippetPickerModal({
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
       }
+      footer={actionMessage ? <text fg={t.error}>{actionMessage}</text> : undefined}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )
