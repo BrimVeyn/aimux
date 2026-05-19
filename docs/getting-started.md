@@ -118,7 +118,9 @@ Important defaults:
 - `i` enters terminal-input mode
 - `Ctrl+G` opens the workspace picker
 - `Ctrl+N` opens the new-tab modal
-- `Ctrl+S` opens the snippet picker
+- `Ctrl+S` opens the snippet picker — see [`guide/macros.md`](guide/macros.md)
+  for inline triggers (`:sig<space>`), built-in variables, and shell-backed
+  variables
 - `Ctrl+T` opens the theme picker
 - `Ctrl+D` enters git mode — see [`guide/git-mode.md`](guide/git-mode.md)
 - the shipped leader key is `Ctrl+W`

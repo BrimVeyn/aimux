@@ -47,6 +47,7 @@ defineConfig({
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
+  macros?: MacrosConfig
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
@@ -64,7 +65,8 @@ defineConfig({
 | `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                               |
 | `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                            |
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                                                      |
-| `snippets`   | Typed surface only | Type exists, but snippets are currently loaded from `aimux-snippets.json`                                            |
+| `snippets`   | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/macros.md` |
+| `macros`     | Supported          | Configures the inline trigger character. See `../guide/macros.md`                                                    |
 | `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                              |
 | `multiRepo`  | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces` |
 | `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                     |
@@ -335,7 +337,7 @@ This is currently a typed API surface, not a documented runtime feature.
 
 ## `snippets`
 
-Status: `Typed surface only`
+Status: `Supported`
 
 Type:
 
@@ -344,14 +346,46 @@ interface SnippetDef {
   name: string
   trigger?: string
   text: string
+  vars?: Record<string, SnippetVar>
+}
+
+interface SnippetShellVar {
+  sh: string
+  timeout?: number  // ms, default 5000
+  trim?: boolean    // default true
+}
+
+type SnippetVar = SnippetShellVar
+```
+
+Runtime behavior:
+
+- snippets are loaded from `aimux-snippets.json` (user-edited, JSON catalog)
+- snippets declared in `aimux.config.ts` are merged into the runtime catalog
+  with id prefix `config:` and treated as read-only in the picker
+- `vars` are only honored on `config:` snippets — any `vars` field on a
+  user-catalog snippet is stripped on load (security: only the typed config
+  may declare shell execution)
+- a snippet whose `trigger` matches an inline-typed sequence expands the
+  `text` with `{{name}}` variable substitution and `$|` cursor placement
+
+See `../guide/macros.md` for the full reference.
+
+## `macros`
+
+Status: `Supported`
+
+Type:
+
+```ts
+interface MacrosConfig {
+  /** Single-character prefix that opens an inline trigger. Default: `:`. */
+  triggerChar?: string
 }
 ```
 
-Current runtime behavior:
-
-- snippets are loaded from `aimux-snippets.json`
-- the runtime seeds that file with default snippets on first use
-- the top-level typed `snippets` field is not currently the main runtime source
+A non-single-character value falls back to `:` at resolution time. See
+`../guide/macros.md`.
 
 ## `autoCommit`
 

@@ -96,7 +96,7 @@ typed config file.
 
 ## `aimux-snippets.json`
 
-This file stores the snippet catalog used by the snippet picker.
+This file stores the user-edited snippet catalog used by the snippet picker.
 
 If it does not exist, `aimux` seeds it with built-in default snippets such as:
 
@@ -105,6 +105,14 @@ If it does not exist, `aimux` seeds it with built-in default snippets such as:
 - write tests
 - refactor
 - fix error
+
+Snippets declared in `aimux.config.ts` are not stored here. They are merged
+into the runtime catalog at every launch with id prefix `config:` and are
+read-only in the picker. See `../guide/macros.md`.
+
+Shell-execution `vars` are stripped from any entry in this file at load time —
+only the typed config may declare them. This is a defensive boundary so a
+tool that writes into `aimux-snippets.json` cannot inject shell commands.
 
 ## Runtime Precedence and Interaction
 
@@ -152,10 +160,17 @@ They are created, renamed, deleted, reordered, and persisted by the runtime in
 
 ### Snippets
 
-Snippets are currently runtime-managed through `aimux-snippets.json`.
+Snippets have two sources, merged at startup:
 
-Even though `@brimveyn/aimux-config` exposes a typed `snippets` field, the app
-runtime currently loads snippets from the catalog file.
+1. `aimux.config.ts` — the typed `snippets[]` array. Each entry becomes a
+   read-only picker row with id `config:${name}`. Required source for any
+   snippet that uses shell-backed `vars`.
+2. `aimux-snippets.json` — the user-edited catalog. Created from the picker
+   (`Ctrl+S`) and persisted as you add / edit / delete entries.
+
+Config-pinned entries win on id collision and cannot be modified from the
+picker. See `../guide/macros.md` for the full lifecycle, including inline
+trigger expansion and shell variables.
 
 ## Legacy Migration
 

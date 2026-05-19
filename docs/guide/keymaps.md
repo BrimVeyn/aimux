@@ -237,6 +237,19 @@ only lists git-mode bindings. It renders as an overlay above the git view
 rather than taking over focus, so panel selection, diff scroll, and the
 split / stacked toggle stay intact while the modal is visible.
 
+### `modal.snippet-picker.filtering`
+
+The snippet picker is always in filter mode. Plain characters go to the
+filter; the special keys below are intercepted:
+
+- `Enter` - paste highlighted snippet into the active terminal
+- `Ctrl+A` - paste into every tab in the active group
+- `Ctrl+O` - open the snippet's source file in `$EDITOR` (config snippets →
+  `aimux.config.ts`; user snippets → `aimux-snippets.json`)
+- `Esc` - close the picker
+
+See `macros.md` for the full picker UX.
+
 ### Universal selection alternates
 
 Every picker / modal that supports a selection (new tab, workspace picker,
