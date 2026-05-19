@@ -5,7 +5,21 @@ import { logDebug } from '../debug/input-log'
 const DEFAULT_TIMEOUT_MS = 5000
 
 /**
- * Run a snippet shell var: `sh -c '<cmd>'`, capture stdout.
+ * Build the shell argv. We default to `$SHELL -l -c <cmd>` so the user's
+ * login shell rc files (e.g. /etc/zprofile → path_helper on macOS) populate
+ * PATH and make tools like `gh`, `jira`, `brew` resolvable — matching
+ * Espanso's behavior. Falls back to `/bin/sh -c` if SHELL is unset.
+ */
+function buildShellArgv(cmd: string): string[] {
+  const userShell = process.env.SHELL
+  if (userShell && userShell.length > 0) {
+    return [userShell, '-l', '-c', cmd]
+  }
+  return ['/bin/sh', '-c', cmd]
+}
+
+/**
+ * Run a snippet shell var via the user's login shell, capture stdout.
  *
  * Returns the trimmed stdout on success, or '' on error / timeout / non-zero
  * exit. Stderr is captured for logging but never propagated into the result —
@@ -16,7 +30,7 @@ export async function runShellVar(name: string, v: SnippetShellVar): Promise<str
 
   let proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
   try {
-    proc = Bun.spawn(['sh', '-c', v.sh], {
+    proc = Bun.spawn(buildShellArgv(v.sh), {
       stderr: 'pipe',
       stdin: 'ignore',
       stdout: 'pipe',
