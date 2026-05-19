@@ -1,9 +1,17 @@
 import { flushSync } from '@opentui/react'
-import { type MutableRefObject, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import {
+  type MutableRefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, AppState, ScrollIntent } from '../state/types'
+import type { MeasuredPaneRect } from './use-pane-size-report'
 
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import {
@@ -19,6 +27,12 @@ const TERMINAL_PANE_VERTICAL_CHROME = 2
 const MIN_TERMINAL_ROWS = 1
 const MIN_TERMINAL_COLS = 20
 const RESIZE_ACTIVITY_SETTLE_MS = 500
+
+// Must match the clamps PtyManager applies in resizeSession/resizeAll, so the
+// size we record as "applied" is the size the PTY/xterm actually adopt — a
+// mismatch here would make the dedupe never settle and resize every frame.
+const PTY_MIN_COLS = 20
+const PTY_MIN_ROWS = 8
 
 function getTerminalBounds(cols: number, rows: number) {
   return createTerminalBounds(cols, rows)
@@ -138,6 +152,35 @@ export function useTerminalResize({
       .map((t) => [t.id, t.scrollIntent])
   )
 
+  const activeTabIdRef = useRef(state.activeTabId)
+  activeTabIdRef.current = state.activeTabId
+  // Last size we pushed to the backend per tab, used to dedupe the measurement
+  // loop so an unchanged box never re-triggers a resize.
+  const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
+
+  // Closed measurement loop: the rendered terminal content box reports its
+  // real geometry; that — not the hardcoded chrome model below — is the
+  // authority for the PTY/xterm size and the mouse-mapping origin. The model
+  // cascade still runs for bootstrap and for tabs whose pane isn't mounted yet;
+  // this corrects any residual divergence (status-bar wrap, split rounding, …).
+  const handleMeasure = useCallback(
+    (tabId: string, rect: MeasuredPaneRect): void => {
+      const cols = Math.max(PTY_MIN_COLS, rect.cols)
+      const rows = Math.max(PTY_MIN_ROWS, rect.rows)
+      const isActive = tabId === activeTabIdRef.current
+      if (isActive) {
+        contentOriginRef.current = { cols, rows, x: rect.x, y: rect.y }
+      }
+      const prev = measuredRef.current.get(tabId)
+      if (prev && prev.cols === cols && prev.rows === rows) {
+        return
+      }
+      measuredRef.current.set(tabId, { cols, rows })
+      backend.resizeTab(tabId, cols, rows, intentsRef.current.get(tabId))
+    },
+    [backend, contentOriginRef]
+  )
+
   const gitPaneInPaneMode = state.gitPane.mode === 'pane' && state.gitPane.visible
   const terminalSize = useMemo(() => {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width : 0
@@ -234,5 +277,5 @@ export function useTerminalResize({
     stableTabIds,
   ])
 
-  return terminalSize
+  return { cols: terminalSize.cols, onMeasure: handleMeasure, rows: terminalSize.rows }
 }

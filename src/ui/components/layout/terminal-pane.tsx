@@ -5,6 +5,7 @@ import { memo, type ReactNode } from 'react'
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
 
+import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
@@ -28,6 +29,7 @@ interface TerminalPaneProps {
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
   onLeftEdgeMouseDown?: (event: OtuiMouseEvent) => boolean
+  onMeasure?: (tabId: string, rect: MeasuredPaneRect) => void
 }
 
 function getTitle(
@@ -112,6 +114,7 @@ export function TerminalPane({
   localScrollbackEnabled,
   mouseForwardingEnabled,
   onLeftEdgeMouseDown,
+  onMeasure,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
@@ -124,6 +127,7 @@ export function TerminalPane({
   tabId,
 }: TerminalPaneProps) {
   const t = useTheme()
+  const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
@@ -287,9 +291,11 @@ export function TerminalPane({
           </box>
         ) : (
           <box
+            ref={setContentBox}
             flexDirection="column"
             flexGrow={1}
             width="100%"
+            overflow="hidden"
             onMouseDown={(e) => {
               e.stopPropagation()
               forwardMouseEvent(e)
@@ -302,10 +308,18 @@ export function TerminalPane({
           </box>
         )}
       </ContextMenuBox>
-      {tab?.status === 'disconnected' ? (
-        <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
+      {tab?.status === 'disconnected' || tab?.errorMessage ? (
+        // Absolutely positioned so it overlays the bordered box instead of
+        // consuming a flex row. If it took a row, the rendered terminal area
+        // would be one line shorter than the size sent to the PTY/xterm,
+        // re-introducing the shifted-content / dead-row bug.
+        <box position="absolute" bottom={0} left={0} backgroundColor={editorBg}>
+          {tab?.status === 'disconnected' ? (
+            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
+          ) : null}
+          {tab?.errorMessage ? <text fg={t.error}>{tab.errorMessage}</text> : null}
+        </box>
       ) : null}
-      {tab?.errorMessage ? <text fg={t.error}>{tab.errorMessage}</text> : null}
     </box>
   )
 }

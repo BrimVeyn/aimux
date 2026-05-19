@@ -49,7 +49,9 @@ export function StatusBar() {
 
   return (
     <box
-      minHeight={2}
+      height={2}
+      flexShrink={0}
+      overflow="hidden"
       paddingLeft={1}
       paddingRight={1}
       paddingTop={0}

@@ -1,5 +1,6 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
+import type { MeasuredPaneRect } from '../../../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { FocusMode, TabSession } from '../../../state/types'
 
@@ -39,6 +40,7 @@ interface SplitLayoutProps {
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
   onLeftEdgeMouseDown?: (event: OtuiMouseEvent) => boolean
+  onMeasure?: (tabId: string, rect: MeasuredPaneRect) => void
   contentOrigin: TerminalContentOrigin
   bounds: PaneRect
 }
@@ -52,6 +54,7 @@ export function SplitLayout({
   mouseForwardingEnabled,
   node,
   onLeftEdgeMouseDown,
+  onMeasure,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
@@ -104,6 +107,7 @@ export function SplitLayout({
         onSeparatorDrag={onSeparatorDrag}
         onSeparatorDragEnd={onSeparatorDragEnd}
         onLeftEdgeMouseDown={onLeftEdgeMouseDown}
+        onMeasure={onMeasure}
       />
     )
   }
@@ -144,6 +148,7 @@ export function SplitLayout({
           onSeparatorDrag={onSeparatorDrag}
           onSeparatorDragEnd={onSeparatorDragEnd}
           onLeftEdgeMouseDown={onLeftEdgeMouseDown}
+          onMeasure={onMeasure}
           contentOrigin={contentOrigin}
           bounds={firstBounds}
         />
@@ -187,6 +192,7 @@ export function SplitLayout({
           onSeparatorDrag={onSeparatorDrag}
           onSeparatorDragEnd={onSeparatorDragEnd}
           onLeftEdgeMouseDown={secondLeftEdgeMouseDown}
+          onMeasure={onMeasure}
           contentOrigin={contentOrigin}
           bounds={secondBounds}
         />

@@ -1,5 +1,6 @@
 import type { MouseEvent } from '@opentui/core'
 
+import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { FocusMode, ModalState, SessionRecord, SnippetRecord } from '../state/types'
 import type { ThemeId } from './themes'
@@ -229,6 +230,7 @@ interface RootViewProps {
   }) => void
   onSeparatorDrag?: (event: MouseEvent) => boolean
   onSeparatorDragEnd?: () => void
+  onMeasure?: (tabId: string, rect: MeasuredPaneRect) => void
   terminalCols: number
   terminalRows: number
 }
@@ -239,6 +241,7 @@ export function RootView({
   mouseForwardingEnabled,
   onEmbeddedGitResizeStart,
   onGitPaneResizeStart,
+  onMeasure,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
@@ -375,6 +378,7 @@ export function RootView({
             onSeparatorDrag={onSeparatorDrag}
             onSeparatorDragEnd={onSeparatorDragEnd}
             onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
+            onMeasure={onMeasure}
             bounds={{
               cols: terminalCols + splitChrome,
               rows: terminalRows + splitChrome,
@@ -398,6 +402,7 @@ export function RootView({
             onTerminalMouseUp={onTerminalMouseUp}
             onPaneActivate={onPaneActivate}
             onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
+            onMeasure={onMeasure}
           />
         )}
         {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (

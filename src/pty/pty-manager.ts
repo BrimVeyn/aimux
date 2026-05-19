@@ -24,6 +24,12 @@ interface SessionHandle {
   pendingModeSequence: string
   pendingWrites: number
   pendingExitCode: number | null
+  /** Scroll intent from the most recent resize, re-applied after the
+   *  parser drains the data that was queued across the resize. */
+  lastScrollIntent: ScrollIntent | undefined
+  /** Set when a resize landed while writes were in flight; the viewport is
+   *  re-anchored once pendingWrites reaches 0. */
+  reanchorAfterDrain: boolean
 }
 
 const ESC = '\x1b'
@@ -255,12 +261,14 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         alternateScrollMode: false,
         cursorVisible: true,
         emulator,
+        lastScrollIntent: undefined,
         lastSnapshot: undefined,
         lastTerminalModes: undefined,
         pendingExitCode: null,
         pendingModeSequence: '',
         pendingWrites: 0,
         pty,
+        reanchorAfterDrain: false,
         tabId: options.tabId,
       }
 
@@ -283,6 +291,15 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         this.scheduleDataRender(session)
         emulator.write(data, () => {
           session.pendingWrites -= 1
+
+          if (session.pendingWrites === 0 && session.reanchorAfterDrain) {
+            // The data queued across a resize has now been parsed into the
+            // reflowed buffer. Re-anchor the viewport before it is snapshotted
+            // so the active screen — not stale scrollback — is what renders.
+            session.reanchorAfterDrain = false
+            this.applyScrollIntent(session, session.lastScrollIntent)
+          }
+
           this.scheduleDataRender(session)
 
           if (session.pendingWrites === 0 && session.pendingExitCode !== null) {
@@ -357,24 +374,46 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     session.emulator.scrollToLine(Math.max(0, intent.absoluteLine))
   }
 
+  private applyResize(
+    session: SessionHandle,
+    cols: number,
+    rows: number,
+    intent: ScrollIntent | undefined,
+    sync: boolean
+  ): void {
+    const safeCols = Math.max(20, cols)
+    const safeRows = Math.max(8, rows)
+    session.pty.resize(safeCols, safeRows)
+    session.emulator.resize(safeCols, safeRows)
+    session.lastScrollIntent = intent
+    this.applyScrollIntent(session, intent)
+
+    if (session.pendingWrites > 0) {
+      // Output produced by the child for the pre-resize size is still queued
+      // in the xterm parser. Snapshotting now would capture a torn buffer
+      // (reflowed but not yet redrawn); a plain shell never issues a full
+      // repaint, so the shifted content + dead rows would stick. Defer the
+      // snapshot to the drain path, which re-anchors the viewport first.
+      session.reanchorAfterDrain = true
+      this.scheduleDataRender(session)
+      return
+    }
+
+    if (sync) {
+      this.flushRenderNow(session)
+    } else {
+      this.scheduleRender(session)
+    }
+  }
+
   resizeAll(
     cols: number,
     rows: number,
     intents?: Map<string, ScrollIntent>,
     options?: { sync?: boolean }
   ): void {
-    const safeCols = Math.max(20, cols)
-    const safeRows = Math.max(8, rows)
-
     for (const session of this.sessions.values()) {
-      session.pty.resize(safeCols, safeRows)
-      session.emulator.resize(safeCols, safeRows)
-      this.applyScrollIntent(session, intents?.get(session.tabId))
-      if (options?.sync) {
-        this.flushRenderNow(session)
-      } else {
-        this.scheduleRender(session)
-      }
+      this.applyResize(session, cols, rows, intents?.get(session.tabId), options?.sync ?? false)
     }
   }
 
@@ -389,16 +428,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     if (!session) {
       return
     }
-    const safeCols = Math.max(20, cols)
-    const safeRows = Math.max(8, rows)
-    session.pty.resize(safeCols, safeRows)
-    session.emulator.resize(safeCols, safeRows)
-    this.applyScrollIntent(session, intent)
-    if (options?.sync) {
-      this.flushRenderNow(session)
-    } else {
-      this.scheduleRender(session)
-    }
+    this.applyResize(session, cols, rows, intent, options?.sync ?? false)
   }
 
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
