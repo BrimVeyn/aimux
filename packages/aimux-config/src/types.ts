@@ -722,20 +722,6 @@ export interface SnippetDef {
   vars?: Record<string, SnippetVar>
 }
 
-// ─── Macros config ────────────────────────────────────────────────────────────
-
-export interface MacrosConfig {
-  /**
-   * Single-character prefix that opens an inline macro trigger.
-   * Defaults to `:` (Espanso-style).
-   */
-  triggerChar?: string
-}
-
-export interface ResolvedMacrosConfig {
-  triggerChar: string
-}
-
 // ─── Action value types ───────────────────────────────────────────────────────
 
 export type ActionFn = (ctx: ModeContext) => KeyResult | null
@@ -932,7 +918,12 @@ export interface AimuxUserConfig {
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
-  macros?: MacrosConfig
+  /**
+   * Single-character prefix that opens an inline snippet trigger.
+   * Defaults to `:` (Espanso-style). Typing `<char><trigger><separator>` in
+   * any non-alternate-screen terminal expands the matching snippet.
+   */
+  snippetTriggerChar?: string
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
@@ -1006,7 +997,7 @@ export interface ResolvedConfig {
       }
   hooks: HooksConfig
   snippets: SnippetDef[]
-  macros: ResolvedMacrosConfig
+  snippetTriggerChar: string
   autoCommit: AutoCommitConfig
   multiRepo: MultiRepoConfig
   statusBar: StatusBarConfig

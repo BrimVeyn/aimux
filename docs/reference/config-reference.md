@@ -47,7 +47,7 @@ defineConfig({
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
-  macros?: MacrosConfig
+  snippetTriggerChar?: string
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
@@ -66,7 +66,7 @@ defineConfig({
 | `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                            |
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                                                      |
 | `snippets`   | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
-| `macros`     | Supported          | Configures the inline trigger character. See `../guide/snippets.md`                                                    |
+| `snippetTriggerChar` | Supported  | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                  |
 | `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                              |
 | `multiRepo`  | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces` |
 | `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                     |
@@ -371,17 +371,15 @@ Runtime behavior:
 
 See `../guide/snippets.md` for the full reference.
 
-## `macros`
+## `snippetTriggerChar`
 
 Status: `Supported`
 
 Type:
 
 ```ts
-interface MacrosConfig {
-  /** Single-character prefix that opens an inline trigger. Default: `:`. */
-  triggerChar?: string
-}
+/** Single-character prefix that opens an inline trigger. Default: `:`. */
+snippetTriggerChar?: string
 ```
 
 A non-single-character value falls back to `:` at resolution time. See

@@ -82,7 +82,7 @@ Nathan
 The trigger character defaults to `:` (Espanso-style) and is configurable:
 
 ```ts
-macros: { triggerChar: ';' }
+snippetTriggerChar: ';'
 ```
 
 A separator must follow the trigger to commit the expansion. Separators are
@@ -232,13 +232,11 @@ body appends after them. This matches Espanso's behavior.
 
 ## Configuration Reference
 
-### `macros`
+### `snippetTriggerChar`
 
 ```ts
-interface MacrosConfig {
-  /** Single-character prefix that opens an inline trigger. Default: `:`. */
-  triggerChar?: string
-}
+/** Single-character prefix that opens an inline trigger. Default: `:`. */
+snippetTriggerChar?: string
 ```
 
 ### `snippets[]`

@@ -264,8 +264,8 @@ export function App({
   snippetsRef.current = state.snippets
   const branchRef = useRef(state.gitPanel.branch)
   branchRef.current = state.gitPanel.branch
-  const triggerCharRef = useRef(resolvedConfig.macros.triggerChar)
-  triggerCharRef.current = resolvedConfig.macros.triggerChar
+  const triggerCharRef = useRef(resolvedConfig.snippetTriggerChar)
+  triggerCharRef.current = resolvedConfig.snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot

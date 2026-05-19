@@ -30,8 +30,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 - `guide/themes.md` - built-in themes, the theme picker, and typed theme helpers
 - `guide/git-mode.md` - git-mode workflow: panel, diff view, keybindings,
   help overlay, and commit flow
-- `guide/snippets.md` - snippets and inline macros: triggers, built-in
-  variables, cursor placement, shell-backed variables, undo
+- `guide/snippets.md` - reusable text fragments: picker, inline triggers,
+  built-in variables, cursor placement, shell-backed variables, undo
 
 ## Reference
 
