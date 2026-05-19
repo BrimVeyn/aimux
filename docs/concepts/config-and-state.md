@@ -108,7 +108,7 @@ If it does not exist, `aimux` seeds it with built-in default snippets such as:
 
 Snippets declared in `aimux.config.ts` are not stored here. They are merged
 into the runtime catalog at every launch with id prefix `config:` and are
-read-only in the picker. See `../guide/macros.md`.
+read-only in the picker. See `../guide/snippets.md`.
 
 Shell-execution `vars` are stripped from any entry in this file at load time —
 only the typed config may declare them. This is a defensive boundary so a
@@ -169,7 +169,7 @@ Snippets have two sources, merged at startup:
    (`Ctrl+S`) and persisted as you add / edit / delete entries.
 
 Config-pinned entries win on id collision and cannot be modified from the
-picker. See `../guide/macros.md` for the full lifecycle, including inline
+picker. See `../guide/snippets.md` for the full lifecycle, including inline
 trigger expansion and shell variables.
 
 ## Legacy Migration

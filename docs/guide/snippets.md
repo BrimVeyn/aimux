@@ -1,21 +1,18 @@
 ---
-title: Macros and Snippets
+title: Snippets
 description: Reusable text fragments triggered inline or via a picker, with built-in variables, shell-backed variables, and cursor placement.
 ---
 
-# Macros and Snippets
+# Snippets
 
-`aimux` ships with one unified system for reusable text fragments. The same
-entries can be:
+A snippet is a reusable text fragment. It can be:
 
 - inserted manually via the **snippet picker** (`Ctrl+S`)
-- expanded **inline** when you type a configured trigger (e.g. `:sig<space>`)
+- expanded **inline** when you type its `trigger` (e.g. `:sig<space>`) — like
+  Espanso macros
 - enriched with **dynamic variables** (`{{date}}`, `{{cwd}}`, `{{branch}}`,
   `{{clipboard}}`, plus user-defined shell commands)
 - placed precisely with a **cursor placeholder** (`$|`)
-
-We call an entry a _snippet_; one with a trigger acts as a _macro_ in the
-Espanso sense.
 
 ## Two Sources of Snippets
 
@@ -291,6 +288,6 @@ etc.) without breaking the public surface.
 
 | Path                                                       | What                          |
 | ---------------------------------------------------------- | ----------------------------- |
-| `~/.config/aimux/<profile>/aimux.config.ts`                | Typed snippets + macros config |
+| `~/.config/aimux/<profile>/aimux.config.ts`                | Typed snippets + trigger char config |
 | `~/.config/aimux/<profile>/aimux-snippets.json`            | User-edited catalog          |
 | `/tmp/aimux-input-debug.log` (when `AIMUX_DEBUG_INPUT=1`)  | Shell-var resolution logs    |

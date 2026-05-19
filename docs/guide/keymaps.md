@@ -248,7 +248,7 @@ filter; the special keys below are intercepted:
   `aimux.config.ts`; user snippets → `aimux-snippets.json`)
 - `Esc` - close the picker
 
-See `macros.md` for the full picker UX.
+See `snippets.md` for the full picker UX.
 
 ### Universal selection alternates
 

@@ -65,8 +65,8 @@ defineConfig({
 | `backends`   | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                               |
 | `sidebar`    | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                            |
 | `hooks`      | Typed surface only | Type exists; runtime use is not currently wired                                                                      |
-| `snippets`   | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/macros.md` |
-| `macros`     | Supported          | Configures the inline trigger character. See `../guide/macros.md`                                                    |
+| `snippets`   | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
+| `macros`     | Supported          | Configures the inline trigger character. See `../guide/snippets.md`                                                    |
 | `autoCommit` | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                              |
 | `multiRepo`  | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces` |
 | `statusBar`  | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                     |
@@ -369,7 +369,7 @@ Runtime behavior:
 - a snippet whose `trigger` matches an inline-typed sequence expands the
   `text` with `{{name}}` variable substitution and `$|` cursor placement
 
-See `../guide/macros.md` for the full reference.
+See `../guide/snippets.md` for the full reference.
 
 ## `macros`
 
@@ -385,7 +385,7 @@ interface MacrosConfig {
 ```
 
 A non-single-character value falls back to `:` at resolution time. See
-`../guide/macros.md`.
+`../guide/snippets.md`.
 
 ## `autoCommit`
 
