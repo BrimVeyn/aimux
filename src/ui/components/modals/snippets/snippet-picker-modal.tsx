@@ -2,6 +2,7 @@ import type { SnippetRecord } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterSnippets } from '../../../../state/selectors'
+import { isConfigSnippetId } from '../../../../state/snippet-catalog'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -32,18 +33,23 @@ export function SnippetPickerModal({
 
   const items: PickerItem[] = filtered.map((snippet, index) => {
     const active = index === selectedIndex
+    const fromConfig = isConfigSnippetId(snippet.id)
     return {
       key: snippet.id,
       onClick: () => {
         dispatchGlobal({ type: 'close-modal' })
         runSideEffectGlobal({ type: 'paste-selected-snippet' })
       },
-      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
-      onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
+      onDelete: fromConfig
+        ? undefined
+        : () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
+      onEdit: fromConfig ? undefined : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
       subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
       title: (
         <text fg={active ? t.text : t.textMuted}>
           <strong>{snippet.name}</strong>
+          {snippet.trigger ? <text fg={t.textMuted}> :{snippet.trigger}</text> : null}
+          {fromConfig ? <text fg={t.textMuted}> [config]</text> : null}
         </text>
       ),
     }

@@ -157,6 +157,10 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
 
 export function isSnippetRecord(value: unknown): value is SnippetRecord {
   return (
-    isObjectRecord(value) && isString(value.id) && isString(value.name) && isString(value.content)
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.content) &&
+    (value.trigger === undefined || isString(value.trigger))
   )
 }

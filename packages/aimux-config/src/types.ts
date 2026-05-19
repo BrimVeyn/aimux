@@ -150,6 +150,7 @@ export interface SnippetRecord {
   id: string
   name: string
   content: string
+  trigger?: string
 }
 
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
@@ -303,7 +304,9 @@ export interface ModalGitCommit extends ModalBase {
 }
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
-  activeField: 'name' | 'content'
+  activeField: 'name' | 'trigger' | 'content'
+  nameBuffer: string
+  triggerBuffer: string
   contentBuffer: string
 }
 
@@ -695,6 +698,20 @@ export interface SnippetDef {
   text: string
 }
 
+// ─── Macros config ────────────────────────────────────────────────────────────
+
+export interface MacrosConfig {
+  /**
+   * Single-character prefix that opens an inline macro trigger.
+   * Defaults to `:` (Espanso-style).
+   */
+  triggerChar?: string
+}
+
+export interface ResolvedMacrosConfig {
+  triggerChar: string
+}
+
 // ─── Action value types ───────────────────────────────────────────────────────
 
 export type ActionFn = (ctx: ModeContext) => KeyResult | null
@@ -891,6 +908,7 @@ export interface AimuxUserConfig {
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
+  macros?: MacrosConfig
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
@@ -964,6 +982,7 @@ export interface ResolvedConfig {
       }
   hooks: HooksConfig
   snippets: SnippetDef[]
+  macros: ResolvedMacrosConfig
   autoCommit: AutoCommitConfig
   multiRepo: MultiRepoConfig
   statusBar: StatusBarConfig

@@ -52,19 +52,14 @@ function getCreateSessionFields(modal: ModalState) {
 
 function getSnippetEditorFields(modal: ModalState) {
   if (modal.type !== 'snippet-editor') {
-    return { snippetContent: '', snippetName: '' }
+    return { snippetContent: '', snippetName: '', snippetTrigger: '' }
   }
 
-  if (modal.activeField === 'name') {
-    return {
-      snippetContent: modal.contentBuffer,
-      snippetName: modal.editBuffer ?? '',
-    }
-  }
-
+  const editValue = modal.editBuffer ?? ''
   return {
-    snippetContent: modal.editBuffer ?? '',
-    snippetName: modal.contentBuffer,
+    snippetContent: modal.activeField === 'content' ? editValue : modal.contentBuffer,
+    snippetName: modal.activeField === 'name' ? editValue : modal.nameBuffer,
+    snippetTrigger: modal.activeField === 'trigger' ? editValue : modal.triggerBuffer,
   }
 }
 
@@ -78,7 +73,7 @@ function renderModal(
     snippets: SnippetRecord[]
     themeId: ThemeId
     createSessionFields: { directoryQuery: string; sessionName: string }
-    snippetEditorFields: { snippetName: string; snippetContent: string }
+    snippetEditorFields: { snippetName: string; snippetTrigger: string; snippetContent: string }
     focusMode: FocusMode
     activeAssistant?: string
     autoCommitModel?: string
@@ -142,6 +137,7 @@ function renderModal(
         <SnippetEditorModal
           activeField={modal.activeField}
           snippetName={options.snippetEditorFields.snippetName}
+          snippetTrigger={options.snippetEditorFields.snippetTrigger}
           snippetContent={options.snippetEditorFields.snippetContent}
           isEditing={modal.sessionTargetId !== null}
         />

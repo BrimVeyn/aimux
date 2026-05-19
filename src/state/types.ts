@@ -342,7 +342,12 @@ export interface ModalCreateSession extends ModalBase {
 
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
-  activeField: 'name' | 'content'
+  activeField: 'name' | 'trigger' | 'content'
+  /** Persisted value of the name field when it is not the active editor. */
+  nameBuffer: string
+  /** Persisted value of the trigger field when it is not the active editor. */
+  triggerBuffer: string
+  /** Persisted value of the content field when it is not the active editor. */
   contentBuffer: string
 }
 
@@ -388,6 +393,7 @@ export interface SnippetRecord {
   id: string
   name: string
   content: string
+  trigger?: string
 }
 
 export interface DiscoveredRepo {

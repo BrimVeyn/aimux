@@ -3,13 +3,23 @@ import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { KeyChord } from '../input/keymap/key-chord'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, FocusMode, TabSession } from '../state/types'
+import type { AppAction, FocusMode, SnippetRecord, TabSession } from '../state/types'
 
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from '../debug/input-log'
 import { createRawInputHandler } from '../input/raw-input-handler'
-import { copyToSystemClipboard } from '../platform/clipboard'
+import { copyToSystemClipboard, readFromSystemClipboard } from '../platform/clipboard'
+import {
+  contentNeedsClipboard,
+  expandSnippet,
+  expandSnippetSync,
+} from '../snippets/expand-variables'
+import {
+  createTriggerDetector,
+  type TriggerDetector,
+  type TriggerMatch,
+} from '../snippets/trigger-detector'
 import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
-import { writePasteToTab, writeToTab } from './pty-write'
+import { writeMacroExpansionToTab, writePasteToTab, writeToTab } from './pty-write'
 import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
 import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
 
@@ -28,6 +38,9 @@ interface UseRendererBindingsOptions {
   focusModeRef: MutableRefObject<FocusMode>
   activeTabIdRef: MutableRefObject<string | null>
   activeTabRef: MutableRefObject<TabSession | undefined>
+  snippetsRef: MutableRefObject<readonly SnippetRecord[]>
+  branchRef: MutableRefObject<string | null>
+  triggerCharRef: MutableRefObject<string>
   handleTerminalShortcut: (chord: KeyChord) => boolean
 }
 
@@ -41,13 +54,17 @@ export function useRendererBindings({
   activeTabRef,
   activeTabViewportY,
   backend,
+  branchRef,
   dispatch,
   focusMode,
   focusModeRef,
   handleTerminalShortcut,
   renderer,
+  snippetsRef,
+  triggerCharRef,
 }: UseRendererBindingsOptions): void {
   const lastViewportRef = useRef<ViewportObservation | null>(null)
+  const triggerDetectorsRef = useRef<Map<string, TriggerDetector>>(new Map())
 
   useEffect(() => {
     renderer.useMouse = true
@@ -55,12 +72,61 @@ export function useRendererBindings({
     renderer.console.hide()
     renderer.console.show = () => {}
 
+    const getOrCreateDetector = (tabId: string): TriggerDetector => {
+      let detector = triggerDetectorsRef.current.get(tabId)
+      if (!detector) {
+        detector = createTriggerDetector({
+          getSnippets: () => snippetsRef.current,
+          getTriggerChar: () => triggerCharRef.current,
+        })
+        triggerDetectorsRef.current.set(tabId, detector)
+      }
+      return detector
+    }
+
+    const expandMacroForTab = (tabId: string, match: TriggerMatch): void => {
+      const tab = activeTabRef.current
+      const content = match.snippet.content
+      const branch = branchRef.current
+      const cwd = process.cwd()
+      const now = new Date()
+
+      const performWrite = (text: string, cursorOffset: number) => {
+        writeMacroExpansionToTab(
+          backend,
+          tabId,
+          tab,
+          match.triggerText.length,
+          text,
+          cursorOffset,
+          dispatch
+        )
+      }
+
+      if (contentNeedsClipboard(content)) {
+        void expandSnippet(content, {
+          branch,
+          clipboard: readFromSystemClipboard,
+          cwd,
+          now,
+        }).then(({ cursorOffset, text }) => performWrite(text, cursorOffset))
+        return
+      }
+
+      const { cursorOffset, text } = expandSnippetSync(content, { branch, cwd, now })
+      performWrite(text, cursorOffset)
+    }
+
     const handler = createRawInputHandler({
+      expandMacro: expandMacroForTab,
+      feedTrigger: (tabId, char) => getOrCreateDetector(tabId).feed(char),
       getActiveTabId: () => activeTabIdRef.current,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       getFocusMode: () => focusModeRef.current,
+      getIsAlternateBuffer: () => activeTabRef.current?.terminalModes.isAlternateBuffer ?? false,
       handleTerminalShortcut,
+      resetTrigger: (tabId) => triggerDetectorsRef.current.get(tabId)?.reset(),
       writeToPty: (tabId, data, options) =>
         writeToTab(backend, tabId, activeTabRef.current, data, dispatch, options),
     })
@@ -146,10 +212,13 @@ export function useRendererBindings({
     activeTabIdRef,
     activeTabRef,
     backend,
+    branchRef,
     dispatch,
     focusModeRef,
     handleTerminalShortcut,
     renderer,
+    snippetsRef,
+    triggerCharRef,
   ])
 
   useEffect(() => {

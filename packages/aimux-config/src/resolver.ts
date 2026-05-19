@@ -40,6 +40,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
     keymaps,
+    macros: resolveMacros(userConfig.macros),
     multiRepo,
     sessionBar: resolveSessionBar(userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
@@ -47,6 +48,13 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
   }
+}
+
+function resolveMacros(userConfig: AimuxUserConfig['macros']): ResolvedConfig['macros'] {
+  const userTrigger = userConfig?.triggerChar
+  const triggerChar =
+    typeof userTrigger === 'string' && userTrigger.length === 1 ? userTrigger : ':'
+  return { triggerChar }
 }
 
 function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['theme'] {

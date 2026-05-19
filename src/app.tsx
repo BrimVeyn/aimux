@@ -34,7 +34,7 @@ import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
-import { loadSnippetCatalog } from './state/snippet-catalog'
+import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
@@ -137,10 +137,11 @@ export function App({
     }
 
     const sessionCatalog = loadSessionCatalog()
+    const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
     const initial = createInitialState(
       json.customCommands,
       sessionCatalog,
-      loadSnippetCatalog(),
+      mergedSnippets,
       sessionCatalog.length === 0,
       {
         gitPane: gitPaneOverrides,
@@ -259,6 +260,13 @@ export function App({
   const stateRef = useRef(state)
   stateRef.current = state
 
+  const snippetsRef = useRef(state.snippets)
+  snippetsRef.current = state.snippets
+  const branchRef = useRef(state.gitPanel.branch)
+  branchRef.current = state.gitPanel.branch
+  const triggerCharRef = useRef(resolvedConfig.macros.triggerChar)
+  triggerCharRef.current = resolvedConfig.macros.triggerChar
+
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
 
@@ -370,11 +378,14 @@ export function App({
     activeTabRef,
     activeTabViewportY: activeTab?.viewport?.viewportY ?? null,
     backend,
+    branchRef,
     dispatch,
     focusMode: state.focusMode,
     focusModeRef,
     handleTerminalShortcut,
     renderer,
+    snippetsRef,
+    triggerCharRef,
   })
 
   const sideEffectCtx: SideEffectContext = {

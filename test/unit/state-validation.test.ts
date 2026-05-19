@@ -80,4 +80,36 @@ describe('state validation', () => {
       })
     ).toBe(false)
   })
+
+  test('accepts a snippet with a trigger', () => {
+    expect(
+      isSnippetRecord({
+        content: 'Hello',
+        id: 'snippet-1',
+        name: 'Greeting',
+        trigger: 'hi',
+      })
+    ).toBe(true)
+  })
+
+  test('accepts a snippet without a trigger', () => {
+    expect(
+      isSnippetRecord({
+        content: 'Hello',
+        id: 'snippet-1',
+        name: 'Greeting',
+      })
+    ).toBe(true)
+  })
+
+  test('rejects a snippet with a non-string trigger', () => {
+    expect(
+      isSnippetRecord({
+        content: 'Hello',
+        id: 'snippet-1',
+        name: 'Greeting',
+        trigger: 42,
+      })
+    ).toBe(false)
+  })
 })

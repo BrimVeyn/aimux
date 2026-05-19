@@ -11,3 +11,17 @@ export function copyToSystemClipboard(text: string): void {
     })
   }
 }
+
+export async function readFromSystemClipboard(): Promise<string> {
+  try {
+    const proc = Bun.spawn(['pbpaste'], { stdout: 'pipe' })
+    const text = await new Response(proc.stdout).text()
+    await proc.exited
+    return text
+  } catch (error) {
+    logDebug('platform.clipboard.readError', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return ''
+  }
+}
