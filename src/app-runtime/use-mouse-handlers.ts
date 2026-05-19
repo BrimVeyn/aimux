@@ -19,6 +19,7 @@ import {
   type MultiClickMode,
   resolveClickSelection,
 } from './click-selection-resolver'
+import { recordMultiClickClipboardWrite } from './multi-click-clipboard-guard'
 import { requestRenderUpTree } from './render-invalidation'
 import {
   type AnchoredRatioDragState,
@@ -540,6 +541,7 @@ export function useMouseHandlers({
     const text = extractStreamText(lines, anchorIdx, anchorCol, focusIdx, drag.focusCol)
     if (text.length > 0) {
       copyToSystemClipboard(text)
+      recordMultiClickClipboardWrite()
     }
 
     multiClickDragRef.current = null

@@ -8,6 +8,7 @@ import type { AppAction, FocusMode, TabSession } from '../state/types'
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from '../debug/input-log'
 import { createRawInputHandler } from '../input/raw-input-handler'
 import { copyToSystemClipboard } from '../platform/clipboard'
+import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
 import { writePasteToTab, writeToTab } from './pty-write'
 import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
 import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
@@ -115,6 +116,16 @@ export function useRendererBindings({
       })
 
       if (selection.isDragging || selectedText.length === 0) {
+        return
+      }
+
+      // After a multi-click drag, handleTerminalMouseUp has just copied the
+      // authoritative text built from drag.capturedLines (anchored at click
+      // time). opentui's finishSelection() then re-fires this 'selection'
+      // event, but the recomputed text can drift by a few rows when output
+      // landed between mouseDown and mouseUp. Skip the redundant write.
+      if (shouldSuppressSelectionCopy()) {
+        logInputDebug('app.selection.suppressed', { textLength: selectedText.length })
         return
       }
 
