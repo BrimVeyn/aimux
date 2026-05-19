@@ -65,6 +65,9 @@ export function useRendererBindings({
 }: UseRendererBindingsOptions): void {
   const lastViewportRef = useRef<ViewportObservation | null>(null)
   const triggerDetectorsRef = useRef<Map<string, TriggerDetector>>(new Map())
+  const pendingMacroUndoRef = useRef<Map<string, { fullLength: number; suffixLength: number }>>(
+    new Map()
+  )
 
   useEffect(() => {
     renderer.useMouse = true
@@ -101,6 +104,15 @@ export function useRendererBindings({
           cursorOffset,
           dispatch
         )
+        // Register an undo window: the next keystroke can erase the whole
+        // expansion if it's a backspace. Only meaningful for short inline
+        // expansions where cursor positions are predictable in raw mode.
+        if (!text.includes('\n')) {
+          pendingMacroUndoRef.current.set(tabId, {
+            fullLength: text.length,
+            suffixLength: text.length - cursorOffset,
+          })
+        }
       }
 
       if (contentNeedsClipboard(content)) {
@@ -117,6 +129,18 @@ export function useRendererBindings({
       performWrite(text, cursorOffset)
     }
 
+    const tryConsumeMacroUndo = (tabId: string, sequence: string): boolean => {
+      const entry = pendingMacroUndoRef.current.get(tabId)
+      if (!entry) return false
+      pendingMacroUndoRef.current.delete(tabId)
+      const isBackspace = sequence === '\x7f' || sequence === '\b'
+      if (!isBackspace) return false
+      const rightArrows = '\x1b[C'.repeat(entry.suffixLength)
+      const dels = '\x7f'.repeat(entry.fullLength)
+      backend.write(tabId, `${rightArrows}${dels}`)
+      return true
+    }
+
     const handler = createRawInputHandler({
       expandMacro: expandMacroForTab,
       feedTrigger: (tabId, char) => getOrCreateDetector(tabId).feed(char),
@@ -127,6 +151,7 @@ export function useRendererBindings({
       getIsAlternateBuffer: () => activeTabRef.current?.terminalModes.isAlternateBuffer ?? false,
       handleTerminalShortcut,
       resetTrigger: (tabId) => triggerDetectorsRef.current.get(tabId)?.reset(),
+      tryConsumeMacroUndo,
       writeToPty: (tabId, data, options) =>
         writeToTab(backend, tabId, activeTabRef.current, data, dispatch, options),
     })

@@ -97,6 +97,12 @@ export function createRawInputHandler(deps: {
   expandMacro?: (tabId: string, match: TriggerMatch) => void
   /** Reset detector state when input boundaries change (paste start, mode toggle). */
   resetTrigger?: (tabId: string) => void
+  /**
+   * Called for every keystroke immediately after a macro expansion: if the
+   * keystroke is a backspace, erase the entire expansion and return true.
+   * Any other keystroke clears the pending-undo state and returns false.
+   */
+  tryConsumeMacroUndo?: (tabId: string, sequence: string) => boolean
 }): (sequence: string) => boolean {
   let bracketedPasteBuffer: string | null = null
 
@@ -166,6 +172,10 @@ export function createRawInputHandler(deps: {
 
       flushPaste(tabId, afterStart.slice(0, endIndex))
       return handleSequence(tabId, afterStart.slice(endIndex + BRACKETED_PASTE_END.length))
+    }
+
+    if (deps.tryConsumeMacroUndo?.(tabId, sequence) ?? false) {
+      return true
     }
 
     if (
