@@ -478,6 +478,7 @@ export function App({
         onSeparatorDrag={handleSeparatorDrag}
         onSeparatorDragEnd={handleSeparatorDragEnd}
         onSidebarResizeStart={handleSidebarResizeStart}
+        onMeasure={terminalSize.onMeasure}
         terminalCols={terminalSize.cols}
         terminalRows={terminalSize.rows}
       />

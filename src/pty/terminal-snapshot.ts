@@ -152,9 +152,16 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
   const lines: TerminalLine[] = []
   const tailLines: TerminalLine[] = []
 
+  // The window starts at viewportY, but cursorY is relative to baseY. The
+  // cursor belongs on a rendered row only when its absolute buffer line
+  // (baseY + cursorY) equals that row's buffer line (startLine + row).
+  // Comparing row === cursorY was correct only while scrolled to the bottom
+  // (viewportY === baseY) and misplaced the cursor otherwise.
+  const cursorLine = buffer.baseY + cursorRow
   for (let row = 0; row < terminal.rows; row += 1) {
+    const lineIndex = startLine + row
     lines.push(
-      buildLine(terminal, startLine + row, row === cursorRow ? cursorColumn : null, cursorVisible)
+      buildLine(terminal, lineIndex, lineIndex === cursorLine ? cursorColumn : null, cursorVisible)
     )
   }
 
