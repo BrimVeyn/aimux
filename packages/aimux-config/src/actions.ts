@@ -201,6 +201,10 @@ export const openSnippetEditor: KeyResult = r(
 
 export const editSelectedSnippet: KeyResult = r([], [{ type: 'edit-selected-snippet' }])
 export const deleteSelectedSnippet: KeyResult = r([], [{ type: 'delete-selected-snippet' }])
+export const openSelectedSnippetSourceInEditor: KeyResult = r(
+  [],
+  [{ type: 'open-selected-snippet-source-in-editor' }]
+)
 
 export const pasteSelectedSnippet: KeyResult = r(
   [{ type: 'close-modal' }],

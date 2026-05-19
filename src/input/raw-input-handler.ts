@@ -1,4 +1,5 @@
 import type { PtyWriteOptions } from '../app-runtime/pty-write'
+import type { TriggerMatch } from '../snippets/trigger-detector'
 import type { FocusMode } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
@@ -88,6 +89,20 @@ export function createRawInputHandler(deps: {
    * Returns true if the chord was consumed by the keymap, false otherwise.
    */
   handleTerminalShortcut: (chord: KeyChord) => boolean
+  /** True when the active tab is in alternate-screen mode (vim, less, htop, ...). */
+  getIsAlternateBuffer?: () => boolean
+  /** Feed a single char to the per-tab macro trigger detector. */
+  feedTrigger?: (tabId: string, char: string) => TriggerMatch | null
+  /** Expand a matched macro and inject it into the PTY (erase + paste + cursor). */
+  expandMacro?: (tabId: string, match: TriggerMatch) => void
+  /** Reset detector state when input boundaries change (paste start, mode toggle). */
+  resetTrigger?: (tabId: string) => void
+  /**
+   * Called for every keystroke immediately after a macro expansion: if the
+   * keystroke is a backspace, erase the entire expansion and return true.
+   * Any other keystroke clears the pending-undo state and returns false.
+   */
+  tryConsumeMacroUndo?: (tabId: string, sequence: string) => boolean
 }): (sequence: string) => boolean {
   let bracketedPasteBuffer: string | null = null
 
@@ -143,6 +158,7 @@ export function createRawInputHandler(deps: {
         sequencePreview: sequence.slice(0, 120),
         tabId,
       })
+      deps.resetTrigger?.(tabId)
       if (!handleSequence(tabId, sequence.slice(0, startIndex))) {
         return false
       }
@@ -156,6 +172,23 @@ export function createRawInputHandler(deps: {
 
       flushPaste(tabId, afterStart.slice(0, endIndex))
       return handleSequence(tabId, afterStart.slice(endIndex + BRACKETED_PASTE_END.length))
+    }
+
+    if (deps.tryConsumeMacroUndo?.(tabId, sequence) ?? false) {
+      return true
+    }
+
+    if (
+      sequence.length === 1 &&
+      deps.feedTrigger &&
+      deps.expandMacro &&
+      !(deps.getIsAlternateBuffer?.() ?? false)
+    ) {
+      const match = deps.feedTrigger(tabId, sequence)
+      if (match) {
+        deps.expandMacro(tabId, match)
+        return true
+      }
     }
 
     if (handleTerminalShortcut(sequence)) {

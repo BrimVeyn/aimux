@@ -2,8 +2,9 @@ import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
 
 interface SnippetEditorModalProps {
-  activeField: 'name' | 'content'
+  activeField: 'name' | 'trigger' | 'content'
   snippetName: string
+  snippetTrigger: string
   snippetContent: string
   isEditing: boolean
 }
@@ -13,18 +14,21 @@ export function SnippetEditorModal({
   isEditing,
   snippetContent,
   snippetName,
+  snippetTrigger,
 }: SnippetEditorModalProps) {
-  const nameActive = activeField === 'name'
-  const contentActive = activeField === 'content'
-
   return (
     <Form
       title={isEditing ? 'Edit snippet' : 'Create snippet'}
       keybindsModeId="modal.snippet-editor"
       width={uiTokens.modalWidth.xl}
     >
-      <TextField active={nameActive} label="Name" value={snippetName} />
-      <TextField active={contentActive} label="Content" value={snippetContent} />
+      <TextField active={activeField === 'name'} label="Name" value={snippetName} />
+      <TextField
+        active={activeField === 'trigger'}
+        label="Trigger (optional)"
+        value={snippetTrigger}
+      />
+      <TextField active={activeField === 'content'} label="Content" value={snippetContent} />
     </Form>
   )
 }

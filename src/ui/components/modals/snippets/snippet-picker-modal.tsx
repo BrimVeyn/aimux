@@ -2,6 +2,7 @@ import type { SnippetRecord } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterSnippets } from '../../../../state/selectors'
+import { isConfigSnippetId } from '../../../../state/snippet-catalog'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -11,6 +12,7 @@ interface SnippetPickerModalProps {
   selectedIndex: number
   filter: string | null
   cursorPos?: number
+  actionMessage?: string | null
 }
 
 const MAX_PREVIEW_LENGTH = 60
@@ -22,6 +24,7 @@ function truncateContent(content: string): string {
 }
 
 export function SnippetPickerModal({
+  actionMessage,
   cursorPos,
   filter,
   selectedIndex,
@@ -32,19 +35,26 @@ export function SnippetPickerModal({
 
   const items: PickerItem[] = filtered.map((snippet, index) => {
     const active = index === selectedIndex
+    const fromConfig = isConfigSnippetId(snippet.id)
     return {
       key: snippet.id,
       onClick: () => {
         dispatchGlobal({ type: 'close-modal' })
         runSideEffectGlobal({ type: 'paste-selected-snippet' })
       },
-      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
-      onEdit: () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
+      onDelete: fromConfig
+        ? undefined
+        : () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
+      onEdit: fromConfig ? undefined : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
       subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
       title: (
-        <text fg={active ? t.text : t.textMuted}>
-          <strong>{snippet.name}</strong>
-        </text>
+        <box flexDirection="row">
+          <text fg={active ? t.text : t.textMuted}>
+            <strong>{snippet.name}</strong>
+          </text>
+          {snippet.trigger ? <text fg={t.textMuted}>{` :${snippet.trigger}`}</text> : null}
+          {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
+        </box>
       ),
     }
   })
@@ -64,6 +74,7 @@ export function SnippetPickerModal({
           {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
         </text>
       }
+      footer={actionMessage ? <text fg={t.error}>{actionMessage}</text> : undefined}
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

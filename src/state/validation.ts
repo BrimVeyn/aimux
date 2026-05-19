@@ -155,8 +155,29 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
   )
 }
 
+function isSnippetVar(value: unknown): boolean {
+  if (!isObjectRecord(value)) return false
+  if (!isString(value.sh)) return false
+  if (value.timeout !== undefined && !isFiniteNumber(value.timeout)) return false
+  if (value.trim !== undefined && !isBoolean(value.trim)) return false
+  return true
+}
+
+function isSnippetVarRecord(value: unknown): boolean {
+  if (!isObjectRecord(value)) return false
+  for (const entry of Object.values(value)) {
+    if (!isSnippetVar(entry)) return false
+  }
+  return true
+}
+
 export function isSnippetRecord(value: unknown): value is SnippetRecord {
   return (
-    isObjectRecord(value) && isString(value.id) && isString(value.name) && isString(value.content)
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.content) &&
+    (value.trigger === undefined || isString(value.trigger)) &&
+    (value.vars === undefined || isSnippetVarRecord(value.vars))
   )
 }

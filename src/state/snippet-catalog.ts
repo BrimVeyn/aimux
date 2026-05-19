@@ -1,3 +1,5 @@
+import type { SnippetDef, SnippetVar } from '@brimveyn/aimux-config'
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -9,9 +11,15 @@ export interface SnippetRecord {
   id: string
   name: string
   content: string
+  trigger?: string
+  vars?: Record<string, SnippetVar>
 }
 
-const SNIPPETS_PATH = join(getProfileConfigDir(), 'aimux-snippets.json')
+export function getSnippetsCatalogPath(): string {
+  return join(getProfileConfigDir(), 'aimux-snippets.json')
+}
+
+const SNIPPETS_PATH = getSnippetsCatalogPath()
 
 const DEFAULT_SNIPPETS: SnippetRecord[] = [
   {
@@ -52,7 +60,7 @@ export function loadSnippetCatalog(): SnippetRecord[] {
       version?: unknown
       snippets?: unknown
     }
-    if (parsed.version !== 1 || !Array.isArray(parsed.snippets)) {
+    if ((parsed.version !== 1 && parsed.version !== 2) || !Array.isArray(parsed.snippets)) {
       logDebug('snippets.catalog.loadIssue', {
         issue: 'invalid snippet catalog header',
         path: SNIPPETS_PATH,
@@ -66,7 +74,7 @@ export function loadSnippetCatalog(): SnippetRecord[] {
       })
       return []
     }
-    return parsed.snippets
+    return parsed.snippets.map(stripUserVars)
   } catch (error) {
     logDebug('snippets.catalog.loadIssue', {
       issue: error instanceof Error ? error.message : String(error),
@@ -79,7 +87,16 @@ export function loadSnippetCatalog(): SnippetRecord[] {
 export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
   try {
     mkdirSync(getProfileConfigDir(), { recursive: true })
-    writeFileSync(SNIPPETS_PATH, `${JSON.stringify({ snippets, version: 1 }, null, 2)}\n`)
+    // Persist only user-owned snippets. Config-pinned entries are reapplied
+    // at boot from `aimux.config.ts`.
+    const userSnippets = snippets.filter((s) => !isConfigSnippetId(s.id)).map(stripUserVars)
+    // Schema v2 adds the optional `trigger` and `vars` fields. v1 files are
+    // still accepted on read (they validate as v2 — both fields are optional)
+    // and get rewritten as v2 on the next save.
+    writeFileSync(
+      SNIPPETS_PATH,
+      `${JSON.stringify({ snippets: userSnippets, version: 2 }, null, 2)}\n`
+    )
   } catch (error) {
     logDebug('snippets.catalog.saveError', {
       error: error instanceof Error ? error.message : String(error),
@@ -87,4 +104,48 @@ export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
       snippetCount: snippets.length,
     })
   }
+}
+
+export const CONFIG_SNIPPET_ID_PREFIX = 'config:'
+
+export function isConfigSnippetId(id: string): boolean {
+  return id.startsWith(CONFIG_SNIPPET_ID_PREFIX)
+}
+
+/**
+ * Shell `vars` are only authorized on config-pinned snippets (those defined in
+ * `aimux.config.ts`). If they ever appear on a user-edited JSON snippet — by
+ * hand edit, restore, or import — strip them. This keeps shell execution
+ * gated by the user's TypeScript config file.
+ *
+ * Exported for testing; called at both load and save time.
+ */
+export function stripUserVars(snippet: SnippetRecord): SnippetRecord {
+  if (snippet.vars === undefined) return snippet
+  if (isConfigSnippetId(snippet.id)) return snippet
+  logDebug('snippets.catalog.strippedVars', { id: snippet.id, name: snippet.name })
+  const { vars, ...clean } = snippet
+  void vars
+  return clean
+}
+
+/**
+ * Merge config-defined snippets with user-edited snippets.
+ * Config-pinned snippets ("sticky") get a stable id `config:${name}` and win
+ * over a user-edited snippet with the same id (they're read-only in the UI).
+ */
+export function mergeConfigSnippets(
+  userSnippets: readonly SnippetRecord[],
+  configSnippets: readonly SnippetDef[]
+): SnippetRecord[] {
+  const fromConfig: SnippetRecord[] = configSnippets.map((s) => ({
+    content: s.text,
+    id: `${CONFIG_SNIPPET_ID_PREFIX}${s.name}`,
+    name: s.name,
+    trigger: s.trigger,
+    vars: s.vars,
+  }))
+  const configIds = new Set(fromConfig.map((s) => s.id))
+  const userKept = userSnippets.filter((s) => !configIds.has(s.id))
+  return [...fromConfig, ...userKept]
 }
