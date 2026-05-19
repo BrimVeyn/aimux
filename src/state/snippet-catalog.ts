@@ -90,6 +90,9 @@ export function saveSnippetCatalog(snippets: SnippetRecord[]): void {
     // Persist only user-owned snippets. Config-pinned entries are reapplied
     // at boot from `aimux.config.ts`.
     const userSnippets = snippets.filter((s) => !isConfigSnippetId(s.id)).map(stripUserVars)
+    // Schema v2 adds the optional `trigger` and `vars` fields. v1 files are
+    // still accepted on read (they validate as v2 — both fields are optional)
+    // and get rewritten as v2 on the next save.
     writeFileSync(
       SNIPPETS_PATH,
       `${JSON.stringify({ snippets: userSnippets, version: 2 }, null, 2)}\n`

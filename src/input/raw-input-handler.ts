@@ -90,7 +90,7 @@ export function createRawInputHandler(deps: {
    */
   handleTerminalShortcut: (chord: KeyChord) => boolean
   /** True when the active tab is in alternate-screen mode (vim, less, htop, ...). */
-  getIsAlternateBuffer?: (tabId: string) => boolean
+  getIsAlternateBuffer?: () => boolean
   /** Feed a single char to the per-tab macro trigger detector. */
   feedTrigger?: (tabId: string, char: string) => TriggerMatch | null
   /** Expand a matched macro and inject it into the PTY (erase + paste + cursor). */
@@ -182,7 +182,7 @@ export function createRawInputHandler(deps: {
       sequence.length === 1 &&
       deps.feedTrigger &&
       deps.expandMacro &&
-      !(deps.getIsAlternateBuffer?.(tabId) ?? false)
+      !(deps.getIsAlternateBuffer?.() ?? false)
     ) {
       const match = deps.feedTrigger(tabId, sequence)
       if (match) {

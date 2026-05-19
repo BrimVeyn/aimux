@@ -3,6 +3,8 @@ import type { SnippetShellVar } from '@brimveyn/aimux-config'
 import { logDebug } from '../debug/input-log'
 
 const DEFAULT_TIMEOUT_MS = 5000
+/** Hard ceiling on any user-supplied timeout to prevent runaway expansions. */
+const MAX_TIMEOUT_MS = 30_000
 
 /**
  * Build the shell argv. We default to `$SHELL -l -c <cmd>` so the user's
@@ -26,7 +28,8 @@ function buildShellArgv(cmd: string): string[] {
  * snippet content is for the terminal, not for surfacing failures.
  */
 export async function runShellVar(name: string, v: SnippetShellVar): Promise<string> {
-  const timeoutMs = v.timeout ?? DEFAULT_TIMEOUT_MS
+  const requested = v.timeout ?? DEFAULT_TIMEOUT_MS
+  const timeoutMs = Math.min(Math.max(requested, 0), MAX_TIMEOUT_MS)
 
   let proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
   try {

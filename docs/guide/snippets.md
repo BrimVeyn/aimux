@@ -18,10 +18,10 @@ A snippet is a reusable text fragment. It can be:
 
 Snippets live in one of two places, with very different permissions:
 
-| Source              | Where                                          | Editable from UI? | Can run shell commands? |
-| ------------------- | ---------------------------------------------- | ----------------- | ----------------------- |
-| Typed config        | `aimux.config.ts` (the `snippets:` array)      | No (read-only)    | Yes                     |
-| User catalog (JSON) | `aimux-snippets.json` (under the profile dir)  | Yes (`Ctrl+S`)    | No (stripped on load)   |
+| Source              | Where                                         | Editable from UI? | Can run shell commands? |
+| ------------------- | --------------------------------------------- | ----------------- | ----------------------- |
+| Typed config        | `aimux.config.ts` (the `snippets:` array)     | No (read-only)    | Yes                     |
+| User catalog (JSON) | `aimux-snippets.json` (under the profile dir) | Yes (`Ctrl+S`)    | No (stripped on load)   |
 
 Config-pinned snippets get a stable id prefix `config:` and a small `[config]`
 badge in the picker. Their entries are reapplied at every launch — you cannot
@@ -41,14 +41,14 @@ intent.
 snippet into the active terminal. The shipped defaults are AI prompts:
 _code review_, _explain_, _write tests_, _refactor_, _fix error_.
 
-| Key      | Action                                                       |
-| -------- | ------------------------------------------------------------ |
-| `Enter`  | Paste into active terminal                                   |
-| `Ctrl+A` | Paste into every tab in the active group                     |
-| `Ctrl+O` | Open the snippet's source file in `$EDITOR`/`$VISUAL`        |
-| `Ctrl+N` / `↓` / `j` | Move selection down                              |
-| `Ctrl+P` / `↑` / `k` | Move selection up                                |
-| `Esc`    | Close the picker                                             |
+| Key                  | Action                                                |
+| -------------------- | ----------------------------------------------------- |
+| `Enter`              | Paste into active terminal                            |
+| `Ctrl+A`             | Paste into every tab in the active group              |
+| `Ctrl+O`             | Open the snippet's source file in `$EDITOR`/`$VISUAL` |
+| `Ctrl+N` / `↓` / `j` | Move selection down                                   |
+| `Ctrl+P` / `↑` / `k` | Move selection up                                     |
+| `Esc`                | Close the picker                                      |
 
 `Ctrl+O` routes by snippet origin:
 
@@ -65,11 +65,13 @@ Give a snippet a `trigger` and it expands inline when you type
 `<triggerChar><trigger><separator>` in any terminal:
 
 ```ts
-snippets: [{
-  name: 'Signature',
-  trigger: 'sig',
-  text: 'Best,\nNathan',
-}]
+snippets: [
+  {
+    name: 'Signature',
+    trigger: 'sig',
+    text: 'Best,\nNathan',
+  },
+]
 ```
 
 In a shell, typing `:sig<space>` becomes:
@@ -103,13 +105,13 @@ Single-line expansions only.
 
 Reference these inside `text` with `{{name}}`:
 
-| Variable               | Resolves to                                      |
-| ---------------------- | ------------------------------------------------ |
-| `{{date}}`             | ISO date `YYYY-MM-DD`                            |
-| `{{date:FORMAT}}`      | custom format with tokens `YYYY MM DD HH mm ss`  |
-| `{{cwd}}`              | aimux process working directory                  |
-| `{{branch}}`           | active git branch from the git panel (empty if none) |
-| `{{clipboard}}`        | macOS clipboard contents (via `pbpaste`)         |
+| Variable          | Resolves to                                          |
+| ----------------- | ---------------------------------------------------- |
+| `{{date}}`        | ISO date `YYYY-MM-DD`                                |
+| `{{date:FORMAT}}` | custom format with tokens `YYYY MM DD HH mm ss`      |
+| `{{cwd}}`         | aimux process working directory                      |
+| `{{branch}}`      | active git branch from the git panel (empty if none) |
+| `{{clipboard}}`   | macOS clipboard contents (via `pbpaste`)             |
 
 Unknown `{{...}}` tokens are left literal — they do not raise an error.
 
@@ -135,16 +137,22 @@ The shape is a dict keyed by variable name, with each value tagged by its
 resolver (V1 supports `sh`):
 
 ```ts
-snippets: [{
-  name: 'PR full',
-  trigger: 'prfull',
-  text: 'backend: {{back}}\nfrontend: {{front}}\nJira: {{jira}}',
-  vars: {
-    back:  { sh: 'cd ~/Rainpath/back && gh pr list --author @me --limit 1 --json url --jq ".[0].url"' },
-    front: { sh: 'cd ~/Rainpath/front && gh pr list --author @me --limit 1 --json url --jq ".[0].url"' },
-    jira:  { sh: 'jira issue list --plain --columns key --no-headers | head -1', timeout: 10000 },
+snippets: [
+  {
+    name: 'PR full',
+    trigger: 'prfull',
+    text: 'backend: {{back}}\nfrontend: {{front}}\nJira: {{jira}}',
+    vars: {
+      back: {
+        sh: 'cd ~/Rainpath/back && gh pr list --author @me --limit 1 --json url --jq ".[0].url"',
+      },
+      front: {
+        sh: 'cd ~/Rainpath/front && gh pr list --author @me --limit 1 --json url --jq ".[0].url"',
+      },
+      jira: { sh: 'jira issue list --plain --columns key --no-headers | head -1', timeout: 10000 },
+    },
   },
-}]
+]
 ```
 
 ### How They Run
@@ -155,13 +163,20 @@ snippets: [{
 - All vars on one snippet run **in parallel** (`Promise.all`).
 - The trimmed stdout of each command replaces `{{name}}` in `text`.
 
+> **Cost note.** A login shell loads your shell's startup files
+> (`.zprofile`, `.zshrc` on zsh; `.bash_profile` / `.profile` on bash). For
+> heavy setups (`oh-my-zsh`, many plugins, slow `nvm` / `pyenv` init), each
+> spawn can take 100-400ms. Vars on a single snippet run in parallel, so the
+> latency floor is roughly the slowest cold-start command. Keep your shell
+> init lean if you rely on shell-backed vars frequently.
+
 ### Options per Var
 
-| Field      | Default | Behavior                                           |
-| ---------- | ------- | -------------------------------------------------- |
-| `sh`       | —       | The shell command. Required.                       |
-| `timeout`  | `5000`  | Kill the process after this many ms.               |
-| `trim`     | `true`  | Trim trailing whitespace from stdout.              |
+| Field     | Default | Behavior                              |
+| --------- | ------- | ------------------------------------- |
+| `sh`      | —       | The shell command. Required.          |
+| `timeout` | `5000`  | Kill the process after this many ms.  |
+| `trim`    | `true`  | Trim trailing whitespace from stdout. |
 
 ### Failure Modes
 
@@ -209,7 +224,7 @@ body appends after them. This matches Espanso's behavior.
 ### Append the current branch to a prompt
 
 ```ts
-{ trigger: 'br', text: 'I'm on the {{branch}} branch.' }
+{ trigger: 'br', text: "I'm on the {{branch}} branch." }
 ```
 
 ### Insert a `git commit` template with the cursor in the message
@@ -251,8 +266,8 @@ interface SnippetDef {
 
 interface SnippetShellVar {
   sh: string
-  timeout?: number  // ms, default 5000
-  trim?: boolean    // default true
+  timeout?: number // ms, default 5000
+  trim?: boolean // default true
 }
 
 type SnippetVar = SnippetShellVar
@@ -284,8 +299,8 @@ etc.) without breaking the public surface.
 
 ## Where Things Live
 
-| Path                                                       | What                          |
-| ---------------------------------------------------------- | ----------------------------- |
-| `~/.config/aimux/<profile>/aimux.config.ts`                | Typed snippets + trigger char config |
-| `~/.config/aimux/<profile>/aimux-snippets.json`            | User-edited catalog          |
-| `/tmp/aimux-input-debug.log` (when `AIMUX_DEBUG_INPUT=1`)  | Shell-var resolution logs    |
+| Path                                                      | What                                 |
+| --------------------------------------------------------- | ------------------------------------ |
+| `~/.config/aimux/<profile>/aimux.config.ts`               | Typed snippets + trigger char config |
+| `~/.config/aimux/<profile>/aimux-snippets.json`           | User-edited catalog                  |
+| `/tmp/aimux-input-debug.log` (when `AIMUX_DEBUG_INPUT=1`) | Shell-var resolution logs            |

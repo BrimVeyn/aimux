@@ -112,4 +112,81 @@ describe('state validation', () => {
       })
     ).toBe(false)
   })
+
+  test('accepts a snippet with valid vars (shell type)', () => {
+    expect(
+      isSnippetRecord({
+        content: 'value={{x}}',
+        id: 'snippet-1',
+        name: 'Has vars',
+        vars: { x: { sh: 'echo hi', timeout: 1000, trim: true } },
+      })
+    ).toBe(true)
+  })
+
+  test('accepts a snippet with an empty vars object', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'Empty vars',
+        vars: {},
+      })
+    ).toBe(true)
+  })
+
+  test('rejects a snippet whose var lacks a sh field', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'No sh',
+        vars: { x: { timeout: 1000 } },
+      })
+    ).toBe(false)
+  })
+
+  test('rejects a snippet whose var has a non-string sh', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'Bad sh',
+        vars: { x: { sh: 42 } },
+      })
+    ).toBe(false)
+  })
+
+  test('rejects a snippet whose var has a non-numeric timeout', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'Bad timeout',
+        vars: { x: { sh: 'echo', timeout: 'soon' } },
+      })
+    ).toBe(false)
+  })
+
+  test('rejects a snippet whose var has a non-boolean trim', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'Bad trim',
+        vars: { x: { sh: 'echo', trim: 'yes' } },
+      })
+    ).toBe(false)
+  })
+
+  test('rejects a snippet whose vars is not an object', () => {
+    expect(
+      isSnippetRecord({
+        content: 'hi',
+        id: 'snippet-1',
+        name: 'Bad vars',
+        vars: 'not-an-object',
+      })
+    ).toBe(false)
+  })
 })

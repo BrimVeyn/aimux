@@ -69,6 +69,13 @@ export function useRendererBindings({
   const pendingMacroUndoRef = useRef<Map<string, { fullLength: number; suffixLength: number }>>(
     new Map()
   )
+  /**
+   * Tabs currently waiting on an async expansion (shell vars or {{clipboard}}).
+   * While a tab is in this set, new trigger detections on that tab are
+   * suppressed — without this, a second trigger typed during the await would
+   * race with the in-flight expansion and corrupt PTY state + undo bookkeeping.
+   */
+  const inFlightAsyncExpansionRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     renderer.useMouse = true
@@ -129,23 +136,28 @@ export function useRendererBindings({
       // Eager erase: drop the typed trigger from the PTY immediately so the
       // user doesn't stare at `:prfull ` while shell vars resolve.
       backend.write(tabId, '\x7f'.repeat(match.triggerText.length))
+      inFlightAsyncExpansionRef.current.add(tabId)
 
       void (async () => {
-        const varEntries = Object.entries(snippet.vars ?? {})
-        const resolved = await Promise.all(
-          varEntries.map(async ([name, v]) => [name, await runShellVar(name, v)] as const)
-        )
-        const customVars = new Map(resolved)
-        const { cursorOffset, text } = await expandSnippet(snippet.content, {
-          branch,
-          clipboard: readFromSystemClipboard,
-          customVars,
-          cwd,
-          now,
-        })
-        // Trigger already erased above; eraseCount = 0 here.
-        writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset, dispatch)
-        registerUndo(text, cursorOffset)
+        try {
+          const varEntries = Object.entries(snippet.vars ?? {})
+          const resolved = await Promise.all(
+            varEntries.map(async ([name, v]) => [name, await runShellVar(name, v)] as const)
+          )
+          const customVars = new Map(resolved)
+          const { cursorOffset, text } = await expandSnippet(snippet.content, {
+            branch,
+            clipboard: readFromSystemClipboard,
+            customVars,
+            cwd,
+            now,
+          })
+          // Trigger already erased above; eraseCount = 0 here.
+          writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset, dispatch)
+          registerUndo(text, cursorOffset)
+        } finally {
+          inFlightAsyncExpansionRef.current.delete(tabId)
+        }
       })()
     }
 
@@ -163,7 +175,15 @@ export function useRendererBindings({
 
     const handler = createRawInputHandler({
       expandMacro: expandMacroForTab,
-      feedTrigger: (tabId, char) => getOrCreateDetector(tabId).feed(char),
+      feedTrigger: (tabId, char) => {
+        // Drop new detections while an async expansion is in flight for this
+        // tab — otherwise the second match races with the awaited write.
+        if (inFlightAsyncExpansionRef.current.has(tabId)) {
+          triggerDetectorsRef.current.get(tabId)?.reset()
+          return null
+        }
+        return getOrCreateDetector(tabId).feed(char)
+      },
       getActiveTabId: () => activeTabIdRef.current,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
