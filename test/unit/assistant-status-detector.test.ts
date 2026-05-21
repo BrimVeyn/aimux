@@ -8,8 +8,9 @@ function snapshot(lines: string[], tailLines: string[] = lines): TerminalSnapsho
   const terminalLines: TerminalLine[] = lines.map((text) => ({
     spans: [{ text }],
   }))
+  const scrolledUp = tailLines !== lines
   return {
-    baseY: 0,
+    baseY: scrolledUp ? 10 : 0,
     cursorVisible: true,
     lines: terminalLines,
     tailLines: tailLines.map((text) => ({ spans: [{ text }] })),
@@ -160,6 +161,29 @@ describe('AssistantStatusDetector', () => {
       viewport: snapshot(['line A', 'line B']),
     })
     expect(idle).toBe('idle')
+  })
+
+  test('works when terminal output does not fill the viewport height', () => {
+    const d = new AssistantStatusDetector()
+    const emptyLine = { spans: [{ text: '' }] }
+    const viewport: TerminalSnapshot = {
+      baseY: 0,
+      cursorVisible: true,
+      lines: [
+        { spans: [{ text: '✱ Thinking…' }] },
+        { spans: [{ text: '  esc/ctrl+c to interrupt' }] },
+        ...Array(38).fill(emptyLine),
+      ],
+      tailLines: Array(10).fill(emptyLine),
+      viewportY: 0,
+    }
+
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport,
+    })
+    expect(s).toBe('working')
   })
 })
 

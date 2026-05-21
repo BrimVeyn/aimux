@@ -10,8 +10,8 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
-export const IPC_PROTOCOL_MIN_VERSION = 7
-export const IPC_PROTOCOL_VERSION = 7
+export const IPC_PROTOCOL_MIN_VERSION = 8
+export const IPC_PROTOCOL_VERSION = 8
 
 export interface ProtocolHelloRequest {
   minVersion: number
