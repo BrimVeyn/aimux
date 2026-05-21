@@ -8,6 +8,7 @@ describe('command registry', () => {
       'claude',
       'codex',
       'opencode',
+      'antigravity',
       'terminal',
     ])
   })

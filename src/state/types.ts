@@ -1,7 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
-export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal'
+export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
 

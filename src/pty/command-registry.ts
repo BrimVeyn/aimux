@@ -30,6 +30,12 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     label: 'OpenCode',
   },
   {
+    command: 'agy',
+    description: 'Antigravity CLI',
+    id: 'antigravity',
+    label: 'Antigravity',
+  },
+  {
     command: DEFAULT_SHELL,
     description: `Plain terminal (${SHELL_NAME})`,
     id: 'terminal',

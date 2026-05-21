@@ -194,6 +194,7 @@ function MouseHarness({
       activeTabId: TEST_TAB_ID,
       currentSessionId: null,
       customCommands: {
+        antigravity: 'antigravity',
         claude: command,
         codex: 'codex',
         opencode: 'opencode',
