@@ -388,6 +388,11 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       launchAssistant(ctx, option.id)
       return
     }
+    case 'edit-selected-assistant': {
+      const option = getSelectedAssistantOption(state)
+      dispatch({ assistantId: option.id, type: 'open-edit-custom-command' })
+      return
+    }
     case 'confirm-selected-session': {
       handleSessionSelection(ctx)
       return

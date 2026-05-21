@@ -26,6 +26,7 @@ export type ModeId =
 export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'launch-selected-assistant' }
+  | { type: 'edit-selected-assistant' }
   | { type: 'confirm-selected-session' }
   | { type: 'delete-selected-session' }
   | { type: 'open-rename-selected-session' }

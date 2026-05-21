@@ -278,6 +278,12 @@ export const cancelEditCustomCommand: KeyResult = r(
   'modal.new-tab.command-edit'
 )
 
+export const editSelectedAssistant: KeyResult = r(
+  [],
+  [{ type: 'edit-selected-assistant' }],
+  'modal.new-tab.editing-command'
+)
+
 // ---------------------------------------------------------------------------
 // Update-available modal
 // ---------------------------------------------------------------------------

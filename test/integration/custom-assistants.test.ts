@@ -66,4 +66,22 @@ describe('custom assistants', () => {
     expect(state.customCommands.claude).toBe('claude --model opus')
     expect(state.customCommands['my-custom-ai']).toBe('/path/to/ai')
   })
+
+  test('open-edit-custom-command sets editingCommand state', () => {
+    const state = createInitialState({}, [], [], false)
+    const next = appReducer(state, { type: 'open-new-tab-modal' })
+    expect(next.modal.type).toBe('new-tab')
+    if (next.modal.type === 'new-tab') {
+      expect(next.modal.editingCommand).toBeNull()
+    }
+
+    const editing = appReducer(next, {
+      assistantId: 'claude',
+      type: 'open-edit-custom-command',
+    })
+    expect(editing.modal.type).toBe('new-tab')
+    if (editing.modal.type === 'new-tab') {
+      expect(editing.modal.editingCommand).toBe('claude')
+    }
+  })
 })

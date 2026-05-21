@@ -203,6 +203,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
         .map('<Up>', actions.moveModalSelection(-1))
+        .map('<C-e>', actions.editSelectedAssistant, 'Edit')
         .passthrough()
     )
 

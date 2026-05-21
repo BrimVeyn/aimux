@@ -430,6 +430,7 @@ export type ModalAction =
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'open-ai-usage-modal' }
+  | { type: 'open-edit-custom-command'; assistantId: AssistantId }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
@@ -599,6 +600,7 @@ export type AppAction =
 export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'launch-selected-assistant' }
+  | { type: 'edit-selected-assistant' }
   | { type: 'confirm-selected-session' }
   | { type: 'delete-selected-session' }
   | { type: 'open-rename-selected-session' }
