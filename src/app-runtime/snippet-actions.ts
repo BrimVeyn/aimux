@@ -2,25 +2,31 @@ import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, AppState, SnippetRecord, TabSession } from '../state/types'
 
 import { createPrefixedId } from '../platform/id'
-import { saveSnippetCatalog } from '../state/snippet-catalog'
+import { isConfigSnippetId, saveSnippetCatalog } from '../state/snippet-catalog'
 import { writePasteToTab } from './pty-write'
 
 function createSnippetId(): string {
   return createPrefixedId('snip')
 }
 
-export function getSnippetEditorValue(state: AppState): { name: string; content: string } | null {
+export interface SnippetEditorValue {
+  name: string
+  trigger: string
+  content: string
+}
+
+export function getSnippetEditorValue(state: AppState): SnippetEditorValue | null {
   if (state.modal.type !== 'snippet-editor') {
     return null
   }
 
   const { modal } = state
-  const name =
-    modal.activeField === 'name' ? (modal.editBuffer ?? '').trim() : modal.contentBuffer.trim()
-  const content =
-    modal.activeField === 'content' ? (modal.editBuffer ?? '').trim() : modal.contentBuffer.trim()
+  const editValue = (modal.editBuffer ?? '').trim()
+  const name = modal.activeField === 'name' ? editValue : modal.nameBuffer.trim()
+  const trigger = modal.activeField === 'trigger' ? editValue : modal.triggerBuffer.trim()
+  const content = modal.activeField === 'content' ? editValue : modal.contentBuffer.trim()
 
-  return { content, name }
+  return { content, name, trigger }
 }
 
 export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null {
@@ -35,21 +41,29 @@ export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null 
   }
 
   const snippetId = state.modal.sessionTargetId
+  // Config-pinned snippets are sticky and read-only in the UI.
+  if (snippetId && isConfigSnippetId(snippetId)) {
+    return null
+  }
+
+  const trigger = editorValue.trigger.length > 0 ? editorValue.trigger : undefined
+
   if (snippetId) {
     return state.snippets.map((snippet) =>
       snippet.id === snippetId
-        ? { ...snippet, content: editorValue.content, name: editorValue.name }
+        ? { ...snippet, content: editorValue.content, name: editorValue.name, trigger }
         : snippet
     )
   }
 
   return [
     ...state.snippets,
-    { content: editorValue.content, id: createSnippetId(), name: editorValue.name },
+    { content: editorValue.content, id: createSnippetId(), name: editorValue.name, trigger },
   ]
 }
 
 export function deleteSnippetState(snippets: SnippetRecord[], snippetId: string): SnippetRecord[] {
+  if (isConfigSnippetId(snippetId)) return snippets
   return snippets.filter((snippet) => snippet.id !== snippetId)
 }
 

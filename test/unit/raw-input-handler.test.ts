@@ -250,4 +250,69 @@ describe('createRawInputHandler', () => {
     const reconstructed = writeToPty.mock.calls.map((c) => c[1]).join('')
     expect(reconstructed).toBe(phrase)
   })
+
+  test('macro trigger detection is suppressed in alternate-screen mode', () => {
+    const feedTrigger = mock((_tabId: string, _char: string) => null)
+    const expandMacro = mock(() => {})
+    const writeToPty = mock(() => {})
+    const handler = createRawInputHandler({
+      expandMacro,
+      feedTrigger,
+      getActiveTabId: () => 'tab-1',
+      getBracketedPasteModeEnabled: () => false,
+      getFocusMode: () => 'terminal-input',
+      getIsAlternateBuffer: () => true, // <-- vim / less / htop active
+      handleTerminalShortcut: () => false,
+      writeToPty,
+    })
+
+    // Type ':' which would normally seed the trigger detector.
+    handler(':')
+
+    expect(feedTrigger).not.toHaveBeenCalled()
+    expect(expandMacro).not.toHaveBeenCalled()
+    // ... and the char still reaches the PTY (so vim can use it).
+    expect(writeToPty).toHaveBeenCalledWith('tab-1', ':', { autoBottom: true })
+  })
+
+  test('macro trigger detection runs when alt-screen is off', () => {
+    const fakeMatch = {
+      snippet: { content: 'expanded', id: 's', name: 's' },
+      triggerText: ':sig ',
+    }
+    const feedTrigger = mock((_tabId: string, char: string) => (char === ' ' ? fakeMatch : null))
+    const expandMacro = mock(() => {})
+    const handler = createRawInputHandler({
+      expandMacro,
+      feedTrigger,
+      getActiveTabId: () => 'tab-1',
+      getBracketedPasteModeEnabled: () => false,
+      getFocusMode: () => 'terminal-input',
+      getIsAlternateBuffer: () => false,
+      handleTerminalShortcut: () => false,
+      writeToPty: () => {},
+    })
+
+    expect(handler(':')).toBe(true) // seeds the detector
+    expect(handler(' ')).toBe(true) // separator → match
+    expect(expandMacro).toHaveBeenCalledWith('tab-1', fakeMatch)
+  })
+
+  test('multi-byte sequences (escape, arrows) never reach the trigger detector', () => {
+    const feedTrigger = mock(() => null)
+    const handler = createRawInputHandler({
+      expandMacro: () => {},
+      feedTrigger,
+      getActiveTabId: () => 'tab-1',
+      getBracketedPasteModeEnabled: () => false,
+      getFocusMode: () => 'terminal-input',
+      getIsAlternateBuffer: () => false,
+      handleTerminalShortcut: () => false,
+      writeToPty: () => {},
+    })
+
+    handler('\x1b[A') // up arrow (3 chars)
+    handler('\x1b[27u') // kitty escape variant
+    expect(feedTrigger).not.toHaveBeenCalled()
+  })
 })

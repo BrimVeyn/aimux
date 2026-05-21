@@ -3,13 +3,24 @@ import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { KeyChord } from '../input/keymap/key-chord'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, FocusMode, TabSession } from '../state/types'
+import type { AppAction, FocusMode, SnippetRecord, TabSession } from '../state/types'
 
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from '../debug/input-log'
 import { createRawInputHandler } from '../input/raw-input-handler'
-import { copyToSystemClipboard } from '../platform/clipboard'
+import { copyToSystemClipboard, readFromSystemClipboard } from '../platform/clipboard'
+import {
+  expandSnippet,
+  expandSnippetSync,
+  requiresAsyncExpansion,
+} from '../snippets/expand-variables'
+import { runShellVar } from '../snippets/run-shell-var'
+import {
+  createTriggerDetector,
+  type TriggerDetector,
+  type TriggerMatch,
+} from '../snippets/trigger-detector'
 import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
-import { writePasteToTab, writeToTab } from './pty-write'
+import { writeMacroExpansionToTab, writePasteToTab, writeToTab } from './pty-write'
 import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
 import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
 
@@ -28,6 +39,9 @@ interface UseRendererBindingsOptions {
   focusModeRef: MutableRefObject<FocusMode>
   activeTabIdRef: MutableRefObject<string | null>
   activeTabRef: MutableRefObject<TabSession | undefined>
+  snippetsRef: MutableRefObject<readonly SnippetRecord[]>
+  branchRef: MutableRefObject<string | null>
+  triggerCharRef: MutableRefObject<string>
   handleTerminalShortcut: (chord: KeyChord) => boolean
 }
 
@@ -41,13 +55,27 @@ export function useRendererBindings({
   activeTabRef,
   activeTabViewportY,
   backend,
+  branchRef,
   dispatch,
   focusMode,
   focusModeRef,
   handleTerminalShortcut,
   renderer,
+  snippetsRef,
+  triggerCharRef,
 }: UseRendererBindingsOptions): void {
   const lastViewportRef = useRef<ViewportObservation | null>(null)
+  const triggerDetectorsRef = useRef<Map<string, TriggerDetector>>(new Map())
+  const pendingMacroUndoRef = useRef<Map<string, { fullLength: number; suffixLength: number }>>(
+    new Map()
+  )
+  /**
+   * Tabs currently waiting on an async expansion (shell vars or {{clipboard}}).
+   * While a tab is in this set, new trigger detections on that tab are
+   * suppressed — without this, a second trigger typed during the await would
+   * race with the in-flight expansion and corrupt PTY state + undo bookkeeping.
+   */
+  const inFlightAsyncExpansionRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     renderer.useMouse = true
@@ -55,12 +83,115 @@ export function useRendererBindings({
     renderer.console.hide()
     renderer.console.show = () => {}
 
+    const getOrCreateDetector = (tabId: string): TriggerDetector => {
+      let detector = triggerDetectorsRef.current.get(tabId)
+      if (!detector) {
+        detector = createTriggerDetector({
+          getSnippets: () => snippetsRef.current,
+          getTriggerChar: () => triggerCharRef.current,
+        })
+        triggerDetectorsRef.current.set(tabId, detector)
+      }
+      return detector
+    }
+
+    const expandMacroForTab = (tabId: string, match: TriggerMatch): void => {
+      const tab = activeTabRef.current
+      const snippet = match.snippet
+      const branch = branchRef.current
+      const cwd = process.cwd()
+      const now = new Date()
+
+      const registerUndo = (text: string, cursorOffset: number) => {
+        // Undo window: only meaningful for short inline expansions where
+        // cursor positions stay predictable in raw mode.
+        if (!text.includes('\n')) {
+          pendingMacroUndoRef.current.set(tabId, {
+            fullLength: text.length,
+            suffixLength: text.length - cursorOffset,
+          })
+        }
+      }
+
+      if (!requiresAsyncExpansion(snippet)) {
+        const { cursorOffset, text } = expandSnippetSync(snippet.content, {
+          branch,
+          customVars: new Map(),
+          cwd,
+          now,
+        })
+        writeMacroExpansionToTab(
+          backend,
+          tabId,
+          tab,
+          match.triggerText.length,
+          text,
+          cursorOffset,
+          dispatch
+        )
+        registerUndo(text, cursorOffset)
+        return
+      }
+
+      // Eager erase: drop the typed trigger from the PTY immediately so the
+      // user doesn't stare at `:prfull ` while shell vars resolve.
+      backend.write(tabId, '\x7f'.repeat(match.triggerText.length))
+      inFlightAsyncExpansionRef.current.add(tabId)
+
+      void (async () => {
+        try {
+          const varEntries = Object.entries(snippet.vars ?? {})
+          const resolved = await Promise.all(
+            varEntries.map(async ([name, v]) => [name, await runShellVar(name, v)] as const)
+          )
+          const customVars = new Map(resolved)
+          const { cursorOffset, text } = await expandSnippet(snippet.content, {
+            branch,
+            clipboard: readFromSystemClipboard,
+            customVars,
+            cwd,
+            now,
+          })
+          // Trigger already erased above; eraseCount = 0 here.
+          writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset, dispatch)
+          registerUndo(text, cursorOffset)
+        } finally {
+          inFlightAsyncExpansionRef.current.delete(tabId)
+        }
+      })()
+    }
+
+    const tryConsumeMacroUndo = (tabId: string, sequence: string): boolean => {
+      const entry = pendingMacroUndoRef.current.get(tabId)
+      if (!entry) return false
+      pendingMacroUndoRef.current.delete(tabId)
+      const isBackspace = sequence === '\x7f' || sequence === '\b'
+      if (!isBackspace) return false
+      const rightArrows = '\x1b[C'.repeat(entry.suffixLength)
+      const dels = '\x7f'.repeat(entry.fullLength)
+      backend.write(tabId, `${rightArrows}${dels}`)
+      return true
+    }
+
     const handler = createRawInputHandler({
+      expandMacro: expandMacroForTab,
+      feedTrigger: (tabId, char) => {
+        // Drop new detections while an async expansion is in flight for this
+        // tab — otherwise the second match races with the awaited write.
+        if (inFlightAsyncExpansionRef.current.has(tabId)) {
+          triggerDetectorsRef.current.get(tabId)?.reset()
+          return null
+        }
+        return getOrCreateDetector(tabId).feed(char)
+      },
       getActiveTabId: () => activeTabIdRef.current,
       getBracketedPasteModeEnabled: () =>
         activeTabRef.current?.terminalModes.bracketedPasteMode ?? false,
       getFocusMode: () => focusModeRef.current,
+      getIsAlternateBuffer: () => activeTabRef.current?.terminalModes.isAlternateBuffer ?? false,
       handleTerminalShortcut,
+      resetTrigger: (tabId) => triggerDetectorsRef.current.get(tabId)?.reset(),
+      tryConsumeMacroUndo,
       writeToPty: (tabId, data, options) =>
         writeToTab(backend, tabId, activeTabRef.current, data, dispatch, options),
     })
@@ -146,10 +277,13 @@ export function useRendererBindings({
     activeTabIdRef,
     activeTabRef,
     backend,
+    branchRef,
     dispatch,
     focusModeRef,
     handleTerminalShortcut,
     renderer,
+    snippetsRef,
+    triggerCharRef,
   ])
 
   useEffect(() => {

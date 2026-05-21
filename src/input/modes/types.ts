@@ -70,6 +70,7 @@ export type SideEffect =
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
+  | { type: 'open-selected-snippet-source-in-editor' }
 
 export interface KeyResult {
   actions: AppAction[]

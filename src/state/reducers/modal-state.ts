@@ -160,6 +160,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
+          actionMessage: null,
           cursorPos: 0,
           editBuffer: '',
           selectedIndex: 0,
@@ -167,6 +168,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'snippet-picker',
         },
       }
+    case 'snippet-picker-set-message': {
+      if (state.modal.type !== 'snippet-picker') return state
+      if (state.modal.actionMessage === action.message) return state
+      return { ...state, modal: { ...state.modal, actionMessage: action.message } }
+    }
     case 'open-snippet-editor': {
       const snippet = action.snippetId
         ? state.snippets.find((s) => s.id === action.snippetId)
@@ -180,8 +186,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           contentBuffer: snippet?.content ?? '',
           cursorPos: initialName.length,
           editBuffer: initialName,
+          nameBuffer: initialName,
           selectedIndex: 0,
           sessionTargetId: snippet?.id ?? null,
+          triggerBuffer: snippet?.trigger ?? '',
           type: 'snippet-editor',
         },
       }
@@ -553,14 +561,33 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         }
       }
       if (state.modal.type === 'snippet-editor') {
-        const nextField = state.modal.activeField === 'name' ? 'content' : 'name'
-        const nextEdit = state.modal.contentBuffer
+        const current = state.modal.editBuffer ?? ''
+        // Save current edit buffer back to the field it belongs to.
+        const updatedBuffers = {
+          contentBuffer:
+            state.modal.activeField === 'content' ? current : state.modal.contentBuffer,
+          nameBuffer: state.modal.activeField === 'name' ? current : state.modal.nameBuffer,
+          triggerBuffer:
+            state.modal.activeField === 'trigger' ? current : state.modal.triggerBuffer,
+        }
+        const cycle: Record<'name' | 'trigger' | 'content', 'name' | 'trigger' | 'content'> = {
+          content: 'name',
+          name: 'trigger',
+          trigger: 'content',
+        }
+        const nextField = cycle[state.modal.activeField]
+        const nextEditByField = {
+          content: updatedBuffers.contentBuffer,
+          name: updatedBuffers.nameBuffer,
+          trigger: updatedBuffers.triggerBuffer,
+        }
+        const nextEdit = nextEditByField[nextField]
         return {
           ...state,
           modal: {
             ...state.modal,
+            ...updatedBuffers,
             activeField: nextField,
-            contentBuffer: state.modal.editBuffer ?? '',
             cursorPos: nextEdit.length,
             editBuffer: nextEdit,
           },

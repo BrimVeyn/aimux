@@ -263,6 +263,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-a>', actions.snippetFilterPasteToGroup, 'Send to group')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<C-o>', actions.openSelectedSnippetSourceInEditor, 'Open source file')
         .map('<Down>', actions.moveModalSelection(1))
         .map('<Up>', actions.moveModalSelection(-1))
         .passthrough()

@@ -44,9 +44,14 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     sessionBar: resolveSessionBar(userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
+    snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
   }
+}
+
+function resolveSnippetTriggerChar(value: string | undefined): string {
+  return typeof value === 'string' && value.length === 1 ? value : ':'
 }
 
 function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['theme'] {
