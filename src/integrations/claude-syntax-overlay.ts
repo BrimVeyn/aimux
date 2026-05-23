@@ -103,10 +103,10 @@ export async function warmClaudeSyntaxOverlay(): Promise<void> {
     warmedHighlighter = h
     const themeName = await ensureActiveShikiTheme(h)
     activeThemeName = themeName
-    await Promise.all(PRELOAD_LANGS.map((lang) => ensureShikiLang(h, lang)))
+    await Promise.all(PRELOAD_LANGS.map(async (lang) => ensureShikiLang(h, lang)))
     ready = true
-  } catch (err) {
-    logDebug('claude-syntax-overlay:warm-failed', { err: String(err) })
+  } catch (error) {
+    logDebug('claude-syntax-overlay:warm-failed', { err: String(error) })
   }
 }
 
@@ -150,7 +150,7 @@ function lineText(line: TerminalLine): string {
 function dominantBg(line: TerminalLine): string | undefined {
   const counts = new Map<string, number>()
   for (const span of line.spans) {
-    if (!span.bg) continue
+    if (!(span.bg != null && span.bg !== '')) continue
     if (span.text.trim().length === 0) continue
     counts.set(span.bg, (counts.get(span.bg) ?? 0) + span.text.length)
   }
@@ -166,7 +166,7 @@ function dominantBg(line: TerminalLine): string | undefined {
 }
 
 function tokenize(code: string, lang: string): ShikiToken[][] {
-  if (!ready || !activeThemeName || !warmedHighlighter) return []
+  if (!ready || activeThemeName == null || activeThemeName === '' || !warmedHighlighter) return []
   try {
     /* eslint-disable typescript-eslint/no-explicit-any */
     return warmedHighlighter.codeToTokens(code, {
@@ -210,7 +210,7 @@ function buildSpans(
     if (!tok.content) continue
     const fs = tok.fontStyle ?? 0
     const tokColor = tok.color?.toLowerCase()
-    const fg = tokColor && accents.has(tokColor) ? tok.color : fallbackFg
+    const fg = tokColor != null && tokColor !== '' && accents.has(tokColor) ? tok.color : fallbackFg
     spans.push({
       bg,
       bold: (fs & 2) !== 0 || undefined,
@@ -381,7 +381,7 @@ function processLines(
   accents: Set<string>,
   targetWidth: number
 ): TerminalLine[] {
-  const out = lines.slice()
+  const out = [...lines]
   let block: BlockContext | null = null
 
   for (let i = 0; i < out.length; i += 1) {
@@ -393,7 +393,7 @@ function processLines(
     const headerMatch = text.match(TOOL_HEADER_RE)
     if (headerMatch) {
       const lang = inferLangFromPath(headerMatch[1] ?? '')
-      if (lang) tabLang.set(tabId, lang)
+      if (lang != null && lang !== '') tabLang.set(tabId, lang)
     }
 
     const prefixMatch = text.match(PREFIX_RE)

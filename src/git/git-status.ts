@@ -88,7 +88,7 @@ function buildEntry(
     removed = 0
   }
   const entry: GitFileEntry = { added, path, removed, section, status }
-  if (renamedFrom) entry.renamedFrom = renamedFrom
+  if (renamedFrom != null && renamedFrom !== '') entry.renamedFrom = renamedFrom
   return entry
 }
 
@@ -179,7 +179,7 @@ async function countUntrackedLines(cwd: string, path: string): Promise<number | 
 async function annotateUntrackedCounts(cwd: string, files: GitFileEntry[]): Promise<void> {
   const untracked = files.filter((f) => f.section === 'untracked')
   if (untracked.length === 0) return
-  const counts = await Promise.all(untracked.map((f) => countUntrackedLines(cwd, f.path)))
+  const counts = await Promise.all(untracked.map(async (f) => countUntrackedLines(cwd, f.path)))
   for (let i = 0; i < untracked.length; i++) {
     const file = untracked[i]
     const count = counts[i]
@@ -208,7 +208,7 @@ function parseNameStatus(
     if (letter === 'R' || letter === 'C') {
       const from = parts[1]
       const to = parts[2]
-      if (!from || !to) continue
+      if (from == null || from === '' || !(to != null && to !== '')) continue
       rows.push({ path: to, renamedFrom: from, status })
     } else {
       const path = parts.slice(1).join('\t')

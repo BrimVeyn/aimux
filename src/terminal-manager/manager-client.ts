@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { connect, Socket } from 'node:net'
+import { connect, type Socket } from 'node:net'
 
 import type {
   ScrollIntent,
@@ -23,7 +23,7 @@ import {
   parseManagerMessage,
 } from '../ipc/manager-protocol'
 
-type ManagerClientEvents = {
+interface ManagerClientEvents {
   render: [
     sessionId: string,
     tabId: string,
@@ -84,7 +84,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     return this.socket
   }
 
-  private send(request: ManagerRequest): Promise<ManagerResponse> {
+  private async send(request: ManagerRequest): Promise<ManagerResponse> {
     const socket = this.getConnectedSocket()
     logDebug('managerClient.send', { id: request.id, type: request.type })
     return new Promise((resolve, reject) => {
@@ -286,7 +286,9 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     return response.payload
   }
 
-  createTab(options: Extract<ManagerRequest, { type: 'createTab' }>['payload']): Promise<void> {
+  async createTab(
+    options: Extract<ManagerRequest, { type: 'createTab' }>['payload']
+  ): Promise<void> {
     logDebug('managerClient.createTab', {
       command: options.command,
       sessionId: options.sessionId,
@@ -296,7 +298,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     return this.sendExpectOk({ id: crypto.randomUUID(), payload: options, type: 'createTab' })
   }
 
-  write(sessionId: string, tabId: string, data: string): Promise<void> {
+  async write(sessionId: string, tabId: string, data: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { data, sessionId, tabId },
@@ -304,7 +306,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  resize(
+  async resize(
     sessionId: string,
     cols: number,
     rows: number,
@@ -317,7 +319,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  resizeTab(
+  async resizeTab(
     sessionId: string,
     tabId: string,
     cols: number,
@@ -331,7 +333,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  scroll(sessionId: string, tabId: string, deltaLines: number): Promise<void> {
+  async scroll(sessionId: string, tabId: string, deltaLines: number): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { deltaLines, sessionId, tabId },
@@ -339,7 +341,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  scrollToBottom(sessionId: string, tabId: string): Promise<void> {
+  async scrollToBottom(sessionId: string, tabId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { sessionId, tabId },
@@ -347,7 +349,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  reapplyScrollIntent(sessionId: string, tabId: string, intent: ScrollIntent): Promise<void> {
+  async reapplyScrollIntent(sessionId: string, tabId: string, intent: ScrollIntent): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { intent, sessionId, tabId },
@@ -355,7 +357,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  setActiveTab(sessionId: string, tabId: string | null): Promise<void> {
+  async setActiveTab(sessionId: string, tabId: string | null): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { sessionId, tabId },
@@ -363,7 +365,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  closeTab(sessionId: string, tabId: string): Promise<void> {
+  async closeTab(sessionId: string, tabId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { sessionId, tabId },
@@ -371,7 +373,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
-  disposeSession(sessionId: string): Promise<void> {
+  async disposeSession(sessionId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
       payload: { sessionId },

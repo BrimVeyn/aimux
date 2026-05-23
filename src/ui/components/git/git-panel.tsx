@@ -105,8 +105,8 @@ function renderFileLabel(
   const displayPath = transform ? transform(file.path) : file.path
   const { basename, prefix } = splitPath(displayPath)
   const dir = stripTrailingSlash(prefix)
-  const showDir = fileListMode === 'flat' && pathConfig.enabled && dir
-  if (!file.renamedFrom) {
+  const showDir = fileListMode === 'flat' && pathConfig.enabled && dir !== ''
+  if (!(file.renamedFrom != null && file.renamedFrom !== '')) {
     return (
       <text selectable={false} wrapMode="none">
         <span fg={t.text}>{basename}</span>
@@ -211,7 +211,9 @@ function renderFileRow(
   // Repo disambiguation prefix: only in flat mode, only when the file came
   // from a sub-repo (root repo files get an empty prefix).
   const repoTag =
-    fileListMode === 'flat' && file.repoPath ? (repoPrefixes[file.repoPath] ?? '') : ''
+    fileListMode === 'flat' && file.repoPath != null && file.repoPath !== ''
+      ? (repoPrefixes[file.repoPath] ?? '')
+      : ''
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
@@ -238,7 +240,7 @@ function renderTreeSection(
   section: GitFileSection,
   title: string,
   files: GitFileEntry[],
-  rows: Array<GitTreeFolderRow | GitTreeFileRow>,
+  rows: (GitTreeFolderRow | GitTreeFileRow)[],
   addedW: number,
   removedW: number,
   fileListMode: GitFileListMode,
@@ -361,7 +363,7 @@ export const GitPanel = memo(function GitPanel({
     [gitPanel.files]
   )
 
-  const statusNode = renderStatus(gitPanel, !!projectPath)
+  const statusNode = renderStatus(gitPanel, !!(projectPath != null && projectPath !== ''))
 
   const hasRemoteTracking = gitPanel.ahead > 0 || gitPanel.behind > 0
   const toggleSection =
@@ -372,7 +374,7 @@ export const GitPanel = memo(function GitPanel({
 
   useEffect(() => {
     const scrollbox = scrollRef.current
-    if (!scrollbox || !selectedEntryKey) return
+    if (!scrollbox || !(selectedEntryKey != null && selectedEntryKey !== '')) return
     const selectedIndex = tree.visibleRows.findIndex((row) => row.key === selectedEntryKey)
     if (selectedIndex < 0) return
     const viewportHeight = Math.max(1, scrollbox.viewport.height)

@@ -35,7 +35,9 @@ async function collectAggregated(
     }
   }
 
-  const results = await Promise.all(repos.map((r) => collectGitStatus(r.path, { headOffset: 0 })))
+  const results = await Promise.all(
+    repos.map(async (r) => collectGitStatus(r.path, { headOffset: 0 }))
+  )
   const files: GitFileEntry[] = []
   let branch: string | null = null
   let ahead = 0
@@ -71,7 +73,7 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
   const repos = useAppStore((s) => s.multiRepo.repos)
 
   useEffect(() => {
-    if (!enabled || !projectPath) return undefined
+    if (!enabled || !(projectPath != null && projectPath !== '')) return
 
     dispatchGlobal({ type: 'git-panel-reset' })
 

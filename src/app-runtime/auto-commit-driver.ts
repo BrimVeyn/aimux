@@ -63,7 +63,7 @@ const UNTRACKED_FILE_BYTES_CAP = 8_000
 const SESSION_TAIL_BYTES_CAP = 8_000
 
 export function extractSessionTail(buffer: string | undefined): string {
-  if (!buffer) return '[no session tail available]'
+  if (!(buffer != null && buffer !== '')) return '[no session tail available]'
   const stripped = stripAnsi(buffer).trimEnd()
   if (stripped.length === 0) return '[no session tail available]'
   return stripped.length > SESSION_TAIL_BYTES_CAP
@@ -161,7 +161,7 @@ export async function onActivityTransition(
     currentHash,
     enabled: config.enabled,
     git: args.git,
-    hasProjectPath: !!args.projectPath,
+    hasProjectPath: !!(args.projectPath != null && args.projectPath !== ''),
     sessionId: args.sessionId,
     state: state.autoCommit,
   })
@@ -181,7 +181,8 @@ export async function onManualTrigger(
   }
   if (!config.enabled) return fail('disabled in config')
   if (!args.git || args.git.files.length === 0) return fail('no changes to summarise')
-  if (!args.projectPath) return fail('no project path for current session')
+  if (!(args.projectPath != null && args.projectPath !== ''))
+    return fail('no project path for current session')
 
   const currentHash = workingTreeHash(args.git)
   const existing = deps.getState().autoCommit.bySession[args.sessionId]

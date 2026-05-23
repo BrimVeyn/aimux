@@ -124,7 +124,7 @@ export function Picker({
       return
     }
     const target = items[selectedIndex]?.key
-    if (!target) return
+    if (!(target != null && target !== '')) return
     isScrollingRef.current = true
     scrollboxRef.current.scrollChildIntoView(target)
     resetScrollTimer()
@@ -156,7 +156,7 @@ export function Picker({
           for (let index = 0; index < items.length; index++) {
             const item = items[index]
             if (!item) continue
-            if (item.group && item.group !== prevGroup) {
+            if (item.group != null && item.group !== '' && item.group !== prevGroup) {
               nodes.push(
                 <box key={`group::${item.group}`} paddingLeft={1} paddingTop={index === 0 ? 0 : 1}>
                   <text fg={t.textMuted} wrapMode="none">

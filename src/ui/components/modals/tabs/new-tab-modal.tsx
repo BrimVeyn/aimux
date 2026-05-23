@@ -38,7 +38,8 @@ function getDeleteBlockedReason({
   worktrees: WorktreeRecord[]
 }): string | null {
   if (!worktree) return null
-  if (!currentSessionId) return 'Cannot delete: no active session.'
+  if (!(currentSessionId != null && currentSessionId !== ''))
+    return 'Cannot delete: no active session.'
   if (worktrees.length <= 1) return 'Cannot delete: at least one worktree must remain.'
   if (worktree.source === 'primary') return 'Cannot delete: root worktree is required.'
   if (worktree.source === 'aimux-temp' && !worktree.createdByAimux) {
@@ -117,7 +118,9 @@ export function NewTabModal({
               cursorPos={activeField === 'branch-name' ? cursorPos : undefined}
               placeholder="aimux/my-feature"
             />
-            {branchError ? <text fg={t.error}>{branchError}</text> : null}
+            {branchError != null && branchError !== '' ? (
+              <text fg={t.error}>{branchError}</text>
+            ) : null}
           </box>
           <text fg={t.textMuted}>Step 3/3: configure new worktree</text>
         </box>
@@ -140,7 +143,8 @@ export function NewTabModal({
       ...worktrees.map((worktree, index) => {
         const active = index === selectedIndex
         const label = worktree.branch ?? worktree.name
-        const canDelete = !getDeleteBlockedReason({ currentSessionId, worktree, worktrees })
+        const blockedReason = getDeleteBlockedReason({ currentSessionId, worktree, worktrees })
+        const canDelete = blockedReason == null || blockedReason === ''
         return {
           key: worktree.id,
           onClick: () => {
@@ -148,7 +152,7 @@ export function NewTabModal({
             runSideEffectGlobal({ type: 'launch-selected-assistant' })
           },
           onDelete:
-            active && canDelete && currentSessionId
+            active && canDelete && currentSessionId != null && currentSessionId !== ''
               ? () => {
                   dispatchGlobal({ index, type: 'set-modal-selection-index' })
                   dispatchGlobal({ message: null, type: 'set-new-tab-worktree-delete-state' })
@@ -189,8 +193,15 @@ export function NewTabModal({
         onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
         footer={
           <box flexDirection="column">
-            {worktreeDeleteMessage || deleteBlockedReason ? (
-              <text fg={worktreeDeleteMessage ? t.error : t.textMuted}>
+            {(worktreeDeleteMessage != null && worktreeDeleteMessage !== '') ||
+            (deleteBlockedReason != null && deleteBlockedReason !== '') ? (
+              <text
+                fg={
+                  worktreeDeleteMessage != null && worktreeDeleteMessage !== ''
+                    ? t.error
+                    : t.textMuted
+                }
+              >
                 {worktreeDeleteMessage ?? deleteBlockedReason}
               </text>
             ) : null}
@@ -212,7 +223,7 @@ export function NewTabModal({
       subtitle: (
         <box flexDirection="column">
           <text fg={t.textMuted}>{option.description}</text>
-          {customCmd ? <text fg={t.primary}>{customCmd}</text> : null}
+          {customCmd != null && customCmd !== '' ? <text fg={t.primary}>{customCmd}</text> : null}
         </box>
       ),
       title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,

@@ -41,7 +41,7 @@ export function useBackendRuntime({
   const { clearAllTimers, clearIdleTimer, clearStartupGrace, startStartupGrace } = timeouts
 
   useEffect(() => {
-    if (!currentSessionId) {
+    if (!(currentSessionId != null && currentSessionId !== '')) {
       attachRequestIdRef.current += 1
       return
     }
@@ -57,12 +57,12 @@ export function useBackendRuntime({
   }, [backend, currentSessionId, currentSessionWorkspaceSnapshot, dispatch, layoutRef])
 
   useEffect(() => {
-    if (!currentSessionId) {
+    if (!(currentSessionId != null && currentSessionId !== '')) {
       return
     }
 
     backend.setActiveTab(activeTabId)
-    if (activeTabId && activeTabScrollIntentRef.current) {
+    if (activeTabId != null && activeTabId !== '' && activeTabScrollIntentRef.current) {
       backend.reapplyScrollIntent(activeTabId, activeTabScrollIntentRef.current)
     }
   }, [activeTabId, activeTabScrollIntentRef, backend, currentSessionId])

@@ -56,16 +56,22 @@ export function describeBindings(
   for (const binding of mode.bindings) {
     const keysDisplay = formatNotationForDisplay(binding.keys, leaderChord)
 
-    if (options.mergeAlternativesByDescription) {
+    if (options.mergeAlternativesByDescription === true) {
       const actionSignature = getActionSignature(binding.result)
-      const existingIndex = binding.description
-        ? resultIndexByDescription.get(binding.description)
-        : resultIndexByAction.get(actionSignature)
+      const existingIndex =
+        binding.description != null && binding.description !== ''
+          ? resultIndexByDescription.get(binding.description)
+          : resultIndexByAction.get(actionSignature)
 
       if (existingIndex === undefined) {
-        if (options.withDescriptionOnly && !binding.description) continue
+        if (
+          options.withDescriptionOnly === true &&
+          !(binding.description != null && binding.description !== '')
+        )
+          continue
         const nextIndex = result.length
-        if (binding.description) resultIndexByDescription.set(binding.description, nextIndex)
+        if (binding.description != null && binding.description !== '')
+          resultIndexByDescription.set(binding.description, nextIndex)
         resultIndexByAction.set(actionSignature, nextIndex)
         seenKeysDisplayByIndex.set(nextIndex, new Set([keysDisplay]))
         result.push({
@@ -83,7 +89,11 @@ export function describeBindings(
       seenKeysDisplay.add(keysDisplay)
       const existing = result[existingIndex]
       if (!existing) continue
-      if (!existing.description && binding.description) {
+      if (
+        (existing.description == null || existing.description === '') &&
+        binding.description != null &&
+        binding.description !== ''
+      ) {
         existing.description = binding.description
         existing.group = binding.group
         resultIndexByDescription.set(binding.description, existingIndex)
@@ -93,9 +103,17 @@ export function describeBindings(
       continue
     }
 
-    if (options.withDescriptionOnly && !binding.description) continue
+    if (
+      options.withDescriptionOnly === true &&
+      !(binding.description != null && binding.description !== '')
+    )
+      continue
 
-    if (options.dedupeByDescription && binding.description) {
+    if (
+      options.dedupeByDescription === true &&
+      binding.description != null &&
+      binding.description !== ''
+    ) {
       if (seenDescriptions.has(binding.description)) continue
       seenDescriptions.add(binding.description)
     }

@@ -59,12 +59,16 @@ export function getStatusBarModel(
   activeTab: TabSession | undefined,
   config: ResolvedKeymapConfig
 ): StatusBarModel {
-  const currentSession = state.currentSessionId
-    ? state.sessions.find((session) => session.id === state.currentSessionId)
-    : undefined
+  const currentSession =
+    state.currentSessionId != null && state.currentSessionId !== ''
+      ? state.sessions.find((session) => session.id === state.currentSessionId)
+      : undefined
   const sessionName = currentSession?.name ?? 'no workspace'
   const sessionPath = getSessionProjectPath(currentSession)
-  const sessionLabel = sessionPath ? `${sessionName} (${abbreviatePath(sessionPath)})` : sessionName
+  const sessionLabel =
+    sessionPath != null && sessionPath !== ''
+      ? `${sessionName} (${abbreviatePath(sessionPath)})`
+      : sessionName
 
   // \u{f0b1} = nf-fa-briefcase (session icon)
   const sessionIcon = '\u{f0b1}'

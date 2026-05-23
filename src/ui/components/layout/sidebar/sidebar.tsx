@@ -1,8 +1,9 @@
-import {
-  type BoxRenderable,
-  type MouseEvent as OtuiMouseEvent,
-  type ScrollBoxRenderable,
+import type {
+  BoxRenderable,
+  MouseEvent as OtuiMouseEvent,
+  ScrollBoxRenderable,
 } from '@opentui/core'
+
 import { memo, useMemo, useRef } from 'react'
 
 import { useAppStore } from '../../../../state/app-store'
@@ -58,9 +59,10 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
   const t = useTheme()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
   const activeWorktree = getActiveWorktree(currentSession)
   const projectPath = getSessionProjectPath(currentSession)
   const branch = useSidebarBranch(projectPath)
@@ -73,7 +75,7 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       <text fg={t.text} selectable={false}>
         {currentSession ? currentSession.name : 'No workspace selected'}
       </text>
-      {branch || activeWorktree ? (
+      {(branch != null && branch !== '') || activeWorktree ? (
         <box flexDirection="row">
           <text fg={t.text} selectable={false}>
             {'\u{e702}'}{' '}
@@ -139,9 +141,10 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
   const worktrees = useMemo(() => currentSession?.worktrees ?? [], [currentSession?.worktrees])
   const worktreeById = useMemo(
     () => new Map(worktrees.map((worktree) => [worktree.id, worktree])),
@@ -157,7 +160,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
     }
     const activeWorktreeId =
       currentSession?.activeWorktreeId ?? getActiveWorktree(currentSession)?.id
-    if (activeWorktreeId) ids.add(activeWorktreeId)
+    if (activeWorktreeId != null && activeWorktreeId !== '') ids.add(activeWorktreeId)
     return ids.size >= 2
   }, [currentSession, groupedTabs, worktrees])
 
@@ -196,12 +199,15 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           const isActive = tab.id === activeTabId
           const alternate = index % 2 === 1
           const info = tabGroupInfo.get(tab.id)
-          const inLayout = !!info?.inLayout
+          const inLayout = !!(info?.inLayout === true)
           const inGroup = info ? index >= info.groupStart && index <= info.groupEnd : false
           const isGroupStart = info ? index === info.groupStart : false
           const isGroupEnd = info ? index === info.groupEnd : false
           const isGroupMiddle = inGroup && !isGroupStart && !isGroupEnd
-          let tabWorktree = tab.worktreeId ? worktreeById.get(tab.worktreeId) : undefined
+          let tabWorktree =
+            tab.worktreeId != null && tab.worktreeId !== ''
+              ? worktreeById.get(tab.worktreeId)
+              : undefined
           if (!tabWorktree && worktrees.length > 1) {
             tabWorktree = worktrees[0]
           }
@@ -350,7 +356,7 @@ export function Sidebar({
         }
       }}
       onMouseDrag={(event) => {
-        if (onResizeDrag?.(event)) {
+        if (onResizeDrag?.(event) === true) {
           event.preventDefault()
           event.stopPropagation()
         }

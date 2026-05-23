@@ -8,7 +8,7 @@ export function useSidebarBranch(projectPath: string | undefined): string | null
   const [branch, setBranch] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!projectPath) {
+    if (!(projectPath != null && projectPath !== '')) {
       setBranch(null)
       return
     }

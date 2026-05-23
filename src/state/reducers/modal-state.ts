@@ -26,12 +26,12 @@ function clampCursor(value: number, max: number): number {
 }
 
 function getCurrentWorktreeCount(state: AppState): number {
-  if (!state.currentSessionId) return 0
+  if (!(state.currentSessionId != null && state.currentSessionId !== '')) return 0
   return state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees?.length ?? 0
 }
 
 function getCurrentWorktreeIndex(state: AppState): number {
-  if (!state.currentSessionId) return 0
+  if (!(state.currentSessionId != null && state.currentSessionId !== '')) return 0
   const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
   return Math.max(
     0,
@@ -40,10 +40,10 @@ function getCurrentWorktreeIndex(state: AppState): number {
 }
 
 function getSelectedNewTabAssistant(state: AppState, assistantId?: string) {
-  if (assistantId) {
+  if (assistantId != null && assistantId !== '') {
     return getAllAssistantOptions(state.customCommands).find((entry) => entry.id === assistantId)
   }
-  if (state.modal.type !== 'new-tab') return undefined
+  if (state.modal.type !== 'new-tab') return
   return filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)[
     state.modal.selectedIndex
   ]
@@ -307,9 +307,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return { ...state, modal: { ...state.modal, actionMessage: action.message } }
     }
     case 'open-snippet-editor': {
-      const snippet = action.snippetId
-        ? state.snippets.find((s) => s.id === action.snippetId)
-        : undefined
+      const snippet =
+        action.snippetId != null && action.snippetId !== ''
+          ? state.snippets.find((s) => s.id === action.snippetId)
+          : undefined
       const initialName = snippet?.name ?? ''
       return {
         ...state,
@@ -940,9 +941,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'open-rename-tab-modal': {
-      const activeTab = state.activeTabId
-        ? state.tabs.find((tab) => tab.id === state.activeTabId)
-        : undefined
+      const activeTab =
+        state.activeTabId != null && state.activeTabId !== ''
+          ? state.tabs.find((tab) => tab.id === state.activeTabId)
+          : undefined
       if (!activeTab) {
         return state
       }

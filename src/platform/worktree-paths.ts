@@ -6,16 +6,17 @@ const DEFAULT_WORKTREE_ROOT = '/tmp/aimux-wt'
 const MAX_SLUG_LENGTH = 24
 
 export function getAimuxWorktreeRoot(): string {
-  return process.env.AIMUX_WORKTREE_ROOT || DEFAULT_WORKTREE_ROOT
+  const root = process.env.AIMUX_WORKTREE_ROOT
+  return root != null && root !== '' ? root : DEFAULT_WORKTREE_ROOT
 }
 
 export function sanitizePathSegment(input: string, maxLength = MAX_SLUG_LENGTH): string {
   const sanitized = input
     .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/\.\.+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  return (sanitized || 'worktree').slice(0, maxLength).replace(/[-_.]+$/g, '') || 'worktree'
+    .replaceAll(/[^A-Za-z0-9._-]+/g, '-')
+    .replaceAll(/\.\.+/g, '-')
+    .replaceAll(/^-+|-+$/g, '')
+  return (sanitized || 'worktree').slice(0, maxLength).replaceAll(/[-_.]+$/g, '') || 'worktree'
 }
 
 function shortHash(input: string, length = 8): string {

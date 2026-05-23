@@ -45,7 +45,7 @@ export interface GitTreeRows {
 export function gitFileKey(
   file: Pick<GitFileEntry, 'path' | 'section'> & { repoPath?: string }
 ): string {
-  return file.repoPath
+  return file.repoPath != null && file.repoPath !== ''
     ? `${file.section}:${file.repoPath}:${file.path}`
     : `${file.section}:${file.path}`
 }
@@ -89,7 +89,7 @@ export function getSelectedGitRow(
     compact?: boolean
   }
 ): GitTreeRow | null {
-  if (!options.selectedEntryKey) return null
+  if (!(options.selectedEntryKey != null && options.selectedEntryKey !== '')) return null
   const { visibleRows } = buildGitTreeRows(
     files,
     options.collapsedFolders,
@@ -185,7 +185,7 @@ function buildSectionTree(files: GitFileEntry[], section: GitFileSection): GitTr
     let cursor = root
     for (let i = 0; i < parts.length - 1; i++) {
       const name = parts[i]
-      if (!name) continue
+      if (!(name != null && name !== '')) continue
       const nextPath = cursor.path ? `${cursor.path}/${name}` : name
       let child = cursor.folders.get(name)
       if (!child) {

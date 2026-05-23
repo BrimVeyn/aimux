@@ -65,7 +65,7 @@ const DiffStage = memo(function DiffStage({
       </box>
     )
   }
-  if (diff.errorMessage) {
+  if (diff.errorMessage != null && diff.errorMessage !== '') {
     return (
       <box flexGrow={1} padding={1}>
         <text fg={t.error}>{diff.errorMessage}</text>
@@ -78,7 +78,7 @@ const DiffStage = memo(function DiffStage({
   }
 
   const placeholder = placeholderText(diff)
-  if (placeholder) {
+  if (placeholder != null && placeholder !== '') {
     return (
       <box flexGrow={1} padding={1}>
         <text fg={t.textMuted}>{placeholder}</text>
@@ -88,7 +88,7 @@ const DiffStage = memo(function DiffStage({
 
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
-      {diff.oldPath ? (
+      {diff.oldPath != null && diff.oldPath !== '' ? (
         <box paddingLeft={1} paddingRight={1}>
           <text fg={t.textMuted}>
             renamed: {diff.oldPath} → {diff.path}
@@ -124,9 +124,10 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const focusMode = useAppStore((s) => s.focusMode)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
   const projectPath = getSessionProjectPath(currentSession)
 
   useRepoDiscovery(projectPath)
@@ -141,8 +142,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     selectedEntryKey: gitMode.selectedEntryKey,
   })
   const selectedDiffKey = selectedFile ? gitFileKey(selectedFile) : null
-  const diff = selectedDiffKey ? gitMode.diffs[selectedDiffKey] : undefined
-  const loading = selectedDiffKey ? !!gitMode.loading[selectedDiffKey] : false
+  const diff =
+    selectedDiffKey != null && selectedDiffKey !== '' ? gitMode.diffs[selectedDiffKey] : undefined
+  const loading =
+    selectedDiffKey != null && selectedDiffKey !== ''
+      ? !!(gitMode.loading[selectedDiffKey] === true)
+      : false
 
   useEffect(() => {
     setGitDiffScroller((delta: number) => {
@@ -169,8 +174,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
 
   useEffect(() => {
     if (focusMode !== 'git') return
-    if (!selectedFile || !projectPath) return
-    if (!selectedDiffKey) return
+    if (!selectedFile || !(projectPath != null && projectPath !== '')) return
+    if (!(selectedDiffKey != null && selectedDiffKey !== '')) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
     void fetchDiff(selectedFile.repoPath ?? projectPath, selectedFile, gitMode.headOffset)
@@ -200,13 +205,13 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }
   const actionMessage = gitMode.actionMessage
   let footerNode: React.ReactNode = null
-  if (pendingHint) {
+  if (pendingHint != null && pendingHint !== '') {
     footerNode = (
       <text fg={t.warning}>
         <strong>{pendingHint}</strong>
       </text>
     )
-  } else if (actionMessage) {
+  } else if (actionMessage != null && actionMessage !== '') {
     footerNode = actionMessage.split('\n').map((line, idx) => (
       <text key={idx} fg={t.primary}>
         {line}
@@ -229,7 +234,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             <text fg={t.text}>
               <strong>aimux · git</strong>
             </text>
-            {gitPanel.branch ? (
+            {gitPanel.branch != null && gitPanel.branch !== '' ? (
               <box flexDirection="row">
                 <text fg={t.text}>{'\u{e702}'} </text>
                 <text fg={t.text}>{gitPanel.branch}</text>
@@ -293,7 +298,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           />
         </box>
       </box>
-      {footerNode ? (
+      {footerNode != null ? (
         <box paddingLeft={1} paddingRight={1} backgroundColor={sidebarBg} flexDirection="column">
           {footerNode}
         </box>

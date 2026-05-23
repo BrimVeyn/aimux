@@ -93,7 +93,7 @@ interface ToolSectionProps {
 
 function ToolSection({ snap, tool }: ToolSectionProps) {
   const t = useTheme()
-  const isHardError = Boolean(snap.error) && !snap.stale
+  const isHardError = Boolean(snap.error) && !(snap.stale === true)
   const relative = formatRelative(snap.lastUpdated)
 
   let body: ReactNode
@@ -119,7 +119,7 @@ function ToolSection({ snap, tool }: ToolSectionProps) {
         <text fg={t.text} selectable={false}>
           {TOOL_TITLE[tool]}
         </text>
-        {snap.planTier ? (
+        {snap.planTier != null && snap.planTier !== '' ? (
           <text fg={t.textMuted} selectable={false}>
             {snap.planTier}
           </text>
@@ -145,7 +145,10 @@ function WindowRow({ window }: { window: UsageWindow }) {
   }
 
   const pctText = percent === null ? '—' : `${Math.round(percent)}% used`
-  const resetText = window.timeRemaining ? `Resets in ${window.timeRemaining}` : null
+  const resetText =
+    window.timeRemaining != null && window.timeRemaining !== ''
+      ? `Resets in ${window.timeRemaining}`
+      : null
 
   return (
     <box flexDirection="column" paddingTop={1}>
@@ -164,7 +167,7 @@ function WindowRow({ window }: { window: UsageWindow }) {
         <text fg={t.textMuted} selectable={false}>
           {pctText}
         </text>
-        {resetText ? (
+        {resetText != null && resetText !== '' ? (
           <text fg={t.textMuted} selectable={false}>
             {resetText}
           </text>
@@ -181,7 +184,7 @@ function PaceLine({ pace }: { pace: NonNullable<UsageWindow['pace']> }) {
   if (paceStageIsBehind(pace.stage)) color = t.warning
   else if (paceStageIsAhead(pace.stage)) color = t.success
 
-  const suffix = pace.rightText ? ` · ${pace.rightText}` : ''
+  const suffix = pace.rightText != null && pace.rightText !== '' ? ` · ${pace.rightText}` : ''
   return (
     <text fg={color} selectable={false}>
       {`Pace: ${pace.label}${suffix}`}

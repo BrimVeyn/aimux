@@ -53,13 +53,8 @@ export function uploadPngEscape(pngBytes: Uint8Array, id: number): string {
   for (let i = 0; i < chunks.length; i++) {
     const isLast = i === chunks.length - 1
     const m = isLast ? 0 : 1
-    let header: string
-    if (i === 0) {
-      // a=t (transmit), t=d (direct), f=100 (PNG), q=2 (quiet).
-      header = `q=2,a=t,t=d,f=100,i=${id},m=${m}`
-    } else {
-      header = `m=${m},q=2`
-    }
+    // a=t (transmit), t=d (direct), f=100 (PNG), q=2 (quiet).
+    const header = i === 0 ? `q=2,a=t,t=d,f=100,i=${id},m=${m}` : `m=${m},q=2`
     parts.push(`${ESC}_G${header};${chunks[i]}${ST}`)
   }
   return wrapForTmux(parts.join(''))

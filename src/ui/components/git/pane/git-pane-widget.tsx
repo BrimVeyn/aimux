@@ -21,9 +21,10 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
   const diffCountConfig = useAppStore((s) => s.gitPane.diffCount)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
   const projectPath = getSessionProjectPath(currentSession)
 
   useRepoDiscovery(projectPath)

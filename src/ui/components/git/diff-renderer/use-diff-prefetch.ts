@@ -100,7 +100,7 @@ export function useDiffPrefetch(
   // Keep a ref to the execute function so the queue keeps the latest closure
   // without needing to recreate the queue itself.
   runTaskRef.current = async (task: Task) => {
-    if (!projectPath) return
+    if (!(projectPath != null && projectPath !== '')) return
     try {
       const diff = await fetchDiff(task.file.repoPath ?? projectPath, task.file, headOffset)
       if (task.controller.signal.aborted) return
@@ -122,13 +122,19 @@ export function useDiffPrefetch(
   }
 
   if (!queueRef.current) {
-    queueRef.current = new PrefetchQueue((task) => runTaskRef.current(task), MAX_CONCURRENCY)
+    queueRef.current = new PrefetchQueue(async (task) => runTaskRef.current(task), MAX_CONCURRENCY)
   }
 
   useEffect(() => {
     const queue = queueRef.current
     if (!queue) return
-    if (!enabled || radius <= 0 || !projectPath || !selectedEntryKey) {
+    if (
+      !enabled ||
+      radius <= 0 ||
+      projectPath == null ||
+      projectPath === '' ||
+      !(selectedEntryKey != null && selectedEntryKey !== '')
+    ) {
       queue.cancelAll()
       return
     }
@@ -149,7 +155,7 @@ export function useDiffPrefetch(
       const key = row.key
       if (diffs[key]) continue
       if (parsed[key]) continue
-      if (loading[key]) continue
+      if (loading[key] === true) continue
       tasks.push({
         controller: new AbortController(),
         distance: Math.abs(i - selectedIdx),

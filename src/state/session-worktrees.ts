@@ -36,12 +36,12 @@ export function ensureSessionWorktrees(
   session: SessionRecord,
   now = new Date().toISOString()
 ): SessionRecord {
-  if (session.worktrees?.length) {
+  if (session.worktrees?.length != null && session.worktrees?.length !== 0) {
     const worktrees = mergeExistingGitWorktrees(
       pruneMissingAimuxTempWorktrees(session.worktrees),
       now
     )
-    if (worktrees.length === 0 && session.projectPath) {
+    if (worktrees.length === 0 && session.projectPath != null && session.projectPath !== '') {
       const worktree = createPrimaryWorktree(session.projectPath, now)
       return { ...session, activeWorktreeId: worktree.id, worktrees: [worktree] }
     }
@@ -57,7 +57,7 @@ export function ensureSessionWorktrees(
     }
   }
 
-  if (!session.projectPath) {
+  if (!(session.projectPath != null && session.projectPath !== '')) {
     return session
   }
 
@@ -175,7 +175,7 @@ function pruneMissingAimuxTempWorktrees(worktrees: WorktreeRecord[]): WorktreeRe
 }
 
 export function getActiveWorktree(session: SessionRecord | undefined): WorktreeRecord | undefined {
-  if (!session?.worktrees?.length) return undefined
+  if (!(session?.worktrees?.length != null && session?.worktrees?.length !== 0)) return undefined
   return (
     session.worktrees.find((worktree) => worktree.id === session.activeWorktreeId) ??
     session.worktrees[0]
@@ -199,7 +199,7 @@ export function withActiveWorktree(session: SessionRecord, worktreeId: string): 
 
 export function getRenderedTabWorktreeId(
   tab: { worktreeId?: string },
-  worktrees: Array<{ id: string }>
+  worktrees: { id: string }[]
 ): string {
   return tab.worktreeId ?? worktrees[0]?.id ?? '__main__'
 }

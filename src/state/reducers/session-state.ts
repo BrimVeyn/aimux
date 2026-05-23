@@ -58,7 +58,7 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId)
       const nextStatuses = { ...state.sessionStatuses }
       delete nextStatuses[action.sessionId]
-      if (action.openSessionPicker) {
+      if (action.openSessionPicker === true) {
         const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
         const maxIndex = filteredNew.length
         const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
@@ -128,12 +128,15 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           if (session.id !== action.sessionId) return session
           const next = {
             ...session,
-            activeWorktreeId: action.activate ? action.worktree.id : session.activeWorktreeId,
-            projectPath: action.activate ? action.worktree.path : session.projectPath,
+            activeWorktreeId:
+              action.activate === true ? action.worktree.id : session.activeWorktreeId,
+            projectPath: action.activate === true ? action.worktree.path : session.projectPath,
             updatedAt: new Date().toISOString(),
             worktrees: [...(session.worktrees ?? []), action.worktree],
           }
-          return next.activeWorktreeId ? next : withActiveWorktree(next, action.worktree.id)
+          return next.activeWorktreeId != null && next.activeWorktreeId !== ''
+            ? next
+            : withActiveWorktree(next, action.worktree.id)
         }),
       }
     case 'remove-worktree-record':

@@ -41,7 +41,9 @@ function mergeSnapshotTabMetadata(
   const persistedById = new Map(workspaceSnapshot.tabs.map((tab) => [tab.id, tab]))
   return tabs.map((tab) => {
     const persisted = persistedById.get(tab.id)
-    return persisted?.worktreeId && !tab.worktreeId
+    return persisted?.worktreeId != null &&
+      persisted?.worktreeId !== '' &&
+      !(tab.worktreeId != null && tab.worktreeId !== '')
       ? { ...tab, worktreeId: persisted.worktreeId }
       : tab
   })

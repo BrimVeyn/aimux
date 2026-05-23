@@ -76,14 +76,14 @@ export const ImageDiffView = memo(function ImageDiffView({ diff }: ImageDiffView
   const showBoth = before && after
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden" backgroundColor={t.background}>
-      {diff.oldPath ? (
+      {diff.oldPath != null && diff.oldPath !== '' ? (
         <box paddingLeft={1} paddingRight={1}>
           <text fg={t.textMuted}>
             renamed: {diff.oldPath} → {diff.path}
           </text>
         </box>
       ) : null}
-      {banner ? (
+      {banner != null && banner !== '' ? (
         <box paddingLeft={1} paddingRight={1}>
           <text fg={protocol === 'kitty' ? t.textMuted : t.warning}>{banner}</text>
         </box>

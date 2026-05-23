@@ -1,4 +1,5 @@
-import { type BoxRenderable } from '@opentui/core'
+import type { BoxRenderable } from '@opentui/core'
+
 import { memo, useEffect, useRef, useState } from 'react'
 
 import { convertToPng, isPng } from '../../../terminal-graphics/format-fallback'
@@ -47,7 +48,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     let cancelled = false
     stateRef.current = { imageId: null, lastKey: null, uploaded: false }
     setError(null)
-    ;(async () => {
+    void (async () => {
       let pngBytes: Uint8Array | null = null
       if (mime === 'image/png' || isPng(bytes)) {
         pngBytes = bytes
@@ -60,7 +61,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
         }
         pngBytes = result.png
       }
-      if (cancelled || !pngBytes) return
+      if (cancelled) return
       const id = nextImageId()
       writeRaw(uploadPngEscape(pngBytes, id))
       stateRef.current.imageId = id
@@ -76,7 +77,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     }
   }, [bytes, mime])
 
-  if (error) {
+  if (error != null && error !== '') {
     return (
       <box flexGrow={1} alignItems="center" justifyContent="center" padding={1}>
         <text fg={t.warning}>({error})</text>

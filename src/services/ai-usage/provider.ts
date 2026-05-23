@@ -49,7 +49,7 @@ export function startAIUsageService(
     }
 
     if (toFetch.length > 0) {
-      const results = await Promise.allSettled(toFetch.map((t) => fetchFor(t, config)))
+      const results = await Promise.allSettled(toFetch.map(async (t) => fetchFor(t, config)))
       if (stopped) return
       for (let i = 0; i < results.length; i++) {
         const result = results[i]

@@ -1,7 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
+import type { ReactNode } from 'react'
 
 import { type BoxRenderable, type OptimizedBuffer, RGBA } from '@opentui/core'
-import { type ReactNode } from 'react'
 
 import { useTheme, useTransparent } from '../../../theme'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
@@ -81,10 +81,10 @@ export function ModalShell({
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
             <text fg={t.text}>{title}</text>
-            {subtitle ? <text fg={t.textMuted}>{subtitle}</text> : null}
+            {subtitle != null && subtitle !== '' ? <text fg={t.textMuted}>{subtitle}</text> : null}
           </box>
           {children}
-          {footer ? <box>{footer}</box> : null}
+          {footer != null ? <box>{footer}</box> : null}
         </box>
       </box>
       {keybindsModeId ? <ModalKeybindsOverlay modeId={keybindsModeId} /> : null}

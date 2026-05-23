@@ -9,7 +9,7 @@ export async function getCurrentPackageVersion(): Promise<string> {
 
 export async function fetchLatestNpmVersion(packageName: string): Promise<string | null> {
   const debugOverride = process.env.AIMUX_DEBUG_UPDATE_LATEST
-  if (debugOverride) {
+  if (debugOverride != null && debugOverride !== '') {
     return debugOverride
   }
 

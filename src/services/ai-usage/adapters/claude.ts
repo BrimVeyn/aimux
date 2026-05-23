@@ -47,7 +47,7 @@ let cachedCreds: ClaudeOAuthCreds | null = null
 const CREDS_EXPIRY_BUFFER_MS = 60_000
 
 function normalizePlanTier(raw: string | undefined | null): string | null {
-  if (!raw) return null
+  if (!(raw != null && raw !== '')) return null
   const trimmed = raw.trim()
   if (!trimmed) return null
   const lower = trimmed.toLowerCase()
@@ -64,7 +64,7 @@ function planTierFromPayload(payload: ClaudeKeychainPayload): string | null {
   if (!o) return null
   const raw = o.rateLimitTier ?? o.rate_limit_tier ?? o.subscriptionType
   const normalized = normalizePlanTier(raw)
-  if (normalized) return normalized
+  if (normalized != null && normalized !== '') return normalized
   if (Array.isArray(o.scopes)) {
     for (const scope of o.scopes) {
       const s = scope.toLowerCase()
@@ -101,7 +101,7 @@ async function readClaudeCreds(): Promise<ClaudeOAuthCreds> {
   }
   const parsed = JSON.parse(result.stdout.trim()) as ClaudeKeychainPayload
   const access = parsed.claudeAiOauth?.accessToken
-  if (!access) {
+  if (!(access != null && access !== '')) {
     throw new Error('no accessToken in Claude Code keychain')
   }
   cachedCreds = {
@@ -123,8 +123,8 @@ function buildWindow(
   const util = typeof payload.utilization === 'number' ? payload.utilization : null
   const percent = util === null ? null : Math.max(0, Math.min(100, util))
   const resetAt = payload.resets_at ?? null
-  const resetAtMs = resetAt ? new Date(resetAt).getTime() : null
-  if (percent === null && !resetAt) return null
+  const resetAtMs = resetAt != null && resetAt !== '' ? new Date(resetAt).getTime() : null
+  if (percent === null && !(resetAt != null && resetAt !== '')) return null
   return {
     kind,
     label,

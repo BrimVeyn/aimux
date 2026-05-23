@@ -84,7 +84,7 @@ function getTargetTerminalTabId(
   activeTabId: string | null,
   isEnabled: boolean
 ): string | null {
-  if (focusMode !== 'terminal-input' || !activeTabId || !isEnabled) {
+  if (focusMode !== 'terminal-input' || activeTabId == null || activeTabId === '' || !isEnabled) {
     return null
   }
 
@@ -248,12 +248,12 @@ export function useMouseHandlers({
       state.activeTabId,
       activeMouseForwardingEnabled
     )
-    if (!targetTabId) {
+    if (!(targetTabId != null && targetTabId !== '')) {
       return
     }
 
     const sequence = getForwardedMouseSequence(event, origin)
-    if (!sequence) {
+    if (!(sequence != null && sequence !== '')) {
       return
     }
 
@@ -262,7 +262,12 @@ export function useMouseHandlers({
 
   const handleTerminalScrollEvent = (event: OtuiMouseEvent) => {
     const targetTabId = getTargetTerminalTabId(state.focusMode, state.activeTabId, true)
-    if (!targetTabId || activeMouseForwardingEnabled || !activeLocalScrollbackEnabled) {
+    if (
+      targetTabId == null ||
+      targetTabId === '' ||
+      activeMouseForwardingEnabled ||
+      !activeLocalScrollbackEnabled
+    ) {
       return
     }
 
@@ -389,7 +394,7 @@ export function useMouseHandlers({
     tabId?: string
   ) => {
     const targetTabId = tabId ?? state.activeTabId
-    if (!targetTabId || !event.target) {
+    if (targetTabId == null || targetTabId === '' || !event.target) {
       return
     }
 
@@ -437,7 +442,7 @@ export function useMouseHandlers({
     }
 
     logInputDebug('click.done', {
-      hasSelection: !!renderer.hasSelection,
+      hasSelection: !!(renderer.hasSelection === true),
       mode: selection.mode,
       targetSelectable: isPositionedNode(event.target) ? !!event.target.selectable : false,
     })

@@ -220,8 +220,8 @@ function classifyGeneric(haystack: string, changedAt: number, now: number): TabA
 }
 
 export function isShellCommand(command: string | undefined): boolean {
-  if (!command) return false
+  if (!(command != null && command !== '')) return false
   const first = command.trim().split(/\s+/u)[0]
-  if (!first) return false
+  if (!(first != null && first !== '')) return false
   return SHELL_COMMAND_PATTERN.test(first)
 }

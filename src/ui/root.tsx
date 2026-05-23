@@ -101,7 +101,7 @@ function renderModal(
           worktreeDeleteConfirmId={modal.type === 'new-tab' ? modal.worktreeDeleteConfirmId : null}
           worktreeDeleteMessage={modal.type === 'new-tab' ? modal.worktreeDeleteMessage : null}
           worktrees={
-            options.currentSessionId
+            options.currentSessionId != null && options.currentSessionId !== ''
               ? (options.sessions.find((session) => session.id === options.currentSessionId)
                   ?.worktrees ?? [])
               : []
@@ -123,7 +123,11 @@ function renderModal(
     case 'session-name':
       return (
         <SessionNameModal
-          title={modal.sessionTargetId ? 'Rename workspace' : 'Create workspace'}
+          title={
+            modal.sessionTargetId != null && modal.sessionTargetId !== ''
+              ? 'Rename workspace'
+              : 'Create workspace'
+          }
           value={modal.editBuffer ?? ''}
         />
       )
@@ -300,7 +304,10 @@ export function RootView({
       : undefined
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
-  const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
+  const activeTree =
+    activeTabId != null && activeTabId !== ''
+      ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
+      : null
   const createSessionFields = getCreateSessionFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
   const splitChrome = PANE_BORDER * 2
@@ -338,7 +345,7 @@ export function RootView({
       height="100%"
       backgroundColor={editorBg}
       onMouseDrag={(event) => {
-        if (onSeparatorDrag?.(event)) {
+        if (onSeparatorDrag?.(event) === true) {
           event.preventDefault()
           event.stopPropagation()
         }

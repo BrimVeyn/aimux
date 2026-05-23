@@ -14,14 +14,14 @@ const SPECIAL_DISPLAY: Record<string, string> = {
 
 function formatModifierKey(baseName: string): string {
   const special = SPECIAL_DISPLAY[baseName]
-  if (special) return special
+  if (special != null && special !== '') return special
   if (baseName.length === 1) return baseName.toUpperCase()
   return baseName.charAt(0).toUpperCase() + baseName.slice(1)
 }
 
 /** Convert a single canonical KeyChord back to a human-readable label. */
 export function formatChord(chord: KeyChord, leader?: KeyChord): string {
-  if (leader && chord === leader) return '<leader>'
+  if (leader != null && leader !== '' && chord === leader) return '<leader>'
 
   let ctrl = false
   let meta = false

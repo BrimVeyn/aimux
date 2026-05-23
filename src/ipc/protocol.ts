@@ -43,7 +43,7 @@ export interface AttachResult {
    * right state immediately, without the per-event race where a separate
    * `sessionStatus` event could arrive before the session was in state.
    */
-  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
+  initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
 }
 
 export type ClientRequest =

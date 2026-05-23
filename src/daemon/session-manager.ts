@@ -11,7 +11,7 @@ import type {
 import { logDebug } from '../debug/input-log'
 import { SessionRegistry } from './session-registry'
 
-type SessionManagerEvents = {
+interface SessionManagerEvents {
   render: [
     sessionId: string,
     tabId: string,

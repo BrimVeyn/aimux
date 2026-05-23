@@ -29,7 +29,7 @@ export function computePace(opts: {
 }): UsagePace | null {
   const { percent, resetAtMs, windowSeconds } = opts
   const now = opts.now ?? Date.now()
-  if (percent === null || resetAtMs === null || !windowSeconds || windowSeconds <= 0) {
+  if (percent === null || resetAtMs === null || windowSeconds == null || windowSeconds <= 0) {
     return null
   }
 
@@ -49,11 +49,8 @@ export function computePace(opts: {
     if (rate > 0) {
       const remaining = Math.max(0, 100 - actual)
       const candidate = remaining / rate
-      if (candidate >= timeUntilReset) {
-        rightText = 'Lasts to reset'
-      } else {
-        rightText = `Runs out in ${formatDuration(candidate)}`
-      }
+      rightText =
+        candidate >= timeUntilReset ? 'Lasts to reset' : `Runs out in ${formatDuration(candidate)}`
     }
   } else if (elapsed > 0 && actual === 0) {
     rightText = 'Lasts to reset'

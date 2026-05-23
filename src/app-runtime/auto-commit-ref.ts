@@ -14,7 +14,7 @@ export function clearActiveAutoCommitDriverIfMatches(trigger: TriggerFn): void {
   if (activeTrigger === trigger) activeTrigger = null
 }
 
-export function triggerAutoCommitNow(args: ActivityTransitionArgs): Promise<void> {
+export async function triggerAutoCommitNow(args: ActivityTransitionArgs): Promise<void> {
   if (!activeTrigger) return Promise.resolve()
   return activeTrigger(args)
 }

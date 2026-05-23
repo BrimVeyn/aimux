@@ -15,7 +15,7 @@ export function createSessionFromCurrentState(
 ): { session: SessionRecord; sessions: SessionRecord[] } {
   const now = new Date().toISOString()
   const workspaceSnapshot =
-    state.currentSessionId || state.tabs.length === 0
+    (state.currentSessionId != null && state.currentSessionId !== '') || state.tabs.length === 0
       ? createEmptyWorkspaceSnapshot()
       : serializeWorkspace(state)
   const session: SessionRecord = {
@@ -29,14 +29,14 @@ export function createSessionFromCurrentState(
     workspaceSnapshot,
     worktrees: undefined,
   }
-  if (projectPath) {
+  if (projectPath != null && projectPath !== '') {
     const worktree = createPrimaryWorktree(projectPath, now)
     session.activeWorktreeId = worktree.id
     session.worktrees = [worktree]
   }
 
   let updatedSessions = state.sessions
-  if (state.currentSessionId) {
+  if (state.currentSessionId != null && state.currentSessionId !== '') {
     const currentSnapshot = serializeWorkspace(state)
     updatedSessions = state.sessions.map((entry) =>
       entry.id === state.currentSessionId
@@ -87,7 +87,8 @@ export function handleCreateSessionEffect(
 ): void {
   const { session, sessions } = createSessionFromCurrentState(state, name, projectPath)
   logInputDebug('app.session.create', {
-    fromCurrentWorkspace: !state.currentSessionId && state.tabs.length > 0,
+    fromCurrentWorkspace:
+      (state.currentSessionId == null || state.currentSessionId === '') && state.tabs.length > 0,
     name,
     sessionId: session.id,
     tabCount: session.workspaceSnapshot?.tabs.length ?? 0,

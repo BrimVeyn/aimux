@@ -54,7 +54,7 @@ export function loadSessionCatalog(): SessionRecord[] {
     return normalized
   }
 
-  if (issue) {
+  if (issue != null && issue !== '') {
     logDebug('sessions.catalog.loadIssue', { issue, path: SESSIONS_PATH })
   }
 

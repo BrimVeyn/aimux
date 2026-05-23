@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { connect, Socket } from 'node:net'
+import { connect, type Socket } from 'node:net'
 
 import type { AssistantId, ScrollIntent, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
@@ -96,7 +96,7 @@ export class RemoteSessionBackend
     return this.socket
   }
 
-  private send(request: ClientRequest): Promise<ServerResponse> {
+  private async send(request: ClientRequest): Promise<ServerResponse> {
     const socket = this.getConnectedSocket()
     logDebug('backend.remote.send', { id: request.id, type: request.type })
     return new Promise((resolve, reject) => {
@@ -139,7 +139,7 @@ export class RemoteSessionBackend
   private reportCommandError(context: string, error: unknown, tabId?: string): void {
     const message = error instanceof Error ? error.message : String(error)
     logDebug('backend.remote.commandError', { context, error: message, tabId })
-    if (tabId) {
+    if (tabId != null && tabId !== '') {
       this.emit('error', tabId, message)
     }
   }

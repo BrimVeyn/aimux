@@ -37,13 +37,13 @@ function writeAtomic(target: string, contents: string): void {
   writeFileSync(tmp, contents, 'utf8')
   try {
     renameSync(tmp, target)
-  } catch (err) {
+  } catch (error) {
     try {
       unlinkSync(tmp)
     } catch {
       /* ignore */
     }
-    throw err
+    throw error
   }
 }
 
@@ -60,8 +60,8 @@ export function syncClaudeTheme(resolved: ResolvedTuiTheme, mode: ThemeMode): vo
   let theme: ClaudeThemeFile
   try {
     theme = resolveClaudeTheme(resolved, mode)
-  } catch (err) {
-    logSyncWarn('resolve-failed', { err: String(err) })
+  } catch (error) {
+    logSyncWarn('resolve-failed', { err: String(error) })
     return
   }
 
@@ -69,8 +69,8 @@ export function syncClaudeTheme(resolved: ResolvedTuiTheme, mode: ThemeMode): vo
   try {
     mkdirSync(join(claudeDir(), 'themes'), { recursive: true })
     writeAtomic(target, `${JSON.stringify(theme, null, 2)}\n`)
-  } catch (err) {
-    logSyncWarn('write-failed', { err: String(err), path: target })
+  } catch (error) {
+    logSyncWarn('write-failed', { err: String(error), path: target })
   }
 }
 
@@ -86,8 +86,8 @@ export function ensureClaudeSettingsThemePref(): void {
     let raw: string
     try {
       raw = readFileSync(target, 'utf8')
-    } catch (err) {
-      logSyncWarn('settings-read-failed', { err: String(err), path: target })
+    } catch (error) {
+      logSyncWarn('settings-read-failed', { err: String(error), path: target })
       return
     }
     if (raw.trim().length > 0) {
@@ -98,8 +98,8 @@ export function ensureClaudeSettingsThemePref(): void {
           return
         }
         parsed = json as Record<string, unknown>
-      } catch (err) {
-        logSyncWarn('settings-parse-failed', { err: String(err), path: target })
+      } catch (error) {
+        logSyncWarn('settings-parse-failed', { err: String(error), path: target })
         return
       }
     }
@@ -112,7 +112,7 @@ export function ensureClaudeSettingsThemePref(): void {
   try {
     mkdirSync(claudeDir(), { recursive: true })
     writeAtomic(target, `${JSON.stringify(parsed, null, 2)}\n`)
-  } catch (err) {
-    logSyncWarn('settings-write-failed', { err: String(err), path: target })
+  } catch (error) {
+    logSyncWarn('settings-write-failed', { err: String(error), path: target })
   }
 }

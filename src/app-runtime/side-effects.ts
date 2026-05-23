@@ -1,10 +1,11 @@
+import type { CliRenderer } from '@opentui/core'
+
 import {
   DEFAULT_EDITOR_ARGS,
   getExternalEditorConfig,
   isAutoCommitEnabled,
   KNOWN_GUI_EDITORS,
 } from '@brimveyn/aimux-config'
-import { type CliRenderer } from '@opentui/core'
 import { $ } from 'bun'
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
@@ -12,6 +13,7 @@ import { dirname, join as joinPath, resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
+import type { ThemeId } from '../ui/themes'
 
 import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
@@ -67,7 +69,6 @@ import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
-import { type ThemeId } from '../ui/themes'
 import { triggerAutoCommitNow } from './auto-commit-ref'
 import {
   handleCreateSessionEffect,
@@ -101,7 +102,7 @@ export interface SideEffectContext {
 
 function getSelectedAssistantOption(state: AppState) {
   const all = getAllAssistantOptions(state.customCommands)
-  if (state.modal.type === 'new-tab' && state.modal.selectedAssistantId) {
+  if (state.modal.type === 'new-tab' && state.modal.selectedAssistantId != null) {
     const selectedAssistantId = state.modal.selectedAssistantId
     return all.find((entry) => entry.id === selectedAssistantId) ?? getAssistantOption(0)
   }
@@ -163,12 +164,12 @@ function openSelectedSessionRename(ctx: SideEffectContext): void {
 function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
   const { activeTab, backend, state } = ctx
   const snippet = getSelectedSnippet(state)
-  if (!snippet || !state.activeTabId) {
+  if (!snippet || !(state.activeTabId != null && state.activeTabId !== '')) {
     return
   }
 
   const groupId = getGroupIdForTab(state.tabGroupMap, state.activeTabId)
-  const groupTree = groupId ? state.layoutTrees[groupId] : null
+  const groupTree = groupId != null && groupId !== '' ? state.layoutTrees[groupId] : null
   if (!groupTree) {
     pasteSnippetToTab(backend, state.activeTabId, activeTab, snippet, ctx.dispatch)
     return
@@ -223,7 +224,7 @@ function applyThemeEffect(
       return
     case 'confirm': {
       const selectedId = ids[state.modal.selectedIndex]
-      if (selectedId) {
+      if (selectedId != null && selectedId !== '') {
         applyTheme(selectedId)
         ctx.setThemeId(selectedId)
         saveConfig({ ...loadConfig(), themeId: selectedId })
@@ -234,7 +235,7 @@ function applyThemeEffect(
       if (ids.length === 0) return
       const nextIndex = (state.modal.selectedIndex + effect.delta + ids.length) % ids.length
       const previewId = ids[nextIndex]
-      if (previewId) {
+      if (previewId != null && previewId !== '') {
         applyTheme(previewId)
       }
       return
@@ -252,7 +253,7 @@ function confirmSplitSelection(ctx: SideEffectContext): void {
     customCommand,
     state.customCommands,
     getActiveWorktree(
-      state.currentSessionId
+      state.currentSessionId != null && state.currentSessionId !== ''
         ? state.sessions.find((s) => s.id === state.currentSessionId)
         : undefined
     )?.id
@@ -344,7 +345,10 @@ export function startTabSession(
 }
 
 function getNewTabTargetWorktreeId(state: AppState): string | undefined {
-  if (state.modal.type !== 'new-tab' || !state.currentSessionId) {
+  if (
+    state.modal.type !== 'new-tab' ||
+    !(state.currentSessionId != null && state.currentSessionId !== '')
+  ) {
     return undefined
   }
   const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
@@ -367,7 +371,7 @@ function launchAssistant(
     state.customCommands,
     worktreeId ??
       getActiveWorktree(
-        state.currentSessionId
+        state.currentSessionId != null && state.currentSessionId !== ''
           ? state.sessions.find((s) => s.id === state.currentSessionId)
           : undefined
       )?.id
@@ -399,7 +403,7 @@ async function launchAssistantInNewWorktree(
   sourceWorktreeId?: string
 ): Promise<void> {
   const sessionId = ctx.state.currentSessionId
-  if (!sessionId) return
+  if (!(sessionId != null && sessionId !== '')) return
   const worktree = await createAimuxTempWorktree(
     ctx,
     sessionId,
@@ -430,10 +434,11 @@ function getTabProjectPath(
   ctx: SideEffectContext,
   tab: Pick<TabSession, 'worktreeId'>
 ): string | undefined {
-  const session = ctx.state.currentSessionId
-    ? ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
-    : undefined
-  if (tab.worktreeId) {
+  const session =
+    ctx.state.currentSessionId != null && ctx.state.currentSessionId !== ''
+      ? ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+      : undefined
+  if (tab.worktreeId != null && tab.worktreeId !== '') {
     const worktree = session?.worktrees?.find((entry) => entry.id === tab.worktreeId)
     if (worktree) return worktree.path
   }
@@ -461,7 +466,7 @@ function executeSplitPane(
 ): void {
   const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const activeTabId = state.activeTabId
-  if (!activeTabId) {
+  if (!(activeTabId != null && activeTabId !== '')) {
     return
   }
 
@@ -501,7 +506,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const worktreeName = state.modal.worktreeName
         const branchName = state.modal.branchName
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
-        void enqueueGitOp(() =>
+        void enqueueGitOp(async () =>
           launchAssistantInNewWorktree(ctx, option.id, worktreeName, branchName, sourceWorktreeId)
         ).catch((error) =>
           ctx.dispatch({
@@ -536,7 +541,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'fork-worktree': {
-      void enqueueGitOp(() =>
+      void enqueueGitOp(async () =>
         runForkWorktree(ctx, effect.sessionId, effect.branchName, effect.baseRef)
       ).catch((error) =>
         ctx.dispatch({
@@ -547,12 +552,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'delete-worktree': {
-      void enqueueGitOp(() =>
+      void enqueueGitOp(async () =>
         runDeleteWorktree(
           { ...ctx, state: ctx.getState() },
           effect.sessionId,
           effect.worktreeId,
-          !!effect.force
+          !!(effect.force === true)
         )
       ).catch((error) => {
         const message = error instanceof Error ? error.message : String(error)
@@ -643,9 +648,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'split-pane': {
-      const sourceTab = effect.sourceTabId
-        ? state.tabs.find((t) => t.id === effect.sourceTabId)
-        : undefined
+      const sourceTab =
+        effect.sourceTabId != null && effect.sourceTabId !== ''
+          ? state.tabs.find((t) => t.id === effect.sourceTabId)
+          : undefined
       const assistant = sourceTab?.assistant ?? 'terminal'
       const customCommand = state.customCommands[assistant]
       const tab = createTabSession(
@@ -726,42 +732,42 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'git-stage': {
-      void enqueueGitOp(() => runGitAction(ctx, ['add', '--', effect.path], effect.path))
+      void enqueueGitOp(async () => runGitAction(ctx, ['add', '--', effect.path], effect.path))
       return
     }
     case 'git-unstage': {
-      void enqueueGitOp(() =>
+      void enqueueGitOp(async () =>
         runGitAction(ctx, ['restore', '--staged', '--', effect.path], effect.path)
       )
       return
     }
     case 'git-stage-all': {
       const paths = ctx.state.gitPanel.files.map((f) => f.path)
-      void enqueueGitOp(() => runGitActionAll(ctx, ['add', '-A'], paths))
+      void enqueueGitOp(async () => runGitActionAll(ctx, ['add', '-A'], paths))
       return
     }
     case 'git-unstage-all': {
       const paths = ctx.state.gitPanel.files.map((f) => f.path)
-      void enqueueGitOp(() => runGitActionAll(ctx, ['reset'], paths))
+      void enqueueGitOp(async () => runGitActionAll(ctx, ['reset'], paths))
       return
     }
     case 'git-restore': {
-      void enqueueGitOp(() => runGitAction(ctx, ['restore', '--', effect.path], effect.path))
+      void enqueueGitOp(async () => runGitAction(ctx, ['restore', '--', effect.path], effect.path))
       return
     }
     case 'git-rm': {
-      void enqueueGitOp(() => runGitRm(ctx, effect.path))
+      void enqueueGitOp(async () => runGitRm(ctx, effect.path))
       return
     }
     case 'git-commit': {
       const { body, title } = effect
-      void enqueueGitOp(() => runGitCommit(ctx, title, body))
+      void enqueueGitOp(async () => runGitCommit(ctx, title, body))
       return
     }
     case 'git-commit-auto': {
       if (!isAutoCommitEnabled()) return
       const { body, title } = effect
-      void enqueueGitOp(() => runGitCommitAuto(ctx, title, body))
+      void enqueueGitOp(async () => runGitCommitAuto(ctx, title, body))
       return
     }
     case 'generate-auto-commit-now': {
@@ -770,7 +776,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'git-push': {
-      void enqueueGitOp(() => runGitPush(ctx))
+      void enqueueGitOp(async () => runGitPush(ctx))
       return
     }
     case 'confirm-update-selection': {
@@ -838,7 +844,7 @@ function openSelectedSnippetSourceInEditor(ctx: SideEffectContext): void {
 function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   const fileEntry = ctx.state.gitPanel.files.find((f) => f.path === relPath)
   const cwd = fileEntry?.repoPath ?? ctx.getCurrentSessionProjectPath()
-  if (!cwd) {
+  if (!(cwd != null && cwd !== '')) {
     ctx.dispatch({ message: 'no working directory', type: 'git-mode-set-message' })
     return
   }
@@ -856,14 +862,14 @@ function launchEditorOnFile(
 ): void {
   const config = getExternalEditorConfig()
   const rawCommand = config.command ?? process.env.VISUAL ?? process.env.EDITOR
-  if (!rawCommand || rawCommand.trim() === '') {
+  if (rawCommand == null || rawCommand === '' || rawCommand.trim() === '') {
     onError('no $EDITOR/$VISUAL set — configure externalEditor in aimux.config.ts')
     return
   }
 
   const cmdParts = shellSplit(rawCommand)
   const executable = cmdParts[0]
-  if (!executable) {
+  if (!(executable != null && executable !== '')) {
     onError('invalid editor command')
     return
   }
@@ -925,7 +931,7 @@ function substituteEditorArgs(template: string[], file: string, line?: string): 
     // Drop standalone line tokens like `{line}`, `+{line}`, `:{line}`.
     if (/^[+:]?\{line\}$/.test(arg)) continue
     // Strip trailing `:{line}` or `+{line}` from compound tokens like `{file}:{line}`.
-    out.push(arg.replace(/[:+]\{line\}/g, '').replaceAll('{file}', file))
+    out.push(arg.replaceAll(/[:+]\{line\}/g, '').replaceAll('{file}', file))
   }
   return out
 }
@@ -988,13 +994,15 @@ function spawnDetached(ctx: SideEffectContext, argv: string[], cwd?: string): vo
       const stderr = await new Response(child.stderr).text()
       const code = await child.exited
       if (code !== 0) {
-        const firstLine = stderr.trim().split('\n')[0] || `exit ${code}`
+        const firstStderrLine = stderr.trim().split('\n')[0]
+        const firstLine =
+          firstStderrLine != null && firstStderrLine !== '' ? firstStderrLine : `exit ${code}`
         ctx.dispatch({ message: `editor: ${firstLine}`, type: 'git-mode-set-message' })
       }
     })()
     child.unref()
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'failed to spawn'
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'failed to spawn'
     ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
   }
 }
@@ -1021,8 +1029,8 @@ async function openEditorInline(
       stdout: 'inherit',
     })
     await proc.exited
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'failed to spawn editor'
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : 'failed to spawn editor'
     ctx.dispatch({ message: `editor: ${msg}`, type: 'git-mode-set-message' })
   } finally {
     renderer.currentRenderBuffer.clear()
@@ -1033,9 +1041,9 @@ async function openEditorInline(
 
 function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void {
   const { backend, dispatch, state } = ctx
-  const ordered = state.sessions
-    .slice()
-    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+  const ordered = [...state.sessions].sort(
+    (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+  )
   const target = ordered[index - 1]
   if (!target) {
     logInputDebug('app.sessionBar.switchOutOfRange', { index, total: ordered.length })
@@ -1097,7 +1105,7 @@ async function createAimuxTempWorktree(
   const source =
     session?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(session)
   const sourcePath = source?.path ?? getSessionProjectPath(session)
-  if (!session || !sourcePath) return undefined
+  if (!session || !(sourcePath != null && sourcePath !== '')) return undefined
 
   // Resolve the *main* repo checkout, never the active linked worktree, so the
   // record's repoRoot stays valid after sibling worktrees are deleted.
@@ -1105,10 +1113,16 @@ async function createAimuxTempWorktree(
   const baseBranch = (await getCurrentBranch(sourcePath)) ?? source?.branch ?? 'HEAD'
   const baseRef = requestedBaseRef ?? baseBranch
   const worktreeId = createPrefixedId('worktree')
-  const worktreeName = requestedName?.trim() || `wt-${sanitizePathSegment(session.name, 12)}`
+  const trimmedName = requestedName?.trim()
+  const worktreeName =
+    trimmedName != null && trimmedName !== ''
+      ? trimmedName
+      : `wt-${sanitizePathSegment(session.name, 12)}`
+  const trimmedBranch = requestedBranchName?.trim()
   const branchName =
-    requestedBranchName?.trim() ||
-    `aimux/${sanitizePathSegment(worktreeName, 40)}-${Date.now().toString(36)}`
+    trimmedBranch != null && trimmedBranch !== ''
+      ? trimmedBranch
+      : `aimux/${sanitizePathSegment(worktreeName, 40)}-${Date.now().toString(36)}`
   const targetPath = makeWorktreePath({ repoRoot, worktreeId, worktreeName })
 
   const existingWorktree = (await listGitWorktrees(repoRoot)).find(
@@ -1315,11 +1329,12 @@ async function runGitAction(
   pathToInvalidate?: string
 ): Promise<void> {
   const fallback = ctx.getCurrentSessionProjectPath()
-  const repoPath = pathToInvalidate
-    ? ctx.state.gitPanel.files.find((f) => f.path === pathToInvalidate)?.repoPath
-    : undefined
+  const repoPath =
+    pathToInvalidate != null && pathToInvalidate !== ''
+      ? ctx.state.gitPanel.files.find((f) => f.path === pathToInvalidate)?.repoPath
+      : undefined
   const cwd = repoPath ?? fallback
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
   const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString().trim()
@@ -1327,7 +1342,7 @@ async function runGitAction(
     return
   }
   ctx.dispatch({ message: null, type: 'git-mode-set-message' })
-  if (pathToInvalidate) {
+  if (pathToInvalidate != null && pathToInvalidate !== '') {
     ctx.dispatch({ path: pathToInvalidate, type: 'git-mode-clear-diff-cache' })
   }
 }
@@ -1338,7 +1353,7 @@ async function runGitActionAll(
   pathsToInvalidate: string[]
 ): Promise<void> {
   const cwd = ctx.getCurrentSessionProjectPath()
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
   const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString().trim()
@@ -1354,17 +1369,15 @@ async function runGitActionAll(
 async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
   const repoPath = ctx.state.gitPanel.files.find((f) => f.path === path)?.repoPath
   const cwd = repoPath ?? ctx.getCurrentSessionProjectPath()
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
   const absolute = `${cwd}/${path}`
   try {
     const stat = await Bun.file(absolute).stat()
-    if (stat.isDirectory()) {
-      await Bun.$`rm -rf -- ${absolute}`.quiet().nothrow()
-    } else {
-      await Bun.file(absolute).unlink()
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'failed to delete file'
+    await (stat.isDirectory()
+      ? Bun.$`rm -rf -- ${absolute}`.quiet().nothrow()
+      : Bun.file(absolute).unlink())
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'failed to delete file'
     ctx.dispatch({ message, type: 'git-mode-set-message' })
     return
   }
@@ -1374,7 +1387,7 @@ async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
 
 async function runGitCommit(ctx: SideEffectContext, title: string, body: string): Promise<void> {
   const cwd = ctx.getCurrentSessionProjectPath()
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
   if (!title) {
     ctx.dispatch({ message: 'empty commit title', type: 'git-mode-set-message' })
     return
@@ -1404,7 +1417,7 @@ async function runGitCommitAuto(
     return
   }
   const cwd = ctx.getCurrentSessionProjectPath()
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
 
   // If the user has manually staged files, respect that intent and commit
   // only the staged set — don't run `git add -A` which would sweep up
@@ -1441,7 +1454,7 @@ async function runGitCommitAuto(
 
 function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
   const sessionId = ctx.state.currentSessionId
-  if (!sessionId) return
+  if (!(sessionId != null && sessionId !== '')) return
   ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
 }
 
@@ -1478,7 +1491,7 @@ async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: strin
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {
   const cwd = ctx.getCurrentSessionProjectPath()
-  if (!cwd) return
+  if (!(cwd != null && cwd !== '')) return
   ctx.dispatch({ message: 'pushing…', type: 'git-mode-set-message' })
 
   const upstream = await $`git -C ${cwd} rev-parse --abbrev-ref --symbolic-full-name @{u}`

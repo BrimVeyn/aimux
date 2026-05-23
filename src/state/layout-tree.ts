@@ -1,7 +1,10 @@
 export type SplitDirection = 'horizontal' | 'vertical'
 
-export type LayoutLeaf = { type: 'leaf'; tabId: string }
-export type LayoutSplit = {
+export interface LayoutLeaf {
+  type: 'leaf'
+  tabId: string
+}
+export interface LayoutSplit {
   type: 'split'
   direction: SplitDirection
   ratio: number
@@ -42,7 +45,7 @@ export function getTreeForTab(
   tabId: string
 ): LayoutNode | null {
   const groupId = tabGroupMap[tabId]
-  if (!groupId) return null
+  if (!(groupId != null && groupId !== '')) return null
   return layoutTrees[groupId] ?? null
 }
 
@@ -303,14 +306,14 @@ export function getAdjacentLeaf(
     if (inFirst && goingToSecond) {
       // Try to recurse in first child first
       const deeper = getAdjacentLeaf(tree.first, fromTabId, direction)
-      if (deeper) return deeper
+      if (deeper != null && deeper !== '') return deeper
       // Cross boundary: go to first leaf of second child
       return firstLeafId(tree.second)
     }
 
     if (inSecond && !goingToSecond) {
       const deeper = getAdjacentLeaf(tree.second, fromTabId, direction)
-      if (deeper) return deeper
+      if (deeper != null && deeper !== '') return deeper
       return lastLeafId(tree.first)
     }
   }

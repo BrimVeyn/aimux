@@ -5,7 +5,8 @@ import type { DiffData, DiffFileStatus, GitFileEntry } from '../state/types'
 import { imageFormatLabel, imageMimeFromPath, isImagePath } from './image-detect'
 
 function resolveStatus(entry: GitFileEntry): { status: DiffFileStatus; oldPath?: string } {
-  if (entry.renamedFrom) return { oldPath: entry.renamedFrom, status: 'renamed' }
+  if (entry.renamedFrom != null && entry.renamedFrom !== '')
+    return { oldPath: entry.renamedFrom, status: 'renamed' }
   if (entry.section === 'untracked' || entry.status === '?') return { status: 'new' }
   if (entry.status === 'D') return { status: 'deleted' }
   if (entry.status === 'A' && (entry.section === 'staged' || entry.section === 'historical')) {
@@ -112,7 +113,7 @@ export async function fetchDiff(
     }
     if (imageBytesBefore) data.imageBytesBefore = imageBytesBefore
     if (imageBytesAfter) data.imageBytesAfter = imageBytesAfter
-    if (oldPath) data.oldPath = oldPath
+    if (oldPath != null && oldPath !== '') data.oldPath = oldPath
     return data
   }
 
@@ -137,6 +138,6 @@ export async function fetchDiff(
     rawDiff,
     status,
   }
-  if (oldPath) data.oldPath = oldPath
+  if (oldPath != null && oldPath !== '') data.oldPath = oldPath
   return data
 }

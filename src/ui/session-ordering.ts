@@ -5,7 +5,7 @@ import type { SessionRecord } from '../state/types'
  * with any missing `order` falling back to `createdAt` ascending.
  */
 export function orderSessionsForDisplay(sessions: SessionRecord[]): SessionRecord[] {
-  return sessions.slice().sort((a, b) => {
+  return [...sessions].sort((a, b) => {
     const ao = a.order ?? Number.MAX_SAFE_INTEGER
     const bo = b.order ?? Number.MAX_SAFE_INTEGER
     if (ao !== bo) return ao - bo
@@ -27,7 +27,7 @@ export function moveIdToIdPosition(
   const from = ids.indexOf(moveId)
   const to = ids.indexOf(intoPositionOfId)
   if (from < 0 || to < 0) return ids
-  const next = ids.slice()
+  const next = [...ids]
   next.splice(from, 1)
   next.splice(to, 0, moveId)
   return next

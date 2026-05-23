@@ -142,7 +142,7 @@ export function normalizeGroupedTabOrder(
 
   for (const tab of tabs) {
     const groupId = tabGroupMap[tab.id]
-    if (!groupId) {
+    if (!(groupId != null && groupId !== '')) {
       continue
     }
 
@@ -162,9 +162,9 @@ export function normalizeGroupedTabOrder(
 
   for (const tab of tabs) {
     const groupId = tabGroupMap[tab.id]
-    const groupTree = groupId ? layoutTrees[groupId] : undefined
+    const groupTree = groupId != null && groupId !== '' ? layoutTrees[groupId] : undefined
 
-    if (!groupId || !groupTree || groupTree.type !== 'split') {
+    if (groupId == null || groupId === '' || !groupTree || groupTree.type !== 'split') {
       orderedTabs.push(tab)
       continue
     }
@@ -196,7 +196,9 @@ export function restoreWorkspaceState(
 > {
   const tabs = restoreTabsFromWorkspace(workspaceSnapshot)
   const activeTabId =
-    workspaceSnapshot?.activeTabId && tabs.some((tab) => tab.id === workspaceSnapshot.activeTabId)
+    workspaceSnapshot?.activeTabId != null &&
+    workspaceSnapshot?.activeTabId !== '' &&
+    tabs.some((tab) => tab.id === workspaceSnapshot.activeTabId)
       ? workspaceSnapshot.activeTabId
       : (tabs[0]?.id ?? null)
 

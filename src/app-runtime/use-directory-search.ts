@@ -42,11 +42,13 @@ export function useDirectorySearch(
       return
     }
 
-    const timer = setTimeout(async () => {
-      const results = await searchProjectDirectories(directoryQuery)
-      if (isCurrent) {
-        dispatch({ results, type: 'set-directory-results' })
-      }
+    const timer = setTimeout(() => {
+      void (async () => {
+        const results = await searchProjectDirectories(directoryQuery)
+        if (isCurrent) {
+          dispatch({ results, type: 'set-directory-results' })
+        }
+      })()
     }, debounceMs)
 
     return () => {

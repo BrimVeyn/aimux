@@ -90,7 +90,7 @@ export function GitCommitModal({
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const bgKind = useAppStore((s) => {
     const id = s.currentSessionId
-    return id ? s.autoCommit.bySession[id]?.kind : undefined
+    return id != null && id !== '' ? s.autoCommit.bySession[id]?.kind : undefined
   })
   const isBgGenerating = bgKind === 'generating'
   const showBgSpinner = isBgGenerating && !isConfirm && !isGenerating
@@ -101,7 +101,7 @@ export function GitCommitModal({
 
   const onAutoCommitClick = (): void => {
     const hasTitle = title.trim().length > 0
-    if (hasTitle || !currentSessionId) {
+    if (hasTitle || !(currentSessionId != null && currentSessionId !== '')) {
       dispatchGlobal({ type: 'git-commit-enter-confirm' })
       return
     }

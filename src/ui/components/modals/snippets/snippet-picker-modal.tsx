@@ -52,7 +52,9 @@ export function SnippetPickerModal({
           <text fg={active ? t.text : t.textMuted}>
             <strong>{snippet.name}</strong>
           </text>
-          {snippet.trigger ? <text fg={t.textMuted}>{` :${snippet.trigger}`}</text> : null}
+          {snippet.trigger != null && snippet.trigger !== '' ? (
+            <text fg={t.textMuted}>{` :${snippet.trigger}`}</text>
+          ) : null}
           {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
         </box>
       ),
@@ -71,10 +73,16 @@ export function SnippetPickerModal({
       selectedIndex={selectedIndex}
       emptyState={
         <text fg={t.textMuted}>
-          {filter ? 'No matching snippets.' : 'No snippets yet. Press n to create one.'}
+          {filter != null && filter !== ''
+            ? 'No matching snippets.'
+            : 'No snippets yet. Press n to create one.'}
         </text>
       }
-      footer={actionMessage ? <text fg={t.error}>{actionMessage}</text> : undefined}
+      footer={
+        actionMessage != null && actionMessage !== '' ? (
+          <text fg={t.error}>{actionMessage}</text>
+        ) : undefined
+      }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />
   )

@@ -1,5 +1,6 @@
 import type { KeyEvent } from '@opentui/core'
 
+import type { SplitDirection } from '../../state/layout-tree'
 import type { AppAction, AppState, GitFileListMode, TabSession } from '../../state/types'
 
 export type ModeId =
@@ -46,7 +47,7 @@ export type SideEffect =
   | { type: 'rename-session'; sessionId: string; name: string }
   | {
       type: 'split-pane'
-      direction: import('../../state/layout-tree').SplitDirection
+      direction: SplitDirection
       sourceTabId?: string
     }
   | { type: 'confirm-split' }

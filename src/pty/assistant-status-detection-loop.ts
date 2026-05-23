@@ -58,9 +58,9 @@ export interface StatusDetectionLoopHandle {
   /** Last session flags, for on-attach replay. */
   getSessionStatus: (sessionId: string) => SessionStatus | undefined
   /** Snapshot of every known session's flags. */
-  snapshotSessions: () => Array<{ sessionId: string; status: SessionStatus }>
+  snapshotSessions: () => { sessionId: string; status: SessionStatus }[]
   /** Snapshot of every known tab's status plus its session. */
-  snapshotTabs: () => Array<{ tabId: string; sessionId: string; status: TabActivity }>
+  snapshotTabs: () => { tabId: string; sessionId: string; status: TabActivity }[]
   /**
    * Synchronously run classification for a single session. Used on client
    * attach so the replay snapshot is populated *before* the client reads it,

@@ -17,11 +17,15 @@ export function getLineText(line: TerminalLine): string {
  */
 export function extractStreamText(
   lines: TerminalLine[],
-  startRow: number,
-  startCol: number,
-  endRow: number,
-  endCol: number
+  startRowArg: number,
+  startColArg: number,
+  endRowArg: number,
+  endColArg: number
 ): string {
+  let startRow = startRowArg
+  let startCol = startColArg
+  let endRow = endRowArg
+  let endCol = endColArg
   if (startRow > endRow || (startRow === endRow && startCol > endCol)) {
     ;[startRow, endRow] = [endRow, startRow]
     ;[startCol, endCol] = [endCol, startCol]
@@ -60,7 +64,7 @@ export function getWordAtColumn(
   }
 
   const ch = lineText[column]
-  if (!ch || !/\S/.test(ch)) {
+  if (ch == null || ch === '' || !/\S/.test(ch)) {
     return { endCol: column, startCol: column, text: '' }
   }
 

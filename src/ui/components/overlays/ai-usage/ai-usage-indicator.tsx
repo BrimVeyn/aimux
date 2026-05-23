@@ -34,7 +34,7 @@ function formatResetIn(snap: {
   resetAt: string | null
   timeRemaining: string | null
 }): string | null {
-  if (snap.resetAt) {
+  if (snap.resetAt != null && snap.resetAt !== '') {
     const diffMs = new Date(snap.resetAt).getTime() - Date.now()
     if (diffMs > 0) {
       const totalMin = Math.round(diffMs / 60_000)
@@ -85,7 +85,7 @@ export function AIUsageIndicator() {
         if (!snap) return null
         const icon = TOOL_ICON[tool]
 
-        if (snap.error && !snap.stale) {
+        if (snap.error != null && snap.error !== '' && !(snap.stale === true)) {
           return (
             <box
               key={tool}
@@ -134,7 +134,7 @@ export function AIUsageIndicator() {
               <text fg={t.text} selectable={false}>
                 {` ${pctText}`}
               </text>
-              {reset ? (
+              {reset != null && reset !== '' ? (
                 <text fg={t.textMuted} selectable={false}>
                   {` · ${reset}`}
                 </text>

@@ -1,6 +1,8 @@
 import type { ModeId, SnippetVar } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
+import type { LayoutNode, SplitDirection } from './layout-tree'
+
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
@@ -109,8 +111,8 @@ export interface WorkspaceSnapshotV1 {
     width: number
   }
   tabs: PersistedTabSnapshot[]
-  layoutTree?: import('./layout-tree').LayoutNode
-  layoutTrees?: Record<string, import('./layout-tree').LayoutNode>
+  layoutTree?: LayoutNode
+  layoutTrees?: Record<string, LayoutNode>
   tabGroupMap?: Record<string, string>
 }
 
@@ -181,7 +183,9 @@ export type GitPanePathConfig =
   | { enabled: false }
   | { enabled: true; pathFn?: (path: string) => string }
 
-export type GitPaneDiffCountConfig = { enabled: boolean }
+export interface GitPaneDiffCountConfig {
+  enabled: boolean
+}
 
 export interface GitPaneState {
   visible: boolean
@@ -357,7 +361,7 @@ export interface ModalHelp extends ModalBase {
 
 export interface ModalSplitPicker extends ModalBase {
   type: 'split-picker'
-  splitDirection: import('./layout-tree').SplitDirection
+  splitDirection: SplitDirection
 }
 
 export interface ModalGitCommit extends ModalBase {
@@ -454,7 +458,7 @@ export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] 
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
-  layoutTrees: Record<string, import('./layout-tree').LayoutNode>
+  layoutTrees: Record<string, LayoutNode>
   tabGroupMap: Record<string, string>
   sessions: SessionRecord[]
   currentSessionId: string | null
@@ -490,7 +494,7 @@ export type ModalAction =
   | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
-  | { type: 'open-split-picker'; direction: import('./layout-tree').SplitDirection }
+  | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-session-picker' }
   | {
       type: 'open-session-name-modal'
@@ -542,8 +546,8 @@ export type TabAction =
       type: 'hydrate-workspace'
       tabs: TabSession[]
       activeTabId: string | null
-      layoutTree?: import('./layout-tree').LayoutNode | null
-      layoutTrees?: Record<string, import('./layout-tree').LayoutNode>
+      layoutTree?: LayoutNode | null
+      layoutTrees?: Record<string, LayoutNode>
       tabGroupMap?: Record<string, string>
     }
   | { type: 'close-tab'; tabId: string }
@@ -569,7 +573,7 @@ export type TabAction =
 export type LayoutAction =
   | {
       type: 'split-pane'
-      direction: import('./layout-tree').SplitDirection
+      direction: SplitDirection
       newTab: TabSession
     }
   | { type: 'close-pane'; tabId: string }
@@ -581,13 +585,13 @@ export type LayoutAction =
       type: 'resize-pane'
       tabId: string
       delta: number
-      axis?: import('./layout-tree').SplitDirection
+      axis?: SplitDirection
     }
   | {
       type: 'set-split-ratio'
       tabId: string
       ratio: number
-      axis?: import('./layout-tree').SplitDirection
+      axis?: SplitDirection
     }
 
 // -- UI actions --
@@ -696,8 +700,8 @@ export type GitModeAction =
       key: string
       hash: string
       themeId: string
-      add: Array<{ start: number; tokens: unknown }>
-      del: Array<{ start: number; tokens: unknown }>
+      add: { start: number; tokens: unknown }[]
+      del: { start: number; tokens: unknown }[]
     }
   | { type: 'git-mode-invalidate-diffs'; paths: string[] }
   | { type: 'git-mode-set-loading'; key: string; loading: boolean }

@@ -17,7 +17,7 @@ import {
   type WorkspaceSnapshotV1,
 } from '../state/types'
 
-type SessionRegistryEvents = {
+interface SessionRegistryEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
@@ -81,7 +81,9 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         this.tabs.set(tab.id, tab)
       }
       this.activeTabId =
-        snapshot.activeTabId && restoredTabs.some((tab) => tab.id === snapshot.activeTabId)
+        snapshot.activeTabId != null &&
+        snapshot.activeTabId !== '' &&
+        restoredTabs.some((tab) => tab.id === snapshot.activeTabId)
           ? snapshot.activeTabId
           : (restoredTabs[0]?.id ?? null)
     } else if (this.tabs.size > 0 && snapshot) {
@@ -93,7 +95,11 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
           existing.worktreeId = persisted.worktreeId
         }
       }
-      if (snapshot.activeTabId && this.tabs.has(snapshot.activeTabId)) {
+      if (
+        snapshot.activeTabId != null &&
+        snapshot.activeTabId !== '' &&
+        this.tabs.has(snapshot.activeTabId)
+      ) {
         this.activeTabId = snapshot.activeTabId
       }
     }
