@@ -15,6 +15,9 @@
     "cat-file",
     "worktree",
     "merge-base",
+    "merge",
+    "reset",
+    "add",
     "ls-files"
   ],
   "ignoreDependencies": ["bun-types"],

@@ -197,6 +197,37 @@ function buildWorktreeMenu(session: SessionRecord): [string, () => void][] {
             worktreeId: active.id,
           }),
       ])
+      // Move the active worktree's changes into another worktree. Squash needs a
+      // branch, so this is offered only from a feature/temp worktree, not primary.
+      const sourceName = active.branch ?? active.name
+      if (active.branch != null && active.branch !== '') {
+        for (const target of worktrees) {
+          if (target.id === active.id) continue
+          const targetLabel = target.branch ?? target.name
+          items.push([
+            `Move → ${targetLabel}`,
+            () =>
+              runSideEffectGlobal({
+                deleteSource: false,
+                sessionId: session.id,
+                sourceWorktreeId: active.id,
+                targetWorktreeId: target.id,
+                type: 'move-worktree',
+              }),
+          ])
+          items.push([
+            `Move → ${targetLabel}, delete ${sourceName}`,
+            () =>
+              runSideEffectGlobal({
+                deleteSource: true,
+                sessionId: session.id,
+                sourceWorktreeId: active.id,
+                targetWorktreeId: target.id,
+                type: 'move-worktree',
+              }),
+          ])
+        }
+      }
     }
   }
   return items

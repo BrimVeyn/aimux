@@ -710,6 +710,13 @@ export type SideEffect =
   | { type: 'switch-worktree'; sessionId: string; worktreeId: string }
   | { type: 'fork-worktree'; sessionId: string; branchName?: string; baseRef?: string }
   | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | {
+      type: 'move-worktree'
+      sessionId: string
+      sourceWorktreeId: string
+      targetWorktreeId: string
+      deleteSource?: boolean
+    }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }

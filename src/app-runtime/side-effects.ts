@@ -18,6 +18,7 @@ import type { ThemeId } from '../ui/themes'
 import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
+import { moveWorktree } from '../git/move-worktree'
 import {
   createGitWorktree,
   getCurrentBranch,
@@ -578,6 +579,23 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         })
         ctx.dispatch({ message, type: 'git-mode-set-message' })
       })
+      return
+    }
+    case 'move-worktree': {
+      void enqueueGitOp(async () =>
+        runMoveWorktree(
+          { ...ctx, state: ctx.getState() },
+          effect.sessionId,
+          effect.sourceWorktreeId,
+          effect.targetWorktreeId,
+          effect.deleteSource === true
+        )
+      ).catch((error) =>
+        ctx.dispatch({
+          message: error instanceof Error ? error.message : String(error),
+          type: 'git-mode-set-message',
+        })
+      )
       return
     }
     case 'open-rename-selected-session': {
@@ -1247,6 +1265,64 @@ function resolveWorktreeGitDir(
       .map((entry) => entry.path),
   ]
   return candidates.find((path) => path !== undefined && existsSync(path)) ?? worktree.repoRoot
+}
+
+async function runMoveWorktree(
+  ctx: SideEffectContext,
+  sessionId: string,
+  sourceWorktreeId: string,
+  targetWorktreeId: string,
+  deleteSource: boolean
+): Promise<void> {
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const source = session?.worktrees?.find((entry) => entry.id === sourceWorktreeId)
+  const target = session?.worktrees?.find((entry) => entry.id === targetWorktreeId)
+  if (!session) throw new Error('session not found')
+  if (!source || !target) throw new Error('worktree not found')
+  if (source.id === target.id) throw new Error('source and target are the same worktree')
+  if (source.branch == null || source.branch === '') {
+    throw new Error('source worktree has no branch to move')
+  }
+  if (deleteSource && source.source === 'primary') {
+    throw new Error('the primary worktree cannot be deleted')
+  }
+
+  const sourceLabel = source.branch ?? source.name
+  const targetLabel = target.branch ?? target.name
+  const result = await moveWorktree({
+    sourceBranch: source.branch,
+    sourcePath: source.path,
+    targetPath: target.path,
+  })
+
+  if (result.kind === 'dirty-target') {
+    ctx.dispatch({
+      message: `Target ${targetLabel} has uncommitted changes — commit or stash it first`,
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+  if (result.kind === 'conflict') {
+    ctx.dispatch({
+      message: `Move hit conflicts in ${result.files.length} file(s) — left ${sourceLabel} untouched`,
+      type: 'git-mode-set-message',
+    })
+    return
+  }
+  if (result.kind === 'error') {
+    ctx.dispatch({ message: `Move failed: ${result.message}`, type: 'git-mode-set-message' })
+    return
+  }
+
+  // Land in the target so the squashed changes can be tested with one dev server.
+  handleSwitchWorktree(ctx, sessionId, targetWorktreeId)
+  if (deleteSource) {
+    await runDeleteWorktree({ ...ctx, state: ctx.getState() }, sessionId, sourceWorktreeId, true)
+  }
+  ctx.dispatch({
+    message: `Moved ${sourceLabel} → ${targetLabel}: ${result.filesChanged} file(s) staged — review & commit`,
+    type: 'git-mode-set-message',
+  })
 }
 
 function removeWorktreeRecordFromSession(
