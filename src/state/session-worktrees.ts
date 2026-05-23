@@ -82,8 +82,13 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
   if (discovered.length === 0) return worktrees
 
   const byPath = new Map(worktrees.map((worktree) => [worktree.path, worktree]))
+  // `git worktree list` reports the main worktree first; prefer the primary
+  // record's repoRoot when it still exists, then git's main worktree.
+  const primaryRepoRoot = worktrees.find((worktree) => worktree.source === 'primary')?.repoRoot
   const repoRoot =
-    worktrees.find((worktree) => worktree.source === 'primary')?.repoRoot ?? anchor.repoRoot
+    primaryRepoRoot !== undefined && existsSync(primaryRepoRoot)
+      ? primaryRepoRoot
+      : (discovered[0]?.path ?? anchor.repoRoot)
   for (const entry of discovered) {
     if (byPath.has(entry.path)) continue
     if (isInsideAimuxWorktreeRoot(entry.path)) continue
@@ -101,7 +106,11 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
     }
     byPath.set(entry.path, worktree)
   }
-  return [...byPath.values()]
+  // Heal records whose repoRoot points at a since-deleted sibling worktree so
+  // later git operations (e.g. deletion via `git -C repoRoot`) don't fail.
+  return [...byPath.values()].map((worktree) =>
+    existsSync(worktree.repoRoot) ? worktree : { ...worktree, repoRoot, updatedAt: now }
+  )
 }
 
 function listGitWorktreesSync(

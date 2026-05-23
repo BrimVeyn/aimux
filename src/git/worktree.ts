@@ -1,4 +1,5 @@
 import { $ } from 'bun'
+import { existsSync } from 'node:fs'
 
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
@@ -8,10 +9,13 @@ export interface GitWorktreeInfo {
   branch?: string
 }
 
-export async function getRepoRoot(cwd: string): Promise<string | undefined> {
-  const result = await $`git -C ${cwd} rev-parse --show-toplevel`.quiet().nothrow()
-  if (result.exitCode !== 0) return undefined
-  return result.text().trim() || undefined
+// Returns the main worktree's path, i.e. the original repository checkout.
+// `git worktree list` always reports the main worktree first, so this stays
+// correct even when called from inside a linked worktree — unlike
+// `rev-parse --show-toplevel`, which returns the *current* worktree's path.
+export async function getMainWorktreeRoot(cwd: string): Promise<string | undefined> {
+  const worktrees = await listGitWorktrees(cwd)
+  return worktrees[0]?.path
 }
 
 export async function getCurrentBranch(cwd: string): Promise<string | undefined> {
@@ -60,9 +64,14 @@ export async function removeGitWorktree({
   const result = force
     ? await $`git -C ${repoPath} worktree remove --force ${targetPath}`.quiet().nothrow()
     : await $`git -C ${repoPath} worktree remove ${targetPath}`.quiet().nothrow()
-  if (result.exitCode !== 0) {
-    throw new Error(result.stderr.toString().trim() || 'failed to remove git worktree')
+  if (result.exitCode === 0) return
+  // The worktree directory may already be gone, leaving only stale admin state
+  // in the main repo. Pruning clears it so deletion still reaches its goal.
+  if (!existsSync(targetPath)) {
+    await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
+    return
   }
+  throw new Error(result.stderr.toString().trim() || 'failed to remove git worktree')
 }
 
 export async function listGitWorktrees(repoPath: string): Promise<GitWorktreeInfo[]> {

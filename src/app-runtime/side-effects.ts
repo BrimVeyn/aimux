@@ -20,7 +20,7 @@ import {
   createGitWorktree,
   getCurrentBranch,
   getHeadSha,
-  getRepoRoot,
+  getMainWorktreeRoot,
   listGitWorktrees,
   removeGitWorktree,
 } from '../git/worktree'
@@ -1099,7 +1099,9 @@ async function createAimuxTempWorktree(
   const sourcePath = source?.path ?? getSessionProjectPath(session)
   if (!session || !sourcePath) return undefined
 
-  const repoRoot = (await getRepoRoot(sourcePath)) ?? source?.repoRoot ?? sourcePath
+  // Resolve the *main* repo checkout, never the active linked worktree, so the
+  // record's repoRoot stays valid after sibling worktrees are deleted.
+  const repoRoot = (await getMainWorktreeRoot(sourcePath)) ?? source?.repoRoot ?? sourcePath
   const baseBranch = (await getCurrentBranch(sourcePath)) ?? source?.branch ?? 'HEAD'
   const baseRef = requestedBaseRef ?? baseBranch
   const worktreeId = createPrefixedId('worktree')
@@ -1201,12 +1203,34 @@ async function runDeleteWorktree(
     isInsideAimuxWorktreeRoot(worktree.path)
   ) {
     await assertSafeAimuxWorktreePath(worktree.path)
-    await removeGitWorktree({ force, repoPath: worktree.repoRoot, targetPath: worktree.path })
+    await removeGitWorktree({
+      force,
+      repoPath: resolveWorktreeGitDir(session, worktree),
+      targetPath: worktree.path,
+    })
   } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
     throw new Error(`refusing unsafe worktree delete: ${worktree.path}`)
   }
 
   removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
+}
+
+// A worktree's stored repoRoot can point at a sibling worktree that was since
+// deleted. Git commands only need *some* existing worktree of the repo (they
+// share the common git dir), so fall back to the main checkout or any live
+// worktree path rather than letting `git -C` fail on a vanished directory.
+function resolveWorktreeGitDir(
+  session: NonNullable<SideEffectContext['state']['sessions'][number]>,
+  worktree: WorktreeRecord
+): string {
+  const candidates = [
+    session.worktrees?.find((entry) => entry.source === 'primary')?.path,
+    worktree.repoRoot,
+    ...(session.worktrees ?? [])
+      .filter((entry) => entry.id !== worktree.id)
+      .map((entry) => entry.path),
+  ]
+  return candidates.find((path) => path !== undefined && existsSync(path)) ?? worktree.repoRoot
 }
 
 function removeWorktreeRecordFromSession(
