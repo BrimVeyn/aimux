@@ -475,6 +475,11 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  /**
+   * Commits each worktree's branch is ahead/behind the ref it forked from,
+   * keyed by worktree id. Ephemeral (polled); not persisted to the catalog.
+   */
+  worktreeDivergence: Record<string, BranchDivergence>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
@@ -619,10 +624,17 @@ export interface GitRefreshPayload {
   files: GitFileEntry[]
 }
 
+/** Commits a worktree branch is ahead/behind the ref it forked from. */
+export interface BranchDivergence {
+  ahead: number
+  behind: number
+}
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
+  | { type: 'set-worktree-divergence'; divergence: Record<string, BranchDivergence> }
 
 // -- Auto-commit state & actions --
 export type AutoCommitSuggestion =

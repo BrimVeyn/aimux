@@ -6,6 +6,9 @@ import type {
 
 import { memo, useMemo, useRef } from 'react'
 
+import type { BranchDivergence } from '../../../../state/types'
+
+import { useWorktreeDivergencePolling } from '../../../../git/worktree-divergence-poller'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import {
@@ -40,6 +43,16 @@ const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
 const RESIZE_HANDLE = '─'
+
+// Compact "↑ahead ↓behind" label for a worktree group header; empty when the
+// branch is level with its base (or divergence isn't known yet).
+function formatDivergence(divergence: BranchDivergence | undefined): string {
+  if (divergence == null) return ''
+  const parts: string[] = []
+  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
+  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
+  return parts.join(' ')
+}
 
 function getRowBackground({
   alternate,
@@ -141,6 +154,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
+  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const currentSession =
     currentSessionId != null && currentSessionId !== ''
       ? sessions.find((s) => s.id === currentSessionId)
@@ -220,6 +234,9 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
             ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
             : t.textMuted
           const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
+          const aheadBehind = formatDivergence(
+            tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
+          )
 
           return (
             <box key={tab.id} flexDirection="column">
@@ -227,7 +244,8 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
                 <box flexDirection="row" paddingTop={index === 0 ? 0 : 1} paddingLeft={1}>
                   <text fg={worktreeColor}>┃ </text>
                   <text fg={worktreeColor}>{worktreeLabel}</text>
-                  <text fg={t.textMuted}> {'─'.repeat(12)}</text>
+                  {aheadBehind !== '' ? <text fg={t.textMuted}> {aheadBehind}</text> : null}
+                  <text fg={t.textMuted}> {'─'.repeat(8)}</text>
                 </box>
               ) : null}
               <box
@@ -270,6 +288,7 @@ export function Sidebar({
   const gitPane = useAppStore((s) => s.gitPane)
   const focusMode = useAppStore((s) => s.focusMode)
   const bodyRef = useRef<BoxRenderable | null>(null)
+  useWorktreeDivergencePolling(sidebarVisible)
 
   if (!sidebarVisible) {
     return null

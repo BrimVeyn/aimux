@@ -438,6 +438,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  worktreeDivergence: Record<string, BranchDivergence>
   pendingChords: string[] | null
 }
 
@@ -574,10 +575,17 @@ export interface GitRefreshPayload {
   files: GitFileEntry[]
 }
 
+/** Commits a worktree branch is ahead/behind the ref it forked from. */
+export interface BranchDivergence {
+  ahead: number
+  behind: number
+}
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
+  | { type: 'set-worktree-divergence'; divergence: Record<string, BranchDivergence> }
 
 export type GitModeAction =
   | { type: 'enter-git-mode' }
