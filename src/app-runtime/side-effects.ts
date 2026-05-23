@@ -1112,7 +1112,9 @@ async function createAimuxTempWorktree(
   const targetPath = makeWorktreePath({ repoRoot, worktreeId, worktreeName })
 
   const existingWorktree = (await listGitWorktrees(repoRoot)).find(
-    (entry) => normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
+    (entry) =>
+      entry.prunable !== true &&
+      normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
   )
   if (existingWorktree) {
     ctx.dispatch({

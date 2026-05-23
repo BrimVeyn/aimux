@@ -81,6 +81,14 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
   const discovered = listGitWorktreesSync(anchor.path)
   if (discovered.length === 0) return worktrees
 
+  // Git keeps admin entries for worktrees whose directory is gone (e.g. a temp
+  // dir cleared on reboot). Drop that stale state so the entries stop
+  // resurfacing in `git worktree list`, and ignore them while reconciling.
+  if (discovered.some((entry) => entry.prunable === true)) {
+    pruneGitWorktreesSync(anchor.path)
+  }
+  const live = discovered.filter((entry) => entry.prunable !== true)
+
   const byPath = new Map(worktrees.map((worktree) => [worktree.path, worktree]))
   // `git worktree list` reports the main worktree first; prefer the primary
   // record's repoRoot when it still exists, then git's main worktree.
@@ -88,8 +96,8 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
   const repoRoot =
     primaryRepoRoot !== undefined && existsSync(primaryRepoRoot)
       ? primaryRepoRoot
-      : (discovered[0]?.path ?? anchor.repoRoot)
-  for (const entry of discovered) {
+      : (live[0]?.path ?? anchor.repoRoot)
+  for (const entry of live) {
     if (byPath.has(entry.path)) continue
     if (isInsideAimuxWorktreeRoot(entry.path)) continue
     const worktree: WorktreeRecord = {
@@ -106,22 +114,33 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
     }
     byPath.set(entry.path, worktree)
   }
-  // Heal records whose repoRoot points at a since-deleted sibling worktree so
-  // later git operations (e.g. deletion via `git -C repoRoot`) don't fail.
-  return [...byPath.values()].map((worktree) =>
-    existsSync(worktree.repoRoot) ? worktree : { ...worktree, repoRoot, updatedAt: now }
+  return (
+    [...byPath.values()]
+      // Drop records whose directory no longer exists (a deleted external
+      // worktree that git already pruned) so they don't reappear on restart.
+      .filter((worktree) => worktree.source === 'primary' || existsSync(worktree.path))
+      // Heal records whose repoRoot points at a since-deleted sibling worktree
+      // so later git operations (e.g. `git -C repoRoot`) don't fail.
+      .map((worktree) =>
+        existsSync(worktree.repoRoot) ? worktree : { ...worktree, repoRoot, updatedAt: now }
+      )
   )
 }
 
-function listGitWorktreesSync(
-  cwd: string
-): Array<{ path: string; head?: string; branch?: string }> {
+interface DiscoveredWorktree {
+  path: string
+  head?: string
+  branch?: string
+  prunable?: boolean
+}
+
+function listGitWorktreesSync(cwd: string): DiscoveredWorktree[] {
   const result = spawnSync('git', ['-C', cwd, 'worktree', 'list', '--porcelain'], {
     encoding: 'utf8',
   })
   if (result.status !== 0 || !result.stdout) return []
-  const worktrees: Array<{ path: string; head?: string; branch?: string }> = []
-  let current: { path: string; head?: string; branch?: string } | null = null
+  const worktrees: DiscoveredWorktree[] = []
+  let current: DiscoveredWorktree | null = null
   for (const line of result.stdout.split('\n')) {
     if (line.startsWith('worktree ')) {
       if (current) worktrees.push(current)
@@ -130,10 +149,16 @@ function listGitWorktreesSync(
       current.head = line.slice('HEAD '.length)
     } else if (current && line.startsWith('branch ')) {
       current.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '')
+    } else if (current && line.startsWith('prunable')) {
+      current.prunable = true
     }
   }
   if (current) worktrees.push(current)
   return worktrees
+}
+
+function pruneGitWorktreesSync(cwd: string): void {
+  spawnSync('git', ['-C', cwd, 'worktree', 'prune'], { encoding: 'utf8' })
 }
 
 function pruneMissingAimuxTempWorktrees(worktrees: WorktreeRecord[]): WorktreeRecord[] {

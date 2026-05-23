@@ -7,6 +7,9 @@ export interface GitWorktreeInfo {
   path: string
   head?: string
   branch?: string
+  // True when git still tracks the worktree but its directory is gone
+  // (e.g. a temp dir cleared on reboot). Such entries are stale admin junk.
+  prunable?: boolean
 }
 
 // Returns the main worktree's path, i.e. the original repository checkout.
@@ -87,6 +90,8 @@ export async function listGitWorktrees(repoPath: string): Promise<GitWorktreeInf
       current.head = line.slice('HEAD '.length)
     } else if (current && line.startsWith('branch ')) {
       current.branch = line.slice('branch '.length).replace(/^refs\/heads\//, '')
+    } else if (current && line.startsWith('prunable')) {
+      current.prunable = true
     }
   }
   if (current) worktrees.push(current)

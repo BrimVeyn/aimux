@@ -86,4 +86,47 @@ describe('worktree repoRoot healing', () => {
     expect(linked?.repoRoot).not.toBe(deletedSibling)
     expect(existsSync(linked?.repoRoot ?? '')).toBe(true)
   })
+
+  test('drops a deleted external worktree and prunes its stale git entry', () => {
+    // Simulate the directory vanishing (e.g. a temp dir cleared on reboot)
+    // while git still tracks it — git marks such worktrees "prunable".
+    rmSync(linkedWorktree, { force: true, recursive: true })
+
+    const session: SessionRecord = {
+      activeWorktreeId: 'wt-primary',
+      createdAt: NOW,
+      id: 'session-prune',
+      lastOpenedAt: NOW,
+      name: 'main',
+      projectPath: mainRepo,
+      updatedAt: NOW,
+      worktrees: [
+        makeWorktreeRecord({
+          id: 'wt-primary',
+          name: 'main',
+          path: mainRepo,
+          repoRoot: mainRepo,
+          source: 'primary',
+        }),
+        makeWorktreeRecord({
+          branch: 'feature',
+          id: 'wt-ghost',
+          name: 'wt-a',
+          path: linkedWorktree,
+          repoRoot: mainRepo,
+        }),
+      ],
+    }
+
+    const reconciled = ensureSessionWorktrees(session, NOW)
+
+    expect(reconciled.worktrees?.map((entry) => entry.id)).toEqual(['wt-primary'])
+    expect(reconciled.worktrees?.some((entry) => entry.path === linkedWorktree)).toBe(false)
+
+    // git no longer reports the prunable worktree once reconciliation runs.
+    const list = execFileSync('git', ['-C', mainRepo, 'worktree', 'list', '--porcelain'], {
+      encoding: 'utf8',
+    })
+    expect(list).not.toContain(linkedWorktree)
+  })
 })
