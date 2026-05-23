@@ -207,8 +207,9 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           }
           const prevTab = groupedTabs[index - 1]
           const startsWorktreeGroup =
-            getRenderedTabWorktreeId(prevTab ?? {}, worktrees) !==
-            getRenderedTabWorktreeId(tab, worktrees)
+            !prevTab ||
+            getRenderedTabWorktreeId(prevTab, worktrees) !==
+              getRenderedTabWorktreeId(tab, worktrees)
           const worktreeColor = tabWorktree
             ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
             : t.textMuted
