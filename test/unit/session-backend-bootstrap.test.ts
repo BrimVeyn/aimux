@@ -24,7 +24,7 @@ describe('session backend bootstrap handshake', () => {
       process.env.XDG_RUNTIME_DIR = originalRuntimeDir
     }
 
-    if (tempRuntimeDir) {
+    if (tempRuntimeDir != null && tempRuntimeDir !== '') {
       rmSync(tempRuntimeDir, { force: true, recursive: true })
       tempRuntimeDir = null
     }
@@ -79,7 +79,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      await expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
         compatible: true,
         processVersion: 'test-daemon',
         selectedVersion: IPC_PROTOCOL_VERSION,
@@ -149,7 +149,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      await expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
         compatible: false,
         error: 'attach returned protocol v1',
         processVersion: 'old-daemon',

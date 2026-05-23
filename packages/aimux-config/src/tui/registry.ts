@@ -76,7 +76,7 @@ export const TUI_THEMES: Record<string, TuiThemeJson> = {
   'zenburn': zenburn as TuiThemeJson,
 }
 
-export type ThemeId = keyof typeof TUI_THEMES & string
+export type ThemeId = keyof typeof TUI_THEMES
 
 export const THEME_IDS: ThemeId[] = Object.keys(TUI_THEMES).sort() as ThemeId[]
 

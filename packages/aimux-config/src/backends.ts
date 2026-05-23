@@ -6,7 +6,7 @@ import type { BackendConfig } from './types'
  */
 export function claudeBackend(opts?: { model?: string }): BackendConfig {
   return {
-    args: opts?.model ? ['--model', opts.model] : [],
+    args: opts?.model != null && opts.model !== '' ? ['--model', opts.model] : [],
     command: 'claude',
   }
 }

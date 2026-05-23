@@ -136,7 +136,7 @@ async function connectClient(socketPath: string): Promise<{
 }
 
 describe('IPC round-trip integration', () => {
-  const cleanups: Array<() => void> = []
+  const cleanups: (() => void)[] = []
 
   afterEach(() => {
     while (cleanups.length > 0) {

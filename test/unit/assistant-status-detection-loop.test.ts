@@ -29,8 +29,8 @@ interface FakeTab {
 
 function makeHarness(initialTabsBySession: Map<string, FakeTab[]>) {
   const tabs = new Map<string, FakeTab[]>(initialTabsBySession)
-  const tabStatusEvents: Array<{ tabId: string; status: TabActivity; sessionId: string }> = []
-  const sessionStatusEvents: Array<{ sessionId: string; status: SessionStatus }> = []
+  const tabStatusEvents: { tabId: string; status: TabActivity; sessionId: string }[] = []
+  const sessionStatusEvents: { sessionId: string; status: SessionStatus }[] = []
   const loop = runStatusDetectionLoop({
     listSessions: () => [...tabs.keys()],
     listTabs: (sessionId): LoopTabView[] =>

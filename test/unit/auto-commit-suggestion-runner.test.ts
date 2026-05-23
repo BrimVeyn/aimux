@@ -8,7 +8,7 @@ function makeFakeSpawn(opts: {
   delayMs?: number
   onAbort?: () => void
 }) {
-  return function fakeSpawn(
+  return async function fakeSpawn(
     _invocation: { executable: string; args: string[] },
     signal: AbortSignal
   ) {

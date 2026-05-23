@@ -28,7 +28,7 @@ describe('config profile paths', () => {
       process.env.AIMUX_RUNTIME_PROFILE = originalRuntimeProfile
     }
 
-    if (tempHome) {
+    if (tempHome != null && tempHome !== '') {
       rmSync(tempHome, { force: true, recursive: true })
       tempHome = null
     }

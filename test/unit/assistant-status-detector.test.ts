@@ -172,9 +172,9 @@ describe('AssistantStatusDetector', () => {
       lines: [
         { spans: [{ text: '✱ Thinking…' }] },
         { spans: [{ text: '  esc/ctrl+c to interrupt' }] },
-        ...Array(38).fill(emptyLine),
+        ...Array.from({ length: 38 }, () => emptyLine),
       ],
-      tailLines: Array(10).fill(emptyLine),
+      tailLines: Array.from({ length: 10 }, () => emptyLine),
       viewportY: 0,
     }
 

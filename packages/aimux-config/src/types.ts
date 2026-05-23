@@ -82,8 +82,11 @@ export interface TerminalModeState {
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-export type LayoutLeaf = { type: 'leaf'; tabId: string }
-export type LayoutSplit = {
+export interface LayoutLeaf {
+  type: 'leaf'
+  tabId: string
+}
+export interface LayoutSplit {
   type: 'split'
   direction: SplitDirection
   ratio: number
@@ -842,7 +845,9 @@ export type GitPanePathConfig =
   | { enabled: false }
   | { enabled: true; pathFn?: (path: string) => string }
 
-export type GitPaneDiffCountConfig = { enabled: boolean }
+export interface GitPaneDiffCountConfig {
+  enabled: boolean
+}
 
 interface GitPaneBaseConfig {
   /** Startup override for git pane visibility. Reapplied on each launch. */

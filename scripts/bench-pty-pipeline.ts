@@ -62,7 +62,7 @@ function makeTerminal(): Terminal {
   return term
 }
 
-function fillTerminal(term: Terminal, lines: number): Promise<void> {
+async function fillTerminal(term: Terminal, lines: number): Promise<void> {
   // Mix of plain text + ANSI color/style sequences to exercise the cell
   // decoding path realistically. Use a callback to await the writes.
   return new Promise((resolve) => {
@@ -125,7 +125,7 @@ stats.push(
 
 // 5) N tabs × one render cycle each — what the daemon does per "frame"
 const tabs = Array.from({ length: TABS }, () => makeTerminal())
-await Promise.all(tabs.map((t) => fillTerminal(t, 500)))
+await Promise.all(tabs.map(async (t) => fillTerminal(t, 500)))
 const tabSnapshots: ReturnType<typeof snapshotTerminal>[] = tabs.map((t) =>
   snapshotTerminal(t, true)
 )
@@ -133,7 +133,7 @@ stats.push(
   bench(`${TABS} tabs × (snapshot + diff) per frame`, Math.floor(ITERS / 2), () => {
     for (let i = 0; i < tabs.length; i++) {
       const t = tabs[i]
-      if (!t) continue
+      if (t == null) continue
       const next = snapshotTerminal(t, true)
       areTerminalSnapshotsEqual(tabSnapshots[i], next)
       tabSnapshots[i] = next
@@ -147,7 +147,7 @@ console.log()
 // Practical interpretation
 const oneCycle = stats[3]
 const tabsCycle = stats[4]
-if (oneCycle && tabsCycle) {
+if (oneCycle != null && tabsCycle != null) {
   const cyclesPerSec1 = oneCycle.opsPerSec
   const tabFramesPerSec = tabsCycle.opsPerSec
   const cpuPctAt60Hz = (60 / cyclesPerSec1) * 100

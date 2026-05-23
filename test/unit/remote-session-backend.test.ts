@@ -13,7 +13,7 @@ import {
 } from '../../src/ipc/protocol'
 import { RemoteSessionBackend } from '../../src/session-backend/remote-session-backend'
 
-function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_500): Promise<T> {
+async function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_500): Promise<T> {
   const start = Date.now()
 
   return new Promise((resolve, reject) => {
@@ -47,7 +47,7 @@ describe('RemoteSessionBackend', () => {
       process.env.XDG_RUNTIME_DIR = originalRuntimeDir
     }
 
-    if (tempRuntimeDir) {
+    if (tempRuntimeDir != null && tempRuntimeDir !== '') {
       rmSync(tempRuntimeDir, { force: true, recursive: true })
       tempRuntimeDir = null
     }
@@ -317,7 +317,7 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      await expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
+      expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
         `Protocol mismatch: client v${IPC_PROTOCOL_VERSION}, daemon v999`
       )
     } finally {
