@@ -44,6 +44,9 @@ const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
 const RESIZE_HANDLE = '─'
 
+// Left accent strip + trailing space for a worktree group header.
+const WORKTREE_STRIP = '▍ '
+
 // Compact "↑ahead ↓behind" label for a worktree group header; empty when the
 // branch is level with its base (or divergence isn't known yet).
 function formatDivergence(divergence: BranchDivergence | undefined): string {
@@ -52,6 +55,15 @@ function formatDivergence(divergence: BranchDivergence | undefined): string {
   if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
   if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
   return parts.join(' ')
+}
+
+// Fit a worktree label into `max` columns, ellipsizing when it would overflow.
+// Branch names are ASCII, so character count tracks rendered column width.
+function truncateLabel(label: string, max: number): string {
+  if (max <= 0) return ''
+  if (label.length <= max) return label
+  if (max === 1) return '…'
+  return `${label.slice(0, max - 1)}…`
 }
 
 function getRowBackground({
@@ -238,24 +250,29 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
           const aheadBehind = formatDivergence(
             tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
           )
+          const aheadBehindText = aheadBehind === '' ? '' : ` ${aheadBehind}`
+          // Reserve room for the strip, the ahead/behind chip and a 1-col gap so
+          // the header never wraps; the divider fills whatever remains (min 0).
+          const labelBudget = Math.max(
+            0,
+            contentWidth - WORKTREE_STRIP.length - aheadBehindText.length - 1
+          )
+          const headerLabel = truncateLabel(worktreeLabel, labelBudget)
 
           return (
             <box key={tab.id} flexDirection="column">
               {showWorktreeSeparators && startsWorktreeGroup ? (
-                <box flexDirection="row" paddingTop={index === 0 ? 0 : 1}>
-                  <text fg={worktreeColor} selectable={false}>
-                    ▍{' '}
+                <box flexDirection="row" overflow="hidden" paddingTop={index === 0 ? 0 : 1}>
+                  <text selectable={false} wrapMode="none" flexShrink={0}>
+                    <span fg={worktreeColor}>
+                      {WORKTREE_STRIP}
+                      {headerLabel}
+                    </span>
+                    {aheadBehindText !== '' ? (
+                      <span fg={t.textMuted}>{aheadBehindText}</span>
+                    ) : null}
                   </text>
-                  <text fg={worktreeColor} selectable={false}>
-                    {worktreeLabel}
-                  </text>
-                  {aheadBehind !== '' ? (
-                    <text fg={t.textMuted} selectable={false}>
-                      {' '}
-                      {aheadBehind}
-                    </text>
-                  ) : null}
-                  <box flexGrow={1} overflow="hidden">
+                  <box flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
                     <text fg={t.textMuted} selectable={false} wrapMode="none">
                       {' '}
                       {'─'.repeat(contentWidth)}
