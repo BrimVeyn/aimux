@@ -200,6 +200,26 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-worktree-move-modal': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          deleteSource: false,
+          editBuffer: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'worktree-move',
+        },
+      }
+    }
+    case 'toggle-worktree-move-delete': {
+      if (state.modal.type !== 'worktree-move') return state
+      return {
+        ...state,
+        modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
+      }
+    }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
@@ -522,7 +542,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
         state.modal.type !== 'split-picker' &&
-        state.modal.type !== 'update-available'
+        state.modal.type !== 'update-available' &&
+        state.modal.type !== 'worktree-move'
       ) {
         return state
       }
@@ -554,6 +575,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         optionCount = filterThemeIds(state.modal.editBuffer).length
       } else if (state.modal.type === 'update-available') {
         optionCount = 2
+      } else if (state.modal.type === 'worktree-move') {
+        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
       } else {
         const filtered = filterSessions(state.sessions, state.modal.editBuffer)
         optionCount = Math.max(1, filtered.length + 1)
@@ -587,6 +610,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'create-session' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
+        state.modal.type !== 'worktree-move' &&
         state.modal.type !== 'help'
       ) {
         return state
@@ -613,6 +637,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         optionCount = filterThemeIds(state.modal.editBuffer).length
       } else if (state.modal.type === 'update-available') {
         optionCount = 2
+      } else if (state.modal.type === 'worktree-move') {
+        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
       } else {
         optionCount = Math.max(1, filterSessions(state.sessions, state.modal.editBuffer).length + 1)
       }

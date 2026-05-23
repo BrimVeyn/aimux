@@ -22,6 +22,7 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
+  | 'modal.worktree-move'
   | 'modal.ai-usage'
 
 export type SideEffect =

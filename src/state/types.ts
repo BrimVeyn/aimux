@@ -45,6 +45,7 @@ export type ModalType =
   | 'git-commit'
   | 'update-available'
   | 'ai-usage'
+  | 'worktree-move'
   | null
 
 export interface TerminalSpan {
@@ -403,6 +404,11 @@ export interface ModalAIUsage extends ModalBase {
   type: 'ai-usage'
 }
 
+export interface ModalWorktreeMove extends ModalBase {
+  type: 'worktree-move'
+  deleteSource: boolean
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -425,6 +431,7 @@ export type ModalState =
   | ModalGitCommit
   | ModalUpdateAvailable
   | ModalAIUsage
+  | ModalWorktreeMove
 
 export interface LayoutState {
   terminalCols: number
@@ -526,6 +533,8 @@ export type ModalAction =
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
+  | { type: 'open-worktree-move-modal' }
+  | { type: 'toggle-worktree-move-delete' }
 
 // -- Session actions --
 export type SessionAction =

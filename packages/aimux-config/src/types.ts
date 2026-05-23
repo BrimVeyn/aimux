@@ -27,6 +27,7 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
+  | 'modal.worktree-move'
   | 'modal.ai-usage'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -358,6 +359,11 @@ export interface ModalAIUsage extends ModalBase {
   type: 'ai-usage'
 }
 
+export interface ModalWorktreeMove extends ModalBase {
+  type: 'worktree-move'
+  deleteSource: boolean
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -373,6 +379,7 @@ export type ModalState =
   | ModalGitCommit
   | ModalUpdateAvailable
   | ModalAIUsage
+  | ModalWorktreeMove
 
 export interface LayoutState {
   terminalCols: number
@@ -483,6 +490,8 @@ export type ModalAction =
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
+  | { type: 'open-worktree-move-modal' }
+  | { type: 'toggle-worktree-move-delete' }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }

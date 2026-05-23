@@ -6,7 +6,6 @@ import type { SessionRecord, SessionStatus } from '../../../state/types'
 
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { getActiveWorktree } from '../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../state/types'
 import { useBusySpinner } from '../../hooks/use-busy-spinner'
@@ -129,7 +128,6 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
             onMouseUp={commitDrop}
             onMouseDragEnd={cancelDrag}
             rightClickMenu={[
-              ...buildWorktreeMenu(session),
               [
                 'Rename workspace',
                 () =>
@@ -165,72 +163,6 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
       </box>
     </box>
   )
-}
-
-function buildWorktreeMenu(session: SessionRecord): [string, () => void][] {
-  const items: [string, () => void][] = []
-  const worktrees = session.worktrees ?? []
-  for (const worktree of worktrees) {
-    items.push([
-      `Switch: ${worktree.branch ?? worktree.name}`,
-      () =>
-        runSideEffectGlobal({
-          sessionId: session.id,
-          type: 'switch-worktree',
-          worktreeId: worktree.id,
-        }),
-    ])
-  }
-  if (items.length > 0) {
-    items.push([
-      'Fork active worktree',
-      () => runSideEffectGlobal({ sessionId: session.id, type: 'fork-worktree' }),
-    ])
-    const active = getActiveWorktree(session)
-    if (active && worktrees.length > 1) {
-      items.push([
-        active.source === 'aimux-temp' ? 'Delete active temp worktree' : 'Remove active worktree',
-        () =>
-          runSideEffectGlobal({
-            sessionId: session.id,
-            type: 'delete-worktree',
-            worktreeId: active.id,
-          }),
-      ])
-      // Move the active worktree's changes into another worktree. Squash needs a
-      // branch, so this is offered only from a feature/temp worktree, not primary.
-      const sourceName = active.branch ?? active.name
-      if (active.branch != null && active.branch !== '') {
-        for (const target of worktrees) {
-          if (target.id === active.id) continue
-          const targetLabel = target.branch ?? target.name
-          items.push([
-            `Move → ${targetLabel}`,
-            () =>
-              runSideEffectGlobal({
-                deleteSource: false,
-                sessionId: session.id,
-                sourceWorktreeId: active.id,
-                targetWorktreeId: target.id,
-                type: 'move-worktree',
-              }),
-          ])
-          items.push([
-            `Move → ${targetLabel}, delete ${sourceName}`,
-            () =>
-              runSideEffectGlobal({
-                deleteSource: true,
-                sessionId: session.id,
-                sourceWorktreeId: active.id,
-                targetWorktreeId: target.id,
-                type: 'move-worktree',
-              }),
-          ])
-        }
-      }
-    }
-  }
-  return items
 }
 
 function arraysEqual(a: string[], b: string[]): boolean {

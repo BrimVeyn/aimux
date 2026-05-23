@@ -104,6 +104,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('o', actions.openSelectedGitFileInEditor, 'Open in editor')
         .map('c', actions.gitCommitOpen, 'Commit')
+        .map('m', actions.openWorktreeMove, 'Move worktree')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
         .map('b', actions.toggleGitReviewBase, 'Review vs base')
@@ -181,6 +182,22 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
         .map('<CR>', actions.confirmUpdateSelection, 'Confirm')
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: worktree-move
+    // -----------------------------------------------------------------------
+    .mode('modal.worktree-move', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('j', actions.moveModalSelection(1), 'Next')
+        .map('k', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<C-n>', actions.moveModalSelection(1))
+        .map('<C-p>', actions.moveModalSelection(-1))
+        .map('d', actions.toggleWorktreeMoveDelete, 'Toggle delete source')
+        .map('<CR>', actions.confirmWorktreeMove, 'Move')
     )
 
     // -----------------------------------------------------------------------

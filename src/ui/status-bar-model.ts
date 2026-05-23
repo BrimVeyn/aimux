@@ -132,6 +132,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.theme-picker.filtering'
     case 'update-available':
       return 'modal.update-available'
+    case 'worktree-move':
+      return 'modal.worktree-move'
     default:
       return null
   }

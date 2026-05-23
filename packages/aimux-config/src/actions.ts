@@ -338,6 +338,58 @@ export const confirmUpdateSelection: KeyResult = r(
   'navigation'
 )
 
+// ---------------------------------------------------------------------------
+// Worktree-move modal
+// ---------------------------------------------------------------------------
+
+export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
+  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+  const worktrees = session?.worktrees ?? []
+  const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
+  const hasBranch = source != null && source.branch != null && source.branch !== ''
+  const others = worktrees.filter((w) => w.id !== source?.id)
+  if (!hasBranch || others.length < 1) {
+    return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
+  }
+  return r([{ type: 'open-worktree-move-modal' }], [], 'modal.worktree-move')
+}
+
+export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
+
+export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+  const worktrees = session?.worktrees ?? []
+  const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
+  const targets = worktrees.filter((w) => w.id !== source?.id)
+  const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
+  const target = targets[selectedIndex]
+  if (!target || !session || !source || modal.type !== 'worktree-move') {
+    return r([{ type: 'close-modal' }], [], 'navigation')
+  }
+  return r(
+    [{ type: 'close-modal' }],
+    [
+      {
+        deleteSource: modal.deleteSource,
+        sessionId: session.id,
+        sourceWorktreeId: source.id,
+        targetWorktreeId: target.id,
+        type: 'move-worktree',
+      },
+    ],
+    'navigation'
+  )
+}
+
 export const closePane: ActionFn = (ctx: ModeContext) => {
   const tabId = ctx.state.activeTabId
   if (!(tabId != null && tabId !== '')) return null
