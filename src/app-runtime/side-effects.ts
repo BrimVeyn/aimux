@@ -25,6 +25,7 @@ import {
   removeGitWorktree,
 } from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
+import { linkNodeModules } from '../platform/worktree-deps'
 import {
   assertSafeAimuxWorktreePath,
   isInsideAimuxWorktreeRoot,
@@ -395,8 +396,7 @@ async function launchAssistantInNewWorktree(
   assistant: AssistantId,
   worktreeName: string,
   branchName?: string,
-  sourceWorktreeId?: string,
-  scripts?: { sanitize?: string; setup?: string }
+  sourceWorktreeId?: string
 ): Promise<void> {
   const sessionId = ctx.state.currentSessionId
   if (!sessionId) return
@@ -406,8 +406,7 @@ async function launchAssistantInNewWorktree(
     worktreeName,
     branchName,
     undefined,
-    sourceWorktreeId,
-    scripts
+    sourceWorktreeId
   )
   if (!worktree) return
   const customCommand = ctx.state.customCommands[assistant]
@@ -502,16 +501,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const worktreeName = state.modal.worktreeName
         const branchName = state.modal.branchName
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
-        const scripts = { sanitize: state.modal.sanitizeScript, setup: state.modal.setupScript }
         void enqueueGitOp(() =>
-          launchAssistantInNewWorktree(
-            ctx,
-            option.id,
-            worktreeName,
-            branchName,
-            sourceWorktreeId,
-            scripts
-          )
+          launchAssistantInNewWorktree(ctx, option.id, worktreeName, branchName, sourceWorktreeId)
         ).catch((error) =>
           ctx.dispatch({
             message: error instanceof Error ? error.message : String(error),
@@ -582,10 +573,6 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         })
         ctx.dispatch({ message, type: 'git-mode-set-message' })
       })
-      return
-    }
-    case 'save-worktree-scripts': {
-      handleSaveWorktreeScripts(ctx)
       return
     }
     case 'open-rename-selected-session': {
@@ -1104,8 +1091,7 @@ async function createAimuxTempWorktree(
   requestedName?: string,
   requestedBranchName?: string,
   requestedBaseRef?: string,
-  sourceWorktreeId?: string,
-  scripts?: { sanitize?: string; setup?: string }
+  sourceWorktreeId?: string
 ): Promise<WorktreeRecord | undefined> {
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const source =
@@ -1137,22 +1123,10 @@ async function createAimuxTempWorktree(
   await mkdir(dirname(targetPath), { recursive: true })
   await assertSafeAimuxWorktreePath(targetPath)
   await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
+  // For JS projects, reuse the source checkout's installed dependencies instead
+  // of forcing a fresh install in the new worktree.
+  const linkedModules = await linkNodeModules(sourcePath, targetPath).catch(() => false)
   const now = new Date().toISOString()
-  const sanitize = scripts?.sanitize?.trim()
-  const setup = scripts?.setup?.trim()
-  const sanitizeScript = sanitize
-    ? { command: sanitize, configuredAt: now }
-    : session.repoSanitizeScript
-  const setupScript = setup ? { command: setup, configuredAt: now } : session.repoSetupScript
-  try {
-    await runWorktreeScript(targetPath, sanitizeScript?.command)
-    await runWorktreeScript(targetPath, setupScript?.command)
-  } catch (error) {
-    ctx.dispatch({
-      message: error instanceof Error ? error.message : String(error),
-      type: 'git-mode-set-message',
-    })
-  }
 
   const worktree: WorktreeRecord = {
     baseRef,
@@ -1164,10 +1138,6 @@ async function createAimuxTempWorktree(
     name: worktreeName,
     path: targetPath,
     repoRoot,
-    sanitizeScript: sanitizeScript
-      ? { ...sanitizeScript, inheritedFromRepo: !sanitize }
-      : undefined,
-    setupScript: setupScript ? { ...setupScript, inheritedFromRepo: !setup } : undefined,
     source: 'aimux-temp',
     updatedAt: now,
   }
@@ -1180,7 +1150,12 @@ async function createAimuxTempWorktree(
   }))
   saveSessionCatalog(sessions)
   ctx.dispatch({ sessions, type: 'set-sessions' })
-  ctx.dispatch({ message: `created worktree ${branchName}`, type: 'git-mode-set-message' })
+  ctx.dispatch({
+    message: linkedModules
+      ? `created worktree ${branchName} (linked node_modules)`
+      : `created worktree ${branchName}`,
+    type: 'git-mode-set-message',
+  })
   return worktree
 }
 
@@ -1273,35 +1248,6 @@ class ActiveWorktreeTabsError extends Error {
       `active assistant tabs are using this worktree (${tabCount}). Click [del] again to close them and delete the worktree.`
     )
   }
-}
-
-function runWorktreeScript(cwd: string, command: string | undefined): Promise<void> {
-  if (!command?.trim()) return Promise.resolve()
-  const proc = Bun.spawn(['bash', '-lc', command], { cwd, stderr: 'pipe', stdout: 'pipe' })
-  return proc.exited.then(async (code) => {
-    if (code === 0) return
-    const stderr = await new Response(proc.stderr).text()
-    throw new Error(stderr.trim() || `worktree script failed with exit code ${code}`)
-  })
-}
-
-function handleSaveWorktreeScripts(ctx: SideEffectContext): void {
-  const modal = ctx.state.modal
-  if (modal.type !== 'worktree-scripts' || !modal.sessionTargetId) return
-  const now = new Date().toISOString()
-  const setup = (modal.activeField === 'setup' ? modal.editBuffer : modal.contentBuffer)?.trim()
-  const sanitize = (
-    modal.activeField === 'sanitize' ? modal.editBuffer : modal.contentBuffer
-  )?.trim()
-  const sessions = replaceSession(ctx.state, modal.sessionTargetId, (session) => ({
-    ...session,
-    repoSanitizeScript: sanitize ? { command: sanitize, configuredAt: now } : undefined,
-    repoSetupScript: setup ? { command: setup, configuredAt: now } : undefined,
-    updatedAt: now,
-  }))
-  saveSessionCatalog(sessions)
-  ctx.dispatch({ sessions, type: 'set-sessions' })
-  ctx.dispatch({ type: 'close-modal' })
 }
 
 function handleConfirmUpdateSelection(ctx: SideEffectContext): void {

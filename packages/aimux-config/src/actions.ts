@@ -781,12 +781,6 @@ export const gitCommitSubmit: ActionFn = (ctx: ModeContext) => {
   )
 }
 
-export const saveWorktreeScripts: ActionFn = () => {
-  return r([], [{ type: 'save-worktree-scripts' }], 'navigation')
-}
-
-export const selectScriptFile: KeyResult = r([{ type: 'select-script-file' }])
-
 export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
   if (modal.type === 'git-commit' && modal.activeField === 'body') {

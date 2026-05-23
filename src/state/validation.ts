@@ -106,15 +106,6 @@ function isStringRecord(value: unknown): boolean {
   return Object.values(value).every(isString)
 }
 
-function isWorktreeScriptConfig(value: unknown): boolean {
-  return (
-    isObjectRecord(value) &&
-    isString(value.command) &&
-    isString(value.configuredAt) &&
-    (value.inheritedFromRepo === undefined || isBoolean(value.inheritedFromRepo))
-  )
-}
-
 function isWorktreeRecord(value: unknown): value is WorktreeRecord {
   return (
     isObjectRecord(value) &&
@@ -128,8 +119,6 @@ function isWorktreeRecord(value: unknown): value is WorktreeRecord {
     (value.source === 'primary' || value.source === 'aimux-temp' || value.source === 'external') &&
     isBoolean(value.createdByAimux) &&
     (value.color === undefined || isString(value.color)) &&
-    (value.setupScript === undefined || isWorktreeScriptConfig(value.setupScript)) &&
-    (value.sanitizeScript === undefined || isWorktreeScriptConfig(value.sanitizeScript)) &&
     isString(value.createdAt) &&
     isString(value.updatedAt)
   )
@@ -185,9 +174,7 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
     (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot)) &&
     (value.worktrees === undefined ||
       (Array.isArray(value.worktrees) && value.worktrees.every(isWorktreeRecord))) &&
-    (value.activeWorktreeId === undefined || isString(value.activeWorktreeId)) &&
-    (value.repoSetupScript === undefined || isWorktreeScriptConfig(value.repoSetupScript)) &&
-    (value.repoSanitizeScript === undefined || isWorktreeScriptConfig(value.repoSanitizeScript))
+    (value.activeWorktreeId === undefined || isString(value.activeWorktreeId))
   )
 }
 

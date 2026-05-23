@@ -148,8 +148,6 @@ function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId |
       return 'modal.session-picker.filtering'
     case 'snippet-editor':
       return 'modal.snippet-editor'
-    case 'worktree-scripts':
-      return 'modal.worktree-scripts'
     case 'snippet-picker':
       return 'modal.snippet-picker.filtering'
     default:

@@ -176,20 +176,6 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
             : session
         ),
       }
-    case 'set-session-repo-scripts':
-      return {
-        ...state,
-        sessions: state.sessions.map((session) =>
-          session.id === action.sessionId
-            ? {
-                ...session,
-                repoSanitizeScript: action.sanitizeScript,
-                repoSetupScript: action.setupScript,
-                updatedAt: new Date().toISOString(),
-              }
-            : session
-        ),
-      }
     default:
       return null
   }

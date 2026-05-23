@@ -186,10 +186,6 @@ function buildWorktreeMenu(session: SessionRecord): Array<[string, () => void]> 
       'Fork active worktree',
       () => runSideEffectGlobal({ sessionId: session.id, type: 'fork-worktree' }),
     ])
-    items.push([
-      'Configure worktree scripts',
-      () => dispatchGlobal({ sessionId: session.id, type: 'open-worktree-scripts-modal' }),
-    ])
     const active = getActiveWorktree(session)
     if (active && worktrees.length > 1) {
       items.push([

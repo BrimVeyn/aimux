@@ -1,11 +1,11 @@
-import type { AssistantId, ScriptFileResult, WorktreeRecord } from '../../../../state/types'
+import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterAssistants } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
-import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
+import { Form, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
 
 interface NewTabModalProps {
@@ -16,20 +16,11 @@ interface NewTabModalProps {
   currentSessionId: string | null
   editingCommand: AssistantId | null
   editBuffer: string
-  activeField:
-    | 'assistant'
-    | 'branch-name'
-    | 'sanitize-script'
-    | 'setup-script'
-    | 'target-worktree'
-    | 'worktree-name'
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
   branchError: string | null
   branchName: string
   createWorktree: boolean
-  sanitizeScript: string
-  scriptResults: ScriptFileResult[]
   selectedAssistantId: AssistantId | null
-  setupScript: string
   step: 'assistant' | 'worktree' | 'worktree-create'
   worktreeDeleteConfirmId: string | null
   worktreeDeleteMessage: string | null
@@ -67,11 +58,8 @@ export function NewTabModal({
   editBuffer,
   editingCommand,
   filter,
-  sanitizeScript,
-  scriptResults,
   selectedAssistantId,
   selectedIndex,
-  setupScript,
   step,
   worktreeDeleteConfirmId,
   worktreeDeleteMessage,
@@ -107,11 +95,6 @@ export function NewTabModal({
   if (step === 'worktree-create') {
     const selectedAssistant =
       options.find((option) => option.id === selectedAssistantId) ?? options[0]
-    const items: FormOptionItem[] = scriptResults.map((result) => ({
-      key: result.path,
-      onClick: () => dispatchGlobal({ type: 'select-script-file' }),
-      title: <text fg={t.text}>{result.path}</text>,
-    }))
     return (
       <Form
         title={`New worktree: ${selectedAssistant?.label ?? 'assistant'}`}
@@ -136,28 +119,6 @@ export function NewTabModal({
             />
             {branchError ? <text fg={t.error}>{branchError}</text> : null}
           </box>
-          <AutoComplete
-            active={activeField === 'sanitize-script'}
-            cursorPos={activeField === 'sanitize-script' ? cursorPos : undefined}
-            items={activeField === 'sanitize-script' ? items : []}
-            label="Sanitize script"
-            selectedIndex={selectedIndex}
-            value={sanitizeScript}
-            placeholder="./scripts/sanitize.sh"
-            emptyState={<text fg={t.textMuted}>Type to search repo files.</text>}
-            onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
-          />
-          <AutoComplete
-            active={activeField === 'setup-script'}
-            cursorPos={activeField === 'setup-script' ? cursorPos : undefined}
-            items={activeField === 'setup-script' ? items : []}
-            label="Setup script"
-            selectedIndex={selectedIndex}
-            value={setupScript}
-            placeholder="./scripts/setup.sh"
-            emptyState={<text fg={t.textMuted}>Type to search repo files.</text>}
-            onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
-          />
           <text fg={t.textMuted}>Step 3/3: configure new worktree</text>
         </box>
       </Form>

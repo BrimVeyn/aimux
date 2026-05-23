@@ -288,22 +288,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: worktree scripts
-    // -----------------------------------------------------------------------
-    .mode('modal.worktree-scripts', (m) =>
-      m
-        .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('<Tab>', actions.switchField, 'Next field')
-        .map('<CR>', actions.saveWorktreeScripts, 'Save')
-        .map('<C-y>', actions.selectScriptFile, 'Use file')
-        .map('<C-n>', actions.moveModalSelection(1), 'Next')
-        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
-        .map('<Down>', actions.moveModalSelection(1))
-        .map('<Up>', actions.moveModalSelection(-1))
-        .passthrough()
-    )
-
-    // -----------------------------------------------------------------------
     // Modal: split-picker
     // -----------------------------------------------------------------------
     .mode('modal.split-picker', (m) =>
