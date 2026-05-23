@@ -106,6 +106,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('c', actions.gitCommitOpen, 'Commit')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
+        .map('b', actions.toggleGitReviewBase, 'Review vs base')
         .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
         .map('T', actions.toggleTreeCompaction, 'Toggle tree compaction')
         .map(']', actions.shiftGitHeadOffset(-1), 'Newer commit')

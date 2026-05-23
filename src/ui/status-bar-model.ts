@@ -91,9 +91,10 @@ export function getStatusBarModel(
     case 'git': {
       const headOffset = state.gitMode.headOffset
       const offsetTag = headOffset > 0 ? `  HEAD~${headOffset}` : ''
+      const reviewTag = state.gitMode.reviewBase ? '  vs base' : ''
       return {
         help: helpHintForMode(config, 'git-mode'),
-        left: `${sessionIcon}  ${sessionLabel}${offsetTag}`,
+        left: `${sessionIcon}  ${sessionLabel}${offsetTag}${reviewTag}`,
         right: hintForGitMode(config, headOffset),
       }
     }

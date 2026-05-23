@@ -31,3 +31,16 @@ export async function getBranchDivergence(
   if (result.exitCode !== 0) return undefined
   return parseDivergenceCount(result.text())
 }
+
+// Fork point: the most recent commit shared by baseRef and ref. Diffing the
+// working tree against this shows everything the worktree changed since it
+// branched off (commits + staged + unstaged) — i.e. what a squash-move lands.
+export async function getMergeBase(
+  repoPath: string,
+  baseRef: string,
+  ref = 'HEAD'
+): Promise<string | undefined> {
+  const result = await $`git -C ${repoPath} merge-base ${baseRef} ${ref}`.quiet().nothrow()
+  if (result.exitCode !== 0) return undefined
+  return result.text().trim() || undefined
+}

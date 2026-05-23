@@ -86,13 +86,19 @@ async function rawUnifiedDiff(
   return result.text()
 }
 
+function resolveCompareRef(headOffset: number, compareRef: string | undefined): string {
+  if (compareRef != null && compareRef !== '') return compareRef
+  return headOffset > 0 ? `HEAD~${headOffset}` : 'HEAD'
+}
+
 export async function fetchDiff(
   cwd: string,
   file: GitFileEntry,
-  headOffset: number = 0
+  headOffset: number = 0,
+  compareRef?: string
 ): Promise<DiffData> {
   const { oldPath, status } = resolveStatus(file)
-  const ref = headOffset > 0 ? `HEAD~${headOffset}` : 'HEAD'
+  const ref = resolveCompareRef(headOffset, compareRef)
 
   if (isImagePath(file.path)) {
     const headPath = oldPath ?? file.path

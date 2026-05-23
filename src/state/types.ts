@@ -296,6 +296,8 @@ export interface GitModeState {
   folds: Record<string, Record<string, FoldState>>
   /** Working-tree-vs-HEAD~N offset. 0 = working tree vs HEAD (default). */
   headOffset: number
+  /** When true, diff the active worktree's working tree against its fork point. */
+  reviewBase: boolean
 }
 
 interface ModalBase {
@@ -722,6 +724,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-toggle-review-base' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }
   | {

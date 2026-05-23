@@ -29,13 +29,16 @@ interface GitPanelProps {
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
   headOffset?: number
+  // When set, the single changed-files section is a worktree fork-point review
+  // ("vs <base>") rather than a HEAD~N history walk.
+  baseLabel?: string
   compact?: boolean
 }
 
-function sectionTitle(section: GitFileSection, headOffset: number): string {
+function sectionTitle(section: GitFileSection, headOffset: number, baseLabel?: string): string {
   switch (section) {
     case 'historical':
-      return `HEAD~${headOffset}`
+      return baseLabel != null && baseLabel !== '' ? baseLabel : `HEAD~${headOffset}`
     case 'staged':
       return 'Staged Changes'
     case 'unstaged':
@@ -339,6 +342,7 @@ const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
 const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
 
 export const GitPanel = memo(function GitPanel({
+  baseLabel,
   collapsedFolders = {},
   compact = false,
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
@@ -352,7 +356,8 @@ export const GitPanel = memo(function GitPanel({
   const t = useTheme()
   useTransparent()
   const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
-  const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
+  const isSingleSection = headOffset > 0 || (baseLabel != null && baseLabel !== '')
+  const sectionOrder = isSingleSection ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
     () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode, compact),
@@ -405,7 +410,7 @@ export const GitPanel = memo(function GitPanel({
               .some((k) => (tree.sections.find((e) => e.section === k)?.files.length ?? 0) > 0)
             return renderTreeSection(
               key,
-              sectionTitle(key, headOffset),
+              sectionTitle(key, headOffset, baseLabel),
               section?.files ?? [],
               section?.rows ?? [],
               addedW,

@@ -13,6 +13,7 @@ interface PrefetchOptions {
   projectPath: string | undefined
   themeId: string
   headOffset: number
+  compareRef?: string
   enabled: boolean
 }
 
@@ -94,7 +95,7 @@ export function useDiffPrefetch(
 
   const queueRef = useRef<PrefetchQueue | null>(null)
 
-  const { enabled, headOffset, projectPath } = opts
+  const { compareRef, enabled, headOffset, projectPath } = opts
   const runTaskRef = useRef<(task: Task) => Promise<void>>(async () => {})
 
   // Keep a ref to the execute function so the queue keeps the latest closure
@@ -102,7 +103,12 @@ export function useDiffPrefetch(
   runTaskRef.current = async (task: Task) => {
     if (!(projectPath != null && projectPath !== '')) return
     try {
-      const diff = await fetchDiff(task.file.repoPath ?? projectPath, task.file, headOffset)
+      const diff = await fetchDiff(
+        task.file.repoPath ?? projectPath,
+        task.file,
+        headOffset,
+        compareRef
+      )
       if (task.controller.signal.aborted) return
       const hash = diffHash(diff.rawDiff)
       dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })
@@ -177,6 +183,7 @@ export function useDiffPrefetch(
     parsed,
     loading,
     headOffset,
+    compareRef,
   ])
 
   useEffect(() => {

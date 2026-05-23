@@ -1,17 +1,18 @@
 import { useTerminalDimensions } from '@opentui/react'
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
+import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
 import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
-import { getSessionProjectPath } from '../../../state/session-worktrees'
+import { getActiveWorktree, getSessionProjectPath } from '../../../state/session-worktrees'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
@@ -130,8 +131,35 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       : undefined
   const projectPath = getSessionProjectPath(currentSession)
 
+  // Review-vs-base: when toggled on for a worktree that records a baseRef,
+  // resolve the fork point and diff the working tree against it.
+  const activeWorktree = getActiveWorktree(currentSession)
+  const reviewBaseRef =
+    gitMode.reviewBase && activeWorktree?.baseRef != null && activeWorktree.baseRef !== ''
+      ? activeWorktree.baseRef
+      : null
+  const [compareRef, setCompareRef] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (reviewBaseRef == null || projectPath == null || projectPath === '') {
+      setCompareRef(undefined)
+      return
+    }
+    let cancelled = false
+    void getMergeBase(projectPath, reviewBaseRef).then((mergeBase) => {
+      if (!cancelled) setCompareRef(mergeBase)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [reviewBaseRef, projectPath])
+
   useRepoDiscovery(projectPath)
-  useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })
+  useGitPanelPolling({
+    compareRef,
+    enabled: focusMode === 'git',
+    headOffset: gitMode.headOffset,
+    projectPath,
+  })
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
 
@@ -166,6 +194,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }, [])
 
   useDiffPrefetch(gitMode.selectedEntryKey, gitPane.prefetchRadius, {
+    compareRef,
     enabled: focusMode === 'git',
     headOffset: gitMode.headOffset,
     projectPath,
@@ -178,7 +207,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (!(selectedDiffKey != null && selectedDiffKey !== '')) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(selectedFile.repoPath ?? projectPath, selectedFile, gitMode.headOffset)
+    void fetchDiff(
+      selectedFile.repoPath ?? projectPath,
+      selectedFile,
+      gitMode.headOffset,
+      compareRef
+    )
       .then((d) =>
         dispatchGlobal({
           diff: d,
@@ -190,7 +224,16 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       .catch(() =>
         dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
       )
-  }, [focusMode, projectPath, selectedFile, selectedDiffKey, diff, loading, gitMode.headOffset])
+  }, [
+    focusMode,
+    projectPath,
+    selectedFile,
+    selectedDiffKey,
+    diff,
+    loading,
+    gitMode.headOffset,
+    compareRef,
+  ])
 
   const pendingPath = gitMode.pendingDeletePath
   const pendingIsUntracked =
@@ -218,6 +261,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       </text>
     ))
   }
+
+  const baseLabel = compareRef != null && reviewBaseRef != null ? `vs ${reviewBaseRef}` : undefined
 
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
@@ -248,9 +293,18 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
                 <text fg={t.textMuted}>[ newer · ] older</text>
               </box>
             ) : null}
+            {baseLabel != null ? (
+              <box flexDirection="row" gap={1}>
+                <text fg={t.primary}>
+                  <strong>{baseLabel}</strong>
+                </text>
+                <text fg={t.textMuted}>b: back</text>
+              </box>
+            ) : null}
             <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
           </box>
           <GitPanel
+            baseLabel={baseLabel}
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
             fileListMode={gitPane.fileListMode}

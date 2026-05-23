@@ -50,6 +50,7 @@ export function emptyGitMode(): GitModeState {
     loading: {},
     parsedFiles: {},
     pendingDeletePath: null,
+    reviewBase: false,
     selectedEntryKey: null,
   }
 }
@@ -90,6 +91,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           highlights: {},
           loading: {},
           parsedFiles: {},
+          reviewBase: false,
         },
       }
     }
@@ -408,6 +410,26 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-diff-view': {
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
+    }
+    case 'git-mode-toggle-review-base': {
+      // Base review and history walking are mutually exclusive views; entering
+      // either resets headOffset and drops cached diffs (computed vs old ref).
+      const next = !state.gitMode.reviewBase
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          actionMessage: null,
+          diffs: {},
+          folds: {},
+          headOffset: 0,
+          highlights: {},
+          loading: {},
+          parsedFiles: {},
+          pendingDeletePath: null,
+          reviewBase: next,
+        },
+      }
     }
     case 'git-mode-shift-head-offset': {
       const next = Math.max(0, state.gitMode.headOffset + action.delta)

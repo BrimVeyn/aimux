@@ -269,6 +269,7 @@ export interface GitModeState {
   diffView: GitDiffView
   folds: Record<string, Record<string, FoldState>>
   headOffset: number
+  reviewBase: boolean
 }
 
 interface ModalBase {
@@ -606,6 +607,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-toggle-review-base' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }
   | {

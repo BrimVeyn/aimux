@@ -26,6 +26,24 @@ function diffFor(path: string): DiffData {
   }
 }
 
+test('git-mode-toggle-review-base flips reviewBase and resets headOffset', () => {
+  const s0 = appReducer(createInitialState(), { offset: 3, type: 'git-mode-set-head-offset' })
+  expect(s0.gitMode.headOffset).toBe(3)
+  const s1 = appReducer(s0, { type: 'git-mode-toggle-review-base' })
+  expect(s1.gitMode.reviewBase).toBe(true)
+  expect(s1.gitMode.headOffset).toBe(0)
+  const s2 = appReducer(s1, { type: 'git-mode-toggle-review-base' })
+  expect(s2.gitMode.reviewBase).toBe(false)
+})
+
+test('exit-git-mode clears reviewBase', () => {
+  const s0 = appReducer(createInitialState(), { type: 'enter-git-mode' })
+  const s1 = appReducer(s0, { type: 'git-mode-toggle-review-base' })
+  expect(s1.gitMode.reviewBase).toBe(true)
+  const s2 = appReducer(s1, { type: 'exit-git-mode' })
+  expect(s2.gitMode.reviewBase).toBe(false)
+})
+
 test('enter-git-mode sets focusMode to git and selects the first visible row', () => {
   const s0 = seedWithFiles([entry('a.ts')])
   const s1 = appReducer(s0, { type: 'enter-git-mode' })
