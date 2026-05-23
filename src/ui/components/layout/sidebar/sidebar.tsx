@@ -143,9 +143,10 @@ function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGrou
 
 interface TabsBodyProps {
   onTabActivate?: (tabId: string) => void
+  contentWidth: number
 }
 
-const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
+const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBodyProps) {
   const t = useTheme()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
@@ -241,11 +242,25 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           return (
             <box key={tab.id} flexDirection="column">
               {showWorktreeSeparators && startsWorktreeGroup ? (
-                <box flexDirection="row" paddingTop={index === 0 ? 0 : 1} paddingLeft={1}>
-                  <text fg={worktreeColor}>┃ </text>
-                  <text fg={worktreeColor}>{worktreeLabel}</text>
-                  {aheadBehind !== '' ? <text fg={t.textMuted}> {aheadBehind}</text> : null}
-                  <text fg={t.textMuted}> {'─'.repeat(8)}</text>
+                <box flexDirection="row" paddingTop={index === 0 ? 0 : 1}>
+                  <text fg={worktreeColor} selectable={false}>
+                    ▍{' '}
+                  </text>
+                  <text fg={worktreeColor} selectable={false}>
+                    {worktreeLabel}
+                  </text>
+                  {aheadBehind !== '' ? (
+                    <text fg={t.textMuted} selectable={false}>
+                      {' '}
+                      {aheadBehind}
+                    </text>
+                  ) : null}
+                  <box flexGrow={1} overflow="hidden">
+                    <text fg={t.textMuted} selectable={false} wrapMode="none">
+                      {' '}
+                      {'─'.repeat(contentWidth)}
+                    </text>
+                  </box>
                 </box>
               ) : null}
               <box
@@ -401,7 +416,7 @@ export function Sidebar({
               flexBasis={0}
               overflow="hidden"
             >
-              <TabsBody onTabActivate={onTabActivate} />
+              <TabsBody onTabActivate={onTabActivate} contentWidth={contentWidth} />
             </box>
             {gitOnBottom ? (
               <>
