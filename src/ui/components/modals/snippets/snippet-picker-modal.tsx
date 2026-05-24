@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react'
+
 import type { SnippetRecord } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
@@ -31,35 +33,46 @@ export function SnippetPickerModal({
   snippets,
 }: SnippetPickerModalProps) {
   const t = useTheme()
-  const filtered = filterSnippets(snippets, filter)
+  const filtered = useMemo(() => filterSnippets(snippets, filter), [filter, snippets])
 
-  const items: PickerItem[] = filtered.map((snippet, index) => {
-    const active = index === selectedIndex
-    const fromConfig = isConfigSnippetId(snippet.id)
-    return {
-      key: snippet.id,
-      onClick: () => {
-        dispatchGlobal({ type: 'close-modal' })
-        runSideEffectGlobal({ type: 'paste-selected-snippet' })
-      },
-      onDelete: fromConfig
-        ? undefined
-        : () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
-      onEdit: fromConfig ? undefined : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
-      subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
-      title: (
-        <box flexDirection="row">
-          <text fg={active ? t.text : t.textMuted}>
-            <strong>{snippet.name}</strong>
-          </text>
-          {snippet.trigger != null && snippet.trigger !== '' ? (
-            <text fg={t.textMuted}>{` :${snippet.trigger}`}</text>
-          ) : null}
-          {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
-        </box>
-      ),
-    }
-  })
+  const items = useMemo<PickerItem[]>(
+    () =>
+      filtered.map((snippet, index) => {
+        const active = index === selectedIndex
+        const fromConfig = isConfigSnippetId(snippet.id)
+        return {
+          key: snippet.id,
+          onClick: () => {
+            dispatchGlobal({ type: 'close-modal' })
+            runSideEffectGlobal({ type: 'paste-selected-snippet' })
+          },
+          onDelete: fromConfig
+            ? undefined
+            : () => runSideEffectGlobal({ type: 'delete-selected-snippet' }),
+          onEdit: fromConfig
+            ? undefined
+            : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
+          subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
+          title: (
+            <box flexDirection="row">
+              <text fg={active ? t.text : t.textMuted}>
+                <strong>{snippet.name}</strong>
+              </text>
+              {snippet.trigger != null && snippet.trigger !== '' ? (
+                <text fg={t.textMuted}>{` :${snippet.trigger}`}</text>
+              ) : null}
+              {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
+            </box>
+          ),
+        }
+      }),
+    [filtered, selectedIndex, t]
+  )
+
+  const handleHover = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
 
   return (
     <Picker
@@ -83,7 +96,7 @@ export function SnippetPickerModal({
           <text fg={t.error}>{actionMessage}</text>
         ) : undefined
       }
-      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+      onHover={handleHover}
     />
   )
 }

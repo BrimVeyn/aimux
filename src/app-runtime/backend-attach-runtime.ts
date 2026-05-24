@@ -109,14 +109,14 @@ export function attachCurrentSession({
   attachRequestIdRef.current = attachRequestId
   let cancelled = false
 
-  void backend
-    .attach({
-      cols: layoutRef.current.terminalCols,
-      rows: layoutRef.current.terminalRows,
-      sessionId: currentSessionId,
-      workspaceSnapshot: currentSessionWorkspaceSnapshot,
-    })
-    .then((result) => {
+  void (async () => {
+    try {
+      const result = await backend.attach({
+        cols: layoutRef.current.terminalCols,
+        rows: layoutRef.current.terminalRows,
+        sessionId: currentSessionId,
+        workspaceSnapshot: currentSessionWorkspaceSnapshot,
+      })
       if (cancelled || attachRequestIdRef.current !== attachRequestId) {
         return
       }
@@ -134,8 +134,7 @@ export function attachCurrentSession({
         layoutRef,
         backend
       )
-    })
-    .catch((error) => {
+    } catch (error) {
       if (cancelled || attachRequestIdRef.current !== attachRequestId) {
         return
       }
@@ -151,7 +150,8 @@ export function attachCurrentSession({
         layoutRef,
         backend
       )
-    })
+    }
+  })()
 
   return () => {
     cancelled = true

@@ -1,3 +1,5 @@
+import { useMemo } from 'react'
+
 import type { DirectoryResult } from '../../../../state/types'
 
 import { abbreviatePath } from '../../../path-format'
@@ -41,15 +43,17 @@ export function CreateSessionModal({
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
 
-  const items: FormOptionItem[] = results.map((result) => {
-    return {
-      key: result.path,
-      leading: <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>,
-      title: (active) => (
-        <text fg={active ? t.text : t.textMuted}>{abbreviatePath(result.path)}</text>
-      ),
-    }
-  })
+  const items = useMemo<FormOptionItem[]>(
+    () =>
+      results.map((result) => ({
+        key: result.path,
+        leading: <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>,
+        title: (active) => (
+          <text fg={active ? t.text : t.textMuted}>{abbreviatePath(result.path)}</text>
+        ),
+      })),
+    [results, t]
+  )
 
   return (
     <Form

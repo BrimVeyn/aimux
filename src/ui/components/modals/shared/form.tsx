@@ -147,12 +147,13 @@ export function AutoComplete({
               return (
                 <ListItem
                   key={item.key}
+                  index={optionIndex}
                   active={optionActive}
                   leading={resolveItemContent(item.leading, optionActive)}
                   title={resolveItemContent(item.title, optionActive)}
                   subtitle={resolveItemContent(item.subtitle, optionActive)}
                   trailing={resolveItemContent(item.trailing, optionActive)}
-                  onHover={onHover ? () => onHover(optionIndex) : undefined}
+                  onHoverIndex={onHover}
                   onClick={item.onClick}
                 />
               )

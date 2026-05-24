@@ -1,5 +1,7 @@
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+
 import { useTerminalDimensions } from '@opentui/react'
-import { memo, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
@@ -145,9 +147,10 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       return
     }
     let cancelled = false
-    void getMergeBase(projectPath, reviewBaseRef).then((mergeBase) => {
+    void (async () => {
+      const mergeBase = await getMergeBase(projectPath, reviewBaseRef)
       if (!cancelled) setCompareRef(mergeBase)
-    })
+    })()
     return () => {
       cancelled = true
     }
@@ -207,23 +210,24 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     if (!(selectedDiffKey != null && selectedDiffKey !== '')) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(
-      selectedFile.repoPath ?? projectPath,
-      selectedFile,
-      gitMode.headOffset,
-      compareRef
-    )
-      .then((d) =>
+    void (async () => {
+      try {
+        const d = await fetchDiff(
+          selectedFile.repoPath ?? projectPath,
+          selectedFile,
+          gitMode.headOffset,
+          compareRef
+        )
         dispatchGlobal({
           diff: d,
           hash: diffHash(d.rawDiff),
           key: selectedDiffKey,
           type: 'git-mode-set-diff',
         })
-      )
-      .catch(() =>
+      } catch {
         dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
-      )
+      }
+    })()
   }, [
     focusMode,
     projectPath,
@@ -256,6 +260,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     )
   } else if (actionMessage != null && actionMessage !== '') {
     footerNode = actionMessage.split('\n').map((line, idx) => (
+      // Message lines are positional and may repeat (e.g. blank lines); index is the identity.
+      // eslint-disable-next-line react/no-array-index-key
       <text key={idx} fg={t.primary}>
         {line}
       </text>
@@ -263,6 +269,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }
 
   const baseLabel = compareRef != null && reviewBaseRef != null ? `vs ${reviewBaseRef}` : undefined
+
+  const handleExitDiff = useCallback((event: OtuiMouseEvent) => {
+    event.preventDefault()
+    event.stopPropagation()
+    dispatchGlobal({ type: 'exit-git-mode' })
+  }, [])
 
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
@@ -331,11 +343,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
               paddingLeft={1}
               paddingRight={1}
               backgroundColor={actionBg}
-              onMouseDown={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                dispatchGlobal({ type: 'exit-git-mode' })
-              }}
+              onMouseDown={handleExitDiff}
             >
               <text fg={t.text}>
                 <strong>Exit diff</strong>

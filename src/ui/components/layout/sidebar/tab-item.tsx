@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+
+import { useCallback, useMemo, useState } from 'react'
 
 import type { TabSession } from '../../../../state/types'
 
@@ -116,6 +118,64 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
   const indicatorColor = getIndicatorColor(active, focused, isInLayout)
   const [hovered, setHovered] = useState(false)
 
+  const rightClickMenu = useMemo<[string, () => void][]>(
+    () => [
+      [
+        'Rename',
+        () => {
+          dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+          dispatchGlobal({ type: 'open-rename-tab-modal' })
+        },
+      ],
+      [
+        'Close',
+        () => {
+          dispatchGlobal({ tabId: tab.id, type: 'close-tab' })
+          runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
+        },
+      ],
+      [
+        'Move up',
+        () => {
+          dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+          dispatchGlobal({ delta: -1, type: 'reorder-active-tab' })
+        },
+      ],
+      [
+        'Move down',
+        () => {
+          dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
+          dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
+        },
+      ],
+      // Move this tab's worktree into another one. Opened from here it overlays
+      // the normal view (no git mode) since the open action doesn't touch focus.
+      ...(moveWorktreeId != null && moveWorktreeId !== ''
+        ? [
+            [
+              'Move worktree',
+              () =>
+                dispatchGlobal({
+                  sourceWorktreeId: moveWorktreeId,
+                  type: 'open-worktree-move-modal',
+                }),
+            ] as [string, () => void],
+          ]
+        : []),
+    ],
+    [moveWorktreeId, tab.id]
+  )
+  const handleMouseOver = useCallback(() => setHovered(true), [])
+  const handleMouseOut = useCallback(() => setHovered(false), [])
+  const handleCloseMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      dispatchGlobal({ tabId: tab.id, type: 'close-tab' })
+      runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
+    },
+    [tab.id]
+  )
+
   return (
     <ContextMenuBox
       id={id}
@@ -125,52 +185,9 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
       paddingBottom={0}
       flexDirection="column"
       gap={0}
-      rightClickMenu={[
-        [
-          'Rename',
-          () => {
-            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
-            dispatchGlobal({ type: 'open-rename-tab-modal' })
-          },
-        ],
-        [
-          'Close',
-          () => {
-            dispatchGlobal({ tabId: tab.id, type: 'close-tab' })
-            runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
-          },
-        ],
-        [
-          'Move up',
-          () => {
-            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
-            dispatchGlobal({ delta: -1, type: 'reorder-active-tab' })
-          },
-        ],
-        [
-          'Move down',
-          () => {
-            dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
-            dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
-          },
-        ],
-        // Move this tab's worktree into another one. Opened from here it overlays
-        // the normal view (no git mode) since the open action doesn't touch focus.
-        ...(moveWorktreeId != null && moveWorktreeId !== ''
-          ? [
-              [
-                'Move worktree',
-                () =>
-                  dispatchGlobal({
-                    sourceWorktreeId: moveWorktreeId,
-                    type: 'open-worktree-move-modal',
-                  }),
-              ] as [string, () => void],
-            ]
-          : []),
-      ]}
-      onMouseOver={() => setHovered(true)}
-      onMouseOut={() => setHovered(false)}
+      rightClickMenu={rightClickMenu}
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
     >
       <box flexDirection="row" alignItems="center">
         <text fg={indicatorColor} selectable={false}>
@@ -182,13 +199,7 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
           </text>
         </box>
         {hovered ? (
-          <box
-            onMouseDown={(event) => {
-              event.stopPropagation()
-              dispatchGlobal({ tabId: tab.id, type: 'close-tab' })
-              runSideEffectGlobal({ tabId: tab.id, type: 'close-tab' })
-            }}
-          >
+          <box onMouseDown={handleCloseMouseDown}>
             <text fg={t.textMuted} selectable={false}>
               ×
             </text>

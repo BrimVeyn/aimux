@@ -1,5 +1,7 @@
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+
 import { useKeyboard } from '@opentui/react'
-import { useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 
 import { useAppStore } from '../../../../state/app-store'
 import {
@@ -8,6 +10,50 @@ import {
   subscribeContextMenu,
 } from '../../../context-menu/controller'
 import { useTheme } from '../../../theme'
+
+const MenuItem = memo(function MenuItem({
+  active,
+  index,
+  label,
+  onHover,
+  onSelect,
+  width,
+}: {
+  active: boolean
+  index: number
+  label: string
+  onHover: (index: number) => void
+  onSelect: () => void
+  width: number
+}) {
+  const t = useTheme()
+  const handleMouseOver = useCallback(() => onHover(index), [index, onHover])
+  const handleMouseDown = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.button !== 0) return
+      closeContextMenu()
+      onSelect()
+    },
+    [onSelect]
+  )
+  return (
+    <box
+      width={width - 2}
+      flexShrink={0}
+      paddingLeft={1}
+      paddingRight={1}
+      backgroundColor={active ? t.backgroundElement : undefined}
+      onMouseOver={handleMouseOver}
+      onMouseDown={handleMouseDown}
+    >
+      <text fg={active ? t.text : t.textMuted} selectable={false}>
+        {label}
+      </text>
+    </box>
+  )
+})
 
 export function ContextMenuOverlay() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
@@ -48,6 +94,15 @@ export function ContextMenuOverlay() {
     }
   })
 
+  const handleBackdropMouseDown = useCallback((e: OtuiMouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    closeContextMenu()
+  }, [])
+  const handleMenuMouseDown = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+  }, [])
+
   if (!menu) return null
 
   const maxLabel = Math.max(...menu.items.map(([label]) => label.length))
@@ -66,11 +121,7 @@ export function ContextMenuOverlay() {
         left={0}
         width="100%"
         height="100%"
-        onMouseDown={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          closeContextMenu()
-        }}
+        onMouseDown={handleBackdropMouseDown}
       />
       <box
         position="absolute"
@@ -81,35 +132,19 @@ export function ContextMenuOverlay() {
         border
         borderColor={t.border}
         backgroundColor={t.backgroundPanel}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-        }}
+        onMouseDown={handleMenuMouseDown}
       >
-        {menu.items.map(([label, onSelect], index) => {
-          const active = index === selected
-          return (
-            <box
-              key={`${label}-${index}`}
-              width={width - 2}
-              flexShrink={0}
-              paddingLeft={1}
-              paddingRight={1}
-              backgroundColor={active ? t.backgroundElement : undefined}
-              onMouseOver={() => setSelected(index)}
-              onMouseDown={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (e.button !== 0) return
-                closeContextMenu()
-                onSelect()
-              }}
-            >
-              <text fg={active ? t.text : t.textMuted} selectable={false}>
-                {label}
-              </text>
-            </box>
-          )
-        })}
+        {menu.items.map(([label, onSelect], index) => (
+          <MenuItem
+            key={label}
+            index={index}
+            label={label}
+            onHover={setSelected}
+            onSelect={onSelect}
+            active={index === selected}
+            width={width}
+          />
+        ))}
       </box>
     </box>
   )

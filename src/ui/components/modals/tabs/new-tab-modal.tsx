@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react'
+
 import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
@@ -68,11 +70,86 @@ export function NewTabModal({
   worktrees,
 }: NewTabModalProps) {
   const t = useTheme()
+  const options = useMemo(() => getAllAssistantOptions(customCommands), [customCommands])
+  const filtered = useMemo(() => filterAssistants(options, filter), [filter, options])
+
+  const handleHover = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
+
+  const worktreeItems = useMemo<PickerItem[]>(
+    () => [
+      ...worktrees.map((worktree, index) => {
+        const active = index === selectedIndex
+        const label = worktree.branch ?? worktree.name
+        const blockedReason = getDeleteBlockedReason({ currentSessionId, worktree, worktrees })
+        const canDelete = blockedReason == null || blockedReason === ''
+        return {
+          key: worktree.id,
+          onClick: () => {
+            dispatchGlobal({ index, type: 'set-modal-selection-index' })
+            runSideEffectGlobal({ type: 'launch-selected-assistant' })
+          },
+          onDelete:
+            active && canDelete && currentSessionId != null && currentSessionId !== ''
+              ? () => {
+                  dispatchGlobal({ index, type: 'set-modal-selection-index' })
+                  dispatchGlobal({ message: null, type: 'set-new-tab-worktree-delete-state' })
+                  runSideEffectGlobal({
+                    force: worktreeDeleteConfirmId === worktree.id,
+                    sessionId: currentSessionId,
+                    type: 'delete-worktree',
+                    worktreeId: worktree.id,
+                  })
+                }
+              : undefined,
+          subtitle: (
+            <box flexDirection="column">
+              <text fg={t.textMuted}>{worktree.path}</text>
+              <text fg={t.textMuted}>{worktree.source}</text>
+            </box>
+          ),
+          title: <text fg={active ? t.text : t.textMuted}>{label}</text>,
+        }
+      }),
+      {
+        key: '__create-worktree__',
+        onClick: () => dispatchGlobal({ type: 'enter-new-tab-worktree-create' }),
+        subtitle: <text fg={t.textMuted}>Create an Aimux temp worktree</text>,
+        title: <text fg={createWorktree ? t.text : t.textMuted}>Create new worktree</text>,
+      },
+    ],
+    [createWorktree, currentSessionId, selectedIndex, t, worktreeDeleteConfirmId, worktrees]
+  )
+
+  const items = useMemo<PickerItem[]>(
+    () =>
+      filtered.map((option, index) => {
+        const active = index === selectedIndex
+        const customCmd = customCommands[option.id]
+        return {
+          key: option.id,
+          onClick: () =>
+            dispatchGlobal({ assistantId: option.id, type: 'select-new-tab-assistant' }),
+          onEdit: () =>
+            dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
+          subtitle: (
+            <box flexDirection="column">
+              <text fg={t.textMuted}>{option.description}</text>
+              {customCmd != null && customCmd !== '' ? (
+                <text fg={t.primary}>{customCmd}</text>
+              ) : null}
+            </box>
+          ),
+          title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+        }
+      }),
+    [customCommands, filtered, selectedIndex, t]
+  )
 
   if (editingCommand !== null) {
-    const option =
-      getAllAssistantOptions(customCommands).find((o) => o.id === editingCommand) ??
-      getAssistantOption(0)
+    const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)
     return (
       <Form
         title={`Edit command — ${option.label}`}
@@ -89,9 +166,6 @@ export function NewTabModal({
       </Form>
     )
   }
-
-  const options = getAllAssistantOptions(customCommands)
-  const filtered = filterAssistants(options, filter)
 
   if (step === 'worktree-create') {
     const selectedAssistant =
@@ -139,47 +213,6 @@ export function NewTabModal({
       worktree: selectedWorktree,
       worktrees,
     })
-    const worktreeItems: PickerItem[] = [
-      ...worktrees.map((worktree, index) => {
-        const active = index === selectedIndex
-        const label = worktree.branch ?? worktree.name
-        const blockedReason = getDeleteBlockedReason({ currentSessionId, worktree, worktrees })
-        const canDelete = blockedReason == null || blockedReason === ''
-        return {
-          key: worktree.id,
-          onClick: () => {
-            dispatchGlobal({ index, type: 'set-modal-selection-index' })
-            runSideEffectGlobal({ type: 'launch-selected-assistant' })
-          },
-          onDelete:
-            active && canDelete && currentSessionId != null && currentSessionId !== ''
-              ? () => {
-                  dispatchGlobal({ index, type: 'set-modal-selection-index' })
-                  dispatchGlobal({ message: null, type: 'set-new-tab-worktree-delete-state' })
-                  runSideEffectGlobal({
-                    force: worktreeDeleteConfirmId === worktree.id,
-                    sessionId: currentSessionId,
-                    type: 'delete-worktree',
-                    worktreeId: worktree.id,
-                  })
-                }
-              : undefined,
-          subtitle: (
-            <box flexDirection="column">
-              <text fg={t.textMuted}>{worktree.path}</text>
-              <text fg={t.textMuted}>{worktree.source}</text>
-            </box>
-          ),
-          title: <text fg={active ? t.text : t.textMuted}>{label}</text>,
-        }
-      }),
-      {
-        key: '__create-worktree__',
-        onClick: () => dispatchGlobal({ type: 'enter-new-tab-worktree-create' }),
-        subtitle: <text fg={t.textMuted}>Create an Aimux temp worktree</text>,
-        title: <text fg={createWorktree ? t.text : t.textMuted}>Create new worktree</text>,
-      },
-    ]
     return (
       <Picker
         title={`New assistant: ${selectedAssistant?.label ?? 'assistant'}`}
@@ -190,7 +223,7 @@ export function NewTabModal({
         items={worktreeItems}
         selectedIndex={selectedIndex}
         emptyState={<text fg={t.textMuted}>No worktrees.</text>}
-        onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+        onHover={handleHover}
         footer={
           <box flexDirection="column">
             {(worktreeDeleteMessage != null && worktreeDeleteMessage !== '') ||
@@ -213,23 +246,6 @@ export function NewTabModal({
     )
   }
 
-  const items: PickerItem[] = filtered.map((option, index) => {
-    const active = index === selectedIndex
-    const customCmd = customCommands[option.id]
-    return {
-      key: option.id,
-      onClick: () => dispatchGlobal({ assistantId: option.id, type: 'select-new-tab-assistant' }),
-      onEdit: () => dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
-      subtitle: (
-        <box flexDirection="column">
-          <text fg={t.textMuted}>{option.description}</text>
-          {customCmd != null && customCmd !== '' ? <text fg={t.primary}>{customCmd}</text> : null}
-        </box>
-      ),
-      title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
-    }
-  })
-
   return (
     <Picker
       title="New assistant: choose assistant"
@@ -241,7 +257,7 @@ export function NewTabModal({
       items={items}
       selectedIndex={selectedIndex}
       emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
-      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+      onHover={handleHover}
       footer={
         <box flexDirection="column">
           <text fg={t.textMuted}>Step 1/2: choose assistant</text>

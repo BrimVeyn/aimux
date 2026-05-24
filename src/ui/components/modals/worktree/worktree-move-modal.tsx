@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react'
+
 import type { WorktreeRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
@@ -10,8 +12,8 @@ interface WorktreeMoveModalProps {
   deleteSource: boolean
   divergence: Record<string, { ahead: number; behind: number }>
   selectedIndex: number
-  sourceLabel: string
-  targets: WorktreeRecord[]
+  sourceWorktreeId: string
+  worktrees: WorktreeRecord[]
 }
 
 const MOVE_HINTS: [key: string, label: string][] = [
@@ -33,10 +35,24 @@ export function WorktreeMoveModal({
   deleteSource,
   divergence,
   selectedIndex,
-  sourceLabel,
-  targets,
+  sourceWorktreeId,
+  worktrees,
 }: WorktreeMoveModalProps) {
   const t = useTheme()
+  const source = useMemo(
+    () => worktrees.find((w) => w.id === sourceWorktreeId),
+    [sourceWorktreeId, worktrees]
+  )
+  const targets = useMemo(
+    () => worktrees.filter((w) => w.id !== sourceWorktreeId),
+    [sourceWorktreeId, worktrees]
+  )
+  const sourceLabel =
+    source?.branch != null && source.branch !== '' ? source.branch : (source?.name ?? 'worktree')
+  const handleSelectIndex = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
   return (
     <ModalShell
       title={`Move ${sourceLabel} →`}
@@ -74,9 +90,10 @@ export function WorktreeMoveModal({
               <ListItem
                 key={worktree.id}
                 id={worktree.id}
+                index={index}
                 active={active}
-                onHover={() => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
-                onClick={() => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+                onHoverIndex={handleSelectIndex}
+                onClickIndex={handleSelectIndex}
                 title={
                   <text fg={active ? t.text : t.textMuted} wrapMode="none">
                     {label}

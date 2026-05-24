@@ -1,6 +1,6 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
-import { memo, type ReactNode, useEffect, useMemo, useRef } from 'react'
+import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import type {
   GitFileEntry,
@@ -18,7 +18,7 @@ import {
   type GitTreeFileRow,
   type GitTreeFolderRow,
 } from '../../../state/git-tree'
-import { getCurrentTheme, getTransparent, useTheme, useTransparent } from '../../theme'
+import { getCurrentTheme, useTheme, useTransparent } from '../../theme'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -167,23 +167,30 @@ function renderDiffCount(
   )
 }
 
-function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode {
-  const t = getCurrentTheme()
-  const bg = isSelected && !getTransparent() ? t.backgroundElement : undefined
-  const onSelect = (): void => {
+const FolderRow = memo(function FolderRow({
+  isSelected,
+  row,
+}: {
+  row: GitTreeFolderRow
+  isSelected: boolean
+}) {
+  const t = useTheme()
+  const transparent = useTransparent()
+  const bg = isSelected && !transparent ? t.backgroundElement : undefined
+  const onSelect = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
-  }
-  const onToggle = (): void => {
+  }, [row.key])
+  const onToggle = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-toggle-folder' })
-  }
+  }, [row.key])
   return (
-    <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
+    <box flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
         <box flexDirection="row" gap={1} onMouseDown={onToggle}>
           <text selectable={false} fg={t.textMuted} bg={bg}>
             {row.isCollapsed ? '▸' : '▾'}
           </text>
-          <text selectable={false} fg={getCurrentTheme().textMuted} bg={bg}>
+          <text selectable={false} fg={t.textMuted} bg={bg}>
             {row.isCollapsed ? '\uf07b' : '\uf07c'}
           </text>
           <text selectable={false} fg={t.textMuted} bg={bg} wrapMode="none">
@@ -193,24 +200,35 @@ function renderFolderRow(row: GitTreeFolderRow, isSelected: boolean): ReactNode 
       </box>
     </box>
   )
-}
+})
 
-function renderFileRow(
-  row: GitTreeFileRow,
-  addedW: number,
-  removedW: number,
-  isSelected: boolean,
-  fileListMode: GitFileListMode,
-  pathConfig: GitPanePathConfig,
-  diffCountConfig: GitPaneDiffCountConfig,
+const FileRow = memo(function FileRow({
+  addedW,
+  diffCountConfig,
+  fileListMode,
+  isSelected,
+  pathConfig,
+  removedW,
+  repoPrefixes,
+  row,
+}: {
+  row: GitTreeFileRow
+  addedW: number
+  removedW: number
+  isSelected: boolean
+  fileListMode: GitFileListMode
+  pathConfig: GitPanePathConfig
+  diffCountConfig: GitPaneDiffCountConfig
   repoPrefixes: Record<string, string>
-): ReactNode {
+}) {
+  const t = useTheme()
+  const transparent = useTransparent()
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected && !getTransparent() ? getCurrentTheme().backgroundElement : undefined
-  const onSelect = (): void => {
+  const bg = isSelected && !transparent ? t.backgroundElement : undefined
+  const onSelect = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
-  }
+  }, [row.key])
   // Repo disambiguation prefix: only in flat mode, only when the file came
   // from a sub-repo (root repo files get an empty prefix).
   const repoTag =
@@ -218,7 +236,7 @@ function renderFileRow(
       ? (repoPrefixes[file.repoPath] ?? '')
       : ''
   return (
-    <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
+    <box flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
         <text selectable={false} fg={statusColor(file.status)} bg={bg}>
           <strong>{displayStatus(file)}</strong>
@@ -226,7 +244,7 @@ function renderFileRow(
       </box>
       {repoTag ? (
         <box flexShrink={0}>
-          <text selectable={false} fg={getCurrentTheme().primary} bg={bg}>
+          <text selectable={false} fg={t.primary} bg={bg}>
             <strong>{repoTag}</strong>
           </text>
         </box>
@@ -237,32 +255,44 @@ function renderFileRow(
       {renderDiffCount(file, addedW, removedW, bg, diffCountConfig, hasNumstat)}
     </box>
   )
-}
+})
 
-function renderTreeSection(
-  section: GitFileSection,
-  title: string,
-  files: GitFileEntry[],
-  rows: (GitTreeFolderRow | GitTreeFileRow)[],
-  addedW: number,
-  removedW: number,
-  fileListMode: GitFileListMode,
-  selectedEntryKey: string | null | undefined,
-  showListModeToggle: boolean,
-  pathConfig: GitPanePathConfig,
-  diffCountConfig: GitPaneDiffCountConfig,
-  marginTop: number,
+const TreeSection = memo(function TreeSection({
+  addedW,
+  diffCountConfig,
+  fileListMode,
+  files,
+  marginTop,
+  pathConfig,
+  removedW,
+  repoPrefixes,
+  rows,
+  selectedEntryKey,
+  showListModeToggle,
+  title,
+}: {
+  title: string
+  files: GitFileEntry[]
+  rows: (GitTreeFolderRow | GitTreeFileRow)[]
+  addedW: number
+  removedW: number
+  fileListMode: GitFileListMode
+  selectedEntryKey: string | null | undefined
+  showListModeToggle: boolean
+  pathConfig: GitPanePathConfig
+  diffCountConfig: GitPaneDiffCountConfig
+  marginTop: number
   repoPrefixes: Record<string, string>
-): ReactNode {
-  if (files.length === 0) return null
-  const t2 = getCurrentTheme()
+}) {
+  const t2 = useTheme()
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
-  const toggleListMode = (): void => {
+  const toggleListMode = useCallback(() => {
     dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
     runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
-  }
+  }, [nextFileListMode])
+  if (files.length === 0) return null
   return (
-    <box key={section} flexDirection="column" marginTop={marginTop}>
+    <box flexDirection="column" marginTop={marginTop}>
       <box flexDirection="row" justifyContent="space-between">
         <text selectable={false} fg={t2.text}>
           <strong>
@@ -284,22 +314,25 @@ function renderTreeSection(
         ) : null}
       </box>
       {rows.map((row) =>
-        row.kind === 'folder'
-          ? renderFolderRow(row, row.key === selectedEntryKey)
-          : renderFileRow(
-              row,
-              addedW,
-              removedW,
-              row.key === selectedEntryKey,
-              fileListMode,
-              pathConfig,
-              diffCountConfig,
-              repoPrefixes
-            )
+        row.kind === 'folder' ? (
+          <FolderRow key={row.key} row={row} isSelected={row.key === selectedEntryKey} />
+        ) : (
+          <FileRow
+            key={row.key}
+            row={row}
+            addedW={addedW}
+            removedW={removedW}
+            isSelected={row.key === selectedEntryKey}
+            fileListMode={fileListMode}
+            pathConfig={pathConfig}
+            diffCountConfig={diffCountConfig}
+            repoPrefixes={repoPrefixes}
+          />
+        )
       )}
     </box>
   )
-}
+})
 
 interface StatusPlaceholder {
   label: string
@@ -340,6 +373,10 @@ function computeStatusPlaceholder(
 
 const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
 const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
+const HIDDEN_SCROLLBAR_OPTIONS = { visible: false }
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+const EMPTY_FILES: GitFileEntry[] = []
+const EMPTY_ROWS: (GitTreeFolderRow | GitTreeFileRow)[] = []
 
 export const GitPanel = memo(function GitPanel({
   baseLabel,
@@ -399,29 +436,31 @@ export const GitPanel = memo(function GitPanel({
           flexGrow={1}
           ref={scrollRef}
           scrollY
-          scrollbarOptions={{ visible: false }}
+          scrollbarOptions={HIDDEN_SCROLLBAR_OPTIONS}
           viewportCulling
-          contentOptions={{ flexDirection: 'column', gap: 0 }}
+          contentOptions={COLUMN_CONTENT_OPTIONS}
         >
           {sectionOrder.map((key, idx) => {
             const section = tree.sections.find((entry) => entry.section === key)
             const priorHasFiles = sectionOrder
               .slice(0, idx)
               .some((k) => (tree.sections.find((e) => e.section === k)?.files.length ?? 0) > 0)
-            return renderTreeSection(
-              key,
-              sectionTitle(key, headOffset, baseLabel),
-              section?.files ?? [],
-              section?.rows ?? [],
-              addedW,
-              removedW,
-              fileListMode,
-              selectedEntryKey,
-              key === toggleSection,
-              pathConfig,
-              diffCountConfig,
-              priorHasFiles ? 1 : 0,
-              repoPrefixes
+            return (
+              <TreeSection
+                key={key}
+                title={sectionTitle(key, headOffset, baseLabel)}
+                files={section?.files ?? EMPTY_FILES}
+                rows={section?.rows ?? EMPTY_ROWS}
+                addedW={addedW}
+                removedW={removedW}
+                fileListMode={fileListMode}
+                selectedEntryKey={selectedEntryKey}
+                showListModeToggle={key === toggleSection}
+                pathConfig={pathConfig}
+                diffCountConfig={diffCountConfig}
+                marginTop={priorHasFiles ? 1 : 0}
+                repoPrefixes={repoPrefixes}
+              />
             )
           })}
         </scrollbox>
