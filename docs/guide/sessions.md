@@ -17,6 +17,7 @@ Each workspace can have:
 - an optional `projectPath`
 - an order in the workspace list
 - a persisted workspace snapshot
+- a set of git [worktrees](worktrees.md) for running agents on parallel branches
 
 That snapshot contains the workspace's tabs, layout, some sidebar state, and the
 last known terminal viewport / scroll anchor for each tab.

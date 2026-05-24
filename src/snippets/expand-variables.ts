@@ -34,16 +34,16 @@ const VAR_RE = /\{\{([^{}]+)\}\}/g
 const TWO = (n: number): string => String(n).padStart(2, '0')
 
 function formatDate(date: Date, format?: string): string {
-  if (!format) {
+  if (!(format != null && format !== '')) {
     return `${date.getFullYear()}-${TWO(date.getMonth() + 1)}-${TWO(date.getDate())}`
   }
   return format
-    .replace(/YYYY/g, String(date.getFullYear()))
-    .replace(/MM/g, TWO(date.getMonth() + 1))
-    .replace(/DD/g, TWO(date.getDate()))
-    .replace(/HH/g, TWO(date.getHours()))
-    .replace(/mm/g, TWO(date.getMinutes()))
-    .replace(/ss/g, TWO(date.getSeconds()))
+    .replaceAll('YYYY', String(date.getFullYear()))
+    .replaceAll('MM', TWO(date.getMonth() + 1))
+    .replaceAll('DD', TWO(date.getDate()))
+    .replaceAll('HH', TWO(date.getHours()))
+    .replaceAll('mm', TWO(date.getMinutes()))
+    .replaceAll('ss', TWO(date.getSeconds()))
 }
 
 function resolveSyncVariable(name: string, ctx: SyncExpansionContext): string | null {

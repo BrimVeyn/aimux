@@ -5,6 +5,8 @@ import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import { saveSessionCatalog } from '../state/session-catalog'
 import { createEmptyWorkspaceSnapshot, serializeWorkspace } from '../state/session-persistence'
+import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-worktrees'
+import { toast } from '../state/toast-store'
 import { buildSessionsWithCurrentSnapshot } from '../state/workspace-save'
 
 export function createSessionFromCurrentState(
@@ -14,10 +16,11 @@ export function createSessionFromCurrentState(
 ): { session: SessionRecord; sessions: SessionRecord[] } {
   const now = new Date().toISOString()
   const workspaceSnapshot =
-    state.currentSessionId || state.tabs.length === 0
+    (state.currentSessionId != null && state.currentSessionId !== '') || state.tabs.length === 0
       ? createEmptyWorkspaceSnapshot()
       : serializeWorkspace(state)
   const session: SessionRecord = {
+    activeWorktreeId: undefined,
     createdAt: now,
     id: createPrefixedId('session'),
     lastOpenedAt: now,
@@ -25,10 +28,16 @@ export function createSessionFromCurrentState(
     projectPath,
     updatedAt: now,
     workspaceSnapshot,
+    worktrees: undefined,
+  }
+  if (projectPath != null && projectPath !== '') {
+    const worktree = createPrimaryWorktree(projectPath, now)
+    session.activeWorktreeId = worktree.id
+    session.worktrees = [worktree]
   }
 
   let updatedSessions = state.sessions
-  if (state.currentSessionId) {
+  if (state.currentSessionId != null && state.currentSessionId !== '') {
     const currentSnapshot = serializeWorkspace(state)
     updatedSessions = state.sessions.map((entry) =>
       entry.id === state.currentSessionId
@@ -39,7 +48,7 @@ export function createSessionFromCurrentState(
 
   return {
     session,
-    sessions: [...updatedSessions, session],
+    sessions: [...updatedSessions, ensureSessionWorktrees(session)],
   }
 }
 
@@ -79,7 +88,8 @@ export function handleCreateSessionEffect(
 ): void {
   const { session, sessions } = createSessionFromCurrentState(state, name, projectPath)
   logInputDebug('app.session.create', {
-    fromCurrentWorkspace: !state.currentSessionId && state.tabs.length > 0,
+    fromCurrentWorkspace:
+      (state.currentSessionId == null || state.currentSessionId === '') && state.tabs.length > 0,
     name,
     sessionId: session.id,
     tabCount: session.workspaceSnapshot?.tabs.length ?? 0,
@@ -137,6 +147,7 @@ export function handleDeleteSessionEffect(
   sessionId: string,
   options?: { openSessionPicker?: boolean }
 ): void {
+  const name = state.sessions.find((entry) => entry.id === sessionId)?.name
   const remaining = deleteSessionRecords(state.sessions, sessionId)
   logInputDebug('app.session.delete', {
     remainingCount: remaining.length,
@@ -152,6 +163,7 @@ export function handleDeleteSessionEffect(
     sessionId,
     type: 'delete-session-record',
   })
+  toast.success(name != null && name !== '' ? `Deleted workspace "${name}"` : 'Workspace deleted')
 }
 
 export function restartTabSession(

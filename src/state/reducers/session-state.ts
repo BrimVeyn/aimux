@@ -2,6 +2,7 @@ import type { AppAction, AppState } from '../types'
 
 import { filterSessions } from '../selectors'
 import { restoreWorkspaceState } from '../session-persistence'
+import { withActiveWorktree } from '../session-worktrees'
 
 const CLOSED_MODAL = {
   editBuffer: null,
@@ -57,7 +58,7 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId)
       const nextStatuses = { ...state.sessionStatuses }
       delete nextStatuses[action.sessionId]
-      if (action.openSessionPicker) {
+      if (action.openSessionPicker === true) {
         const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
         const maxIndex = filteredNew.length
         const clampedIndex = Math.min(state.modal.selectedIndex, maxIndex)
@@ -120,6 +121,64 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         sessionStatuses: { ...state.sessionStatuses, [action.sessionId]: action.status },
       }
     }
+    case 'add-worktree-record':
+      return {
+        ...state,
+        sessions: state.sessions.map((session) => {
+          if (session.id !== action.sessionId) return session
+          const next = {
+            ...session,
+            activeWorktreeId:
+              action.activate === true ? action.worktree.id : session.activeWorktreeId,
+            projectPath: action.activate === true ? action.worktree.path : session.projectPath,
+            updatedAt: new Date().toISOString(),
+            worktrees: [...(session.worktrees ?? []), action.worktree],
+          }
+          return next.activeWorktreeId != null && next.activeWorktreeId !== ''
+            ? next
+            : withActiveWorktree(next, action.worktree.id)
+        }),
+      }
+    case 'remove-worktree-record':
+      return {
+        ...state,
+        sessions: state.sessions.map((session) => {
+          if (session.id !== action.sessionId) return session
+          const remaining = (session.worktrees ?? []).filter((w) => w.id !== action.worktreeId)
+          if (remaining.length === 0) return session
+          if (session.activeWorktreeId !== action.worktreeId) {
+            return { ...session, updatedAt: new Date().toISOString(), worktrees: remaining }
+          }
+          return withActiveWorktree(
+            { ...session, activeWorktreeId: remaining[0]?.id, worktrees: remaining },
+            remaining[0]?.id ?? ''
+          )
+        }),
+      }
+    case 'set-active-worktree':
+      return {
+        ...state,
+        sessions: state.sessions.map((session) =>
+          session.id === action.sessionId ? withActiveWorktree(session, action.worktreeId) : session
+        ),
+      }
+    case 'update-worktree-record':
+      return {
+        ...state,
+        sessions: state.sessions.map((session) =>
+          session.id === action.sessionId
+            ? {
+                ...session,
+                updatedAt: new Date().toISOString(),
+                worktrees: session.worktrees?.map((worktree) =>
+                  worktree.id === action.worktreeId
+                    ? { ...worktree, ...action.patch, updatedAt: new Date().toISOString() }
+                    : worktree
+                ),
+              }
+            : session
+        ),
+      }
     default:
       return null
   }

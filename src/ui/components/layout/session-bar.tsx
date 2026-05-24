@@ -61,7 +61,7 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
   }
 
   const handleMouseDrag = (event: OtuiMouseEvent) => {
-    if (!draggingId) return
+    if (!(draggingId != null && draggingId !== '')) return
     const hit = findChipAtX(event.x)
     if (hit === null) {
       lastSwapWithRef.current = null
@@ -83,7 +83,7 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
     setDragOrder(null)
     lastSwapWithRef.current = null
 
-    if (!source || !finalOrder) return
+    if (source == null || source === '' || !finalOrder) return
 
     const changed = !arraysEqual(finalOrder, baselineOrder)
     if (changed) {
@@ -184,7 +184,7 @@ interface SessionChipProps {
   onMouseDrag: (event: OtuiMouseEvent) => void
   onMouseUp: (event: OtuiMouseEvent) => void
   onMouseDragEnd: (event: OtuiMouseEvent) => void
-  rightClickMenu: Array<[string, () => void]>
+  rightClickMenu: [string, () => void][]
 }
 
 function SessionChip({

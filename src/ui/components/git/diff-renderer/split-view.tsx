@@ -230,7 +230,9 @@ function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-h
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={t.text}>{row.spec}</text>
-      {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
+      {row.context != null && row.context !== '' ? (
+        <text fg={t.textMuted}> {row.context}</text>
+      ) : null}
     </box>
   )
 }
@@ -285,9 +287,9 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
       {tokens.map((tok, i) => {
         const s = tokenToSpan(tok)
         let attributes = 0
-        if (s.bold) attributes |= TextAttributes.BOLD
-        if (s.italic) attributes |= TextAttributes.ITALIC
-        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        if (s.bold === true) attributes |= TextAttributes.BOLD
+        if (s.italic === true) attributes |= TextAttributes.ITALIC
+        if (s.underline === true) attributes |= TextAttributes.UNDERLINE
         return (
           <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}

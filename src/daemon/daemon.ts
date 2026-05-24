@@ -84,7 +84,7 @@ function sendOk(socket: Socket, id: string): void {
 
 function requireSession(socket: Socket, attachedSessions: Map<Socket, string>): string {
   const sessionId = attachedSessions.get(socket)
-  if (!sessionId) {
+  if (!(sessionId != null && sessionId !== '')) {
     throw new Error('No session attached')
   }
   return sessionId
@@ -100,7 +100,7 @@ function requireNegotiatedVersion(socket: Socket, versions: Map<Socket, number>)
 
 async function canConnectToSocket(socketPath: string): Promise<boolean> {
   const securityIssue = getSocketSecurityIssue(socketPath)
-  if (securityIssue) {
+  if (securityIssue != null && securityIssue !== '') {
     logDebug('daemon.socketUnhealthy', { issue: securityIssue, socketPath })
     return false
   }
@@ -527,7 +527,7 @@ export async function runDaemon(): Promise<void> {
                 case 'disposeAll': {
                   const sessionId = attachedSessions.get(socket)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  if (sessionId) {
+                  if (sessionId != null && sessionId !== '') {
                     for (const [tabId, entry] of tabRegistry) {
                       if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
                     }

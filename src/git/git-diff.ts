@@ -5,7 +5,8 @@ import type { DiffData, DiffFileStatus, GitFileEntry } from '../state/types'
 import { imageFormatLabel, imageMimeFromPath, isImagePath } from './image-detect'
 
 function resolveStatus(entry: GitFileEntry): { status: DiffFileStatus; oldPath?: string } {
-  if (entry.renamedFrom) return { oldPath: entry.renamedFrom, status: 'renamed' }
+  if (entry.renamedFrom != null && entry.renamedFrom !== '')
+    return { oldPath: entry.renamedFrom, status: 'renamed' }
   if (entry.section === 'untracked' || entry.status === '?') return { status: 'new' }
   if (entry.status === 'D') return { status: 'deleted' }
   if (entry.status === 'A' && (entry.section === 'staged' || entry.section === 'historical')) {
@@ -85,13 +86,19 @@ async function rawUnifiedDiff(
   return result.text()
 }
 
+function resolveCompareRef(headOffset: number, compareRef: string | undefined): string {
+  if (compareRef != null && compareRef !== '') return compareRef
+  return headOffset > 0 ? `HEAD~${headOffset}` : 'HEAD'
+}
+
 export async function fetchDiff(
   cwd: string,
   file: GitFileEntry,
-  headOffset: number = 0
+  headOffset: number = 0,
+  compareRef?: string
 ): Promise<DiffData> {
   const { oldPath, status } = resolveStatus(file)
-  const ref = headOffset > 0 ? `HEAD~${headOffset}` : 'HEAD'
+  const ref = resolveCompareRef(headOffset, compareRef)
 
   if (isImagePath(file.path)) {
     const headPath = oldPath ?? file.path
@@ -112,7 +119,7 @@ export async function fetchDiff(
     }
     if (imageBytesBefore) data.imageBytesBefore = imageBytesBefore
     if (imageBytesAfter) data.imageBytesAfter = imageBytesAfter
-    if (oldPath) data.oldPath = oldPath
+    if (oldPath != null && oldPath !== '') data.oldPath = oldPath
     return data
   }
 
@@ -137,6 +144,6 @@ export async function fetchDiff(
     rawDiff,
     status,
   }
-  if (oldPath) data.oldPath = oldPath
+  if (oldPath != null && oldPath !== '') data.oldPath = oldPath
   return data
 }

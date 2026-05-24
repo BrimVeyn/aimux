@@ -3,7 +3,7 @@ import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 import { memo, type ReactNode } from 'react'
 
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
-import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
+import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
 
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
@@ -15,7 +15,7 @@ import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 interface TerminalPaneProps {
   tab?: TabSession
   tabId?: string
-  focusMode: import('../../../state/types').FocusMode
+  focusMode: FocusMode
   isActive?: boolean
   contentOrigin: TerminalContentOrigin
   mouseForwardingEnabled: boolean
@@ -61,15 +61,15 @@ function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMo
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
   let node: ReactNode = span.text
 
-  if (span.underline) {
+  if (span.underline === true) {
     node = <u>{node}</u>
   }
 
-  if (span.italic) {
+  if (span.italic === true) {
     node = <em>{node}</em>
   }
 
-  if (span.bold) {
+  if (span.bold === true) {
     node = <strong>{node}</strong>
   }
 
@@ -132,35 +132,36 @@ export function TerminalPane({
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
-  const rightClickMenu: ContextMenuItem[] | undefined = tabId
-    ? [
-        [
-          'Split vertically',
-          () =>
-            runSideEffectGlobal({
-              direction: 'vertical',
-              sourceTabId: tabId,
-              type: 'split-pane',
-            }),
-        ],
-        [
-          'Split horizontally',
-          () =>
-            runSideEffectGlobal({
-              direction: 'horizontal',
-              sourceTabId: tabId,
-              type: 'split-pane',
-            }),
-        ],
-        [
-          'Close pane',
-          () => {
-            dispatchGlobal({ tabId, type: 'close-pane' })
-            runSideEffectGlobal({ tabId, type: 'close-tab' })
-          },
-        ],
-      ]
-    : undefined
+  const rightClickMenu: ContextMenuItem[] | undefined =
+    tabId != null && tabId !== ''
+      ? [
+          [
+            'Split vertically',
+            () =>
+              runSideEffectGlobal({
+                direction: 'vertical',
+                sourceTabId: tabId,
+                type: 'split-pane',
+              }),
+          ],
+          [
+            'Split horizontally',
+            () =>
+              runSideEffectGlobal({
+                direction: 'horizontal',
+                sourceTabId: tabId,
+                type: 'split-pane',
+              }),
+          ],
+          [
+            'Close pane',
+            () => {
+              dispatchGlobal({ tabId, type: 'close-pane' })
+              runSideEffectGlobal({ tabId, type: 'close-tab' })
+            },
+          ],
+        ]
+      : undefined
   const isOnPaneBorder = (event: OtuiMouseEvent) =>
     event.x === contentOrigin.x - 1 ||
     event.x === contentOrigin.x + contentOrigin.cols ||
@@ -206,22 +207,22 @@ export function TerminalPane({
       })
     }
     if (event.type === 'drag') {
-      if (onTerminalDrag?.(event, contentOrigin, tabId)) {
+      if (onTerminalDrag?.(event, contentOrigin, tabId) === true) {
         event.preventDefault()
         return
       }
-      if (onSeparatorDrag?.(event)) {
+      if (onSeparatorDrag?.(event) === true) {
         event.preventDefault()
         return
       }
     }
     if (event.type === 'up') {
-      if (onTerminalMouseUp?.(event)) {
+      if (onTerminalMouseUp?.(event) === true) {
         event.preventDefault()
       }
       onSeparatorDragEnd?.()
     }
-    if (tabId && onPaneActivate && event.type === 'down') {
+    if (tabId != null && tabId !== '' && onPaneActivate && event.type === 'down') {
       onPaneActivate(tabId)
     }
     if (!canForwardMouse) {
@@ -308,7 +309,7 @@ export function TerminalPane({
           </box>
         )}
       </ContextMenuBox>
-      {tab?.status === 'disconnected' || tab?.errorMessage ? (
+      {tab?.status === 'disconnected' || (tab?.errorMessage != null && tab.errorMessage !== '') ? (
         // Absolutely positioned so it overlays the bordered box instead of
         // consuming a flex row. If it took a row, the rendered terminal area
         // would be one line shorter than the size sent to the PTY/xterm,
@@ -317,7 +318,9 @@ export function TerminalPane({
           {tab?.status === 'disconnected' ? (
             <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
           ) : null}
-          {tab?.errorMessage ? <text fg={t.error}>{tab.errorMessage}</text> : null}
+          {tab?.errorMessage != null && tab?.errorMessage !== '' ? (
+            <text fg={t.error}>{tab.errorMessage}</text>
+          ) : null}
         </box>
       ) : null}
     </box>

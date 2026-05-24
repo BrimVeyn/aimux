@@ -40,11 +40,11 @@ export function ListItem({
           </>
         )}
         {leading}
-        {leading ? <text> </text> : null}
+        {leading != null ? <text> </text> : null}
         <box flexGrow={isRow ? 0 : 1}>{title}</box>
-        {trailing ? <box>{trailing}</box> : null}
+        {trailing != null ? <box>{trailing}</box> : null}
       </box>
-      {subtitle ? <box paddingLeft={2}>{subtitle}</box> : null}
+      {subtitle != null ? <box paddingLeft={2}>{subtitle}</box> : null}
     </box>
   )
   return (

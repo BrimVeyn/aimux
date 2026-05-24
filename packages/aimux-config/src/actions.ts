@@ -80,7 +80,7 @@ export const splitHorizontal: KeyResult = r(
 )
 
 export const enterInsert: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.activeTabId) return null
+  if (!(ctx.state.activeTabId != null && ctx.state.activeTabId !== '')) return null
   return r([{ focusMode: 'terminal-input', type: 'set-focus-mode' }], [], 'terminal-input')
 }
 
@@ -88,13 +88,15 @@ export const closeModal: KeyResult = r([{ type: 'close-modal' }], [], 'navigatio
 
 export const closeOverlayModal: KeyResult = r([{ type: 'close-modal' }])
 
+export const cancelNewTabModal: KeyResult = r([{ type: 'cancel-command-edit' }])
+
 // ---------------------------------------------------------------------------
 // Dynamic actions (need ctx at runtime — ActionFn)
 // ---------------------------------------------------------------------------
 
 export const closeTab: ActionFn = (ctx: ModeContext) => {
   const tabId = ctx.state.activeTabId
-  if (!tabId) return null
+  if (!(tabId != null && tabId !== '')) return null
   return r([{ type: 'close-active-tab' }], [{ tabId, type: 'close-tab' }])
 }
 
@@ -153,7 +155,7 @@ export function focusPane(direction: 'left' | 'right' | 'up' | 'down'): KeyResul
 export function resizePane(delta: number, axis: 'horizontal' | 'vertical'): ActionFn {
   return (ctx: ModeContext) => {
     const tabId = ctx.state.activeTabId
-    if (!tabId) return null
+    if (!(tabId != null && tabId !== '')) return null
     return r([{ axis, delta, tabId, type: 'resize-pane' }])
   }
 }
@@ -173,7 +175,45 @@ export function moveModalSelectionWithPreview(
 // Modal-specific actions
 // ---------------------------------------------------------------------------
 
-export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
+export const launchSelectedAssistant: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'assistant') {
+    return r([{ type: 'select-new-tab-assistant' }])
+  }
+  if (
+    ctx.state.modal.type === 'new-tab' &&
+    ctx.state.modal.step === 'worktree' &&
+    ctx.state.modal.createWorktree
+  ) {
+    return r([{ type: 'enter-new-tab-worktree-create' }])
+  }
+  return r([], [{ type: 'launch-selected-assistant' }])
+}
+
+export const toggleNewTabWorktree: KeyResult = r([{ type: 'toggle-new-tab-worktree' }])
+
+export const deleteSelectedWorktree: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const sessionId = ctx.state.currentSessionId
+  if (modal.type !== 'new-tab' || modal.step !== 'worktree' || modal.createWorktree) return null
+  if (!(sessionId != null && sessionId !== '')) return null
+  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const worktree = session?.worktrees?.[modal.selectedIndex]
+  if (!worktree) return null
+  return r(
+    [
+      { index: modal.selectedIndex, type: 'set-modal-selection-index' },
+      { message: null, type: 'set-new-tab-worktree-delete-state' },
+    ],
+    [
+      {
+        force: modal.worktreeDeleteConfirmId === worktree.id,
+        sessionId,
+        type: 'delete-worktree',
+        worktreeId: worktree.id,
+      },
+    ]
+  )
+}
 
 export const cancelCommandEdit = (returnTo: KeyResult['transition']): KeyResult =>
   r([{ type: 'cancel-command-edit' }], [], returnTo)
@@ -298,9 +338,66 @@ export const confirmUpdateSelection: KeyResult = r(
   'navigation'
 )
 
+// ---------------------------------------------------------------------------
+// Worktree-move modal
+// ---------------------------------------------------------------------------
+
+export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.gitMode.headOffset > 0) {
+    return r([
+      {
+        message: 'disabled while viewing HEAD~N (press 0 or [ to return)',
+        type: 'git-mode-set-message',
+      },
+    ])
+  }
+  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+  const worktrees = session?.worktrees ?? []
+  // From git mode, the source is the active worktree (the one being reviewed).
+  const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
+  const hasBranch = source != null && source.branch != null && source.branch !== ''
+  const others = worktrees.filter((w) => w.id !== source?.id)
+  if (!hasBranch || source == null || others.length < 1) {
+    return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
+  }
+  // Overlay: no mode transition — deriveModeId routes input to the picker and
+  // focusMode stays 'git' so the git view remains mounted underneath.
+  return r([{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }])
+}
+
+export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
+
+export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+  const worktrees = session?.worktrees ?? []
+  const sourceId = modal.type === 'worktree-move' ? modal.sourceWorktreeId : undefined
+  const source = worktrees.find((w) => w.id === sourceId)
+  const targets = worktrees.filter((w) => w.id !== sourceId)
+  const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
+  const target = targets[selectedIndex]
+  if (!target || !session || !source || modal.type !== 'worktree-move') {
+    return r([{ type: 'close-modal' }])
+  }
+  // Overlay close keeps focusMode 'git' (see close-modal reducer), so the move
+  // result lands back in the git view that was underneath the picker.
+  return r(
+    [{ type: 'close-modal' }],
+    [
+      {
+        deleteSource: modal.deleteSource,
+        sessionId: session.id,
+        sourceWorktreeId: source.id,
+        targetWorktreeId: target.id,
+        type: 'move-worktree',
+      },
+    ]
+  )
+}
+
 export const closePane: ActionFn = (ctx: ModeContext) => {
   const tabId = ctx.state.activeTabId
-  if (!tabId) return null
+  if (!(tabId != null && tabId !== '')) return null
   return r(
     [
       { tabId, type: 'close-pane' },
@@ -345,7 +442,9 @@ export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {
     ? 'modal.session-picker.filtering'
     : 'navigation'
   const effects: KeyResult['effects'] =
-    trimmed && sessionId ? [{ name: trimmed, sessionId, type: 'rename-session' }] : []
+    trimmed && sessionId != null && sessionId !== ''
+      ? [{ name: trimmed, sessionId, type: 'rename-session' }]
+      : []
   return r([closeAction], effects, transition)
 }
 
@@ -354,7 +453,7 @@ export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   const trimmed = (ctx.state.modal.editBuffer ?? '').trim()
   const tabId = ctx.state.modal.sessionTargetId
   const actions: KeyResult['actions'] = []
-  if (trimmed && tabId) {
+  if (trimmed && tabId != null && tabId !== '') {
     actions.push({ tabId, title: trimmed, type: 'rename-tab' })
   }
   actions.push({ type: 'close-modal' })
@@ -387,14 +486,14 @@ export const confirmCreateSession: ActionFn = (ctx: ModeContext) => {
 }
 
 function getDefaultSessionName(projectPath?: string): string {
-  if (!projectPath) return ''
+  if (!(projectPath != null && projectPath !== '')) return ''
   const segments = projectPath.split('/').filter(Boolean)
   return segments.at(-1) ?? ''
 }
 
 // Session picker escape (conditional)
 export const sessionPickerEscape: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.currentSessionId) return null
+  if (!(ctx.state.currentSessionId != null && ctx.state.currentSessionId !== '')) return null
   return r([{ type: 'close-modal' }], [], 'navigation')
 }
 
@@ -420,15 +519,19 @@ function clearPendingDelete(ctx: ModeContext): AppAction[] {
   return [{ path: null, type: 'git-mode-set-pending-delete' }]
 }
 
-function gitFileKey(section: string, path: string): string {
-  return `${section}:${path}`
+function gitFileKey(section: string, path: string, repoPath?: string): string {
+  return repoPath != null && repoPath !== ''
+    ? `${section}:${repoPath}:${path}`
+    : `${section}:${path}`
 }
 
 function selectedGitFile(ctx: ModeContext) {
   const key = ctx.state.gitMode.selectedEntryKey
-  if (!key) return null
+  if (!(key != null && key !== '')) return null
   return (
-    ctx.state.gitPanel.files.find((file) => gitFileKey(file.section, file.path) === key) ?? null
+    ctx.state.gitPanel.files.find(
+      (file) => gitFileKey(file.section, file.path, file.repoPath) === key
+    ) ?? null
   )
 }
 
@@ -449,17 +552,20 @@ export function selectGitFileOnly(delta: -1 | 1): ActionFn {
 }
 
 export const toggleSelectedGitFolder: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  if (!(ctx.state.gitMode.selectedEntryKey != null && ctx.state.gitMode.selectedEntryKey !== ''))
+    return r([])
   return r([{ type: 'git-mode-toggle-selected-folder' }])
 }
 
 export const collapseGitSelection: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  if (!(ctx.state.gitMode.selectedEntryKey != null && ctx.state.gitMode.selectedEntryKey !== ''))
+    return r([])
   return r([{ type: 'git-mode-collapse-selection' }])
 }
 
 export const expandGitSelection: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.gitMode.selectedEntryKey) return r([])
+  if (!(ctx.state.gitMode.selectedEntryKey != null && ctx.state.gitMode.selectedEntryKey !== ''))
+    return r([])
   return r([{ type: 'git-mode-expand-selection' }])
 }
 
@@ -484,6 +590,8 @@ export function scrollGitDiff(delta: number): KeyResult {
 }
 
 export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
+
+export const toggleGitReviewBase: KeyResult = r([{ type: 'git-mode-toggle-review-base' }])
 
 export function shiftGitHeadOffset(delta: number): KeyResult {
   return r([
@@ -561,7 +669,7 @@ export const gitDestructiveSelected: ActionFn = (ctx: ModeContext) => {
 export const gitToggleFoldAll: ActionFn = (ctx: ModeContext) => {
   const file = selectedGitFile(ctx)
   if (!file) return r([])
-  const key = gitFileKey(file.section, file.path)
+  const key = gitFileKey(file.section, file.path, file.repoPath)
   return r([{ key, type: 'git-mode-fold-toggle-all' }])
 }
 
@@ -687,7 +795,7 @@ export const gitCommitEnterConfirm: ActionFn = (ctx: ModeContext) => {
     return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
   }
   const sessionId = ctx.state.currentSessionId
-  if (!sessionId) {
+  if (!(sessionId != null && sessionId !== '')) {
     return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
   }
   return r(
@@ -706,7 +814,7 @@ export const gitCommitLeaveConfirm: KeyResult = r(
 export const gitCommitLeaveGenerating: ActionFn = (ctx: ModeContext) => {
   const sessionId = ctx.state.currentSessionId
   const actionsList: AppAction[] = [{ type: 'git-commit-leave-generating' }]
-  if (sessionId) {
+  if (sessionId != null && sessionId !== '') {
     actionsList.push({ sessionId, type: 'auto-commit-clear' })
   }
   return r(actionsList, [], 'modal.git-commit')

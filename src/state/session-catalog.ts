@@ -6,6 +6,8 @@ import type { SessionRecord } from './types'
 import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
+import { ensureSessionWorktrees } from './session-worktrees'
+import { toast } from './toast-store'
 import { isSessionRecord } from './validation'
 
 interface SessionCatalogFile {
@@ -46,10 +48,14 @@ export function loadSessionCatalog(): SessionRecord[] {
   const { file, issue } = readCatalogFile()
   if (file) {
     logDebug('sessions.catalog.load', { sessionCount: file.sessions.length })
-    return normalizeOrder(file.sessions)
+    const normalized = normalizeSessions(file.sessions)
+    if (JSON.stringify(normalized) !== JSON.stringify(file.sessions)) {
+      saveSessionCatalog(normalized)
+    }
+    return normalized
   }
 
-  if (issue) {
+  if (issue != null && issue !== '') {
     logDebug('sessions.catalog.loadIssue', { issue, path: SESSIONS_PATH })
   }
 
@@ -69,13 +75,14 @@ export function loadSessionCatalog(): SessionRecord[] {
     workspaceSnapshot: config.workspaceSnapshot,
   }
 
-  saveSessionCatalog([migrated])
+  const normalized = normalizeSessions([migrated])
+  saveSessionCatalog(normalized)
   saveConfig({ ...config, workspaceSnapshot: undefined })
   logDebug('sessions.catalog.migrateLegacyWorkspace', {
     migratedSessionId: migrated.id,
     tabCount: migrated.workspaceSnapshot?.tabs.length ?? 0,
   })
-  return [migrated]
+  return normalized
 }
 
 export function saveSessionCatalog(sessions: SessionRecord[]): void {
@@ -84,11 +91,15 @@ export function saveSessionCatalog(sessions: SessionRecord[]): void {
     writeFileSync(SESSIONS_PATH, `${JSON.stringify({ sessions, version: 1 }, null, 2)}\n`)
     logDebug('sessions.catalog.save', { sessionCount: sessions.length })
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     logDebug('sessions.catalog.saveError', {
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
       path: SESSIONS_PATH,
       sessionCount: sessions.length,
     })
+    // Persisting the catalog underpins workspace/worktree state — a silent
+    // failure means the user loses sessions on restart. Surface it.
+    toast.error(`Failed to save sessions: ${message}`)
   }
 }
 
@@ -125,4 +136,8 @@ function normalizeOrder(sessions: SessionRecord[]): SessionRecord[] {
   withoutOrder.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
   const merged = [...withOrder, ...withoutOrder]
   return merged.map((s, i) => (s.order === i ? s : { ...s, order: i }))
+}
+
+function normalizeSessions(sessions: SessionRecord[]): SessionRecord[] {
+  return normalizeOrder(sessions).map((session) => ensureSessionWorktrees(session))
 }

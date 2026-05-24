@@ -1,6 +1,7 @@
+import type { FoldDispatch } from './pierre-diff'
+
 import { useTheme } from '../../../theme'
 import { FOLD_STEP, type FoldInfo } from './build-rows'
-import { type FoldDispatch } from './pierre-diff'
 
 interface Props {
   fold: FoldInfo

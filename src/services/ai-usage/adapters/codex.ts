@@ -40,7 +40,7 @@ const AUTH_TIMEOUT_MS = 15_000
 
 function codexHome(): string {
   const env = process.env.CODEX_HOME?.trim()
-  if (env) return env
+  if (env != null && env !== '') return env
   return join(homedir(), '.codex')
 }
 
@@ -81,7 +81,7 @@ async function resolveUsageURL(): Promise<string> {
   try {
     const contents = await readFile(join(codexHome(), 'config.toml'), 'utf8')
     const parsed = parseChatGPTBaseFromConfig(contents)
-    if (parsed) base = parsed
+    if (parsed != null && parsed !== '') base = parsed
   } catch {
     // no config.toml or unreadable — fall back to default
   }
@@ -94,7 +94,7 @@ async function loadAuth(): Promise<{ accessToken: string; accountId: string | nu
   const raw = await readFile(join(codexHome(), 'auth.json'), 'utf8')
   const parsed = JSON.parse(raw) as CodexAuthFile
   const accessToken = parsed.tokens?.access_token
-  if (!accessToken) {
+  if (!(accessToken != null && accessToken !== '')) {
     throw new Error('no access_token in ~/.codex/auth.json — run `codex` to sign in')
   }
   return {
@@ -104,7 +104,7 @@ async function loadAuth(): Promise<{ accessToken: string; accountId: string | nu
 }
 
 function normalizePlanTier(raw: string | undefined | null): string | null {
-  if (!raw) return null
+  if (!(raw != null && raw !== '')) return null
   const trimmed = raw.trim()
   if (!trimmed) return null
   const lower = trimmed.toLowerCase()
@@ -128,11 +128,11 @@ function buildCodexWindow(
   if (!window) return null
   const percent =
     typeof window.used_percent === 'number' ? Math.max(0, Math.min(100, window.used_percent)) : null
-  const resetAtMs = window.reset_at ? window.reset_at * 1000 : null
-  const resetAt = resetAtMs ? new Date(resetAtMs).toISOString() : null
+  const resetAtMs = window.reset_at != null && window.reset_at !== 0 ? window.reset_at * 1000 : null
+  const resetAt = resetAtMs != null && resetAtMs !== 0 ? new Date(resetAtMs).toISOString() : null
   const windowSeconds =
     typeof window.limit_window_seconds === 'number' ? window.limit_window_seconds : null
-  if (percent === null && !resetAt) return null
+  if (percent === null && !(resetAt != null && resetAt !== '')) return null
   return {
     kind,
     label,
@@ -186,7 +186,7 @@ export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<Usage
       'Authorization': `Bearer ${accessToken}`,
       'User-Agent': 'aimux',
     }
-    if (accountId) headers['ChatGPT-Account-Id'] = accountId
+    if (accountId != null && accountId !== '') headers['ChatGPT-Account-Id'] = accountId
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS)

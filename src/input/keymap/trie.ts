@@ -52,7 +52,7 @@ export class KeyTrie {
   remove(sequence: KeyChord[]): boolean {
     if (sequence.length === 0) return false
 
-    const path: Array<{ node: TrieNode; chord: KeyChord }> = []
+    const path: { node: TrieNode; chord: KeyChord }[] = []
     let node = this.root
 
     for (const chord of sequence) {

@@ -5,7 +5,7 @@ export function filterAssistants(
   options: AssistantOption[],
   filter: string | null
 ): AssistantOption[] {
-  if (!filter) return options
+  if (!(filter != null && filter !== '')) return options
   const lower = filter.toLowerCase()
   return options.filter(
     (o) => o.label.toLowerCase().includes(lower) || o.description.toLowerCase().includes(lower)
@@ -13,7 +13,7 @@ export function filterAssistants(
 }
 
 export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
-  if (!filter) {
+  if (!(filter != null && filter !== '')) {
     return sessions
   }
 
@@ -21,12 +21,14 @@ export function filterSessions(sessions: SessionRecord[], filter: string | null)
   return sessions.filter(
     (session) =>
       session.name.toLowerCase().includes(lower) ||
-      (session.projectPath && session.projectPath.toLowerCase().includes(lower))
+      (session.projectPath != null &&
+        session.projectPath !== '' &&
+        session.projectPath.toLowerCase().includes(lower))
   )
 }
 
 export function filterSnippets(snippets: SnippetRecord[], filter: string | null): SnippetRecord[] {
-  if (!filter) {
+  if (!(filter != null && filter !== '')) {
     return snippets
   }
 

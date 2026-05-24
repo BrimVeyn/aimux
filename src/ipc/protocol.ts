@@ -10,8 +10,8 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
-export const IPC_PROTOCOL_MIN_VERSION = 7
-export const IPC_PROTOCOL_VERSION = 7
+export const IPC_PROTOCOL_MIN_VERSION = 8
+export const IPC_PROTOCOL_VERSION = 8
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -43,7 +43,7 @@ export interface AttachResult {
    * right state immediately, without the per-event race where a separate
    * `sessionStatus` event could arrive before the session was in state.
    */
-  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
+  initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
 }
 
 export type ClientRequest =

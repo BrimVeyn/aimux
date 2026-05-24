@@ -36,7 +36,7 @@ describe('daemon runtime paths', () => {
       process.env.AIMUX_RUNTIME_PROFILE = originalRuntimeProfile
     }
 
-    if (tempRuntimeDir) {
+    if (tempRuntimeDir != null && tempRuntimeDir !== '') {
       rmSync(tempRuntimeDir, { force: true, recursive: true })
       tempRuntimeDir = null
     }

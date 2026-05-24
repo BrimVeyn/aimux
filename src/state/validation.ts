@@ -5,6 +5,7 @@ import type {
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
+  WorktreeRecord,
 } from './types'
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -105,6 +106,24 @@ function isStringRecord(value: unknown): boolean {
   return Object.values(value).every(isString)
 }
 
+function isWorktreeRecord(value: unknown): value is WorktreeRecord {
+  return (
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.name) &&
+    isString(value.path) &&
+    isString(value.repoRoot) &&
+    (value.branch === undefined || isString(value.branch)) &&
+    (value.baseRef === undefined || isString(value.baseRef)) &&
+    (value.commitSha === undefined || isString(value.commitSha)) &&
+    (value.source === 'primary' || value.source === 'aimux-temp' || value.source === 'external') &&
+    isBoolean(value.createdByAimux) &&
+    (value.color === undefined || isString(value.color)) &&
+    isString(value.createdAt) &&
+    isString(value.updatedAt)
+  )
+}
+
 export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
   return (
     isObjectRecord(value) &&
@@ -132,7 +151,8 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
         (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
         (tab.scrollIntent === undefined || isScrollIntent(tab.scrollIntent)) &&
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
-        (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
+        (tab.exitCode === undefined || isFiniteNumber(tab.exitCode)) &&
+        (tab.worktreeId === undefined || isString(tab.worktreeId))
     ) &&
     (value.layoutTree === undefined || isLayoutNode(value.layoutTree)) &&
     (value.layoutTrees === undefined || isLayoutTreesMap(value.layoutTrees)) &&
@@ -151,7 +171,10 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
     isString(value.lastOpenedAt) &&
     (value.order === undefined ||
       (typeof value.order === 'number' && Number.isFinite(value.order))) &&
-    (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot))
+    (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot)) &&
+    (value.worktrees === undefined ||
+      (Array.isArray(value.worktrees) && value.worktrees.every(isWorktreeRecord))) &&
+    (value.activeWorktreeId === undefined || isString(value.activeWorktreeId))
   )
 }
 

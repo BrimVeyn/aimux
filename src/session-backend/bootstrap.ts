@@ -48,7 +48,7 @@ async function spawnDaemon(): Promise<void> {
 
 async function canConnectToDaemon(socketPath: string): Promise<boolean> {
   const securityIssue = getSocketSecurityIssue(socketPath)
-  if (securityIssue) {
+  if (securityIssue != null && securityIssue !== '') {
     logDebug('backend.healthcheck.socketIssue', { issue: securityIssue, socketPath })
     return false
   }
@@ -77,7 +77,7 @@ export async function probeDaemonProtocolCompatibility(
   socketPath: string
 ): Promise<DaemonHandshakeProbeResult> {
   const securityIssue = getSocketSecurityIssue(socketPath)
-  if (securityIssue) {
+  if (securityIssue != null && securityIssue !== '') {
     return { compatible: false, error: securityIssue }
   }
 

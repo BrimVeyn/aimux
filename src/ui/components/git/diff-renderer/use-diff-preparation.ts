@@ -163,11 +163,11 @@ export function useDiffPreparation(
     (segments: readonly DiffSegment[]) => {
       const file = parsed.file
       const filetype = parsed.filetype
-      if (!file || !filetype) return
+      if (!file || !(filetype != null && filetype !== '')) return
       const owner = requestOwner
       const version = requestVersionRef.current
       const activeHash = cachedParsed?.hash ?? (localOwnerMatches ? localHash : null)
-      if (!activeHash) return
+      if (!(activeHash != null && activeHash !== '')) return
       const next = segments.filter(
         (segment) =>
           (segment.kind === 'context' || segment.kind === 'change') &&

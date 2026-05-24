@@ -80,7 +80,7 @@ describe('snapshotTerminal', () => {
     })
 
     const snapshot = snapshotTerminal(terminal)
-    expect(snapshot.lines[0]?.spans.some((span) => span.cursor)).toBe(true)
+    expect(snapshot.lines[0]?.spans.some((span) => span.cursor === true)).toBe(true)
     terminal.dispose()
   })
 
@@ -156,7 +156,7 @@ describe('snapshotTerminal', () => {
 
     const snapshot = snapshotTerminal(terminal, false)
     expect(snapshot.cursorVisible).toBe(false)
-    expect(snapshot.lines[0]?.spans.some((span) => span.cursor)).toBe(false)
+    expect(snapshot.lines[0]?.spans.some((span) => span.cursor === true)).toBe(false)
     terminal.dispose()
   })
 })

@@ -19,7 +19,7 @@ interface HelpModalProps {
 function matchesFilter(needle: string, ...fields: (string | undefined)[]): boolean {
   if (!needle) return true
   const lower = needle.toLowerCase()
-  return fields.some((f) => f?.toLowerCase().includes(lower))
+  return fields.some((f) => f?.toLowerCase().includes(lower) === true)
 }
 
 export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModalProps) {
@@ -75,7 +75,9 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
       items={items}
       selectedIndex={selectedIndex}
       emptyState={
-        <text fg={t.textMuted}>{filter ? 'No matching bindings.' : 'No bindings registered.'}</text>
+        <text fg={t.textMuted}>
+          {filter != null && filter !== '' ? 'No matching bindings.' : 'No bindings registered.'}
+        </text>
       }
       onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
     />

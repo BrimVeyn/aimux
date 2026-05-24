@@ -104,8 +104,10 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('o', actions.openSelectedGitFileInEditor, 'Open in editor')
         .map('c', actions.gitCommitOpen, 'Commit')
+        .map('m', actions.openWorktreeMove, 'Move worktree')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
+        .map('b', actions.toggleGitReviewBase, 'Review vs base')
         .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
         .map('T', actions.toggleTreeCompaction, 'Toggle tree compaction')
         .map(']', actions.shiftGitHeadOffset(-1), 'Newer commit')
@@ -183,6 +185,22 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: worktree-move
+    // -----------------------------------------------------------------------
+    .mode('modal.worktree-move', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('j', actions.moveModalSelection(1), 'Next')
+        .map('k', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .map('<C-n>', actions.moveModalSelection(1))
+        .map('<C-p>', actions.moveModalSelection(-1))
+        .map('d', actions.toggleWorktreeMoveDelete, 'Toggle delete source')
+        .map('<CR>', actions.confirmWorktreeMove, 'Move')
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: rename-tab
     // -----------------------------------------------------------------------
     .mode('modal.rename-tab', (m) =>
@@ -197,8 +215,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.new-tab.command-edit', (m) =>
       m
-        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<Esc>', actions.cancelNewTabModal, 'Cancel')
         .map('<CR>', actions.launchSelectedAssistant, 'Launch')
+        .map('<C-w>', actions.toggleNewTabWorktree, 'WT')
+        .map('<C-d>', actions.deleteSelectedWorktree, 'Delete WT')
+        .map('<Tab>', actions.switchField, 'Next field')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

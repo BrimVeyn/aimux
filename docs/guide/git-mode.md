@@ -65,6 +65,8 @@ Actions on the selected file:
 | `d`   | Unstage / delete (two-press for destructive ops) |
 | `c`   | Open the commit modal                            |
 | `p`   | Push                                             |
+| `b`   | Toggle review vs base (worktrees)                |
+| `m`   | Move this worktree's changes into another        |
 | `v`   | Toggle split / stacked diff                      |
 | `t`   | Toggle flat / tree list                          |
 | `]`   | Older commit (HEAD~N → N+1)                      |
@@ -110,6 +112,16 @@ While the offset is non-zero:
   `no older commit — clamped to HEAD~N`.
 
 Leaving git mode (`Esc`) resets the offset back to `0`.
+
+## Worktree review & move
+
+Two git-mode bindings act on [worktrees](worktrees.md):
+
+- `b` toggles **review vs base** — the diff against the worktree's fork point
+  (everything it changed since branching) instead of vs `HEAD`.
+- `m` opens the **move picker** to squash this worktree's changes into another.
+
+See the [Worktrees guide](worktrees.md) for the full flow.
 
 ## Help Modal
 

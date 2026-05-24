@@ -19,7 +19,7 @@ describe('describeBindings', () => {
     })
     const all = describeBindings(config, 'modal.theme-picker.filtering')
     expect(all.length).toBeGreaterThan(withDesc.length)
-    expect(withDesc.every((b) => !!b.description)).toBe(true)
+    expect(withDesc.every((b) => !!(b.description != null && b.description !== ''))).toBe(true)
   })
 
   test('reflects user-config overrides', () => {

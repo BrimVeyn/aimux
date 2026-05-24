@@ -11,10 +11,11 @@ import { discoverRepos } from './repo-discovery'
 export function useRepoDiscovery(projectPath: string | undefined): void {
   useEffect(() => {
     const cfg = getMultiRepoConfig()
-    if (!cfg.enabled || !projectPath) {
+    if (!cfg.enabled || !(projectPath != null && projectPath !== '')) {
       dispatchGlobal({ type: 'multi-repo-clear' })
       return
     }
+    dispatchGlobal({ type: 'multi-repo-clear' })
     let cancelled = false
     void (async () => {
       const repos = await discoverRepos(projectPath, cfg.maxDepth)

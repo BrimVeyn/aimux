@@ -36,7 +36,7 @@ export function useSidebarAutoScroll({
       return
     }
 
-    if (!previousVisibilityRef.current && activeTabId) {
+    if (!previousVisibilityRef.current && activeTabId != null && activeTabId !== '') {
       scrollbox.scrollChildIntoView(`sidebar-tab-${activeTabId}`)
       previousVisibilityRef.current = true
       previousActiveIndexRef.current = activeIndex
@@ -53,7 +53,7 @@ export function useSidebarAutoScroll({
       scrollbox.scrollTo({ x: 0, y: 0 })
     } else if (scrollTarget === 'bottom') {
       scrollbox.scrollTo({ x: 0, y: scrollbox.scrollHeight })
-    } else if (scrollTarget === 'active-item' && activeTabId) {
+    } else if (scrollTarget === 'active-item' && activeTabId != null && activeTabId !== '') {
       scrollbox.scrollChildIntoView(`sidebar-tab-${activeTabId}`)
     }
 

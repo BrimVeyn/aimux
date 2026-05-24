@@ -28,9 +28,11 @@ import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
+import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
+import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { useTheme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
@@ -78,6 +80,7 @@ function renderModal(
     focusMode: FocusMode
     activeAssistant?: string
     autoCommitModel?: string
+    worktreeDivergence: Record<string, { ahead: number; behind: number }>
   }
 ) {
   switch (modal.type) {
@@ -89,8 +92,24 @@ function renderModal(
           customCommands={options.customCommands}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
+          currentSessionId={options.currentSessionId}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
+          activeField={modal.type === 'new-tab' ? modal.activeField : 'assistant'}
+          branchError={modal.type === 'new-tab' ? modal.branchError : null}
+          branchName={modal.type === 'new-tab' ? modal.branchName : ''}
+          createWorktree={modal.type === 'new-tab' ? modal.createWorktree : false}
+          selectedAssistantId={modal.type === 'new-tab' ? modal.selectedAssistantId : null}
+          step={modal.type === 'new-tab' ? modal.step : 'assistant'}
+          worktreeDeleteConfirmId={modal.type === 'new-tab' ? modal.worktreeDeleteConfirmId : null}
+          worktreeDeleteMessage={modal.type === 'new-tab' ? modal.worktreeDeleteMessage : null}
+          worktrees={
+            options.currentSessionId != null && options.currentSessionId !== ''
+              ? (options.sessions.find((session) => session.id === options.currentSessionId)
+                  ?.worktrees ?? [])
+              : []
+          }
+          worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
         />
       )
     case 'session-picker':
@@ -107,7 +126,11 @@ function renderModal(
     case 'session-name':
       return (
         <SessionNameModal
-          title={modal.sessionTargetId ? 'Rename workspace' : 'Create workspace'}
+          title={
+            modal.sessionTargetId != null && modal.sessionTargetId !== ''
+              ? 'Rename workspace'
+              : 'Create workspace'
+          }
           value={modal.editBuffer ?? ''}
         />
       )
@@ -161,6 +184,29 @@ function renderModal(
           latestVersion={modal.latestVersion}
         />
       )
+    case 'worktree-move': {
+      const session =
+        options.currentSessionId != null && options.currentSessionId !== ''
+          ? options.sessions.find((entry) => entry.id === options.currentSessionId)
+          : undefined
+      const worktrees = session?.worktrees ?? []
+      const sourceId = modal.sourceWorktreeId
+      const source = worktrees.find((w) => w.id === sourceId)
+      const targets = worktrees.filter((w) => w.id !== sourceId)
+      const sourceLabel =
+        source?.branch != null && source.branch !== ''
+          ? source.branch
+          : (source?.name ?? 'worktree')
+      return (
+        <WorktreeMoveModal
+          deleteSource={modal.type === 'worktree-move' ? modal.deleteSource : false}
+          divergence={options.worktreeDivergence}
+          selectedIndex={modal.selectedIndex}
+          sourceLabel={sourceLabel}
+          targets={targets}
+        />
+      )
+    }
     case 'help':
       return (
         <HelpModal
@@ -266,6 +312,7 @@ export function RootView({
   const customCommands = useAppStore((s) => s.customCommands)
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const sessionBarPosition = useAppStore((s) => s.sessionBar.position)
   const gitPaneMode = useAppStore((s) => s.gitPane.mode)
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
@@ -284,7 +331,10 @@ export function RootView({
       : undefined
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
-  const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
+  const activeTree =
+    activeTabId != null && activeTabId !== ''
+      ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
+      : null
   const createSessionFields = getCreateSessionFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
   const splitChrome = PANE_BORDER * 2
@@ -310,7 +360,9 @@ export function RootView({
           snippetEditorFields,
           snippets,
           themeId,
+          worktreeDivergence,
         })}
+        <ToastViewport />
       </box>
     )
   }
@@ -322,7 +374,7 @@ export function RootView({
       height="100%"
       backgroundColor={editorBg}
       onMouseDrag={(event) => {
-        if (onSeparatorDrag?.(event)) {
+        if (onSeparatorDrag?.(event) === true) {
           event.preventDefault()
           event.stopPropagation()
         }
@@ -424,7 +476,9 @@ export function RootView({
         snippetEditorFields,
         snippets,
         themeId,
+        worktreeDivergence,
       })}
+      <ToastViewport />
     </box>
   )
 }

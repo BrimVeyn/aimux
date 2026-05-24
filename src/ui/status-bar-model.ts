@@ -3,6 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState, TabSession } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
+import { getSessionProjectPath } from '../state/session-worktrees'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
@@ -58,13 +59,16 @@ export function getStatusBarModel(
   activeTab: TabSession | undefined,
   config: ResolvedKeymapConfig
 ): StatusBarModel {
-  const currentSession = state.currentSessionId
-    ? state.sessions.find((session) => session.id === state.currentSessionId)
-    : undefined
+  const currentSession =
+    state.currentSessionId != null && state.currentSessionId !== ''
+      ? state.sessions.find((session) => session.id === state.currentSessionId)
+      : undefined
   const sessionName = currentSession?.name ?? 'no workspace'
-  const sessionLabel = currentSession?.projectPath
-    ? `${sessionName} (${abbreviatePath(currentSession.projectPath)})`
-    : sessionName
+  const sessionPath = getSessionProjectPath(currentSession)
+  const sessionLabel =
+    sessionPath != null && sessionPath !== ''
+      ? `${sessionName} (${abbreviatePath(sessionPath)})`
+      : sessionName
 
   // \u{f0b1} = nf-fa-briefcase (session icon)
   const sessionIcon = '\u{f0b1}'
@@ -87,9 +91,10 @@ export function getStatusBarModel(
     case 'git': {
       const headOffset = state.gitMode.headOffset
       const offsetTag = headOffset > 0 ? `  HEAD~${headOffset}` : ''
+      const reviewTag = state.gitMode.reviewBase ? '  vs base' : ''
       return {
         help: helpHintForMode(config, 'git-mode'),
-        left: `${sessionIcon}  ${sessionLabel}${offsetTag}`,
+        left: `${sessionIcon}  ${sessionLabel}${offsetTag}${reviewTag}`,
         right: hintForGitMode(config, headOffset),
       }
     }
@@ -127,6 +132,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.theme-picker.filtering'
     case 'update-available':
       return 'modal.update-available'
+    case 'worktree-move':
+      return 'modal.worktree-move'
     default:
       return null
   }

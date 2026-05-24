@@ -7,7 +7,7 @@ import type { ScrollIntent, TerminalModeState, TerminalSnapshot } from '../state
 import { logDebug } from '../debug/input-log'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
 
-type PtyManagerEvents = {
+interface PtyManagerEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]

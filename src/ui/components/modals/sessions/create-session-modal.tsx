@@ -62,7 +62,11 @@ export function CreateSessionModal({
         label="Search projects"
         placeholder="Type a project name..."
         value={directoryQuery}
-        displayValue={pendingProjectPath ? abbreviatePath(pendingProjectPath) : directoryQuery}
+        displayValue={
+          pendingProjectPath != null && pendingProjectPath !== ''
+            ? abbreviatePath(pendingProjectPath)
+            : directoryQuery
+        }
         items={items}
         selectedIndex={selectedIndex}
         maxVisibleRows={VISIBLE_ROWS}

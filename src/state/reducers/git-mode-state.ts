@@ -50,6 +50,7 @@ export function emptyGitMode(): GitModeState {
     loading: {},
     parsedFiles: {},
     pendingDeletePath: null,
+    reviewBase: false,
     selectedEntryKey: null,
   }
 }
@@ -90,6 +91,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           highlights: {},
           loading: {},
           parsedFiles: {},
+          reviewBase: false,
         },
       }
     }
@@ -102,7 +104,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         action.delta,
         state.gitPane.treeCompaction
       )
-      if (!next || next === state.gitMode.selectedEntryKey) return state
+      if (next == null || next === '' || next === state.gitMode.selectedEntryKey) return state
       return {
         ...state,
         gitMode: {
@@ -121,7 +123,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         action.delta,
         state.gitPane.treeCompaction
       )
-      if (!next || next === state.gitMode.selectedEntryKey) return state
+      if (next == null || next === '' || next === state.gitMode.selectedEntryKey) return state
       return {
         ...state,
         gitMode: {
@@ -140,7 +142,13 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         [action.key],
         state.gitPane.treeCompaction
       )
-      if (!next || next !== action.key || next === state.gitMode.selectedEntryKey) return state
+      if (
+        next == null ||
+        next === '' ||
+        next !== action.key ||
+        next === state.gitMode.selectedEntryKey
+      )
+        return state
       return {
         ...state,
         gitMode: {
@@ -199,7 +207,12 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           },
         }
       }
-      if (!row.parentKey || row.parentKey === state.gitMode.selectedEntryKey) return state
+      if (
+        row.parentKey == null ||
+        row.parentKey === '' ||
+        row.parentKey === state.gitMode.selectedEntryKey
+      )
+        return state
       return {
         ...state,
         gitMode: {
@@ -318,7 +331,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       const k = `${action.key}|${action.themeId}`
       const existing = state.gitMode.highlights[k]
       const sameContent = existing && existing.hash === action.hash
-      if (sameContent) {
+      if (sameContent === true) {
         const existingAdd = existing.add as unknown[]
         const existingDel = existing.del as unknown[]
         let changesAnything = false
@@ -344,8 +357,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         }
         if (!changesAnything) return state
       }
-      const nextAdd = sameContent ? ([...(existing.add as unknown[])] as unknown[]) : []
-      const nextDel = sameContent ? ([...(existing.del as unknown[])] as unknown[]) : []
+      const nextAdd = sameContent === true ? ([...(existing.add as unknown[])] as unknown[]) : []
+      const nextDel = sameContent === true ? ([...(existing.del as unknown[])] as unknown[]) : []
       for (const patch of action.add) {
         const tokens = patch.tokens as unknown[]
         for (let i = 0; i < tokens.length; i++) nextAdd[patch.start + i] = tokens[i]
@@ -397,6 +410,26 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-diff-view': {
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
+    }
+    case 'git-mode-toggle-review-base': {
+      // Base review and history walking are mutually exclusive views; entering
+      // either resets headOffset and drops cached diffs (computed vs old ref).
+      const next = !state.gitMode.reviewBase
+      return {
+        ...state,
+        gitMode: {
+          ...state.gitMode,
+          actionMessage: null,
+          diffs: {},
+          folds: {},
+          headOffset: 0,
+          highlights: {},
+          loading: {},
+          parsedFiles: {},
+          pendingDeletePath: null,
+          reviewBase: next,
+        },
+      }
     }
     case 'git-mode-shift-head-offset': {
       const next = Math.max(0, state.gitMode.headOffset + action.delta)
@@ -485,13 +518,10 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         const duplicateIdx = files.findIndex(
           (f, i) => i !== idx && f.path === action.path && f.section === toSection
         )
-        if (duplicateIdx >= 0) {
-          nextFiles = files.filter((_, i) => i !== idx)
-        } else {
-          nextFiles = files.map((f, i) =>
-            i === idx ? ({ ...f, section: toSection } as GitFileEntry) : f
-          )
-        }
+        nextFiles =
+          duplicateIdx >= 0
+            ? files.filter((_, i) => i !== idx)
+            : files.map((f, i) => (i === idx ? ({ ...f, section: toSection } as GitFileEntry) : f))
       }
       nextFiles = sortFilesBySection(nextFiles)
       const movedCurrentKey = gitFileKey({ path: action.path, section: action.fromSection })

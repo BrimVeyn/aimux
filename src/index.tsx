@@ -77,7 +77,7 @@ logDebug('index.userConfigLoaded', {
 // plain code so we can re-tokenize on the snapshot. Set on process.env
 // before backend bootstrap so the spawned daemon (and its child PTYs)
 // inherit it.
-if (resolvedConfig.theme?.beta?.experimentalSyntaxHighlight) {
+if (resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true) {
   process.env.CLAUDE_CODE_SYNTAX_HIGHLIGHT = 'false'
 }
 

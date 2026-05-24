@@ -8,8 +8,9 @@ function snapshot(lines: string[], tailLines: string[] = lines): TerminalSnapsho
   const terminalLines: TerminalLine[] = lines.map((text) => ({
     spans: [{ text }],
   }))
+  const scrolledUp = tailLines !== lines
   return {
-    baseY: 0,
+    baseY: scrolledUp ? 10 : 0,
     cursorVisible: true,
     lines: terminalLines,
     tailLines: tailLines.map((text) => ({ spans: [{ text }] })),
@@ -57,6 +58,34 @@ describe('AssistantStatusDetector', () => {
       viewport: snapshot(['❯ type your prompt']),
     })
     expect(s).toBe('idle')
+  })
+
+  test('claude: idle welcome screen is not mistaken for a spinner', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot([
+        'Claude Code v2.1.150',
+        'Opus 4.7 (1M context) with xhigh effort · Claude Max',
+        '/private/tmp/aimux-wt/r-73931791/wt-test-bd759',
+        '',
+        '> Try "edit app.tsx to..."',
+        '',
+        '  ▶▶ bypass permissions on (shift+tab to cycle) · ← for agents',
+      ]),
+    })
+    expect(s).toBe('idle')
+  })
+
+  test('claude: spinner line without an interrupt hint is working', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot(['✱ Thinking…']),
+    })
+    expect(s).toBe('working')
   })
 
   test('codex: detects working and waiting-input', () => {
@@ -160,6 +189,29 @@ describe('AssistantStatusDetector', () => {
       viewport: snapshot(['line A', 'line B']),
     })
     expect(idle).toBe('idle')
+  })
+
+  test('works when terminal output does not fill the viewport height', () => {
+    const d = new AssistantStatusDetector()
+    const emptyLine = { spans: [{ text: '' }] }
+    const viewport: TerminalSnapshot = {
+      baseY: 0,
+      cursorVisible: true,
+      lines: [
+        { spans: [{ text: '✱ Thinking…' }] },
+        { spans: [{ text: '  esc/ctrl+c to interrupt' }] },
+        ...Array.from({ length: 38 }, () => emptyLine),
+      ],
+      tailLines: Array.from({ length: 10 }, () => emptyLine),
+      viewportY: 0,
+    }
+
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport,
+    })
+    expect(s).toBe('working')
   })
 })
 

@@ -8,7 +8,7 @@ export function getRuntimeProfile(): string {
 }
 
 function getRuntimeBaseDir(): string {
-  if (process.env.XDG_RUNTIME_DIR) {
+  if (process.env.XDG_RUNTIME_DIR != null && process.env.XDG_RUNTIME_DIR !== '') {
     return join(process.env.XDG_RUNTIME_DIR, `aimux-${getRuntimeProfile()}`)
   }
 

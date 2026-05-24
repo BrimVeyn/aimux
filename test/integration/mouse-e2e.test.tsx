@@ -47,7 +47,7 @@ const INITIAL_TERMINAL_MODES: TerminalModeState = {
   sendFocusMode: false,
 }
 
-const cleanups: Array<() => void> = []
+const cleanups: (() => void)[] = []
 
 afterEach(() => {
   while (cleanups.length > 0) {
@@ -263,7 +263,7 @@ function MouseHarness({
       localScrollbackEnabled={localScrollbackEnabled}
       onTerminalMouseEvent={(event, origin) => {
         const sequence = encodeMouseEventForPty(event, origin)
-        if (sequence) {
+        if (sequence != null && sequence !== '') {
           ptyManager.write(TEST_TAB_ID, sequence)
         }
       }}
@@ -336,8 +336,8 @@ const RESIZE_RENDERER = {
 
 function ResizeHarness({
   embeddedRatio = 0.5,
-  gitPaneMode = 'embedded',
-  gitPanePosition = 'bottom',
+  gitPaneMode,
+  gitPanePosition,
 }: {
   gitPaneMode: 'embedded' | 'pane'
   gitPanePosition: 'top' | 'bottom' | 'left' | 'right'

@@ -24,10 +24,8 @@ async function tryConverter(
       stdout: 'pipe',
     })
     const writer = proc.stdin
-    if (writer) {
-      writer.write(bytes)
-      await writer.end()
-    }
+    void writer.write(bytes)
+    await writer.end()
     const timer = setTimeout(() => proc.kill(), timeoutMs)
     const [out, code] = await Promise.all([new Response(proc.stdout).bytes(), proc.exited])
     clearTimeout(timer)
@@ -85,11 +83,11 @@ export async function convertToPng(bytes: Uint8Array, mime: string): Promise<Con
     const png = await renderSvgToPng(bytes)
     result = png ? { kind: 'ok', png } : { kind: 'error', reason: 'failed to render SVG' }
   } else {
-    const attempts: Array<() => Promise<Uint8Array | null>> = [
-      () => tryConverter(['magick', '-', 'png:-'], bytes, 1500),
-      () => tryConverter(['convert', '-', 'png:-'], bytes, 1500),
-      () => trySips(bytes),
-      () =>
+    const attempts: (() => Promise<Uint8Array | null>)[] = [
+      async () => tryConverter(['magick', '-', 'png:-'], bytes, 1500),
+      async () => tryConverter(['convert', '-', 'png:-'], bytes, 1500),
+      async () => trySips(bytes),
+      async () =>
         tryConverter(
           [
             'ffmpeg',

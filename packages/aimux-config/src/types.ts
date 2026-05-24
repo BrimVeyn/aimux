@@ -27,6 +27,7 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
+  | 'modal.worktree-move'
   | 'modal.ai-usage'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
@@ -82,8 +83,11 @@ export interface TerminalModeState {
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-export type LayoutLeaf = { type: 'leaf'; tabId: string }
-export type LayoutSplit = {
+export interface LayoutLeaf {
+  type: 'leaf'
+  tabId: string
+}
+export interface LayoutSplit {
   type: 'split'
   direction: SplitDirection
   ratio: number
@@ -105,6 +109,7 @@ export interface PersistedTabSnapshot {
   terminalModes: TerminalModeState
   errorMessage?: string
   exitCode?: number
+  worktreeId?: string
 }
 
 export interface WorkspaceSnapshotV1 {
@@ -121,6 +126,23 @@ export interface WorkspaceSnapshotV1 {
   tabGroupMap?: Record<string, string>
 }
 
+export type WorktreeSource = 'primary' | 'aimux-temp' | 'external'
+
+export interface WorktreeRecord {
+  id: string
+  name: string
+  path: string
+  repoRoot: string
+  branch?: string
+  baseRef?: string
+  commitSha?: string
+  source: WorktreeSource
+  createdByAimux: boolean
+  color?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface SessionRecord {
   id: string
   name: string
@@ -130,6 +152,8 @@ export interface SessionRecord {
   lastOpenedAt: string
   order?: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+  worktrees?: WorktreeRecord[]
+  activeWorktreeId?: string
 }
 
 export interface TabSession {
@@ -144,6 +168,7 @@ export interface TabSession {
   command: string
   errorMessage?: string
   exitCode?: number
+  worktreeId?: string
 }
 
 export interface SnippetRecord {
@@ -194,6 +219,7 @@ export interface GitFileEntry {
   status: GitFileStatus
   added: number | null
   removed: number | null
+  repoPath?: string
 }
 
 export type GitPanelError = 'not-a-repo' | 'unknown'
@@ -244,6 +270,7 @@ export interface GitModeState {
   diffView: GitDiffView
   folds: Record<string, Record<string, FoldState>>
   headOffset: number
+  reviewBase: boolean
 }
 
 interface ModalBase {
@@ -262,6 +289,16 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
+  branchError: string | null
+  branchName: string
+  createWorktree: boolean
+  selectedAssistantId: AssistantId | null
+  step: 'assistant' | 'worktree' | 'worktree-create'
+  targetWorktreeIndex: number
+  worktreeDeleteConfirmId: string | null
+  worktreeDeleteMessage: string | null
+  worktreeName: string
 }
 export interface ModalSessionPicker extends ModalBase {
   type: 'session-picker'
@@ -322,6 +359,13 @@ export interface ModalAIUsage extends ModalBase {
   type: 'ai-usage'
 }
 
+export interface ModalWorktreeMove extends ModalBase {
+  type: 'worktree-move'
+  /** The worktree being moved (may differ from the active one, e.g. a tab menu). */
+  sourceWorktreeId: string
+  deleteSource: boolean
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -337,6 +381,7 @@ export type ModalState =
   | ModalGitCommit
   | ModalUpdateAvailable
   | ModalAIUsage
+  | ModalWorktreeMove
 
 export interface LayoutState {
   terminalCols: number
@@ -403,6 +448,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  worktreeDivergence: Record<string, BranchDivergence>
   pendingChords: string[] | null
 }
 
@@ -410,6 +456,15 @@ export interface AppState {
 
 export type ModalAction =
   | { type: 'open-new-tab-modal' }
+  | { type: 'set-new-tab-branch-error'; message: string | null }
+  | {
+      type: 'set-new-tab-worktree-delete-state'
+      confirmWorktreeId?: string | null
+      message: string | null
+    }
+  | { type: 'enter-new-tab-worktree-create' }
+  | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
+  | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-session-picker' }
@@ -434,8 +489,11 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker' }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
+  | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
+  | { type: 'toggle-worktree-move-delete' }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
@@ -445,6 +503,15 @@ export type SessionAction =
   | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
   | { type: 'reorder-sessions'; orderedIds: string[] }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
+  | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
+  | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
+  | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
+  | {
+      type: 'update-worktree-record'
+      sessionId: string
+      worktreeId: string
+      patch: Partial<WorktreeRecord>
+    }
 
 export type TabAction =
   | { type: 'add-tab'; tab: TabSession }
@@ -520,10 +587,17 @@ export interface GitRefreshPayload {
   files: GitFileEntry[]
 }
 
+/** Commits a worktree branch is ahead/behind the ref it forked from. */
+export interface BranchDivergence {
+  ahead: number
+  behind: number
+}
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
+  | { type: 'set-worktree-divergence'; divergence: Record<string, BranchDivergence> }
 
 export type GitModeAction =
   | { type: 'enter-git-mode' }
@@ -544,6 +618,7 @@ export type GitModeAction =
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-toggle-review-base' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }
   | {
@@ -643,6 +718,14 @@ export type SideEffect =
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
+  | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | {
+      type: 'move-worktree'
+      sessionId: string
+      sourceWorktreeId: string
+      targetWorktreeId: string
+      deleteSource?: boolean
+    }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
@@ -788,7 +871,9 @@ export type GitPanePathConfig =
   | { enabled: false }
   | { enabled: true; pathFn?: (path: string) => string }
 
-export type GitPaneDiffCountConfig = { enabled: boolean }
+export interface GitPaneDiffCountConfig {
+  enabled: boolean
+}
 
 interface GitPaneBaseConfig {
   /** Startup override for git pane visibility. Reapplied on each launch. */

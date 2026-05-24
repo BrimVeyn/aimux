@@ -40,12 +40,12 @@ export function loadCachedSnapshot(tool: AIUsageTool, maxAgeMs: number): CachedS
   if (typeof entry.fetchedAt !== 'number') return null
   const ageMs = Date.now() - entry.fetchedAt
   if (ageMs > maxAgeMs) return null
-  if (!entry.snapshot || entry.snapshot.tool !== tool) return null
+  if (entry.snapshot.tool !== tool) return null
   return { ageMs, snapshot: entry.snapshot }
 }
 
 export function saveCachedSnapshot(snapshot: UsageSnapshot): void {
-  if (snapshot.error) return
+  if (snapshot.error != null && snapshot.error !== '') return
   if (snapshot.percent === null) return
   try {
     mkdirSync(CACHE_DIR, { recursive: true })

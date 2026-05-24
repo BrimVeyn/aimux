@@ -52,7 +52,7 @@ export function useAutoCommitDriver({
   depsRef.current = deps
 
   useEffect(() => {
-    const handler: (args: Parameters<typeof onManualTrigger>[1]) => Promise<void> = (args) =>
+    const handler: (args: Parameters<typeof onManualTrigger>[1]) => Promise<void> = async (args) =>
       onManualTrigger(depsRef.current, args)
     setActiveAutoCommitDriver(handler)
     return () => clearActiveAutoCommitDriverIfMatches(handler)
@@ -74,7 +74,7 @@ export function useAutoCommitDriver({
         (before === 'working' || before === 'waiting-input') && tab.activity === 'idle'
       if (becameIdle) {
         const sessionId = state.currentSessionId
-        if (!sessionId) continue
+        if (!(sessionId != null && sessionId !== '')) continue
         const session = state.sessions.find((s) => s.id === sessionId)
         const git = gitPayloadFromState(state)
         void onActivityTransition(depsRef.current, {
@@ -95,7 +95,7 @@ export function useAutoCommitDriver({
   useEffect(() => {
     if (!configRef.current.enabled) return
     const sessionId = state.currentSessionId
-    if (!sessionId) return
+    if (!(sessionId != null && sessionId !== '')) return
     const payload = gitPayloadFromState(state)
     if (!payload) return
     const cacheKey = JSON.stringify(payload)
@@ -109,7 +109,10 @@ export function useAutoCommitDriver({
     // fast mode) and where the user edits via an external editor.
     if (gitStabilizeTimerRef.current) clearTimeout(gitStabilizeTimerRef.current)
     const activeTabId = state.activeTabId
-    const activeTab = activeTabId ? state.tabs.find((tab) => tab.id === activeTabId) : undefined
+    const activeTab =
+      activeTabId != null && activeTabId !== ''
+        ? state.tabs.find((tab) => tab.id === activeTabId)
+        : undefined
     if (!activeTab) return
     const session = state.sessions.find((s) => s.id === sessionId)
     gitStabilizeTimerRef.current = setTimeout(() => {

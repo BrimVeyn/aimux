@@ -11,7 +11,7 @@ let cached: GraphicsProtocol | null = null
 export function detectGraphicsProtocol(renderer: CliRenderer): GraphicsProtocol {
   if (cached !== null) return cached
   const caps = (renderer as RendererWithCapabilities).capabilities
-  if (caps?.kitty_graphics) {
+  if (caps?.kitty_graphics === true) {
     cached = 'kitty'
     return cached
   }

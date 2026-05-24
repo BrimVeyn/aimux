@@ -12,7 +12,7 @@ export function InputField({ active, cursorPos, placeholder, value }: InputField
   const t = useTheme()
   const fg = active ? t.text : t.textMuted
   if (!active) {
-    const showPlaceholder = !value && !!placeholder
+    const showPlaceholder = !value && !!(placeholder != null && placeholder !== '')
     return (
       <Surface tone="input" padding={1}>
         <text fg={showPlaceholder ? t.textMuted : fg}>{showPlaceholder ? placeholder : value}</text>

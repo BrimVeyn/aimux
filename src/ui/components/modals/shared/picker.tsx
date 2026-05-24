@@ -18,6 +18,7 @@ export interface PickerItem {
   onClick?: () => void
   onEdit?: () => void
   onDelete?: () => void
+  onWorktree?: () => void
 }
 
 interface PickerProps {
@@ -38,7 +39,15 @@ interface PickerProps {
 const VIEWPORT_HEIGHT_RATIO = 0.6
 const MODAL_CHROME_ROWS = 6
 
-function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: () => void }) {
+function PickerItemCtas({
+  onDelete,
+  onEdit,
+  onWorktree,
+}: {
+  onEdit?: () => void
+  onDelete?: () => void
+  onWorktree?: () => void
+}) {
   const t = useTheme()
   return (
     <box flexDirection="row" gap={1}>
@@ -50,6 +59,16 @@ function PickerItemCtas({ onDelete, onEdit }: { onEdit?: () => void; onDelete?: 
           }}
         >
           <text fg={t.primary}>[edit]</text>
+        </box>
+      ) : null}
+      {onWorktree ? (
+        <box
+          onMouseDown={(event) => {
+            event.stopPropagation()
+            onWorktree()
+          }}
+        >
+          <text fg={t.warning}>[WT]</text>
         </box>
       ) : null}
       {onDelete ? (
@@ -105,7 +124,7 @@ export function Picker({
       return
     }
     const target = items[selectedIndex]?.key
-    if (!target) return
+    if (!(target != null && target !== '')) return
     isScrollingRef.current = true
     scrollboxRef.current.scrollChildIntoView(target)
     resetScrollTimer()
@@ -137,7 +156,7 @@ export function Picker({
           for (let index = 0; index < items.length; index++) {
             const item = items[index]
             if (!item) continue
-            if (item.group && item.group !== prevGroup) {
+            if (item.group != null && item.group !== '' && item.group !== prevGroup) {
               nodes.push(
                 <box key={`group::${item.group}`} paddingLeft={1} paddingTop={index === 0 ? 0 : 1}>
                   <text fg={t.textMuted} wrapMode="none">
@@ -151,8 +170,12 @@ export function Picker({
             const capturedIndex = index
             const trailing =
               item.trailing ??
-              (active && (item.onEdit || item.onDelete) ? (
-                <PickerItemCtas onEdit={item.onEdit} onDelete={item.onDelete} />
+              (active && (item.onEdit || item.onDelete || item.onWorktree) ? (
+                <PickerItemCtas
+                  onEdit={item.onEdit}
+                  onDelete={item.onDelete}
+                  onWorktree={item.onWorktree}
+                />
               ) : null)
             nodes.push(
               <ListItem

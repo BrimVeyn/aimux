@@ -14,7 +14,7 @@ const MAX_TIMEOUT_MS = 30_000
  */
 function buildShellArgv(cmd: string): string[] {
   const userShell = process.env.SHELL
-  if (userShell && userShell.length > 0) {
+  if (userShell != null && userShell !== '' && userShell.length > 0) {
     return [userShell, '-l', '-c', cmd]
   }
   return ['/bin/sh', '-c', cmd]

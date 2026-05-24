@@ -1,4 +1,11 @@
-import type { AppAction, AppState, GitFileEntry, GitFileSection, GitPanelState } from '../types'
+import type {
+  AppAction,
+  AppState,
+  BranchDivergence,
+  GitFileEntry,
+  GitFileSection,
+  GitPanelState,
+} from '../types'
 
 import { clampGitPaneRatio } from '../git-pane-sizing'
 import { reconcileSelectedGitEntryKey } from '../git-tree'
@@ -25,6 +32,20 @@ export function sortFilesBySection(files: GitFileEntry[]): GitFileEntry[] {
 
 function clampRatio(value: number): number {
   return clampGitPaneRatio(value)
+}
+
+function sameDivergence(
+  a: Record<string, BranchDivergence>,
+  b: Record<string, BranchDivergence>
+): boolean {
+  const aKeys = Object.keys(a)
+  if (aKeys.length !== Object.keys(b).length) return false
+  for (const key of aKeys) {
+    const x = a[key]
+    const y = b[key]
+    if (x == null || y == null || x.ahead !== y.ahead || x.behind !== y.behind) return false
+  }
+  return true
 }
 
 export function emptyGitPanel(): GitPanelState {
@@ -188,6 +209,10 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
         gitPanel: { ...prev, error: action.kind, files: [] },
       }
     }
+    case 'set-worktree-divergence': {
+      if (sameDivergence(state.worktreeDivergence, action.divergence)) return state
+      return { ...state, worktreeDivergence: action.divergence }
+    }
     case 'git-panel-reset': {
       const prev = state.gitPanel
       if (
@@ -201,7 +226,18 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       }
       return {
         ...state,
-        gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey: null },
+        // A reset means the underlying worktree/ref changed, so cached diffs are
+        // stale — drop them (keyed by section:path, they'd otherwise serve a
+        // previous worktree's diff for a same-named file after a move/switch).
+        gitMode: {
+          ...state.gitMode,
+          diffs: {},
+          highlights: {},
+          loading: {},
+          parsedFiles: {},
+          pendingDeletePath: null,
+          selectedEntryKey: null,
+        },
         gitPanel: emptyGitPanel(),
       }
     }

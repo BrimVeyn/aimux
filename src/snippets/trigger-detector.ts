@@ -50,7 +50,7 @@ export function createTriggerDetector(opts: TriggerDetectorOptions): TriggerDete
   function tryMatch(separator: string): TriggerMatch | null {
     const triggerChar = opts.getTriggerChar()
     for (const snippet of opts.getSnippets()) {
-      if (snippet.trigger && snippet.trigger === buffer) {
+      if (snippet.trigger != null && snippet.trigger !== '' && snippet.trigger === buffer) {
         const triggerText = `${triggerChar}${buffer}${separator}`
         reset()
         return { snippet, triggerText }

@@ -10,6 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
+import type { TerminalContentOrigin } from './input/raw-input-handler'
 import type { SessionBackend } from './session-backend/types'
 
 import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
@@ -25,7 +26,6 @@ import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
-import { type TerminalContentOrigin } from './input/raw-input-handler'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
@@ -34,6 +34,7 @@ import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
+import { getSessionProjectPath } from './state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { KeymapContext } from './ui/keymap-context'
@@ -81,7 +82,10 @@ export function App({
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
     const config = loadConfig()
-    const persisted = config.themeId && isKnownThemeId(config.themeId) ? config.themeId : undefined
+    const persisted =
+      config.themeId != null && config.themeId !== '' && isKnownThemeId(config.themeId)
+        ? config.themeId
+        : undefined
     const initial: ThemeId = persisted ?? resolvedConfig.theme?.initialId ?? 'aimux'
     applyTheme(initial)
     if (resolvedConfig.theme?.initialMode) setMode(resolvedConfig.theme.initialMode)
@@ -180,7 +184,7 @@ export function App({
   }, [dispatch])
 
   useEffect(() => {
-    if (!resolvedConfig.theme?.beta?.harmonizeClaudeTheme) return
+    if (!(resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true)) return
     ensureClaudeSettingsThemePref()
     syncClaudeTheme(getCurrentTheme(), getCurrentMode())
     return subscribeThemeChanges((resolved, mode) => {
@@ -190,7 +194,7 @@ export function App({
 
   useEffect(() => {
     const aiUsage = resolvedConfig.statusBar?.aiUsage
-    if (!aiUsage?.enabled) {
+    if (!(aiUsage?.enabled === true)) {
       aiUsageStore.getState().setEnabled(false)
       return
     }
@@ -215,7 +219,7 @@ export function App({
         getCurrentPackageVersion(),
         fetchLatestNpmVersion('@brimveyn/aimux'),
       ])
-      if (cancelled || !latest) return
+      if (cancelled || !(latest != null && latest !== '')) return
       if (!isNewerVersion(latest, current)) return
       if (loadConfig().skippedUpdateVersion === latest) return
       dispatch({
@@ -395,9 +399,10 @@ export function App({
     clearStartupGrace,
     dispatch,
     getCurrentSessionProjectPath: () => {
-      if (!state.currentSessionId) return undefined
-      return state.sessions.find((s) => s.id === state.currentSessionId)?.projectPath
+      if (!(state.currentSessionId != null && state.currentSessionId !== '')) return
+      return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
     },
+    getState: () => stateRef.current,
     renderer,
     setThemeId,
     startStartupGrace,

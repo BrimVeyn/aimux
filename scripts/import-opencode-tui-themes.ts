@@ -24,12 +24,12 @@ function main() {
 
   // Wipe non-house JSONs so removed upstream themes vanish locally too.
   for (const f of readdirSync(OUT_DIR)) {
-    if (f.endsWith('.json') && !HOUSE.has(f)) rmSync(join(OUT_DIR, f))
+    if (f.endsWith('.json') === true && !HOUSE.has(f)) rmSync(join(OUT_DIR, f))
   }
 
   let count = 0
   for (const f of readdirSync(SRC_DIR)) {
-    if (!f.endsWith('.json')) continue
+    if (f.endsWith('.json') !== true) continue
     if (HOUSE.has(f)) continue
     copyFileSync(join(SRC_DIR, f), join(OUT_DIR, f))
     count += 1

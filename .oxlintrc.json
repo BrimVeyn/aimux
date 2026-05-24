@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "react", "import"],
+  "plugins": ["typescript", "unicorn", "react", "import", "promise", "react-perf"],
   "categories": {
     "correctness": "error"
   },
@@ -16,20 +16,34 @@
     "perfectionist/sort-named-imports": "error",
     "perfectionist/sort-named-exports": "error",
     "default-case-last": "error",
-    "eqeqeq": "error",
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
     "no-console": "error",
     "no-duplicate-imports": "error",
     "no-else-return": "error",
     "no-nested-ternary": "error",
     "no-unused-vars": "error",
     "prefer-template": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "no-param-reassign": "error",
+    "no-throw-literal": "error",
+    "radix": "error",
     "typescript/no-empty-object-type": "off",
     "typescript/no-explicit-any": "error",
     "typescript/no-misused-promises": "error",
     "typescript/promise-function-async": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/strict-boolean-expressions": "error",
-    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      { "considerDefaultExhaustiveForUnions": true }
+    ],
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/array-type": "error",
     "import/no-cycle": "error",
     "unicorn/filename-case": [
       "error",
@@ -41,10 +55,33 @@
       }
     ],
     "react/rules-of-hooks": "error",
+    "react/no-unescaped-entities": "error",
+    "react/no-array-index-key": "warn",
     "unicorn/no-array-for-each": "error",
     "unicorn/no-array-reduce": "error",
     "unicorn/prefer-module": "error",
-    "react/no-unescaped-entities": "error"
+    "unicorn/no-useless-undefined": ["error", { "checkArguments": false }],
+    "unicorn/prefer-string-replace-all": "error",
+    "unicorn/prefer-at": "error",
+    "unicorn/catch-error-name": "error",
+    "unicorn/new-for-builtins": "error",
+    "unicorn/prefer-ternary": "error",
+    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-spread": "error",
+    "no-implicit-coercion": ["warn", { "allow": ["!!"] }],
+    "promise/prefer-await-to-then": "warn",
+    "typescript/consistent-type-definitions": "warn",
+    "react-perf/jsx-no-new-function-as-prop": "warn",
+    "react-perf/jsx-no-new-array-as-prop": "warn",
+    "react-perf/jsx-no-new-object-as-prop": "warn"
   },
+  "overrides": [
+    {
+      "files": ["**/*.tsx"],
+      "rules": {
+        "typescript/promise-function-async": "off"
+      }
+    }
+  ],
   "ignorePatterns": ["**/*.js", "**/dist/**", "**/build/**", "**/*.cjs", "**/*.mjs", "**/*.d.ts"]
 }

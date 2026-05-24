@@ -1,5 +1,6 @@
 import type { KeyEvent } from '@opentui/core'
 
+import type { SplitDirection } from '../../state/layout-tree'
 import type { AppAction, AppState, GitFileListMode, TabSession } from '../../state/types'
 
 export type ModeId =
@@ -21,6 +22,7 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
+  | 'modal.worktree-move'
   | 'modal.ai-usage'
 
 export type SideEffect =
@@ -46,7 +48,7 @@ export type SideEffect =
   | { type: 'rename-session'; sessionId: string; name: string }
   | {
       type: 'split-pane'
-      direction: import('../../state/layout-tree').SplitDirection
+      direction: SplitDirection
       sourceTabId?: string
     }
   | { type: 'confirm-split' }
@@ -67,6 +69,14 @@ export type SideEffect =
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
+  | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | {
+      type: 'move-worktree'
+      sessionId: string
+      sourceWorktreeId: string
+      targetWorktreeId: string
+      deleteSource?: boolean
+    }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }

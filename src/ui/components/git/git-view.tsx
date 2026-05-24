@@ -1,16 +1,18 @@
 import { useTerminalDimensions } from '@opentui/react'
-import { memo, useEffect, useRef } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 
 import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
+import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
 import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
+import { getActiveWorktree, getSessionProjectPath } from '../../../state/session-worktrees'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
@@ -64,7 +66,7 @@ const DiffStage = memo(function DiffStage({
       </box>
     )
   }
-  if (diff.errorMessage) {
+  if (diff.errorMessage != null && diff.errorMessage !== '') {
     return (
       <box flexGrow={1} padding={1}>
         <text fg={t.error}>{diff.errorMessage}</text>
@@ -77,7 +79,7 @@ const DiffStage = memo(function DiffStage({
   }
 
   const placeholder = placeholderText(diff)
-  if (placeholder) {
+  if (placeholder != null && placeholder !== '') {
     return (
       <box flexGrow={1} padding={1}>
         <text fg={t.textMuted}>{placeholder}</text>
@@ -87,7 +89,7 @@ const DiffStage = memo(function DiffStage({
 
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
-      {diff.oldPath ? (
+      {diff.oldPath != null && diff.oldPath !== '' ? (
         <box paddingLeft={1} paddingRight={1}>
           <text fg={t.textMuted}>
             renamed: {diff.oldPath} → {diff.path}
@@ -123,13 +125,41 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const focusMode = useAppStore((s) => s.focusMode)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
-  const projectPath = currentSession?.projectPath
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
+  const projectPath = getSessionProjectPath(currentSession)
+
+  // Review-vs-base: when toggled on for a worktree that records a baseRef,
+  // resolve the fork point and diff the working tree against it.
+  const activeWorktree = getActiveWorktree(currentSession)
+  const reviewBaseRef =
+    gitMode.reviewBase && activeWorktree?.baseRef != null && activeWorktree.baseRef !== ''
+      ? activeWorktree.baseRef
+      : null
+  const [compareRef, setCompareRef] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    if (reviewBaseRef == null || projectPath == null || projectPath === '') {
+      setCompareRef(undefined)
+      return
+    }
+    let cancelled = false
+    void getMergeBase(projectPath, reviewBaseRef).then((mergeBase) => {
+      if (!cancelled) setCompareRef(mergeBase)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [reviewBaseRef, projectPath])
 
   useRepoDiscovery(projectPath)
-  useGitPanelPolling({ enabled: focusMode === 'git', headOffset: gitMode.headOffset, projectPath })
+  useGitPanelPolling({
+    compareRef,
+    enabled: focusMode === 'git',
+    headOffset: gitMode.headOffset,
+    projectPath,
+  })
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
 
@@ -140,8 +170,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     selectedEntryKey: gitMode.selectedEntryKey,
   })
   const selectedDiffKey = selectedFile ? gitFileKey(selectedFile) : null
-  const diff = selectedDiffKey ? gitMode.diffs[selectedDiffKey] : undefined
-  const loading = selectedDiffKey ? !!gitMode.loading[selectedDiffKey] : false
+  const diff =
+    selectedDiffKey != null && selectedDiffKey !== '' ? gitMode.diffs[selectedDiffKey] : undefined
+  const loading =
+    selectedDiffKey != null && selectedDiffKey !== ''
+      ? !!(gitMode.loading[selectedDiffKey] === true)
+      : false
 
   useEffect(() => {
     setGitDiffScroller((delta: number) => {
@@ -160,6 +194,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }, [])
 
   useDiffPrefetch(gitMode.selectedEntryKey, gitPane.prefetchRadius, {
+    compareRef,
     enabled: focusMode === 'git',
     headOffset: gitMode.headOffset,
     projectPath,
@@ -168,11 +203,16 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
 
   useEffect(() => {
     if (focusMode !== 'git') return
-    if (!selectedFile || !projectPath) return
-    if (!selectedDiffKey) return
+    if (!selectedFile || !(projectPath != null && projectPath !== '')) return
+    if (!(selectedDiffKey != null && selectedDiffKey !== '')) return
     if (diff || loading) return
     dispatchGlobal({ key: selectedDiffKey, loading: true, type: 'git-mode-set-loading' })
-    void fetchDiff(selectedFile.repoPath ?? projectPath, selectedFile, gitMode.headOffset)
+    void fetchDiff(
+      selectedFile.repoPath ?? projectPath,
+      selectedFile,
+      gitMode.headOffset,
+      compareRef
+    )
       .then((d) =>
         dispatchGlobal({
           diff: d,
@@ -184,7 +224,16 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
       .catch(() =>
         dispatchGlobal({ key: selectedDiffKey, loading: false, type: 'git-mode-set-loading' })
       )
-  }, [focusMode, projectPath, selectedFile, selectedDiffKey, diff, loading, gitMode.headOffset])
+  }, [
+    focusMode,
+    projectPath,
+    selectedFile,
+    selectedDiffKey,
+    diff,
+    loading,
+    gitMode.headOffset,
+    compareRef,
+  ])
 
   const pendingPath = gitMode.pendingDeletePath
   const pendingIsUntracked =
@@ -199,19 +248,21 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   }
   const actionMessage = gitMode.actionMessage
   let footerNode: React.ReactNode = null
-  if (pendingHint) {
+  if (pendingHint != null && pendingHint !== '') {
     footerNode = (
       <text fg={t.warning}>
         <strong>{pendingHint}</strong>
       </text>
     )
-  } else if (actionMessage) {
+  } else if (actionMessage != null && actionMessage !== '') {
     footerNode = actionMessage.split('\n').map((line, idx) => (
       <text key={idx} fg={t.primary}>
         {line}
       </text>
     ))
   }
+
+  const baseLabel = compareRef != null && reviewBaseRef != null ? `vs ${reviewBaseRef}` : undefined
 
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
@@ -228,7 +279,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             <text fg={t.text}>
               <strong>aimux · git</strong>
             </text>
-            {gitPanel.branch ? (
+            {gitPanel.branch != null && gitPanel.branch !== '' ? (
               <box flexDirection="row">
                 <text fg={t.text}>{'\u{e702}'} </text>
                 <text fg={t.text}>{gitPanel.branch}</text>
@@ -242,9 +293,18 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
                 <text fg={t.textMuted}>[ newer · ] older</text>
               </box>
             ) : null}
+            {baseLabel != null ? (
+              <box flexDirection="row" gap={1}>
+                <text fg={t.primary}>
+                  <strong>{baseLabel}</strong>
+                </text>
+                <text fg={t.textMuted}>b: back</text>
+              </box>
+            ) : null}
             <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
           </box>
           <GitPanel
+            baseLabel={baseLabel}
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
             fileListMode={gitPane.fileListMode}
@@ -292,7 +352,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           />
         </box>
       </box>
-      {footerNode ? (
+      {footerNode != null ? (
         <box paddingLeft={1} paddingRight={1} backgroundColor={sidebarBg} flexDirection="column">
           {footerNode}
         </box>

@@ -47,7 +47,7 @@ export function SessionPickerModal({
   const ordered = orderSessionsForDisplay(sessions)
   const baselineOrder = ordered.map((s) => s.id)
   const filtered = filterSessions(ordered, filter)
-  const hasFilter = !!filter
+  const hasFilter = !!(filter != null && filter !== '')
 
   const sessionItems: PickerItem[] = filtered.map((session, index) => {
     const active = index === selectedIndex
@@ -56,9 +56,10 @@ export function SessionPickerModal({
       key: session.id,
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
       onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
-      subtitle: session.projectPath ? (
-        <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
-      ) : undefined,
+      subtitle:
+        session.projectPath != null && session.projectPath !== '' ? (
+          <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
+        ) : undefined,
       title: (
         <text fg={active ? t.text : t.textMuted}>
           {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}

@@ -42,13 +42,13 @@ export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null 
 
   const snippetId = state.modal.sessionTargetId
   // Config-pinned snippets are sticky and read-only in the UI.
-  if (snippetId && isConfigSnippetId(snippetId)) {
+  if (snippetId != null && snippetId !== '' && isConfigSnippetId(snippetId)) {
     return null
   }
 
   const trigger = editorValue.trigger.length > 0 ? editorValue.trigger : undefined
 
-  if (snippetId) {
+  if (snippetId != null && snippetId !== '') {
     return state.snippets.map((snippet) =>
       snippet.id === snippetId
         ? { ...snippet, content: editorValue.content, name: editorValue.name, trigger }
@@ -74,7 +74,7 @@ export function pasteSnippetToTab(
   snippet: SnippetRecord | undefined,
   dispatch?: (action: AppAction) => void
 ): void {
-  if (!snippet || !activeTabId || !activeTab) {
+  if (!snippet || activeTabId == null || activeTabId === '' || !activeTab) {
     return
   }
 

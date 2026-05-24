@@ -22,14 +22,14 @@ interface PrepareOptions {
   signal?: AbortSignal
 }
 
-function yieldToEventLoop(): Promise<void> {
+async function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => {
     setImmediate(resolve)
   })
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
-  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+  if (signal?.aborted === true) throw new DOMException('Aborted', 'AbortError')
 }
 
 // Lifts diff parsing off the synchronous render tree and returns a segmented

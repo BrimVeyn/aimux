@@ -53,7 +53,7 @@
     "demo:themes": "vhs assets/themes.tape",
     "restart-daemon": "AIMUX_PROFILE=dev bun run src/index.tsx restart-daemon",
     "restart-terminal-manager": "AIMUX_PROFILE=dev bun run src/index.tsx restart-terminal-manager",
-    "lint": "oxlint .",
+    "lint": "oxlint --type-aware .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip-bun",
@@ -79,6 +79,7 @@
     "lefthook": "^2.1.4",
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",
+    "oxlint-tsgolint": "^0.23.0",
     "typescript": "^6.0.2"
   }
 }

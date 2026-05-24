@@ -29,13 +29,16 @@ interface GitPanelProps {
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
   headOffset?: number
+  // When set, the single changed-files section is a worktree fork-point review
+  // ("vs <base>") rather than a HEAD~N history walk.
+  baseLabel?: string
   compact?: boolean
 }
 
-function sectionTitle(section: GitFileSection, headOffset: number): string {
+function sectionTitle(section: GitFileSection, headOffset: number, baseLabel?: string): string {
   switch (section) {
     case 'historical':
-      return `HEAD~${headOffset}`
+      return baseLabel != null && baseLabel !== '' ? baseLabel : `HEAD~${headOffset}`
     case 'staged':
       return 'Staged Changes'
     case 'unstaged':
@@ -105,8 +108,8 @@ function renderFileLabel(
   const displayPath = transform ? transform(file.path) : file.path
   const { basename, prefix } = splitPath(displayPath)
   const dir = stripTrailingSlash(prefix)
-  const showDir = fileListMode === 'flat' && pathConfig.enabled && dir
-  if (!file.renamedFrom) {
+  const showDir = fileListMode === 'flat' && pathConfig.enabled && dir !== ''
+  if (!(file.renamedFrom != null && file.renamedFrom !== '')) {
     return (
       <text selectable={false} wrapMode="none">
         <span fg={t.text}>{basename}</span>
@@ -211,7 +214,9 @@ function renderFileRow(
   // Repo disambiguation prefix: only in flat mode, only when the file came
   // from a sub-repo (root repo files get an empty prefix).
   const repoTag =
-    fileListMode === 'flat' && file.repoPath ? (repoPrefixes[file.repoPath] ?? '') : ''
+    fileListMode === 'flat' && file.repoPath != null && file.repoPath !== ''
+      ? (repoPrefixes[file.repoPath] ?? '')
+      : ''
   return (
     <box key={row.key} flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
       <box width={2} flexShrink={0} justifyContent="center">
@@ -238,7 +243,7 @@ function renderTreeSection(
   section: GitFileSection,
   title: string,
   files: GitFileEntry[],
-  rows: Array<GitTreeFolderRow | GitTreeFileRow>,
+  rows: (GitTreeFolderRow | GitTreeFileRow)[],
   addedW: number,
   removedW: number,
   fileListMode: GitFileListMode,
@@ -337,6 +342,7 @@ const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
 const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
 
 export const GitPanel = memo(function GitPanel({
+  baseLabel,
   collapsedFolders = {},
   compact = false,
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
@@ -350,7 +356,8 @@ export const GitPanel = memo(function GitPanel({
   const t = useTheme()
   useTransparent()
   const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
-  const sectionOrder = headOffset > 0 ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
+  const isSingleSection = headOffset > 0 || (baseLabel != null && baseLabel !== '')
+  const sectionOrder = isSingleSection ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
     () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode, compact),
@@ -361,7 +368,7 @@ export const GitPanel = memo(function GitPanel({
     [gitPanel.files]
   )
 
-  const statusNode = renderStatus(gitPanel, !!projectPath)
+  const statusNode = renderStatus(gitPanel, !!(projectPath != null && projectPath !== ''))
 
   const hasRemoteTracking = gitPanel.ahead > 0 || gitPanel.behind > 0
   const toggleSection =
@@ -372,7 +379,7 @@ export const GitPanel = memo(function GitPanel({
 
   useEffect(() => {
     const scrollbox = scrollRef.current
-    if (!scrollbox || !selectedEntryKey) return
+    if (!scrollbox || !(selectedEntryKey != null && selectedEntryKey !== '')) return
     const selectedIndex = tree.visibleRows.findIndex((row) => row.key === selectedEntryKey)
     if (selectedIndex < 0) return
     const viewportHeight = Math.max(1, scrollbox.viewport.height)
@@ -403,7 +410,7 @@ export const GitPanel = memo(function GitPanel({
               .some((k) => (tree.sections.find((e) => e.section === k)?.files.length ?? 0) > 0)
             return renderTreeSection(
               key,
-              sectionTitle(key, headOffset),
+              sectionTitle(key, headOffset, baseLabel),
               section?.files ?? [],
               section?.rows ?? [],
               addedW,

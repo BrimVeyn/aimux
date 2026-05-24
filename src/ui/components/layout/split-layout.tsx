@@ -161,7 +161,7 @@ export function SplitLayout({
           e.preventDefault()
           if (!onSeparatorDragStart) return
           const leafId = getFirstLeafId(node.first)
-          if (!leafId) return
+          if (!(leafId != null && leafId !== '')) return
           onSeparatorDragStart({
             direction: node.direction,
             screenStart:
