@@ -7,6 +7,7 @@ import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
 import { ensureSessionWorktrees } from './session-worktrees'
+import { toast } from './toast-store'
 import { isSessionRecord } from './validation'
 
 interface SessionCatalogFile {
@@ -90,11 +91,15 @@ export function saveSessionCatalog(sessions: SessionRecord[]): void {
     writeFileSync(SESSIONS_PATH, `${JSON.stringify({ sessions, version: 1 }, null, 2)}\n`)
     logDebug('sessions.catalog.save', { sessionCount: sessions.length })
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
     logDebug('sessions.catalog.saveError', {
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
       path: SESSIONS_PATH,
       sessionCount: sessions.length,
     })
+    // Persisting the catalog underpins workspace/worktree state — a silent
+    // failure means the user loses sessions on restart. Surface it.
+    toast.error(`Failed to save sessions: ${message}`)
   }
 }
 

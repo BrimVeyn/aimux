@@ -30,6 +30,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 - `guide/themes.md` - built-in themes, the theme picker, and typed theme helpers
 - `guide/git-mode.md` - git-mode workflow: panel, diff view, keybindings,
   help overlay, and commit flow
+- `guide/worktrees.md` - per-workspace git worktrees: create, review against
+  base, and squash-move work between worktrees
 - `guide/snippets.md` - reusable text fragments: picker, inline triggers,
   built-in variables, cursor placement, shell-backed variables, undo
 
@@ -45,6 +47,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 - `developer/architecture.md` - app, daemon, terminal-manager, and state flow
 - `developer/aimux-config-internals.md` - builder internals, merge rules, and
   support-status caveats
+- `developer/toasts.md` - the transient notification system: imperative API,
+  options, and architecture
 
 ## Support Status Labels
 

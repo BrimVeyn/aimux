@@ -1448,14 +1448,15 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
   if (result.exitCode !== 0) {
     const stderr = result.stderr.toString().trim()
-    ctx.dispatch({
-      message: stderr || 'commit failed',
-      type: 'git-mode-set-message',
-    })
+    ctx.dispatch({ message: null, type: 'git-mode-set-message' })
+    toast.error(stderr || 'Commit failed')
     return
   }
   clearAutoCommitForCurrentSession(ctx)
-  ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
+  // Match the push flow: clear any inline git-pane message and surface the
+  // result as a toast so it's seen even after leaving git mode.
+  ctx.dispatch({ message: null, type: 'git-mode-set-message' })
+  toast.success(`Committed: ${title}`)
 }
 
 async function runGitCommitAuto(
@@ -1479,10 +1480,8 @@ async function runGitCommitAuto(
     const addArgs = ['add', '-A']
     const addResult = await $`git -C ${cwd} ${addArgs}`.quiet().nothrow()
     if (addResult.exitCode !== 0) {
-      ctx.dispatch({
-        message: addResult.stderr.toString().trim() || 'auto-commit: git add failed',
-        type: 'git-mode-set-message',
-      })
+      ctx.dispatch({ message: null, type: 'git-mode-set-message' })
+      toast.error(addResult.stderr.toString().trim() || 'Auto-commit: git add failed')
       return
     }
   }
@@ -1492,10 +1491,8 @@ async function runGitCommitAuto(
     : await $`git -C ${cwd} commit -m ${title}`.quiet().nothrow()
 
   if (commitResult.exitCode !== 0) {
-    ctx.dispatch({
-      message: commitResult.stderr.toString().trim() || 'auto-commit: commit failed',
-      type: 'git-mode-set-message',
-    })
+    ctx.dispatch({ message: null, type: 'git-mode-set-message' })
+    toast.error(commitResult.stderr.toString().trim() || 'Auto-commit: commit failed')
     return
   }
 
@@ -1513,16 +1510,13 @@ async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: strin
   const session = ctx.state.sessions.find((s) => s.id === sessionId)
   const panel = ctx.state.gitPanel
   if (panel.error !== null) {
-    ctx.dispatch({ message: 'auto-commit: git panel unavailable', type: 'git-mode-set-message' })
+    toast.warning('Auto-commit: git panel unavailable')
     ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
     return
   }
   const tab = ctx.activeTab
   if (!tab) {
-    ctx.dispatch({
-      message: 'auto-commit: no active assistant tab — open a claude/codex session first',
-      type: 'git-mode-set-message',
-    })
+    toast.warning('Auto-commit: no active assistant tab — open a claude/codex session first')
     ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
     return
   }

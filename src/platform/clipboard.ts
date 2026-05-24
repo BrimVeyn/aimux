@@ -1,4 +1,5 @@
 import { logDebug } from '../debug/input-log'
+import { toast } from '../state/toast-store'
 
 export function copyToSystemClipboard(text: string): void {
   try {
@@ -9,6 +10,7 @@ export function copyToSystemClipboard(text: string): void {
     logDebug('platform.clipboard.copyError', {
       error: error instanceof Error ? error.message : String(error),
     })
+    toast.error('Copy failed')
   }
 }
 

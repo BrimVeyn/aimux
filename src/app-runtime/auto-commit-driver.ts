@@ -15,6 +15,7 @@ import { stripAnsi } from '../auto-commit/strip-ansi'
 import { runSuggestion } from '../auto-commit/suggestion-runner'
 import { workingTreeHash } from '../auto-commit/working-tree-hash'
 import { isCommandAvailable } from '../pty/command-registry'
+import { toast } from '../state/toast-store'
 
 export interface TriggerInput {
   enabled: boolean
@@ -176,7 +177,9 @@ export async function onManualTrigger(
 ): Promise<void> {
   const config = deps.getConfig()
   const fail = (reason: string): void => {
-    deps.dispatch({ message: `auto-commit: ${reason}`, type: 'git-mode-set-message' })
+    // Manual auto-commit triggers can fire outside git mode, so surface the
+    // reason as a toast rather than an inline git-pane message that's unseen.
+    toast.warning(`Auto-commit: ${reason}`)
     deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
   }
   if (!config.enabled) return fail('disabled in config')
