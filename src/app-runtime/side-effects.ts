@@ -1195,6 +1195,16 @@ async function createAimuxTempWorktree(
   return worktree
 }
 
+// Dispose and close every tab pinned to a worktree (timers, pty session, state).
+function disposeWorktreeTabs(ctx: SideEffectContext, worktreeId: string): void {
+  for (const tab of ctx.state.tabs.filter((entry) => entry.worktreeId === worktreeId)) {
+    ctx.clearIdleTimer(tab.id)
+    ctx.clearStartupGrace(tab.id)
+    ctx.backend.disposeSession(tab.id)
+    ctx.dispatch({ tabId: tab.id, type: 'close-tab' })
+  }
+}
+
 async function runDeleteWorktree(
   ctx: SideEffectContext,
   sessionId: string,
@@ -1212,14 +1222,7 @@ async function runDeleteWorktree(
   if (tabsInWorktree.length > 0 && !force) {
     throw new ActiveWorktreeTabsError(tabsInWorktree.length)
   }
-  if (tabsInWorktree.length > 0) {
-    for (const tab of tabsInWorktree) {
-      ctx.clearIdleTimer(tab.id)
-      ctx.clearStartupGrace(tab.id)
-      ctx.backend.disposeSession(tab.id)
-      ctx.dispatch({ tabId: tab.id, type: 'close-tab' })
-    }
-  }
+  disposeWorktreeTabs(ctx, worktreeId)
 
   if (
     worktree.source === 'aimux-temp' &&
@@ -1314,10 +1317,19 @@ async function runMoveWorktree(
     return
   }
 
-  // Land in the target so the squashed changes can be tested with one dev server.
-  handleSwitchWorktree(ctx, sessionId, targetWorktreeId)
+  // Land on the target. When deleting the source, close its terminals and
+  // switch to the target up front, synchronously, BEFORE the slow
+  // `git worktree remove`. Closing the source's active tab re-syncs the active
+  // worktree to a default tab (withActiveTabWorktree); doing the close+switch in
+  // one batch lands on the target with no intermediate render, so the removal
+  // runs with the target already active instead of flashing/sticking to a
+  // default worktree. Re-read state each step so we never resurrect the source.
   if (deleteSource) {
+    disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, sourceWorktreeId)
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
     await runDeleteWorktree({ ...ctx, state: ctx.getState() }, sessionId, sourceWorktreeId, true)
+  } else {
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
   }
   ctx.dispatch({
     message: `Moved ${sourceLabel} → ${targetLabel}: ${result.filesChanged} file(s) staged — review & commit`,

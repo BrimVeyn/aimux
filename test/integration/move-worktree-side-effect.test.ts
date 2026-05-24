@@ -18,7 +18,8 @@ function git(cwd: string, ...args: string[]): string {
 
 let base: string
 let main: string
-let wt: string
+let src: string
+let tgt: string
 let prevHome: string | undefined
 let prevRoot: string | undefined
 
@@ -35,10 +36,12 @@ beforeEach(() => {
   writeFileSync(join(main, 'file.txt'), 'base\n')
   git(main, 'add', '-A')
   git(main, 'commit', '-m', 'init')
-  // aimux-temp worktree placed inside the sandboxed worktree root.
-  wt = join(base, 'aimux-wt', 'r-test', 'feature-1')
-  git(main, 'worktree', 'add', '-b', 'feature', wt)
-  writeFileSync(join(wt, 'file.txt'), 'base\nfeature\n')
+  // Two aimux-temp worktrees inside the sandboxed root: source + target.
+  src = join(base, 'aimux-wt', 'r-test', 'src-1')
+  tgt = join(base, 'aimux-wt', 'r-test', 'tgt-1')
+  git(main, 'worktree', 'add', '-b', 'feature', src)
+  git(main, 'worktree', 'add', '-b', 'target-branch', tgt)
+  writeFileSync(join(src, 'file.txt'), 'base\nfeature\n')
 })
 
 afterEach(() => {
@@ -49,12 +52,12 @@ afterEach(() => {
   rmSync(base, { force: true, recursive: true })
 })
 
-function tab(): TabSession {
+function tab(id: string, worktreeId: string): TabSession {
   return {
     assistant: 'terminal',
     buffer: '',
     command: '',
-    id: 't1',
+    id,
     status: 'running',
     terminalModes: {
       alternateScrollMode: false,
@@ -63,12 +66,25 @@ function tab(): TabSession {
       mouseTrackingMode: 'none',
       sendFocusMode: false,
     },
-    title: 'term',
-    worktreeId: 'wt-feat',
+    title: id,
+    worktreeId,
   }
 }
 
-test('move-worktree with deleteSource closes source tabs and removes the worktree', async () => {
+function tempWorktree(over: Partial<WorktreeRecord> & Pick<WorktreeRecord, 'id' | 'path'>) {
+  return {
+    branch: 'b',
+    createdAt: NOW,
+    createdByAimux: true,
+    name: over.id,
+    repoRoot: main,
+    source: 'aimux-temp' as const,
+    updatedAt: NOW,
+    ...over,
+  } satisfies WorktreeRecord
+}
+
+test('move + delete leaves the target active (not snapped back to a default worktree)', async () => {
   const worktrees: WorktreeRecord[] = [
     {
       createdAt: NOW,
@@ -80,20 +96,11 @@ test('move-worktree with deleteSource closes source tabs and removes the worktre
       source: 'primary',
       updatedAt: NOW,
     },
-    {
-      branch: 'feature',
-      createdAt: NOW,
-      createdByAimux: true,
-      id: 'wt-feat',
-      name: 'feature',
-      path: wt,
-      repoRoot: main,
-      source: 'aimux-temp',
-      updatedAt: NOW,
-    },
+    tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
+    tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
   ]
   const session: SessionRecord = {
-    activeWorktreeId: 'wt-feat',
+    activeWorktreeId: 'wt-src',
     createdAt: NOW,
     id: 's1',
     lastOpenedAt: NOW,
@@ -101,10 +108,13 @@ test('move-worktree with deleteSource closes source tabs and removes the worktre
     updatedAt: NOW,
     worktrees,
   }
+  // A tab in the primary worktree is what the source tab would reselect to on
+  // close — the bug snapped the active worktree there instead of the target.
   let state: AppState = {
     ...createInitialState({}, [session]),
+    activeTabId: 't-src',
     currentSessionId: 's1',
-    tabs: [tab()],
+    tabs: [tab('t-main', 'wt-main'), tab('t-src', 'wt-src')],
   }
   const disposed: string[] = []
   const ctx: SideEffectContext = {
@@ -132,18 +142,18 @@ test('move-worktree with deleteSource closes source tabs and removes the worktre
     {
       deleteSource: true,
       sessionId: 's1',
-      sourceWorktreeId: 'wt-feat',
-      targetWorktreeId: 'wt-main',
+      sourceWorktreeId: 'wt-src',
+      targetWorktreeId: 'wt-tgt',
       type: 'move-worktree',
     },
     ctx
   )
-  // The move runs inside enqueueGitOp; chain after it to await completion.
   await enqueueGitOp(async () => {})
 
-  const remaining = state.sessions[0]?.worktrees?.map((w) => w.id)
-  expect(remaining).toEqual(['wt-main'])
-  expect(disposed).toContain('t1')
-  expect(git(main, 'worktree', 'list', '--porcelain')).not.toContain(wt)
-  expect(git(main, 'diff', '--cached', '--name-only')).toContain('file.txt')
+  const after = state.sessions[0]
+  // The target is the active worktree — not the primary the closed tab pointed at.
+  expect(after?.activeWorktreeId).toBe('wt-tgt')
+  expect(after?.worktrees?.map((w) => w.id)).toEqual(['wt-main', 'wt-tgt'])
+  expect(disposed).toContain('t-src')
+  expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
 })
