@@ -590,12 +590,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           effect.targetWorktreeId,
           effect.deleteSource === true
         )
-      ).catch((error) =>
+      ).catch((error) => {
+        ctx.dispatch({ type: 'enter-git-mode' })
         ctx.dispatch({
           message: error instanceof Error ? error.message : String(error),
           type: 'git-mode-set-message',
         })
-      )
+      })
       return
     }
     case 'open-rename-selected-session': {
@@ -1294,6 +1295,11 @@ async function runMoveWorktree(
     sourcePath: source.path,
     targetPath: target.path,
   })
+
+  // The picker closed to navigation; return to the git pane so the outcome —
+  // a refused move (dirty target / conflict) or the success summary — is seen
+  // instead of vanishing into an unread git-mode message.
+  ctx.dispatch({ type: 'enter-git-mode' })
 
   if (result.kind === 'dirty-target') {
     ctx.dispatch({
