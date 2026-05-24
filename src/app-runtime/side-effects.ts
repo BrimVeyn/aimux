@@ -58,6 +58,7 @@ import { saveSessionCatalog } from '../state/session-catalog'
 import { getActiveWorktree, getSessionProjectPath } from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
+import { toast } from '../state/toast-store'
 import {
   type AppAction,
   type AppState,
@@ -1298,22 +1299,20 @@ async function runMoveWorktree(
     targetPath: target.path,
   })
 
+  // Toasts surface the outcome everywhere — the picker can be opened outside git
+  // mode (from a tab menu), where the git-pane message would never be seen.
   if (result.kind === 'dirty-target') {
-    ctx.dispatch({
-      message: `Target ${targetLabel} has uncommitted changes — commit or stash it first`,
-      type: 'git-mode-set-message',
-    })
+    toast.warning(`Target ${targetLabel} has uncommitted changes — commit or stash it first`)
     return
   }
   if (result.kind === 'conflict') {
-    ctx.dispatch({
-      message: `Move hit conflicts in ${result.files.length} file(s) — left ${sourceLabel} untouched`,
-      type: 'git-mode-set-message',
-    })
+    toast.warning(
+      `Move hit conflicts in ${result.files.length} file(s) — left ${sourceLabel} untouched`
+    )
     return
   }
   if (result.kind === 'error') {
-    ctx.dispatch({ message: `Move failed: ${result.message}`, type: 'git-mode-set-message' })
+    toast.error(`Move failed: ${result.message}`)
     return
   }
 
@@ -1331,10 +1330,9 @@ async function runMoveWorktree(
   } else {
     handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
   }
-  ctx.dispatch({
-    message: `Moved ${sourceLabel} → ${targetLabel}: ${result.filesChanged} file(s) staged — review & commit`,
-    type: 'git-mode-set-message',
-  })
+  toast.success(
+    `Moved ${sourceLabel} → ${targetLabel} · ${result.filesChanged} file(s) staged — review & commit`
+  )
 }
 
 function removeWorktreeRecordFromSession(

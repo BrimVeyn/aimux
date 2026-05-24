@@ -32,6 +32,7 @@ import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-mo
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
+import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { useTheme } from './theme'
 
 function getCreateSessionFields(modal: ModalState) {
@@ -361,6 +362,7 @@ export function RootView({
           themeId,
           worktreeDivergence,
         })}
+        <ToastViewport />
       </box>
     )
   }
@@ -476,6 +478,7 @@ export function RootView({
         themeId,
         worktreeDivergence,
       })}
+      <ToastViewport />
     </box>
   )
 }
