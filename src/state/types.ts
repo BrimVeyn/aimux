@@ -406,6 +406,8 @@ export interface ModalAIUsage extends ModalBase {
 
 export interface ModalWorktreeMove extends ModalBase {
   type: 'worktree-move'
+  /** The worktree being moved (may differ from the active one, e.g. a tab menu). */
+  sourceWorktreeId: string
   deleteSource: boolean
 }
 
@@ -533,7 +535,7 @@ export type ModalAction =
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
-  | { type: 'open-worktree-move-modal' }
+  | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
   | { type: 'toggle-worktree-move-delete' }
 
 // -- Session actions --

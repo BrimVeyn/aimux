@@ -201,8 +201,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'open-worktree-move-modal': {
-      // Overlay: keep focusMode (git) so the git view stays mounted underneath,
-      // like the help modal. deriveModeId routes input to the picker while open.
+      // Overlay: keep focusMode (git when opened via `m`, navigation when opened
+      // from a tab menu) so the view underneath stays mounted, like the help
+      // modal. deriveModeId routes input to the picker while open.
       return {
         ...state,
         modal: {
@@ -210,6 +211,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: null,
           selectedIndex: 0,
           sessionTargetId: null,
+          sourceWorktreeId: action.sourceWorktreeId,
           type: 'worktree-move',
         },
       }

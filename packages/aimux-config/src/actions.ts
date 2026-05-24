@@ -353,15 +353,16 @@ export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
   }
   const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
   const worktrees = session?.worktrees ?? []
+  // From git mode, the source is the active worktree (the one being reviewed).
   const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
   const hasBranch = source != null && source.branch != null && source.branch !== ''
   const others = worktrees.filter((w) => w.id !== source?.id)
-  if (!hasBranch || others.length < 1) {
+  if (!hasBranch || source == null || others.length < 1) {
     return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
   }
   // Overlay: no mode transition — deriveModeId routes input to the picker and
   // focusMode stays 'git' so the git view remains mounted underneath.
-  return r([{ type: 'open-worktree-move-modal' }])
+  return r([{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }])
 }
 
 export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
@@ -370,8 +371,9 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
   const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
   const worktrees = session?.worktrees ?? []
-  const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
-  const targets = worktrees.filter((w) => w.id !== source?.id)
+  const sourceId = modal.type === 'worktree-move' ? modal.sourceWorktreeId : undefined
+  const source = worktrees.find((w) => w.id === sourceId)
+  const targets = worktrees.filter((w) => w.id !== sourceId)
   const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
   const target = targets[selectedIndex]
   if (!target || !session || !source || modal.type !== 'worktree-move') {

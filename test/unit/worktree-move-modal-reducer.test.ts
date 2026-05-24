@@ -39,22 +39,31 @@ function seed(): AppState {
 }
 
 test('open-worktree-move-modal overlays git mode without flipping focus', () => {
-  const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
+  const s1 = appReducer(seed(), { sourceWorktreeId: 'wt-a', type: 'open-worktree-move-modal' })
   if (s1.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
   expect(s1.focusMode).toBe('git')
+  expect(s1.modal.sourceWorktreeId).toBe('wt-a')
   expect(s1.modal.selectedIndex).toBe(0)
   expect(s1.modal.deleteSource).toBe(false)
 })
 
+test('opening from a tab menu (navigation) stays in the normal view, not git mode', () => {
+  const base = { ...seed(), focusMode: 'navigation' as const }
+  const s1 = appReducer(base, { sourceWorktreeId: 'wt-b', type: 'open-worktree-move-modal' })
+  if (s1.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
+  expect(s1.focusMode).toBe('navigation')
+  expect(s1.modal.sourceWorktreeId).toBe('wt-b')
+})
+
 test('closing the picker stays in git mode (overlay, never exited)', () => {
-  const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
+  const s1 = appReducer(seed(), { sourceWorktreeId: 'wt-a', type: 'open-worktree-move-modal' })
   const s2 = appReducer(s1, { type: 'close-modal' })
   expect(s2.modal.type).toBeNull()
   expect(s2.focusMode).toBe('git')
 })
 
 test('toggle-worktree-move-delete flips deleteSource', () => {
-  const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
+  const s1 = appReducer(seed(), { sourceWorktreeId: 'wt-a', type: 'open-worktree-move-modal' })
   const s2 = appReducer(s1, { type: 'toggle-worktree-move-delete' })
   if (s2.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
   expect(s2.modal.deleteSource).toBe(true)
@@ -62,7 +71,7 @@ test('toggle-worktree-move-delete flips deleteSource', () => {
 
 test('move-modal-selection navigates within the target list (worktrees minus active source)', () => {
   // 3 worktrees, active = wt-a → 2 targets (wt-main, wt-b) → optionCount 2.
-  const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
+  const s1 = appReducer(seed(), { sourceWorktreeId: 'wt-a', type: 'open-worktree-move-modal' })
   const s2 = appReducer(s1, { delta: 1, type: 'move-modal-selection' })
   expect(s2.modal.selectedIndex).toBe(1)
   // Wraps around the 2 targets, not beyond.

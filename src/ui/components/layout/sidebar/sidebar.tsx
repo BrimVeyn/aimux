@@ -231,13 +231,20 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
           const isGroupStart = info ? index === info.groupStart : false
           const isGroupEnd = info ? index === info.groupEnd : false
           const isGroupMiddle = inGroup && !isGroupStart && !isGroupEnd
-          let tabWorktree =
+          const tabOwnWorktree =
             tab.worktreeId != null && tab.worktreeId !== ''
               ? worktreeById.get(tab.worktreeId)
               : undefined
+          let tabWorktree = tabOwnWorktree
           if (!tabWorktree && worktrees.length > 1) {
             tabWorktree = worktrees[0]
           }
+          // A tab's worktree can be moved when it has a branch (squash needs one,
+          // so not the primary) and there's at least one other worktree to land in.
+          const moveWorktreeId =
+            tabOwnWorktree?.branch != null && tabOwnWorktree.branch !== '' && worktrees.length > 1
+              ? tabOwnWorktree.id
+              : undefined
           const prevTab = groupedTabs[index - 1]
           const startsWorktreeGroup =
             !prevTab ||
@@ -296,6 +303,7 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
                     active={isActive}
                     focused={focusMode === 'navigation'}
                     inLayout={inLayout}
+                    moveWorktreeId={moveWorktreeId}
                   />
                 </box>
               </box>

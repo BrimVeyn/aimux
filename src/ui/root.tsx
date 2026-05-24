@@ -189,8 +189,9 @@ function renderModal(
           ? options.sessions.find((entry) => entry.id === options.currentSessionId)
           : undefined
       const worktrees = session?.worktrees ?? []
-      const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
-      const targets = worktrees.filter((w) => w.id !== source?.id)
+      const sourceId = modal.sourceWorktreeId
+      const source = worktrees.find((w) => w.id === sourceId)
+      const targets = worktrees.filter((w) => w.id !== sourceId)
       const sourceLabel =
         source?.branch != null && source.branch !== ''
           ? source.branch

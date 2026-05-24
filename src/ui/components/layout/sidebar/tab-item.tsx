@@ -13,6 +13,8 @@ interface TabItemProps {
   active: boolean
   focused: boolean
   inLayout?: boolean
+  /** When set, this tab's worktree can be moved — adds a "Move worktree" entry. */
+  moveWorktreeId?: string
 }
 
 function getStatusColor(status: TabSession['status']): string {
@@ -106,7 +108,7 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   )
 }
 
-export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
+export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: TabItemProps) {
   const t = useTheme()
   const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
@@ -152,6 +154,20 @@ export function TabItem({ active, focused, id, inLayout, tab }: TabItemProps) {
             dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
           },
         ],
+        // Move this tab's worktree into another one. Opened from here it overlays
+        // the normal view (no git mode) since the open action doesn't touch focus.
+        ...(moveWorktreeId != null && moveWorktreeId !== ''
+          ? [
+              [
+                'Move worktree',
+                () =>
+                  dispatchGlobal({
+                    sourceWorktreeId: moveWorktreeId,
+                    type: 'open-worktree-move-modal',
+                  }),
+              ] as [string, () => void],
+            ]
+          : []),
       ]}
       onMouseOver={() => setHovered(true)}
       onMouseOut={() => setHovered(false)}
