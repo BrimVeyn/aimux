@@ -14,6 +14,13 @@ interface WorktreeMoveModalProps {
   targets: WorktreeRecord[]
 }
 
+const MOVE_HINTS: [key: string, label: string][] = [
+  ['↵', 'move into selected target'],
+  ['d', 'toggle delete source'],
+  ['j/k', 'change target'],
+  ['esc', 'cancel'],
+]
+
 function formatDivergence(divergence: { ahead: number; behind: number } | undefined): string {
   if (divergence == null) return ''
   const parts: string[] = []
@@ -36,9 +43,21 @@ export function WorktreeMoveModal({
       keybindsModeId="modal.worktree-move"
       width={uiTokens.modalWidth.md}
       footer={
-        <box flexDirection="column" gap={0}>
-          <text fg={t.textMuted}>{`delete source after move: ${deleteSource ? 'on' : 'off'}`}</text>
-          <text fg={t.textMuted}>↵ move · d toggle delete · j/k move · esc cancel</text>
+        <box flexDirection="column" gap={1} marginTop={1}>
+          <box flexDirection="row" gap={1}>
+            <text fg={t.textMuted}>delete source after move</text>
+            <text fg={deleteSource ? t.warning : t.text}>{deleteSource ? 'on' : 'off'}</text>
+          </box>
+          <box flexDirection="column" gap={0}>
+            {MOVE_HINTS.map(([key, label]) => (
+              <box key={key} flexDirection="row" gap={2}>
+                <box width={4} flexShrink={0}>
+                  <text fg={t.primary}>{key}</text>
+                </box>
+                <text fg={t.textMuted}>{label}</text>
+              </box>
+            ))}
+          </box>
         </box>
       }
     >
