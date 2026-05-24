@@ -6,6 +6,7 @@ import { createPrefixedId } from '../platform/id'
 import { saveSessionCatalog } from '../state/session-catalog'
 import { createEmptyWorkspaceSnapshot, serializeWorkspace } from '../state/session-persistence'
 import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-worktrees'
+import { toast } from '../state/toast-store'
 import { buildSessionsWithCurrentSnapshot } from '../state/workspace-save'
 
 export function createSessionFromCurrentState(
@@ -146,6 +147,7 @@ export function handleDeleteSessionEffect(
   sessionId: string,
   options?: { openSessionPicker?: boolean }
 ): void {
+  const name = state.sessions.find((entry) => entry.id === sessionId)?.name
   const remaining = deleteSessionRecords(state.sessions, sessionId)
   logInputDebug('app.session.delete', {
     remainingCount: remaining.length,
@@ -161,6 +163,7 @@ export function handleDeleteSessionEffect(
     sessionId,
     type: 'delete-session-record',
   })
+  toast.success(name != null && name !== '' ? `Deleted workspace "${name}"` : 'Workspace deleted')
 }
 
 export function restartTabSession(

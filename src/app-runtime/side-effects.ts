@@ -510,12 +510,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
         void enqueueGitOp(async () =>
           launchAssistantInNewWorktree(ctx, option.id, worktreeName, branchName, sourceWorktreeId)
-        ).catch((error) =>
-          ctx.dispatch({
-            message: error instanceof Error ? error.message : String(error),
-            type: 'git-mode-set-message',
-          })
-        )
+        ).catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
         return
       }
       launchAssistant(ctx, option.id, getNewTabTargetWorktreeId(state))
@@ -536,21 +531,6 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'delete-session': {
       handleDeleteSessionEffect(state, backend, dispatch, effect.sessionId)
-      return
-    }
-    case 'switch-worktree': {
-      handleSwitchWorktree(ctx, effect.sessionId, effect.worktreeId)
-      return
-    }
-    case 'fork-worktree': {
-      void enqueueGitOp(async () =>
-        runForkWorktree(ctx, effect.sessionId, effect.branchName, effect.baseRef)
-      ).catch((error) =>
-        ctx.dispatch({
-          message: error instanceof Error ? error.message : String(error),
-          type: 'git-mode-set-message',
-        })
-      )
       return
     }
     case 'delete-worktree': {
@@ -591,12 +571,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           effect.targetWorktreeId,
           effect.deleteSource === true
         )
-      ).catch((error) =>
-        ctx.dispatch({
-          message: error instanceof Error ? error.message : String(error),
-          type: 'git-mode-set-message',
-        })
-      )
+      ).catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
       return
     }
     case 'open-rename-selected-session': {
@@ -1099,15 +1074,6 @@ function handleSwitchWorktree(ctx: SideEffectContext, sessionId: string, worktre
   ctx.dispatch({ sessions, type: 'set-sessions' })
 }
 
-async function runForkWorktree(
-  ctx: SideEffectContext,
-  sessionId: string,
-  requestedBranchName?: string,
-  requestedBaseRef?: string
-): Promise<void> {
-  await createAimuxTempWorktree(ctx, sessionId, requestedBranchName, undefined, requestedBaseRef)
-}
-
 function normalizeBranchName(branch: string | undefined): string | undefined {
   return branch?.replace(/^refs\/heads\//, '').trim()
 }
@@ -1187,12 +1153,11 @@ async function createAimuxTempWorktree(
   }))
   saveSessionCatalog(sessions)
   ctx.dispatch({ sessions, type: 'set-sessions' })
-  ctx.dispatch({
-    message: linkedModules
-      ? `created worktree ${branchName} (linked node_modules)`
-      : `created worktree ${branchName}`,
-    type: 'git-mode-set-message',
-  })
+  toast.success(
+    linkedModules
+      ? `Created worktree ${branchName} (linked node_modules)`
+      : `Created worktree ${branchName}`
+  )
   return worktree
 }
 
@@ -1589,13 +1554,12 @@ async function runGitPush(ctx: SideEffectContext): Promise<void> {
     ? await $`git -C ${cwd} push`.quiet().nothrow()
     : await $`git -C ${cwd} push --set-upstream origin HEAD`.quiet().nothrow()
 
+  // Clear the inline "pushing…" progress; surface the result as a toast so it's
+  // visible even after leaving git mode (and so push failures aren't missed).
+  ctx.dispatch({ message: null, type: 'git-mode-set-message' })
   if (result.exitCode !== 0) {
-    const stderr = result.stderr.toString().trim()
-    ctx.dispatch({
-      message: stderr || 'push failed',
-      type: 'git-mode-set-message',
-    })
+    toast.error(result.stderr.toString().trim() || 'Push failed')
     return
   }
-  ctx.dispatch({ message: 'pushed', type: 'git-mode-set-message' })
+  toast.success('Pushed')
 }
