@@ -36,6 +36,12 @@ export function deriveModeId(state: AppState): ModeId {
     return 'modal.help.filtering'
   }
 
+  // Overlay on top of git mode without flipping focusMode (like help) — route
+  // input to the picker while it's open even though focus stays 'git'.
+  if (state.modal.type === 'worktree-move') {
+    return 'modal.worktree-move'
+  }
+
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]
   if (directMode) {
     return directMode

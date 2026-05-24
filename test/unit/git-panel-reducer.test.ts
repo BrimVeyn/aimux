@@ -31,6 +31,23 @@ function moveGitPane(
   })
 }
 
+test('git-panel-reset clears cached diffs so a switched worktree fetches fresh', () => {
+  const base = seedState()
+  const s0: AppState = {
+    ...base,
+    gitMode: {
+      ...base.gitMode,
+      diffs: { 'unstaged:f.ts': { path: 'f.ts', rawDiff: 'stale', status: 'modified' } },
+      selectedEntryKey: 'unstaged:f.ts',
+    },
+    gitPanel: { ...base.gitPanel, branch: 'main', files: [entry()] },
+  }
+  const s1 = appReducer(s0, { type: 'git-panel-reset' })
+  expect(Object.keys(s1.gitMode.diffs)).toHaveLength(0)
+  expect(s1.gitMode.selectedEntryKey).toBeNull()
+  expect(s1.gitPanel.files).toHaveLength(0)
+})
+
 test('toggle-git-pane flips visibility', () => {
   const s0 = seedState()
   const s1 = appReducer(s0, { type: 'toggle-git-pane' })

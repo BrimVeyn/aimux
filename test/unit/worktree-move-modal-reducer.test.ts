@@ -34,15 +34,23 @@ function seed(): AppState {
       worktree('wt-b', { branch: 'feat/b' }),
     ],
   }
-  return { ...createInitialState({}, [session]), currentSessionId: 's1' }
+  // The picker is only opened from git mode.
+  return { ...createInitialState({}, [session]), currentSessionId: 's1', focusMode: 'git' }
 }
 
-test('open-worktree-move-modal opens the picker with defaults', () => {
+test('open-worktree-move-modal overlays git mode without flipping focus', () => {
   const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
   if (s1.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
-  expect(s1.focusMode).toBe('modal')
+  expect(s1.focusMode).toBe('git')
   expect(s1.modal.selectedIndex).toBe(0)
   expect(s1.modal.deleteSource).toBe(false)
+})
+
+test('closing the picker stays in git mode (overlay, never exited)', () => {
+  const s1 = appReducer(seed(), { type: 'open-worktree-move-modal' })
+  const s2 = appReducer(s1, { type: 'close-modal' })
+  expect(s2.modal.type).toBeNull()
+  expect(s2.focusMode).toBe('git')
 })
 
 test('toggle-worktree-move-delete flips deleteSource', () => {

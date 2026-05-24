@@ -226,7 +226,18 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       }
       return {
         ...state,
-        gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey: null },
+        // A reset means the underlying worktree/ref changed, so cached diffs are
+        // stale — drop them (keyed by section:path, they'd otherwise serve a
+        // previous worktree's diff for a same-named file after a move/switch).
+        gitMode: {
+          ...state.gitMode,
+          diffs: {},
+          highlights: {},
+          loading: {},
+          parsedFiles: {},
+          pendingDeletePath: null,
+          selectedEntryKey: null,
+        },
         gitPanel: emptyGitPanel(),
       }
     }

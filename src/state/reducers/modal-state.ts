@@ -201,9 +201,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'open-worktree-move-modal': {
+      // Overlay: keep focusMode (git) so the git view stays mounted underneath,
+      // like the help modal. deriveModeId routes input to the picker while open.
       return {
         ...state,
-        focusMode: 'modal',
         modal: {
           deleteSource: false,
           editBuffer: null,
@@ -519,8 +520,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     }
     case 'close-modal': {
       const closingType = state.modal.type
-      // Help is a pure overlay — it never flipped focusMode, so leave it alone.
-      if (closingType === 'help') {
+      // Pure overlays never flipped focusMode (they render on top of git mode),
+      // so leave it alone — closing returns to whatever was underneath.
+      if (closingType === 'help' || closingType === 'worktree-move') {
         return { ...state, modal: emptyModal() }
       }
       const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'

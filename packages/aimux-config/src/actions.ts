@@ -359,7 +359,9 @@ export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
   if (!hasBranch || others.length < 1) {
     return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
   }
-  return r([{ type: 'open-worktree-move-modal' }], [], 'modal.worktree-move')
+  // Overlay: no mode transition — deriveModeId routes input to the picker and
+  // focusMode stays 'git' so the git view remains mounted underneath.
+  return r([{ type: 'open-worktree-move-modal' }])
 }
 
 export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
@@ -373,8 +375,10 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
   const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
   const target = targets[selectedIndex]
   if (!target || !session || !source || modal.type !== 'worktree-move') {
-    return r([{ type: 'close-modal' }], [], 'navigation')
+    return r([{ type: 'close-modal' }])
   }
+  // Overlay close keeps focusMode 'git' (see close-modal reducer), so the move
+  // result lands back in the git view that was underneath the picker.
   return r(
     [{ type: 'close-modal' }],
     [
@@ -385,8 +389,7 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
         targetWorktreeId: target.id,
         type: 'move-worktree',
       },
-    ],
-    'navigation'
+    ]
   )
 }
 
