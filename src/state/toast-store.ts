@@ -31,8 +31,13 @@ export interface Toast {
 }
 
 export const TOAST_CONFIG = {
-  defaultDurationMs: 3500,
   defaultPosition: 'top-right' as ToastPosition,
+  // Default auto-dismiss per variant when `durationMs` isn't given. Errors (and
+  // warnings) linger longer than confirmations so they're not missed.
+  durations: { error: 7000, info: 3500, success: 3500, warning: 5000 } as Record<
+    ToastVariant,
+    number
+  >,
   gap: 1,
   /** Most recent toasts kept visible per position; older ones are evicted. */
   maxVisible: 4,
@@ -53,15 +58,16 @@ export const toastStore = createStore<ToastStoreState>((set) => ({
   dismiss: (id) => set((state) => ({ toasts: state.toasts.filter((entry) => entry.id !== id) })),
   show: (opts) => {
     const id = createPrefixedId('toast')
+    const variant = opts.variant ?? 'info'
     const next: Toast = {
       content: opts.content,
       createdAt: Date.now(),
-      durationMs: opts.durationMs ?? TOAST_CONFIG.defaultDurationMs,
+      durationMs: opts.durationMs ?? TOAST_CONFIG.durations[variant],
       id,
       message: opts.message,
       position: opts.position ?? TOAST_CONFIG.defaultPosition,
       title: opts.title,
-      variant: opts.variant ?? 'info',
+      variant,
     }
     set((state) => ({ toasts: [...state.toasts, next] }))
     return id

@@ -8,7 +8,6 @@ import {
   type ToastVariant,
 } from '../../../../state/toast-store'
 import { type ResolvedTuiTheme, useTheme } from '../../../theme'
-import { Surface } from '../../primitives/surface'
 import { slideOffsetStyle, type ToastAnchor } from './toast-position'
 import { useToastAnimation } from './use-toast-animation'
 
@@ -49,7 +48,7 @@ export function ToastItem({ anchor, toast }: ToastItemProps) {
   }, [toast.durationMs, requestExit])
 
   const width = Math.max(16, Math.min(TOAST_CONFIG.width, dimensions.width - 4))
-  const distance = anchor.horizontal === 'center' ? VERTICAL_SLIDE : width + 2
+  const distance = anchor.horizontal === 'center' ? VERTICAL_SLIDE : width + 4
   const margins = slideOffsetStyle(anchor, Math.round(away * distance))
   const { color, icon } = variantStyle(toast.variant, t)
   const hasTitle = toast.title != null && toast.title !== ''
@@ -57,7 +56,13 @@ export function ToastItem({ anchor, toast }: ToastItemProps) {
 
   return (
     <box flexShrink={0} {...margins}>
-      <Surface tone="elevated" paddingLeft={1} paddingRight={1} width={width}>
+      <box
+        border
+        borderColor={color}
+        backgroundColor={t.backgroundElement}
+        padding={1}
+        width={width}
+      >
         {toast.content ?? (
           <box flexDirection="row" gap={1}>
             <text fg={color} selectable={false}>
@@ -77,7 +82,7 @@ export function ToastItem({ anchor, toast }: ToastItemProps) {
             </box>
           </box>
         )}
-      </Surface>
+      </box>
     </box>
   )
 }

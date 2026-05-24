@@ -13,8 +13,23 @@ test('show adds a toast with defaults and returns its id', () => {
   expect(created?.id).toBe(id)
   expect(created?.variant).toBe('info')
   expect(created?.position).toBe(TOAST_CONFIG.defaultPosition)
-  expect(created?.durationMs).toBe(TOAST_CONFIG.defaultDurationMs)
+  expect(created?.durationMs).toBe(TOAST_CONFIG.durations.info)
   expect(created?.message).toBe('hi')
+})
+
+test('errors default to a longer duration than confirmations', () => {
+  const errorId = toast.error('boom')
+  const successId = toast.success('ok')
+  const byId = new Map(toastStore.getState().toasts.map((entry) => [entry.id, entry]))
+  const errorMs = byId.get(errorId)?.durationMs ?? 0
+  const successMs = byId.get(successId)?.durationMs ?? 0
+  expect(errorMs).toBeGreaterThan(successMs)
+})
+
+test('an explicit durationMs always wins over the per-variant default', () => {
+  const id = toast.error('boom', { durationMs: 1000 })
+  const created = toastStore.getState().toasts.find((entry) => entry.id === id)
+  expect(created?.durationMs).toBe(1000)
 })
 
 test('variant shortcuts set variant + message and accept overrides', () => {
