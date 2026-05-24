@@ -293,12 +293,16 @@ export async function runDaemon(): Promise<void> {
    * previous broadcast state, matching pre-fix behaviour).
    */
   const updateTmBroadcastForClientCount = (count: number): void => {
-    void manager.setBroadcastEnabled(count > 0).catch((error) => {
-      logDebug('daemon.setBroadcastEnabled.error', {
-        count,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    })
+    void (async () => {
+      try {
+        await manager.setBroadcastEnabled(count > 0)
+      } catch (error) {
+        logDebug('daemon.setBroadcastEnabled.error', {
+          count,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })()
   }
 
   // Initial state: no clients yet, ask the TM to suspend broadcast.
@@ -317,7 +321,13 @@ export async function runDaemon(): Promise<void> {
     let processing: Promise<void> = Promise.resolve()
 
     socket.on('data', (chunk) => {
-      processing = processing.then(async () => {
+      const previous = processing
+      processing = (async () => {
+        try {
+          await previous
+        } catch {
+          // A prior chunk's failure shouldn't block later chunks on this socket.
+        }
         try {
           for (const message of decoder.push(chunk)) {
             try {
@@ -556,7 +566,7 @@ export async function runDaemon(): Promise<void> {
           decoder.reset()
           send(socket, { id: crypto.randomUUID(), payload: { message }, type: 'error' })
         }
-      })
+      })()
     })
 
     socket.on('close', () => {

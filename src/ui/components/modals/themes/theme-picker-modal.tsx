@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo } from 'react'
 
 import type { ThemeId } from '../../../themes'
 
@@ -37,19 +37,28 @@ export function ThemePickerModal({
 
   const effectiveIndex = clampSelection(selectedIndex, filtered.length)
 
-  const items: PickerItem[] = filtered.map((id, rowIndex) => {
-    const active = rowIndex === effectiveIndex
-    const isCurrent = id === currentThemeId
-    return {
-      key: id,
-      onClick: () => {
-        dispatchGlobal({ type: 'close-modal' })
-        runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
-      },
-      title: <text fg={active ? t.text : t.textMuted}>{themeDisplayName(id)}</text>,
-      trailing: isCurrent ? <text fg={t.primary}>current</text> : undefined,
-    }
-  })
+  const items = useMemo<PickerItem[]>(
+    () =>
+      filtered.map((id, rowIndex) => {
+        const active = rowIndex === effectiveIndex
+        const isCurrent = id === currentThemeId
+        return {
+          key: id,
+          onClick: () => {
+            dispatchGlobal({ type: 'close-modal' })
+            runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
+          },
+          title: <text fg={active ? t.text : t.textMuted}>{themeDisplayName(id)}</text>,
+          trailing: isCurrent ? <text fg={t.primary}>current</text> : undefined,
+        }
+      }),
+    [currentThemeId, effectiveIndex, filtered, t]
+  )
+
+  const handleHover = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
 
   return (
     <Picker
@@ -70,7 +79,7 @@ export function ThemePickerModal({
       items={items}
       selectedIndex={effectiveIndex}
       emptyState={<text fg={t.textMuted}>No themes available.</text>}
-      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+      onHover={handleHover}
     />
   )
 }

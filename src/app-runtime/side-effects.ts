@@ -508,9 +508,21 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const worktreeName = state.modal.worktreeName
         const branchName = state.modal.branchName
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
-        void enqueueGitOp(async () =>
-          launchAssistantInNewWorktree(ctx, option.id, worktreeName, branchName, sourceWorktreeId)
-        ).catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
+        void (async () => {
+          try {
+            await enqueueGitOp(async () =>
+              launchAssistantInNewWorktree(
+                ctx,
+                option.id,
+                worktreeName,
+                branchName,
+                sourceWorktreeId
+              )
+            )
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : String(error))
+          }
+        })()
         return
       }
       launchAssistant(ctx, option.id, getNewTabTargetWorktreeId(state))
@@ -534,44 +546,54 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'delete-worktree': {
-      void enqueueGitOp(async () =>
-        runDeleteWorktree(
-          { ...ctx, state: ctx.getState() },
-          effect.sessionId,
-          effect.worktreeId,
-          !!(effect.force === true)
-        )
-      ).catch((error) => {
-        const message = error instanceof Error ? error.message : String(error)
-        const forceable = isForceableWorktreeDeleteError(message)
-        const latest = ctx.getState()
-        if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
-          const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
-          const selected = session?.worktrees?.[latest.modal.selectedIndex]
-          if (selected && selected.id !== effect.worktreeId) {
-            ctx.dispatch({ message, type: 'git-mode-set-message' })
-            return
+      void (async () => {
+        try {
+          await enqueueGitOp(async () =>
+            runDeleteWorktree(
+              { ...ctx, state: ctx.getState() },
+              effect.sessionId,
+              effect.worktreeId,
+              !!(effect.force === true)
+            )
+          )
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const forceable = isForceableWorktreeDeleteError(message)
+          const latest = ctx.getState()
+          if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
+            const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
+            const selected = session?.worktrees?.[latest.modal.selectedIndex]
+            if (selected && selected.id !== effect.worktreeId) {
+              ctx.dispatch({ message, type: 'git-mode-set-message' })
+              return
+            }
           }
+          ctx.dispatch({
+            confirmWorktreeId: forceable ? effect.worktreeId : null,
+            message: forceable ? message : `Could not delete worktree: ${message}`,
+            type: 'set-new-tab-worktree-delete-state',
+          })
+          ctx.dispatch({ message, type: 'git-mode-set-message' })
         }
-        ctx.dispatch({
-          confirmWorktreeId: forceable ? effect.worktreeId : null,
-          message: forceable ? message : `Could not delete worktree: ${message}`,
-          type: 'set-new-tab-worktree-delete-state',
-        })
-        ctx.dispatch({ message, type: 'git-mode-set-message' })
-      })
+      })()
       return
     }
     case 'move-worktree': {
-      void enqueueGitOp(async () =>
-        runMoveWorktree(
-          { ...ctx, state: ctx.getState() },
-          effect.sessionId,
-          effect.sourceWorktreeId,
-          effect.targetWorktreeId,
-          effect.deleteSource === true
-        )
-      ).catch((error) => toast.error(error instanceof Error ? error.message : String(error)))
+      void (async () => {
+        try {
+          await enqueueGitOp(async () =>
+            runMoveWorktree(
+              { ...ctx, state: ctx.getState() },
+              effect.sessionId,
+              effect.sourceWorktreeId,
+              effect.targetWorktreeId,
+              effect.deleteSource === true
+            )
+          )
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : String(error))
+        }
+      })()
       return
     }
     case 'open-rename-selected-session': {
@@ -1364,14 +1386,15 @@ function runUpdateFromTui(ctx: SideEffectContext, latestVersion: string): void {
     stdin: 'inherit',
     stdout: 'inherit',
   })
-  void proc.exited.then((code) => {
+  void (async () => {
+    const code = await proc.exited
     if (code === 0) {
       process.stdout.write(`\nUpdated. Run \`aimux\` to start the new version.\n`)
     } else {
       process.stderr.write(`\nUpdate failed (exit code ${code}).\n`)
     }
     process.exit(code ?? 1)
-  })
+  })()
 }
 
 async function runGitAction(

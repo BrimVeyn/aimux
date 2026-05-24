@@ -215,6 +215,8 @@ async function main() {
   console.log(`\u001b[32m✔\u001b[0m released ${tag}`)
 }
 
-main().catch((error) => {
+try {
+  await main()
+} catch (error) {
   fail(error instanceof Error ? error.message : String(error))
-})
+}

@@ -1,5 +1,7 @@
 import type { AIUsageTool } from '@brimveyn/aimux-config'
 
+import { useCallback } from 'react'
+
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
@@ -52,18 +54,21 @@ export function AIUsageIndicator() {
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
+  const openModal = useCallback(
+    (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dispatchGlobal({ type: 'open-ai-usage-modal' })
+    },
+    []
+  )
+
   if (!enabled) return null
 
   const ordered: AIUsageTool[] = ['claude', 'codex']
   const entries = ordered
     .map((tool) => ({ snap: snapshots[tool], tool }))
     .filter((entry) => entry.snap !== undefined)
-
-  const openModal = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
-    e.preventDefault()
-    e.stopPropagation()
-    dispatchGlobal({ type: 'open-ai-usage-modal' })
-  }
 
   if (entries.length === 0) {
     return (

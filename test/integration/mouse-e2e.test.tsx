@@ -1,10 +1,20 @@
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+
 import { createTestRenderer } from '@opentui/core/testing'
 import { createRoot, useTerminalDimensions } from '@opentui/react'
 import { afterEach, describe, expect, test } from 'bun:test'
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 
 import type { TerminalContentOrigin } from '../../src/input/raw-input-handler'
 import type { SessionBackend } from '../../src/session-backend/types'
@@ -18,6 +28,8 @@ import { appStore } from '../../src/state/app-store'
 import { getGitPaneWidthFromRatio } from '../../src/state/git-pane-sizing'
 import { appReducer, createInitialState } from '../../src/state/store'
 import { RootView } from '../../src/ui/root'
+
+const NOOP = (): void => {}
 
 const TEST_WIDTH = 120
 const TEST_HEIGHT = 40
@@ -255,32 +267,41 @@ function MouseHarness({
     appStore.setState(storeState)
   }, [storeState])
 
+  const handleTerminalMouseEvent = useCallback(
+    (event: OtuiMouseEvent, origin: TerminalContentOrigin) => {
+      const sequence = encodeMouseEventForPty(event, origin)
+      if (sequence != null && sequence !== '') {
+        ptyManager.write(TEST_TAB_ID, sequence)
+      }
+    },
+    [ptyManager]
+  )
+  const handleTerminalScrollEvent = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (event.type !== 'scroll') {
+        return
+      }
+
+      const direction = event.scroll?.direction
+      if (direction === 'up') {
+        ptyManager.scrollViewport(TEST_TAB_ID, -LOCAL_SCROLL_DELTA)
+      } else if (direction === 'down') {
+        ptyManager.scrollViewport(TEST_TAB_ID, LOCAL_SCROLL_DELTA)
+      }
+    },
+    [ptyManager]
+  )
+
   return (
     <RootView
       themeId="aimux-dark"
       contentOrigin={contentOriginRef.current}
       mouseForwardingEnabled={mouseForwardingEnabled}
       localScrollbackEnabled={localScrollbackEnabled}
-      onTerminalMouseEvent={(event, origin) => {
-        const sequence = encodeMouseEventForPty(event, origin)
-        if (sequence != null && sequence !== '') {
-          ptyManager.write(TEST_TAB_ID, sequence)
-        }
-      }}
+      onTerminalMouseEvent={handleTerminalMouseEvent}
       terminalCols={terminalSize.cols}
       terminalRows={terminalSize.rows}
-      onTerminalScrollEvent={(event) => {
-        if (event.type !== 'scroll') {
-          return
-        }
-
-        const direction = event.scroll?.direction
-        if (direction === 'up') {
-          ptyManager.scrollViewport(TEST_TAB_ID, -LOCAL_SCROLL_DELTA)
-        } else if (direction === 'down') {
-          ptyManager.scrollViewport(TEST_TAB_ID, LOCAL_SCROLL_DELTA)
-        }
-      }}
+      onTerminalScrollEvent={handleTerminalScrollEvent}
     />
   )
 }
@@ -391,8 +412,8 @@ function ResizeHarness({
       contentOrigin={RESIZE_CONTENT_ORIGIN}
       mouseForwardingEnabled={false}
       localScrollbackEnabled={false}
-      onTerminalMouseEvent={() => {}}
-      onTerminalScrollEvent={() => {}}
+      onTerminalMouseEvent={NOOP}
+      onTerminalScrollEvent={NOOP}
       onTerminalClick={handlers.handleTerminalClick}
       onPaneActivate={handlers.handlePaneActivate}
       onSplitResize={handlers.handleSplitResize}

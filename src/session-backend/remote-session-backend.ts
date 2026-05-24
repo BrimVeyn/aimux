@@ -144,6 +144,17 @@ export class RemoteSessionBackend
     }
   }
 
+  /** Fire-and-forget a command, reporting any failure via reportCommandError. */
+  private dispatchCommand(request: ClientRequest, context: string, tabId?: string): void {
+    void (async () => {
+      try {
+        await this.sendExpectOk(request)
+      } catch (error) {
+        this.reportCommandError(context, error, tabId)
+      }
+    })()
+  }
+
   private handleServerEvent(message: ServerEvent): void {
     logDebug('backend.remote.event', { type: message.type })
     switch (message.type) {
@@ -352,8 +363,10 @@ export class RemoteSessionBackend
       return
     }
 
-    void this.sendExpectOk({ id: crypto.randomUUID(), payload: options, type: 'createTab' }).catch(
-      (error) => this.reportCommandError('createTab', error, options.tabId)
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: options, type: 'createTab' },
+      'createTab',
+      options.tabId
     )
   }
 
@@ -362,55 +375,54 @@ export class RemoteSessionBackend
       logDebug('backend.remote.skipWriteBeforeAttach', { inputLength: input.length, tabId })
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { data: input, tabId },
-      type: 'write',
-    }).catch((error) => this.reportCommandError('write', error, tabId))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { data: input, tabId }, type: 'write' },
+      'write',
+      tabId
+    )
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { deltaLines, tabId },
-      type: 'scroll',
-    }).catch((error) => this.reportCommandError('scroll', error, tabId))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { deltaLines, tabId }, type: 'scroll' },
+      'scroll',
+      tabId
+    )
   }
 
   scrollViewportToBottom(tabId: string): void {
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { tabId },
-      type: 'scrollToBottom',
-    }).catch((error) => this.reportCommandError('scrollToBottom', error, tabId))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { tabId }, type: 'scrollToBottom' },
+      'scrollToBottom',
+      tabId
+    )
   }
 
   reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { intent, tabId },
-      type: 'reapplyScrollIntent',
-    }).catch((error) => this.reportCommandError('reapplyScrollIntent', error, tabId))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { intent, tabId }, type: 'reapplyScrollIntent' },
+      'reapplyScrollIntent',
+      tabId
+    )
   }
 
   setActiveTab(tabId: string | null): void {
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { tabId },
-      type: 'setActiveTab',
-    }).catch((error) => this.reportCommandError('setActiveTab', error))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { tabId }, type: 'setActiveTab' },
+      'setActiveTab'
+    )
   }
 
   resizeAll(
@@ -425,11 +437,14 @@ export class RemoteSessionBackend
     }
     logDebug('backend.remote.resize', { cols, rows, sessionId: this.currentSessionId })
     const intentsRecord = intents ? Object.fromEntries(intents.entries()) : undefined
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { cols, intents: intentsRecord, rows },
-      type: 'resizeClient',
-    }).catch((error) => this.reportCommandError('resizeClient', error))
+    this.dispatchCommand(
+      {
+        id: crypto.randomUUID(),
+        payload: { cols, intents: intentsRecord, rows },
+        type: 'resizeClient',
+      },
+      'resizeClient'
+    )
   }
 
   resizeTab(
@@ -442,19 +457,21 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { cols, intent, rows, tabId },
-      type: 'resizeTab',
-    }).catch((error) => this.reportCommandError('resizeTab', error, tabId))
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { cols, intent, rows, tabId }, type: 'resizeTab' },
+      'resizeTab',
+      tabId
+    )
   }
 
   disposeSession(tabId: string): void {
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({ id: crypto.randomUUID(), payload: { tabId }, type: 'closeTab' }).catch(
-      (error) => this.reportCommandError('closeTab', error, tabId)
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { tabId }, type: 'closeTab' },
+      'closeTab',
+      tabId
     )
   }
 
@@ -462,9 +479,7 @@ export class RemoteSessionBackend
     if (!this.attached) {
       return
     }
-    void this.sendExpectOk({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }).catch(
-      (error) => this.reportCommandError('disposeAll', error)
-    )
+    this.dispatchCommand({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }, 'disposeAll')
   }
 
   async destroy(keepSessions = true): Promise<void> {

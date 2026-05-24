@@ -4,7 +4,7 @@ import type {
   ScrollBoxRenderable,
 } from '@opentui/core'
 
-import { memo, useMemo, useRef } from 'react'
+import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
 
 import type { BranchDivergence } from '../../../../state/types'
 
@@ -43,6 +43,7 @@ const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
 const RESIZE_HANDLE = '─'
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
 // Left accent strip + trailing space for a worktree group header.
 const WORKTREE_STRIP = '▍ '
@@ -92,6 +93,11 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
   const projectPath = getSessionProjectPath(currentSession)
   const branch = useSidebarBranch(projectPath)
 
+  const handleNewAssistant = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+    dispatchGlobal({ type: 'open-new-tab-modal' })
+  }, [])
+
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
       <text fg={t.text} selectable={false}>
@@ -122,10 +128,7 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
         backgroundColor={t.backgroundPanel}
         justifyContent="center"
         marginTop={1}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-          dispatchGlobal({ type: 'open-new-tab-modal' })
-        }}
+        onMouseDown={handleNewAssistant}
       >
         <text fg={t.text} selectable={false}>
           + New assistant
@@ -152,6 +155,31 @@ function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGrou
     </box>
   )
 }
+
+const TabRowButton = memo(function TabRowButton({
+  backgroundColor,
+  children,
+  onActivate,
+  tabId,
+}: {
+  tabId: string
+  backgroundColor: string | undefined
+  onActivate?: (tabId: string) => void
+  children: ReactNode
+}) {
+  const handleMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      onActivate?.(tabId)
+    },
+    [onActivate, tabId]
+  )
+  return (
+    <box backgroundColor={backgroundColor} flexDirection="row" onMouseDown={handleMouseDown}>
+      {children}
+    </box>
+  )
+})
 
 interface TabsBodyProps {
   onTabActivate?: (tabId: string) => void
@@ -213,7 +241,7 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
       flexGrow={1}
       scrollY
       viewportCulling
-      contentOptions={{ flexDirection: 'column', gap: 0 }}
+      contentOptions={COLUMN_CONTENT_OPTIONS}
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
@@ -287,13 +315,10 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
                   </box>
                 </box>
               ) : null}
-              <box
+              <TabRowButton
+                tabId={tab.id}
+                onActivate={onTabActivate}
                 backgroundColor={getRowBackground({ alternate, isActive, t })}
-                flexDirection="row"
-                onMouseDown={(event) => {
-                  event.stopPropagation()
-                  onTabActivate?.(tab.id)
-                }}
               >
                 {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
                 <box flexGrow={1}>
@@ -306,7 +331,7 @@ const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBod
                     moveWorktreeId={moveWorktreeId}
                   />
                 </box>
-              </box>
+              </TabRowButton>
             </box>
           )
         })
@@ -329,6 +354,52 @@ export function Sidebar({
   const focusMode = useAppStore((s) => s.focusMode)
   const bodyRef = useRef<BoxRenderable | null>(null)
   useWorktreeDivergencePolling(sidebarVisible)
+
+  const handleSidebarMouseDown = useCallback(() => {
+    if (focusMode === 'terminal-input') {
+      dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
+    }
+  }, [focusMode])
+  const handleSidebarMouseDrag = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (onResizeDrag?.(event) === true) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    },
+    [onResizeDrag]
+  )
+  const handleSidebarMouseUp = useCallback(() => {
+    onResizeDragEnd?.()
+  }, [onResizeDragEnd])
+  const handleEmbeddedHandleMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      const body = bodyRef.current
+      if (!body) return
+      event.preventDefault()
+      event.stopPropagation()
+      onEmbeddedGitResizeStart?.({
+        containerStart: body.y,
+        position: gitPane.position === 'top' ? 'top' : 'bottom',
+        totalSize: Math.max(1, body.height),
+      })
+    },
+    [gitPane.position, onEmbeddedGitResizeStart]
+  )
+  const sidebarMenu = useMemo<[string, () => void][]>(
+    () => [
+      ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
+      ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
+      [
+        'Toggle diff mode',
+        () => {
+          dispatchGlobal({ type: 'enter-git-mode' })
+          dispatchGlobal({ type: 'git-mode-toggle-diff-view' })
+        },
+      ],
+    ],
+    []
+  )
 
   if (!sidebarVisible) {
     return null
@@ -369,21 +440,7 @@ export function Sidebar({
     </ContextMenuBox>
   ) : null
   const embeddedHandle = gitEmbedded ? (
-    <box
-      minHeight={1}
-      flexShrink={0}
-      onMouseDown={(event) => {
-        const body = bodyRef.current
-        if (!body) return
-        event.preventDefault()
-        event.stopPropagation()
-        onEmbeddedGitResizeStart?.({
-          containerStart: body.y,
-          position: gitPane.position === 'top' ? 'top' : 'bottom',
-          totalSize: Math.max(1, body.height),
-        })
-      }}
-    >
+    <box minHeight={1} flexShrink={0} onMouseDown={handleEmbeddedHandleMouseDown}>
       <text fg={t.border} selectable={false}>
         {RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}
       </text>
@@ -398,31 +455,10 @@ export function Sidebar({
       backgroundColor={sidebarBg}
       gap={0}
       overflow="hidden"
-      rightClickMenu={[
-        ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
-        ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
-        [
-          'Toggle diff mode',
-          () => {
-            dispatchGlobal({ type: 'enter-git-mode' })
-            dispatchGlobal({ type: 'git-mode-toggle-diff-view' })
-          },
-        ],
-      ]}
-      onMouseDown={() => {
-        if (focusMode === 'terminal-input') {
-          dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
-        }
-      }}
-      onMouseDrag={(event) => {
-        if (onResizeDrag?.(event) === true) {
-          event.preventDefault()
-          event.stopPropagation()
-        }
-      }}
-      onMouseUp={() => {
-        onResizeDragEnd?.()
-      }}
+      rightClickMenu={sidebarMenu}
+      onMouseDown={handleSidebarMouseDown}
+      onMouseDrag={handleSidebarMouseDrag}
+      onMouseUp={handleSidebarMouseUp}
     >
       <box flexDirection="row" width={sidebarWidth} flexGrow={1} overflow="hidden">
         <box width={contentWidth} flexGrow={1} flexDirection="column" overflow="hidden">

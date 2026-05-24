@@ -1,6 +1,6 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 
-import { useLayoutEffect, useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo } from 'react'
 
 import { collectHelpEntries, HELP_MODE_LABELS } from '../../../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
@@ -48,22 +48,29 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
     dispatchGlobal({ count: filtered.length, type: 'set-help-entry-count' })
   }, [filtered.length])
 
-  const items: PickerItem[] = filtered.map((entry, index) => {
-    return {
-      group: entry.modeLabel,
-      key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
-      title: (
-        <text fg={t.textMuted} wrapMode="none">
-          {entry.description ?? ''}
-        </text>
-      ),
-      trailing: (
-        <text fg={t.textMuted} wrapMode="none">
-          {entry.keysDisplay}
-        </text>
-      ),
-    }
-  })
+  const items = useMemo<PickerItem[]>(
+    () =>
+      filtered.map((entry, index) => ({
+        group: entry.modeLabel,
+        key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
+        title: (
+          <text fg={t.textMuted} wrapMode="none">
+            {entry.description ?? ''}
+          </text>
+        ),
+        trailing: (
+          <text fg={t.textMuted} wrapMode="none">
+            {entry.keysDisplay}
+          </text>
+        ),
+      })),
+    [filtered, t]
+  )
+
+  const handleHover = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
 
   return (
     <Picker
@@ -79,7 +86,7 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
           {filter != null && filter !== '' ? 'No matching bindings.' : 'No bindings registered.'}
         </text>
       }
-      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+      onHover={handleHover}
     />
   )
 }

@@ -124,8 +124,9 @@ export function useDiffPreparation(
     const owner = requestOwner
     const version = requestVersionRef.current
     setPreparing(true)
-    void prepareDiff(diff, path, { signal: controller.signal })
-      .then((result) => {
+    void (async () => {
+      try {
+        const result = await prepareDiff(diff, path, { signal: controller.signal })
         if (
           controller.signal.aborted ||
           requestVersionRef.current !== version ||
@@ -142,9 +143,9 @@ export function useDiffPreparation(
           key: cacheKey,
           type: 'git-mode-set-parsed',
         })
-      })
-      .catch(() => {})
-      .finally(() => {
+      } catch {
+        // Aborted or failed preparation; nothing to surface here.
+      } finally {
         if (
           !controller.signal.aborted &&
           requestVersionRef.current === version &&
@@ -152,7 +153,8 @@ export function useDiffPreparation(
         ) {
           setPreparing(false)
         }
-      })
+      }
+    })()
 
     return () => {
       controller.abort()

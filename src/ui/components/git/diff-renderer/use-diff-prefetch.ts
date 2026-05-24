@@ -67,11 +67,15 @@ class PrefetchQueue {
       if (!task) break
       this.inflight.set(task.key, task.controller)
       this.running += 1
-      void this.execute(task).finally(() => {
-        this.inflight.delete(task.key)
-        this.running -= 1
-        this.pump()
-      })
+      void (async () => {
+        try {
+          await this.execute(task)
+        } finally {
+          this.inflight.delete(task.key)
+          this.running -= 1
+          this.pump()
+        }
+      })()
     }
   }
 }

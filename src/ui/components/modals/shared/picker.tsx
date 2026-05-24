@@ -1,8 +1,8 @@
 import type { ModeId } from '@brimveyn/aimux-config'
-import type { ScrollBoxRenderable } from '@opentui/core'
+import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 
 import { useTerminalDimensions } from '@opentui/react'
-import { type ReactNode, useLayoutEffect, useRef } from 'react'
+import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 
 import { useTheme } from '../../../theme'
 import { BareInput } from '../../primitives/bare-input'
@@ -49,35 +49,41 @@ function PickerItemCtas({
   onWorktree?: () => void
 }) {
   const t = useTheme()
+  const handleEdit = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      onEdit?.()
+    },
+    [onEdit]
+  )
+  const handleWorktree = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      onWorktree?.()
+    },
+    [onWorktree]
+  )
+  const handleDelete = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      onDelete?.()
+    },
+    [onDelete]
+  )
   return (
     <box flexDirection="row" gap={1}>
       {onEdit ? (
-        <box
-          onMouseDown={(event) => {
-            event.stopPropagation()
-            onEdit()
-          }}
-        >
+        <box onMouseDown={handleEdit}>
           <text fg={t.primary}>[edit]</text>
         </box>
       ) : null}
       {onWorktree ? (
-        <box
-          onMouseDown={(event) => {
-            event.stopPropagation()
-            onWorktree()
-          }}
-        >
+        <box onMouseDown={handleWorktree}>
           <text fg={t.warning}>[WT]</text>
         </box>
       ) : null}
       {onDelete ? (
-        <box
-          onMouseDown={(event) => {
-            event.stopPropagation()
-            onDelete()
-          }}
-        >
+        <box onMouseDown={handleDelete}>
           <text fg={t.error}>[del]</text>
         </box>
       ) : null}
@@ -109,13 +115,29 @@ export function Picker({
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const skipNextScrollRef = useRef(false)
 
-  const resetScrollTimer = () => {
+  const resetScrollTimer = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current)
     scrollTimerRef.current = setTimeout(() => {
       isScrollingRef.current = false
       scrollTimerRef.current = null
     }, 10)
-  }
+  }, [])
+
+  const handleScrollboxScroll = useCallback(() => {
+    isScrollingRef.current = true
+    resetScrollTimer()
+  }, [resetScrollTimer])
+
+  const handleItemHover = useCallback(
+    (index: number) => {
+      if (isScrollingRef.current) return
+      skipNextScrollRef.current = true
+      onHover(index)
+    },
+    [onHover]
+  )
+
+  const listContentOptions = useMemo(() => ({ flexDirection: 'column' as const, gap }), [gap])
 
   useLayoutEffect(() => {
     if (!scrollboxRef.current) return
@@ -128,7 +150,7 @@ export function Picker({
     isScrollingRef.current = true
     scrollboxRef.current.scrollChildIntoView(target)
     resetScrollTimer()
-  }, [selectedIndex, items])
+  }, [selectedIndex, items, resetScrollTimer])
 
   return (
     <ModalShell
@@ -144,11 +166,8 @@ export function Picker({
         ref={scrollboxRef}
         scrollY
         height={items.length === 0 ? 0 : listHeight}
-        contentOptions={{ flexDirection: 'column', gap }}
-        onMouseScroll={() => {
-          isScrollingRef.current = true
-          resetScrollTimer()
-        }}
+        contentOptions={listContentOptions}
+        onMouseScroll={handleScrollboxScroll}
       >
         {(() => {
           let prevGroup: string | undefined
@@ -181,15 +200,12 @@ export function Picker({
               <ListItem
                 key={item.key}
                 id={item.key}
+                index={capturedIndex}
                 active={active}
                 title={item.title}
                 subtitle={item.subtitle}
                 trailing={trailing}
-                onHover={() => {
-                  if (isScrollingRef.current) return
-                  skipNextScrollRef.current = true
-                  onHover(capturedIndex)
-                }}
+                onHoverIndex={handleItemHover}
                 onClick={item.onClick}
               />
             )
