@@ -80,12 +80,12 @@ Two ways to start a move:
 
 In the picker:
 
-| Key            | Action                          |
-| -------------- | ------------------------------- |
-| `j` / `k`, `↑` / `↓` | Choose the target worktree |
-| `d`            | Toggle **delete source after move** |
-| `Enter`        | Run the move                    |
-| `Esc`          | Cancel                          |
+| Key                  | Action                              |
+| -------------------- | ----------------------------------- |
+| `j` / `k`, `↑` / `↓` | Choose the target worktree          |
+| `d`                  | Toggle **delete source after move** |
+| `Enter`              | Run the move                        |
+| `Esc`                | Cancel                              |
 
 When the move succeeds, aimux switches you to the **target** worktree with the
 changes staged, ready to review and commit, and shows a success toast. If

@@ -43,14 +43,14 @@ The variant shortcuts take a `message` plus optional overrides:
 
 ## Options
 
-| Option       | Default                         | Notes                                                            |
-| ------------ | ------------------------------- | ---------------------------------------------------------------- |
-| `variant`    | `'info'`                        | `info` / `success` / `warning` / `error` — themed color + icon   |
-| `message`    | —                               | Body text                                                        |
-| `title`      | —                               | Optional bold heading above the message                          |
-| `content`    | —                               | A `ReactNode` rendered inside the toast shell instead of title/message |
-| `durationMs` | per-variant (see below)         | Auto-dismiss delay; `0` = sticky (until dismissed)               |
-| `position`   | `'top-right'`                   | `top\|bottom` × `left\|center\|right`                            |
+| Option       | Default                 | Notes                                                                  |
+| ------------ | ----------------------- | ---------------------------------------------------------------------- |
+| `variant`    | `'info'`                | `info` / `success` / `warning` / `error` — themed color + icon         |
+| `message`    | —                       | Body text                                                              |
+| `title`      | —                       | Optional bold heading above the message                                |
+| `content`    | —                       | A `ReactNode` rendered inside the toast shell instead of title/message |
+| `durationMs` | per-variant (see below) | Auto-dismiss delay; `0` = sticky (until dismissed)                     |
+| `position`   | `'top-right'`           | `top\|bottom` × `left\|center\|right`                                  |
 
 **Composition:** for anything beyond a title + message, pass `content`. The
 component still owns the chrome (border, padding), positioning, slide animation,
