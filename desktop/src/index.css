@@ -3,6 +3,22 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+@font-face {
+    font-family: "JetBrainsMono Nerd Font Mono";
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url("/fonts/JetBrainsMonoNerdFontMono-Regular.ttf") format("truetype");
+}
+
+@font-face {
+    font-family: "JetBrainsMono Nerd Font Mono";
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url("/fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* Fallback aimux palette so the app renders before the first WS projection.

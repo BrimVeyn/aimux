@@ -2,9 +2,10 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
 import type { TerminalSnapshot } from "@/lib/types";
 
-const FONT_FAMILY = "ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace";
+const FONT_FAMILY =
+  "'JetBrainsMono Nerd Font Mono', ui-monospace, 'SF Mono', Menlo, Monaco, monospace";
 const FONT_SIZE = 13;
-const LINE_HEIGHT = 17;
+const LINE_HEIGHT = 15;
 const DEFAULT_FG = "#edf4ff";
 const DEFAULT_BG = "#11151b";
 const MEASURE_CHARS = 50;
