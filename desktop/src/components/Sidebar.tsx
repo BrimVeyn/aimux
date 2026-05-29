@@ -1,18 +1,18 @@
 import { theme } from "@/lib/theme";
-import type { TabMeta } from "@/lib/types";
+import type { ProjectedTab } from "@/lib/types";
 
 import { Spinner } from "./Spinner";
 
 interface SidebarProps {
   sessionName: string | null;
-  tabs: TabMeta[];
+  tabs: ProjectedTab[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewTab: () => void;
 }
 
-function Activity({ tab }: { tab: TabMeta }) {
+function Activity({ tab }: { tab: ProjectedTab }) {
   if (tab.activity === "working") {
     return (
       <span style={{ color: theme.primary }}>

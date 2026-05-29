@@ -1,21 +1,22 @@
 import { theme } from "@/lib/theme";
-import type { SessionMeta } from "@/lib/types";
+import type { SessionRecordLite, SessionStatus } from "@/lib/types";
 
 import { Spinner } from "./Spinner";
 
 interface SessionBarProps {
-  sessions: SessionMeta[];
+  sessions: SessionRecordLite[];
+  statuses: Record<string, SessionStatus>;
   currentSessionId: string | null;
   onSwitch: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
 }
 
-function StatusDot({ session, active }: { session: SessionMeta; active: boolean }) {
-  if (session.status?.working === true) {
+function StatusDot({ status, active }: { status: SessionStatus | undefined; active: boolean }) {
+  if (status?.working === true) {
     return <Spinner color={theme.primary} />;
   }
-  if (session.status?.waiting === true) {
+  if (status?.waiting === true) {
     return <span style={{ color: theme.warning }}>?</span>;
   }
   return <span style={{ color: active ? theme.primary : theme.success }}>●</span>;
@@ -23,6 +24,7 @@ function StatusDot({ session, active }: { session: SessionMeta; active: boolean 
 
 export function SessionBar({
   sessions,
+  statuses,
   currentSessionId,
   onSwitch,
   onNew,
@@ -39,11 +41,11 @@ export function SessionBar({
           <div
             key={session.id}
             onMouseDown={() => onSwitch(session.id)}
-            title={session.path ?? session.name}
+            title={session.projectPath ?? session.name}
             className="group flex shrink-0 cursor-pointer items-center gap-1 rounded px-2 py-0.5"
             style={{ backgroundColor: active ? theme.backgroundElement : "transparent" }}
           >
-            <StatusDot session={session} active={active} />
+            <StatusDot status={statuses[session.id]} active={active} />
             <span style={{ color: active ? theme.text : theme.textMuted }}>
               [{index + 1}] {session.name}
             </span>

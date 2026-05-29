@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
-import { encodeKey } from "@/lib/keys";
-import type { TerminalModeState, TerminalSnapshot } from "@/lib/types";
+import type { TerminalSnapshot } from "@/lib/types";
 
 const FONT_FAMILY = "ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace";
 const FONT_SIZE = 13;
@@ -12,13 +11,14 @@ const MEASURE_CHARS = 50;
 
 interface TerminalProps {
   snapshot: TerminalSnapshot | null;
-  modes: TerminalModeState | null;
-  onInput: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   onScroll: (deltaLines: number) => void;
 }
 
-export function Terminal({ snapshot, modes, onInput, onResize, onScroll }: TerminalProps) {
+// Renders a backend TerminalSnapshot to a DOM grid and reports its measured
+// size. Keyboard/paste are handled at the window level (App.tsx) and routed
+// through the host's keymap pipeline.
+export function Terminal({ snapshot, onResize, onScroll }: TerminalProps) {
   const screenRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLSpanElement>(null);
   const cellRef = useRef({ height: LINE_HEIGHT, width: 8 });
@@ -38,7 +38,6 @@ export function Terminal({ snapshot, modes, onInput, onResize, onScroll }: Termi
     }
   }, [onResize]);
 
-  // Measure one monospace cell, then size the terminal to the window.
   useLayoutEffect(() => {
     const measure = () => {
       if (measureRef.current) {
@@ -61,30 +60,6 @@ export function Terminal({ snapshot, modes, onInput, onResize, onScroll }: Termi
     return () => observer.disconnect();
   }, [recomputeSize]);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const data = encodeKey(e.nativeEvent);
-      if (data !== null) {
-        e.preventDefault();
-        onInput(data);
-      }
-    },
-    [onInput],
-  );
-
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      e.preventDefault();
-      const text = e.clipboardData.getData("text");
-      if (text === "") {
-        return;
-      }
-      const wrapped = modes?.bracketedPasteMode === true ? `\x1b[200~${text}\x1b[201~` : text;
-      onInput(wrapped);
-    },
-    [modes, onInput],
-  );
-
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       const lines = Math.round(e.deltaY / LINE_HEIGHT) || (e.deltaY > 0 ? 1 : -1);
@@ -98,13 +73,8 @@ export function Terminal({ snapshot, modes, onInput, onResize, onScroll }: Termi
   return (
     <div
       ref={screenRef}
-      tabIndex={0}
-      autoFocus
-      onKeyDown={handleKeyDown}
-      onPaste={handlePaste}
       onWheel={handleWheel}
-      onMouseDown={() => screenRef.current?.focus()}
-      className="h-full w-full overflow-hidden outline-none"
+      className="h-full w-full overflow-hidden"
       style={{
         backgroundColor: DEFAULT_BG,
         color: DEFAULT_FG,
@@ -124,7 +94,7 @@ export function Terminal({ snapshot, modes, onInput, onResize, onScroll }: Termi
       {snapshot?.lines.map((line, rowIndex) => (
         <div key={rowIndex} style={{ height: LINE_HEIGHT }}>
           {line.spans.length === 0
-            ? " "
+            ? " "
             : line.spans.map((span, spanIndex) => {
                 const isCursor = span.cursor === true && cursorVisible;
                 return (

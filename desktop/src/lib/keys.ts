@@ -1,48 +1,54 @@
-// Translate a browser KeyboardEvent into the terminal byte string a PTY expects.
-// Returns null when the key is not handled (caller should let the browser keep
-// its default behaviour, e.g. for Cmd-based shortcuts).
+import type { KeyPayload } from "./types";
+
+// Normalize a browser KeyboardEvent into aimux's KeyInput shape. The host owns
+// chord matching AND terminal byte-encoding, so the browser only forwards a
+// normalized descriptor. Returns null for events we let the browser handle
+// (pure modifier presses, Cmd/Win shortcuts).
 
 const NAMED: Record<string, string> = {
-  ArrowUp: "\x1b[A",
-  ArrowDown: "\x1b[B",
-  ArrowRight: "\x1b[C",
-  ArrowLeft: "\x1b[D",
-  Home: "\x1b[H",
-  End: "\x1b[F",
-  PageUp: "\x1b[5~",
-  PageDown: "\x1b[6~",
-  Insert: "\x1b[2~",
-  Delete: "\x1b[3~",
-  Enter: "\r",
-  Tab: "\t",
-  Backspace: "\x7f",
-  Escape: "\x1b",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+  ArrowRight: "right",
+  ArrowUp: "up",
+  Backspace: "backspace",
+  Delete: "delete",
+  End: "end",
+  Enter: "return",
+  Escape: "escape",
+  Home: "home",
+  Insert: "insert",
+  PageDown: "pagedown",
+  PageUp: "pageup",
+  Tab: "tab",
+  " ": "space",
 };
 
-export function encodeKey(e: KeyboardEvent): string | null {
-  // Leave Cmd/Win shortcuts to the browser/OS (copy, paste, devtools, ...).
+const MODIFIER_KEYS = new Set(["Shift", "Control", "Alt", "Meta"]);
+
+export function normalizeKey(e: KeyboardEvent): KeyPayload | null {
+  if (MODIFIER_KEYS.has(e.key)) {
+    return null;
+  }
+  // Leave Cmd/Win shortcuts to the browser/OS (copy, paste, devtools).
   if (e.metaKey) {
     return null;
   }
 
   const named = NAMED[e.key];
+  let name: string;
   if (named !== undefined) {
-    return e.altKey ? `\x1b${named}` : named;
+    name = named;
+  } else if (e.key.length === 1 && /^[A-Za-z]$/.test(e.key)) {
+    name = e.key.toLowerCase();
+  } else {
+    name = e.key;
   }
 
-  // Ctrl+letter -> control byte (Ctrl+C = 0x03, etc.).
-  if (e.ctrlKey && e.key.length === 1) {
-    const code = e.key.toUpperCase().charCodeAt(0);
-    if (code >= 64 && code <= 95) {
-      return String.fromCharCode(code & 0x1f);
-    }
-    return null;
-  }
-
-  // Printable single character.
-  if (e.key.length === 1) {
-    return e.altKey ? `\x1b${e.key}` : e.key;
-  }
-
-  return null;
+  return {
+    ctrl: e.ctrlKey,
+    meta: e.altKey,
+    name,
+    sequence: e.key.length === 1 ? e.key : "",
+    shift: e.shiftKey,
+  };
 }

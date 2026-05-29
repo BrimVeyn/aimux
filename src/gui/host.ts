@@ -1,248 +1,214 @@
 import type { ServerWebSocket } from 'bun'
 
+import {
+  setAutoCommitEnabled,
+  setExternalEditorConfig,
+  setMultiRepoConfig,
+} from '@brimveyn/aimux-config'
 import { basename } from 'node:path'
 
-import type {
-  AssistantId,
-  SessionRecord,
-  TerminalModeState,
-  TerminalSnapshot,
-} from '../state/types'
+import type { LayoutState } from '../state/types'
 
-import { createSessionFromCurrentState, deleteSessionRecords } from '../app-runtime/session-actions'
+import { attachCurrentSession } from '../app-runtime/backend-attach-runtime'
+import { bindBackendRuntimeEvents } from '../app-runtime/backend-runtime-events'
+import {
+  createSessionFromCurrentState,
+  handleCreateSessionEffect,
+  handleDeleteSessionEffect,
+  handleSwitchSessionEffect,
+} from '../app-runtime/session-actions'
+import { loadConfig } from '../config'
+import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
-import { ASSISTANT_OPTIONS } from '../pty/command-registry'
+import { setActiveKeymap } from '../input/keymap/keymap-ref'
+import { registerAllModes } from '../input/modes/handlers'
 import { createSessionBackend } from '../session-backend/bootstrap'
+import { appStore } from '../state/app-store'
+import { setActiveDispatch, setActiveSideEffectRunner } from '../state/dispatch-ref'
 import {
   findMostRecentSession,
   loadSessionCatalog,
   saveSessionCatalog,
 } from '../state/session-catalog'
-import { getSessionProjectPath } from '../state/session-worktrees'
+import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
+import { applyTheme, setMode, setTransparent } from '../ui/theme'
+import { isKnownThemeId, type ThemeId } from '../ui/themes'
+import { createPipeline } from './host-pipeline'
+import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
 import { launchShell } from './launch-shell'
-import {
-  type GuiServerMessage,
-  parseClientMessage,
-  type SessionMeta,
-  type TabMeta,
-} from './protocol'
+import { type GuiServerMessage, parseClientMessage } from './protocol'
+import { projectAppState } from './state-projection'
 
 const GUI_PORT = 7878
-const DEFAULT_COLS = 80
-const DEFAULT_ROWS = 24
-
-interface CachedRender {
-  viewport: TerminalSnapshot
-  modes: TerminalModeState
-}
 
 export async function runGui(): Promise<void> {
+  const resolvedConfig = await loadUserConfig()
+  setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+  setMultiRepoConfig(resolvedConfig.multiRepo)
+  setExternalEditorConfig(resolvedConfig.externalEditor)
+
+  const json = loadConfig()
+
+  // Theme singleton (used by status-bar-model etc.); the browser also re-resolves.
+  const persisted =
+    json.themeId != null && json.themeId !== '' && isKnownThemeId(json.themeId)
+      ? json.themeId
+      : undefined
+  let themeId: ThemeId = persisted ?? resolvedConfig.theme?.initialId ?? 'aimux'
+  applyTheme(themeId)
+  if (resolvedConfig.theme?.initialMode) {
+    setMode(resolvedConfig.theme.initialMode)
+  }
+  if (json.themeMode) {
+    setMode(json.themeMode)
+  }
+  setTransparent(json.themeTransparent ?? false)
+
+  // Initial AppState (port of app.tsx's lazy init, trimmed for the GUI).
+  let sessionCatalog = loadSessionCatalog()
+  const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
+  const initial = createInitialState(json.customCommands, sessionCatalog, mergedSnippets, false, {
+    sessionBarPosition:
+      resolvedConfig.sessionBar?.initialPosition ?? json.sessionBarPosition ?? 'top',
+    sessionBarVisible: resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true,
+    sidebar: json.sidebar,
+  })
+  appStore.setState(initial)
+
+  const dispatch = appStore.getState().dispatch
+  const getState = () => appStore.getState()
+
+  // Resolve the initial session: most recent, else a fresh one for the cwd.
+  let initialSession = findMostRecentSession(sessionCatalog)
+  if (initialSession === undefined) {
+    const cwd = process.cwd()
+    const created = createSessionFromCurrentState(getState(), basename(cwd) || cwd, cwd)
+    sessionCatalog = created.sessions
+    saveSessionCatalog(sessionCatalog)
+    dispatch({ sessions: sessionCatalog, type: 'set-sessions' })
+    initialSession = created.session
+  }
+  dispatch({
+    sessionId: initialSession.id,
+    type: 'load-session',
+    workspaceSnapshot: initialSession.workspaceSnapshot,
+  })
+
   const backend = await createSessionBackend()
+  setActiveKeymap(resolvedConfig.keymaps)
+  const handlers = registerAllModes(resolvedConfig.keymaps)
+  setActiveDispatch(dispatch)
 
-  let sessions: SessionRecord[] = []
-  let currentSession: SessionRecord | null = null
-  let currentSessionId: string | null = null
-  let tabs: TabMeta[] = []
-  let activeTabId: string | null = null
-  let cols = DEFAULT_COLS
-  let rows = DEFAULT_ROWS
+  const timeouts = createTabTimeouts()
+  const renderer = createStubRenderer()
+
   let activeWs: ServerWebSocket<unknown> | null = null
-  const lastRender = new Map<string, CachedRender>()
-  const sessionStatuses = new Map<string, SessionMeta['status']>()
-
   const send = (message: GuiServerMessage): void => {
     activeWs?.send(JSON.stringify(message))
   }
 
-  const sessionMetas = (): SessionMeta[] =>
-    sessions.map((session) => ({
-      id: session.id,
-      name: session.name,
-      path: getSessionProjectPath(session),
-      status: sessionStatuses.get(session.id),
-    }))
-
-  const sendInit = (): void => {
-    send({
-      activeTabId,
-      cols,
-      currentSessionId,
-      rows,
-      sessions: sessionMetas(),
-      t: 'init',
-      tabs,
+  let broadcastScheduled = false
+  const broadcastState = (): void => {
+    send({ projection: projectAppState(getState(), themeId), t: 'state' })
+  }
+  const scheduleBroadcast = (): void => {
+    if (broadcastScheduled) {
+      return
+    }
+    broadcastScheduled = true
+    queueMicrotask(() => {
+      broadcastScheduled = false
+      broadcastState()
     })
   }
 
-  const broadcastTabs = (): void => {
-    send({ activeTabId, t: 'tabs', tabs })
-  }
+  const pipeline = createPipeline({
+    backend,
+    getThemeId: () => themeId,
+    renderer,
+    setThemeId: (id) => {
+      themeId = id
+      scheduleBroadcast()
+    },
+    timeouts,
+  })
+  pipeline.wireHandlerCallbacks(handlers)
+  setActiveSideEffectRunner(pipeline.runEffect)
 
-  const broadcastSessions = (): void => {
-    send({ currentSessionId, sessions: sessionMetas(), t: 'sessions' })
-  }
+  // Bind backend events (render/exit/error/activity) into the store, exactly
+  // like the TUI runtime. We don't call the returned cleanup (host lives on).
+  const resizingRef = { current: false }
+  bindBackendRuntimeEvents({
+    backend,
+    dispatch,
+    resizingRef,
+    syntaxOverlayEnabled: () => false,
+    timeouts: {
+      clearAllTimers: timeouts.clearAllTimers,
+      clearIdleTimer: timeouts.clearIdleTimer,
+      clearStartupGrace: timeouts.clearStartupGrace,
+    },
+  })
 
-  const replayActive = (): void => {
-    if (activeTabId === null) {
-      return
-    }
-    const cached = lastRender.get(activeTabId)
-    if (cached) {
-      send({ modes: cached.modes, t: 'render', tabId: activeTabId, viewport: cached.viewport })
-    }
-  }
-
-  const createTab = (assistant: AssistantId): void => {
-    const option =
-      ASSISTANT_OPTIONS.find((entry) => entry.id === assistant) ??
-      ASSISTANT_OPTIONS.find((entry) => entry.id === 'terminal')
-    if (!option) {
-      return
-    }
-
-    const tabId = crypto.randomUUID()
-    backend.createSession({
-      assistant: option.id,
-      cols,
-      command: option.command,
-      cwd: getSessionProjectPath(currentSession ?? undefined) ?? process.cwd(),
-      rows,
-      tabId,
-      title: option.label,
-    })
-    tabs = [
-      ...tabs,
-      { assistant: option.id, command: option.command, id: tabId, title: option.label },
-    ]
-    activeTabId = tabId
-    backend.setActiveTab(tabId)
-    broadcastTabs()
-  }
-
-  // Attach the backend to a session, hydrate its tabs, and (re)broadcast state.
-  const attachSession = async (session: SessionRecord): Promise<void> => {
-    const result = await backend.attach({
-      cols,
-      rows,
-      sessionId: session.id,
-      workspaceSnapshot: session.workspaceSnapshot,
-    })
-    currentSession = session
-    currentSessionId = session.id
-    lastRender.clear()
-
-    if (result !== null) {
-      tabs = result.tabs.map((tab) => ({
-        activity: tab.activity,
-        assistant: tab.assistant,
-        command: tab.command,
-        id: tab.id,
-        title: tab.title,
-      }))
-      activeTabId = result.activeTabId
-      for (const entry of result.initialSessionStatuses) {
-        sessionStatuses.set(entry.sessionId, entry.status)
-      }
-    } else {
-      tabs = []
-      activeTabId = null
-    }
-
-    if (tabs.length === 0) {
-      createTab('terminal')
-    } else if (activeTabId !== null) {
-      backend.setActiveTab(activeTabId)
-    }
-
-    sendInit()
-    broadcastSessions()
-  }
-
-  const switchSession = async (sessionId: string): Promise<void> => {
-    if (sessionId === currentSessionId) {
-      return
-    }
-    const target = sessions.find((session) => session.id === sessionId)
-    if (!target) {
-      return
-    }
-    const now = new Date().toISOString()
-    sessions = sessions.map((session) =>
-      session.id === sessionId ? { ...session, lastOpenedAt: now } : session
-    )
-    saveSessionCatalog(sessions)
-    await backend.destroy(true)
-    await attachSession(target)
-  }
-
-  const createSessionForFolder = async (path: string): Promise<void> => {
-    const state = createInitialState({}, sessions, [])
-    const created = createSessionFromCurrentState(state, basename(path) || path, path)
-    sessions = created.sessions
-    saveSessionCatalog(sessions)
-    await backend.destroy(true)
-    await attachSession(created.session)
-  }
-
-  const deleteSession = async (sessionId: string): Promise<void> => {
-    sessions = deleteSessionRecords(sessions, sessionId)
-    saveSessionCatalog(sessions)
-    if (sessionId !== currentSessionId) {
-      broadcastSessions()
-      return
-    }
-    await backend.destroy(true)
-    const next = findMostRecentSession(sessions)
-    await (next === undefined ? createSessionForFolder(process.cwd()) : attachSession(next))
-  }
-
+  // Forward the active tab's render to the browser (Phase 1: active only).
+  const lastRender = new Map<string, GuiServerMessage & { t: 'render' }>()
   backend.on('render', (tabId, viewport, modes) => {
-    lastRender.set(tabId, { modes, viewport })
-    if (tabId === activeTabId) {
-      send({ modes, t: 'render', tabId, viewport })
+    const message: GuiServerMessage & { t: 'render' } = { modes, t: 'render', tabId, viewport }
+    lastRender.set(tabId, message)
+    if (tabId === getState().activeTabId) {
+      send(message)
     }
   })
-  backend.on('tabActivity', (tabId, activity) => {
-    tabs = tabs.map((tab) => (tab.id === tabId ? { ...tab, activity } : tab))
-    send({ activity, t: 'tabActivity', tabId })
-  })
-  backend.on('sessionActivity', (sessionId, status) => {
-    sessionStatuses.set(sessionId, status)
-    broadcastSessions()
-  })
-  backend.on('exit', (tabId, code) => {
-    send({ code, t: 'exit', tabId })
-    tabs = tabs.filter((tab) => tab.id !== tabId)
-    lastRender.delete(tabId)
-    if (activeTabId === tabId) {
-      activeTabId = tabs.at(-1)?.id ?? null
-      if (activeTabId !== null) {
-        backend.setActiveTab(activeTabId)
+  const replayActive = (): void => {
+    const tabId = getState().activeTabId
+    if (tabId === null) {
+      return
+    }
+    const cached = lastRender.get(tabId)
+    if (cached) {
+      send(cached)
+    }
+  }
+
+  // React to session/active-tab changes (attach + setActiveTab), like the TUI runtime.
+  const layoutRef: { current: LayoutState } = { current: getState().layout }
+  const attachRequestIdRef = { current: 0 }
+  let lastSessionId = getState().currentSessionId
+  let lastActiveTabId = getState().activeTabId
+  const attachSession = (sessionId: string): void => {
+    const session = getState().sessions.find((entry) => entry.id === sessionId)
+    attachCurrentSession({
+      attachRequestIdRef,
+      backend,
+      currentSessionId: sessionId,
+      currentSessionWorkspaceSnapshot: session?.workspaceSnapshot,
+      dispatch,
+      layoutRef,
+    })
+  }
+  appStore.subscribe(() => {
+    const state = getState()
+    layoutRef.current = state.layout
+    if (state.currentSessionId !== lastSessionId) {
+      lastSessionId = state.currentSessionId
+      if (state.currentSessionId !== null && state.currentSessionId !== '') {
+        attachSession(state.currentSessionId)
       }
     }
-    broadcastTabs()
-  })
-  backend.on('error', (tabId, message) => {
-    send({ message, t: 'error', tabId })
+    if (state.activeTabId !== lastActiveTabId) {
+      lastActiveTabId = state.activeTabId
+      if (state.currentSessionId !== null && state.currentSessionId !== '') {
+        backend.setActiveTab(state.activeTabId)
+      }
+    }
+    scheduleBroadcast()
   })
 
-  // Resolve the initial session: most-recent from the catalog, else a fresh one
-  // for the current working directory.
-  sessions = loadSessionCatalog()
-  let initial = findMostRecentSession(sessions)
-  if (initial === undefined) {
-    const cwd = process.cwd()
-    const created = createSessionFromCurrentState(
-      createInitialState({}, sessions, []),
-      basename(cwd) || cwd,
-      cwd
-    )
-    sessions = created.sessions
-    saveSessionCatalog(sessions)
-    initial = created.session
+  // Initial attach (load-session above fired before subscribe was wired).
+  if (lastSessionId !== null && lastSessionId !== '') {
+    attachSession(lastSessionId)
   }
-  await attachSession(initial)
 
   const server = Bun.serve({
     fetch(req, srv) {
@@ -267,41 +233,59 @@ export async function runGui(): Promise<void> {
         if (message === null) {
           return
         }
+        const state = getState()
         switch (message.t) {
-          case 'input':
-            if (activeTabId !== null) {
-              backend.write(activeTabId, message.data)
-            }
+          case 'key':
+            pipeline.handleKey({
+              ctrl: message.ctrl,
+              meta: message.meta,
+              name: message.name,
+              sequence: message.sequence,
+              shift: message.shift,
+            })
             break
-          case 'resize':
-            cols = message.cols
-            rows = message.rows
-            backend.resizeAll(cols, rows)
+          case 'paste':
+            if (state.focusMode === 'terminal-input' && state.activeTabId !== null) {
+              const tab = state.tabs.find((entry) => entry.id === state.activeTabId)
+              const wrapped =
+                tab?.terminalModes.bracketedPasteMode === true
+                  ? `\x1b[200~${message.text}\x1b[201~`
+                  : message.text
+              backend.write(state.activeTabId, wrapped)
+            }
             break
           case 'scroll':
-            if (activeTabId !== null) {
-              backend.scrollViewport(activeTabId, message.deltaLines)
+            if (state.activeTabId !== null) {
+              backend.scrollViewport(state.activeTabId, message.deltaLines)
             }
             break
-          case 'setActiveTab':
-            activeTabId = message.tabId
-            backend.setActiveTab(message.tabId)
-            replayActive()
+          case 'resizeWindow':
+            dispatch({ cols: message.cols, rows: message.rows, type: 'set-terminal-size' })
+            backend.resizeAll(message.cols, message.rows)
             break
-          case 'createTab':
-            createTab(message.assistant)
+          case 'resizeTab':
+            backend.resizeTab(message.tabId, message.cols, message.rows)
             break
-          case 'closeTab':
-            backend.disposeSession(message.tabId)
+          case 'paneActivate':
+            dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
-          case 'switchSession':
-            void switchSession(message.sessionId)
+          case 'switchSession': {
+            const session = state.sessions.find((entry) => entry.id === message.sessionId)
+            if (session) {
+              handleSwitchSessionEffect(state, backend, dispatch, session)
+            }
             break
+          }
           case 'createSession':
-            void createSessionForFolder(message.path)
+            handleCreateSessionEffect(
+              state,
+              dispatch,
+              basename(message.path) || message.path,
+              message.path
+            )
             break
           case 'deleteSession':
-            void deleteSession(message.sessionId)
+            handleDeleteSessionEffect(state, backend, dispatch, message.sessionId)
             break
           default:
             break
@@ -309,7 +293,7 @@ export async function runGui(): Promise<void> {
       },
       open(ws) {
         activeWs = ws
-        sendInit()
+        broadcastState()
         replayActive()
       },
     },
@@ -333,7 +317,5 @@ export async function runGui(): Promise<void> {
       '  Browser (HMR):  cd desktop && bun run dev   -> http://localhost:1420\n' +
       '  Native window:  cd desktop && bun run tauri build, then `bun run gui`\n'
   )
-  // Host-only mode: never resolve, so index.tsx does not fall through to the
-  // @opentui TUI renderer. Bun.serve keeps the process alive in the background.
   await new Promise<never>(() => {})
 }

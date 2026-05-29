@@ -4,13 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@/Terminal";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
+import { normalizeKey } from "@/lib/keys";
 import { theme } from "@/lib/theme";
-import type {
-  SessionMeta,
-  TabMeta,
-  TerminalModeState,
-  TerminalSnapshot,
-} from "@/lib/types";
+import type { AppStateProjection, TerminalModeState, TerminalSnapshot } from "@/lib/types";
 import { type ConnectionStatus, GuiSocket } from "@/lib/ws";
 
 interface RenderState {
@@ -19,10 +15,7 @@ interface RenderState {
 }
 
 function App() {
-  const [tabs, setTabs] = useState<TabMeta[]>([]);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [projection, setProjection] = useState<AppStateProjection | null>(null);
   const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const socketRef = useRef<GuiSocket | null>(null);
@@ -31,20 +24,8 @@ function App() {
     document.documentElement.classList.add("dark");
     const socket = new GuiSocket((message) => {
       switch (message.t) {
-        case "init":
-          setTabs(message.tabs);
-          setActiveTabId(message.activeTabId);
-          setSessions(message.sessions);
-          setCurrentSessionId(message.currentSessionId);
-          setRenders({});
-          break;
-        case "tabs":
-          setTabs(message.tabs);
-          setActiveTabId(message.activeTabId);
-          break;
-        case "sessions":
-          setSessions(message.sessions);
-          setCurrentSessionId(message.currentSessionId);
+        case "state":
+          setProjection(message.projection);
           break;
         case "render":
           setRenders((prev) => ({
@@ -52,15 +33,9 @@ function App() {
             [message.tabId]: { modes: message.modes, viewport: message.viewport },
           }));
           break;
-        case "tabActivity":
-          setTabs((prev) =>
-            prev.map((tab) =>
-              tab.id === message.tabId ? { ...tab, activity: message.activity } : tab,
-            ),
-          );
-          break;
         case "exit":
         case "error":
+        case "toast":
           break;
         default:
           break;
@@ -71,17 +46,47 @@ function App() {
     return () => socket.dispose();
   }, []);
 
-  const selectTab = useCallback((tabId: string) => {
-    setActiveTabId(tabId);
-    socketRef.current?.send({ t: "setActiveTab", tabId });
+  // Window-level keyboard: every key flows to the host, which runs aimux's
+  // keymap/mode pipeline (and forwards unbound keys to the PTY in terminal-input).
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const key = normalizeKey(e);
+      if (key === null) {
+        return;
+      }
+      e.preventDefault();
+      socketRef.current?.send({ t: "key", ...key });
+    };
+    const onPaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData("text") ?? "";
+      if (text !== "") {
+        e.preventDefault();
+        socketRef.current?.send({ t: "paste", text });
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("paste", onPaste);
+    };
   }, []);
 
-  const newTab = useCallback(() => {
-    socketRef.current?.send({ assistant: "terminal", t: "createTab" });
+  const activateTab = useCallback((tabId: string) => {
+    socketRef.current?.send({ t: "paneActivate", tabId });
   }, []);
 
   const closeTab = useCallback((tabId: string) => {
-    socketRef.current?.send({ t: "closeTab", tabId });
+    // Close via aimux's default `dd` binding on the (now active) tab.
+    socketRef.current?.send({ t: "paneActivate", tabId });
+    const d = { ctrl: false, meta: false, name: "d", sequence: "d", shift: false, t: "key" } as const;
+    socketRef.current?.send(d);
+    socketRef.current?.send(d);
+  }, []);
+
+  const newTab = useCallback(() => {
+    // Open the new-tab modal (Ctrl+N). Modal UI lands in Phase 3.
+    socketRef.current?.send({ ctrl: true, meta: false, name: "n", sequence: "n", shift: false, t: "key" });
   }, []);
 
   const switchSession = useCallback((sessionId: string) => {
@@ -107,50 +112,46 @@ function App() {
     })();
   }, []);
 
-  const onInput = useCallback((data: string) => {
-    socketRef.current?.send({ data, t: "input" });
-  }, []);
-
   const onResize = useCallback((cols: number, rows: number) => {
-    socketRef.current?.send({ cols, rows, t: "resize" });
+    socketRef.current?.send({ cols, rows, t: "resizeWindow" });
   }, []);
 
   const onScroll = useCallback((deltaLines: number) => {
     socketRef.current?.send({ deltaLines, t: "scroll" });
   }, []);
 
+  const activeTabId = projection?.activeTabId ?? null;
   const active = activeTabId !== null ? (renders[activeTabId] ?? null) : null;
-  const sessionName = sessions.find((s) => s.id === currentSessionId)?.name ?? null;
+  const currentSession = projection?.sessions.find((s) => s.id === projection.currentSessionId);
 
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
       <SessionBar
-        sessions={sessions}
-        currentSessionId={currentSessionId}
+        sessions={projection?.sessions ?? []}
+        statuses={projection?.sessionStatuses ?? {}}
+        currentSessionId={projection?.currentSessionId ?? null}
         onSwitch={switchSession}
         onNew={newSession}
         onDelete={deleteSession}
       />
       <div className="flex min-h-0 flex-1">
         <Sidebar
-          sessionName={sessionName}
-          tabs={tabs}
+          sessionName={currentSession?.name ?? null}
+          tabs={projection?.tabs ?? []}
           activeTabId={activeTabId}
-          onSelectTab={selectTab}
+          onSelectTab={activateTab}
           onCloseTab={closeTab}
           onNewTab={newTab}
         />
         <main className="min-w-0 flex-1">
           <Terminal
             snapshot={active?.viewport ?? null}
-            modes={active?.modes ?? null}
-            onInput={onInput}
             onResize={onResize}
             onScroll={onScroll}
           />
         </main>
         <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
-          {status === "open" ? "" : status}
+          {status === "open" ? (projection?.focusMode ?? "") : status}
         </span>
       </div>
     </div>
