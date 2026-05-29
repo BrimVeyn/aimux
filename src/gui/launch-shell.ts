@@ -29,6 +29,13 @@ async function resolveShellBinary(): Promise<string | null> {
  * runs `bun run tauri dev` in `desktop/` themselves).
  */
 export async function launchShell(port: number): Promise<Subprocess | null> {
+  // Browser-dev mode: keep the host running without opening the native window,
+  // so the frontend can be served by Vite (HMR) and opened in a browser.
+  if (process.env.AIMUX_GUI_NO_SHELL === '1') {
+    logDebug('gui.launchShell.skipped', { reason: 'AIMUX_GUI_NO_SHELL' })
+    return null
+  }
+
   const binary = await resolveShellBinary()
   if (binary === null) {
     logDebug('gui.launchShell.noBinary', { candidates: SHELL_BINARY_CANDIDATES })

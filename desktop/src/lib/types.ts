@@ -35,11 +35,24 @@ export interface TerminalModeState {
 
 export type TabActivity = "working" | "waiting-input" | "idle";
 
+export interface SessionStatus {
+  working: boolean;
+  waiting: boolean;
+}
+
 export interface TabMeta {
   id: string;
   title: string;
+  command: string;
   assistant: string;
   activity?: TabActivity;
+}
+
+export interface SessionMeta {
+  id: string;
+  name: string;
+  path?: string;
+  status?: SessionStatus;
 }
 
 export type GuiClientMessage =
@@ -48,7 +61,10 @@ export type GuiClientMessage =
   | { t: "scroll"; deltaLines: number }
   | { t: "setActiveTab"; tabId: string }
   | { t: "createTab"; assistant: string }
-  | { t: "closeTab"; tabId: string };
+  | { t: "closeTab"; tabId: string }
+  | { t: "switchSession"; sessionId: string }
+  | { t: "createSession"; path: string }
+  | { t: "deleteSession"; sessionId: string };
 
 export type GuiServerMessage =
   | {
@@ -57,9 +73,12 @@ export type GuiServerMessage =
       activeTabId: string | null;
       cols: number;
       rows: number;
+      sessions: SessionMeta[];
+      currentSessionId: string | null;
     }
   | { t: "render"; tabId: string; viewport: TerminalSnapshot; modes: TerminalModeState }
   | { t: "exit"; tabId: string; code: number }
   | { t: "error"; tabId: string; message: string }
   | { t: "tabActivity"; tabId: string; activity: TabActivity }
-  | { t: "tabs"; tabs: TabMeta[]; activeTabId: string | null };
+  | { t: "tabs"; tabs: TabMeta[]; activeTabId: string | null }
+  | { t: "sessions"; sessions: SessionMeta[]; currentSessionId: string | null };

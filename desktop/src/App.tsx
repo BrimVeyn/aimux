@@ -1,10 +1,16 @@
-import { Plus } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Terminal } from "@/Terminal";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TabMeta, TerminalModeState, TerminalSnapshot } from "@/lib/types";
+import { SessionBar } from "@/components/SessionBar";
+import { Sidebar } from "@/components/Sidebar";
+import { theme } from "@/lib/theme";
+import type {
+  SessionMeta,
+  TabMeta,
+  TerminalModeState,
+  TerminalSnapshot,
+} from "@/lib/types";
 import { type ConnectionStatus, GuiSocket } from "@/lib/ws";
 
 interface RenderState {
@@ -12,14 +18,11 @@ interface RenderState {
   modes: TerminalModeState;
 }
 
-const ACTIVITY_COLOR: Record<string, string> = {
-  "waiting-input": "bg-sky-400",
-  working: "bg-amber-400",
-};
-
 function App() {
   const [tabs, setTabs] = useState<TabMeta[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const socketRef = useRef<GuiSocket | null>(null);
@@ -31,10 +34,17 @@ function App() {
         case "init":
           setTabs(message.tabs);
           setActiveTabId(message.activeTabId);
+          setSessions(message.sessions);
+          setCurrentSessionId(message.currentSessionId);
+          setRenders({});
           break;
         case "tabs":
           setTabs(message.tabs);
           setActiveTabId(message.activeTabId);
+          break;
+        case "sessions":
+          setSessions(message.sessions);
+          setCurrentSessionId(message.currentSessionId);
           break;
         case "render":
           setRenders((prev) => ({
@@ -66,8 +76,35 @@ function App() {
     socketRef.current?.send({ t: "setActiveTab", tabId });
   }, []);
 
-  const createTerminal = useCallback(() => {
+  const newTab = useCallback(() => {
     socketRef.current?.send({ assistant: "terminal", t: "createTab" });
+  }, []);
+
+  const closeTab = useCallback((tabId: string) => {
+    socketRef.current?.send({ t: "closeTab", tabId });
+  }, []);
+
+  const switchSession = useCallback((sessionId: string) => {
+    socketRef.current?.send({ sessionId, t: "switchSession" });
+  }, []);
+
+  const deleteSession = useCallback((sessionId: string) => {
+    socketRef.current?.send({ sessionId, t: "deleteSession" });
+  }, []);
+
+  const newSession = useCallback(() => {
+    void (async () => {
+      let path: string | null = null;
+      try {
+        const picked = await open({ directory: true, multiple: false });
+        path = typeof picked === "string" ? picked : null;
+      } catch {
+        path = window.prompt("Folder path for new session:");
+      }
+      if (path !== null && path !== "") {
+        socketRef.current?.send({ path, t: "createSession" });
+      }
+    })();
   }, []);
 
   const onInput = useCallback((data: string) => {
@@ -83,38 +120,39 @@ function App() {
   }, []);
 
   const active = activeTabId !== null ? (renders[activeTabId] ?? null) : null;
+  const sessionName = sessions.find((s) => s.id === currentSessionId)?.name ?? null;
 
   return (
-    <div className="dark flex h-screen w-screen flex-col bg-background text-foreground">
-      <header className="flex items-center gap-2 border-b px-2 py-1.5">
-        <Tabs value={activeTabId ?? undefined} onValueChange={selectTab}>
-          <TabsList>
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab.id} value={tab.id} className="gap-1.5">
-                <span
-                  className={`size-1.5 rounded-full ${ACTIVITY_COLOR[tab.activity ?? ""] ?? "bg-transparent"}`}
-                />
-                {tab.title}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-        <Button size="icon" variant="ghost" className="size-7" onClick={createTerminal}>
-          <Plus className="size-4" />
-        </Button>
-        <span className="ml-auto text-xs text-muted-foreground">
-          {status === "open" ? "connected" : status}
-        </span>
-      </header>
-      <main className="min-h-0 flex-1">
-        <Terminal
-          snapshot={active?.viewport ?? null}
-          modes={active?.modes ?? null}
-          onInput={onInput}
-          onResize={onResize}
-          onScroll={onScroll}
+    <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
+      <SessionBar
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSwitch={switchSession}
+        onNew={newSession}
+        onDelete={deleteSession}
+      />
+      <div className="flex min-h-0 flex-1">
+        <Sidebar
+          sessionName={sessionName}
+          tabs={tabs}
+          activeTabId={activeTabId}
+          onSelectTab={selectTab}
+          onCloseTab={closeTab}
+          onNewTab={newTab}
         />
-      </main>
+        <main className="min-w-0 flex-1">
+          <Terminal
+            snapshot={active?.viewport ?? null}
+            modes={active?.modes ?? null}
+            onInput={onInput}
+            onResize={onResize}
+            onScroll={onScroll}
+          />
+        </main>
+        <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
+          {status === "open" ? "" : status}
+        </span>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,10 @@
-import type { AssistantId, TabActivity, TerminalModeState, TerminalSnapshot } from '../state/types'
+import type {
+  AssistantId,
+  SessionStatus,
+  TabActivity,
+  TerminalModeState,
+  TerminalSnapshot,
+} from '../state/types'
 
 /**
  * Thin WebSocket message contract between the GUI host (`src/gui/host.ts`) and
@@ -14,8 +20,17 @@ import type { AssistantId, TabActivity, TerminalModeState, TerminalSnapshot } fr
 export interface TabMeta {
   id: string
   title: string
+  command: string
   assistant: AssistantId
   activity?: TabActivity
+}
+
+/** Lightweight session (workspace) descriptor for the session bar. */
+export interface SessionMeta {
+  id: string
+  name: string
+  path?: string
+  status?: SessionStatus
 }
 
 /** Messages sent from the browser to the host. */
@@ -26,6 +41,9 @@ export type GuiClientMessage =
   | { t: 'setActiveTab'; tabId: string }
   | { t: 'createTab'; assistant: AssistantId }
   | { t: 'closeTab'; tabId: string }
+  | { t: 'switchSession'; sessionId: string }
+  | { t: 'createSession'; path: string }
+  | { t: 'deleteSession'; sessionId: string }
 
 /** Messages sent from the host to the browser. */
 export type GuiServerMessage =
@@ -35,12 +53,15 @@ export type GuiServerMessage =
       activeTabId: string | null
       cols: number
       rows: number
+      sessions: SessionMeta[]
+      currentSessionId: string | null
     }
   | { t: 'render'; tabId: string; viewport: TerminalSnapshot; modes: TerminalModeState }
   | { t: 'exit'; tabId: string; code: number }
   | { t: 'error'; tabId: string; message: string }
   | { t: 'tabActivity'; tabId: string; activity: TabActivity }
   | { t: 'tabs'; tabs: TabMeta[]; activeTabId: string | null }
+  | { t: 'sessions'; sessions: SessionMeta[]; currentSessionId: string | null }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -81,6 +102,16 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
         : null
     case 'closeTab':
       return typeof value.tabId === 'string' ? { t: 'closeTab', tabId: value.tabId } : null
+    case 'switchSession':
+      return typeof value.sessionId === 'string'
+        ? { sessionId: value.sessionId, t: 'switchSession' }
+        : null
+    case 'createSession':
+      return typeof value.path === 'string' ? { path: value.path, t: 'createSession' } : null
+    case 'deleteSession':
+      return typeof value.sessionId === 'string'
+        ? { sessionId: value.sessionId, t: 'deleteSession' }
+        : null
     default:
       return null
   }

@@ -6,8 +6,8 @@ import type { TerminalModeState, TerminalSnapshot } from "@/lib/types";
 const FONT_FAMILY = "ui-monospace, 'SF Mono', Menlo, Monaco, 'Cascadia Code', monospace";
 const FONT_SIZE = 13;
 const LINE_HEIGHT = 17;
-const DEFAULT_FG = "#d4d4d4";
-const DEFAULT_BG = "#1e1e1e";
+const DEFAULT_FG = "#edf4ff";
+const DEFAULT_BG = "#11151b";
 const MEASURE_CHARS = 50;
 
 interface TerminalProps {
