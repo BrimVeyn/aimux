@@ -18,6 +18,16 @@ interface Options {
   compareRef?: string
 }
 
+interface StartOptions {
+  enabled: boolean
+  projectPath: string | undefined
+  headOffset: number
+  compareRef?: string
+  // Snapshot getter — called at the start of every tick so repo changes are
+  // picked up without restarting the loop.
+  getRepos: () => DiscoveredRepo[]
+}
+
 function tagFiles(files: GitFileEntry[], repoPath: string): GitFileEntry[] {
   return files.map((f) => ({ ...f, repoPath }))
 }
@@ -71,6 +81,70 @@ async function collectAggregated(
   return { kind: 'ok', payload }
 }
 
+/**
+ * Headless git-panel poller. Returns a disposer that cancels the loop and
+ * clears the pending timer. Used by `useGitPanelPolling` (React) and the GUI
+ * host (no React root). Same observable behavior as the previous useEffect
+ * body lived inside `useGitPanelPolling`.
+ */
+export function startGitPanelPolling({
+  compareRef,
+  enabled,
+  getRepos,
+  headOffset,
+  projectPath,
+}: StartOptions): () => void {
+  if (!enabled || !(projectPath != null && projectPath !== '')) {
+    return () => {}
+  }
+
+  dispatchGlobal({ type: 'git-panel-reset' })
+
+  let cancelled = false
+  let timer: ReturnType<typeof setTimeout> | null = null
+  let delay = BASE_INTERVAL_MS
+
+  const schedule = () => {
+    if (cancelled) return
+    timer = setTimeout(() => void tick(), delay)
+  }
+
+  const tick = async () => {
+    const repos = getRepos()
+    const result =
+      repos.length > 0
+        ? await collectAggregated(repos, projectPath, headOffset, compareRef)
+        : await collectGitStatus(projectPath, { compareRef, headOffset })
+    if (cancelled) return
+    if (result.kind === 'ok') {
+      const payload =
+        repos.length === 0
+          ? { ...result.payload, files: tagFiles(result.payload.files, projectPath) }
+          : result.payload
+      dispatchGlobal({ payload, type: 'git-refresh-success' })
+      delay = BASE_INTERVAL_MS
+    } else if (result.kind === 'out-of-range') {
+      dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })
+      dispatchGlobal({
+        message: `no older commit — clamped to HEAD~${result.maxOffset}`,
+        type: 'git-mode-set-message',
+      })
+      delay = BASE_INTERVAL_MS
+    } else {
+      dispatchGlobal({ kind: result.error, type: 'git-refresh-error' })
+      delay = Math.min(delay * 2, MAX_INTERVAL_MS)
+    }
+    schedule()
+  }
+
+  void tick()
+
+  return () => {
+    cancelled = true
+    if (timer) clearTimeout(timer)
+  }
+}
+
 export function useGitPanelPolling({
   compareRef,
   enabled,
@@ -82,51 +156,12 @@ export function useGitPanelPolling({
   const repos = useAppStore((s) => s.multiRepo.repos)
 
   useEffect(() => {
-    if (!enabled || !(projectPath != null && projectPath !== '')) return
-
-    dispatchGlobal({ type: 'git-panel-reset' })
-
-    let cancelled = false
-    let timer: ReturnType<typeof setTimeout> | null = null
-    let delay = BASE_INTERVAL_MS
-
-    const schedule = () => {
-      if (cancelled) return
-      timer = setTimeout(() => void tick(), delay)
-    }
-
-    const tick = async () => {
-      const result =
-        repos.length > 0
-          ? await collectAggregated(repos, projectPath, headOffset, compareRef)
-          : await collectGitStatus(projectPath, { compareRef, headOffset })
-      if (cancelled) return
-      if (result.kind === 'ok') {
-        const payload =
-          repos.length === 0
-            ? { ...result.payload, files: tagFiles(result.payload.files, projectPath) }
-            : result.payload
-        dispatchGlobal({ payload, type: 'git-refresh-success' })
-        delay = BASE_INTERVAL_MS
-      } else if (result.kind === 'out-of-range') {
-        dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })
-        dispatchGlobal({
-          message: `no older commit — clamped to HEAD~${result.maxOffset}`,
-          type: 'git-mode-set-message',
-        })
-        delay = BASE_INTERVAL_MS
-      } else {
-        dispatchGlobal({ kind: result.error, type: 'git-refresh-error' })
-        delay = Math.min(delay * 2, MAX_INTERVAL_MS)
-      }
-      schedule()
-    }
-
-    void tick()
-
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
+    return startGitPanelPolling({
+      compareRef,
+      enabled,
+      getRepos: () => repos,
+      headOffset,
+      projectPath,
+    })
   }, [enabled, projectPath, headOffset, compareRef, repos])
 }

@@ -21,6 +21,8 @@ import {
 import { loadConfig } from '../config'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
+import { startGitPanelPolling } from '../git/git-poller'
+import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
 import { createSessionBackend } from '../session-backend/bootstrap'
@@ -31,6 +33,7 @@ import {
   loadSessionCatalog,
   saveSessionCatalog,
 } from '../state/session-catalog'
+import { getSessionProjectPath } from '../state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
 import {
@@ -217,6 +220,51 @@ export async function runGui(): Promise<void> {
       layoutRef,
     })
   }
+
+  // Git pollers — the TUI runs these from React hooks (git-view, git-pane-widget,
+  // sidebar). Without a React root in GUI mode they never start, so gitPanel.files
+  // stays empty forever. Drive them from the host instead so the projection
+  // mirrors the same data the TUI sees.
+  //
+  // Restart the panel poller whenever the inputs change (projectPath / headOffset
+  // / repos). compareRef (review-vs-base fork point) needs an async git merge-base
+  // resolution and is only meaningful in git focus mode — left as undefined for
+  // Stage 2a (read-only panel). It will be wired in Stage 2b alongside the diff
+  // viewer.
+  const projectPathOf = (state: ReturnType<typeof getState>): string | undefined => {
+    const id = state.currentSessionId
+    const session = id != null && id !== '' ? state.sessions.find((s) => s.id === id) : undefined
+    return getSessionProjectPath(session)
+  }
+  const disposers: { divergence: (() => void) | null; panel: (() => void) | null } = {
+    divergence: null,
+    panel: null,
+  }
+  let lastPanelProjectPath = projectPathOf(getState())
+  let lastPanelHeadOffset = getState().gitMode.headOffset
+  let lastPanelRepos = getState().multiRepo.repos
+  const restartPanelPoll = (): void => {
+    disposers.panel?.()
+    disposers.panel = startGitPanelPolling({
+      enabled: true,
+      getRepos: () => appStore.getState().multiRepo.repos,
+      headOffset: lastPanelHeadOffset,
+      projectPath: lastPanelProjectPath,
+    })
+  }
+  let lastDivergenceSessionId = getState().currentSessionId
+  let lastDivergenceSessions = getState().sessions
+  const restartDivergencePoll = (): void => {
+    disposers.divergence?.()
+    disposers.divergence = startWorktreeDivergencePolling({
+      enabled: true,
+      getCurrentSessionId: () => appStore.getState().currentSessionId,
+      getSessions: () => appStore.getState().sessions,
+    })
+  }
+  restartPanelPoll()
+  restartDivergencePoll()
+
   appStore.subscribe(() => {
     const state = getState()
     layoutRef.current = state.layout
@@ -231,6 +279,31 @@ export async function runGui(): Promise<void> {
       if (state.currentSessionId !== null && state.currentSessionId !== '') {
         backend.setActiveTab(state.activeTabId)
       }
+    }
+    // Panel poller — restart when any of its inputs change.
+    const nextPath = projectPathOf(state)
+    const nextOffset = state.gitMode.headOffset
+    const nextRepos = state.multiRepo.repos
+    if (
+      nextPath !== lastPanelProjectPath ||
+      nextOffset !== lastPanelHeadOffset ||
+      nextRepos !== lastPanelRepos
+    ) {
+      lastPanelProjectPath = nextPath
+      lastPanelHeadOffset = nextOffset
+      lastPanelRepos = nextRepos
+      restartPanelPoll()
+    }
+    // Divergence poller — restart when session identity or sessions array changes
+    // (worktrees live inside sessions, so any worktree change comes with a new
+    // sessions reference via the reducer's immutable updates).
+    if (
+      state.currentSessionId !== lastDivergenceSessionId ||
+      state.sessions !== lastDivergenceSessions
+    ) {
+      lastDivergenceSessionId = state.currentSessionId
+      lastDivergenceSessions = state.sessions
+      restartDivergencePoll()
     }
     directorySearch.onModal(state.modal)
     scheduleBroadcast()
@@ -390,6 +463,8 @@ export async function runGui(): Promise<void> {
   const shell = await launchShell(port)
   if (shell !== null) {
     await shell.exited
+    disposers.panel?.()
+    disposers.divergence?.()
     await backend.destroy()
     void server.stop()
     process.exit(0)
