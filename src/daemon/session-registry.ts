@@ -18,6 +18,7 @@ import { createDefaultTerminalModes } from '../state/terminal-modes'
 
 interface SessionRegistryEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
+  bytes: [tabId: string, data: string]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
 }
@@ -29,6 +30,9 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
 
   constructor() {
     super()
+    this.ptyManager.on('bytes', (tabId, data) => {
+      this.emit('bytes', tabId, data)
+    })
     this.ptyManager.on('render', (tabId, viewport, terminalModes) => {
       const tab = this.tabs.get(tabId)
       if (!tab) {
@@ -183,6 +187,10 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
 
   scrollViewportToBottom(tabId: string): void {
     this.ptyManager.scrollViewportToBottom(tabId)
+  }
+
+  serializeBuffer(tabId: string): string {
+    return this.ptyManager.serializeBuffer(tabId)
   }
 
   setActiveTab(tabId: string | null): void {

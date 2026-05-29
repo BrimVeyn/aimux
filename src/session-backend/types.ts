@@ -11,6 +11,7 @@ import type {
 
 export interface SessionBackendEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
+  bytes: [tabId: string, data: string]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
   sessionActivity: [sessionId: string, status: SessionStatus]
@@ -48,6 +49,7 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
   write(tabId: string, input: string): void
   scrollViewport(tabId: string, deltaLines: number): void
   scrollViewportToBottom(tabId: string): void
+  serializeBuffer(tabId: string): string
   setActiveTab(tabId: string | null): void
   resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void
   resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void

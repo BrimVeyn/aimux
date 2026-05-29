@@ -17,6 +17,7 @@ interface SessionManagerEvents {
     viewport: TerminalSnapshot,
     terminalModes: TerminalModeState,
   ]
+  bytes: [sessionId: string, tabId: string, data: string]
   exit: [sessionId: string, tabId: string, exitCode: number]
   error: [sessionId: string, tabId: string, message: string]
 }
@@ -31,6 +32,9 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     }
 
     const registry = new SessionRegistry()
+    registry.on('bytes', (tabId, data) => {
+      this.emit('bytes', sessionId, tabId, data)
+    })
     registry.on('render', (tabId, viewport, terminalModes) => {
       this.emit('render', sessionId, tabId, viewport, terminalModes)
     })
@@ -87,6 +91,10 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   scrollToBottom(sessionId: string, tabId: string): void {
     this.getOrCreateRegistry(sessionId).scrollViewportToBottom(tabId)
+  }
+
+  serializeBuffer(sessionId: string, tabId: string): string {
+    return this.registries.get(sessionId)?.serializeBuffer(tabId) ?? ''
   }
 
   setActiveTab(sessionId: string, tabId: string | null): void {

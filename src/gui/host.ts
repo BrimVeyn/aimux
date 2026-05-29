@@ -198,8 +198,33 @@ export async function runGui(): Promise<void> {
       send(message)
     }
   })
+  // Per-WS-connection set of tabs we've already sent a serialized buffer dump
+  // for, so live `bytes` events don't double-paint the scrollback. Cleared on
+  // every new connection (the client xterm.js is empty at that point).
+  let dumpedTabIds = new Set<string>()
+  const sendBytesDump = (tabId: string): void => {
+    if (dumpedTabIds.has(tabId)) return
+    const data = backend.serializeBuffer(tabId)
+    dumpedTabIds.add(tabId)
+    if (data !== '') {
+      send({ data, t: 'bytes', tabId })
+    }
+  }
+  backend.on('bytes', (tabId, data) => {
+    // Live PTY output: only forward once the initial dump has been sent for
+    // this tab on the current connection, so the client xterm.js never sees
+    // a delta before the buffer it belongs to.
+    if (!visibleTabIds().includes(tabId)) return
+    if (!dumpedTabIds.has(tabId)) {
+      sendBytesDump(tabId)
+    }
+    send({ data, t: 'bytes', tabId })
+  })
   const replayVisible = (): void => {
     for (const tabId of visibleTabIds()) {
+      // Always replay the serialized buffer first — it's the source of truth
+      // for the visible scrollback after a reconnect / tab switch.
+      sendBytesDump(tabId)
       const cached = lastRender.get(tabId)
       if (cached) {
         send(cached)
@@ -392,6 +417,9 @@ export async function runGui(): Promise<void> {
       close(ws) {
         if (activeWs === ws) {
           activeWs = null
+          // Drop the per-connection dump set so the next client gets a fresh
+          // serialized buffer for each visible tab on connect.
+          dumpedTabIds = new Set<string>()
         }
       },
       message(ws, raw) {
@@ -492,8 +520,20 @@ export async function runGui(): Promise<void> {
       },
       open(ws) {
         activeWs = ws
-        broadcastState()
-        replayVisible()
+        // Fresh client → empty xterm.js → re-dump every visible tab.
+        dumpedTabIds = new Set<string>()
+        try {
+          broadcastState()
+        } catch (error) {
+          process.stderr.write(`gui.host.open.broadcastState threw: ${String(error)}\n`)
+          logDebug('gui.host.open.broadcastStateThrew', { error: String(error) })
+        }
+        try {
+          replayVisible()
+        } catch (error) {
+          process.stderr.write(`gui.host.open.replayVisible threw: ${String(error)}\n`)
+          logDebug('gui.host.open.replayVisibleThrew', { error: String(error) })
+        }
       },
     },
   })

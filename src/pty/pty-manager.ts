@@ -1,3 +1,4 @@
+import { SerializeAddon } from '@xterm/addon-serialize'
 import { Terminal as XTerm } from '@xterm/headless'
 import { type IPty, spawn } from 'bun-pty'
 import { EventEmitter } from 'node:events'
@@ -9,6 +10,7 @@ import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot
 
 interface PtyManagerEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
+  bytes: [tabId: string, data: string]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
 }
@@ -289,6 +291,10 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
           pendingWrites: session.pendingWrites,
           tabId: options.tabId,
         })
+        // Forward raw PTY bytes to subscribers (GUI streams these to a
+        // client-side xterm.js for pixel-perfect rendering). Runs in parallel
+        // with the snapshot pipeline below — TUI keeps using snapshots.
+        this.emit('bytes', options.tabId, data)
         const trackedModes = trackPrivateModes(
           session.alternateScrollMode,
           session.cursorVisible,
@@ -368,6 +374,24 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
     session.emulator.scrollToBottom()
     this.scheduleRender(session)
+  }
+
+  /**
+   * Snapshot the session's terminal buffer as an ANSI byte string. The GUI
+   * client writes this dump into its xterm.js on (re)connect / tab focus so
+   * the visible scrollback is restored before live `bytes` events resume.
+   * Returns '' for unknown tabIds.
+   */
+  serializeBuffer(tabId: string): string {
+    const session = this.sessions.get(tabId)
+    if (!session) return ''
+    const addon = new SerializeAddon()
+    try {
+      session.emulator.loadAddon(addon)
+      return addon.serialize()
+    } finally {
+      addon.dispose()
+    }
   }
 
   private applyScrollIntent(session: SessionHandle, intent: ScrollIntent | undefined): void {

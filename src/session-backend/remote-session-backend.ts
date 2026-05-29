@@ -404,6 +404,16 @@ export class RemoteSessionBackend
     )
   }
 
+  /**
+   * The remote/daemon path does not yet stream raw PTY bytes back over IPC,
+   * so there's no client-side buffer to serialize. Return '' — the GUI host
+   * just skips the replay dump for tabs whose backend has no buffer. v2 of
+   * the daemon protocol can add this if the GUI ever needs remote sessions.
+   */
+  serializeBuffer(_tabId: string): string {
+    return ''
+  }
+
   setActiveTab(tabId: string | null): void {
     if (!this.attached) {
       return

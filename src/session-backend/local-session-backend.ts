@@ -28,6 +28,11 @@ export class LocalSessionBackend
         this.emit('render', tabId, viewport, terminalModes)
       }
     })
+    this.sessionManager.on('bytes', (sessionId, tabId, data) => {
+      if (sessionId === this.currentSessionId) {
+        this.emit('bytes', tabId, data)
+      }
+    })
     this.sessionManager.on('exit', (sessionId, tabId, exitCode) => {
       if (sessionId === this.currentSessionId) {
         this.emit('exit', tabId, exitCode)
@@ -139,6 +144,11 @@ export class LocalSessionBackend
   scrollViewportToBottom(tabId: string): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
+  }
+
+  serializeBuffer(tabId: string): string {
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return ''
+    return this.sessionManager.serializeBuffer(this.currentSessionId, tabId)
   }
 
   setActiveTab(tabId: string | null): void {
