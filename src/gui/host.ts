@@ -21,6 +21,7 @@ import {
 import { loadConfig } from '../config'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
+import { startDiffOnDemandPipeline } from '../git/diff-orchestration'
 import { startGitPanelPolling } from '../git/git-poller'
 import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
@@ -28,6 +29,7 @@ import { registerAllModes } from '../input/modes/handlers'
 import { createSessionBackend } from '../session-backend/bootstrap'
 import { appStore } from '../state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from '../state/dispatch-ref'
+import { gitFileKey } from '../state/git-tree'
 import {
   findMostRecentSession,
   loadSessionCatalog,
@@ -236,7 +238,12 @@ export async function runGui(): Promise<void> {
     const session = id != null && id !== '' ? state.sessions.find((s) => s.id === id) : undefined
     return getSessionProjectPath(session)
   }
-  const disposers: { divergence: (() => void) | null; panel: (() => void) | null } = {
+  const disposers: {
+    diff: (() => void) | null
+    divergence: (() => void) | null
+    panel: (() => void) | null
+  } = {
+    diff: null,
     divergence: null,
     panel: null,
   }
@@ -264,6 +271,29 @@ export async function runGui(): Promise<void> {
   }
   restartPanelPoll()
   restartDivergencePoll()
+
+  // On-demand diff fetcher — pulls the diff for the currently selected entry
+  // in git-mode. Subscribes to the store internally; same rationale as the
+  // pollers above (no React root in GUI mode → React hook never runs).
+  disposers.diff = startDiffOnDemandPipeline({
+    enabled: true,
+    getCachedDiff: (key) => appStore.getState().gitMode.diffs[key],
+    // Stage 2c will wire review-vs-base; for now we always diff against HEAD~N.
+    // Explicit `: undefined` annotation keeps the inferred return type aligned
+    // with the orchestrator's `getCompareRef: () => string | undefined`.
+    getCompareRef: (): string | undefined => {
+      return undefined
+    },
+    getHeadOffset: () => appStore.getState().gitMode.headOffset,
+    getProjectPath: () => projectPathOf(appStore.getState()),
+    getSelectedFile: () => {
+      const s = appStore.getState()
+      const key = s.gitMode.selectedEntryKey
+      if (key == null || key === '') return null
+      return s.gitPanel.files.find((f) => gitFileKey(f) === key) ?? null
+    },
+    getSelectedKey: () => appStore.getState().gitMode.selectedEntryKey,
+  })
 
   appStore.subscribe(() => {
     const state = getState()
@@ -465,6 +495,7 @@ export async function runGui(): Promise<void> {
     await shell.exited
     disposers.panel?.()
     disposers.divergence?.()
+    disposers.diff?.()
     await backend.destroy()
     void server.stop()
     process.exit(0)

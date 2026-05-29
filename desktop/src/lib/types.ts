@@ -128,16 +128,58 @@ export interface GitPanelLite {
   files: GitFileEntryLite[];
 }
 
+/**
+ * Browser-side mirror of aimux's `DiffData`. Diverges from the host type only
+ * in the image byte fields: the host stores `Uint8Array`, but the projection
+ * (see `src/gui/encode-diff-images.ts`) rewrites them to base64 strings before
+ * emit so they survive JSON serialization. The base64 string drops straight
+ * into `<img src="data:image/<mime>;base64,...">`.
+ */
+export interface DiffDataLite {
+  binarySizeAfter?: number;
+  binarySizeBefore?: number;
+  errorMessage?: string;
+  imageBytesAfter?: string;
+  imageBytesBefore?: string;
+  imageFormatLabel?: string;
+  imageMime?: string;
+  oldPath?: string;
+  path: string;
+  rawDiff: string;
+  // Mirrors `DiffFileStatus`: 'modified' | 'new' | 'deleted' | 'binary' | 'renamed' | 'image'.
+  status: "modified" | "new" | "deleted" | "binary" | "renamed" | "image";
+}
+
+export interface FoldStateLite {
+  bottom: number;
+  top: number;
+}
+
+/**
+ * `parsedFiles[k].file` and `highlights[k].add/del` stay `unknown` — they're
+ * deep tree-of-tokens structures from `prepareDiff` / shiki. Narrow at read
+ * sites in the desktop components (same pattern the TUI uses via
+ * `getParsedPayload` / `getHighlightsTokens`).
+ */
 export interface GitModeLite {
-  // Stage 2a only needs these; diff-viewer fields stay untyped on the wire.
+  actionMessage: string | null;
   collapsedFolders: Record<string, true>;
+  diffs: Record<string, DiffDataLite>;
+  diffView: "split" | "stacked";
+  folds: Record<string, Record<string, FoldStateLite>>;
   headOffset: number;
+  highlights: Record<string, { add: unknown; del: unknown; hash: string; themeId: string }>;
+  loading: Record<string, boolean>;
+  parsedFiles: Record<string, { file: unknown; hash: string }>;
+  pendingDeletePath: string | null;
+  reviewBase: boolean;
   selectedEntryKey: string | null;
-  [k: string]: unknown;
 }
 
 export interface GitPaneLite {
   diffCount: { enabled: boolean };
+  // Width fraction the panel takes inside the full-screen git-mode view.
+  diffModeRatio: number;
   embeddedRatio: number;
   fileListMode: "tree" | "flat";
   mode: "pane" | "embedded";

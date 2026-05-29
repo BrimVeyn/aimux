@@ -1,29 +1,58 @@
 import { useEffect, useRef } from 'react'
 
-import type { GitFileEntry } from '../../../../state/types'
+import type { DiffData, GitFileEntry } from '../../../../state/types'
 
 import { diffHash } from '../../../../git/diff-hash'
 import { fetchDiff } from '../../../../git/git-diff'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { buildGitTreeRows } from '../../../../state/git-tree'
-import { prepareDiff } from './prepare-diff'
+import { type PreparedDiff, prepareDiff } from './prepare-diff'
 
 interface PrefetchOptions {
-  projectPath: string | undefined
-  themeId: string
-  headOffset: number
   compareRef?: string
   enabled: boolean
+  headOffset: number
+  projectPath: string | undefined
+  themeId: string
 }
 
 const MAX_CONCURRENCY = 3
 
 interface Task {
-  key: string
-  file: GitFileEntry
-  distance: number
   controller: AbortController
+  distance: number
+  file: GitFileEntry
+  key: string
+}
+
+interface FetchAndPrepareOpts {
+  compareRef?: string
+  file: GitFileEntry
+  headOffset: number
+  projectPath: string
+  signal?: AbortSignal
+}
+
+/**
+ * Pure async pipeline: fetch the diff for one file then run `prepareDiff`.
+ *
+ * Returns both the raw `DiffData` (with `hash` already computed via the
+ * matching `diffHash`) and the `PreparedDiff` (parsed + segments). The caller
+ * decides what to dispatch — this function never touches the store. Used by
+ * the React `useDiffPrefetch` hook and by the GUI host's on-demand
+ * orchestrator so both code paths share the exact same fetch/parse work.
+ */
+export async function fetchAndPrepareDiff(
+  opts: FetchAndPrepareOpts
+): Promise<{ diff: DiffData; hash: string; prepared: PreparedDiff }> {
+  const { compareRef, file, headOffset, projectPath, signal } = opts
+  const diff = await fetchDiff(file.repoPath ?? projectPath, file, headOffset, compareRef)
+  if (signal?.aborted === true) throw new DOMException('Aborted', 'AbortError')
+  const hash = diffHash(diff.rawDiff)
+  const prepared = await prepareDiff(diff.rawDiff, file.path, { signal })
+  if (signal?.aborted === true) throw new DOMException('Aborted', 'AbortError')
+  return { diff, hash, prepared }
 }
 
 class PrefetchQueue {
@@ -35,6 +64,12 @@ class PrefetchQueue {
     private readonly execute: (task: Task) => Promise<void>,
     private readonly maxConcurrency: number
   ) {}
+
+  cancelAll(): void {
+    for (const [, controller] of this.inflight) controller.abort()
+    this.inflight.clear()
+    this.queue = []
+  }
 
   schedule(tasks: Task[]): void {
     const keepKeys = new Set(tasks.map((t) => t.key))
@@ -53,12 +88,6 @@ class PrefetchQueue {
     }
     this.queue.sort((a, b) => a.distance - b.distance)
     this.pump()
-  }
-
-  cancelAll(): void {
-    for (const [, controller] of this.inflight) controller.abort()
-    this.inflight.clear()
-    this.queue = []
   }
 
   private pump(): void {
@@ -107,22 +136,18 @@ export function useDiffPrefetch(
   runTaskRef.current = async (task: Task) => {
     if (!(projectPath != null && projectPath !== '')) return
     try {
-      const diff = await fetchDiff(
-        task.file.repoPath ?? projectPath,
-        task.file,
+      const { diff, hash, prepared } = await fetchAndPrepareDiff({
+        compareRef,
+        file: task.file,
         headOffset,
-        compareRef
-      )
-      if (task.controller.signal.aborted) return
-      const hash = diffHash(diff.rawDiff)
-      dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })
-      const prep = await prepareDiff(diff.rawDiff, task.file.path, {
+        projectPath,
         signal: task.controller.signal,
       })
       if (task.controller.signal.aborted) return
+      dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })
       dispatchGlobal({
-        file: prep.parsed,
-        hash: prep.hash,
+        file: prepared.parsed,
+        hash: prepared.hash,
         key: task.key,
         type: 'git-mode-set-parsed',
       })
