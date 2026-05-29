@@ -12,25 +12,16 @@ import { TerminalPane } from "@/components/TerminalPane";
 import { normalizeKey } from "@/lib/keys";
 import { theme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
-import type {
-  AppStateProjection,
-  LayoutNode,
-  ProjectedTab,
-  TerminalModeState,
-  TerminalSnapshot,
-} from "@/lib/types";
+import type { AppStateProjection, LayoutNode, ProjectedTab } from "@/lib/types";
 import { type ConnectionStatus, GuiSocket } from "@/lib/ws";
-
-interface RenderState {
-  viewport: TerminalSnapshot;
-  modes: TerminalModeState;
-}
 
 function App() {
   const [projection, setProjection] = useState<AppStateProjection | null>(null);
-  const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const socketRef = useRef<GuiSocket | null>(null);
+  // Singleton fan-out for per-tab PTY byte streams. The host emits `bytes`
+  // messages; each XtermPane subscribes via `bytes-<tabId>`.
+  const bytesEmitterRef = useRef<EventTarget>(new EventTarget());
 
   useTheme(projection?.themeId, projection?.themeMode);
 
@@ -41,12 +32,12 @@ function App() {
         case "state":
           setProjection(message.projection);
           break;
-        case "render":
-          setRenders((prev) => ({
-            ...prev,
-            [message.tabId]: { modes: message.modes, viewport: message.viewport },
-          }));
+        case "bytes":
+          bytesEmitterRef.current.dispatchEvent(
+            new CustomEvent(`bytes-${message.tabId}`, { detail: message.data }),
+          );
           break;
+        case "render":
         case "exit":
         case "error":
         case "toast":
@@ -144,10 +135,6 @@ function App() {
         socketRef.current?.send({ path, t: "createSession" });
       }
     })();
-  }, []);
-
-  const onScroll = useCallback((deltaLines: number) => {
-    socketRef.current?.send({ deltaLines, t: "scroll" });
   }, []);
 
   const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
@@ -283,24 +270,24 @@ function App() {
             <main className="min-w-0 flex-1 p-1">
               {activeTree !== null && activeTree.type === "split" ? (
                 <SplitLayout
-                  node={activeTree}
                   activeTabId={activeTabId}
-                  tabsById={tabsById}
-                  renders={renders}
-                  onResizeTab={resizeTab}
+                  bytesEmitter={bytesEmitterRef.current}
+                  node={activeTree}
                   onActivate={activateTab}
-                  onScroll={onScroll}
+                  onResizeTab={resizeTab}
                   onSetSplitRatio={setSplitRatio}
+                  tabsById={tabsById}
+                  themeId={projection?.themeId ?? ""}
                 />
               ) : activeTabId !== null ? (
                 <TerminalPane
-                  tabId={activeTabId}
-                  tab={tabsById[activeTabId]}
-                  snapshot={renders[activeTabId]?.viewport ?? null}
+                  bytesEmitter={bytesEmitterRef.current}
                   isActive
-                  onResizeTab={resizeTab}
                   onActivate={activateTab}
-                  onScroll={onScroll}
+                  onResizeTab={resizeTab}
+                  tab={tabsById[activeTabId]}
+                  tabId={activeTabId}
+                  themeId={projection?.themeId ?? ""}
                 />
               ) : null}
             </main>

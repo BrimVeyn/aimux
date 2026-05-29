@@ -1,91 +1,29 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
-
-import {
-  DEFAULT_BG_GRID,
-  DEFAULT_FG_GRID,
-  FONT_FAMILY_GRID,
-  FONT_SIZE_GRID,
-  LINE_HEIGHT_GRID,
-  MEASURE_CHARS_GRID,
-  TerminalGrid,
-} from "@/Terminal";
+import { XtermPane } from "@/components/XtermPane";
 import { theme } from "@/lib/theme";
-import type { ProjectedTab, TerminalSnapshot } from "@/lib/types";
+import type { ProjectedTab } from "@/lib/types";
 
 interface TerminalPaneProps {
-  tabId: string;
-  tab: ProjectedTab | undefined;
-  snapshot: TerminalSnapshot | null;
+  bytesEmitter: EventTarget;
   isActive: boolean;
-  onResizeTab: (tabId: string, cols: number, rows: number) => void;
   onActivate: (tabId: string) => void;
-  onScroll: (deltaLines: number) => void;
+  onResizeTab: (tabId: string, cols: number, rows: number) => void;
+  tab: ProjectedTab | undefined;
+  tabId: string;
+  themeId: string;
 }
 
-// One split pane: title bar + bordered terminal grid that measures itself and
-// reports its size to the host (resizeTab). Input stays host-driven; clicking
-// the pane only sends paneActivate.
+// One split pane: title bar + bordered xterm.js terminal. Input stays
+// host-driven (window-level keymap in App.tsx); clicking the pane sends
+// paneActivate. Sizing and scrolling are owned by xterm + FitAddon.
 export function TerminalPane({
-  tabId,
-  tab,
-  snapshot,
+  bytesEmitter,
   isActive,
-  onResizeTab,
   onActivate,
-  onScroll,
+  onResizeTab,
+  tab,
+  tabId,
+  themeId,
 }: TerminalPaneProps) {
-  const screenRef = useRef<HTMLDivElement>(null);
-  const measureRef = useRef<HTMLSpanElement>(null);
-  const cellRef = useRef({ height: LINE_HEIGHT_GRID, width: 8 });
-  const lastSizeRef = useRef({ cols: 0, rows: 0 });
-
-  const recompute = useCallback(() => {
-    const screen = screenRef.current;
-    if (!screen) {
-      return;
-    }
-    const { height, width } = cellRef.current;
-    const cols = Math.max(1, Math.floor(screen.clientWidth / width));
-    const rows = Math.max(1, Math.floor(screen.clientHeight / height));
-    if (cols !== lastSizeRef.current.cols || rows !== lastSizeRef.current.rows) {
-      lastSizeRef.current = { cols, rows };
-      onResizeTab(tabId, cols, rows);
-    }
-  }, [onResizeTab, tabId]);
-
-  useLayoutEffect(() => {
-    const measure = () => {
-      if (measureRef.current) {
-        cellRef.current = {
-          height: LINE_HEIGHT_GRID,
-          width: measureRef.current.getBoundingClientRect().width / MEASURE_CHARS_GRID,
-        };
-      }
-      recompute();
-    };
-    measure();
-    void document.fonts.ready.then(measure);
-  }, [recompute]);
-
-  useEffect(() => {
-    const observer = new ResizeObserver(() => recompute());
-    if (screenRef.current) {
-      observer.observe(screenRef.current);
-    }
-    return () => observer.disconnect();
-  }, [recompute]);
-
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
-      if (!isActive) {
-        return;
-      }
-      const lines = Math.round(e.deltaY / LINE_HEIGHT_GRID) || (e.deltaY > 0 ? 1 : -1);
-      onScroll(-lines);
-    },
-    [isActive, onScroll],
-  );
-
   const borderColor = isActive ? theme.primary : theme.border;
   const title = tab ? `${tab.title} · ${tab.status}` : tabId;
 
@@ -106,27 +44,13 @@ export function TerminalPane({
         <span>{isActive ? "▸" : " "}</span>
         <span className="truncate">{title}</span>
       </div>
-      <div
-        ref={screenRef}
-        onWheel={handleWheel}
-        className="min-h-0 flex-1 overflow-hidden"
-        style={{
-          backgroundColor: DEFAULT_BG_GRID,
-          color: DEFAULT_FG_GRID,
-          fontFamily: FONT_FAMILY_GRID,
-          fontSize: FONT_SIZE_GRID,
-          lineHeight: `${LINE_HEIGHT_GRID}px`,
-          whiteSpace: "pre",
-        }}
-      >
-        <span
-          ref={measureRef}
-          aria-hidden
-          style={{ left: -9999, position: "absolute", visibility: "hidden" }}
-        >
-          {"0".repeat(MEASURE_CHARS_GRID)}
-        </span>
-        <TerminalGrid snapshot={snapshot} />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <XtermPane
+          bytesEmitter={bytesEmitter}
+          onResize={onResizeTab}
+          tabId={tabId}
+          themeId={themeId}
+        />
       </div>
     </div>
   );

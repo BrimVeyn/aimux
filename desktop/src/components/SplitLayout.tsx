@@ -1,17 +1,17 @@
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TerminalPane } from "@/components/TerminalPane";
 import { aimuxToRrpDirection } from "@/lib/split";
-import type { LayoutNode, ProjectedTab, TerminalSnapshot } from "@/lib/types";
+import type { LayoutNode, ProjectedTab } from "@/lib/types";
 
 interface SplitLayoutProps {
-  node: LayoutNode;
   activeTabId: string | null;
-  tabsById: Record<string, ProjectedTab>;
-  renders: Record<string, { viewport: TerminalSnapshot } | undefined>;
-  onResizeTab: (tabId: string, cols: number, rows: number) => void;
+  bytesEmitter: EventTarget;
+  node: LayoutNode;
   onActivate: (tabId: string) => void;
-  onScroll: (deltaLines: number) => void;
+  onResizeTab: (tabId: string, cols: number, rows: number) => void;
   onSetSplitRatio: (tabId: string, ratio: number, axis: "horizontal" | "vertical") => void;
+  tabsById: Record<string, ProjectedTab>;
+  themeId: string;
 }
 
 // Recursive render of aimux's layout tree. Panels are uncontrolled
@@ -23,13 +23,13 @@ export function SplitLayout(props: SplitLayoutProps) {
   if (node.type === "leaf") {
     return (
       <TerminalPane
-        tabId={node.tabId}
-        tab={props.tabsById[node.tabId]}
-        snapshot={props.renders[node.tabId]?.viewport ?? null}
+        bytesEmitter={props.bytesEmitter}
         isActive={node.tabId === props.activeTabId}
-        onResizeTab={props.onResizeTab}
         onActivate={props.onActivate}
-        onScroll={props.onScroll}
+        onResizeTab={props.onResizeTab}
+        tab={props.tabsById[node.tabId]}
+        tabId={node.tabId}
+        themeId={props.themeId}
       />
     );
   }
