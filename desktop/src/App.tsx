@@ -64,6 +64,23 @@ function App() {
   // keymap/mode pipeline (and forwards unbound keys to the PTY in terminal-input).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // ctrl-u/d in git-mode = page up/down in the diff. The TUI mutates a
+      // scroll offset in its own renderer; in the GUI we own the scroll via
+      // native DOM, so the host action is a no-op for us. Intercept and scroll
+      // the diff container directly.
+      if (
+        e.ctrlKey &&
+        (e.key === "d" || e.key === "u") &&
+        document.querySelector("[data-git-diff-scroll]") !== null
+      ) {
+        const el = document.querySelector<HTMLElement>("[data-git-diff-scroll]");
+        if (el !== null) {
+          e.preventDefault();
+          const dir = e.key === "d" ? 1 : -1;
+          el.scrollBy({ behavior: "auto", top: dir * el.clientHeight * 0.85 });
+          return;
+        }
+      }
       const key = normalizeKey(e);
       if (key === null) {
         return;

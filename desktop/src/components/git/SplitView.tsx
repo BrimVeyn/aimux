@@ -108,6 +108,7 @@ export function SplitView({ addTokens, delTokens, file, segments }: SplitViewPro
   return (
     <div
       className="h-full overflow-auto font-mono text-xs"
+      data-git-diff-scroll
       style={{ backgroundColor: theme.background, color: theme.text }}
     >
       {rows.map((row, idx) => {
