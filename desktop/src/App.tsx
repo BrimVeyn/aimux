@@ -143,6 +143,22 @@ function App() {
 
   const activeTabId = projection?.activeTabId ?? null;
   const currentSession = projection?.sessions.find((s) => s.id === projection.currentSessionId);
+  const activeWorktree = currentSession?.worktrees?.find(
+    (w) => w.id === currentSession.activeWorktreeId,
+  );
+  const activeWorktreeId = currentSession?.activeWorktreeId ?? null;
+  const sidebarBranch = activeWorktree?.branch ?? null;
+  const worktreeCount = currentSession?.worktrees?.length ?? 0;
+
+  const openWorktreeMove = useCallback(() => {
+    if (activeWorktreeId !== null) {
+      socketRef.current?.send({ sourceWorktreeId: activeWorktreeId, t: "openWorktreeMove" });
+    }
+  }, [activeWorktreeId]);
+
+  const toggleWorktreeMoveDelete = useCallback(() => {
+    socketRef.current?.send({ t: "toggleWorktreeMoveDelete" });
+  }, []);
   const tabsById: Record<string, ProjectedTab> = {};
   for (const t of projection?.tabs ?? []) {
     tabsById[t.id] = t;
@@ -164,11 +180,14 @@ function App() {
       <div className="flex min-h-0 flex-1">
         <Sidebar
           sessionName={currentSession?.name ?? null}
+          branch={sidebarBranch}
+          worktreeCount={worktreeCount}
           tabs={projection?.tabs ?? []}
           activeTabId={activeTabId}
           onSelectTab={activateTab}
           onCloseTab={closeTab}
           onNewTab={newTab}
+          onOpenWorktreeMove={openWorktreeMove}
         />
         <main className="min-w-0 flex-1 p-1">
           {activeTree !== null && activeTree.type === "split" ? (
@@ -203,6 +222,7 @@ function App() {
           modal={projection.modal}
           customCommands={projection.customCommands}
           worktrees={currentSession?.worktrees ?? []}
+          worktreeDivergence={projection.worktreeDivergence}
           sessions={projection.sessions}
           currentSessionId={projection.currentSessionId}
           snippets={projection.snippets}
@@ -211,6 +231,7 @@ function App() {
           directoryResults={projection.modal.directoryResults ?? []}
           onSelect={selectModal}
           onConfirm={confirmModal}
+          onToggleDeleteSource={toggleWorktreeMoveDelete}
         />
       ) : null}
     </div>

@@ -6,11 +6,14 @@ import { AimuxButton } from "./ui/AimuxButton";
 
 interface SidebarProps {
   sessionName: string | null;
+  branch: string | null;
+  worktreeCount: number;
   tabs: ProjectedTab[];
   activeTabId: string | null;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewTab: () => void;
+  onOpenWorktreeMove?: () => void;
 }
 
 function Activity({ tab }: { tab: ProjectedTab }) {
@@ -32,12 +35,16 @@ function Activity({ tab }: { tab: ProjectedTab }) {
 
 export function Sidebar({
   sessionName,
+  branch,
+  worktreeCount,
   tabs,
   activeTabId,
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onOpenWorktreeMove,
 }: SidebarProps) {
+  const moveDisabled = worktreeCount < 2;
   return (
     <div
       className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r font-mono text-xs"
@@ -50,13 +57,28 @@ export function Sidebar({
         <span className="truncate" style={{ color: theme.textMuted }}>
           {sessionName ?? "No workspace selected"}
         </span>
-        <AimuxButton
-          className="mt-1.5 px-2 py-1 text-left"
-          onClick={onNewTab}
-          tone="panel"
-        >
-          + New assistant
-        </AimuxButton>
+        {branch !== null && branch !== "" ? (
+          <span className="truncate" style={{ color: theme.textMuted }}>
+            ⎇ {branch}
+          </span>
+        ) : null}
+        <div className="mt-1.5 flex gap-1">
+          <AimuxButton
+            className="flex-1 px-2 py-1 text-left"
+            onClick={onNewTab}
+            tone="panel"
+          >
+            + New assistant
+          </AimuxButton>
+          <AimuxButton
+            className="px-2 py-1 text-left"
+            onClick={moveDisabled ? undefined : onOpenWorktreeMove}
+            style={moveDisabled ? { opacity: 0.4, pointerEvents: "none" } : undefined}
+            tone="panel"
+          >
+            ↗ Move
+          </AimuxButton>
+        </div>
       </div>
 
       <div className="px-3 py-1 select-none" style={{ color: theme.textMuted }}>

@@ -70,11 +70,22 @@ export interface ProjectedTab {
 export interface WorktreeLite {
   id: string;
   name: string;
+  baseRef?: string;
+  branch?: string;
+  color?: string;
+  commitSha?: string;
+  createdAt?: string;
+  createdByAimux?: boolean;
+  path?: string;
+  repoRoot?: string;
+  source?: "primary" | "aimux-temp" | "external";
+  updatedAt?: string;
 }
 
 export interface SessionRecordLite {
   id: string;
   name: string;
+  activeWorktreeId?: string;
   projectPath?: string;
   worktrees?: WorktreeLite[];
 }
@@ -101,20 +112,25 @@ export interface DirectoryResultLite {
 
 /** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
 export interface ModalProjection {
+  // `type` is open-ended: includes "new-tab", "session-picker", "snippet-picker",
+  // "split-picker", "theme-picker", "create-session", "worktree-move", etc.
   type: string | null;
   editBuffer: string | null;
   selectedIndex: number;
-  selectedAssistantId?: string | null;
-  step?: "assistant" | "worktree" | "worktree-create";
-  createWorktree?: boolean;
-  worktreeName?: string;
-  branchName?: string;
   // Phase 3 additions
-  scope?: string | null;
-  activeField?: "directory" | "name";
-  nameBuffer?: string;
-  directoryResults?: DirectoryResultLite[];
   actionMessage?: string | null;
+  activeField?: "directory" | "name";
+  branchName?: string;
+  createWorktree?: boolean;
+  // worktree-move specific fields
+  deleteSource?: boolean;
+  directoryResults?: DirectoryResultLite[];
+  nameBuffer?: string;
+  scope?: string | null;
+  selectedAssistantId?: string | null;
+  sourceWorktreeId?: string;
+  step?: "assistant" | "worktree" | "worktree-create";
+  worktreeName?: string;
 }
 
 /** The slice of aimux's AppState the GUI renders (full state is streamed). */
@@ -137,6 +153,7 @@ export interface AppStateProjection {
   helpEntries: GuiHelpEntry[];
   layoutTrees: Record<string, LayoutNode>;
   tabGroupMap: Record<string, string>;
+  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
 }
 
 /** Normalized keyboard event in aimux's KeyInput shape. */
@@ -162,7 +179,9 @@ export type GuiClientMessage =
   | { t: "closeTab"; tabId: string }
   | { t: "switchSession"; sessionId: string }
   | { t: "createSession"; path: string }
-  | { t: "deleteSession"; sessionId: string };
+  | { t: "deleteSession"; sessionId: string }
+  | { t: "openWorktreeMove"; sourceWorktreeId: string }
+  | { t: "toggleWorktreeMoveDelete" };
 
 export type ToastLevel = "info" | "success" | "error";
 

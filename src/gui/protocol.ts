@@ -28,6 +28,8 @@ export type GuiClientMessage =
   | { t: 'switchSession'; sessionId: string }
   | { t: 'createSession'; path: string }
   | { t: 'deleteSession'; sessionId: string }
+  | { t: 'openWorktreeMove'; sourceWorktreeId: string }
+  | { t: 'toggleWorktreeMoveDelete' }
 
 export type ToastLevel = 'info' | 'success' | 'error'
 
@@ -127,6 +129,12 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return typeof value.sessionId === 'string'
         ? { sessionId: value.sessionId, t: 'deleteSession' }
         : null
+    case 'openWorktreeMove':
+      return typeof value.sourceWorktreeId === 'string'
+        ? { sourceWorktreeId: value.sourceWorktreeId, t: 'openWorktreeMove' }
+        : null
+    case 'toggleWorktreeMoveDelete':
+      return { t: 'toggleWorktreeMoveDelete' }
     default:
       return null
   }

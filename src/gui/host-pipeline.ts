@@ -136,6 +136,7 @@ export function createPipeline(opts: PipelineOptions) {
     'snippet-picker': actions.snippetFilterPaste as KeyResult,
     'split-picker': actions.confirmSplit as KeyResult,
     'theme-picker': actions.confirmTheme as KeyResult,
+    'worktree-move': actions.confirmWorktreeMove as ActionFn,
   }
 
   // Confirm the active modal's selection (Enter-equivalent) via the real action.

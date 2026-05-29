@@ -6,7 +6,9 @@ import { SessionPickerModal } from "@/components/modals/SessionPickerModal";
 import { SnippetPickerModal } from "@/components/modals/SnippetPickerModal";
 import { TextFieldModal } from "@/components/modals/TextFieldModal";
 import { ThemePickerModal } from "@/components/modals/ThemePickerModal";
+import { WorktreeMoveModal } from "@/components/modals/WorktreeMoveModal";
 import { allAssistants, filterAssistants } from "@/lib/assistants";
+import { formatDivergence } from "@/lib/git";
 import { theme } from "@/lib/theme";
 import type {
   DirectoryResultLite,
@@ -21,6 +23,7 @@ interface ModalHostProps {
   modal: ModalProjection;
   customCommands: Record<string, string>;
   worktrees: WorktreeLite[];
+  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
   sessions: SessionRecordLite[];
   currentSessionId: string | null;
   snippets: SnippetRecordLite[];
@@ -29,6 +32,7 @@ interface ModalHostProps {
   directoryResults: DirectoryResultLite[];
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
+  onToggleDeleteSource: () => void;
 }
 
 // Renders modal overlays. Input is driven by the host's keymap pipeline (the
@@ -38,6 +42,7 @@ export function ModalHost({
   modal,
   customCommands,
   worktrees,
+  worktreeDivergence,
   sessions,
   currentSessionId,
   snippets,
@@ -46,6 +51,7 @@ export function ModalHost({
   directoryResults,
   onSelect,
   onConfirm,
+  onToggleDeleteSource,
 }: ModalHostProps) {
   if (modal.type === null) {
     return null;
@@ -67,6 +73,7 @@ export function ModalHost({
             modal={modal}
             customCommands={customCommands}
             worktrees={worktrees}
+            worktreeDivergence={worktreeDivergence}
             onSelect={onSelect}
             onConfirm={onConfirm}
           />
@@ -111,6 +118,16 @@ export function ModalHost({
             directoryResults={directoryResults}
             onSelect={onSelect}
             onConfirm={onConfirm}
+          />
+        ) : modal.type === "worktree-move" ? (
+          <WorktreeMoveModal
+            modal={modal}
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            worktreeDivergence={worktreeDivergence}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+            onToggleDeleteSource={onToggleDeleteSource}
           />
         ) : (
             <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
@@ -248,12 +265,14 @@ function NewTabModal({
   modal,
   customCommands,
   worktrees,
+  worktreeDivergence,
   onSelect,
   onConfirm,
 }: {
   modal: ModalProjection;
   customCommands: Record<string, string>;
   worktrees: WorktreeLite[];
+  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
 }) {
@@ -274,15 +293,22 @@ function NewTabModal({
           </div>
         ) : (
           <div className="flex flex-col">
-            {worktrees.map((wt, index) => (
-              <Row
-                key={wt.id}
-                selected={index === modal.selectedIndex}
-                label={wt.name}
-                onSelect={() => onSelect(index)}
-                onConfirm={() => onConfirm(index)}
-              />
-            ))}
+            {worktrees.map((wt, index) => {
+              const primary = wt.source === "primary" ? " (primary)" : "";
+              const divergence = formatDivergence(worktreeDivergence[wt.id]);
+              const primaryText =
+                wt.branch !== undefined && wt.branch !== "" ? wt.branch : wt.name;
+              const label = `${primaryText}${primary}${divergence !== "" ? ` ${divergence}` : ""}`;
+              return (
+                <Row
+                  key={wt.id}
+                  selected={index === modal.selectedIndex}
+                  label={label}
+                  onSelect={() => onSelect(index)}
+                  onConfirm={() => onConfirm(index)}
+                />
+              );
+            })}
             {worktrees.length === 0 ? (
               <div className="px-2 py-1" style={{ color: theme.textMuted }}>
                 (current directory)

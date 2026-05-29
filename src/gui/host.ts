@@ -361,6 +361,15 @@ export async function runGui(): Promise<void> {
           case 'deleteSession':
             handleDeleteSessionEffect(state, backend, dispatch, message.sessionId)
             break
+          case 'openWorktreeMove':
+            dispatch({
+              sourceWorktreeId: message.sourceWorktreeId,
+              type: 'open-worktree-move-modal',
+            })
+            break
+          case 'toggleWorktreeMoveDelete':
+            dispatch({ type: 'toggle-worktree-move-delete' })
+            break
           default:
             break
         }
