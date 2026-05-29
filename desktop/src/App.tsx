@@ -146,15 +146,7 @@ function App() {
   const activeWorktree = currentSession?.worktrees?.find(
     (w) => w.id === currentSession.activeWorktreeId,
   );
-  const activeWorktreeId = currentSession?.activeWorktreeId ?? null;
   const sidebarBranch = activeWorktree?.branch ?? null;
-  const worktreeCount = currentSession?.worktrees?.length ?? 0;
-
-  const openWorktreeMove = useCallback(() => {
-    if (activeWorktreeId !== null) {
-      socketRef.current?.send({ sourceWorktreeId: activeWorktreeId, t: "openWorktreeMove" });
-    }
-  }, [activeWorktreeId]);
 
   const toggleWorktreeMoveDelete = useCallback(() => {
     socketRef.current?.send({ t: "toggleWorktreeMoveDelete" });
@@ -181,13 +173,11 @@ function App() {
         <Sidebar
           sessionName={currentSession?.name ?? null}
           branch={sidebarBranch}
-          worktreeCount={worktreeCount}
           tabs={projection?.tabs ?? []}
           activeTabId={activeTabId}
           onSelectTab={activateTab}
           onCloseTab={closeTab}
           onNewTab={newTab}
-          onOpenWorktreeMove={openWorktreeMove}
         />
         <main className="min-w-0 flex-1 p-1">
           {activeTree !== null && activeTree.type === "split" ? (
