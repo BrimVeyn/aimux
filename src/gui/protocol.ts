@@ -20,6 +20,8 @@ export type GuiClientMessage =
   | { t: 'resizeWindow'; cols: number; rows: number }
   | { t: 'resizeTab'; tabId: string; cols: number; rows: number }
   | { t: 'paneActivate'; tabId: string }
+  | { t: 'modalSelect'; index: number }
+  | { t: 'modalConfirm'; index?: number }
   | { t: 'setSplitRatio'; tabId: string; ratio: number; axis?: SplitDirection }
   | { t: 'openNewTab' }
   | { t: 'closeTab'; tabId: string }
@@ -91,6 +93,15 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
         : null
     case 'paneActivate':
       return typeof value.tabId === 'string' ? { t: 'paneActivate', tabId: value.tabId } : null
+    case 'modalSelect':
+      return typeof value.index === 'number' ? { index: value.index, t: 'modalSelect' } : null
+    case 'modalConfirm':
+      if (value.index !== undefined && typeof value.index !== 'number') {
+        return null
+      }
+      return value.index === undefined
+        ? { t: 'modalConfirm' }
+        : { index: value.index, t: 'modalConfirm' }
     case 'setSplitRatio': {
       if (typeof value.tabId !== 'string' || typeof value.ratio !== 'number') {
         return null

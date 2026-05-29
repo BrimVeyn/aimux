@@ -1,7 +1,9 @@
 import type { CliRenderer } from '@opentui/core'
 
+import { actions } from '@brimveyn/aimux-config'
+
 import type { KeymapModeHandler } from '../input/keymap/keymap-mode-handler'
-import type { TrieBinding } from '../input/keymap/trie'
+import type { ActionFn, TrieBinding } from '../input/keymap/trie'
 import type { KeyInput, KeyResult, ModeContext, ModeId } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
 import type { ThemeId } from '../ui/themes'
@@ -111,5 +113,57 @@ export function createPipeline(opts: PipelineOptions) {
   const runEffect = (effect: Parameters<typeof executeSideEffect>[0]): void =>
     executeSideEffect(effect, makeCtx())
 
-  return { handleKey, processKeyResult, runEffect, wireHandlerCallbacks }
+  // Set the modal's selected row (mouse hover). For the theme picker this also
+  // runs a live preview — the preview effect reads state.modal.selectedIndex, so
+  // the dispatch must land first (it does, synchronously).
+  function selectModalIndex(index: number): void {
+    dispatch({ index, type: 'set-modal-selection-index' })
+    if (getState().modal.type === 'theme-picker') {
+      // The preview effect reads state.modal.selectedIndex (set above), not the
+      // delta; `delta` is required by the effect's type but inert for this path.
+      runEffect({ action: 'preview', delta: 1, type: 'apply-theme' })
+    }
+  }
+
+  // What Enter (<CR>) does per modal, mirrored from the `.mode('modal.*')` blocks
+  // in packages/aimux-config/src/defaults.ts. Keyed by modal.type (not mode id).
+  // The config package's Action types are structurally identical to the local
+  // ones; cast bridges the duplicated declarations.
+  const modalConfirmActions: Partial<Record<string, ActionFn | KeyResult>> = {
+    'create-session': actions.confirmCreateSession as ActionFn,
+    'new-tab': actions.launchSelectedAssistant as ActionFn,
+    'session-picker': actions.confirmSelectedSession as KeyResult,
+    'snippet-picker': actions.snippetFilterPaste as KeyResult,
+    'split-picker': actions.confirmSplit as KeyResult,
+    'theme-picker': actions.confirmTheme as KeyResult,
+  }
+
+  // Confirm the active modal's selection (Enter-equivalent) via the real action.
+  function confirmActiveModal(): void {
+    const modalType = getState().modal.type
+    if (modalType === null) {
+      return
+    }
+    const entry = modalConfirmActions[modalType]
+    if (entry === undefined) {
+      return
+    }
+    if (typeof entry === 'function') {
+      const result = entry({ state: getState() })
+      if (result !== null) {
+        processKeyResult(result, deriveModeId(getState()))
+      }
+      return
+    }
+    processKeyResult(entry, deriveModeId(getState()))
+  }
+
+  return {
+    confirmActiveModal,
+    handleKey,
+    processKeyResult,
+    runEffect,
+    selectModalIndex,
+    wireHandlerCallbacks,
+  }
 }

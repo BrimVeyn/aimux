@@ -19,10 +19,14 @@ export function SessionPickerModal({
   modal,
   sessions,
   currentSessionId,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   sessions: SessionRecordLite[];
   currentSessionId: string | null;
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   const options = filterSessions(sessions, modal.editBuffer);
   return (
@@ -36,6 +40,8 @@ export function SessionPickerModal({
             selected={index === modal.selectedIndex}
             label={s.id === currentSessionId ? `${s.name} (current)` : s.name}
             hint={s.projectPath}
+            onSelect={() => onSelect(index)}
+            onConfirm={() => onConfirm(index)}
           />
         ))}
         {options.length === 0 ? <Empty /> : null}

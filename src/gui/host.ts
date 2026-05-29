@@ -318,6 +318,15 @@ export async function runGui(): Promise<void> {
           case 'paneActivate':
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
+          case 'modalSelect':
+            pipeline.selectModalIndex(message.index)
+            break
+          case 'modalConfirm':
+            if (message.index !== undefined) {
+              pipeline.selectModalIndex(message.index)
+            }
+            pipeline.confirmActiveModal()
+            break
           case 'setSplitRatio':
             dispatch({
               axis: message.axis,

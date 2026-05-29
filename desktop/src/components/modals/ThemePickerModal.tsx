@@ -22,9 +22,13 @@ function filterThemeIds(filter: string | null): ThemeId[] {
 export function ThemePickerModal({
   modal,
   committedThemeId,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   committedThemeId: string;
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   const options = filterThemeIds(modal.editBuffer);
   return (
@@ -41,6 +45,8 @@ export function ThemePickerModal({
                 ? `${themeDisplayName(id)} (current)`
                 : themeDisplayName(id)
             }
+            onSelect={() => onSelect(index)}
+            onConfirm={() => onConfirm(index)}
           />
         ))}
         {options.length === 0 ? <Empty /> : null}

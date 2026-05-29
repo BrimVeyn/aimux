@@ -103,6 +103,14 @@ function App() {
     socketRef.current?.send({ sessionId, t: "deleteSession" });
   }, []);
 
+  const selectModal = useCallback((index: number) => {
+    socketRef.current?.send({ index, t: "modalSelect" });
+  }, []);
+
+  const confirmModal = useCallback((index: number) => {
+    socketRef.current?.send({ index, t: "modalConfirm" });
+  }, []);
+
   const newSession = useCallback(() => {
     void (async () => {
       let path: string | null = null;
@@ -201,6 +209,8 @@ function App() {
           committedThemeId={projection.committedThemeId}
           helpEntries={projection.helpEntries}
           directoryResults={projection.modal.directoryResults ?? []}
+          onSelect={selectModal}
+          onConfirm={confirmModal}
         />
       ) : null}
     </div>

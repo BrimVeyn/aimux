@@ -27,6 +27,8 @@ interface ModalHostProps {
   committedThemeId: string;
   helpEntries: GuiHelpEntry[];
   directoryResults: DirectoryResultLite[];
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }
 
 // Renders modal overlays. Input is driven by the host's keymap pipeline (the
@@ -42,6 +44,8 @@ export function ModalHost({
   committedThemeId,
   helpEntries,
   directoryResults,
+  onSelect,
+  onConfirm,
 }: ModalHostProps) {
   if (modal.type === null) {
     return null;
@@ -59,19 +63,42 @@ export function ModalHost({
       >
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
           {modal.type === "new-tab" ? (
-          <NewTabModal modal={modal} customCommands={customCommands} worktrees={worktrees} />
+          <NewTabModal
+            modal={modal}
+            customCommands={customCommands}
+            worktrees={worktrees}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+          />
         ) : modal.type === "split-picker" ? (
-          <SplitPickerModal modal={modal} customCommands={customCommands} />
+          <SplitPickerModal
+            modal={modal}
+            customCommands={customCommands}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+          />
         ) : modal.type === "session-picker" ? (
           <SessionPickerModal
             modal={modal}
             sessions={sessions}
             currentSessionId={currentSessionId}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
           />
         ) : modal.type === "snippet-picker" ? (
-          <SnippetPickerModal modal={modal} snippets={snippets} />
+          <SnippetPickerModal
+            modal={modal}
+            snippets={snippets}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+          />
         ) : modal.type === "theme-picker" ? (
-          <ThemePickerModal modal={modal} committedThemeId={committedThemeId} />
+          <ThemePickerModal
+            modal={modal}
+            committedThemeId={committedThemeId}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+          />
         ) : modal.type === "help" ? (
           <HelpModal modal={modal} helpEntries={helpEntries} />
         ) : modal.type === "rename-tab" ? (
@@ -79,7 +106,12 @@ export function ModalHost({
         ) : modal.type === "session-name" ? (
           <TextFieldModal modal={modal} title="Workspace name" />
         ) : modal.type === "create-session" ? (
-          <CreateSessionModal modal={modal} directoryResults={directoryResults} />
+          <CreateSessionModal
+            modal={modal}
+            directoryResults={directoryResults}
+            onSelect={onSelect}
+            onConfirm={onConfirm}
+          />
         ) : (
             <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
           )}
@@ -121,17 +153,32 @@ export function Footer({ text }: { text: string }) {
   );
 }
 
-export function Row({ selected, label, hint }: { selected: boolean; label: string; hint?: string }) {
+export function Row({
+  selected,
+  label,
+  hint,
+  onSelect,
+  onConfirm,
+}: {
+  selected: boolean;
+  label: string;
+  hint?: string;
+  onSelect?: () => void;
+  onConfirm?: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (selected) {
       ref.current?.scrollIntoView({ block: "nearest" });
     }
   }, [selected]);
+  const interactive = onSelect !== undefined || onConfirm !== undefined;
   return (
     <div
       ref={ref}
-      className="flex items-center gap-2 rounded px-2 py-1"
+      className={`flex items-center gap-2 rounded px-2 py-1${interactive ? " cursor-pointer" : ""}`}
+      onMouseEnter={onSelect}
+      onClick={onConfirm}
       style={{ backgroundColor: selected ? theme.backgroundElement : "transparent" }}
     >
       <span style={{ color: selected ? theme.primary : theme.textMuted }}>
@@ -150,9 +197,13 @@ export function Row({ selected, label, hint }: { selected: boolean; label: strin
 function SplitPickerModal({
   modal,
   customCommands,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   customCommands: Record<string, string>;
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   const options = filterAssistants(allAssistants(customCommands), modal.editBuffer);
   return (
@@ -176,6 +227,8 @@ function SplitPickerModal({
             selected={index === modal.selectedIndex}
             label={option.label}
             hint={option.description}
+            onSelect={() => onSelect(index)}
+            onConfirm={() => onConfirm(index)}
           />
         ))}
         {options.length === 0 ? (
@@ -195,10 +248,14 @@ function NewTabModal({
   modal,
   customCommands,
   worktrees,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   customCommands: Record<string, string>;
   worktrees: WorktreeLite[];
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   // Step 2: choose a worktree to launch in (or create a new one).
   if (modal.step === "worktree" || modal.step === "worktree-create") {
@@ -218,7 +275,13 @@ function NewTabModal({
         ) : (
           <div className="flex flex-col">
             {worktrees.map((wt, index) => (
-              <Row key={wt.id} selected={index === modal.selectedIndex} label={wt.name} />
+              <Row
+                key={wt.id}
+                selected={index === modal.selectedIndex}
+                label={wt.name}
+                onSelect={() => onSelect(index)}
+                onConfirm={() => onConfirm(index)}
+              />
             ))}
             {worktrees.length === 0 ? (
               <div className="px-2 py-1" style={{ color: theme.textMuted }}>
@@ -257,6 +320,8 @@ function NewTabModal({
             selected={index === modal.selectedIndex}
             label={option.label}
             hint={option.description}
+            onSelect={() => onSelect(index)}
+            onConfirm={() => onConfirm(index)}
           />
         ))}
         {options.length === 0 ? (

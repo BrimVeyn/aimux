@@ -5,9 +5,13 @@ import type { DirectoryResultLite, ModalProjection } from "@/lib/types";
 export function CreateSessionModal({
   modal,
   directoryResults,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   directoryResults: DirectoryResultLite[];
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   const dirActive = modal.activeField !== "name";
   return (
@@ -33,6 +37,8 @@ export function CreateSessionModal({
               selected={dirActive && index === modal.selectedIndex}
               label={r.path}
               hint={r.type}
+              onSelect={() => onSelect(index)}
+              onConfirm={() => onConfirm(index)}
             />
           ))}
           {dirActive && directoryResults.length === 0 ? <Empty /> : null}

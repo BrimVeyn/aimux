@@ -16,9 +16,13 @@ function filterSnippets(
 export function SnippetPickerModal({
   modal,
   snippets,
+  onSelect,
+  onConfirm,
 }: {
   modal: ModalProjection;
   snippets: SnippetRecordLite[];
+  onSelect: (index: number) => void;
+  onConfirm: (index: number) => void;
 }) {
   const options = filterSnippets(snippets, modal.editBuffer);
   return (
@@ -32,6 +36,8 @@ export function SnippetPickerModal({
             selected={index === modal.selectedIndex}
             label={s.name}
             hint={s.content.replace(/\s+/g, " ").slice(0, 40)}
+            onSelect={() => onSelect(index)}
+            onConfirm={() => onConfirm(index)}
           />
         ))}
         {options.length === 0 ? <Empty /> : null}

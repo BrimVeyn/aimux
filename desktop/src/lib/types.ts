@@ -155,6 +155,8 @@ export type GuiClientMessage =
   | { t: "resizeWindow"; cols: number; rows: number }
   | { t: "resizeTab"; tabId: string; cols: number; rows: number }
   | { t: "paneActivate"; tabId: string }
+  | { t: "modalSelect"; index: number }
+  | { t: "modalConfirm"; index?: number }
   | { t: "setSplitRatio"; tabId: string; ratio: number; axis?: SplitDirection }
   | { t: "openNewTab" }
   | { t: "closeTab"; tabId: string }
