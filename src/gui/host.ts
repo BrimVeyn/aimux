@@ -18,6 +18,7 @@ import {
   handleDeleteSessionEffect,
   handleSwitchSessionEffect,
 } from '../app-runtime/session-actions'
+import { startWorkspaceAutosave } from '../app-runtime/use-workspace-autosave'
 import { loadConfig } from '../config'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
@@ -239,10 +240,12 @@ export async function runGui(): Promise<void> {
     return getSessionProjectPath(session)
   }
   const disposers: {
+    autosave: (() => void) | null
     diff: (() => void) | null
     divergence: (() => void) | null
     panel: (() => void) | null
   } = {
+    autosave: null,
     diff: null,
     divergence: null,
     panel: null,
@@ -271,6 +274,16 @@ export async function runGui(): Promise<void> {
   }
   restartPanelPoll()
   restartDivergencePoll()
+
+  // Workspace autosave — TUI uses useWorkspaceAutosave (debounce 250ms) to
+  // persist tabs/layout/gitPane on every state change. Same React-hook blocker
+  // as the pollers: drive it from the host so the GUI restores the last
+  // workspace snapshot on next launch.
+  disposers.autosave = startWorkspaceAutosave({
+    debounceMs: 250,
+    getState: () => appStore.getState(),
+    subscribe: (listener) => appStore.subscribe(listener),
+  })
 
   // On-demand diff fetcher — pulls the diff for the currently selected entry
   // in git-mode. Subscribes to the store internally; same rationale as the
@@ -496,6 +509,7 @@ export async function runGui(): Promise<void> {
     disposers.panel?.()
     disposers.divergence?.()
     disposers.diff?.()
+    disposers.autosave?.()
     await backend.destroy()
     void server.stop()
     process.exit(0)
