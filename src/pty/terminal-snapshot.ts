@@ -157,8 +157,14 @@ function buildLine(
       cursorColumn < terminal.cols
 
     if (cursorInPad && cursorColumn !== null) {
-      const leading = cursorColumn - visualColumns
-      const trailing = terminal.cols - cursorColumn - 1
+      // cursorColumn is a buffer column while visualColumns is a sum of cell
+      // widths; they diverge when wide glyphs precede the gap. Clamp the offset
+      // into the pad so leading + cursor + trailing always equals padCount and
+      // the row never over/undershoots terminal.cols (cursor may be a column
+      // off in pathological wide-char rows, but the row width stays correct).
+      const cursorOffset = Math.min(cursorColumn - visualColumns, padCount - 1)
+      const leading = cursorOffset
+      const trailing = padCount - cursorOffset - 1
       if (leading > 0) {
         pushSpan(spans, { text: ' '.repeat(leading) })
       }

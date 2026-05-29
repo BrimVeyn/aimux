@@ -7,13 +7,12 @@ export function getLineText(line: TerminalLine): string {
 /**
  * Extract text from a range of terminal lines as a single string.
  *
- * Multi-row selections are lossy: trailing `[ \t]+` is stripped from each
- * joined segment to drop the viewport padding the snapshot layer fills blank
- * cells with. Without this, shell line continuations (`\` followed by padding
- * spaces then `\n`) paste as escaped-space sequences instead of continuations.
- *
- * Single-row selections are returned verbatim — trailing spaces the user
- * explicitly dragged over are preserved.
+ * Trailing `[ \t]+` is stripped from each joined segment to drop the viewport
+ * padding the snapshot layer fills blank cells with (every rendered row is now
+ * padded to the full terminal width to prevent ghosting). Without this, shell
+ * line continuations (`\` + padding spaces + `\n`) paste as escaped-space
+ * sequences, and a single-line copy dragged to/past end-of-line would pick up
+ * the synthetic padding spaces.
  */
 export function extractStreamText(
   lines: TerminalLine[],
@@ -38,7 +37,7 @@ export function extractStreamText(
   for (let row = clampedStart; row <= clampedEnd; row++) {
     const text = getLineText(lines[row] as TerminalLine)
     if (row === startRow && row === endRow) {
-      parts.push(text.slice(Math.max(0, startCol), Math.max(0, endCol)))
+      parts.push(rtrim(text.slice(Math.max(0, startCol), Math.max(0, endCol))))
     } else if (row === startRow) {
       parts.push(rtrim(text.slice(Math.max(0, startCol))))
     } else if (row === endRow) {

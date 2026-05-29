@@ -141,7 +141,9 @@ test('extractStreamText rtrims trailing padding on multi-line join', () => {
   expect(extractStreamText(lines, 0, 0, 2, 24)).toBe('echo "a" && \\\n  echo "b" && \\\n  echo "c"')
 })
 
-test('extractStreamText preserves single-line trailing spaces', () => {
+test('extractStreamText rtrims single-line trailing spaces (row padding is synthetic)', () => {
+  // Every rendered row is padded to the full terminal width to prevent
+  // ghosting, so trailing spaces on a single-row copy are padding, not content.
   const lines = [makeLine('abc   ')]
-  expect(extractStreamText(lines, 0, 0, 0, 6)).toBe('abc   ')
+  expect(extractStreamText(lines, 0, 0, 0, 6)).toBe('abc')
 })
