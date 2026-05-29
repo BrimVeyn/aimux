@@ -1,14 +1,15 @@
-// Mirror of aimux's default "aimux" dark theme tokens (packages/aimux-config TUI
-// themes). Used to make the GUI chrome match the TUI look.
+// GUI chrome palette, backed by the live --aimux-<token> CSS variables set by
+// useTheme. Same keys as before so components don't change. Tokens verified
+// against packages/aimux-config/src/tui/tokens.ts.
 export const theme = {
-  background: "#11151b",
-  backgroundPanel: "#161b22",
-  backgroundElement: "#1f2630",
-  text: "#edf4ff",
-  textMuted: "#8a97a9",
-  border: "#2a3340",
-  primary: "#7cd1b8",
-  success: "#8bd5ca",
-  warning: "#f6c177",
-  error: "#f38ba8",
+  background: "var(--aimux-background)",
+  backgroundPanel: "var(--aimux-backgroundPanel)",
+  backgroundElement: "var(--aimux-backgroundElement)",
+  text: "var(--aimux-text)",
+  textMuted: "var(--aimux-textMuted)",
+  border: "var(--aimux-border)",
+  primary: "var(--aimux-primary)",
+  success: "var(--aimux-success)",
+  warning: "var(--aimux-warning)",
+  error: "var(--aimux-error)",
 } as const;

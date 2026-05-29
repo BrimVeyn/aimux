@@ -1,4 +1,7 @@
+import type { ThemeMode } from '@brimveyn/aimux-config'
+
 import type { AppState, TabSession } from '../state/types'
+import type { GuiHelpEntry } from './gui-help-entries'
 
 // The browser renders the full AppState, EXCEPT the heavy per-tab terminal
 // payloads (`buffer`, `viewport`) which stream separately as `render` events.
@@ -6,8 +9,11 @@ import type { AppState, TabSession } from '../state/types'
 export type ProjectedTab = Omit<TabSession, 'buffer' | 'viewport'>
 
 export interface AppStateProjection extends Omit<AppState, 'tabs'> {
+  helpEntries: GuiHelpEntry[]
   tabs: ProjectedTab[]
   themeId: string
+  themeMode: ThemeMode
+  transparent: boolean
 }
 
 function projectTab(tab: TabSession): ProjectedTab {
@@ -25,10 +31,21 @@ function projectTab(tab: TabSession): ProjectedTab {
   }
 }
 
-export function projectAppState(state: AppState, themeId: string): AppStateProjection {
+export function projectAppState(
+  state: AppState,
+  options: {
+    helpEntries: GuiHelpEntry[]
+    themeId: string
+    themeMode: ThemeMode
+    transparent: boolean
+  }
+): AppStateProjection {
   return {
     ...state,
+    helpEntries: options.helpEntries,
     tabs: state.tabs.map(projectTab),
-    themeId,
+    themeId: options.themeId,
+    themeMode: options.themeMode,
+    transparent: options.transparent,
   }
 }

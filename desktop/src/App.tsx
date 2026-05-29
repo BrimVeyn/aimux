@@ -8,6 +8,7 @@ import { SplitLayout } from "@/components/SplitLayout";
 import { TerminalPane } from "@/components/TerminalPane";
 import { normalizeKey } from "@/lib/keys";
 import { theme } from "@/lib/theme";
+import { useTheme } from "@/lib/use-theme";
 import type {
   AppStateProjection,
   LayoutNode,
@@ -27,6 +28,8 @@ function App() {
   const [renders, setRenders] = useState<Record<string, RenderState>>({});
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const socketRef = useRef<GuiSocket | null>(null);
+
+  useTheme(projection?.themeId, projection?.themeMode);
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
@@ -192,6 +195,12 @@ function App() {
           modal={projection.modal}
           customCommands={projection.customCommands}
           worktrees={currentSession?.worktrees ?? []}
+          sessions={projection.sessions}
+          currentSessionId={projection.currentSessionId}
+          snippets={projection.snippets}
+          themeId={projection.themeId}
+          helpEntries={projection.helpEntries}
+          directoryResults={projection.modal.directoryResults ?? []}
         />
       ) : null}
     </div>

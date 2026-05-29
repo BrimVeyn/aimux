@@ -26,6 +26,8 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@aimux": path.resolve(__dirname, "../src"),
+      "@aimux-config": path.resolve(__dirname, "../packages/aimux-config/src"),
     },
   },
 

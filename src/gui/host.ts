@@ -32,8 +32,10 @@ import {
 } from '../state/session-catalog'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
-import { applyTheme, setMode, setTransparent } from '../ui/theme'
+import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
 import { isKnownThemeId, type ThemeId } from '../ui/themes'
+import { createDirectorySearchRunner } from './gui-directory-search'
+import { computeGuiHelpEntries } from './gui-help-entries'
 import { createPipeline } from './host-pipeline'
 import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
 import { computeVisibleTabIds } from './host-visible'
@@ -99,7 +101,9 @@ export async function runGui(): Promise<void> {
   const backend = await createSessionBackend()
   setActiveKeymap(resolvedConfig.keymaps)
   const handlers = registerAllModes(resolvedConfig.keymaps)
+  const helpEntries = computeGuiHelpEntries(resolvedConfig.keymaps)
   setActiveDispatch(dispatch)
+  const directorySearch = createDirectorySearchRunner(dispatch)
 
   const timeouts = createTabTimeouts()
   const renderer = createStubRenderer()
@@ -111,7 +115,15 @@ export async function runGui(): Promise<void> {
 
   let broadcastScheduled = false
   const broadcastState = (): void => {
-    send({ projection: projectAppState(getState(), themeId), t: 'state' })
+    send({
+      projection: projectAppState(getState(), {
+        helpEntries,
+        themeId,
+        themeMode: getCurrentMode(),
+        transparent: getTransparent(),
+      }),
+      t: 'state',
+    })
   }
   const scheduleBroadcast = (): void => {
     if (broadcastScheduled) {
@@ -203,6 +215,7 @@ export async function runGui(): Promise<void> {
         backend.setActiveTab(state.activeTabId)
       }
     }
+    directorySearch.onModal(state.modal)
     scheduleBroadcast()
     replayVisible()
   })

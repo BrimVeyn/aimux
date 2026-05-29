@@ -5,6 +5,21 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Fallback aimux palette so the app renders before the first WS projection.
+   useTheme overrides these once the host pushes the active theme. */
+:root {
+    --aimux-background: #11151b;
+    --aimux-backgroundPanel: #161b22;
+    --aimux-backgroundElement: #1f2630;
+    --aimux-text: #edf4ff;
+    --aimux-textMuted: #8a97a9;
+    --aimux-border: #2a3340;
+    --aimux-primary: #7cd1b8;
+    --aimux-success: #8bd5ca;
+    --aimux-warning: #f6c177;
+    --aimux-error: #f38ba8;
+}
+
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;

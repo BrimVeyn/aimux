@@ -79,6 +79,26 @@ export interface SessionRecordLite {
   worktrees?: WorktreeLite[];
 }
 
+export interface GuiHelpEntry {
+  keys: string;
+  keysDisplay: string;
+  description: string;
+  group: string;
+  modeLabel: string;
+}
+
+export interface SnippetRecordLite {
+  id: string;
+  name: string;
+  content: string;
+  trigger?: string;
+}
+
+export interface DirectoryResultLite {
+  path: string;
+  type: "git-repo" | "worktree" | "workspace";
+}
+
 /** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
 export interface ModalProjection {
   type: string | null;
@@ -89,6 +109,12 @@ export interface ModalProjection {
   createWorktree?: boolean;
   worktreeName?: string;
   branchName?: string;
+  // Phase 3 additions
+  scope?: string | null;
+  activeField?: "directory" | "name";
+  nameBuffer?: string;
+  directoryResults?: DirectoryResultLite[];
+  actionMessage?: string | null;
 }
 
 /** The slice of aimux's AppState the GUI renders (full state is streamed). */
@@ -98,12 +124,16 @@ export interface AppStateProjection {
   sessions: SessionRecordLite[];
   currentSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
+  snippets: SnippetRecordLite[];
   focusMode: FocusMode;
   modal: ModalProjection;
   customCommands: Record<string, string>;
   sidebar: { visible: boolean; width: number };
   sessionBar: { visible: boolean; position: "top" | "bottom" };
   themeId: string;
+  themeMode: "dark" | "light";
+  transparent: boolean;
+  helpEntries: GuiHelpEntry[];
   layoutTrees: Record<string, LayoutNode>;
   tabGroupMap: Record<string, string>;
 }
