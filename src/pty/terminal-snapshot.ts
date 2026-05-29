@@ -100,6 +100,7 @@ function buildLine(
 
   const cell = terminal.buffer.active.getNullCell()
   const spans: TerminalSpan[] = []
+  let visualColumns = 0
 
   for (let column = 0; column < terminal.cols; column += 1) {
     const current = line.getCell(column, cell)
@@ -138,6 +139,48 @@ function buildLine(
       text,
       underline: current.isUnderline() ? true : undefined,
     })
+
+    visualColumns += current.getWidth()
+  }
+
+  // Pad the row to the full terminal width so opentui overwrites every cell.
+  // Without padding, cells past the last written character retain content
+  // from the previous frame (opentui's `blendCells` preserves the existing
+  // char when an overlay space lands on it — see modal-shell.tsx for the
+  // same class of bug solved differently for transparent modals).
+  if (visualColumns < terminal.cols) {
+    const padCount = terminal.cols - visualColumns
+    const cursorInPad =
+      cursorVisible &&
+      cursorColumn !== null &&
+      cursorColumn >= visualColumns &&
+      cursorColumn < terminal.cols
+
+    if (cursorInPad && cursorColumn !== null) {
+      // cursorColumn is a buffer column while visualColumns is a sum of cell
+      // widths; they diverge when wide glyphs precede the gap. Clamp the offset
+      // into the pad so leading + cursor + trailing always equals padCount and
+      // the row never over/undershoots terminal.cols (cursor may be a column
+      // off in pathological wide-char rows, but the row width stays correct).
+      const cursorOffset = Math.min(cursorColumn - visualColumns, padCount - 1)
+      const leading = cursorOffset
+      const trailing = padCount - cursorOffset - 1
+      if (leading > 0) {
+        pushSpan(spans, { text: ' '.repeat(leading) })
+      }
+      const tokens = getCurrentTheme()
+      pushSpan(spans, {
+        bg: tokens.text,
+        cursor: true,
+        fg: tokens.background,
+        text: ' ',
+      })
+      if (trailing > 0) {
+        pushSpan(spans, { text: ' '.repeat(trailing) })
+      }
+    } else {
+      pushSpan(spans, { text: ' '.repeat(padCount) })
+    }
   }
 
   return { spans }

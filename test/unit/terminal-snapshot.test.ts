@@ -159,4 +159,36 @@ describe('snapshotTerminal', () => {
     expect(snapshot.lines[0]?.spans.some((span) => span.cursor === true)).toBe(false)
     terminal.dispose()
   })
+
+  test('pads short rows to the full terminal width to prevent ghosting', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('hi', resolve)
+    })
+
+    const snapshot = snapshotTerminal(terminal, false)
+    const firstLine = snapshot.lines[0]
+    const width = firstLine?.spans.reduce((sum, span) => sum + span.text.length, 0)
+    expect(width).toBe(20)
+    expect(firstLine?.spans.map((span) => span.text).join('')).toBe('hi'.padEnd(20))
+    terminal.dispose()
+  })
+
+  test('renders the cursor in the pad without changing the row width', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('hi', resolve)
+    })
+
+    // Cursor sits at column 2, in the unwritten tail.
+    const snapshot = snapshotTerminal(terminal, true)
+    const firstLine = snapshot.lines[0]
+    const width = firstLine?.spans.reduce((sum, span) => sum + span.text.length, 0)
+    expect(width).toBe(20)
+    const cursorSpan = firstLine?.spans.find((span) => span.cursor === true)
+    expect(cursorSpan?.text).toBe(' ')
+    terminal.dispose()
+  })
 })
