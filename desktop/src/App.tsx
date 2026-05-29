@@ -1,6 +1,8 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { GitPanel } from "@/components/git/GitPanel";
 import { ModalHost } from "@/components/ModalHost";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -159,6 +161,47 @@ function App() {
   const activeTree: LayoutNode | null =
     groupId !== null ? (projection?.layoutTrees[groupId] ?? null) : null;
 
+  const gitPane = projection?.gitPane;
+  // Stage 2a: pane+top/bottom isn't a real TUI combo (top/bottom are embedded-only).
+  // Fall back to left-pane behavior so the panel is still visible if the host ever
+  // emits this combo; Task 3 may revisit.
+  const showPanelLeftOrRight =
+    gitPane?.visible === true &&
+    gitPane.mode === "pane" &&
+    (gitPane.position === "left" ||
+      gitPane.position === "right" ||
+      gitPane.position === "top" ||
+      gitPane.position === "bottom");
+  const showPanelEmbedded =
+    gitPane?.visible === true &&
+    gitPane.mode === "embedded" &&
+    (gitPane.position === "top" || gitPane.position === "bottom");
+  const panelOnRight = gitPane?.mode === "pane" && gitPane.position === "right";
+
+  const gitPanelElement =
+    projection !== null && gitPane !== undefined ? (
+      <div
+        className="h-full overflow-hidden border-r"
+        style={{
+          backgroundColor: theme.backgroundPanel,
+          borderColor: theme.border,
+          padding: 8,
+        }}
+      >
+        <GitPanel
+          gitMode={projection.gitMode}
+          gitPane={gitPane}
+          gitPanel={projection.gitPanel}
+          projectPath={currentSession?.projectPath}
+        />
+      </div>
+    ) : null;
+
+  const paneWrapperStyle: React.CSSProperties =
+    gitPane !== undefined
+      ? { flexBasis: `${gitPane.paneRatio * 100}%`, flexShrink: 0, minWidth: 0 }
+      : {};
+
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
       <SessionBar
@@ -178,7 +221,15 @@ function App() {
           onSelectTab={activateTab}
           onCloseTab={closeTab}
           onNewTab={newTab}
+          embeddedRatio={showPanelEmbedded ? gitPane?.embeddedRatio : undefined}
+          gitPanelPosition={
+            showPanelEmbedded ? (gitPane?.position as "top" | "bottom") : undefined
+          }
+          gitPanelSlot={showPanelEmbedded ? gitPanelElement : undefined}
         />
+        {showPanelLeftOrRight && !panelOnRight ? (
+          <div style={paneWrapperStyle}>{gitPanelElement}</div>
+        ) : null}
         <main className="min-w-0 flex-1 p-1">
           {activeTree !== null && activeTree.type === "split" ? (
             <SplitLayout
@@ -203,6 +254,9 @@ function App() {
             />
           ) : null}
         </main>
+        {showPanelLeftOrRight && panelOnRight ? (
+          <div style={paneWrapperStyle}>{gitPanelElement}</div>
+        ) : null}
         <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
           {status === "open" ? (projection?.focusMode ?? "") : status}
         </span>

@@ -1,3 +1,5 @@
+import type React from "react";
+
 import { theme } from "@/lib/theme";
 import type { ProjectedTab } from "@/lib/types";
 
@@ -12,6 +14,9 @@ interface SidebarProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewTab: () => void;
+  embeddedRatio?: number;
+  gitPanelPosition?: "top" | "bottom";
+  gitPanelSlot?: React.ReactNode;
 }
 
 function Activity({ tab }: { tab: ProjectedTab }) {
@@ -39,7 +44,18 @@ export function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  embeddedRatio = 0.4,
+  gitPanelPosition,
+  gitPanelSlot,
 }: SidebarProps) {
+  const slotStyle: React.CSSProperties = {
+    flexBasis: `${embeddedRatio * 100}%`,
+    flexShrink: 0,
+    overflow: "auto",
+  };
+  const showSlotTop = gitPanelSlot !== undefined && gitPanelPosition === "top";
+  const showSlotBottom = gitPanelSlot !== undefined && gitPanelPosition === "bottom";
+
   return (
     <div
       className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r font-mono text-xs"
@@ -65,6 +81,8 @@ export function Sidebar({
           + New assistant
         </AimuxButton>
       </div>
+
+      {showSlotTop ? <div style={slotStyle}>{gitPanelSlot}</div> : null}
 
       <div className="px-3 py-1 select-none" style={{ color: theme.textMuted }}>
         {"·".repeat(26)}
@@ -109,6 +127,8 @@ export function Sidebar({
           );
         })}
       </div>
+
+      {showSlotBottom ? <div style={slotStyle}>{gitPanelSlot}</div> : null}
     </div>
   );
 }

@@ -110,6 +110,48 @@ export interface DirectoryResultLite {
   type: "git-repo" | "worktree" | "workspace";
 }
 
+export interface GitFileEntryLite {
+  added?: number;
+  oldPath?: string;
+  path: string;
+  removed?: number;
+  repoPath?: string;
+  section: "historical" | "staged" | "unstaged" | "untracked";
+  status: "?" | "A" | "C" | "R" | "D" | "U" | "M";
+}
+
+export interface GitPanelLite {
+  ahead: number;
+  behind: number;
+  branch: string | null;
+  error: "not-a-repo" | "unknown" | null;
+  files: GitFileEntryLite[];
+}
+
+export interface GitModeLite {
+  // Stage 2a only needs these; diff-viewer fields stay untyped on the wire.
+  collapsedFolders: Record<string, true>;
+  headOffset: number;
+  selectedEntryKey: string | null;
+  [k: string]: unknown;
+}
+
+export interface GitPaneLite {
+  diffCount: { enabled: boolean };
+  embeddedRatio: number;
+  fileListMode: "tree" | "flat";
+  mode: "pane" | "embedded";
+  paneRatio: number;
+  position: "left" | "right" | "top" | "bottom";
+  treeCompaction: boolean;
+  visible: boolean;
+}
+
+export interface MultiRepoLite {
+  prefixes: Record<string, string>;
+  repos: { isRoot: boolean; name: string; path: string }[];
+}
+
 /** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
 export interface ModalProjection {
   // `type` is open-ended: includes "new-tab", "session-picker", "snippet-picker",
@@ -150,8 +192,12 @@ export interface AppStateProjection {
   committedThemeId: string;
   themeMode: "dark" | "light";
   transparent: boolean;
+  gitMode: GitModeLite;
+  gitPane: GitPaneLite;
+  gitPanel: GitPanelLite;
   helpEntries: GuiHelpEntry[];
   layoutTrees: Record<string, LayoutNode>;
+  multiRepo: MultiRepoLite;
   tabGroupMap: Record<string, string>;
   worktreeDivergence: Record<string, { ahead: number; behind: number }>;
 }
