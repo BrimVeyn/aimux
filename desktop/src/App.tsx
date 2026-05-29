@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { GitPanel } from "@/components/git/GitPanel";
+import { GitView } from "@/components/git/GitView";
 import { ModalHost } from "@/components/ModalHost";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
@@ -162,10 +163,13 @@ function App() {
     groupId !== null ? (projection?.layoutTrees[groupId] ?? null) : null;
 
   const gitPane = projection?.gitPane;
+  const inGitMode =
+    projection?.focusMode === "git" || projection?.modal.type === "git-commit";
   // Stage 2a: pane+top/bottom isn't a real TUI combo (top/bottom are embedded-only).
   // Fall back to left-pane behavior so the panel is still visible if the host ever
   // emits this combo; Task 3 may revisit.
   const showPanelLeftOrRight =
+    !inGitMode &&
     gitPane?.visible === true &&
     gitPane.mode === "pane" &&
     (gitPane.position === "left" ||
@@ -173,6 +177,7 @@ function App() {
       gitPane.position === "top" ||
       gitPane.position === "bottom");
   const showPanelEmbedded =
+    !inGitMode &&
     gitPane?.visible === true &&
     gitPane.mode === "embedded" &&
     (gitPane.position === "top" || gitPane.position === "bottom");
@@ -202,6 +207,30 @@ function App() {
       ? { flexBasis: `${gitPane.paneRatio * 100}%`, flexShrink: 0, minWidth: 0 }
       : {};
 
+  const exitGitMode = useCallback(() => {
+    // The host runs aimux's git-mode keymap; sending Escape exits the mode.
+    socketRef.current?.send({
+      ctrl: false,
+      meta: false,
+      name: "escape",
+      sequence: "",
+      shift: false,
+      t: "key",
+    });
+  }, []);
+
+  const gitViewElement =
+    projection !== null && gitPane !== undefined ? (
+      <GitView
+        gitMode={projection.gitMode}
+        gitPane={gitPane}
+        gitPanel={projection.gitPanel}
+        onExit={exitGitMode}
+        projectPath={currentSession?.projectPath}
+        themeId={projection.themeId}
+      />
+    ) : null;
+
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
       <SessionBar
@@ -213,50 +242,56 @@ function App() {
         onDelete={deleteSession}
       />
       <div className="flex min-h-0 flex-1">
-        <Sidebar
-          sessionName={currentSession?.name ?? null}
-          branch={sidebarBranch}
-          tabs={projection?.tabs ?? []}
-          activeTabId={activeTabId}
-          onSelectTab={activateTab}
-          onCloseTab={closeTab}
-          onNewTab={newTab}
-          embeddedRatio={showPanelEmbedded ? gitPane?.embeddedRatio : undefined}
-          gitPanelPosition={
-            showPanelEmbedded ? (gitPane?.position as "top" | "bottom") : undefined
-          }
-          gitPanelSlot={showPanelEmbedded ? gitPanelElement : undefined}
-        />
-        {showPanelLeftOrRight && !panelOnRight ? (
-          <div style={paneWrapperStyle}>{gitPanelElement}</div>
-        ) : null}
-        <main className="min-w-0 flex-1 p-1">
-          {activeTree !== null && activeTree.type === "split" ? (
-            <SplitLayout
-              node={activeTree}
+        {inGitMode ? (
+          gitViewElement
+        ) : (
+          <>
+            <Sidebar
+              sessionName={currentSession?.name ?? null}
+              branch={sidebarBranch}
+              tabs={projection?.tabs ?? []}
               activeTabId={activeTabId}
-              tabsById={tabsById}
-              renders={renders}
-              onResizeTab={resizeTab}
-              onActivate={activateTab}
-              onScroll={onScroll}
-              onSetSplitRatio={setSplitRatio}
+              onSelectTab={activateTab}
+              onCloseTab={closeTab}
+              onNewTab={newTab}
+              embeddedRatio={showPanelEmbedded ? gitPane?.embeddedRatio : undefined}
+              gitPanelPosition={
+                showPanelEmbedded ? (gitPane?.position as "top" | "bottom") : undefined
+              }
+              gitPanelSlot={showPanelEmbedded ? gitPanelElement : undefined}
             />
-          ) : activeTabId !== null ? (
-            <TerminalPane
-              tabId={activeTabId}
-              tab={tabsById[activeTabId]}
-              snapshot={renders[activeTabId]?.viewport ?? null}
-              isActive
-              onResizeTab={resizeTab}
-              onActivate={activateTab}
-              onScroll={onScroll}
-            />
-          ) : null}
-        </main>
-        {showPanelLeftOrRight && panelOnRight ? (
-          <div style={paneWrapperStyle}>{gitPanelElement}</div>
-        ) : null}
+            {showPanelLeftOrRight && !panelOnRight ? (
+              <div style={paneWrapperStyle}>{gitPanelElement}</div>
+            ) : null}
+            <main className="min-w-0 flex-1 p-1">
+              {activeTree !== null && activeTree.type === "split" ? (
+                <SplitLayout
+                  node={activeTree}
+                  activeTabId={activeTabId}
+                  tabsById={tabsById}
+                  renders={renders}
+                  onResizeTab={resizeTab}
+                  onActivate={activateTab}
+                  onScroll={onScroll}
+                  onSetSplitRatio={setSplitRatio}
+                />
+              ) : activeTabId !== null ? (
+                <TerminalPane
+                  tabId={activeTabId}
+                  tab={tabsById[activeTabId]}
+                  snapshot={renders[activeTabId]?.viewport ?? null}
+                  isActive
+                  onResizeTab={resizeTab}
+                  onActivate={activateTab}
+                  onScroll={onScroll}
+                />
+              ) : null}
+            </main>
+            {showPanelLeftOrRight && panelOnRight ? (
+              <div style={paneWrapperStyle}>{gitPanelElement}</div>
+            ) : null}
+          </>
+        )}
         <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
           {status === "open" ? (projection?.focusMode ?? "") : status}
         </span>
