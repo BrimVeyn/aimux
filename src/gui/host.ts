@@ -5,6 +5,7 @@ import {
   setExternalEditorConfig,
   setMultiRepoConfig,
 } from '@brimveyn/aimux-config'
+import { connect } from 'node:net'
 import { basename } from 'node:path'
 
 import type { LayoutState } from '../state/types'
@@ -223,6 +224,24 @@ export async function runGui(): Promise<void> {
   // Initial attach (load-session above fired before subscribe was wired).
   if (lastSessionId !== null && lastSessionId !== '') {
     attachSession(lastSessionId)
+  }
+
+  // Fail loudly if a stale GUI host still holds the port, instead of silently
+  // leaving the browser talking to an old (version-skewed) host.
+  const portOccupied = await new Promise<boolean>((resolve) => {
+    const probe = connect(GUI_PORT, '127.0.0.1')
+    probe.once('connect', () => {
+      probe.destroy()
+      resolve(true)
+    })
+    probe.once('error', () => resolve(false))
+  })
+  if (portOccupied) {
+    process.stdout.write(
+      `\n✖ aimux GUI: port ${GUI_PORT} is already in use (a previous host is still running).\n` +
+        `  Kill it and retry:\n    lsof -ti tcp:${GUI_PORT} | xargs kill -9\n\n`
+    )
+    process.exit(1)
   }
 
   const server = Bun.serve({
