@@ -1,7 +1,6 @@
 import { THEME_IDS, type ThemeId } from "@aimux-config/tui/registry";
 
 import { Empty, FilterField, Footer, Row } from "@/components/ModalHost";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ModalProjection } from "@/lib/types";
 
 function themeDisplayName(id: string): string {
@@ -32,18 +31,16 @@ export function ThemePickerModal({
     <div className="flex flex-col gap-2">
       <div className="font-bold">Theme</div>
       <FilterField value={modal.editBuffer} />
-      <ScrollArea className="max-h-72">
-        <div className="flex flex-col">
-          {options.map((id, index) => (
-            <Row
-              key={id}
-              selected={index === modal.selectedIndex}
-              label={id === themeId ? `${themeDisplayName(id)} (current)` : themeDisplayName(id)}
-            />
-          ))}
-          {options.length === 0 ? <Empty /> : null}
-        </div>
-      </ScrollArea>
+      <div className="flex flex-col">
+        {options.map((id, index) => (
+          <Row
+            key={id}
+            selected={index === modal.selectedIndex}
+            label={id === themeId ? `${themeDisplayName(id)} (current)` : themeDisplayName(id)}
+          />
+        ))}
+        {options.length === 0 ? <Empty /> : null}
+      </div>
       <Footer text="↑/↓ preview · Enter apply · Esc restore" />
     </div>
   );

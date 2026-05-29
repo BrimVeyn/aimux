@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { CreateSessionModal } from "@/components/modals/CreateSessionModal";
 import { HelpModal } from "@/components/modals/HelpModal";
 import { SessionPickerModal } from "@/components/modals/SessionPickerModal";
@@ -45,17 +47,18 @@ export function ModalHost({
     return null;
   }
   return (
-    <div className="absolute inset-0 z-50 flex items-start justify-center pt-24">
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(0,0,0,0.45)" }} />
+    <div className="absolute inset-0 z-50 flex items-start justify-center pt-[8vh]">
+      <div className="absolute inset-0" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} />
       <div
-        className="relative w-[28rem] max-w-[90vw] rounded-lg border p-3 font-mono text-xs shadow-2xl"
+        className="relative flex max-h-[84vh] w-[34rem] max-w-[92vw] flex-col overflow-hidden rounded-lg border font-mono text-xs shadow-2xl"
         style={{
           backgroundColor: theme.backgroundPanel,
           borderColor: theme.border,
           color: theme.text,
         }}
       >
-        {modal.type === "new-tab" ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
+          {modal.type === "new-tab" ? (
           <NewTabModal modal={modal} customCommands={customCommands} worktrees={worktrees} />
         ) : modal.type === "split-picker" ? (
           <SplitPickerModal modal={modal} customCommands={customCommands} />
@@ -78,8 +81,9 @@ export function ModalHost({
         ) : modal.type === "create-session" ? (
           <CreateSessionModal modal={modal} directoryResults={directoryResults} />
         ) : (
-          <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
-        )}
+            <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -118,8 +122,15 @@ export function Footer({ text }: { text: string }) {
 }
 
 export function Row({ selected, label, hint }: { selected: boolean; label: string; hint?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selected) {
+      ref.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [selected]);
   return (
     <div
+      ref={ref}
       className="flex items-center gap-2 rounded px-2 py-1"
       style={{ backgroundColor: selected ? theme.backgroundElement : "transparent" }}
     >

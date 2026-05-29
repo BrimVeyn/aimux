@@ -1,6 +1,4 @@
 import { FilterField, Footer } from "@/components/ModalHost";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { theme } from "@/lib/theme";
 import type { GuiHelpEntry, ModalProjection } from "@/lib/types";
 
@@ -33,36 +31,36 @@ export function HelpModal({
     <div className="flex flex-col gap-2">
       <div className="font-bold">Keybindings</div>
       <FilterField value={modal.editBuffer} />
-      <ScrollArea className="max-h-80">
-        <div className="flex flex-col gap-2">
-          {[...groups.entries()].map(([label, list], groupIndex) => (
-            <div key={label} className="flex flex-col">
-              {groupIndex > 0 ? <Separator className="mb-2" /> : null}
-              <div className="px-2 py-0.5 font-semibold" style={{ color: theme.primary }}>
-                {label}
+      <div className="flex flex-col gap-2">
+        {[...groups.entries()].map(([label, list], groupIndex) => (
+          <div key={label} className="flex flex-col">
+            {groupIndex > 0 ? (
+              <div className="mb-2 h-px" style={{ backgroundColor: theme.border }} />
+            ) : null}
+            <div className="px-2 py-0.5 font-semibold" style={{ color: theme.primary }}>
+              {label}
+            </div>
+            {list.map((e) => (
+              <div
+                key={`${label}:${e.keys}:${e.description}`}
+                className="flex items-center gap-2 px-2 py-0.5"
+              >
+                <span className="font-mono" style={{ color: theme.text }}>
+                  {e.keysDisplay}
+                </span>
+                <span className="ml-auto truncate" style={{ color: theme.textMuted }}>
+                  {e.description}
+                </span>
               </div>
-              {list.map((e) => (
-                <div
-                  key={`${label}:${e.keys}:${e.description}`}
-                  className="flex items-center gap-2 px-2 py-0.5"
-                >
-                  <span className="font-mono" style={{ color: theme.text }}>
-                    {e.keysDisplay}
-                  </span>
-                  <span className="ml-auto truncate" style={{ color: theme.textMuted }}>
-                    {e.description}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-          {entries.length === 0 ? (
-            <div className="px-2 py-1" style={{ color: theme.textMuted }}>
-              no match
-            </div>
-          ) : null}
-        </div>
-      </ScrollArea>
+            ))}
+          </div>
+        ))}
+        {entries.length === 0 ? (
+          <div className="px-2 py-1" style={{ color: theme.textMuted }}>
+            no match
+          </div>
+        ) : null}
+      </div>
       <Footer text="type to filter · Esc close" />
     </div>
   );
