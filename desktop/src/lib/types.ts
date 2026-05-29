@@ -50,10 +50,28 @@ export interface ProjectedTab {
   activity?: TabActivity;
 }
 
+export interface WorktreeLite {
+  id: string;
+  name: string;
+}
+
 export interface SessionRecordLite {
   id: string;
   name: string;
   projectPath?: string;
+  worktrees?: WorktreeLite[];
+}
+
+/** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
+export interface ModalProjection {
+  type: string | null;
+  editBuffer: string | null;
+  selectedIndex: number;
+  selectedAssistantId?: string | null;
+  step?: "assistant" | "worktree" | "worktree-create";
+  createWorktree?: boolean;
+  worktreeName?: string;
+  branchName?: string;
 }
 
 /** The slice of aimux's AppState the GUI renders (full state is streamed). */
@@ -64,6 +82,8 @@ export interface AppStateProjection {
   currentSessionId: string | null;
   sessionStatuses: Record<string, SessionStatus>;
   focusMode: FocusMode;
+  modal: ModalProjection;
+  customCommands: Record<string, string>;
   sidebar: { visible: boolean; width: number };
   sessionBar: { visible: boolean; position: "top" | "bottom" };
   themeId: string;
@@ -85,6 +105,8 @@ export type GuiClientMessage =
   | { t: "resizeWindow"; cols: number; rows: number }
   | { t: "resizeTab"; tabId: string; cols: number; rows: number }
   | { t: "paneActivate"; tabId: string }
+  | { t: "openNewTab" }
+  | { t: "closeTab"; tabId: string }
   | { t: "switchSession"; sessionId: string }
   | { t: "createSession"; path: string }
   | { t: "deleteSession"; sessionId: string };

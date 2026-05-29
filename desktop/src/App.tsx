@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Terminal } from "@/Terminal";
+import { ModalHost } from "@/components/ModalHost";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
 import { normalizeKey } from "@/lib/keys";
@@ -77,16 +78,11 @@ function App() {
   }, []);
 
   const closeTab = useCallback((tabId: string) => {
-    // Close via aimux's default `dd` binding on the (now active) tab.
-    socketRef.current?.send({ t: "paneActivate", tabId });
-    const d = { ctrl: false, meta: false, name: "d", sequence: "d", shift: false, t: "key" } as const;
-    socketRef.current?.send(d);
-    socketRef.current?.send(d);
+    socketRef.current?.send({ t: "closeTab", tabId });
   }, []);
 
   const newTab = useCallback(() => {
-    // Open the new-tab modal (Ctrl+N). Modal UI lands in Phase 3.
-    socketRef.current?.send({ ctrl: true, meta: false, name: "n", sequence: "n", shift: false, t: "key" });
+    socketRef.current?.send({ t: "openNewTab" });
   }, []);
 
   const switchSession = useCallback((sessionId: string) => {
@@ -154,6 +150,13 @@ function App() {
           {status === "open" ? (projection?.focusMode ?? "") : status}
         </span>
       </div>
+      {projection ? (
+        <ModalHost
+          modal={projection.modal}
+          customCommands={projection.customCommands}
+          worktrees={currentSession?.worktrees ?? []}
+        />
+      ) : null}
     </div>
   );
 }

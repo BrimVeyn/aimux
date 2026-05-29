@@ -269,6 +269,14 @@ export async function runGui(): Promise<void> {
           case 'paneActivate':
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
+          case 'openNewTab':
+            // Same action Ctrl+N resolves to, dispatched directly (mode-independent).
+            dispatch({ type: 'open-new-tab-modal' })
+            break
+          case 'closeTab':
+            dispatch({ tabId: message.tabId, type: 'close-tab' })
+            backend.disposeSession(message.tabId)
+            break
           case 'switchSession': {
             const session = state.sessions.find((entry) => entry.id === message.sessionId)
             if (session) {

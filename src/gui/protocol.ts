@@ -19,6 +19,8 @@ export type GuiClientMessage =
   | { t: 'resizeWindow'; cols: number; rows: number }
   | { t: 'resizeTab'; tabId: string; cols: number; rows: number }
   | { t: 'paneActivate'; tabId: string }
+  | { t: 'openNewTab' }
+  | { t: 'closeTab'; tabId: string }
   | { t: 'switchSession'; sessionId: string }
   | { t: 'createSession'; path: string }
   | { t: 'deleteSession'; sessionId: string }
@@ -87,6 +89,10 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
         : null
     case 'paneActivate':
       return typeof value.tabId === 'string' ? { t: 'paneActivate', tabId: value.tabId } : null
+    case 'openNewTab':
+      return { t: 'openNewTab' }
+    case 'closeTab':
+      return typeof value.tabId === 'string' ? { t: 'closeTab', tabId: value.tabId } : null
     case 'switchSession':
       return typeof value.sessionId === 'string'
         ? { sessionId: value.sessionId, t: 'switchSession' }
