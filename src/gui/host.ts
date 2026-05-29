@@ -33,7 +33,15 @@ import {
 } from '../state/session-catalog'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
-import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
+import {
+  applyTheme,
+  getCurrentMode,
+  getCurrentThemeId,
+  getTransparent,
+  setMode,
+  setTransparent,
+  subscribeThemeChanges,
+} from '../ui/theme'
 import { isKnownThemeId, type ThemeId } from '../ui/themes'
 import { createDirectorySearchRunner } from './gui-directory-search'
 import { computeGuiHelpEntries } from './gui-help-entries'
@@ -119,7 +127,9 @@ export async function runGui(): Promise<void> {
     send({
       projection: projectAppState(getState(), {
         helpEntries,
-        themeId,
+        // The singleton reflects live preview (applyTheme) AND confirm/restore;
+        // the host's `themeId` var stays the committed id (used for restore).
+        themeId: getCurrentThemeId(),
         themeMode: getCurrentMode(),
         transparent: getTransparent(),
       }),
@@ -136,6 +146,10 @@ export async function runGui(): Promise<void> {
       broadcastState()
     })
   }
+
+  // Theme preview/confirm/restore all go through applyTheme on the singleton;
+  // rebroadcast so the browser recolors live as the user moves in the picker.
+  subscribeThemeChanges(() => scheduleBroadcast())
 
   const pipeline = createPipeline({
     backend,
