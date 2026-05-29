@@ -28,6 +28,8 @@ export function ModalHost({ modal, customCommands, worktrees }: ModalHostProps) 
       >
         {modal.type === "new-tab" ? (
           <NewTabModal modal={modal} customCommands={customCommands} worktrees={worktrees} />
+        ) : modal.type === "split-picker" ? (
+          <SplitPickerModal modal={modal} customCommands={customCommands} />
         ) : (
           <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
         )}
@@ -51,6 +53,50 @@ function Row({ selected, label, hint }: { selected: boolean; label: string; hint
           {hint}
         </span>
       ) : null}
+    </div>
+  );
+}
+
+function SplitPickerModal({
+  modal,
+  customCommands,
+}: {
+  modal: ModalProjection;
+  customCommands: Record<string, string>;
+}) {
+  const options = filterAssistants(allAssistants(customCommands), modal.editBuffer);
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="font-bold">Split pane</div>
+      <div
+        className="rounded px-2 py-1"
+        style={{ backgroundColor: theme.backgroundElement, color: theme.text }}
+      >
+        {modal.editBuffer !== null && modal.editBuffer !== "" ? (
+          modal.editBuffer
+        ) : (
+          <span style={{ color: theme.textMuted }}>type to filter…</span>
+        )}
+        <span style={{ color: theme.primary }}>▏</span>
+      </div>
+      <div className="flex flex-col">
+        {options.map((option, index) => (
+          <Row
+            key={option.id}
+            selected={index === modal.selectedIndex}
+            label={option.label}
+            hint={option.description}
+          />
+        ))}
+        {options.length === 0 ? (
+          <div className="px-2 py-1" style={{ color: theme.textMuted }}>
+            no match
+          </div>
+        ) : null}
+      </div>
+      <div className="pt-1" style={{ color: theme.textMuted }}>
+        ↑/↓ or C-p/C-n select · Enter split · Esc cancel
+      </div>
     </div>
   );
 }

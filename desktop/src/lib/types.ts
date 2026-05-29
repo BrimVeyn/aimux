@@ -32,6 +32,23 @@ export interface TerminalModeState {
   bracketedPasteMode: boolean;
 }
 
+export type SplitDirection = "horizontal" | "vertical";
+
+export interface LayoutLeaf {
+  type: "leaf";
+  tabId: string;
+}
+
+export interface LayoutSplit {
+  type: "split";
+  direction: SplitDirection;
+  ratio: number;
+  first: LayoutNode;
+  second: LayoutNode;
+}
+
+export type LayoutNode = LayoutLeaf | LayoutSplit;
+
 export type TabActivity = "working" | "waiting-input" | "idle";
 export type TabStatus = "starting" | "running" | "disconnected" | "error";
 export type FocusMode = "navigation" | "terminal-input" | "modal" | "command-edit" | "git";
@@ -87,6 +104,8 @@ export interface AppStateProjection {
   sidebar: { visible: boolean; width: number };
   sessionBar: { visible: boolean; position: "top" | "bottom" };
   themeId: string;
+  layoutTrees: Record<string, LayoutNode>;
+  tabGroupMap: Record<string, string>;
 }
 
 /** Normalized keyboard event in aimux's KeyInput shape. */
@@ -105,6 +124,7 @@ export type GuiClientMessage =
   | { t: "resizeWindow"; cols: number; rows: number }
   | { t: "resizeTab"; tabId: string; cols: number; rows: number }
   | { t: "paneActivate"; tabId: string }
+  | { t: "setSplitRatio"; tabId: string; ratio: number; axis?: SplitDirection }
   | { t: "openNewTab" }
   | { t: "closeTab"; tabId: string }
   | { t: "switchSession"; sessionId: string }

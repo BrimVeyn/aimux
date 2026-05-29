@@ -1,13 +1,20 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { Terminal } from "@/Terminal";
 import { ModalHost } from "@/components/ModalHost";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
+import { SplitLayout } from "@/components/SplitLayout";
+import { TerminalPane } from "@/components/TerminalPane";
 import { normalizeKey } from "@/lib/keys";
 import { theme } from "@/lib/theme";
-import type { AppStateProjection, TerminalModeState, TerminalSnapshot } from "@/lib/types";
+import type {
+  AppStateProjection,
+  LayoutNode,
+  ProjectedTab,
+  TerminalModeState,
+  TerminalSnapshot,
+} from "@/lib/types";
 import { type ConnectionStatus, GuiSocket } from "@/lib/ws";
 
 interface RenderState {
@@ -108,17 +115,30 @@ function App() {
     })();
   }, []);
 
-  const onResize = useCallback((cols: number, rows: number) => {
-    socketRef.current?.send({ cols, rows, t: "resizeWindow" });
-  }, []);
-
   const onScroll = useCallback((deltaLines: number) => {
     socketRef.current?.send({ deltaLines, t: "scroll" });
   }, []);
 
+  const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
+    socketRef.current?.send({ cols, rows, t: "resizeTab", tabId });
+  }, []);
+
+  const setSplitRatio = useCallback(
+    (tabId: string, ratio: number, axis: "horizontal" | "vertical") => {
+      socketRef.current?.send({ axis, ratio, t: "setSplitRatio", tabId });
+    },
+    [],
+  );
+
   const activeTabId = projection?.activeTabId ?? null;
-  const active = activeTabId !== null ? (renders[activeTabId] ?? null) : null;
   const currentSession = projection?.sessions.find((s) => s.id === projection.currentSessionId);
+  const tabsById: Record<string, ProjectedTab> = {};
+  for (const t of projection?.tabs ?? []) {
+    tabsById[t.id] = t;
+  }
+  const groupId = activeTabId !== null ? (projection?.tabGroupMap[activeTabId] ?? null) : null;
+  const activeTree: LayoutNode | null =
+    groupId !== null ? (projection?.layoutTrees[groupId] ?? null) : null;
 
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
@@ -139,12 +159,29 @@ function App() {
           onCloseTab={closeTab}
           onNewTab={newTab}
         />
-        <main className="min-w-0 flex-1">
-          <Terminal
-            snapshot={active?.viewport ?? null}
-            onResize={onResize}
-            onScroll={onScroll}
-          />
+        <main className="min-w-0 flex-1 p-1">
+          {activeTree !== null && activeTree.type === "split" ? (
+            <SplitLayout
+              node={activeTree}
+              activeTabId={activeTabId}
+              tabsById={tabsById}
+              renders={renders}
+              onResizeTab={resizeTab}
+              onActivate={activateTab}
+              onScroll={onScroll}
+              onSetSplitRatio={setSplitRatio}
+            />
+          ) : activeTabId !== null ? (
+            <TerminalPane
+              tabId={activeTabId}
+              tab={tabsById[activeTabId]}
+              snapshot={renders[activeTabId]?.viewport ?? null}
+              isActive
+              onResizeTab={resizeTab}
+              onActivate={activateTab}
+              onScroll={onScroll}
+            />
+          ) : null}
         </main>
         <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
           {status === "open" ? (projection?.focusMode ?? "") : status}

@@ -36,6 +36,7 @@ import { applyTheme, setMode, setTransparent } from '../ui/theme'
 import { isKnownThemeId, type ThemeId } from '../ui/themes'
 import { createPipeline } from './host-pipeline'
 import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
+import { computeVisibleTabIds } from './host-visible'
 import { launchShell } from './launch-shell'
 import { type GuiServerMessage, parseClientMessage } from './protocol'
 import { projectAppState } from './state-projection'
@@ -151,23 +152,23 @@ export async function runGui(): Promise<void> {
     },
   })
 
-  // Forward the active tab's render to the browser (Phase 1: active only).
+  // Forward renders for every VISIBLE pane (all leaves of the active group's tree).
   const lastRender = new Map<string, GuiServerMessage & { t: 'render' }>()
+  const visibleTabIds = (): string[] =>
+    computeVisibleTabIds(getState().layoutTrees, getState().tabGroupMap, getState().activeTabId)
   backend.on('render', (tabId, viewport, modes) => {
     const message: GuiServerMessage & { t: 'render' } = { modes, t: 'render', tabId, viewport }
     lastRender.set(tabId, message)
-    if (tabId === getState().activeTabId) {
+    if (visibleTabIds().includes(tabId)) {
       send(message)
     }
   })
-  const replayActive = (): void => {
-    const tabId = getState().activeTabId
-    if (tabId === null) {
-      return
-    }
-    const cached = lastRender.get(tabId)
-    if (cached) {
-      send(cached)
+  const replayVisible = (): void => {
+    for (const tabId of visibleTabIds()) {
+      const cached = lastRender.get(tabId)
+      if (cached) {
+        send(cached)
+      }
     }
   }
 
@@ -203,6 +204,7 @@ export async function runGui(): Promise<void> {
       }
     }
     scheduleBroadcast()
+    replayVisible()
   })
 
   // Initial attach (load-session above fired before subscribe was wired).
@@ -261,13 +263,20 @@ export async function runGui(): Promise<void> {
             break
           case 'resizeWindow':
             dispatch({ cols: message.cols, rows: message.rows, type: 'set-terminal-size' })
-            backend.resizeAll(message.cols, message.rows)
             break
           case 'resizeTab':
             backend.resizeTab(message.tabId, message.cols, message.rows)
             break
           case 'paneActivate':
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
+            break
+          case 'setSplitRatio':
+            dispatch({
+              axis: message.axis,
+              ratio: message.ratio,
+              tabId: message.tabId,
+              type: 'set-split-ratio',
+            })
             break
           case 'openNewTab':
             // Same action Ctrl+N resolves to, dispatched directly (mode-independent).
@@ -302,7 +311,7 @@ export async function runGui(): Promise<void> {
       open(ws) {
         activeWs = ws
         broadcastState()
-        replayActive()
+        replayVisible()
       },
     },
   })

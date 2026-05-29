@@ -1,4 +1,5 @@
 import type { KeyInput } from '../input/modes/types'
+import type { SplitDirection } from '../state/layout-tree'
 import type { TerminalModeState, TerminalSnapshot } from '../state/types'
 import type { AppStateProjection } from './state-projection'
 
@@ -19,6 +20,7 @@ export type GuiClientMessage =
   | { t: 'resizeWindow'; cols: number; rows: number }
   | { t: 'resizeTab'; tabId: string; cols: number; rows: number }
   | { t: 'paneActivate'; tabId: string }
+  | { t: 'setSplitRatio'; tabId: string; ratio: number; axis?: SplitDirection }
   | { t: 'openNewTab' }
   | { t: 'closeTab'; tabId: string }
   | { t: 'switchSession'; sessionId: string }
@@ -89,6 +91,17 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
         : null
     case 'paneActivate':
       return typeof value.tabId === 'string' ? { t: 'paneActivate', tabId: value.tabId } : null
+    case 'setSplitRatio': {
+      if (typeof value.tabId !== 'string' || typeof value.ratio !== 'number') {
+        return null
+      }
+      if (value.axis !== undefined && value.axis !== 'horizontal' && value.axis !== 'vertical') {
+        return null
+      }
+      return value.axis === undefined
+        ? { ratio: value.ratio, t: 'setSplitRatio', tabId: value.tabId }
+        : { axis: value.axis, ratio: value.ratio, t: 'setSplitRatio', tabId: value.tabId }
+    }
     case 'openNewTab':
       return { t: 'openNewTab' }
     case 'closeTab':

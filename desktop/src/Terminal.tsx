@@ -9,6 +9,44 @@ const DEFAULT_FG = "#edf4ff";
 const DEFAULT_BG = "#11151b";
 const MEASURE_CHARS = 50;
 
+export const FONT_FAMILY_GRID = FONT_FAMILY;
+export const FONT_SIZE_GRID = FONT_SIZE;
+export const LINE_HEIGHT_GRID = LINE_HEIGHT;
+export const DEFAULT_FG_GRID = DEFAULT_FG;
+export const DEFAULT_BG_GRID = DEFAULT_BG;
+export const MEASURE_CHARS_GRID = MEASURE_CHARS;
+
+export function TerminalGrid({ snapshot }: { snapshot: TerminalSnapshot | null }) {
+  const cursorVisible = snapshot?.cursorVisible === true;
+  return (
+    <>
+      {snapshot?.lines.map((line, rowIndex) => (
+        <div key={rowIndex} style={{ height: LINE_HEIGHT }}>
+          {line.spans.length === 0
+            ? " "
+            : line.spans.map((span, spanIndex) => {
+                const isCursor = span.cursor === true && cursorVisible;
+                return (
+                  <span
+                    key={spanIndex}
+                    style={{
+                      backgroundColor: isCursor ? (span.fg ?? DEFAULT_FG) : span.bg,
+                      color: isCursor ? (span.bg ?? DEFAULT_BG) : span.fg,
+                      fontStyle: span.italic === true ? "italic" : undefined,
+                      fontWeight: span.bold === true ? "bold" : undefined,
+                      textDecoration: span.underline === true ? "underline" : undefined,
+                    }}
+                  >
+                    {span.text}
+                  </span>
+                );
+              })}
+        </div>
+      ))}
+    </>
+  );
+}
+
 interface TerminalProps {
   snapshot: TerminalSnapshot | null;
   onResize: (cols: number, rows: number) => void;
@@ -68,8 +106,6 @@ export function Terminal({ snapshot, onResize, onScroll }: TerminalProps) {
     [onScroll],
   );
 
-  const cursorVisible = snapshot?.cursorVisible === true;
-
   return (
     <div
       ref={screenRef}
@@ -91,29 +127,7 @@ export function Terminal({ snapshot, onResize, onScroll }: TerminalProps) {
       >
         {"0".repeat(MEASURE_CHARS)}
       </span>
-      {snapshot?.lines.map((line, rowIndex) => (
-        <div key={rowIndex} style={{ height: LINE_HEIGHT }}>
-          {line.spans.length === 0
-            ? " "
-            : line.spans.map((span, spanIndex) => {
-                const isCursor = span.cursor === true && cursorVisible;
-                return (
-                  <span
-                    key={spanIndex}
-                    style={{
-                      backgroundColor: isCursor ? (span.fg ?? DEFAULT_FG) : span.bg,
-                      color: isCursor ? (span.bg ?? DEFAULT_BG) : span.fg,
-                      fontStyle: span.italic === true ? "italic" : undefined,
-                      fontWeight: span.bold === true ? "bold" : undefined,
-                      textDecoration: span.underline === true ? "underline" : undefined,
-                    }}
-                  >
-                    {span.text}
-                  </span>
-                );
-              })}
-        </div>
-      ))}
+      <TerminalGrid snapshot={snapshot} />
     </div>
   );
 }
