@@ -15,7 +15,6 @@ function createSnapshot(): WorkspaceSnapshotV1 {
         buffer: '',
         command: 'claude',
         id: 'tab-a',
-        scrollIntent: { absoluteLine: 11, kind: 'anchor' },
         status: 'running',
         terminalModes: {
           alternateScrollMode: false,
@@ -32,7 +31,7 @@ function createSnapshot(): WorkspaceSnapshotV1 {
 }
 
 describe('LocalSessionBackend.attach', () => {
-  test('passes persisted scroll intents to full-session resize during attach', async () => {
+  test('resizes the full session during attach without threading scroll intents', async () => {
     const backend = new LocalSessionBackend()
     const backendInternal = backend as unknown as {
       sessionManager: {
@@ -70,19 +69,15 @@ describe('LocalSessionBackend.attach', () => {
     })
 
     const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as Array<
-      [
-        sessionId: string,
-        cols: number,
-        rows: number,
-        intents?: Map<string, WorkspaceSnapshotV1['tabs'][number]['scrollIntent']>,
-      ]
+      [sessionId: string, cols: number, rows: number, options?: { sync?: boolean }]
     >
     const firstResize = resizeArgs[0]
     expect(firstResize).toBeDefined()
     expect(firstResize?.[0]).toBe('session-a')
     expect(firstResize?.[1]).toBe(80)
     expect(firstResize?.[2]).toBe(24)
-    expect(firstResize?.[3]).toEqual(new Map([['tab-a', { absoluteLine: 11, kind: 'anchor' }]]))
+    // The backend derives its own re-anchor from the emulator; no intent map.
+    expect(firstResize?.[3]).toBeUndefined()
     expect(backendInternal.sessionManager.resizeTab).not.toHaveBeenCalled()
   })
 })

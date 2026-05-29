@@ -120,15 +120,7 @@ export function useRendererBindings({
           cwd,
           now,
         })
-        writeMacroExpansionToTab(
-          backend,
-          tabId,
-          tab,
-          match.triggerText.length,
-          text,
-          cursorOffset,
-          dispatch
-        )
+        writeMacroExpansionToTab(backend, tabId, tab, match.triggerText.length, text, cursorOffset)
         registerUndo(text, cursorOffset)
         return
       }
@@ -153,7 +145,7 @@ export function useRendererBindings({
             now,
           })
           // Trigger already erased above; eraseCount = 0 here.
-          writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset, dispatch)
+          writeMacroExpansionToTab(backend, tabId, tab, 0, text, cursorOffset)
           registerUndo(text, cursorOffset)
         } finally {
           inFlightAsyncExpansionRef.current.delete(tabId)
@@ -193,7 +185,7 @@ export function useRendererBindings({
       resetTrigger: (tabId) => triggerDetectorsRef.current.get(tabId)?.reset(),
       tryConsumeMacroUndo,
       writeToPty: (tabId, data, options) =>
-        writeToTab(backend, tabId, activeTabRef.current, data, dispatch, options),
+        writeToTab(backend, tabId, activeTabRef.current, data, options),
     })
 
     const handlePasteEvent = (event: { bytes: Uint8Array; defaultPrevented?: boolean }) => {
@@ -229,7 +221,7 @@ export function useRendererBindings({
         return
       }
 
-      writePasteToTab(backend, tabId, tab, payload, dispatch)
+      writePasteToTab(backend, tabId, tab, payload)
     }
 
     const handleSelection = (selection: OtuiSelection) => {

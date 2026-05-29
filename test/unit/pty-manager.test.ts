@@ -1,7 +1,5 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { ScrollIntent } from '../../src/state/types'
-
 import { PtyManager } from '../../src/pty/pty-manager'
 
 describe('PtyManager', () => {
@@ -374,7 +372,7 @@ describe('PtyManager', () => {
     manager.disposeAll()
   })
 
-  test('resizeAll preserves anchor scrollIntent after reflow', async () => {
+  test('resize re-anchors from the emulator state after reflow', async () => {
     const manager = new PtyManager()
     let latestViewportY = 0
     let latestBaseY = 0
@@ -405,19 +403,20 @@ describe('PtyManager', () => {
 
     manager.scrollViewport('tab-intent', -10)
     await new Promise<void>((resolve) => setTimeout(resolve, 20))
-    const anchorLine = latestViewportY
     const firstLineBeforeResize = (latestText.split('\n')[0] ?? '').trim()
 
-    const intents = new Map<string, ScrollIntent>([
-      ['tab-intent', { absoluteLine: anchorLine, kind: 'anchor' }],
-    ])
-    manager.resizeAll(60, 8, intents)
+    // The backend owns scroll: resize derives the re-anchor target from the
+    // emulator's own (pre-reflow) position, so the scrolled-up view persists.
+    manager.resizeAll(60, 8)
     await new Promise<void>((resolve) => setTimeout(resolve, 50))
 
     expect(latestViewportY).toBeLessThan(latestBaseY)
     expect(latestText).toContain(firstLineBeforeResize)
 
-    manager.resizeAll(80, 8, new Map([['tab-intent', { kind: 'bottom' }]]))
+    // Once scrolled to the bottom, a resize keeps it pinned to the bottom.
+    manager.scrollViewportToBottom('tab-intent')
+    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+    manager.resizeAll(80, 8)
     await new Promise<void>((resolve) => setTimeout(resolve, 50))
     expect(latestViewportY).toBe(latestBaseY)
 

@@ -37,13 +37,7 @@ import {
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
-import {
-  type AppAction,
-  type AppState,
-  type AssistantId,
-  DEFAULT_SCROLL_INTENT,
-  type TabSession,
-} from '../state/types'
+import { type AppAction, type AppState, type AssistantId, type TabSession } from '../state/types'
 import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
@@ -146,14 +140,14 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
   const groupId = getGroupIdForTab(state.tabGroupMap, state.activeTabId)
   const groupTree = groupId ? state.layoutTrees[groupId] : null
   if (!groupTree) {
-    pasteSnippetToTab(backend, state.activeTabId, activeTab, snippet, ctx.dispatch)
+    pasteSnippetToTab(backend, state.activeTabId, activeTab, snippet)
     return
   }
 
   for (const tabId of allLeafIds(groupTree)) {
     const tab = state.tabs.find((entry) => entry.id === tabId)
     if (tab) {
-      pasteSnippetToTab(backend, tabId, tab, snippet, ctx.dispatch)
+      pasteSnippetToTab(backend, tabId, tab, snippet)
     }
   }
 }
@@ -257,7 +251,6 @@ export function createTabSession(
     buffer: '',
     command: customCommand ?? option.command,
     id: createTabId(),
-    scrollIntent: DEFAULT_SCROLL_INTENT,
     status: 'starting',
     terminalModes: createDefaultTerminalModes(),
     title: option.label,
@@ -432,13 +425,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       )
       return
     case 'paste-selected-snippet': {
-      pasteSnippetToTab(
-        backend,
-        state.activeTabId,
-        ctx.activeTab,
-        getSelectedSnippet(state),
-        dispatch
-      )
+      pasteSnippetToTab(backend, state.activeTabId, ctx.activeTab, getSelectedSnippet(state))
       return
     }
     case 'paste-snippet-to-group': {

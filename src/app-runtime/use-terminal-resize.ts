@@ -10,7 +10,7 @@ import {
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, ScrollIntent } from '../state/types'
+import type { AppAction, AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
@@ -44,7 +44,6 @@ function resizeSplitTabs(
   tabIds: string[],
   cols: number,
   rows: number,
-  intents: Map<string, ScrollIntent>,
   options?: { sync?: boolean }
 ): void {
   const bounds = getTerminalBounds(cols, rows)
@@ -52,13 +51,13 @@ function resizeSplitTabs(
 
   forEachSplitPaneRect(Object.values(layoutTrees), bounds, (tabId, rect) => {
     const size = toTerminalContentSize(rect)
-    backend.resizeTab(tabId, size.cols, size.rows, intents.get(tabId), options)
+    backend.resizeTab(tabId, size.cols, size.rows, options)
     resizedTabIds.add(tabId)
   })
 
   for (const id of tabIds) {
     if (!resizedTabIds.has(id)) {
-      backend.resizeTab(id, cols, rows, intents.get(id), options)
+      backend.resizeTab(id, cols, rows, options)
     }
   }
 }
@@ -81,7 +80,6 @@ interface RunResizeCascadeArgs {
   rows: number
   layoutTrees: AppState['layoutTrees']
   stableTabIds: string[]
-  intents: Map<string, ScrollIntent>
   sync: boolean
 }
 
@@ -89,7 +87,6 @@ function runResizeCascade({
   backend,
   cols,
   dispatch,
-  intents,
   layoutTrees,
   resizingRef,
   resizingTimerRef,
@@ -107,9 +104,9 @@ function runResizeCascade({
       clearTimeout(resizingTimerRef.current)
     }
     if (hasSplits) {
-      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, intents, options)
+      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, options)
     } else {
-      backend.resizeAll(cols, rows, intents, options)
+      backend.resizeAll(cols, rows, options)
     }
     resizingTimerRef.current = setTimeout(() => {
       resizingRef.current = false
@@ -133,7 +130,6 @@ export function useTerminalResize({
 }: UseTerminalResizeOptions) {
   const resizingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tabIdsRef = useRef<string[]>([])
-  const intentsRef = useRef<Map<string, ScrollIntent>>(new Map())
   const handledBySyncRef = useRef(false)
   const sidebarMountedRef = useRef(false)
 
@@ -145,12 +141,6 @@ export function useTerminalResize({
     tabIdsRef.current = currentTabIds
   }
   const stableTabIds = tabIdsRef.current
-
-  intentsRef.current = new Map(
-    state.tabs
-      .filter((t): t is typeof t & { scrollIntent: ScrollIntent } => t.scrollIntent !== undefined)
-      .map((t) => [t.id, t.scrollIntent])
-  )
 
   const activeTabIdRef = useRef(state.activeTabId)
   activeTabIdRef.current = state.activeTabId
@@ -176,7 +166,7 @@ export function useTerminalResize({
         return
       }
       measuredRef.current.set(tabId, { cols, rows })
-      backend.resizeTab(tabId, cols, rows, intentsRef.current.get(tabId))
+      backend.resizeTab(tabId, cols, rows)
     },
     [backend, contentOriginRef]
   )
@@ -230,7 +220,6 @@ export function useTerminalResize({
       backend,
       cols: terminalSize.cols,
       dispatch,
-      intents: intentsRef.current,
       layoutTrees: state.layoutTrees,
       resizingRef,
       resizingTimerRef,
@@ -259,7 +248,6 @@ export function useTerminalResize({
       backend,
       cols: terminalSize.cols,
       dispatch,
-      intents: intentsRef.current,
       layoutTrees: state.layoutTrees,
       resizingRef,
       resizingTimerRef,

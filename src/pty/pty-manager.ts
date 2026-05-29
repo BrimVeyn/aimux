@@ -85,6 +85,17 @@ function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): Termin
   }
 }
 
+// Read the scroll position straight from the emulator that owns it. This is the
+// single source of truth for re-anchoring across a resize: deriving it here
+// (zero latency) instead of accepting a frontend-supplied intent avoids the
+// stale-mirror drift that desynced selection/copy from the rendered viewport.
+function deriveEmulatorScrollIntent(emulator: XTerm): ScrollIntent {
+  const buffer = emulator.buffer.active
+  return buffer.viewportY >= buffer.baseY
+    ? { kind: 'bottom' }
+    : { absoluteLine: buffer.viewportY, kind: 'anchor' }
+}
+
 function envInt(name: string, fallback: number): number {
   const raw = process.env[name]
   if (raw === undefined) return fallback
@@ -374,13 +385,11 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     session.emulator.scrollToLine(Math.max(0, intent.absoluteLine))
   }
 
-  private applyResize(
-    session: SessionHandle,
-    cols: number,
-    rows: number,
-    intent: ScrollIntent | undefined,
-    sync: boolean
-  ): void {
+  private applyResize(session: SessionHandle, cols: number, rows: number, sync: boolean): void {
+    // Capture the scroll position from the emulator *before* reflow, so the
+    // re-anchor restores where the user actually was. The frontend no longer
+    // supplies an intent — the backend owns scroll position end to end.
+    const intent = deriveEmulatorScrollIntent(session.emulator)
     const safeCols = Math.max(20, cols)
     const safeRows = Math.max(8, rows)
     session.pty.resize(safeCols, safeRows)
@@ -406,38 +415,18 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
   }
 
-  resizeAll(
-    cols: number,
-    rows: number,
-    intents?: Map<string, ScrollIntent>,
-    options?: { sync?: boolean }
-  ): void {
+  resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void {
     for (const session of this.sessions.values()) {
-      this.applyResize(session, cols, rows, intents?.get(session.tabId), options?.sync ?? false)
+      this.applyResize(session, cols, rows, options?.sync ?? false)
     }
   }
 
-  resizeSession(
-    tabId: string,
-    cols: number,
-    rows: number,
-    intent?: ScrollIntent,
-    options?: { sync?: boolean }
-  ): void {
+  resizeSession(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
     const session = this.sessions.get(tabId)
     if (!session) {
       return
     }
-    this.applyResize(session, cols, rows, intent, options?.sync ?? false)
-  }
-
-  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
-    const session = this.sessions.get(tabId)
-    if (!session) {
-      return
-    }
-    this.applyScrollIntent(session, intent)
-    this.scheduleRender(session)
+    this.applyResize(session, cols, rows, options?.sync ?? false)
   }
 
   disposeSession(tabId: string): void {

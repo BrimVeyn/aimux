@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { connect, Socket } from 'node:net'
 
-import type { AssistantId, ScrollIntent, WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { getIpcDaemonSocketPath } from '../daemon/runtime-paths'
@@ -391,17 +391,6 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('scrollToBottom', error, tabId))
   }
 
-  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
-    if (!this.attached) {
-      return
-    }
-    void this.sendExpectOk({
-      id: crypto.randomUUID(),
-      payload: { intent, tabId },
-      type: 'reapplyScrollIntent',
-    }).catch((error) => this.reportCommandError('reapplyScrollIntent', error, tabId))
-  }
-
   setActiveTab(tabId: string | null): void {
     if (!this.attached) {
       return
@@ -413,38 +402,26 @@ export class RemoteSessionBackend
     }).catch((error) => this.reportCommandError('setActiveTab', error))
   }
 
-  resizeAll(
-    cols: number,
-    rows: number,
-    intents?: Map<string, ScrollIntent>,
-    _options?: { sync?: boolean }
-  ): void {
+  resizeAll(cols: number, rows: number, _options?: { sync?: boolean }): void {
     if (!this.attached) {
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
     }
     logDebug('backend.remote.resize', { cols, rows, sessionId: this.currentSessionId })
-    const intentsRecord = intents ? Object.fromEntries(intents.entries()) : undefined
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, intents: intentsRecord, rows },
+      payload: { cols, rows },
       type: 'resizeClient',
     }).catch((error) => this.reportCommandError('resizeClient', error))
   }
 
-  resizeTab(
-    tabId: string,
-    cols: number,
-    rows: number,
-    intent?: ScrollIntent,
-    _options?: { sync?: boolean }
-  ): void {
+  resizeTab(tabId: string, cols: number, rows: number, _options?: { sync?: boolean }): void {
     if (!this.attached) {
       return
     }
     void this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, intent, rows, tabId },
+      payload: { cols, rows, tabId },
       type: 'resizeTab',
     }).catch((error) => this.reportCommandError('resizeTab', error, tabId))
   }

@@ -1,7 +1,6 @@
 import { EventEmitter } from 'node:events'
 
 import type {
-  ScrollIntent,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
@@ -68,14 +67,8 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     this.getOrCreateRegistry(sessionId).write(tabId, data)
   }
 
-  resize(
-    sessionId: string,
-    cols: number,
-    rows: number,
-    intents?: Map<string, ScrollIntent>,
-    options?: { sync?: boolean }
-  ): void {
-    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, intents, options)
+  resize(sessionId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
+    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, options)
   }
 
   resizeTab(
@@ -83,10 +76,9 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     tabId: string,
     cols: number,
     rows: number,
-    intent?: ScrollIntent,
     options?: { sync?: boolean }
   ): void {
-    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, intent, options)
+    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, options)
   }
 
   scroll(sessionId: string, tabId: string, deltaLines: number): void {
@@ -95,10 +87,6 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
 
   scrollToBottom(sessionId: string, tabId: string): void {
     this.getOrCreateRegistry(sessionId).scrollViewportToBottom(tabId)
-  }
-
-  reapplyScrollIntent(sessionId: string, tabId: string, intent: ScrollIntent): void {
-    this.getOrCreateRegistry(sessionId).reapplyScrollIntent(tabId, intent)
   }
 
   setActiveTab(sessionId: string, tabId: string | null): void {
