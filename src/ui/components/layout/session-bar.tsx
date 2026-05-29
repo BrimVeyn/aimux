@@ -1,6 +1,6 @@
 import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useMemo, useRef, useState } from 'react'
 
 import type { SessionRecord, SessionStatus } from '../../../state/types'
 
@@ -31,59 +31,56 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
   const chipRefs = useRef(new Map<string, BoxRenderable>())
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
-  if ((!bar.visible && !forceVisible) || ordered.length === 0) return null
+  const baselineOrder = useMemo(() => ordered.map((s) => s.id), [ordered])
 
-  const visibleSessions =
-    dragOrder !== null
-      ? dragOrder
-          .map((id) => ordered.find((s) => s.id === id))
-          .filter((s): s is SessionRecord => !!s)
-      : ordered
-
-  const baselineOrder = ordered.map((s) => s.id)
-
-  function setChipRef(id: string, ref: BoxRenderable | null): void {
+  const setChipRef = useCallback((id: string, ref: BoxRenderable | null): void => {
     if (ref) chipRefs.current.set(id, ref)
     else chipRefs.current.delete(id)
-  }
+  }, [])
 
-  function findChipAtX(x: number): string | null {
+  const findChipAtX = useCallback((x: number): string | null => {
     for (const [id, ref] of chipRefs.current) {
       if (x >= ref.x && x < ref.x + ref.width) return id
     }
     return null
-  }
+  }, [])
 
-  const handleMouseDown = (id: string) => {
-    setDraggingId(id)
-    setDragOrder(baselineOrder)
-    lastSwapWithRef.current = null
-  }
-
-  const handleMouseDrag = (event: OtuiMouseEvent) => {
-    if (!draggingId) return
-    const hit = findChipAtX(event.x)
-    if (hit === null) {
+  const handleMouseDown = useCallback(
+    (id: string) => {
+      setDraggingId(id)
+      setDragOrder(baselineOrder)
       lastSwapWithRef.current = null
-      return
-    }
-    if (hit === draggingId) {
-      lastSwapWithRef.current = null
-      return
-    }
-    if (hit === lastSwapWithRef.current) return
-    setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hit) : prev))
-    lastSwapWithRef.current = hit
-  }
+    },
+    [baselineOrder]
+  )
 
-  const commitDrop = () => {
+  const handleMouseDrag = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (!(draggingId != null && draggingId !== '')) return
+      const hit = findChipAtX(event.x)
+      if (hit === null) {
+        lastSwapWithRef.current = null
+        return
+      }
+      if (hit === draggingId) {
+        lastSwapWithRef.current = null
+        return
+      }
+      if (hit === lastSwapWithRef.current) return
+      setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hit) : prev))
+      lastSwapWithRef.current = hit
+    },
+    [draggingId, findChipAtX]
+  )
+
+  const commitDrop = useCallback(() => {
     const source = draggingId
     const finalOrder = dragOrder
     setDraggingId(null)
     setDragOrder(null)
     lastSwapWithRef.current = null
 
-    if (!source || !finalOrder) return
+    if (source == null || source === '' || !finalOrder) return
 
     const changed = !arraysEqual(finalOrder, baselineOrder)
     if (changed) {
@@ -95,13 +92,27 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
     if (idx >= 0) {
       runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
     }
-  }
+  }, [baselineOrder, dragOrder, draggingId])
 
-  const cancelDrag = () => {
+  const cancelDrag = useCallback(() => {
     setDraggingId(null)
     setDragOrder(null)
     lastSwapWithRef.current = null
-  }
+  }, [])
+
+  const handleNewSession = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+    dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
+  }, [])
+
+  if ((!bar.visible && !forceVisible) || ordered.length === 0) return null
+
+  const visibleSessions =
+    dragOrder !== null
+      ? dragOrder
+          .map((id) => ordered.find((s) => s.id === id))
+          .filter((s): s is SessionRecord => !!s)
+      : ordered
 
   return (
     <box
@@ -112,50 +123,28 @@ export function SessionBar({ forceVisible = false }: SessionBarProps) {
       paddingRight={1}
       backgroundColor={headerBg}
     >
-      {visibleSessions.map((session) => {
-        const displayIndex = baselineOrder.indexOf(session.id) + 1
-        return (
-          <SessionChip
-            key={session.id}
-            session={session}
-            index={displayIndex}
-            active={session.id === currentId}
-            status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
-            dragging={draggingId === session.id}
-            onRef={(r) => setChipRef(session.id, r)}
-            onMouseDown={() => handleMouseDown(session.id)}
-            onMouseDrag={handleMouseDrag}
-            onMouseUp={commitDrop}
-            onMouseDragEnd={cancelDrag}
-            rightClickMenu={[
-              [
-                'Rename workspace',
-                () =>
-                  dispatchGlobal({
-                    initialName: session.name,
-                    returnToSessionPicker: false,
-                    sessionTargetId: session.id,
-                    type: 'open-session-name-modal',
-                  }),
-              ],
-              [
-                'Delete workspace',
-                () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
-              ],
-            ]}
-          />
-        )
-      })}
+      {visibleSessions.map((session) => (
+        <SessionChip
+          key={session.id}
+          session={session}
+          index={baselineOrder.indexOf(session.id) + 1}
+          active={session.id === currentId}
+          status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
+          dragging={draggingId === session.id}
+          setChipRef={setChipRef}
+          onDragStart={handleMouseDown}
+          onDrag={handleMouseDrag}
+          onDrop={commitDrop}
+          onDragCancel={cancelDrag}
+        />
+      ))}
       <box flexGrow={1} />
       <box
         flexDirection="row"
         paddingLeft={1}
         paddingRight={1}
         backgroundColor={t.backgroundElement}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-          dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
-        }}
+        onMouseDown={handleNewSession}
       >
         <text fg={t.text} selectable={false}>
           + New
@@ -179,25 +168,23 @@ interface SessionChipProps {
   active: boolean
   status: SessionStatus
   dragging: boolean
-  onRef: (ref: BoxRenderable | null) => void
-  onMouseDown: (event: OtuiMouseEvent) => void
-  onMouseDrag: (event: OtuiMouseEvent) => void
-  onMouseUp: (event: OtuiMouseEvent) => void
-  onMouseDragEnd: (event: OtuiMouseEvent) => void
-  rightClickMenu: Array<[string, () => void]>
+  setChipRef: (id: string, ref: BoxRenderable | null) => void
+  onDragStart: (id: string) => void
+  onDrag: (event: OtuiMouseEvent) => void
+  onDrop: () => void
+  onDragCancel: () => void
 }
 
-function SessionChip({
+const SessionChip = memo(function SessionChip({
   active,
   dragging,
   index,
-  onMouseDown,
-  onMouseDrag,
-  onMouseDragEnd,
-  onMouseUp,
-  onRef,
-  rightClickMenu,
+  onDrag,
+  onDragCancel,
+  onDragStart,
+  onDrop,
   session,
+  setChipRef,
   status,
 }: SessionChipProps) {
   const t = useTheme()
@@ -212,30 +199,68 @@ function SessionChip({
   const waitingColor = t.warning
   const [hovered, setHovered] = useState(false)
 
+  const handleRef = useCallback(
+    (r: BoxRenderable | null) => setChipRef(session.id, r),
+    [setChipRef, session.id]
+  )
+  const handleMouseDown = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      onDragStart(session.id)
+    },
+    [onDragStart, session.id]
+  )
+  const handleMouseUp = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      onDrop()
+    },
+    [onDrop]
+  )
+  const handleMouseOver = useCallback(() => setHovered(true), [])
+  const handleMouseOut = useCallback(() => setHovered(false), [])
+  const handleDeleteMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' })
+    },
+    [session.id]
+  )
+  const rightClickMenu = useMemo<[string, () => void][]>(
+    () => [
+      [
+        'Rename workspace',
+        () =>
+          dispatchGlobal({
+            initialName: session.name,
+            returnToSessionPicker: false,
+            sessionTargetId: session.id,
+            type: 'open-session-name-modal',
+          }),
+      ],
+      [
+        'Delete workspace',
+        () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
+      ],
+    ],
+    [session.id, session.name]
+  )
+
   return (
     <ContextMenuBox
-      ref={onRef}
+      ref={handleRef}
       flexDirection="row"
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
-      onMouseOver={() => setHovered(true)}
-      onMouseOut={() => setHovered(false)}
-      onMouseDown={(e) => {
-        e.preventDefault()
-        onMouseDown(e)
-      }}
-      onMouseDrag={(e) => {
-        onMouseDrag(e)
-      }}
-      onMouseUp={(e) => {
-        e.preventDefault()
-        onMouseUp(e)
-      }}
-      onMouseDragEnd={(e) => {
-        onMouseDragEnd(e)
-      }}
+      onMouseOver={handleMouseOver}
+      onMouseOut={handleMouseOut}
+      onMouseDown={handleMouseDown}
+      onMouseDrag={onDrag}
+      onMouseUp={handleMouseUp}
+      onMouseDragEnd={onDragCancel}
     >
       {showWaiting ? (
         <text fg={waitingColor} selectable={false}>
@@ -256,14 +281,7 @@ function SessionChip({
         [{index}] {session.name}
       </text>
       {hovered ? (
-        <box
-          paddingLeft={1}
-          onMouseDown={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' })
-          }}
-        >
+        <box paddingLeft={1} onMouseDown={handleDeleteMouseDown}>
           <text fg={t.textMuted} selectable={false}>
             ×
           </text>
@@ -275,4 +293,4 @@ function SessionChip({
       )}
     </ContextMenuBox>
   )
-}
+})

@@ -1,9 +1,9 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { memo, type ReactNode } from 'react'
+import { memo, type ReactNode, useCallback, useMemo } from 'react'
 
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
-import type { TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
+import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
 
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
@@ -15,7 +15,7 @@ import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 interface TerminalPaneProps {
   tab?: TabSession
   tabId?: string
-  focusMode: import('../../../state/types').FocusMode
+  focusMode: FocusMode
   isActive?: boolean
   contentOrigin: TerminalContentOrigin
   mouseForwardingEnabled: boolean
@@ -61,15 +61,15 @@ function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMo
 function renderSpan(span: TerminalSpan, key: string): ReactNode {
   let node: ReactNode = span.text
 
-  if (span.underline) {
+  if (span.underline === true) {
     node = <u>{node}</u>
   }
 
-  if (span.italic) {
+  if (span.italic === true) {
     node = <em>{node}</em>
   }
 
-  if (span.bold) {
+  if (span.bold === true) {
     node = <strong>{node}</strong>
   }
 
@@ -95,6 +95,8 @@ const TerminalViewport = memo(function TerminalViewport({
     return (
       <text fg={t.text}>
         {lines.map((line, lineIndex) => (
+          // Terminal rows are a fixed positional grid; the row index is the identity.
+          // eslint-disable-next-line react/no-array-index-key
           <span key={`line-${lineIndex}`}>
             {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`))}
             {lineIndex < lines.length - 1 ? '\n' : ''}
@@ -132,124 +134,169 @@ export function TerminalPane({
   const paneIsActive = isActive ?? true
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
-  const rightClickMenu: ContextMenuItem[] | undefined = tabId
-    ? [
-        [
-          'Split vertically',
-          () =>
-            runSideEffectGlobal({
-              direction: 'vertical',
-              sourceTabId: tabId,
-              type: 'split-pane',
-            }),
-        ],
-        [
-          'Split horizontally',
-          () =>
-            runSideEffectGlobal({
-              direction: 'horizontal',
-              sourceTabId: tabId,
-              type: 'split-pane',
-            }),
-        ],
-        [
-          'Close pane',
-          () => {
-            dispatchGlobal({ tabId, type: 'close-pane' })
-            runSideEffectGlobal({ tabId, type: 'close-tab' })
-          },
-        ],
-      ]
-    : undefined
-  const isOnPaneBorder = (event: OtuiMouseEvent) =>
-    event.x === contentOrigin.x - 1 ||
-    event.x === contentOrigin.x + contentOrigin.cols ||
-    event.y === contentOrigin.y - 1 ||
-    event.y === contentOrigin.y + contentOrigin.rows
-  const forwardMouseEvent = (event: OtuiMouseEvent) => {
-    if (event.type === 'down' && event.button === 2 && rightClickMenu) {
-      event.preventDefault()
-      event.stopPropagation()
-      openContextMenu(event.x, event.y, rightClickMenu)
-      return
-    }
-    if (
-      event.type === 'down' &&
-      event.button === 0 &&
-      onLeftEdgeMouseDown &&
-      event.x === contentOrigin.x - 1
-    ) {
-      if (onLeftEdgeMouseDown(event)) {
+  const rightClickMenu = useMemo<ContextMenuItem[] | undefined>(
+    () =>
+      tabId != null && tabId !== ''
+        ? [
+            [
+              'Split vertically',
+              () =>
+                runSideEffectGlobal({
+                  direction: 'vertical',
+                  sourceTabId: tabId,
+                  type: 'split-pane',
+                }),
+            ],
+            [
+              'Split horizontally',
+              () =>
+                runSideEffectGlobal({
+                  direction: 'horizontal',
+                  sourceTabId: tabId,
+                  type: 'split-pane',
+                }),
+            ],
+            [
+              'Close pane',
+              () => {
+                dispatchGlobal({ tabId, type: 'close-pane' })
+                runSideEffectGlobal({ tabId, type: 'close-tab' })
+              },
+            ],
+          ]
+        : undefined,
+    [tabId]
+  )
+  const isOnPaneBorder = useCallback(
+    (event: OtuiMouseEvent) =>
+      event.x === contentOrigin.x - 1 ||
+      event.x === contentOrigin.x + contentOrigin.cols ||
+      event.y === contentOrigin.y - 1 ||
+      event.y === contentOrigin.y + contentOrigin.rows,
+    [contentOrigin]
+  )
+  const forwardMouseEvent = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (event.type === 'down' && event.button === 2 && rightClickMenu) {
+        event.preventDefault()
+        event.stopPropagation()
+        openContextMenu(event.x, event.y, rightClickMenu)
+        return
+      }
+      if (
+        event.type === 'down' &&
+        event.button === 0 &&
+        onLeftEdgeMouseDown &&
+        event.x === contentOrigin.x - 1
+      ) {
+        if (onLeftEdgeMouseDown(event)) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
+      }
+      // Absorb left-button clicks on pane borders — they should not focus the
+      // pane or be forwarded to the terminal. This keeps borders available for
+      // resize actions (split separators, sidebar edge) without conflicting
+      // with focus-on-click behavior in the content area.
+      if (event.type === 'down' && event.button === 0 && isOnPaneBorder(event)) {
         event.preventDefault()
         event.stopPropagation()
         return
       }
-    }
-    // Absorb left-button clicks on pane borders — they should not focus the
-    // pane or be forwarded to the terminal. This keeps borders available for
-    // resize actions (split separators, sidebar edge) without conflicting
-    // with focus-on-click behavior in the content area.
-    if (event.type === 'down' && event.button === 0 && isOnPaneBorder(event)) {
+      if (event.type === 'down') {
+        logInputDebug('pane.mouseDown', {
+          button: event.button,
+          canForward: canForwardMouse,
+          eventType: event.type,
+          tabId,
+          willClick: !canForwardMouse && !!tab && event.button === 0 && !!onTerminalClick,
+          x: event.x,
+          y: event.y,
+        })
+      }
+      if (event.type === 'drag') {
+        if (onTerminalDrag?.(event, contentOrigin, tabId) === true) {
+          event.preventDefault()
+          return
+        }
+        if (onSeparatorDrag?.(event) === true) {
+          event.preventDefault()
+          return
+        }
+      }
+      if (event.type === 'up') {
+        if (onTerminalMouseUp?.(event) === true) {
+          event.preventDefault()
+        }
+        onSeparatorDragEnd?.()
+      }
+      if (tabId != null && tabId !== '' && onPaneActivate && event.type === 'down') {
+        onPaneActivate(tabId)
+      }
+      if (!canForwardMouse) {
+        if (tab && event.type === 'down' && event.button === 0 && onTerminalClick) {
+          onTerminalClick(event, contentOrigin, tabId)
+        }
+        return
+      }
+
       event.preventDefault()
       event.stopPropagation()
-      return
-    }
-    if (event.type === 'down') {
-      logInputDebug('pane.mouseDown', {
-        button: event.button,
-        canForward: canForwardMouse,
-        eventType: event.type,
-        tabId,
-        willClick: !canForwardMouse && !!tab && event.button === 0 && !!onTerminalClick,
-        x: event.x,
-        y: event.y,
-      })
-    }
-    if (event.type === 'drag') {
-      if (onTerminalDrag?.(event, contentOrigin, tabId)) {
-        event.preventDefault()
-        return
-      }
-      if (onSeparatorDrag?.(event)) {
-        event.preventDefault()
-        return
-      }
-    }
-    if (event.type === 'up') {
-      if (onTerminalMouseUp?.(event)) {
-        event.preventDefault()
-      }
-      onSeparatorDragEnd?.()
-    }
-    if (tabId && onPaneActivate && event.type === 'down') {
-      onPaneActivate(tabId)
-    }
-    if (!canForwardMouse) {
-      if (tab && event.type === 'down' && event.button === 0 && onTerminalClick) {
-        onTerminalClick(event, contentOrigin, tabId)
-      }
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-    onTerminalMouseEvent(event, contentOrigin)
-  }
-  const forwardScrollEvent = (event: OtuiMouseEvent) => {
-    if (!canForwardMouse && !canUseLocalScrollback) {
-      return
-    }
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (canForwardMouse) {
       onTerminalMouseEvent(event, contentOrigin)
-      return
-    }
+    },
+    [
+      canForwardMouse,
+      contentOrigin,
+      isOnPaneBorder,
+      onLeftEdgeMouseDown,
+      onPaneActivate,
+      onSeparatorDrag,
+      onSeparatorDragEnd,
+      onTerminalClick,
+      onTerminalDrag,
+      onTerminalMouseEvent,
+      onTerminalMouseUp,
+      rightClickMenu,
+      tab,
+      tabId,
+    ]
+  )
+  const forwardScrollEvent = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (!canForwardMouse && !canUseLocalScrollback) {
+        return
+      }
 
-    onTerminalScrollEvent(event)
-  }
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (canForwardMouse) {
+        onTerminalMouseEvent(event, contentOrigin)
+        return
+      }
+
+      onTerminalScrollEvent(event)
+    },
+    [
+      canForwardMouse,
+      canUseLocalScrollback,
+      contentOrigin,
+      onTerminalMouseEvent,
+      onTerminalScrollEvent,
+    ]
+  )
+  const handleNoTabMouseDown = useCallback((event: OtuiMouseEvent) => {
+    event.stopPropagation()
+    dispatchGlobal({ type: 'open-new-tab-modal' })
+  }, [])
+  const handleContentMouseDown = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.stopPropagation()
+      forwardMouseEvent(e)
+    },
+    [forwardMouseEvent]
+  )
   return (
     <box flexDirection="column" flexGrow={1} gap={0}>
       <ContextMenuBox
@@ -281,10 +328,7 @@ export function TerminalPane({
               marginTop={1}
               paddingX={2}
               backgroundColor={t.backgroundPanel}
-              onMouseDown={(event) => {
-                event.stopPropagation()
-                dispatchGlobal({ type: 'open-new-tab-modal' })
-              }}
+              onMouseDown={handleNoTabMouseDown}
             >
               <text fg={t.text}>New assistant</text>
             </box>
@@ -296,10 +340,7 @@ export function TerminalPane({
             flexGrow={1}
             width="100%"
             overflow="hidden"
-            onMouseDown={(e) => {
-              e.stopPropagation()
-              forwardMouseEvent(e)
-            }}
+            onMouseDown={handleContentMouseDown}
             onMouseUp={forwardMouseEvent}
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
@@ -308,7 +349,7 @@ export function TerminalPane({
           </box>
         )}
       </ContextMenuBox>
-      {tab?.status === 'disconnected' || tab?.errorMessage ? (
+      {tab?.status === 'disconnected' || (tab?.errorMessage != null && tab.errorMessage !== '') ? (
         // Absolutely positioned so it overlays the bordered box instead of
         // consuming a flex row. If it took a row, the rendered terminal area
         // would be one line shorter than the size sent to the PTY/xterm,
@@ -317,7 +358,9 @@ export function TerminalPane({
           {tab?.status === 'disconnected' ? (
             <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
           ) : null}
-          {tab?.errorMessage ? <text fg={t.error}>{tab.errorMessage}</text> : null}
+          {tab?.errorMessage != null && tab?.errorMessage !== '' ? (
+            <text fg={t.error}>{tab.errorMessage}</text>
+          ) : null}
         </box>
       ) : null}
     </box>

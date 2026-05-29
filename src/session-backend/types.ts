@@ -9,7 +9,7 @@ import type {
   WorkspaceSnapshotV1,
 } from '../state/types'
 
-export type SessionBackendEvents = {
+export interface SessionBackendEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
@@ -25,7 +25,7 @@ export interface BackendAttachResult {
    * atomically with tab hydration to prevent an unknown-tab race on
    * separate `sessionActivity` events.
    */
-  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
+  initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
 }
 
 export interface SessionBackend extends EventEmitter<SessionBackendEvents> {

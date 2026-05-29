@@ -22,6 +22,9 @@ snippets, themes, and fully configurable keymaps.
 - configurable git pane (embedded in the sidebar or as a standalone pane) and a
   dedicated [git mode](docs/guide/git-mode.md) for review / stage / commit /
   push with a split or stacked diff view and shiki-powered highlighting
+- [git worktrees](docs/guide/worktrees.md) for running agents on parallel
+  branches — create per-branch worktrees, review each against its base, and
+  squash-move a worktree's work into another
 - built-in help generated from the resolved keymap
 - theme picker with 67 built-in themes (shiki catalog + aimux house themes) and a `/` filter
 

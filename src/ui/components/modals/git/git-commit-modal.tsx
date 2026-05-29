@@ -1,5 +1,7 @@
+import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+
 import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import type { ModeId } from '../../../../input/modes/types'
 
@@ -90,7 +92,7 @@ export function GitCommitModal({
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const bgKind = useAppStore((s) => {
     const id = s.currentSessionId
-    return id ? s.autoCommit.bySession[id]?.kind : undefined
+    return id != null && id !== '' ? s.autoCommit.bySession[id]?.kind : undefined
   })
   const isBgGenerating = bgKind === 'generating'
   const showBgSpinner = isBgGenerating && !isConfirm && !isGenerating
@@ -99,9 +101,9 @@ export function GitCommitModal({
     (s) => s.gitPanel.files.filter((f) => f.section === 'staged').length
   )
 
-  const onAutoCommitClick = (): void => {
+  const onAutoCommitClick = useCallback((): void => {
     const hasTitle = title.trim().length > 0
-    if (hasTitle || !currentSessionId) {
+    if (hasTitle || !(currentSessionId != null && currentSessionId !== '')) {
       dispatchGlobal({ type: 'git-commit-enter-confirm' })
       return
     }
@@ -113,7 +115,16 @@ export function GitCommitModal({
     if (bgKind !== 'generating') {
       runSideEffectGlobal({ sessionId: currentSessionId, type: 'generate-auto-commit-now' })
     }
-  }
+  }, [bgKind, currentSessionId, title])
+
+  const handleAutoCommitMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onAutoCommitClick()
+    },
+    [onAutoCommitClick]
+  )
 
   const modeId = pickModeId(stage)
   const shellTitle = pickShellTitle(stage)
@@ -169,11 +180,7 @@ export function GitCommitModal({
             flexDirection="row"
             gap={1}
             alignItems="center"
-            onMouseDown={(event) => {
-              event.preventDefault()
-              event.stopPropagation()
-              onAutoCommitClick()
-            }}
+            onMouseDown={handleAutoCommitMouseDown}
           >
             {showBgSpinner ? <text fg={t.primary}>{bgSpinnerFrame}</text> : null}
             <text fg={t.text}>

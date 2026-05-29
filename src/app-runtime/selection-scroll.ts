@@ -4,7 +4,7 @@ interface SelectableLike {
 }
 
 function isUsableTarget(target: SelectableLike | null | undefined): target is SelectableLike {
-  return Boolean(target?.selectable) && !target?.isDestroyed
+  return Boolean(target?.selectable) && !(target?.isDestroyed === true)
 }
 
 interface SelectionLike {
@@ -69,7 +69,7 @@ export function shiftSelectionByScroll(renderer: RendererSelectionApi, deltaLine
 
   const live = renderer.getSelection()
 
-  if (!live?.isActive) {
+  if (!(live?.isActive === true)) {
     resetSelectionShiftState(renderer)
     return
   }

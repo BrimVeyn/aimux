@@ -1,11 +1,11 @@
 import type { GitPaneMode, GitPanePosition, GitPaneState } from '../../../../state/types'
 import type { ContextMenuItem } from '../../../context-menu/controller'
 
-const GIT_PANE_MENU_OPTIONS: Array<{
+const GIT_PANE_MENU_OPTIONS: {
   label: string
   mode: GitPaneMode
   position: GitPanePosition
-}> = [
+}[] = [
   { label: 'Move to top', mode: 'embedded', position: 'top' },
   { label: 'Move to bottom', mode: 'embedded', position: 'bottom' },
   { label: 'Move to left', mode: 'pane', position: 'left' },

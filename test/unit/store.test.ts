@@ -112,6 +112,191 @@ describe('appReducer', () => {
     expect(next.focusMode).toBe('navigation')
   })
 
+  test('activating a tab switches active session worktree', () => {
+    const now = '2024-01-01T00:00:00.000Z'
+    const initial = {
+      ...createInitialState(
+        {},
+        [
+          {
+            activeWorktreeId: 'wt-1',
+            createdAt: now,
+            id: 'session-1',
+            lastOpenedAt: now,
+            name: 'Main',
+            projectPath: '/repo/main',
+            updatedAt: now,
+            worktrees: [
+              {
+                createdAt: now,
+                createdByAimux: false,
+                id: 'wt-1',
+                name: 'main',
+                path: '/repo/main',
+                repoRoot: '/repo/main',
+                source: 'primary' as const,
+                updatedAt: now,
+              },
+              {
+                createdAt: now,
+                createdByAimux: true,
+                id: 'wt-2',
+                name: 'feature',
+                path: '/repo/feature',
+                repoRoot: '/repo/main',
+                source: 'aimux-temp' as const,
+                updatedAt: now,
+              },
+            ],
+          },
+        ],
+        [],
+        false
+      ),
+      activeTabId: 'tab-1',
+      currentSessionId: 'session-1',
+      tabs: [
+        createTab({
+          assistant: 'claude',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running',
+          title: 'Claude',
+          worktreeId: 'wt-1',
+        }),
+        createTab({
+          assistant: 'codex',
+          command: 'codex',
+          id: 'tab-2',
+          status: 'running',
+          title: 'Codex',
+          worktreeId: 'wt-2',
+        }),
+      ],
+    }
+
+    const next = appReducer(initial, { tabId: 'tab-2', type: 'set-active-tab' })
+    const session = next.sessions.find((entry) => entry.id === 'session-1')
+
+    expect(session?.activeWorktreeId).toBe('wt-2')
+    expect(session?.projectPath).toBe('/repo/feature')
+  })
+
+  test('activating a legacy tab leaves active worktree unchanged', () => {
+    const now = '2024-01-01T00:00:00.000Z'
+    const initial = {
+      ...createInitialState(
+        {},
+        [
+          {
+            activeWorktreeId: 'wt-1',
+            createdAt: now,
+            id: 'session-1',
+            lastOpenedAt: now,
+            name: 'Main',
+            projectPath: '/repo/main',
+            updatedAt: now,
+            worktrees: [
+              {
+                createdAt: now,
+                createdByAimux: false,
+                id: 'wt-1',
+                name: 'main',
+                path: '/repo/main',
+                repoRoot: '/repo/main',
+                source: 'primary' as const,
+                updatedAt: now,
+              },
+            ],
+          },
+        ],
+        [],
+        false
+      ),
+      activeTabId: 'tab-1',
+      currentSessionId: 'session-1',
+      tabs: [
+        createTab({
+          assistant: 'claude',
+          command: 'claude',
+          id: 'tab-1',
+          status: 'running',
+          title: 'Claude',
+        }),
+      ],
+    }
+
+    const next = appReducer(initial, { tabId: 'tab-1', type: 'set-active-tab' })
+    const session = next.sessions.find((entry) => entry.id === 'session-1')
+
+    expect(session?.activeWorktreeId).toBe('wt-1')
+    expect(session?.projectPath).toBe('/repo/main')
+  })
+
+  test('new assistant flow chooses assistant before worktree', () => {
+    const now = '2024-01-01T00:00:00.000Z'
+    const initial = createInitialState(
+      {},
+      [
+        {
+          activeWorktreeId: 'wt-feature',
+          createdAt: now,
+          id: 'session-1',
+          lastOpenedAt: now,
+          name: 'Main',
+          projectPath: '/repo/feature',
+          updatedAt: now,
+          worktrees: [
+            {
+              createdAt: now,
+              createdByAimux: false,
+              id: 'wt-main',
+              name: 'main',
+              path: '/repo/main',
+              repoRoot: '/repo/main',
+              source: 'primary' as const,
+              updatedAt: now,
+            },
+            {
+              createdAt: now,
+              createdByAimux: true,
+              id: 'wt-feature',
+              name: 'feature',
+              path: '/repo/feature',
+              repoRoot: '/repo/main',
+              source: 'aimux-temp' as const,
+              updatedAt: now,
+            },
+          ],
+        },
+      ],
+      [],
+      false
+    )
+    const opened = appReducer(
+      { ...initial, currentSessionId: 'session-1' },
+      { type: 'open-new-tab-modal' }
+    )
+    expect(opened.modal.type).toBe('new-tab')
+    if (opened.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
+    expect(opened.modal.step).toBe('assistant')
+    expect(opened.modal.targetWorktreeIndex).toBe(1)
+
+    const selected = appReducer(opened, { type: 'select-new-tab-assistant' })
+    expect(selected.modal.type).toBe('new-tab')
+    if (selected.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
+    expect(selected.modal.step).toBe('worktree')
+    expect(selected.modal.selectedIndex).toBe(1)
+    expect(selected.modal.createWorktree).toBe(false)
+
+    const createNew = appReducer(selected, { delta: 1, type: 'move-modal-selection' })
+    expect(createNew.modal.type).toBe('new-tab')
+    if (createNew.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
+    expect(createNew.modal.selectedIndex).toBe(2)
+    expect(createNew.modal.createWorktree).toBe(true)
+    expect(createNew.modal.targetWorktreeIndex).toBe(1)
+  })
+
   test('deleting a non-current session keeps the current workspace and modal state', () => {
     const initial = {
       ...createInitialState({}, [
@@ -288,6 +473,81 @@ describe('appReducer', () => {
 
     const next = appReducer(initial, { delta: 1, type: 'move-active-tab' })
     expect(next.activeTabId).toBe('2')
+  })
+
+  test('moves active tab by grouped sidebar worktree order', () => {
+    const now = '2024-01-01T00:00:00.000Z'
+    const initial = {
+      ...createInitialState(
+        {},
+        [
+          {
+            activeWorktreeId: 'wt-main',
+            createdAt: now,
+            id: 'session-1',
+            lastOpenedAt: now,
+            name: 'Main',
+            projectPath: '/repo/main',
+            updatedAt: now,
+            worktrees: [
+              {
+                createdAt: now,
+                createdByAimux: false,
+                id: 'wt-main',
+                name: 'main',
+                path: '/repo/main',
+                repoRoot: '/repo/main',
+                source: 'primary' as const,
+                updatedAt: now,
+              },
+              {
+                createdAt: now,
+                createdByAimux: true,
+                id: 'wt-feature',
+                name: 'feature',
+                path: '/repo/feature',
+                repoRoot: '/repo/main',
+                source: 'aimux-temp' as const,
+                updatedAt: now,
+              },
+            ],
+          },
+        ],
+        [],
+        false
+      ),
+      activeTabId: 'main-1',
+      currentSessionId: 'session-1',
+      tabs: [
+        createTab({
+          assistant: 'claude',
+          command: 'claude',
+          id: 'main-1',
+          status: 'running',
+          title: 'Main 1',
+          worktreeId: 'wt-main',
+        }),
+        createTab({
+          assistant: 'codex',
+          command: 'codex',
+          id: 'feature-1',
+          status: 'running',
+          title: 'Feature 1',
+          worktreeId: 'wt-feature',
+        }),
+        createTab({
+          assistant: 'opencode',
+          command: 'opencode',
+          id: 'main-2',
+          status: 'running',
+          title: 'Main 2',
+          worktreeId: 'wt-main',
+        }),
+      ],
+    }
+
+    const next = appReducer(initial, { delta: 1, type: 'move-active-tab' })
+    expect(next.activeTabId).toBe('main-2')
   })
 
   test('wraps from last tab to first tab', () => {

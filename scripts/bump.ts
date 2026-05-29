@@ -29,7 +29,7 @@ function sh(cmd: string, args: string[], opts: { capture?: boolean } = {}): stri
   const res = spawnSync(cmd, args, {
     cwd: ROOT,
     encoding: 'utf8',
-    stdio: opts.capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    stdio: opts.capture === true ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   })
   if (res.status !== 0) {
     fail(`\`${cmd} ${args.join(' ')}\` exited ${res.status ?? 'null'}`)
@@ -109,7 +109,7 @@ function tagExists(tag: string): boolean {
 }
 
 async function confirm(question: string): Promise<boolean> {
-  if (!process.stdin.isTTY) {
+  if (process.stdin.isTTY !== true) {
     fail('cannot prompt for confirmation without a TTY (run interactively)')
   }
   process.stdout.write(`${question} [y/N] `)
@@ -215,6 +215,8 @@ async function main() {
   console.log(`\u001b[32m✔\u001b[0m released ${tag}`)
 }
 
-main().catch((error) => {
+try {
+  await main()
+} catch (error) {
   fail(error instanceof Error ? error.message : String(error))
-})
+}

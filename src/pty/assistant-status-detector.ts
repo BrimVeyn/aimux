@@ -20,6 +20,7 @@ const ACTIVE_CHANGE_WINDOW_MS = 600
 
 /** Spinner glyphs used by claude code's status lines. */
 const CLAUDE_SPINNER_GLYPHS = '·✱✲✳✴✵✶✷✸✹✺✻✼✽✾✿❀❁❂❃❇❈❉❊❋✢✣✤✥✦✧✨⊛⊕⊙◉◎◍⁂⁕※⍟☼★☆'
+const CLAUDE_SPINNER_GLYPH_SET = new Set(CLAUDE_SPINNER_GLYPHS)
 
 const SHELL_COMMAND_PATTERN =
   /(^|\/)(bash|zsh|fish|sh|dash|ash|ksh|tcsh|csh|nu|pwsh|powershell|elvish|xonsh)(\.exe)?$/i
@@ -85,7 +86,8 @@ export class AssistantStatusDetector {
 }
 
 function extractTailText(viewport: TerminalSnapshot, lineCount: number): string {
-  const lines = viewport.tailLines ?? viewport.lines
+  const isScrolledToBottom = viewport.viewportY === viewport.baseY
+  const lines = isScrolledToBottom ? viewport.lines : (viewport.tailLines ?? viewport.lines)
   // Full-screen TUIs (claude, opencode) paint in the alternate buffer and
   // often leave the last rows blank, putting their status bar higher up.
   // Skip trailing blank rows before taking the last `lineCount`.
@@ -152,10 +154,17 @@ function classifyClaude(haystack: string, rawTail: string): TabActivity {
   return 'idle'
 }
 
+// A real spinner line looks like `✱ Thinking…`: glyph at the line start, with
+// the ellipsis on the same line. Anchoring to the line start rejects the `·`
+// separators Claude scatters mid-line through its header/footer (e.g.
+// `Opus 4.7 … · Claude Max`, `… · ← for agents`), which would otherwise pair
+// with a stray `...` placeholder and mark an idle home screen as working.
 function hasClaudeSpinner(rawTail: string): boolean {
-  if (!rawTail.includes('…') && !rawTail.includes('...')) return false
-  for (const ch of CLAUDE_SPINNER_GLYPHS) {
-    if (rawTail.includes(ch)) return true
+  for (const line of rawTail.split('\n')) {
+    const trimmed = line.trimStart()
+    const first = trimmed[0]
+    if (first == null || !CLAUDE_SPINNER_GLYPH_SET.has(first)) continue
+    if (trimmed.includes('…') || trimmed.includes('...')) return true
   }
   return false
 }
@@ -219,8 +228,8 @@ function classifyGeneric(haystack: string, changedAt: number, now: number): TabA
 }
 
 export function isShellCommand(command: string | undefined): boolean {
-  if (!command) return false
+  if (!(command != null && command !== '')) return false
   const first = command.trim().split(/\s+/u)[0]
-  if (!first) return false
+  if (!(first != null && first !== '')) return false
   return SHELL_COMMAND_PATTERN.test(first)
 }

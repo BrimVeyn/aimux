@@ -34,6 +34,30 @@ import { tokenToSpan } from './highlight'
 import { useSegmentVirtualization } from './use-segment-virtualization'
 
 const OVERSCAN = 24
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+const HIDDEN_SCROLLBAR_OPTIONS = { visible: false }
+
+// Stable per-row key derived from the line identities in the row, so rows keep a
+// consistent identity across fold expand/collapse rather than relying on position.
+function splitCellKey(cell: SplitCell): string {
+  switch (cell.type) {
+    case 'context':
+      return `c${cell.lineNumber}`
+    case 'addition':
+      return `a${cell.lineNumber}`
+    case 'deletion':
+      return `d${cell.lineNumber}`
+    case 'fold':
+      return `f${cell.fold.foldId}`
+    case 'filler':
+      return 'x'
+  }
+}
+
+function splitRowKey(row: SplitRowOrHeader): string {
+  if (row.type === 'hunk-header') return `hh:${row.spec}`
+  return `${splitCellKey(row.left)}|${splitCellKey(row.right)}`
+}
 
 export interface SplitViewHandle {
   leftScroll: ScrollBoxRenderable | null
@@ -154,15 +178,15 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         flexGrow={1}
         scrollY
         viewportCulling
-        contentOptions={{ flexDirection: 'column', gap: 0 }}
-        verticalScrollbarOptions={{ visible: false }}
+        contentOptions={COLUMN_CONTENT_OPTIONS}
+        verticalScrollbarOptions={HIDDEN_SCROLLBAR_OPTIONS}
         onMouseScroll={handleScroll}
       >
         {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
         {renderedSegments.map((rendered) =>
-          rendered.rows.map((row, i) => (
+          rendered.rows.map((row) => (
             <SideRow
-              key={`${rendered.segment.id}:left:${i}`}
+              key={`${rendered.segment.id}:left:${splitRowKey(row)}`}
               cell={row.type === 'row' ? row.left : null}
               foldDispatch={foldDispatch}
               gw={gw}
@@ -180,14 +204,14 @@ export const SplitView = forwardRef<SplitViewHandle, Props>(function SplitView(
         flexGrow={1}
         scrollY
         viewportCulling
-        contentOptions={{ flexDirection: 'column', gap: 0 }}
+        contentOptions={COLUMN_CONTENT_OPTIONS}
         onMouseScroll={handleScroll}
       >
         {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
         {renderedSegments.map((rendered) =>
-          rendered.rows.map((row, i) => (
+          rendered.rows.map((row) => (
             <SideRow
-              key={`${rendered.segment.id}:right:${i}`}
+              key={`${rendered.segment.id}:right:${splitRowKey(row)}`}
               cell={row.type === 'row' ? row.right : null}
               foldDispatch={foldDispatch}
               gw={gw}
@@ -230,7 +254,9 @@ function HunkHeaderRow({ row }: { row: Extract<SplitRowOrHeader, { type: 'hunk-h
   return (
     <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
       <text fg={t.text}>{row.spec}</text>
-      {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
+      {row.context != null && row.context !== '' ? (
+        <text fg={t.textMuted}> {row.context}</text>
+      ) : null}
     </box>
   )
 }
@@ -285,10 +311,12 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
       {tokens.map((tok, i) => {
         const s = tokenToSpan(tok)
         let attributes = 0
-        if (s.bold) attributes |= TextAttributes.BOLD
-        if (s.italic) attributes |= TextAttributes.ITALIC
-        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        if (s.bold === true) attributes |= TextAttributes.BOLD
+        if (s.italic === true) attributes |= TextAttributes.ITALIC
+        if (s.underline === true) attributes |= TextAttributes.UNDERLINE
         return (
+          // Syntax tokens are positional within a single line and never reorder.
+          // eslint-disable-next-line react/no-array-index-key
           <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}
           </span>

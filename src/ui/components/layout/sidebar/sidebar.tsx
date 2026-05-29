@@ -1,12 +1,23 @@
-import {
-  type BoxRenderable,
-  type MouseEvent as OtuiMouseEvent,
-  type ScrollBoxRenderable,
+import type {
+  BoxRenderable,
+  MouseEvent as OtuiMouseEvent,
+  ScrollBoxRenderable,
 } from '@opentui/core'
-import { memo, useMemo, useRef } from 'react'
 
+import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
+
+import type { BranchDivergence } from '../../../../state/types'
+
+import { useWorktreeDivergencePolling } from '../../../../git/worktree-divergence-poller'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import {
+  getActiveWorktree,
+  getRenderedTabWorktreeId,
+  getSessionProjectPath,
+  getWorktreeColor,
+  orderTabsByWorktree,
+} from '../../../../state/session-worktrees'
 import { getCurrentTheme, type ResolvedTuiTheme, useTheme } from '../../../theme'
 import { buildGitPaneContextMenu } from '../../git/pane/git-pane-context-menu'
 import { GitPaneWidget } from '../../git/pane/git-pane-widget'
@@ -32,6 +43,29 @@ const GUTTER_MIDDLE = '├'
 const GUTTER_END = '╰'
 const GUTTER_PAD = '│'
 const RESIZE_HANDLE = '─'
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+
+// Left accent strip + trailing space for a worktree group header.
+const WORKTREE_STRIP = '▍ '
+
+// Compact "↑ahead ↓behind" label for a worktree group header; empty when the
+// branch is level with its base (or divergence isn't known yet).
+function formatDivergence(divergence: BranchDivergence | undefined): string {
+  if (divergence == null) return ''
+  const parts: string[] = []
+  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
+  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
+  return parts.join(' ')
+}
+
+// Fit a worktree label into `max` columns, ellipsizing when it would overflow.
+// Branch names are ASCII, so character count tracks rendered column width.
+function truncateLabel(label: string, max: number): string {
+  if (max <= 0) return ''
+  if (label.length <= max) return label
+  if (max === 1) return '…'
+  return `${label.slice(0, max - 1)}…`
+}
 
 function getRowBackground({
   alternate,
@@ -51,11 +85,18 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
   const t = useTheme()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
-  const projectPath = currentSession?.projectPath
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
+  const activeWorktree = getActiveWorktree(currentSession)
+  const projectPath = getSessionProjectPath(currentSession)
   const branch = useSidebarBranch(projectPath)
+
+  const handleNewAssistant = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+    dispatchGlobal({ type: 'open-new-tab-modal' })
+  }, [])
 
   return (
     <box flexDirection="column" flexShrink={0} gap={0}>
@@ -65,14 +106,20 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
       <text fg={t.text} selectable={false}>
         {currentSession ? currentSession.name : 'No workspace selected'}
       </text>
-      {branch ? (
+      {(branch != null && branch !== '') || activeWorktree ? (
         <box flexDirection="row">
           <text fg={t.text} selectable={false}>
             {'\u{e702}'}{' '}
           </text>
           <text fg={t.text} selectable={false}>
-            {branch}
+            {branch ?? activeWorktree?.branch ?? activeWorktree?.name}
           </text>
+          {activeWorktree?.source === 'aimux-temp' ? (
+            <text fg={t.textMuted} selectable={false}>
+              {' '}
+              tmp
+            </text>
+          ) : null}
         </box>
       ) : null}
       <box
@@ -81,10 +128,7 @@ const SidebarTop = memo(function SidebarTop({ contentWidth }: { contentWidth: nu
         backgroundColor={t.backgroundPanel}
         justifyContent="center"
         marginTop={1}
-        onMouseDown={(e) => {
-          e.stopPropagation()
-          dispatchGlobal({ type: 'open-new-tab-modal' })
-        }}
+        onMouseDown={handleNewAssistant}
       >
         <text fg={t.text} selectable={false}>
           + New assistant
@@ -112,27 +156,81 @@ function renderGroupGutter(isGroupStart: boolean, isGroupMiddle: boolean, isGrou
   )
 }
 
+const TabRowButton = memo(function TabRowButton({
+  backgroundColor,
+  children,
+  onActivate,
+  tabId,
+}: {
+  tabId: string
+  backgroundColor: string | undefined
+  onActivate?: (tabId: string) => void
+  children: ReactNode
+}) {
+  const handleMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      onActivate?.(tabId)
+    },
+    [onActivate, tabId]
+  )
+  return (
+    <box backgroundColor={backgroundColor} flexDirection="row" onMouseDown={handleMouseDown}>
+      {children}
+    </box>
+  )
+})
+
 interface TabsBodyProps {
   onTabActivate?: (tabId: string) => void
+  contentWidth: number
 }
 
-const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
+const TabsBody = memo(function TabsBody({ contentWidth, onTabActivate }: TabsBodyProps) {
   const t = useTheme()
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const focusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
+  const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const sessions = useAppStore((s) => s.sessions)
+  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
+  const worktrees = useMemo(() => currentSession?.worktrees ?? [], [currentSession?.worktrees])
+  const worktreeById = useMemo(
+    () => new Map(worktrees.map((worktree) => [worktree.id, worktree])),
+    [worktrees]
+  )
+  const groupedTabs = useMemo(() => {
+    return orderTabsByWorktree(tabs, currentSession)
+  }, [currentSession, tabs])
+  const showWorktreeSeparators = useMemo(() => {
+    const ids = new Set<string>()
+    for (const tab of groupedTabs) {
+      ids.add(getRenderedTabWorktreeId(tab, worktrees))
+    }
+    const activeWorktreeId =
+      currentSession?.activeWorktreeId ?? getActiveWorktree(currentSession)?.id
+    if (activeWorktreeId != null && activeWorktreeId !== '') ids.add(activeWorktreeId)
+    return ids.size >= 2
+  }, [currentSession, groupedTabs, worktrees])
 
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
-  const activeIndex = tabs.findIndex((tab) => tab.id === activeTabId)
-  const tabGroupInfo = useMemo(() => buildTabGroupInfo(layoutTrees, tabs), [layoutTrees, tabs])
+  const activeIndex = groupedTabs.findIndex((tab) => tab.id === activeTabId)
+  const tabGroupInfo = useMemo(
+    () => buildTabGroupInfo(layoutTrees, groupedTabs),
+    [layoutTrees, groupedTabs]
+  )
 
   useSidebarAutoScroll({
     activeIndex,
     activeTabId,
     scrollRef,
-    tabCount: tabs.length,
+    tabCount: groupedTabs.length,
     visible: sidebarVisible,
   })
 
@@ -143,7 +241,7 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
       flexGrow={1}
       scrollY
       viewportCulling
-      contentOptions={{ flexDirection: 'column', gap: 0 }}
+      contentOptions={COLUMN_CONTENT_OPTIONS}
     >
       {tabs.length === 0 ? (
         <box paddingTop={1}>
@@ -152,36 +250,88 @@ const TabsBody = memo(function TabsBody({ onTabActivate }: TabsBodyProps) {
           </text>
         </box>
       ) : (
-        tabs.map((tab, index) => {
+        groupedTabs.map((tab, index) => {
           const isActive = tab.id === activeTabId
           const alternate = index % 2 === 1
           const info = tabGroupInfo.get(tab.id)
-          const inLayout = !!info?.inLayout
+          const inLayout = !!(info?.inLayout === true)
           const inGroup = info ? index >= info.groupStart && index <= info.groupEnd : false
           const isGroupStart = info ? index === info.groupStart : false
           const isGroupEnd = info ? index === info.groupEnd : false
           const isGroupMiddle = inGroup && !isGroupStart && !isGroupEnd
+          const tabOwnWorktree =
+            tab.worktreeId != null && tab.worktreeId !== ''
+              ? worktreeById.get(tab.worktreeId)
+              : undefined
+          let tabWorktree = tabOwnWorktree
+          if (!tabWorktree && worktrees.length > 1) {
+            tabWorktree = worktrees[0]
+          }
+          // A tab's worktree can be moved when it has a branch (squash needs one,
+          // so not the primary) and there's at least one other worktree to land in.
+          const moveWorktreeId =
+            tabOwnWorktree?.branch != null && tabOwnWorktree.branch !== '' && worktrees.length > 1
+              ? tabOwnWorktree.id
+              : undefined
+          const prevTab = groupedTabs[index - 1]
+          const startsWorktreeGroup =
+            !prevTab ||
+            getRenderedTabWorktreeId(prevTab, worktrees) !==
+              getRenderedTabWorktreeId(tab, worktrees)
+          const worktreeColor = tabWorktree
+            ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
+            : t.textMuted
+          const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
+          const aheadBehind = formatDivergence(
+            tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
+          )
+          const aheadBehindText = aheadBehind === '' ? '' : ` ${aheadBehind}`
+          // Reserve room for the strip, the ahead/behind chip and a 1-col gap so
+          // the header never wraps; the divider fills whatever remains (min 0).
+          const labelBudget = Math.max(
+            0,
+            contentWidth - WORKTREE_STRIP.length - aheadBehindText.length - 1
+          )
+          const headerLabel = truncateLabel(worktreeLabel, labelBudget)
 
           return (
-            <box
-              key={tab.id}
-              backgroundColor={getRowBackground({ alternate, isActive, t })}
-              flexDirection="row"
-              onMouseDown={(event) => {
-                event.stopPropagation()
-                onTabActivate?.(tab.id)
-              }}
-            >
-              {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
-              <box flexGrow={1}>
-                <TabItem
-                  id={`sidebar-tab-${tab.id}`}
-                  tab={tab}
-                  active={isActive}
-                  focused={focusMode === 'navigation'}
-                  inLayout={inLayout}
-                />
-              </box>
+            <box key={tab.id} flexDirection="column">
+              {showWorktreeSeparators && startsWorktreeGroup ? (
+                <box flexDirection="row" overflow="hidden" paddingTop={index === 0 ? 0 : 1}>
+                  <text selectable={false} wrapMode="none" flexShrink={0}>
+                    <span fg={worktreeColor}>
+                      {WORKTREE_STRIP}
+                      {headerLabel}
+                    </span>
+                    {aheadBehindText !== '' ? (
+                      <span fg={t.textMuted}>{aheadBehindText}</span>
+                    ) : null}
+                  </text>
+                  <box flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
+                    <text fg={t.textMuted} selectable={false} wrapMode="none">
+                      {' '}
+                      {'─'.repeat(contentWidth)}
+                    </text>
+                  </box>
+                </box>
+              ) : null}
+              <TabRowButton
+                tabId={tab.id}
+                onActivate={onTabActivate}
+                backgroundColor={getRowBackground({ alternate, isActive, t })}
+              >
+                {inGroup ? renderGroupGutter(isGroupStart, isGroupMiddle, isGroupEnd) : null}
+                <box flexGrow={1}>
+                  <TabItem
+                    id={`sidebar-tab-${tab.id}`}
+                    tab={tab}
+                    active={isActive}
+                    focused={focusMode === 'navigation'}
+                    inLayout={inLayout}
+                    moveWorktreeId={moveWorktreeId}
+                  />
+                </box>
+              </TabRowButton>
             </box>
           )
         })
@@ -203,6 +353,53 @@ export function Sidebar({
   const gitPane = useAppStore((s) => s.gitPane)
   const focusMode = useAppStore((s) => s.focusMode)
   const bodyRef = useRef<BoxRenderable | null>(null)
+  useWorktreeDivergencePolling(sidebarVisible)
+
+  const handleSidebarMouseDown = useCallback(() => {
+    if (focusMode === 'terminal-input') {
+      dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
+    }
+  }, [focusMode])
+  const handleSidebarMouseDrag = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (onResizeDrag?.(event) === true) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    },
+    [onResizeDrag]
+  )
+  const handleSidebarMouseUp = useCallback(() => {
+    onResizeDragEnd?.()
+  }, [onResizeDragEnd])
+  const handleEmbeddedHandleMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      const body = bodyRef.current
+      if (!body) return
+      event.preventDefault()
+      event.stopPropagation()
+      onEmbeddedGitResizeStart?.({
+        containerStart: body.y,
+        position: gitPane.position === 'top' ? 'top' : 'bottom',
+        totalSize: Math.max(1, body.height),
+      })
+    },
+    [gitPane.position, onEmbeddedGitResizeStart]
+  )
+  const sidebarMenu = useMemo<[string, () => void][]>(
+    () => [
+      ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
+      ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
+      [
+        'Toggle diff mode',
+        () => {
+          dispatchGlobal({ type: 'enter-git-mode' })
+          dispatchGlobal({ type: 'git-mode-toggle-diff-view' })
+        },
+      ],
+    ],
+    []
+  )
 
   if (!sidebarVisible) {
     return null
@@ -243,21 +440,7 @@ export function Sidebar({
     </ContextMenuBox>
   ) : null
   const embeddedHandle = gitEmbedded ? (
-    <box
-      minHeight={1}
-      flexShrink={0}
-      onMouseDown={(event) => {
-        const body = bodyRef.current
-        if (!body) return
-        event.preventDefault()
-        event.stopPropagation()
-        onEmbeddedGitResizeStart?.({
-          containerStart: body.y,
-          position: gitPane.position === 'top' ? 'top' : 'bottom',
-          totalSize: Math.max(1, body.height),
-        })
-      }}
-    >
+    <box minHeight={1} flexShrink={0} onMouseDown={handleEmbeddedHandleMouseDown}>
       <text fg={t.border} selectable={false}>
         {RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}
       </text>
@@ -272,31 +455,10 @@ export function Sidebar({
       backgroundColor={sidebarBg}
       gap={0}
       overflow="hidden"
-      rightClickMenu={[
-        ['Hide sidebar', () => dispatchGlobal({ type: 'toggle-sidebar' })],
-        ['Toggle git pane', () => dispatchGlobal({ type: 'toggle-git-pane' })],
-        [
-          'Toggle diff mode',
-          () => {
-            dispatchGlobal({ type: 'enter-git-mode' })
-            dispatchGlobal({ type: 'git-mode-toggle-diff-view' })
-          },
-        ],
-      ]}
-      onMouseDown={() => {
-        if (focusMode === 'terminal-input') {
-          dispatchGlobal({ focusMode: 'navigation', type: 'set-focus-mode' })
-        }
-      }}
-      onMouseDrag={(event) => {
-        if (onResizeDrag?.(event)) {
-          event.preventDefault()
-          event.stopPropagation()
-        }
-      }}
-      onMouseUp={() => {
-        onResizeDragEnd?.()
-      }}
+      rightClickMenu={sidebarMenu}
+      onMouseDown={handleSidebarMouseDown}
+      onMouseDrag={handleSidebarMouseDrag}
+      onMouseUp={handleSidebarMouseUp}
     >
       <box flexDirection="row" width={sidebarWidth} flexGrow={1} overflow="hidden">
         <box width={contentWidth} flexGrow={1} flexDirection="column" overflow="hidden">
@@ -315,7 +477,7 @@ export function Sidebar({
               flexBasis={0}
               overflow="hidden"
             >
-              <TabsBody onTabActivate={onTabActivate} />
+              <TabsBody onTabActivate={onTabActivate} contentWidth={contentWidth} />
             </box>
             {gitOnBottom ? (
               <>

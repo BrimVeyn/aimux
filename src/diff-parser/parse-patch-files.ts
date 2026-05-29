@@ -64,7 +64,7 @@ export function processFile(
     const lines = hunk.split(SPLIT_WITH_NEWLINES)
     const firstLine = lines.shift()
     if (firstLine == null) {
-      if (throwOnError) throw Error('parsePatchContent: invalid hunk')
+      if (throwOnError) throw new Error('parsePatchContent: invalid hunk')
       else console.error('parsePatchContent: invalid hunk', hunk)
       continue
     }
@@ -73,7 +73,7 @@ export function processFile(
     let deletionLines = 0
     if (fileHeaderMatch == null || currentFile == null) {
       if (currentFile != null) {
-        if (throwOnError) throw Error('parsePatchContent: Invalid hunk')
+        if (throwOnError) throw new Error('parsePatchContent: Invalid hunk')
         else console.error('parsePatchContent: Invalid hunk', hunk)
         continue
       }
@@ -139,8 +139,9 @@ export function processFile(
             currentFile.mode = line.replace('deleted file mode', '').trim()
           }
           if (line.startsWith('similarity index')) {
-            if (line.startsWith('similarity index 100%')) currentFile.type = 'rename-pure'
-            else currentFile.type = 'rename-changed'
+            currentFile.type = line.startsWith('similarity index 100%')
+              ? 'rename-pure'
+              : 'rename-changed'
           }
           if (line.startsWith('index ')) {
             const [, prevObjectId, newObjectId, mode] = line.trim().match(INDEX_LINE_METADATA) ?? []
@@ -162,24 +163,24 @@ export function processFile(
     let lastLineType: 'addition' | 'deletion' | 'context' | undefined
     while (
       lines.length > 0 &&
-      (lines[lines.length - 1] === '\n' ||
-        lines[lines.length - 1] === '\r' ||
-        lines[lines.length - 1] === '\r\n' ||
-        lines[lines.length - 1] === '')
+      (lines.at(-1) === '\n' ||
+        lines.at(-1) === '\r' ||
+        lines.at(-1) === '\r\n' ||
+        lines.at(-1) === '')
     ) {
       lines.pop()
     }
-    const additionStart = parseInt(fileHeaderMatch[3] ?? '')
-    const deletionStart = parseInt(fileHeaderMatch[1] ?? '')
+    const additionStart = parseInt(fileHeaderMatch[3] ?? '', 10)
+    const deletionStart = parseInt(fileHeaderMatch[1] ?? '', 10)
     deletionLineIndex = isPartial ? deletionLineIndex : deletionStart - 1
     additionLineIndex = isPartial ? additionLineIndex : additionStart - 1
     const hunkData = {
-      additionCount: parseInt(fileHeaderMatch[4] ?? '1'),
+      additionCount: parseInt(fileHeaderMatch[4] ?? '1', 10),
       additionLineIndex,
       additionLines,
       additionStart,
       collapsedBefore: 0,
-      deletionCount: parseInt(fileHeaderMatch[2] ?? '1'),
+      deletionCount: parseInt(fileHeaderMatch[2] ?? '1', 10),
       deletionLineIndex,
       deletionLines,
       deletionStart,
@@ -199,7 +200,7 @@ export function processFile(
       isNaN(hunkData.additionStart) ||
       isNaN(hunkData.deletionStart)
     ) {
-      if (throwOnError) throw Error('parsePatchContent: invalid hunk metadata')
+      if (throwOnError) throw new Error('parsePatchContent: invalid hunk metadata')
       else console.error('parsePatchContent: invalid hunk metadata', hunkData)
       continue
     }
@@ -285,7 +286,7 @@ export function processFile(
     currentFile.unifiedLineCount += hunkData.collapsedBefore + hunkData.unifiedLineCount
   }
   if (currentFile == null) return
-  const lastHunk = currentFile.hunks[currentFile.hunks.length - 1]
+  const lastHunk = currentFile.hunks.at(-1)
   if (
     lastHunk != null &&
     !isPartial &&
@@ -300,8 +301,7 @@ export function processFile(
   }
   if (!isGitDiff) {
     if (currentFile.prevName != null && currentFile.name !== currentFile.prevName) {
-      if (currentFile.hunks.length > 0) currentFile.type = 'rename-changed'
-      else currentFile.type = 'rename-pure'
+      currentFile.type = currentFile.hunks.length > 0 ? 'rename-changed' : 'rename-pure'
     } else if (newFile != null && newFile.contents === '') currentFile.type = 'deleted'
     else if (oldFile != null && oldFile.contents === '') currentFile.type = 'new'
   }
@@ -323,12 +323,12 @@ export function processPatch(
   for (const fileOrPatchMetadata of rawFiles) {
     if (isGitDiff && !GIT_DIFF_FILE_BREAK_REGEX.test(fileOrPatchMetadata)) {
       if (patchMetadata == null) patchMetadata = fileOrPatchMetadata
-      else if (throwOnError) throw Error('parsePatchContent: unknown file blob')
+      else if (throwOnError) throw new Error('parsePatchContent: unknown file blob')
       else console.error('parsePatchContent: unknown file blob:', fileOrPatchMetadata)
       continue
     } else if (!isGitDiff && !UNIFIED_DIFF_FILE_BREAK_REGEX.test(fileOrPatchMetadata)) {
       if (patchMetadata == null) patchMetadata = fileOrPatchMetadata
-      else if (throwOnError) throw Error('parsePatchContent: unknown file blob')
+      else if (throwOnError) throw new Error('parsePatchContent: unknown file blob')
       else console.error('parsePatchContent: unknown file blob:', fileOrPatchMetadata)
       continue
     }

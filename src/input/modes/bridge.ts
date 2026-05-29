@@ -26,6 +26,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'ai-usage': 'modal.ai-usage',
   'update-available': 'modal.update-available',
+  'worktree-move': 'modal.worktree-move',
 }
 
 export function deriveModeId(state: AppState): ModeId {
@@ -33,6 +34,12 @@ export function deriveModeId(state: AppState): ModeId {
   // focusMode, so it needs modal-first dispatch. Always in filter mode.
   if (state.modal.type === 'help') {
     return 'modal.help.filtering'
+  }
+
+  // Overlay on top of git mode without flipping focusMode (like help) — route
+  // input to the picker while it's open even though focus stays 'git'.
+  if (state.modal.type === 'worktree-move') {
+    return 'modal.worktree-move'
   }
 
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]

@@ -7,7 +7,8 @@ export interface AssistantOption {
   description: string
 }
 
-const DEFAULT_SHELL = process.env.SHELL || 'sh'
+const DEFAULT_SHELL =
+  process.env.SHELL != null && process.env.SHELL !== '' ? process.env.SHELL : 'sh'
 const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
 
 export const ASSISTANT_OPTIONS: AssistantOption[] = [

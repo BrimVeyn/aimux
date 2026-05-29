@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState, WorkspaceSnapshotV1 } from '../state/types'
+import type { AppAction, LayoutState, TabSession, WorkspaceSnapshotV1 } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import {
@@ -31,6 +31,22 @@ export function resizeSnapshotPanes(
   })
 }
 
+function mergeSnapshotTabMetadata(
+  tabs: TabSession[],
+  workspaceSnapshot: WorkspaceSnapshotV1 | undefined
+): TabSession[] {
+  if (!workspaceSnapshot) return tabs
+  const persistedById = new Map(workspaceSnapshot.tabs.map((tab) => [tab.id, tab]))
+  return tabs.map((tab) => {
+    const persisted = persistedById.get(tab.id)
+    return persisted?.worktreeId != null &&
+      persisted?.worktreeId !== '' &&
+      !(tab.worktreeId != null && tab.worktreeId !== '')
+      ? { ...tab, worktreeId: persisted.worktreeId }
+      : tab
+  })
+}
+
 function hydrateAttachedSession(
   dispatch: (action: AppAction) => void,
   sessionId: string,
@@ -45,7 +61,7 @@ function hydrateAttachedSession(
       layoutTree: workspaceSnapshot?.layoutTree,
       layoutTrees: workspaceSnapshot?.layoutTrees,
       tabGroupMap: workspaceSnapshot?.tabGroupMap,
-      tabs: result.tabs,
+      tabs: mergeSnapshotTabMetadata(result.tabs, workspaceSnapshot),
       type: 'hydrate-workspace',
     })
     // Dispatch the session-status snapshot *after* hydrate-workspace so
@@ -91,14 +107,14 @@ export function attachCurrentSession({
   attachRequestIdRef.current = attachRequestId
   let cancelled = false
 
-  void backend
-    .attach({
-      cols: layoutRef.current.terminalCols,
-      rows: layoutRef.current.terminalRows,
-      sessionId: currentSessionId,
-      workspaceSnapshot: currentSessionWorkspaceSnapshot,
-    })
-    .then((result) => {
+  void (async () => {
+    try {
+      const result = await backend.attach({
+        cols: layoutRef.current.terminalCols,
+        rows: layoutRef.current.terminalRows,
+        sessionId: currentSessionId,
+        workspaceSnapshot: currentSessionWorkspaceSnapshot,
+      })
       if (cancelled || attachRequestIdRef.current !== attachRequestId) {
         return
       }
@@ -116,8 +132,7 @@ export function attachCurrentSession({
         layoutRef,
         backend
       )
-    })
-    .catch((error) => {
+    } catch (error) {
       if (cancelled || attachRequestIdRef.current !== attachRequestId) {
         return
       }
@@ -133,7 +148,8 @@ export function attachCurrentSession({
         layoutRef,
         backend
       )
-    })
+    }
+  })()
 
   return () => {
     cancelled = true

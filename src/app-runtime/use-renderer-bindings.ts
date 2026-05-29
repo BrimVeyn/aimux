@@ -1,4 +1,5 @@
-import { useRenderer } from '@opentui/react'
+import type { useRenderer } from '@opentui/react'
+
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { KeyChord } from '../input/keymap/key-chord'
@@ -194,7 +195,7 @@ export function useRendererBindings({
         defaultPrevented: event.defaultPrevented ?? false,
       })
 
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented === true) {
         return
       }
 
@@ -212,12 +213,12 @@ export function useRendererBindings({
       })
 
       if (currentFocusMode === 'command-edit') {
-        const sanitized = payload.replace(/\r\n?/g, '\n')
+        const sanitized = payload.replaceAll(/\r\n?/g, '\n')
         dispatch({ char: sanitized, type: 'update-command-edit' })
         return
       }
 
-      if (currentFocusMode !== 'terminal-input' || !tabId || !tab) {
+      if (currentFocusMode !== 'terminal-input' || tabId == null || tabId === '' || !tab) {
         return
       }
 
@@ -238,7 +239,7 @@ export function useRendererBindings({
         textLength: selectedText.length,
       })
 
-      if (selection.isDragging || selectedText.length === 0) {
+      if (selection.isDragging === true || selectedText.length === 0) {
         return
       }
 

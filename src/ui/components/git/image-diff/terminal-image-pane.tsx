@@ -1,5 +1,6 @@
-import { type BoxRenderable } from '@opentui/core'
-import { memo, useEffect, useRef, useState } from 'react'
+import type { BoxRenderable } from '@opentui/core'
+
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 
 import { convertToPng, isPng } from '../../../terminal-graphics/format-fallback'
 import {
@@ -47,7 +48,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     let cancelled = false
     stateRef.current = { imageId: null, lastKey: null, uploaded: false }
     setError(null)
-    ;(async () => {
+    void (async () => {
       let pngBytes: Uint8Array | null = null
       if (mime === 'image/png' || isPng(bytes)) {
         pngBytes = bytes
@@ -60,7 +61,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
         }
         pngBytes = result.png
       }
-      if (cancelled || !pngBytes) return
+      if (cancelled) return
       const id = nextImageId()
       writeRaw(uploadPngEscape(pngBytes, id))
       stateRef.current.imageId = id
@@ -76,15 +77,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     }
   }, [bytes, mime])
 
-  if (error) {
-    return (
-      <box flexGrow={1} alignItems="center" justifyContent="center" padding={1}>
-        <text fg={t.warning}>({error})</text>
-      </box>
-    )
-  }
-
-  function renderAfter(this: BoxRenderable): void {
+  const renderAfter = useCallback(function (this: BoxRenderable): void {
     const state = stateRef.current
     if (!state.uploaded || state.imageId === null) return
     const key = `${this.screenX},${this.screenY},${this.width},${this.height}`
@@ -93,6 +86,14 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     const seq = buildPlacement(state.imageId, this.screenX, this.screenY)
     // Queue write to land AFTER opentui's native cell flush in this frame.
     process.nextTick(() => writeRaw(seq))
+  }, [])
+
+  if (error != null && error !== '') {
+    return (
+      <box flexGrow={1} alignItems="center" justifyContent="center" padding={1}>
+        <text fg={t.warning}>({error})</text>
+      </box>
+    )
   }
 
   return <box flexGrow={1} renderAfter={renderAfter} />

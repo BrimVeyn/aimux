@@ -33,6 +33,24 @@ import { tokenToSpan } from './highlight'
 import { useSegmentVirtualization } from './use-segment-virtualization'
 
 const OVERSCAN = 24
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+
+// Stable per-row key derived from the line identities in the row, so rows keep a
+// consistent identity across fold expand/collapse rather than relying on position.
+function unifiedRowKey(row: UnifiedRowOrHeader): string {
+  switch (row.type) {
+    case 'hunk-header':
+      return `hh:${row.spec}`
+    case 'fold':
+      return `f:${row.fold.foldId}`
+    case 'context':
+      return `c:${row.delLineNumber}:${row.addLineNumber}`
+    case 'addition':
+      return `a:${row.lineNumber}`
+    case 'deletion':
+      return `d:${row.lineNumber}`
+  }
+}
 
 export interface StackedViewHandle {
   scroll: ScrollBoxRenderable | null
@@ -148,14 +166,14 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
       flexGrow={1}
       scrollY
       viewportCulling
-      contentOptions={{ flexDirection: 'column', gap: 0 }}
+      contentOptions={COLUMN_CONTENT_OPTIONS}
       onMouseScroll={handleScroll}
     >
       {visibleWindow.topSpacer > 0 ? <box height={visibleWindow.topSpacer} /> : null}
       {renderedSegments.map((rendered) =>
-        rendered.rows.map((row, i) => (
+        rendered.rows.map((row) => (
           <UnifiedRowRender
-            key={`${rendered.segment.id}:${i}`}
+            key={`${rendered.segment.id}:${unifiedRowKey(row)}`}
             foldDispatch={foldDispatch}
             gw={gw}
             highlights={highlights}
@@ -186,7 +204,9 @@ function UnifiedRowRender({
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
         <text fg={t.text}>{row.spec}</text>
-        {row.context ? <text fg={t.textMuted}> {row.context}</text> : null}
+        {row.context != null && row.context !== '' ? (
+          <text fg={t.textMuted}> {row.context}</text>
+        ) : null}
       </box>
     )
   }
@@ -230,10 +250,12 @@ function LineContent({ content, tokens }: { content: string; tokens: ThemedToken
       {tokens.map((tok, i) => {
         const s = tokenToSpan(tok)
         let attributes = 0
-        if (s.bold) attributes |= TextAttributes.BOLD
-        if (s.italic) attributes |= TextAttributes.ITALIC
-        if (s.underline) attributes |= TextAttributes.UNDERLINE
+        if (s.bold === true) attributes |= TextAttributes.BOLD
+        if (s.italic === true) attributes |= TextAttributes.ITALIC
+        if (s.underline === true) attributes |= TextAttributes.UNDERLINE
         return (
+          // Syntax tokens are positional within a single line and never reorder.
+          // eslint-disable-next-line react/no-array-index-key
           <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
             {s.text}
           </span>

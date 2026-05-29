@@ -86,13 +86,13 @@ describe('PtyManager', () => {
 
   test('tracks mouse and focus modes from terminal output', async () => {
     const manager = new PtyManager()
-    const seenModes: Array<{
+    const seenModes: {
       mouseTrackingMode: string
       sendFocusMode: boolean
       alternateScrollMode: boolean
       isAlternateBuffer: boolean
       bracketedPasteMode: boolean
-    }> = []
+    }[] = []
 
     const exitCode = await new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -146,7 +146,7 @@ describe('PtyManager', () => {
 
   test('tracks alternate scroll mode across split PTY output', async () => {
     const manager = new PtyManager()
-    const seenModes: Array<boolean> = []
+    const seenModes: boolean[] = []
 
     const exitCode = await new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -185,13 +185,13 @@ describe('PtyManager', () => {
 
     expect(exitCode).toBe(0)
     expect(seenModes).toContain(true)
-    expect(seenModes[seenModes.length - 1]).toBe(false)
+    expect(seenModes.at(-1)).toBe(false)
     manager.disposeAll()
   })
 
   test('tracks alternate scroll mode in bundled private-mode sequences', async () => {
     const manager = new PtyManager()
-    const seenModes: Array<boolean> = []
+    const seenModes: boolean[] = []
 
     const exitCode = await new Promise<number>((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -230,7 +230,7 @@ describe('PtyManager', () => {
 
     expect(exitCode).toBe(0)
     expect(seenModes).toContain(true)
-    expect(seenModes[seenModes.length - 1]).toBe(false)
+    expect(seenModes.at(-1)).toBe(false)
     manager.disposeAll()
   })
 
@@ -277,7 +277,7 @@ describe('PtyManager', () => {
     expect(exitCode).toBe(0)
     expect(seenCursorStates).toContain(true)
     expect(seenCursorStates).toContain(false)
-    expect(seenCursorStates[seenCursorStates.length - 1]).toBe(true)
+    expect(seenCursorStates.at(-1)).toBe(true)
     manager.disposeAll()
   })
 
@@ -326,7 +326,7 @@ describe('PtyManager', () => {
 
     expect(exitCode).toBe(0)
     expect(seenModes).toContain(true)
-    expect(seenModes[seenModes.length - 1]).toBe(false)
+    expect(seenModes.at(-1)).toBe(false)
     manager.disposeAll()
   })
 

@@ -135,7 +135,7 @@ export class SequenceResolver {
   }
 
   private updateRepeatOnResolve(chord: KeyChord, binding: TrieBinding): void {
-    if (binding.repeatable) {
+    if (binding.repeatable === true) {
       this.repeatTerminal = chord
       this.repeatBinding = binding
     } else {

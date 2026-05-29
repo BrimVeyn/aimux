@@ -1,5 +1,12 @@
 import { EventEmitter } from 'node:events'
 
+import type {
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from '../state/types'
+
 import { logDebug } from '../debug/input-log'
 import { PtyManager } from '../pty/pty-manager'
 import {
@@ -8,14 +15,8 @@ import {
   restoreTabsFromWorkspace,
 } from '../state/session-persistence'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
-import {
-  type TabSession,
-  type TerminalModeState,
-  type TerminalSnapshot,
-  type WorkspaceSnapshotV1,
-} from '../state/types'
 
-type SessionRegistryEvents = {
+interface SessionRegistryEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
@@ -79,7 +80,9 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         this.tabs.set(tab.id, tab)
       }
       this.activeTabId =
-        snapshot.activeTabId && restoredTabs.some((tab) => tab.id === snapshot.activeTabId)
+        snapshot.activeTabId != null &&
+        snapshot.activeTabId !== '' &&
+        restoredTabs.some((tab) => tab.id === snapshot.activeTabId)
           ? snapshot.activeTabId
           : (restoredTabs[0]?.id ?? null)
     } else if (this.tabs.size > 0 && snapshot) {
@@ -87,9 +90,14 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         const existing = this.tabs.get(persisted.id)
         if (existing) {
           existing.title = persisted.title
+          existing.worktreeId = persisted.worktreeId
         }
       }
-      if (snapshot.activeTabId && this.tabs.has(snapshot.activeTabId)) {
+      if (
+        snapshot.activeTabId != null &&
+        snapshot.activeTabId !== '' &&
+        this.tabs.has(snapshot.activeTabId)
+      ) {
         this.activeTabId = snapshot.activeTabId
       }
     }

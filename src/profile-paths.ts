@@ -4,14 +4,14 @@ export const DEFAULT_PROFILE = 'default'
 
 function sanitizeProfile(profile: string): string {
   const trimmed = profile.trim().toLowerCase()
-  const normalized = trimmed.replace(/[^a-z0-9._-]+/g, '-')
-  const collapsed = normalized.replace(/-+/g, '-').replace(/^-|-$/g, '')
+  const normalized = trimmed.replaceAll(/[^a-z0-9._-]+/g, '-')
+  const collapsed = normalized.replaceAll(/-+/g, '-').replaceAll(/^-|-$/g, '')
   return collapsed || DEFAULT_PROFILE
 }
 
 export function getProfileName(): string {
   const configured = process.env.AIMUX_PROFILE ?? process.env.AIMUX_RUNTIME_PROFILE
-  if (!configured) {
+  if (!(configured != null && configured !== '')) {
     return DEFAULT_PROFILE
   }
 

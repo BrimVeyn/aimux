@@ -57,7 +57,7 @@ describe('LocalSessionBackend.attach', () => {
     }
     backendInternal.statusLoop = {
       classifyNow: mock(() => {}),
-      getTabStatus: mock(() => undefined),
+      getTabStatus: mock(() => {}),
       snapshotSessions: mock(() => []),
     }
 
@@ -68,9 +68,12 @@ describe('LocalSessionBackend.attach', () => {
       workspaceSnapshot: snapshot,
     })
 
-    const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as Array<
-      [sessionId: string, cols: number, rows: number, options?: { sync?: boolean }]
-    >
+    const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as [
+      sessionId: string,
+      cols: number,
+      rows: number,
+      options?: { sync?: boolean },
+    ][]
     const firstResize = resizeArgs[0]
     expect(firstResize).toBeDefined()
     expect(firstResize?.[0]).toBe('session-a')

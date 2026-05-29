@@ -13,6 +13,9 @@ interface Options {
   enabled: boolean
   projectPath: string | undefined
   headOffset: number
+  // When set, diff the working tree against this ref (worktree fork point for
+  // review-vs-base) instead of HEAD/HEAD~N.
+  compareRef?: string
 }
 
 function tagFiles(files: GitFileEntry[], repoPath: string): GitFileEntry[] {
@@ -22,13 +25,23 @@ function tagFiles(files: GitFileEntry[], repoPath: string): GitFileEntry[] {
 async function collectAggregated(
   repos: DiscoveredRepo[],
   fallbackCwd: string,
-  headOffset: number
+  headOffset: number,
+  compareRef: string | undefined
 ): Promise<GitCollectResult> {
-  // Historical walking (HEAD~N) is per-repo and doesn't compose; fall back to
-  // the root/fallback repo when offset > 0 to preserve existing behaviour.
-  if (headOffset > 0) return collectGitStatus(fallbackCwd, { headOffset })
+  // Historical walking (HEAD~N) and review-vs-base are per-repo and don't
+  // compose; fall back to the root/fallback repo to preserve existing behaviour.
+  if ((compareRef != null && compareRef !== '') || headOffset > 0) {
+    const result = await collectGitStatus(fallbackCwd, { compareRef, headOffset })
+    if (result.kind !== 'ok') return result
+    return {
+      kind: 'ok',
+      payload: { ...result.payload, files: tagFiles(result.payload.files, fallbackCwd) },
+    }
+  }
 
-  const results = await Promise.all(repos.map((r) => collectGitStatus(r.path, { headOffset: 0 })))
+  const results = await Promise.all(
+    repos.map(async (r) => collectGitStatus(r.path, { headOffset: 0 }))
+  )
   const files: GitFileEntry[] = []
   let branch: string | null = null
   let ahead = 0
@@ -58,13 +71,18 @@ async function collectAggregated(
   return { kind: 'ok', payload }
 }
 
-export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options): void {
+export function useGitPanelPolling({
+  compareRef,
+  enabled,
+  headOffset,
+  projectPath,
+}: Options): void {
   // Read repos from the store imperatively — changes trigger a fresh effect run
   // because the repos identity is stable across ticks until set-repos fires.
   const repos = useAppStore((s) => s.multiRepo.repos)
 
   useEffect(() => {
-    if (!enabled || !projectPath) return undefined
+    if (!enabled || !(projectPath != null && projectPath !== '')) return
 
     dispatchGlobal({ type: 'git-panel-reset' })
 
@@ -80,11 +98,15 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
     const tick = async () => {
       const result =
         repos.length > 0
-          ? await collectAggregated(repos, projectPath, headOffset)
-          : await collectGitStatus(projectPath, { headOffset })
+          ? await collectAggregated(repos, projectPath, headOffset, compareRef)
+          : await collectGitStatus(projectPath, { compareRef, headOffset })
       if (cancelled) return
       if (result.kind === 'ok') {
-        dispatchGlobal({ payload: result.payload, type: 'git-refresh-success' })
+        const payload =
+          repos.length === 0
+            ? { ...result.payload, files: tagFiles(result.payload.files, projectPath) }
+            : result.payload
+        dispatchGlobal({ payload, type: 'git-refresh-success' })
         delay = BASE_INTERVAL_MS
       } else if (result.kind === 'out-of-range') {
         dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })
@@ -106,5 +128,5 @@ export function useGitPanelPolling({ enabled, headOffset, projectPath }: Options
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [enabled, projectPath, headOffset, repos])
+  }, [enabled, projectPath, headOffset, compareRef, repos])
 }

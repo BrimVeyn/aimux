@@ -106,7 +106,7 @@ export class LocalSessionBackend
     rows: number
     cwd?: string
   }): void {
-    if (!this.currentSessionId) {
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) {
       logDebug('backend.local.skipCreateWithoutSession', { tabId: options.tabId })
       return
     }
@@ -119,7 +119,7 @@ export class LocalSessionBackend
   }
 
   write(tabId: string, input: string): void {
-    if (!this.currentSessionId) {
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) {
       logDebug('backend.local.skipWriteWithoutSession', { inputLength: input.length, tabId })
       return
     }
@@ -132,46 +132,46 @@ export class LocalSessionBackend
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.scroll(this.currentSessionId, tabId, deltaLines)
   }
 
   scrollViewportToBottom(tabId: string): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
   }
 
   setActiveTab(tabId: string | null): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.setActiveTab', { sessionId: this.currentSessionId, tabId })
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
 
   resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.resize(this.currentSessionId, cols, rows, options)
   }
 
   resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, options)
   }
 
   disposeSession(tabId: string): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.disposeSession', { sessionId: this.currentSessionId, tabId })
     this.sessionManager.closeTab(this.currentSessionId, tabId)
   }
 
   disposeAll(): void {
-    if (!this.currentSessionId) return
+    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.disposeAll', { sessionId: this.currentSessionId })
     this.sessionManager.disposeSession(this.currentSessionId)
   }
 
   destroy(keepSessions = true): void {
     logDebug('backend.local.destroy', { keepSessions, sessionId: this.currentSessionId })
-    if (!keepSessions && this.currentSessionId) {
+    if (!keepSessions && this.currentSessionId != null && this.currentSessionId !== '') {
       this.sessionManager.disposeSession(this.currentSessionId)
     }
     this.statusLoop.stop()

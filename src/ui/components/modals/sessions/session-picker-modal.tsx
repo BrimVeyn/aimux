@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from 'react'
+
 import type { SessionRecord } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
@@ -44,40 +46,46 @@ export function SessionPickerModal({
   sessions,
 }: SessionPickerModalProps) {
   const t = useTheme()
-  const ordered = orderSessionsForDisplay(sessions)
-  const baselineOrder = ordered.map((s) => s.id)
-  const filtered = filterSessions(ordered, filter)
-  const hasFilter = !!filter
+  const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
+  const filtered = useMemo(() => filterSessions(ordered, filter), [filter, ordered])
+  const hasFilter = !!(filter != null && filter !== '')
 
-  const sessionItems: PickerItem[] = filtered.map((session, index) => {
-    const active = index === selectedIndex
-    const displayIndex = baselineOrder.indexOf(session.id) + 1
-    return {
-      key: session.id,
+  const items = useMemo<PickerItem[]>(() => {
+    const baselineOrder = ordered.map((s) => s.id)
+    const sessionItems: PickerItem[] = filtered.map((session, index) => {
+      const active = index === selectedIndex
+      const displayIndex = baselineOrder.indexOf(session.id) + 1
+      return {
+        key: session.id,
+        onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
+        onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
+        subtitle:
+          session.projectPath != null && session.projectPath !== '' ? (
+            <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
+          ) : undefined,
+        title: (
+          <text fg={active ? t.text : t.textMuted}>
+            {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
+          </text>
+        ),
+      }
+    })
+    const createNewItem: PickerItem = {
+      key: '__create-new__',
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
-      onDelete: () => runSideEffectGlobal({ type: 'delete-selected-session' }),
-      subtitle: session.projectPath ? (
-        <text fg={t.textMuted}>{abbreviatePath(session.projectPath)}</text>
-      ) : undefined,
       title: (
-        <text fg={active ? t.text : t.textMuted}>
-          {formatSessionLine(session, currentSessionId, currentTabCount, displayIndex)}
+        <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
+          Create new workspace
         </text>
       ),
     }
-  })
+    return [...sessionItems, createNewItem]
+  }, [currentSessionId, currentTabCount, filtered, ordered, selectedIndex, t])
 
-  const createNewItem: PickerItem = {
-    key: '__create-new__',
-    onClick: () => runSideEffectGlobal({ type: 'confirm-selected-session' }),
-    title: (
-      <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
-        Create new workspace
-      </text>
-    ),
-  }
-
-  const items = [...sessionItems, createNewItem]
+  const handleHover = useCallback(
+    (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
+    []
+  )
 
   return (
     <Picker
@@ -94,7 +102,7 @@ export function SessionPickerModal({
           <text fg={t.textMuted}>{getEmptyStateMessage(hasFilter)}</text>
         ) : undefined
       }
-      onHover={(index) => dispatchGlobal({ index, type: 'set-modal-selection-index' })}
+      onHover={handleHover}
     />
   )
 }

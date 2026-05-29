@@ -67,9 +67,12 @@ describe('resizeSnapshotPanes', () => {
 
     resizeSnapshotPanes(createSnapshot(), layoutRef, backend as unknown as SessionBackend)
 
-    const calls = backend.resizeTab.mock.calls as unknown as Array<
-      [tabId: string, cols: number, rows: number, options?: { sync?: boolean }]
-    >
+    const calls = backend.resizeTab.mock.calls as unknown as [
+      tabId: string,
+      cols: number,
+      rows: number,
+      options?: { sync?: boolean },
+    ][]
     expect(calls).toHaveLength(2)
     const firstCall = calls[0]
     const secondCall = calls[1]

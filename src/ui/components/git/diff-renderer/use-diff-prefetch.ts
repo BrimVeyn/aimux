@@ -13,6 +13,7 @@ interface PrefetchOptions {
   projectPath: string | undefined
   themeId: string
   headOffset: number
+  compareRef?: string
   enabled: boolean
 }
 
@@ -66,11 +67,15 @@ class PrefetchQueue {
       if (!task) break
       this.inflight.set(task.key, task.controller)
       this.running += 1
-      void this.execute(task).finally(() => {
-        this.inflight.delete(task.key)
-        this.running -= 1
-        this.pump()
-      })
+      void (async () => {
+        try {
+          await this.execute(task)
+        } finally {
+          this.inflight.delete(task.key)
+          this.running -= 1
+          this.pump()
+        }
+      })()
     }
   }
 }
@@ -94,15 +99,20 @@ export function useDiffPrefetch(
 
   const queueRef = useRef<PrefetchQueue | null>(null)
 
-  const { enabled, headOffset, projectPath } = opts
+  const { compareRef, enabled, headOffset, projectPath } = opts
   const runTaskRef = useRef<(task: Task) => Promise<void>>(async () => {})
 
   // Keep a ref to the execute function so the queue keeps the latest closure
   // without needing to recreate the queue itself.
   runTaskRef.current = async (task: Task) => {
-    if (!projectPath) return
+    if (!(projectPath != null && projectPath !== '')) return
     try {
-      const diff = await fetchDiff(task.file.repoPath ?? projectPath, task.file, headOffset)
+      const diff = await fetchDiff(
+        task.file.repoPath ?? projectPath,
+        task.file,
+        headOffset,
+        compareRef
+      )
       if (task.controller.signal.aborted) return
       const hash = diffHash(diff.rawDiff)
       dispatchGlobal({ diff, hash, key: task.key, type: 'git-mode-set-diff' })
@@ -122,13 +132,19 @@ export function useDiffPrefetch(
   }
 
   if (!queueRef.current) {
-    queueRef.current = new PrefetchQueue((task) => runTaskRef.current(task), MAX_CONCURRENCY)
+    queueRef.current = new PrefetchQueue(async (task) => runTaskRef.current(task), MAX_CONCURRENCY)
   }
 
   useEffect(() => {
     const queue = queueRef.current
     if (!queue) return
-    if (!enabled || radius <= 0 || !projectPath || !selectedEntryKey) {
+    if (
+      !enabled ||
+      radius <= 0 ||
+      projectPath == null ||
+      projectPath === '' ||
+      !(selectedEntryKey != null && selectedEntryKey !== '')
+    ) {
       queue.cancelAll()
       return
     }
@@ -149,7 +165,7 @@ export function useDiffPrefetch(
       const key = row.key
       if (diffs[key]) continue
       if (parsed[key]) continue
-      if (loading[key]) continue
+      if (loading[key] === true) continue
       tasks.push({
         controller: new AbortController(),
         distance: Math.abs(i - selectedIdx),
@@ -171,6 +187,7 @@ export function useDiffPrefetch(
     parsed,
     loading,
     headOffset,
+    compareRef,
   ])
 
   useEffect(() => {

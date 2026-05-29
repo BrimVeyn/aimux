@@ -3,11 +3,11 @@ import type { ThemedToken } from 'shiki'
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
 
+import type { FoldState } from '../../../../state/types'
 import type { ThemeId } from '../../../themes'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { type FoldState } from '../../../../state/types'
 import { useTheme } from '../../../theme'
 import { buildDiffSegments, firstChangeSegmentOffset, gutterWidth } from './build-rows'
 import { SplitView, type SplitViewHandle } from './split-view'

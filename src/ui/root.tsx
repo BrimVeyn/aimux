@@ -1,8 +1,16 @@
 import type { MouseEvent } from '@opentui/core'
 
+import { useCallback, useMemo } from 'react'
+
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
-import type { FocusMode, ModalState, SessionRecord, SnippetRecord } from '../state/types'
+import type {
+  FocusMode,
+  ModalState,
+  SessionRecord,
+  SnippetRecord,
+  WorktreeRecord,
+} from '../state/types'
 import type { ThemeId } from './themes'
 
 import { useAppStore } from '../state/app-store'
@@ -28,10 +36,14 @@ import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
+import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
+import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { useTheme } from './theme'
+
+const EMPTY_WORKTREES: WorktreeRecord[] = []
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -78,6 +90,7 @@ function renderModal(
     focusMode: FocusMode
     activeAssistant?: string
     autoCommitModel?: string
+    worktreeDivergence: Record<string, { ahead: number; behind: number }>
   }
 ) {
   switch (modal.type) {
@@ -89,8 +102,24 @@ function renderModal(
           customCommands={options.customCommands}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
+          currentSessionId={options.currentSessionId}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
+          activeField={modal.type === 'new-tab' ? modal.activeField : 'assistant'}
+          branchError={modal.type === 'new-tab' ? modal.branchError : null}
+          branchName={modal.type === 'new-tab' ? modal.branchName : ''}
+          createWorktree={modal.type === 'new-tab' ? modal.createWorktree : false}
+          selectedAssistantId={modal.type === 'new-tab' ? modal.selectedAssistantId : null}
+          step={modal.type === 'new-tab' ? modal.step : 'assistant'}
+          worktreeDeleteConfirmId={modal.type === 'new-tab' ? modal.worktreeDeleteConfirmId : null}
+          worktreeDeleteMessage={modal.type === 'new-tab' ? modal.worktreeDeleteMessage : null}
+          worktrees={
+            options.currentSessionId != null && options.currentSessionId !== ''
+              ? (options.sessions.find((session) => session.id === options.currentSessionId)
+                  ?.worktrees ?? EMPTY_WORKTREES)
+              : EMPTY_WORKTREES
+          }
+          worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
         />
       )
     case 'session-picker':
@@ -107,7 +136,11 @@ function renderModal(
     case 'session-name':
       return (
         <SessionNameModal
-          title={modal.sessionTargetId ? 'Rename workspace' : 'Create workspace'}
+          title={
+            modal.sessionTargetId != null && modal.sessionTargetId !== ''
+              ? 'Rename workspace'
+              : 'Create workspace'
+          }
           value={modal.editBuffer ?? ''}
         />
       )
@@ -161,6 +194,21 @@ function renderModal(
           latestVersion={modal.latestVersion}
         />
       )
+    case 'worktree-move': {
+      const session =
+        options.currentSessionId != null && options.currentSessionId !== ''
+          ? options.sessions.find((entry) => entry.id === options.currentSessionId)
+          : undefined
+      return (
+        <WorktreeMoveModal
+          deleteSource={modal.type === 'worktree-move' ? modal.deleteSource : false}
+          divergence={options.worktreeDivergence}
+          selectedIndex={modal.selectedIndex}
+          sourceWorktreeId={modal.sourceWorktreeId}
+          worktrees={session?.worktrees ?? EMPTY_WORKTREES}
+        />
+      )
+    }
     case 'help':
       return (
         <HelpModal
@@ -266,6 +314,7 @@ export function RootView({
   const customCommands = useAppStore((s) => s.customCommands)
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const sessionBarPosition = useAppStore((s) => s.sessionBar.position)
   const gitPaneMode = useAppStore((s) => s.gitPane.mode)
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
@@ -275,19 +324,66 @@ export function RootView({
   const sidebarVisible = useAppStore((s) => s.sidebar.visible)
 
   const gitPaneInPaneOnLeft = gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left'
+  const splitChrome = PANE_BORDER * 2
+
+  const handleSidebarEdgeResize = useCallback(
+    (event: MouseEvent): boolean => {
+      onSidebarResizeStart?.({ initialWidth: sidebarWidth, screenStart: event.x })
+      return true
+    },
+    [onSidebarResizeStart, sidebarWidth]
+  )
   const handleTerminalLeftEdgeMouseDown =
     sidebarVisible && !gitPaneInPaneOnLeft && onSidebarResizeStart
-      ? (event: MouseEvent) => {
-          onSidebarResizeStart({ initialWidth: sidebarWidth, screenStart: event.x })
-          return true
-        }
+      ? handleSidebarEdgeResize
       : undefined
 
+  const handleRootMouseDrag = useCallback(
+    (event: MouseEvent) => {
+      if (onSeparatorDrag?.(event) === true) {
+        event.preventDefault()
+        event.stopPropagation()
+      }
+    },
+    [onSeparatorDrag]
+  )
+  const handleRootMouseUp = useCallback(
+    (event: MouseEvent) => {
+      // Catch releases that land outside any TerminalPane (sidebar, gap,
+      // status bar, …) so an in-flight multi-click drag — and its
+      // auto-scroll interval — is always finalised.
+      onTerminalMouseUp?.(event)
+      onSeparatorDragEnd?.()
+    },
+    [onSeparatorDragEnd, onTerminalMouseUp]
+  )
+
+  const splitContentOrigin = useMemo(
+    () => ({
+      cols: terminalCols + splitChrome,
+      rows: terminalRows + splitChrome,
+      x: contentOrigin.x - PANE_BORDER,
+      y: contentOrigin.y - PANE_BORDER,
+    }),
+    [contentOrigin, splitChrome, terminalCols, terminalRows]
+  )
+  const splitBounds = useMemo(
+    () => ({
+      cols: terminalCols + splitChrome,
+      rows: terminalRows + splitChrome,
+      x: 0,
+      y: 0,
+    }),
+    [splitChrome, terminalCols, terminalRows]
+  )
+
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
-  const activeTree = activeTabId ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId) : null
+  const activeTree =
+    activeTabId != null && activeTabId !== ''
+      ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
+      : null
   const createSessionFields = getCreateSessionFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
-  const splitChrome = PANE_BORDER * 2
 
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
   if (inGitMode) {
@@ -310,7 +406,9 @@ export function RootView({
           snippetEditorFields,
           snippets,
           themeId,
+          worktreeDivergence,
         })}
+        <ToastViewport />
       </box>
     )
   }
@@ -321,19 +419,8 @@ export function RootView({
       width="100%"
       height="100%"
       backgroundColor={editorBg}
-      onMouseDrag={(event) => {
-        if (onSeparatorDrag?.(event)) {
-          event.preventDefault()
-          event.stopPropagation()
-        }
-      }}
-      onMouseUp={(event) => {
-        // Catch releases that land outside any TerminalPane (sidebar, gap,
-        // status bar, …) so an in-flight multi-click drag — and its
-        // auto-scroll interval — is always finalised.
-        onTerminalMouseUp?.(event)
-        onSeparatorDragEnd?.()
-      }}
+      onMouseDrag={handleRootMouseDrag}
+      onMouseUp={handleRootMouseUp}
     >
       {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
@@ -356,12 +443,7 @@ export function RootView({
             tabs={tabs}
             activeTabId={activeTabId}
             focusMode={focusMode}
-            contentOrigin={{
-              cols: terminalCols + splitChrome,
-              rows: terminalRows + splitChrome,
-              x: contentOrigin.x - PANE_BORDER,
-              y: contentOrigin.y - PANE_BORDER,
-            }}
+            contentOrigin={splitContentOrigin}
             mouseForwardingEnabled={mouseForwardingEnabled}
             localScrollbackEnabled={localScrollbackEnabled}
             onTerminalMouseEvent={onTerminalMouseEvent}
@@ -376,12 +458,7 @@ export function RootView({
             onSeparatorDragEnd={onSeparatorDragEnd}
             onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
             onMeasure={onMeasure}
-            bounds={{
-              cols: terminalCols + splitChrome,
-              rows: terminalRows + splitChrome,
-              x: 0,
-              y: 0,
-            }}
+            bounds={splitBounds}
           />
         ) : (
           <TerminalPane
@@ -424,7 +501,9 @@ export function RootView({
         snippetEditorFields,
         snippets,
         themeId,
+        worktreeDivergence,
       })}
+      <ToastViewport />
     </box>
   )
 }
@@ -455,16 +534,20 @@ function GitPaneInPaneMode({
       dispatchGlobal({ position: nextPosition, type: 'set-git-pane-position' })
     }
   )
+  const handleResizeMouseDown = useCallback(
+    (event: MouseEvent) => {
+      event.preventDefault()
+      event.stopPropagation()
+      onGitPaneResizeStart?.({ initialWidth: width, screenStart: event.x, side: position })
+    },
+    [onGitPaneResizeStart, position, width]
+  )
   const handle = (
     <box
       width={1}
       flexShrink={0}
       backgroundColor={tokens.border}
-      onMouseDown={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        onGitPaneResizeStart?.({ initialWidth: width, screenStart: event.x, side: position })
-      }}
+      onMouseDown={handleResizeMouseDown}
     />
   )
   return (

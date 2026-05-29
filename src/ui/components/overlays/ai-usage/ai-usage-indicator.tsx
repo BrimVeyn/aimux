@@ -1,5 +1,7 @@
 import type { AIUsageTool } from '@brimveyn/aimux-config'
 
+import { useCallback } from 'react'
+
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
@@ -34,7 +36,7 @@ function formatResetIn(snap: {
   resetAt: string | null
   timeRemaining: string | null
 }): string | null {
-  if (snap.resetAt) {
+  if (snap.resetAt != null && snap.resetAt !== '') {
     const diffMs = new Date(snap.resetAt).getTime() - Date.now()
     if (diffMs > 0) {
       const totalMin = Math.round(diffMs / 60_000)
@@ -52,18 +54,21 @@ export function AIUsageIndicator() {
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
+  const openModal = useCallback(
+    (e: { preventDefault: () => void; stopPropagation: () => void }) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dispatchGlobal({ type: 'open-ai-usage-modal' })
+    },
+    []
+  )
+
   if (!enabled) return null
 
   const ordered: AIUsageTool[] = ['claude', 'codex']
   const entries = ordered
     .map((tool) => ({ snap: snapshots[tool], tool }))
     .filter((entry) => entry.snap !== undefined)
-
-  const openModal = (e: { preventDefault: () => void; stopPropagation: () => void }) => {
-    e.preventDefault()
-    e.stopPropagation()
-    dispatchGlobal({ type: 'open-ai-usage-modal' })
-  }
 
   if (entries.length === 0) {
     return (
@@ -85,7 +90,7 @@ export function AIUsageIndicator() {
         if (!snap) return null
         const icon = TOOL_ICON[tool]
 
-        if (snap.error && !snap.stale) {
+        if (snap.error != null && snap.error !== '' && !(snap.stale === true)) {
           return (
             <box
               key={tool}
@@ -134,7 +139,7 @@ export function AIUsageIndicator() {
               <text fg={t.text} selectable={false}>
                 {` ${pctText}`}
               </text>
-              {reset ? (
+              {reset != null && reset !== '' ? (
                 <text fg={t.textMuted} selectable={false}>
                   {` · ${reset}`}
                 </text>

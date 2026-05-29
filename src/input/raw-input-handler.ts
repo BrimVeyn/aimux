@@ -224,7 +224,7 @@ export function createRawInputHandler(deps: {
     }
 
     const activeTabId = deps.getActiveTabId()
-    if (!activeTabId) {
+    if (!(activeTabId != null && activeTabId !== '')) {
       return false
     }
 

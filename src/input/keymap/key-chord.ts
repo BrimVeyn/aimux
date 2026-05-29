@@ -77,7 +77,7 @@ export function parseKeyNotation(notation: string, leader?: KeyChord): KeyChord[
 
     // Handle <leader>
     if (inner.toLowerCase() === 'leader') {
-      if (!leader) {
+      if (!(leader != null && leader !== '')) {
         throw new Error('parseKeyNotation: <leader> used but no leader key configured')
       }
       chords.push(leader)
@@ -102,7 +102,7 @@ export function parseKeyNotation(notation: string, leader?: KeyChord): KeyChord[
 function parseAngleBracketToken(inner: string): KeyChord {
   // Check if it's a special name (no modifiers)
   const specialInner = SPECIAL_NAMES[inner]
-  if (specialInner) {
+  if (specialInner != null && specialInner !== '') {
     return specialInner
   }
 
@@ -120,11 +120,11 @@ function parseAngleBracketToken(inner: string): KeyChord {
     else if (mod === 'S') shift = true
   }
 
-  let keyName = parts[parts.length - 1] ?? ''
+  let keyName = parts.at(-1) ?? ''
 
   // Check if the key part is a special name
   const specialKey = SPECIAL_NAMES[keyName]
-  if (specialKey) {
+  if (specialKey != null && specialKey !== '') {
     keyName = specialKey
   }
 

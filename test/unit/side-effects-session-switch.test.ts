@@ -21,7 +21,7 @@ test('switch-session-by-index exits git mode when clicking the active session', 
     focusMode: 'git' as const,
     sessions: [createSession('session-1', 1), createSession('session-2', 2)],
   }
-  const dispatched: Array<{ type: string }> = []
+  const dispatched: { type: string }[] = []
 
   executeSideEffect(
     { index: 1, type: 'switch-session-by-index' },
@@ -33,7 +33,8 @@ test('switch-session-by-index exits git mode when clicking the active session', 
       dispatch: (action) => {
         dispatched.push(action)
       },
-      getCurrentSessionProjectPath: () => undefined,
+      getCurrentSessionProjectPath: () => {},
+      getState: () => state,
       renderer: { destroy() {} } as never,
       setThemeId: () => {},
       startStartupGrace: () => {},

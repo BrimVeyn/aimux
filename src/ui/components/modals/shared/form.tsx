@@ -1,6 +1,5 @@
 import type { ModeId } from '@brimveyn/aimux-config'
-
-import { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
 import { useTheme } from '../../../theme'
 import { InputField } from '../../primitives/input-field'
@@ -84,8 +83,8 @@ export function FieldLabel({ active = false, children, description }: FieldLabel
   const t = useTheme()
   return (
     <box flexDirection="column">
-      {children ? <text fg={active ? t.text : t.textMuted}>{children}</text> : null}
-      {description ? <text fg={t.textMuted}>{description}</text> : null}
+      {children != null ? <text fg={active ? t.text : t.textMuted}>{children}</text> : null}
+      {description != null ? <text fg={t.textMuted}>{description}</text> : null}
     </box>
   )
 }
@@ -100,7 +99,7 @@ export function TextField({
 }: TextFieldProps) {
   return (
     <box flexDirection="column">
-      {label || description ? (
+      {label != null || description != null ? (
         <FieldLabel active={active} description={description}>
           {label}
         </FieldLabel>
@@ -148,12 +147,13 @@ export function AutoComplete({
               return (
                 <ListItem
                   key={item.key}
+                  index={optionIndex}
                   active={optionActive}
                   leading={resolveItemContent(item.leading, optionActive)}
                   title={resolveItemContent(item.title, optionActive)}
                   subtitle={resolveItemContent(item.subtitle, optionActive)}
                   trailing={resolveItemContent(item.trailing, optionActive)}
-                  onHover={onHover ? () => onHover(optionIndex) : undefined}
+                  onHoverIndex={onHover}
                   onClick={item.onClick}
                 />
               )

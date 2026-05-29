@@ -8,10 +8,10 @@ import type {
   TabSession,
   TerminalModeState,
 } from '../state/types'
+import type { TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
-import { type TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend

@@ -124,8 +124,9 @@ export function useDiffPreparation(
     const owner = requestOwner
     const version = requestVersionRef.current
     setPreparing(true)
-    void prepareDiff(diff, path, { signal: controller.signal })
-      .then((result) => {
+    void (async () => {
+      try {
+        const result = await prepareDiff(diff, path, { signal: controller.signal })
         if (
           controller.signal.aborted ||
           requestVersionRef.current !== version ||
@@ -142,9 +143,9 @@ export function useDiffPreparation(
           key: cacheKey,
           type: 'git-mode-set-parsed',
         })
-      })
-      .catch(() => {})
-      .finally(() => {
+      } catch {
+        // Aborted or failed preparation; nothing to surface here.
+      } finally {
         if (
           !controller.signal.aborted &&
           requestVersionRef.current === version &&
@@ -152,7 +153,8 @@ export function useDiffPreparation(
         ) {
           setPreparing(false)
         }
-      })
+      }
+    })()
 
     return () => {
       controller.abort()
@@ -163,11 +165,11 @@ export function useDiffPreparation(
     (segments: readonly DiffSegment[]) => {
       const file = parsed.file
       const filetype = parsed.filetype
-      if (!file || !filetype) return
+      if (!file || !(filetype != null && filetype !== '')) return
       const owner = requestOwner
       const version = requestVersionRef.current
       const activeHash = cachedParsed?.hash ?? (localOwnerMatches ? localHash : null)
-      if (!activeHash) return
+      if (!(activeHash != null && activeHash !== '')) return
       const next = segments.filter(
         (segment) =>
           (segment.kind === 'context' || segment.kind === 'change') &&

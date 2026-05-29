@@ -12,13 +12,7 @@ const TRANSPARENT: RGBA = { a: 0, b: 0, g: 0, r: 0 }
 function rgbaFromHex(hex: string): RGBA {
   const h = hex.replace('#', '')
   // expand short forms (#rgb, #rgba)
-  const expanded =
-    h.length === 3 || h.length === 4
-      ? h
-          .split('')
-          .map((c) => c + c)
-          .join('')
-      : h
+  const expanded = h.length === 3 || h.length === 4 ? h.replaceAll(/(.)/g, '$1$1') : h
   if (expanded.length === 6) {
     const num = parseInt(expanded, 16)
     return {

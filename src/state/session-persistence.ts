@@ -1,5 +1,6 @@
+import type { AppState, TabSession, TabStatus, WorkspaceSnapshotV1 } from './types'
+
 import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
-import { type AppState, type TabSession, type TabStatus, type WorkspaceSnapshotV1 } from './types'
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   return {
@@ -44,6 +45,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      worktreeId: tab.worktreeId,
     })),
     version: 1,
   }
@@ -71,6 +73,7 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      worktreeId: tab.worktreeId,
     }))
 }
 
@@ -119,7 +122,7 @@ export function normalizeGroupedTabOrder(
 
   for (const tab of tabs) {
     const groupId = tabGroupMap[tab.id]
-    if (!groupId) {
+    if (!(groupId != null && groupId !== '')) {
       continue
     }
 
@@ -139,9 +142,9 @@ export function normalizeGroupedTabOrder(
 
   for (const tab of tabs) {
     const groupId = tabGroupMap[tab.id]
-    const groupTree = groupId ? layoutTrees[groupId] : undefined
+    const groupTree = groupId != null && groupId !== '' ? layoutTrees[groupId] : undefined
 
-    if (!groupId || !groupTree || groupTree.type !== 'split') {
+    if (groupId == null || groupId === '' || !groupTree || groupTree.type !== 'split') {
       orderedTabs.push(tab)
       continue
     }
@@ -173,7 +176,9 @@ export function restoreWorkspaceState(
 > {
   const tabs = restoreTabsFromWorkspace(workspaceSnapshot)
   const activeTabId =
-    workspaceSnapshot?.activeTabId && tabs.some((tab) => tab.id === workspaceSnapshot.activeTabId)
+    workspaceSnapshot?.activeTabId != null &&
+    workspaceSnapshot?.activeTabId !== '' &&
+    tabs.some((tab) => tab.id === workspaceSnapshot.activeTabId)
       ? workspaceSnapshot.activeTabId
       : (tabs[0]?.id ?? null)
 

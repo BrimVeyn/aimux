@@ -8,7 +8,7 @@ export function themeDisplayName(id: ThemeId): string {
 }
 
 export function filterThemeIds(filter: string | null): ThemeId[] {
-  if (!filter) return THEME_IDS
+  if (!(filter != null && filter !== '')) return THEME_IDS
   const needle = filter.toLowerCase()
   return THEME_IDS.filter((id) => {
     return id.toLowerCase().includes(needle) || themeDisplayName(id).toLowerCase().includes(needle)

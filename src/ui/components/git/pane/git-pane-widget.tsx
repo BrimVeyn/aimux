@@ -5,6 +5,7 @@ import type { GitPanelState } from '../../../../state/types'
 import { useGitPanelPolling } from '../../../../git/git-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
+import { getSessionProjectPath } from '../../../../state/session-worktrees'
 import { GitPanel } from '../git-panel'
 
 interface GitPaneWidgetProps {
@@ -20,10 +21,11 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
   const diffCountConfig = useAppStore((s) => s.gitPane.diffCount)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const currentSession = currentSessionId
-    ? sessions.find((s) => s.id === currentSessionId)
-    : undefined
-  const projectPath = currentSession?.projectPath
+  const currentSession =
+    currentSessionId != null && currentSessionId !== ''
+      ? sessions.find((s) => s.id === currentSessionId)
+      : undefined
+  const projectPath = getSessionProjectPath(currentSession)
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })

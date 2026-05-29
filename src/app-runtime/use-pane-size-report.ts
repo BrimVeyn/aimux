@@ -44,7 +44,7 @@ export function usePaneSizeReport(
 
   const measure = useCallback(() => {
     const box = boxRef.current
-    if (!box || !tabId || !enabled || !onMeasure) {
+    if (!box || tabId == null || tabId === '' || !enabled || !onMeasure) {
       return
     }
     const cols = Math.round(box.width)

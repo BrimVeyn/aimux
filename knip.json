@@ -12,7 +12,13 @@
     "status",
     "printf",
     "branch",
-    "cat-file"
+    "cat-file",
+    "worktree",
+    "merge-base",
+    "merge",
+    "reset",
+    "add",
+    "ls-files"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {

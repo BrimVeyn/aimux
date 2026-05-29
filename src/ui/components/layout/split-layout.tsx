@@ -1,5 +1,7 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
+import { useCallback, useMemo } from 'react'
+
 import type { MeasuredPaneRect } from '../../../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { FocusMode, TabSession } from '../../../state/types'
@@ -68,15 +70,34 @@ export function SplitLayout({
   tabs,
 }: SplitLayoutProps) {
   const t = useTheme()
-  if (node.type === 'leaf') {
-    const tab = tabs.find((t) => t.id === node.tabId)
-    const isActive = node.tabId === activeTabId
-    const paneOrigin: TerminalContentOrigin = {
+  const paneOrigin = useMemo<TerminalContentOrigin>(
+    () => ({
       cols: Math.max(1, bounds.cols - PANE_CHROME * 2),
       rows: Math.max(1, bounds.rows - PANE_CHROME * 2),
       x: contentOrigin.x + bounds.x + PANE_CHROME,
       y: contentOrigin.y + bounds.y + PANE_CHROME,
-    }
+    }),
+    [bounds, contentOrigin]
+  )
+  const handleSeparatorMouseDown = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      if (node.type !== 'split' || !onSeparatorDragStart) return
+      const leafId = getFirstLeafId(node.first)
+      if (!(leafId != null && leafId !== '')) return
+      onSeparatorDragStart({
+        direction: node.direction,
+        screenStart:
+          node.direction === 'vertical' ? contentOrigin.x + bounds.x : contentOrigin.y + bounds.y,
+        tabId: leafId,
+        totalSize: node.direction === 'vertical' ? bounds.cols : bounds.rows,
+      })
+    },
+    [bounds, contentOrigin, node, onSeparatorDragStart]
+  )
+  if (node.type === 'leaf') {
+    const tab = tabs.find((t) => t.id === node.tabId)
+    const isActive = node.tabId === activeTabId
     logInputDebug('split.paneOrigin', {
       boundsCols: bounds.cols,
       boundsRows: bounds.rows,
@@ -157,21 +178,7 @@ export function SplitLayout({
         minWidth={node.direction === 'vertical' ? 1 : undefined}
         minHeight={node.direction === 'horizontal' ? 1 : undefined}
         backgroundColor={t.border}
-        onMouseDown={(e: OtuiMouseEvent) => {
-          e.preventDefault()
-          if (!onSeparatorDragStart) return
-          const leafId = getFirstLeafId(node.first)
-          if (!leafId) return
-          onSeparatorDragStart({
-            direction: node.direction,
-            screenStart:
-              node.direction === 'vertical'
-                ? contentOrigin.x + bounds.x
-                : contentOrigin.y + bounds.y,
-            tabId: leafId,
-            totalSize: node.direction === 'vertical' ? bounds.cols : bounds.rows,
-          })
-        }}
+        onMouseDown={handleSeparatorMouseDown}
       />
       <box flexGrow={secondGrow} flexDirection="column" overflow="hidden">
         <SplitLayout

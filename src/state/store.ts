@@ -117,6 +117,7 @@ export function createInitialState(
     snippets,
     tabGroupMap: {},
     tabs: [],
+    worktreeDivergence: {},
   }
 }
 

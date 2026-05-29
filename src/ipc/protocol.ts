@@ -9,11 +9,13 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
-// v8: scroll position is owned entirely by the backend emulator. Dropped the
+// v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
 // `reapplyScrollIntent` message — the frontend no longer derives or sends it.
-export const IPC_PROTOCOL_MIN_VERSION = 8
-export const IPC_PROTOCOL_VERSION = 8
+// (v8 was the unfilled-viewport status-detector change; this is a further
+// breaking wire change, so the version steps again.)
+export const IPC_PROTOCOL_MIN_VERSION = 9
+export const IPC_PROTOCOL_VERSION = 9
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -45,7 +47,7 @@ export interface AttachResult {
    * right state immediately, without the per-event race where a separate
    * `sessionStatus` event could arrive before the session was in state.
    */
-  initialSessionStatuses: Array<{ sessionId: string; status: SessionStatus }>
+  initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
 }
 
 export type ClientRequest =
