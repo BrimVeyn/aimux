@@ -70,15 +70,10 @@ export interface TerminalSnapshot {
   cursorVisible: boolean
 }
 
+// The scroll position is owned end-to-end by the backend emulator; this type
+// only describes the re-anchor target the backend computes for itself across a
+// reflow. The frontend no longer derives, stores, or sends a scroll intent.
 export type ScrollIntent = { kind: 'bottom' } | { absoluteLine: number; kind: 'anchor' }
-
-export const DEFAULT_SCROLL_INTENT: ScrollIntent = { kind: 'bottom' }
-
-export function deriveScrollIntent(viewport: TerminalSnapshot): ScrollIntent {
-  return viewport.viewportY >= viewport.baseY
-    ? { kind: 'bottom' }
-    : { absoluteLine: viewport.viewportY, kind: 'anchor' }
-}
 
 export interface TerminalModeState {
   mouseTrackingMode: 'none' | 'x10' | 'vt200' | 'drag' | 'any'
@@ -97,7 +92,6 @@ export interface PersistedTabSnapshot {
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
-  scrollIntent?: ScrollIntent
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
@@ -163,7 +157,6 @@ export interface TabSession {
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
-  scrollIntent?: ScrollIntent
   command: string
   errorMessage?: string
   exitCode?: number
@@ -583,7 +576,6 @@ export type TabAction =
       terminalModes: TerminalModeState
       source?: 'resize' | 'scroll' | 'data' | 'switch'
     }
-  | { type: 'set-scroll-intent'; tabId: string; intent: ScrollIntent }
   | { type: 'set-tab-activity'; tabId: string; activity?: TabActivity }
   | { type: 'set-tab-error'; tabId: string; message: string }
 

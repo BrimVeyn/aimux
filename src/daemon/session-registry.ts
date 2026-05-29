@@ -1,5 +1,12 @@
 import { EventEmitter } from 'node:events'
 
+import type {
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from '../state/types'
+
 import { logDebug } from '../debug/input-log'
 import { PtyManager } from '../pty/pty-manager'
 import {
@@ -8,14 +15,6 @@ import {
   restoreTabsFromWorkspace,
 } from '../state/session-persistence'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
-import {
-  DEFAULT_SCROLL_INTENT,
-  type ScrollIntent,
-  type TabSession,
-  type TerminalModeState,
-  type TerminalSnapshot,
-  type WorkspaceSnapshotV1,
-} from '../state/types'
 
 interface SessionRegistryEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
@@ -91,7 +90,6 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         const existing = this.tabs.get(persisted.id)
         if (existing) {
           existing.title = persisted.title
-          existing.scrollIntent = persisted.scrollIntent ?? DEFAULT_SCROLL_INTENT
           existing.worktreeId = persisted.worktreeId
         }
       }
@@ -147,7 +145,6 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         buffer: '',
         command: [options.command, ...(options.args ?? [])].join(' '),
         id: options.tabId,
-        scrollIntent: DEFAULT_SCROLL_INTENT,
         status: 'starting',
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
@@ -159,7 +156,6 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.exitCode = undefined
       existing.viewport = undefined
       existing.terminalModes = createDefaultTerminalModes()
-      existing.scrollIntent = DEFAULT_SCROLL_INTENT
       existing.assistant = options.assistant
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
@@ -173,23 +169,12 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     this.ptyManager.write(tabId, data)
   }
 
-  resizeAll(
-    cols: number,
-    rows: number,
-    intents?: Map<string, ScrollIntent>,
-    options?: { sync?: boolean }
-  ): void {
-    this.ptyManager.resizeAll(cols, rows, intents, options)
+  resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void {
+    this.ptyManager.resizeAll(cols, rows, options)
   }
 
-  resizeTab(
-    tabId: string,
-    cols: number,
-    rows: number,
-    intent?: ScrollIntent,
-    options?: { sync?: boolean }
-  ): void {
-    this.ptyManager.resizeSession(tabId, cols, rows, intent, options)
+  resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
+    this.ptyManager.resizeSession(tabId, cols, rows, options)
   }
 
   scrollViewport(tabId: string, deltaLines: number): void {
@@ -198,10 +183,6 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
 
   scrollViewportToBottom(tabId: string): void {
     this.ptyManager.scrollViewportToBottom(tabId)
-  }
-
-  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
-    this.ptyManager.reapplyScrollIntent(tabId, intent)
   }
 
   setActiveTab(tabId: string | null): void {

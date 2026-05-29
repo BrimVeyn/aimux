@@ -1,5 +1,5 @@
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, TabSession } from '../state/types'
+import type { TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { buildPtyPastePayload } from '../input/paste'
@@ -18,7 +18,6 @@ export function writeToTab(
   tabId: string,
   tab: TabSession | undefined,
   input: string,
-  dispatch?: (action: AppAction) => void,
   options?: PtyWriteOptions
 ): void {
   logInputDebug('ptyWrite.writeToTab', {
@@ -28,8 +27,9 @@ export function writeToTab(
     tabId,
   })
   if ((options?.autoBottom ?? true) && tab && shouldScrollViewportToBottom(tab)) {
+    // Backend owns the scroll position; the snapshot it emits reflects the new
+    // bottom, so the frontend mirror updates without a separate dispatch.
     backend.scrollViewportToBottom(tabId)
-    dispatch?.({ intent: { kind: 'bottom' }, tabId, type: 'set-scroll-intent' })
   }
 
   backend.write(tabId, input)
@@ -39,11 +39,10 @@ export function writePasteToTab(
   backend: SessionBackend,
   tabId: string,
   tab: TabSession | undefined,
-  text: string,
-  dispatch?: (action: AppAction) => void
+  text: string
 ): void {
   const payload = buildPtyPastePayload(text, tab?.terminalModes.bracketedPasteMode ?? false)
-  writeToTab(backend, tabId, tab, payload, dispatch, { autoBottom: true })
+  writeToTab(backend, tabId, tab, payload, { autoBottom: true })
 }
 
 const DEL = '\x7f'
@@ -63,12 +62,10 @@ export function writeMacroExpansionToTab(
   tab: TabSession | undefined,
   eraseCount: number,
   expandedText: string,
-  cursorOffset: number,
-  dispatch?: (action: AppAction) => void
+  cursorOffset: number
 ): void {
   if (tab && shouldScrollViewportToBottom(tab)) {
     backend.scrollViewportToBottom(tabId)
-    dispatch?.({ intent: { kind: 'bottom' }, tabId, type: 'set-scroll-intent' })
   }
 
   const erase = eraseCount > 0 ? DEL.repeat(eraseCount) : ''

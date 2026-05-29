@@ -60,6 +60,16 @@ interface MultiClickDragState {
   capturedLines: Map<number, TerminalLine>
   autoScrollTimer: ReturnType<typeof setInterval> | null
   autoScrollDir: -1 | 0 | 1
+  // A scroll command was sent to the backend and we are still waiting for the
+  // snapshot it produces. Gates the next auto-scroll tick so the backend's
+  // viewportY can never run ahead of the frontend mirror (which all the
+  // selection math reads) — the source of the copy-offset drift.
+  autoScrollPending: boolean
+  // The drag tab's viewport object last handled by the snapshot effect. Used
+  // to ignore snapshot churn from *other* tabs: updateTab keeps unchanged tabs
+  // by reference, so an unrelated tab's output must not clear autoScrollPending
+  // or re-extend the selection.
+  lastProcessedViewport: TabSession['viewport']
 }
 
 interface UseMouseHandlersOptions {
@@ -161,6 +171,7 @@ export function useMouseHandlers({
     }
     drag.autoScrollTimer = null
     drag.autoScrollDir = 0
+    drag.autoScrollPending = false
   }
 
   const canScroll = (tab: TabSession | undefined, dir: -1 | 1): boolean => {
@@ -174,14 +185,20 @@ export function useMouseHandlers({
     clearAutoScroll(drag)
     drag.autoScrollDir = dir
     drag.autoScrollTimer = setInterval(() => {
+      // Wait for the previous scroll's snapshot before issuing the next one, so
+      // the backend viewportY stays in lockstep with the frontend mirror.
+      if (drag.autoScrollPending) {
+        return
+      }
       const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
       if (!canScroll(tab, dir)) {
         clearAutoScroll(drag)
         return
       }
+      drag.autoScrollPending = true
       backend.scrollViewport(drag.tabId, dir)
       // The snapshot dispatch will trigger the viewport-change effect below,
-      // which recaptures lines and re-extends the selection focus.
+      // which clears autoScrollPending, recaptures lines, and re-extends focus.
     }, AUTO_SCROLL_INTERVAL_MS)
   }
 
@@ -215,6 +232,16 @@ export function useMouseHandlers({
     if (!drag) return
     const tab = stateRef.current.tabs.find((t: TabSession) => t.id === drag.tabId)
     if (!tab?.viewport) return
+
+    // The effect fires on any tab's snapshot (state.tabs is a fresh array), but
+    // the drag tab's viewport object only changes when *its* snapshot lands.
+    // Ignore churn from other tabs so the auto-scroll lockstep below stays 1:1.
+    if (tab.viewport === drag.lastProcessedViewport) return
+    drag.lastProcessedViewport = tab.viewport
+
+    // A fresh snapshot for the drag tab landed: the backend has caught up, so
+    // the auto-scroll loop may issue its next step.
+    drag.autoScrollPending = false
 
     captureViewportLines(drag, tab)
 
@@ -425,6 +452,7 @@ export function useMouseHandlers({
         anchorEndCol: selection.endCol,
         anchorStartCol: selection.startCol,
         autoScrollDir: 0,
+        autoScrollPending: false,
         autoScrollTimer: null,
         baseX: anchor.baseX,
         baseY: anchor.baseY,
@@ -433,6 +461,7 @@ export function useMouseHandlers({
         focusCol: selection.endCol,
         lastEventScreenX: event.x,
         lastEventScreenY: event.y,
+        lastProcessedViewport: tab.viewport,
         mode: selection.mode,
         tabId: targetTabId,
         target: selection.target,

@@ -71,14 +71,13 @@ export function pasteSnippetToTab(
   backend: SessionBackend,
   activeTabId: string | null,
   activeTab: TabSession | undefined,
-  snippet: SnippetRecord | undefined,
-  dispatch?: (action: AppAction) => void
+  snippet: SnippetRecord | undefined
 ): void {
   if (!snippet || activeTabId == null || activeTabId === '' || !activeTab) {
     return
   }
 
-  writePasteToTab(backend, activeTabId, activeTab, snippet.content, dispatch)
+  writePasteToTab(backend, activeTabId, activeTab, snippet.content)
 }
 
 export function handleDeleteSnippetEffect(

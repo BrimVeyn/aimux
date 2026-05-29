@@ -1,7 +1,7 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState, ScrollIntent } from '../state/types'
+import type { AppAction, LayoutState } from '../state/types'
 
 import { attachCurrentSession } from './backend-attach-runtime'
 import { bindBackendRuntimeEvents } from './backend-runtime-events'
@@ -11,7 +11,6 @@ interface BackendRuntimeOptions {
   backend: SessionBackend
   dispatch: (action: AppAction) => void
   activeTabId: string | null
-  activeTabScrollIntentRef: MutableRefObject<ScrollIntent | null>
   currentSessionId: string | null
   layoutRef: MutableRefObject<LayoutState>
   resizingRef: MutableRefObject<boolean>
@@ -27,7 +26,6 @@ export interface TabRuntimeControls {
 
 export function useBackendRuntime({
   activeTabId,
-  activeTabScrollIntentRef,
   backend,
   currentSessionId,
   currentSessionWorkspaceSnapshot,
@@ -61,11 +59,10 @@ export function useBackendRuntime({
       return
     }
 
+    // The backend owns each tab's scroll position; a backgrounded tab keeps it
+    // in its own emulator, so switching back needs no re-anchor from here.
     backend.setActiveTab(activeTabId)
-    if (activeTabId != null && activeTabId !== '' && activeTabScrollIntentRef.current) {
-      backend.reapplyScrollIntent(activeTabId, activeTabScrollIntentRef.current)
-    }
-  }, [activeTabId, activeTabScrollIntentRef, backend, currentSessionId])
+  }, [activeTabId, backend, currentSessionId])
 
   useEffect(() => {
     return bindBackendRuntimeEvents({

@@ -23,7 +23,6 @@ function createSnapshot(): WorkspaceSnapshotV1 {
         buffer: '',
         command: 'claude',
         id: 'tab-a',
-        scrollIntent: { absoluteLine: 9, kind: 'anchor' },
         status: 'running',
         terminalModes: {
           alternateScrollMode: false,
@@ -39,7 +38,6 @@ function createSnapshot(): WorkspaceSnapshotV1 {
         buffer: '',
         command: 'codex',
         id: 'tab-b',
-        scrollIntent: { kind: 'bottom' },
         status: 'running',
         terminalModes: {
           alternateScrollMode: false,
@@ -56,7 +54,7 @@ function createSnapshot(): WorkspaceSnapshotV1 {
 }
 
 describe('resizeSnapshotPanes', () => {
-  test('passes persisted scrollIntent to backend.resizeTab', () => {
+  test('resizes each snapshot pane without sending a scroll intent', () => {
     const backend = {
       resizeTab: mock(() => {}),
     }
@@ -73,7 +71,7 @@ describe('resizeSnapshotPanes', () => {
       tabId: string,
       cols: number,
       rows: number,
-      intent?: WorkspaceSnapshotV1['tabs'][number]['scrollIntent'],
+      options?: { sync?: boolean },
     ][]
     expect(calls).toHaveLength(2)
     const firstCall = calls[0]
@@ -81,8 +79,9 @@ describe('resizeSnapshotPanes', () => {
     expect(firstCall).toBeDefined()
     expect(secondCall).toBeDefined()
     expect(firstCall?.[0]).toBe('tab-a')
-    expect(firstCall?.[3]).toEqual({ absoluteLine: 9, kind: 'anchor' })
     expect(secondCall?.[0]).toBe('tab-b')
-    expect(secondCall?.[3]).toEqual({ kind: 'bottom' })
+    // The backend owns scroll: no per-tab intent is threaded through resize.
+    expect(firstCall?.[3]).toBeUndefined()
+    expect(secondCall?.[3]).toBeUndefined()
   })
 })

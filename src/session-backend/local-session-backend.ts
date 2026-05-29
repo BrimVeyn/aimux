@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events'
 
-import type { AssistantId, ScrollIntent, WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
 import type { SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
@@ -12,7 +12,6 @@ import {
   getSnapshotTrees,
   toTerminalContentSize,
 } from '../state/layout-resize'
-import { getSnapshotScrollIntents } from '../state/session-persistence'
 
 export class LocalSessionBackend
   extends EventEmitter<SessionBackendEvents>
@@ -67,22 +66,15 @@ export class LocalSessionBackend
     })
     this.currentSessionId = options.sessionId
     const trees = getSnapshotTrees(options.workspaceSnapshot)
-    const intents = getSnapshotScrollIntents(options.workspaceSnapshot)
     const splitTrees = trees.filter((t) => t.type === 'split')
     if (splitTrees.length > 0) {
       const bounds = createTerminalBounds(options.cols, options.rows)
       forEachSplitPaneRect(splitTrees, bounds, (tabId, rect) => {
         const size = toTerminalContentSize(rect)
-        this.sessionManager.resizeTab(
-          options.sessionId,
-          tabId,
-          size.cols,
-          size.rows,
-          intents.get(tabId)
-        )
+        this.sessionManager.resizeTab(options.sessionId, tabId, size.cols, size.rows)
       })
     } else {
-      this.sessionManager.resize(options.sessionId, options.cols, options.rows, intents)
+      this.sessionManager.resize(options.sessionId, options.cols, options.rows)
     }
     const attachResult = this.sessionManager.attachSession(
       options.sessionId,
@@ -149,36 +141,20 @@ export class LocalSessionBackend
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
   }
 
-  reapplyScrollIntent(tabId: string, intent: ScrollIntent): void {
-    if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
-    this.sessionManager.reapplyScrollIntent(this.currentSessionId, tabId, intent)
-  }
-
   setActiveTab(tabId: string | null): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.setActiveTab', { sessionId: this.currentSessionId, tabId })
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
 
-  resizeAll(
-    cols: number,
-    rows: number,
-    intents?: Map<string, ScrollIntent>,
-    options?: { sync?: boolean }
-  ): void {
+  resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
-    this.sessionManager.resize(this.currentSessionId, cols, rows, intents, options)
+    this.sessionManager.resize(this.currentSessionId, cols, rows, options)
   }
 
-  resizeTab(
-    tabId: string,
-    cols: number,
-    rows: number,
-    intent?: ScrollIntent,
-    options?: { sync?: boolean }
-  ): void {
+  resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
-    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, intent, options)
+    this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, options)
   }
 
   disposeSession(tabId: string): void {

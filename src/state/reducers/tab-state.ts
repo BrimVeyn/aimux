@@ -1,3 +1,5 @@
+import type { AppAction, AppState, TabSession } from '../types'
+
 import {
   allLeafIds,
   createGroupId,
@@ -15,13 +17,6 @@ import {
 import { normalizeGroupedTabOrder } from '../session-persistence'
 import { orderTabsByWorktree, withActiveWorktree } from '../session-worktrees'
 import { createDefaultTerminalModes } from '../terminal-modes'
-import {
-  type AppAction,
-  type AppState,
-  DEFAULT_SCROLL_INTENT,
-  deriveScrollIntent,
-  type TabSession,
-} from '../types'
 
 const MAX_BUFFER_LENGTH = 50_000
 
@@ -448,7 +443,6 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
             buffer: '',
             errorMessage: undefined,
             exitCode: undefined,
-            scrollIntent: DEFAULT_SCROLL_INTENT,
             status: 'starting',
             terminalModes: createDefaultTerminalModes(),
             viewport: undefined,
@@ -470,21 +464,9 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         ...state,
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
-          scrollIntent:
-            action.source === 'resize' || action.source === 'switch'
-              ? (tab.scrollIntent ?? DEFAULT_SCROLL_INTENT)
-              : deriveScrollIntent(action.viewport),
           status: tab.status === 'starting' ? 'running' : tab.status,
           terminalModes: action.terminalModes,
           viewport: action.viewport,
-        })),
-      }
-    case 'set-scroll-intent':
-      return {
-        ...state,
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
-          ...tab,
-          scrollIntent: action.intent,
         })),
       }
     case 'set-tab-activity':

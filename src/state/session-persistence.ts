@@ -1,12 +1,6 @@
+import type { AppState, TabSession, TabStatus, WorkspaceSnapshotV1 } from './types'
+
 import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
-import {
-  type AppState,
-  DEFAULT_SCROLL_INTENT,
-  type ScrollIntent,
-  type TabSession,
-  type TabStatus,
-  type WorkspaceSnapshotV1,
-} from './types'
 
 export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   return {
@@ -47,7 +41,6 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
       id: tab.id,
-      scrollIntent: tab.scrollIntent,
       status: tab.status === 'disconnected' ? 'running' : tab.status,
       terminalModes: tab.terminalModes,
       title: tab.title,
@@ -76,25 +69,12 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
       id: tab.id,
-      scrollIntent: tab.scrollIntent ?? DEFAULT_SCROLL_INTENT,
       status: getDisconnectedStatus(tab.status),
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
       worktreeId: tab.worktreeId,
     }))
-}
-
-export function getSnapshotScrollIntents(
-  snapshot: WorkspaceSnapshotV1 | undefined
-): Map<string, ScrollIntent> {
-  if (!snapshot || snapshot.version !== 1) {
-    return new Map()
-  }
-
-  return new Map(
-    snapshot.tabs.map((tab) => [tab.id, tab.scrollIntent ?? DEFAULT_SCROLL_INTENT] as const)
-  )
 }
 
 export function restoreLayoutTrees(
