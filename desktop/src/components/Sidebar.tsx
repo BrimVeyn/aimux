@@ -2,6 +2,7 @@ import { theme } from "@/lib/theme";
 import type { ProjectedTab } from "@/lib/types";
 
 import { Spinner } from "./Spinner";
+import { AimuxButton } from "./ui/AimuxButton";
 
 interface SidebarProps {
   sessionName: string | null;
@@ -49,14 +50,13 @@ export function Sidebar({
         <span className="truncate" style={{ color: theme.textMuted }}>
           {sessionName ?? "No workspace selected"}
         </span>
-        <button
-          type="button"
+        <AimuxButton
+          className="mt-1.5 px-2 py-1 text-left"
           onClick={onNewTab}
-          className="mt-1.5 rounded px-2 py-1 text-left transition-colors"
-          style={{ backgroundColor: theme.backgroundPanel, color: theme.text }}
+          tone="panel"
         >
           + New assistant
-        </button>
+        </AimuxButton>
       </div>
 
       <div className="px-3 py-1 select-none" style={{ color: theme.textMuted }}>
@@ -83,17 +83,16 @@ export function Sidebar({
                 >
                   {tab.title}
                 </span>
-                <button
-                  type="button"
+                <AimuxButton
+                  className="px-1 opacity-0 group-hover:opacity-100"
                   onMouseDown={(e) => {
                     e.stopPropagation();
                     onCloseTab(tab.id);
                   }}
-                  className="opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{ color: theme.textMuted }}
+                  variant="ghost"
                 >
                   ×
-                </button>
+                </AimuxButton>
               </div>
               <div className="flex items-center gap-2 pl-3" style={{ color: theme.textMuted }}>
                 <span className="truncate">{tab.command.split(" ")[0]}</span>

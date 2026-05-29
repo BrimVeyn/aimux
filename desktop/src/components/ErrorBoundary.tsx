@@ -47,13 +47,21 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <button
             type="button"
             onClick={() => this.setState({ error: null })}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "#1f2630";
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "#2a3340";
+            }}
             style={{
               backgroundColor: "#1f2630",
               border: "1px solid #2a3340",
               borderRadius: 6,
               color: "#edf4ff",
+              cursor: "pointer",
               marginTop: 16,
               padding: "4px 12px",
+              transition: "background-color 150ms",
             }}
           >
             Retry

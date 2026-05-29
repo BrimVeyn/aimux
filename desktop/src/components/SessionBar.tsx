@@ -2,6 +2,7 @@ import { theme } from "@/lib/theme";
 import type { SessionRecordLite, SessionStatus } from "@/lib/types";
 
 import { Spinner } from "./Spinner";
+import { AimuxButton } from "./ui/AimuxButton";
 
 interface SessionBarProps {
   sessions: SessionRecordLite[];
@@ -49,29 +50,23 @@ export function SessionBar({
             <span style={{ color: active ? theme.text : theme.textMuted }}>
               [{index + 1}] {session.name}
             </span>
-            <button
-              type="button"
+            <AimuxButton
+              className="px-1 opacity-0 group-hover:opacity-100"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 onDelete(session.id);
               }}
-              className="opacity-0 transition-opacity group-hover:opacity-100"
-              style={{ color: theme.textMuted }}
+              variant="ghost"
             >
               ×
-            </button>
+            </AimuxButton>
           </div>
         );
       })}
       <div className="flex-1" />
-      <button
-        type="button"
-        onMouseDown={onNew}
-        className="shrink-0 rounded px-2 py-0.5"
-        style={{ backgroundColor: theme.backgroundElement, color: theme.text }}
-      >
+      <AimuxButton className="shrink-0 px-2 py-0.5" onMouseDown={onNew}>
         + New
-      </button>
+      </AimuxButton>
     </div>
   );
 }
