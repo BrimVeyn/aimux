@@ -83,5 +83,13 @@
       }
     }
   ],
-  "ignorePatterns": ["**/*.js", "**/dist/**", "**/build/**", "**/*.cjs", "**/*.mjs", "**/*.d.ts"]
+  "ignorePatterns": [
+    "**/*.js",
+    "**/dist/**",
+    "**/build/**",
+    "**/*.cjs",
+    "**/*.mjs",
+    "**/*.d.ts",
+    "desktop/**"
+  ]
 }

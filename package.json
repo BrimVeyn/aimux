@@ -44,6 +44,7 @@
   "scripts": {
     "dev": "AIMUX_PROFILE=dev bun --watch src/index.tsx",
     "start": "AIMUX_PROFILE=dev bun run src/index.tsx",
+    "gui": "AIMUX_PROFILE=dev bun run src/index.tsx --gui",
     "test": "bun test",
     "check": "tsc --noEmit",
     "demo": "vhs assets/demo.tape",

@@ -50,9 +50,17 @@ if (command === 'terminal-manager') {
   await runTerminalManager()
 }
 
+if (command === '--gui' || command === 'gui') {
+  // Must run before createCliRenderer: the @opentui renderer takes the TTY
+  // into alternate-screen mode, which would corrupt a GUI-only session.
+  const { runGui } = await import('./gui/host')
+  await runGui()
+  // runGui keeps the process alive via Bun.serve; never falls through.
+}
+
 if (command === '--help' || command === '-h') {
   process.stdout.write(
-    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                           Start aimux\n  aimux update                    Update to latest version\n  aimux doctor                    Diagnose setup issues\n  aimux restart-daemon            Restart IPC daemon\n  aimux restart-terminal-manager  Restart terminal-manager (kills live workspaces)\n\n'
+    'aimux -- terminal multiplexer for AI CLIs\n\nUsage:\n  aimux                           Start aimux\n  aimux --gui                     Start the experimental GUI (Tauri)\n  aimux update                    Update to latest version\n  aimux doctor                    Diagnose setup issues\n  aimux restart-daemon            Restart IPC daemon\n  aimux restart-terminal-manager  Restart terminal-manager (kills live workspaces)\n\n'
   )
   process.exit(0)
 }
