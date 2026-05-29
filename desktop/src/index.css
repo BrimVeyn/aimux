@@ -18,6 +18,8 @@
     --aimux-success: #8bd5ca;
     --aimux-warning: #f6c177;
     --aimux-error: #f38ba8;
+    --aimux-diffAdded: #8bd5ca;
+    --aimux-diffRemoved: #f38ba8;
 }
 
 @theme inline {

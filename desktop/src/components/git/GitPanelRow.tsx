@@ -1,0 +1,148 @@
+import type { ReactNode } from "react";
+
+import type { GitTreeFileRow, GitTreeFolderRow } from "@aimux/state/git-tree";
+
+import { theme } from "@/lib/theme";
+import type { GitFileEntryLite } from "@/lib/types";
+
+import { type GitFileStatus, statusColor, statusGlyph } from "./git-status-colors";
+
+interface SectionHeaderProps {
+  count: number;
+  fileListMode: "flat" | "tree";
+  showListModeToggle: boolean;
+  title: string;
+}
+
+// Mirrors the section header row (~line 295 in src/ui/components/git/git-panel.tsx).
+export function SectionHeader({
+  count,
+  fileListMode,
+  showListModeToggle,
+  title,
+}: SectionHeaderProps): ReactNode {
+  return (
+    <div
+      className="flex items-center justify-between"
+      style={{ color: theme.text, paddingRight: "0.5ch" }}
+    >
+      <span className="font-bold">
+        {title} ({count})
+      </span>
+      {showListModeToggle ? (
+        <span className="flex gap-[1ch]">
+          <span style={{ color: fileListMode === "tree" ? theme.primary : theme.textMuted }}>
+            tree
+          </span>
+          <span style={{ color: theme.textMuted }}>|</span>
+          <span style={{ color: fileListMode === "flat" ? theme.primary : theme.textMuted }}>
+            flat
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+interface FolderRowProps {
+  isSelected: boolean;
+  row: GitTreeFolderRow;
+}
+
+// Mirrors FolderRow (~line 170). Display-only for Stage 2a: no onClick, no toggle.
+export function FolderRow({ isSelected, row }: FolderRowProps): ReactNode {
+  const bg = isSelected ? theme.backgroundElement : undefined;
+  // The TUI prepends a row marker (›/space) via selection bg only; the GUI keeps
+  // parity by tinting the bg the same way (no extra glyph for folders).
+  return (
+    <div
+      className="flex items-center gap-[1ch] whitespace-nowrap"
+      style={{ backgroundColor: bg, paddingLeft: `${row.depth * 2}ch` }}
+    >
+      <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "▸" : "▾"}</span>
+      <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "" : ""}</span>
+      <span className="overflow-hidden text-ellipsis" style={{ color: theme.textMuted }}>
+        {row.name}
+      </span>
+    </div>
+  );
+}
+
+interface FileRowProps {
+  addedW: number;
+  diffCountEnabled: boolean;
+  fileListMode: "flat" | "tree";
+  isSelected: boolean;
+  removedW: number;
+  row: GitTreeFileRow;
+}
+
+function padStart(value: number | null | undefined, width: number): string {
+  return String(value ?? 0).padStart(width, " ");
+}
+
+function splitPath(path: string): { basename: string; prefix: string } {
+  const slash = path.lastIndexOf("/");
+  if (slash < 0) {
+    return { basename: path, prefix: "" };
+  }
+  return { basename: path.slice(slash + 1), prefix: path.slice(0, slash + 1) };
+}
+
+function stripTrailingSlash(prefix: string): string {
+  return prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+}
+
+// Mirrors FileRow + renderFileLabel + renderDiffCount (~line 100–260). Stage 2a:
+// skip the repo-prefix tag (multi-repo disambiguation is a later stage) and the
+// renamedFrom path (the wire shape uses `oldPath` which isn't exposed yet).
+export function FileRow({
+  addedW,
+  diffCountEnabled,
+  fileListMode,
+  isSelected,
+  removedW,
+  row,
+}: FileRowProps): ReactNode {
+  const file = row.file as GitFileEntryLite;
+  const bg = isSelected ? theme.backgroundElement : undefined;
+  const isUntracked = file.section === "untracked";
+  const glyph = statusGlyph(file.status as GitFileStatus, isUntracked);
+  const hasNumstat = file.added != null || file.removed != null;
+  const { basename, prefix } = splitPath(file.path);
+  const dir = stripTrailingSlash(prefix);
+  const showDir = fileListMode === "flat" && dir !== "";
+  const depthPad = fileListMode === "tree" ? `${row.depth * 2}ch` : "0";
+  return (
+    <div
+      className="flex items-center gap-[1ch] whitespace-nowrap"
+      style={{ backgroundColor: bg }}
+    >
+      <span
+        className="inline-flex w-[2ch] shrink-0 justify-center font-bold"
+        style={{ color: statusColor(file.status as GitFileStatus) }}
+      >
+        {glyph}
+      </span>
+      <span
+        className="min-w-0 flex-1 overflow-hidden text-ellipsis"
+        style={{ paddingLeft: depthPad }}
+      >
+        <span style={{ color: theme.text }}>{basename}</span>
+        {showDir ? <span style={{ color: theme.textMuted }}>{" "}{dir}</span> : null}
+      </span>
+      {diffCountEnabled ? (
+        hasNumstat ? (
+          <span className="flex shrink-0 gap-[1ch]">
+            <span style={{ color: theme.diffAdded }}>{`+${padStart(file.added, addedW)}`}</span>
+            <span style={{ color: theme.diffRemoved }}>{`−${padStart(file.removed, removedW)}`}</span>
+          </span>
+        ) : (
+          <span className="shrink-0" style={{ color: theme.textMuted }}>
+            —
+          </span>
+        )
+      ) : null}
+    </div>
+  );
+}
