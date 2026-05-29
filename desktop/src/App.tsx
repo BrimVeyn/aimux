@@ -198,7 +198,7 @@ function App() {
           sessions={projection.sessions}
           currentSessionId={projection.currentSessionId}
           snippets={projection.snippets}
-          themeId={projection.themeId}
+          committedThemeId={projection.committedThemeId}
           helpEntries={projection.helpEntries}
           directoryResults={projection.modal.directoryResults ?? []}
         />

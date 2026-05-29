@@ -126,9 +126,11 @@ export async function runGui(): Promise<void> {
   const broadcastState = (): void => {
     send({
       projection: projectAppState(getState(), {
+        // `committedThemeId` is the saved id — used for the "(current)" marker so
+        // it stays put while previewing. `themeId` is the LIVE theme (preview +
+        // confirm/restore) and drives the renderer CSS.
+        committedThemeId: themeId,
         helpEntries,
-        // The singleton reflects live preview (applyTheme) AND confirm/restore;
-        // the host's `themeId` var stays the committed id (used for restore).
         themeId: getCurrentThemeId(),
         themeMode: getCurrentMode(),
         transparent: getTransparent(),

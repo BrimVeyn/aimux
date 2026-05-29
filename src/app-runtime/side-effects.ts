@@ -218,18 +218,22 @@ function applyThemeEffect(
       applyTheme(ctx.themeId)
       return
     case 'confirm': {
+      // Modal is still open here (confirmTheme carries no close-modal action),
+      // so selectedIndex + filter are valid. Read, persist, then close.
       const selectedId = ids[state.modal.selectedIndex]
       if (selectedId != null && selectedId !== '') {
         applyTheme(selectedId)
         ctx.setThemeId(selectedId)
         saveConfig({ ...loadConfig(), themeId: selectedId })
       }
+      ctx.dispatch({ type: 'close-modal' })
       return
     }
     case 'preview': {
+      // selectedIndex was already moved by the move-modal-selection action;
+      // apply that row directly (no delta re-derivation).
       if (ids.length === 0) return
-      const nextIndex = (state.modal.selectedIndex + effect.delta + ids.length) % ids.length
-      const previewId = ids[nextIndex]
+      const previewId = ids[state.modal.selectedIndex]
       if (previewId != null && previewId !== '') {
         applyTheme(previewId)
       }
@@ -613,10 +617,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     case 'paste-selected-snippet': {
       pasteSnippetToTab(backend, state.activeTabId, ctx.activeTab, getSelectedSnippet(state))
+      dispatch({ type: 'close-modal' })
       return
     }
     case 'paste-snippet-to-group': {
       pasteSnippetToActiveGroup(ctx)
+      dispatch({ type: 'close-modal' })
       return
     }
     case 'edit-selected-snippet': {

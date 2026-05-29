@@ -11,7 +11,11 @@ export type ProjectedTab = Omit<TabSession, 'buffer' | 'viewport'>
 export interface AppStateProjection extends Omit<AppState, 'tabs'> {
   helpEntries: GuiHelpEntry[]
   tabs: ProjectedTab[]
+  // `themeId` is the LIVE theme (reflects preview while the picker is open) and
+  // drives the renderer's CSS. `committedThemeId` is the saved theme, used for
+  // the "(current)" marker so it stays put while previewing.
   themeId: string
+  committedThemeId: string
   themeMode: ThemeMode
   transparent: boolean
 }
@@ -36,12 +40,14 @@ export function projectAppState(
   options: {
     helpEntries: GuiHelpEntry[]
     themeId: string
+    committedThemeId: string
     themeMode: ThemeMode
     transparent: boolean
   }
 ): AppStateProjection {
   return {
     ...state,
+    committedThemeId: options.committedThemeId,
     helpEntries: options.helpEntries,
     tabs: state.tabs.map(projectTab),
     themeId: options.themeId,

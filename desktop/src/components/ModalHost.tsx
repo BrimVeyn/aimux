@@ -24,7 +24,7 @@ interface ModalHostProps {
   sessions: SessionRecordLite[];
   currentSessionId: string | null;
   snippets: SnippetRecordLite[];
-  themeId: string;
+  committedThemeId: string;
   helpEntries: GuiHelpEntry[];
   directoryResults: DirectoryResultLite[];
 }
@@ -39,7 +39,7 @@ export function ModalHost({
   sessions,
   currentSessionId,
   snippets,
-  themeId,
+  committedThemeId,
   helpEntries,
   directoryResults,
 }: ModalHostProps) {
@@ -71,7 +71,7 @@ export function ModalHost({
         ) : modal.type === "snippet-picker" ? (
           <SnippetPickerModal modal={modal} snippets={snippets} />
         ) : modal.type === "theme-picker" ? (
-          <ThemePickerModal modal={modal} themeId={themeId} />
+          <ThemePickerModal modal={modal} committedThemeId={committedThemeId} />
         ) : modal.type === "help" ? (
           <HelpModal modal={modal} helpEntries={helpEntries} />
         ) : modal.type === "rename-tab" ? (

@@ -21,10 +21,10 @@ function filterThemeIds(filter: string | null): ThemeId[] {
 
 export function ThemePickerModal({
   modal,
-  themeId,
+  committedThemeId,
 }: {
   modal: ModalProjection;
-  themeId: string;
+  committedThemeId: string;
 }) {
   const options = filterThemeIds(modal.editBuffer);
   return (
@@ -36,7 +36,11 @@ export function ThemePickerModal({
           <Row
             key={id}
             selected={index === modal.selectedIndex}
-            label={id === themeId ? `${themeDisplayName(id)} (current)` : themeDisplayName(id)}
+            label={
+              id === committedThemeId
+                ? `${themeDisplayName(id)} (current)`
+                : themeDisplayName(id)
+            }
           />
         ))}
         {options.length === 0 ? <Empty /> : null}

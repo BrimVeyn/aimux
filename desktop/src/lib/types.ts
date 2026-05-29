@@ -131,6 +131,7 @@ export interface AppStateProjection {
   sidebar: { visible: boolean; width: number };
   sessionBar: { visible: boolean; position: "top" | "bottom" };
   themeId: string;
+  committedThemeId: string;
   themeMode: "dark" | "light";
   transparent: boolean;
   helpEntries: GuiHelpEntry[];

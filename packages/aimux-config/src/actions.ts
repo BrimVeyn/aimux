@@ -246,14 +246,16 @@ export const openSelectedSnippetSourceInEditor: KeyResult = r(
   [{ type: 'open-selected-snippet-source-in-editor' }]
 )
 
+// close-modal lives in the effect (after reading the selected snippet), not as
+// an action — otherwise the effect would read a torn-down modal. See confirmTheme.
 export const pasteSelectedSnippet: KeyResult = r(
-  [{ type: 'close-modal' }],
+  [],
   [{ type: 'paste-selected-snippet' }],
   'navigation'
 )
 
 export const pasteSnippetToGroup: KeyResult = r(
-  [{ type: 'close-modal' }],
+  [],
   [{ type: 'paste-snippet-to-group' }],
   'navigation'
 )
@@ -266,17 +268,20 @@ export const restoreTheme: KeyResult = r(
   'navigation'
 )
 
+// No `close-modal` action here: the confirm side-effect must read the still-open
+// modal's selectedIndex before the modal is torn down. The effect closes it
+// itself afterwards (same pattern as confirmSplit).
 export const confirmTheme: KeyResult = r(
-  [{ type: 'close-modal' }],
+  [],
   [{ action: 'confirm', type: 'apply-theme' }],
   'navigation'
 )
 
 export function previewTheme(delta: 1 | -1): KeyResult {
-  return r(
-    [{ delta, type: 'move-modal-selection' }],
-    [{ action: 'preview', delta, type: 'apply-theme' }]
-  )
+  // The action moves selectedIndex; the effect applies ids[selectedIndex].
+  // selectedIndex is the single source of truth — the effect must NOT re-apply
+  // the delta (that double-stepped the preview off from the highlighted row).
+  return r([{ delta, type: 'move-modal-selection' }], [{ action: 'preview', type: 'apply-theme' }])
 }
 
 export const toggleTransparent: KeyResult = r([], [{ type: 'toggle-transparent' }])
