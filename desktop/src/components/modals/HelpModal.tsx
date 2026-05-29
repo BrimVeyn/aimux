@@ -20,7 +20,7 @@ export function HelpModal({
   modal: ModalProjection;
   helpEntries: GuiHelpEntry[];
 }) {
-  const entries = filterHelp(helpEntries, modal.editBuffer);
+  const entries = filterHelp(helpEntries ?? [], modal.editBuffer);
   const groups = new Map<string, GuiHelpEntry[]>();
   for (const e of entries) {
     const list = groups.get(e.modeLabel) ?? [];
