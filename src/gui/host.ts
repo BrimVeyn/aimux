@@ -480,6 +480,11 @@ export async function runGui(): Promise<void> {
             backend.resizeTab(message.tabId, message.cols, message.rows)
             break
           case 'paneActivate':
+            // The frontend remounts xterm.js per tabId (TerminalPane keys on
+            // tabId), so the newly-active tab's xterm starts empty. Forget the
+            // dump-sent marker so the next replayVisible re-streams the
+            // serialized buffer into the fresh terminal.
+            dumpedTabIds.delete(message.tabId)
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
           case 'modalSelect':

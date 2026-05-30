@@ -45,7 +45,13 @@ export function TerminalPane({
         <span className="truncate">{title}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
+        {/* key={tabId}: when the active tab changes, mount a fresh xterm.js
+            instance bound to the new tabId. The XtermPane effect captures the
+            tabId in closure for its bytesEmitter listener and runs only on
+            mount, so without a remount we'd keep painting bytes from the
+            previous tab into the wrong terminal. */}
         <XtermPane
+          key={tabId}
           bytesEmitter={bytesEmitter}
           onResize={onResizeTab}
           tabId={tabId}
