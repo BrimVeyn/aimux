@@ -299,6 +299,10 @@ export async function runGui(): Promise<void> {
   const pipeline = createPipeline({
     backend,
     beforeTerminalWrite: (tabId, bytes) => {
+      // Backspace within the post-expansion window undoes the expansion.
+      // Must run before the printable filter since DEL/\b are control
+      // codes. Mirrors src/app-runtime/use-renderer-bindings.ts:157.
+      if (snippetDriver.tryConsumeUndo(tabId, bytes)) return true
       // Snippet trigger detection: only react when the user typed exactly
       // one printable char. Multi-byte sequences (arrow keys, function
       // keys, escape sequences) bypass the detector and flow to PTY.

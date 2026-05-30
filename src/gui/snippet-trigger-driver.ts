@@ -38,11 +38,21 @@ export interface SnippetTriggerDriver {
   feedKey: (tabId: string, char: string) => boolean
   /** Reset the per-tab detector buffer (call on tab close or focus loss). */
   reset: (tabId: string) => void
+  /**
+   * If `sequence` is a backspace (\x7f or \b) AND a recent inline expansion
+   * is pending undo on `tabId`, dispatch the undo sequence (cursor-right *
+   * suffixLength + DEL * fullLength) to the backend and return true. The
+   * undo entry is consumed (one-shot) regardless of whether `sequence` was
+   * backspace, matching the TUI's tryConsumeMacroUndo semantics.
+   * Returns false otherwise so the caller proceeds with the raw write.
+   */
+  tryConsumeUndo: (tabId: string, sequence: string) => boolean
 }
 
 export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerDriver {
   const detectors = new Map<string, TriggerDetector>()
   const inFlight = new Set<string>()
+  const pendingUndo = new Map<string, { fullLength: number; suffixLength: number }>()
 
   const getOrCreateDetector = (tabId: string): TriggerDetector => {
     let detector = detectors.get(tabId)
@@ -54,6 +64,22 @@ export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerD
       detectors.set(tabId, detector)
     }
     return detector
+  }
+
+  const registerUndo = (tabId: string, text: string, cursorOffset: number) => {
+    // Undo window: only meaningful for short inline expansions where
+    // cursor positions stay predictable in raw mode. Mirrors
+    // src/app-runtime/use-renderer-bindings.ts:109.
+    if (!text.includes('\n')) {
+      pendingUndo.set(tabId, {
+        fullLength: text.length,
+        suffixLength: text.length - cursorOffset,
+      })
+    } else {
+      // Any new expansion overwrites the previous undo entry — drop stale
+      // state when the new expansion is multi-line and ineligible.
+      pendingUndo.delete(tabId)
+    }
   }
 
   const expandMacro = (tabId: string, match: TriggerMatch): void => {
@@ -83,6 +109,7 @@ export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerD
         text,
         cursorOffset
       )
+      registerUndo(tabId, text, cursorOffset)
       return
     }
 
@@ -111,6 +138,7 @@ export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerD
           now,
         })
         writeMacroExpansionToTab(opts.backend, tabId, tab, 0, text, cursorOffset)
+        registerUndo(tabId, text, cursorOffset)
         logDebug('gui.host.snippetTrigger.expandAsyncDone', {
           snippetName: snippet.name,
           tabId,
@@ -131,6 +159,7 @@ export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerD
     dispose(tabId) {
       detectors.delete(tabId)
       inFlight.delete(tabId)
+      pendingUndo.delete(tabId)
     },
     feedKey(tabId, char) {
       // While an async expansion is in flight on this tab, swallow any new
@@ -147,6 +176,17 @@ export function createSnippetTriggerDriver(opts: DriverOptions): SnippetTriggerD
     },
     reset(tabId) {
       detectors.get(tabId)?.reset()
+    },
+    tryConsumeUndo(tabId, sequence) {
+      const entry = pendingUndo.get(tabId)
+      if (!entry) return false
+      pendingUndo.delete(tabId)
+      const isBackspace = sequence === '\x7f' || sequence === '\b'
+      if (!isBackspace) return false
+      const rightArrows = '\x1b[C'.repeat(entry.suffixLength)
+      const dels = '\x7f'.repeat(entry.fullLength)
+      opts.backend.write(tabId, `${rightArrows}${dels}`)
+      return true
     },
   }
 }
