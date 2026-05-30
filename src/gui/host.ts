@@ -599,6 +599,11 @@ export async function runGui(): Promise<void> {
             })
             break
           case 'paste':
+            if (state.focusMode === 'command-edit') {
+              const sanitized = message.text.replaceAll(/\r\n?/g, '\n')
+              dispatch({ char: sanitized, type: 'update-command-edit' })
+              break
+            }
             if (state.focusMode === 'terminal-input' && state.activeTabId !== null) {
               const tab = state.tabs.find((entry) => entry.id === state.activeTabId)
               const wrapped =
