@@ -10,6 +10,7 @@ import { basename } from 'node:path'
 
 import type { LayoutState } from '../state/types'
 
+import { version as APP_VERSION } from '../../package.json'
 import { attachCurrentSession } from '../app-runtime/backend-attach-runtime'
 import { bindBackendRuntimeEvents } from '../app-runtime/backend-runtime-events'
 import {
@@ -27,7 +28,9 @@ import { startGitPanelPolling } from '../git/git-poller'
 import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
+import { startAIUsageService } from '../services/ai-usage/provider'
 import { createSessionBackend } from '../session-backend/bootstrap'
+import { aiUsageStore } from '../state/ai-usage-store'
 import { appStore } from '../state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from '../state/dispatch-ref'
 import { gitFileKey } from '../state/git-tree'
@@ -39,6 +42,7 @@ import {
 import { getSessionProjectPath } from '../state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
+import { getStatusBarModel } from '../ui/status-bar-model'
 import {
   applyTheme,
   getCurrentMode,
@@ -130,11 +134,13 @@ export async function runGui(): Promise<void> {
   // PtyManager lives in this process, so without an explicit disposeAll the
   // child claude/shell processes would be reparented to init and leak.
   let backendDisposed = false
+  let stopAIUsage: (() => void) | null = null
   const disposeBackend = (): void => {
     if (backendDisposed) {
       return
     }
     backendDisposed = true
+    stopAIUsage?.()
     backend.disposeAll()
   }
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
@@ -160,13 +166,25 @@ export async function runGui(): Promise<void> {
 
   let broadcastScheduled = false
   const broadcastState = (): void => {
+    const state = getState()
+    const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
+    const usage = aiUsageStore.getState()
     send({
-      projection: projectAppState(getState(), {
+      projection: projectAppState(state, {
+        // AI usage lives in a separate vanilla store (not AppState); ship its
+        // current snapshots so the GUI status bar can render the indicator.
+        aiUsage: { enabled: usage.enabled, snapshots: usage.snapshots },
         // `committedThemeId` is the saved id — used for the "(current)" marker so
         // it stays put while previewing. `themeId` is the LIVE theme (preview +
         // confirm/restore) and drives the renderer CSS.
         committedThemeId: themeId,
         helpEntries,
+        // Reuse the TUI's status-bar model (left/right/help strings) so the GUI
+        // renders identical content; it needs the keymap config the host owns.
+        statusBar: {
+          ...getStatusBarModel(state, activeTab, resolvedConfig.keymaps),
+          version: APP_VERSION,
+        },
         themeId: getCurrentThemeId(),
         themeMode: getCurrentMode(),
         transparent: getTransparent(),
@@ -183,6 +201,23 @@ export async function runGui(): Promise<void> {
       broadcastScheduled = false
       broadcastState()
     })
+  }
+
+  // Mirror app.tsx's AI usage lifecycle: poll the configured tools and feed the
+  // shared store; each snapshot triggers a rebroadcast so the GUI status bar
+  // updates. The browser computes the live reset countdown locally.
+  const aiUsageConfig = resolvedConfig.statusBar?.aiUsage
+  if (aiUsageConfig?.enabled === true) {
+    aiUsageStore.getState().setEnabled(true)
+    const handle = startAIUsageService(aiUsageConfig, (snap) => {
+      aiUsageStore.getState().setSnapshot(snap)
+      scheduleBroadcast()
+    })
+    stopAIUsage = () => {
+      handle.stop()
+      aiUsageStore.getState().clear()
+      aiUsageStore.getState().setEnabled(false)
+    }
   }
 
   // Theme preview/confirm/restore all go through applyTheme on the singleton;
@@ -497,6 +532,11 @@ export async function runGui(): Promise<void> {
           case 'openNewTab':
             // Same action Ctrl+N resolves to, dispatched directly (mode-independent).
             dispatch({ type: 'open-new-tab-modal' })
+            break
+          case 'openAiUsageModal':
+            // Clicking the usage indicator opens the detail modal (web-native:
+            // explicit host command, not a simulated keystroke).
+            dispatch({ type: 'open-ai-usage-modal' })
             break
           case 'closeTab':
             dispatch({ tabId: message.tabId, type: 'close-tab' })

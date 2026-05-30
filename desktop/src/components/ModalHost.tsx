@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 
+import { AIUsageModal } from "@/components/AIUsageModal";
 import { CreateSessionModal } from "@/components/modals/CreateSessionModal";
 import { HelpModal } from "@/components/modals/HelpModal";
 import { SessionPickerModal } from "@/components/modals/SessionPickerModal";
@@ -11,11 +12,13 @@ import { allAssistants, filterAssistants } from "@/lib/assistants";
 import { formatDivergence } from "@/lib/git";
 import { theme } from "@/lib/theme";
 import type {
+  AIUsageTool,
   DirectoryResultLite,
   GuiHelpEntry,
   ModalProjection,
   SessionRecordLite,
   SnippetRecordLite,
+  UsageSnapshot,
   WorktreeLite,
 } from "@/lib/types";
 
@@ -29,6 +32,7 @@ interface ModalHostProps {
   snippets: SnippetRecordLite[];
   committedThemeId: string;
   helpEntries: GuiHelpEntry[];
+  aiUsageSnapshots: Partial<Record<AIUsageTool, UsageSnapshot>>;
   directoryResults: DirectoryResultLite[];
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
@@ -48,6 +52,7 @@ export function ModalHost({
   snippets,
   committedThemeId,
   helpEntries,
+  aiUsageSnapshots,
   directoryResults,
   onSelect,
   onConfirm,
@@ -108,6 +113,8 @@ export function ModalHost({
           />
         ) : modal.type === "help" ? (
           <HelpModal modal={modal} helpEntries={helpEntries} />
+        ) : modal.type === "ai-usage" ? (
+          <AIUsageModal snapshots={aiUsageSnapshots} />
         ) : modal.type === "rename-tab" ? (
           <TextFieldModal modal={modal} title="Rename tab" />
         ) : modal.type === "session-name" ? (

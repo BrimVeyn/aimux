@@ -98,6 +98,73 @@ export interface GuiHelpEntry {
   modeLabel: string;
 }
 
+// Mirror of the host's status-bar model (src/ui/status-bar-model.ts) plus the
+// app version. The host computes left/right/help strings (it owns the keymap
+// config); the browser just renders them.
+export interface StatusBarProjection {
+  left: string;
+  right: string;
+  help: string;
+  version: string;
+}
+
+export type AIUsageTool = "claude" | "codex";
+
+export type UsageWindowKind =
+  | "session"
+  | "weekly"
+  | "sonnet"
+  | "opus"
+  | "primary"
+  | "secondary";
+
+export type UsagePaceStage =
+  | "farAhead"
+  | "ahead"
+  | "slightlyAhead"
+  | "onTrack"
+  | "slightlyBehind"
+  | "behind"
+  | "farBehind";
+
+export interface UsagePace {
+  delta: number;
+  stage: UsagePaceStage;
+  label: string;
+  rightText: string | null;
+}
+
+export interface UsageWindow {
+  kind: UsageWindowKind;
+  label: string;
+  percent: number | null;
+  resetAt: string | null;
+  timeRemaining: string | null;
+  windowSeconds: number | null;
+  pace: UsagePace | null;
+}
+
+// Mirror of aimux's UsageSnapshot (src/services/ai-usage/types.ts).
+export interface UsageSnapshot {
+  tool: AIUsageTool;
+  percent: number | null;
+  tokens: { input: number; output: number; cache: number; total: number };
+  costUSD: number | null;
+  resetAt: string | null;
+  timeRemaining: string | null;
+  burnRatePerHour: number | null;
+  lastUpdated: string;
+  planTier: string | null;
+  windows: UsageWindow[];
+  error?: string;
+  stale?: boolean;
+}
+
+export interface AIUsageProjection {
+  enabled: boolean;
+  snapshots: Partial<Record<AIUsageTool, UsageSnapshot>>;
+}
+
 export interface SnippetRecordLite {
   id: string;
   name: string;
@@ -238,6 +305,8 @@ export interface AppStateProjection {
   gitPane: GitPaneLite;
   gitPanel: GitPanelLite;
   helpEntries: GuiHelpEntry[];
+  statusBar: StatusBarProjection;
+  aiUsage: AIUsageProjection;
   layoutTrees: Record<string, LayoutNode>;
   multiRepo: MultiRepoLite;
   tabGroupMap: Record<string, string>;
@@ -270,7 +339,8 @@ export type GuiClientMessage =
   | { t: "deleteSession"; sessionId: string }
   | { t: "openWorktreeMove"; sourceWorktreeId: string }
   | { t: "requestBytes"; tabId: string }
-  | { t: "toggleWorktreeMoveDelete" };
+  | { t: "toggleWorktreeMoveDelete" }
+  | { t: "openAiUsageModal" };
 
 export type ToastLevel = "info" | "success" | "error";
 

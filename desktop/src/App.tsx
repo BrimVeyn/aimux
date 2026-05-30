@@ -8,6 +8,7 @@ import { ModalHost } from "@/components/ModalHost";
 import { SessionBar } from "@/components/SessionBar";
 import { Sidebar } from "@/components/Sidebar";
 import { SplitLayout } from "@/components/SplitLayout";
+import { StatusBar } from "@/components/StatusBar";
 import { TerminalPane } from "@/components/TerminalPane";
 import { normalizeKey } from "@/lib/keys";
 import { theme } from "@/lib/theme";
@@ -104,6 +105,10 @@ function App() {
 
   const newTab = useCallback(() => {
     socketRef.current?.send({ t: "openNewTab" });
+  }, []);
+
+  const openUsage = useCallback(() => {
+    socketRef.current?.send({ t: "openAiUsageModal" });
   }, []);
 
   const switchSession = useCallback((sessionId: string) => {
@@ -302,10 +307,21 @@ function App() {
             ) : null}
           </>
         )}
-        <span className="absolute right-2 bottom-1 text-xs" style={{ color: theme.textMuted }}>
-          {status === "open" ? (projection?.focusMode ?? "") : status}
-        </span>
       </div>
+      {projection ? (
+        <StatusBar
+          projection={projection}
+          connecting={status !== "open"}
+          onOpenUsage={openUsage}
+        />
+      ) : (
+        <div
+          className="flex shrink-0 flex-row justify-end px-2 py-0.5 font-mono text-xs"
+          style={{ backgroundColor: theme.backgroundPanel, color: theme.textMuted }}
+        >
+          {status}
+        </div>
+      )}
       {projection ? (
         <ModalHost
           modal={projection.modal}
@@ -317,6 +333,7 @@ function App() {
           snippets={projection.snippets}
           committedThemeId={projection.committedThemeId}
           helpEntries={projection.helpEntries}
+          aiUsageSnapshots={projection.aiUsage.snapshots}
           directoryResults={projection.modal.directoryResults ?? []}
           onSelect={selectModal}
           onConfirm={confirmModal}

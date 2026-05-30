@@ -31,6 +31,7 @@ export type GuiClientMessage =
   | { t: 'openWorktreeMove'; sourceWorktreeId: string }
   | { t: 'requestBytes'; tabId: string }
   | { t: 'toggleWorktreeMoveDelete' }
+  | { t: 'openAiUsageModal' }
 
 export type ToastLevel = 'info' | 'success' | 'error'
 
@@ -139,6 +140,8 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return typeof value.tabId === 'string' ? { t: 'requestBytes', tabId: value.tabId } : null
     case 'toggleWorktreeMoveDelete':
       return { t: 'toggleWorktreeMoveDelete' }
+    case 'openAiUsageModal':
+      return { t: 'openAiUsageModal' }
     default:
       return null
   }
