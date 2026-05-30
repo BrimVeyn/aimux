@@ -31,10 +31,12 @@ function App() {
   // Singleton fan-out for per-tab PTY byte streams. The host emits `bytes`
   // messages; each XtermPane subscribes via `bytes-<tabId>`.
   const bytesEmitterRef = useRef<EventTarget>(new EventTarget())
-  // Latest open-modal type, read by chrome click handlers without re-creating
-  // the callback on every projection frame.
+  // Latest open-modal type + focusMode, read by chrome click handlers without
+  // re-creating the callback on every projection frame.
   const modalTypeRef = useRef<string | null>(null)
+  const focusModeRef = useRef<string>('navigation')
   modalTypeRef.current = projection?.modal.type ?? null
+  focusModeRef.current = projection?.focusMode ?? 'navigation'
 
   useTheme(projection?.themeId, projection?.themeMode)
 
@@ -202,10 +204,12 @@ function App() {
   }, [])
 
   // Chrome (SessionBar/Sidebar/StatusBar) sits above the modal backdrop via
-  // z-index, so its buttons stay clickable in any mode. To avoid leaving an
-  // open picker/editor visible behind the chrome action, dismiss it first via
-  // the same Esc path the backdrop click already uses.
-  const dismissModalIfOpen = useCallback(() => {
+  // z-index, so its buttons stay clickable in any mode. Before the action
+  // runs, return the host to navigation: close any open modal (same Esc path
+  // the backdrop uses) or leave terminal-input mode if we're typing into a
+  // pane. Mirrors the TUI's implicit "modes don't outlive a mouse click on
+  // chrome" expectation.
+  const prepareForChromeAction = useCallback(() => {
     if (modalTypeRef.current !== null) {
       socketRef.current?.send({
         ctrl: false,
@@ -215,49 +219,59 @@ function App() {
         shift: false,
         t: 'key',
       })
+      return
+    }
+    if (focusModeRef.current === 'terminal-input') {
+      socketRef.current?.send({ t: 'leaveInsertMode' })
+    }
+  }, [])
+
+  const enterInsertMode = useCallback(() => {
+    if (focusModeRef.current !== 'terminal-input') {
+      socketRef.current?.send({ t: 'enterInsertMode' })
     }
   }, [])
 
   const activateTab = useCallback(
     (tabId: string) => {
-      dismissModalIfOpen()
+      prepareForChromeAction()
       socketRef.current?.send({ t: 'paneActivate', tabId })
     },
-    [dismissModalIfOpen]
+    [prepareForChromeAction]
   )
 
   const closeTab = useCallback(
     (tabId: string) => {
-      dismissModalIfOpen()
+      prepareForChromeAction()
       socketRef.current?.send({ t: 'closeTab', tabId })
     },
-    [dismissModalIfOpen]
+    [prepareForChromeAction]
   )
 
   const newTab = useCallback(() => {
-    dismissModalIfOpen()
+    prepareForChromeAction()
     socketRef.current?.send({ t: 'openNewTab' })
-  }, [dismissModalIfOpen])
+  }, [prepareForChromeAction])
 
   const openUsage = useCallback(() => {
-    dismissModalIfOpen()
+    prepareForChromeAction()
     socketRef.current?.send({ t: 'openAiUsageModal' })
-  }, [dismissModalIfOpen])
+  }, [prepareForChromeAction])
 
   const switchSession = useCallback(
     (sessionId: string) => {
-      dismissModalIfOpen()
+      prepareForChromeAction()
       socketRef.current?.send({ sessionId, t: 'switchSession' })
     },
-    [dismissModalIfOpen]
+    [prepareForChromeAction]
   )
 
   const deleteSession = useCallback(
     (sessionId: string) => {
-      dismissModalIfOpen()
+      prepareForChromeAction()
       socketRef.current?.send({ sessionId, t: 'deleteSession' })
     },
-    [dismissModalIfOpen]
+    [prepareForChromeAction]
   )
 
   const selectModal = useCallback((index: number) => {
@@ -269,7 +283,7 @@ function App() {
   }, [])
 
   const newSession = useCallback(() => {
-    dismissModalIfOpen()
+    prepareForChromeAction()
     void (async () => {
       let path: string | null = null
       try {
@@ -282,7 +296,7 @@ function App() {
         socketRef.current?.send({ path, t: 'createSession' })
       }
     })()
-  }, [dismissModalIfOpen])
+  }, [prepareForChromeAction])
 
   const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
     socketRef.current?.send({ cols, rows, t: 'resizeTab', tabId })
@@ -485,6 +499,7 @@ function App() {
                   focusMode={projection?.focusMode ?? 'navigation'}
                   node={activeTree}
                   onActivate={activateTab}
+                  onEnterInsert={enterInsertMode}
                   onRequestBytes={requestBytes}
                   onResizeTab={resizeTab}
                   onSetSplitRatio={setSplitRatio}
@@ -497,6 +512,7 @@ function App() {
                   focusMode={projection?.focusMode ?? 'navigation'}
                   isActive
                   onActivate={activateTab}
+                  onEnterInsert={enterInsertMode}
                   onRequestBytes={requestBytes}
                   onResizeTab={resizeTab}
                   tab={tabsById[activeTabId]}

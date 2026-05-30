@@ -7,6 +7,7 @@ interface TerminalPaneProps {
   focusMode: FocusMode;
   isActive: boolean;
   onActivate: (tabId: string) => void;
+  onEnterInsert: () => void;
   onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
   tab: ProjectedTab | undefined;
@@ -22,6 +23,7 @@ export function TerminalPane({
   focusMode,
   isActive,
   onActivate,
+  onEnterInsert,
   onRequestBytes,
   onResizeTab,
   tab,
@@ -41,7 +43,10 @@ export function TerminalPane({
     <div
       className="flex h-full w-full flex-col overflow-hidden rounded border"
       style={{ borderColor }}
-      onMouseDown={() => onActivate(tabId)}
+      onMouseDown={() => {
+        onActivate(tabId);
+        onEnterInsert();
+      }}
     >
       <div
         className="flex items-center gap-1 px-2 py-0.5 font-mono text-xs"

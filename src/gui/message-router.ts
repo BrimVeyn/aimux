@@ -1,5 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 
+import { actions } from '@brimveyn/aimux-config'
 import { basename } from 'node:path'
 
 import type { SessionBackend } from '../session-backend/types'
@@ -12,6 +13,7 @@ import {
   handleSwitchSessionEffect,
 } from '../app-runtime/session-actions'
 import { logDebug } from '../debug/input-log'
+import { deriveModeId } from '../input/modes/bridge'
 import { dispatchIntent } from './intent-handlers'
 
 /** Per-connection state held by the transport for rate limiting. */
@@ -147,6 +149,24 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
     case 'openSnippetEditor':
       dispatch({ snippetId: message.snippetId, type: 'open-snippet-editor' })
       break
+    case 'enterInsertMode': {
+      // Click-driven equivalent of the `i` mapping in navigation mode. Funnels
+      // through the same KeyResult the keymap would produce so the mode-pipeline
+      // and focusMode stay in sync.
+      const enterState = runtime.getState()
+      const enterResult = actions.enterInsert({ state: enterState })
+      if (enterResult !== null) {
+        pipeline.processKeyResult(enterResult, deriveModeId(enterState))
+      }
+      break
+    }
+    case 'leaveInsertMode': {
+      const leaveState = runtime.getState()
+      if (leaveState.focusMode === 'terminal-input') {
+        pipeline.processKeyResult(actions.leaveTerminalInput, deriveModeId(leaveState))
+      }
+      break
+    }
     case 'intent':
       dispatchIntent(message.intent, runtime)
       break

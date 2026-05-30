@@ -41,6 +41,8 @@ export type GuiClientMessage =
   | { t: 'toggleWorktreeMoveDelete' }
   | { t: 'openAiUsageModal' }
   | { t: 'openSnippetEditor'; snippetId?: string }
+  | { t: 'enterInsertMode' }
+  | { t: 'leaveInsertMode' }
   | { t: 'intent'; intent: GuiIntent }
 
 export type ToastLevel = 'info' | 'success' | 'error'
@@ -158,6 +160,10 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return value.snippetId === undefined
         ? { t: 'openSnippetEditor' }
         : { snippetId: value.snippetId, t: 'openSnippetEditor' }
+    case 'enterInsertMode':
+      return { t: 'enterInsertMode' }
+    case 'leaveInsertMode':
+      return { t: 'leaveInsertMode' }
     case 'intent': {
       const intent = parseGuiIntent(value.intent)
       return intent === null ? null : { intent, t: 'intent' }

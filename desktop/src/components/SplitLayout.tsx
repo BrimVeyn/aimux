@@ -9,6 +9,7 @@ interface SplitLayoutProps {
   focusMode: FocusMode;
   node: LayoutNode;
   onActivate: (tabId: string) => void;
+  onEnterInsert: () => void;
   onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
   onSetSplitRatio: (tabId: string, ratio: number, axis: "horizontal" | "vertical") => void;
@@ -29,6 +30,7 @@ export function SplitLayout(props: SplitLayoutProps) {
         focusMode={props.focusMode}
         isActive={node.tabId === props.activeTabId}
         onActivate={props.onActivate}
+        onEnterInsert={props.onEnterInsert}
         onRequestBytes={props.onRequestBytes}
         onResizeTab={props.onResizeTab}
         tab={props.tabsById[node.tabId]}
