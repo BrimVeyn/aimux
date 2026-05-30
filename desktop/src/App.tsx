@@ -15,11 +15,18 @@ import { disposeTerminal, liveTerminalIds } from "@/lib/terminal-registry";
 import { theme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
 import type { AppStateProjection, LayoutNode, ProjectedTab } from "@/lib/types";
+import { PROTOCOL_VERSION } from "@/lib/types";
 import { type ConnectionStatus, GuiSocket } from "@/lib/ws";
+
+type ConnectionPhase = "connecting" | "handshaking" | "ready" | "incompatible";
 
 function App() {
   const [projection, setProjection] = useState<AppStateProjection | null>(null);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
+  const [phase, setPhase] = useState<ConnectionPhase>("connecting");
+  // Held across renders so the message handler (mounted once) can short-circuit
+  // every frame after a version mismatch without React state-update churn.
+  const phaseRef = useRef<ConnectionPhase>("connecting");
   const socketRef = useRef<GuiSocket | null>(null);
   // Singleton fan-out for per-tab PTY byte streams. The host emits `bytes`
   // messages; each XtermPane subscribes via `bytes-<tabId>`.
@@ -42,30 +49,67 @@ function App() {
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
-    const socket = new GuiSocket((message) => {
-      switch (message.t) {
-        case "state":
-          setProjection(message.projection);
-          break;
-        case "bytes":
-          bytesEmitterRef.current.dispatchEvent(
-            new CustomEvent(`bytes-${message.tabId}`, { detail: message.data }),
+    const socket = new GuiSocket(
+      (message) => {
+        // After a version mismatch we deliberately refuse to interpret further
+        // frames so the user sees the banner (instead of a half-rendered UI
+        // running on a stale schema).
+        if (phaseRef.current === "incompatible") return;
+        if (message.t === "hello") {
+          if (message.version !== PROTOCOL_VERSION) {
+            console.error(
+              `[gui-protocol] version mismatch: host=${message.version} client=${PROTOCOL_VERSION}`,
+            );
+            phaseRef.current = "incompatible";
+            setPhase("incompatible");
+            return;
+          }
+          console.info(
+            `[gui-protocol] handshake v${message.version}, caps=[${message.capabilities.join(",")}]`,
           );
-          break;
-        case "bytesReset":
-          bytesEmitterRef.current.dispatchEvent(
-            new CustomEvent(`bytesReset-${message.tabId}`, { detail: message.data }),
-          );
-          break;
-        case "render":
-        case "exit":
-        case "error":
-        case "toast":
-          break;
-        default:
-          break;
-      }
-    }, setStatus);
+          phaseRef.current = "ready";
+          setPhase("ready");
+          return;
+        }
+        // All other frames require a completed handshake.
+        if (phaseRef.current !== "ready") return;
+        switch (message.t) {
+          case "state":
+            setProjection(message.projection);
+            break;
+          case "bytes":
+            bytesEmitterRef.current.dispatchEvent(
+              new CustomEvent(`bytes-${message.tabId}`, { detail: message.data }),
+            );
+            break;
+          case "bytesReset":
+            bytesEmitterRef.current.dispatchEvent(
+              new CustomEvent(`bytesReset-${message.tabId}`, { detail: message.data }),
+            );
+            break;
+          case "exit":
+          case "error":
+          case "toast":
+            break;
+          default:
+            break;
+        }
+      },
+      (next) => {
+        setStatus(next);
+        // Reset the handshake state whenever the socket lifecycle resets so a
+        // reconnect re-validates the version. `incompatible` is a permanent
+        // refusal — leave it sticky.
+        if (phaseRef.current === "incompatible") return;
+        if (next === "open") {
+          phaseRef.current = "handshaking";
+          setPhase("handshaking");
+        } else {
+          phaseRef.current = "connecting";
+          setPhase("connecting");
+        }
+      },
+    );
     socket.connect();
     socketRef.current = socket;
     return () => socket.dispose();
@@ -270,6 +314,23 @@ function App() {
         themeId={projection.themeId}
       />
     ) : null;
+
+  if (phase === "incompatible") {
+    return (
+      <div
+        className="flex h-screen w-screen flex-col items-center justify-center gap-3 p-8 text-center font-mono text-sm"
+        style={{ backgroundColor: theme.background, color: theme.text }}
+      >
+        <div className="text-lg font-semibold" style={{ color: theme.error }}>
+          GUI protocol version mismatch
+        </div>
+        <div style={{ color: theme.textMuted }}>
+          This desktop expects protocol v{PROTOCOL_VERSION}, but the host speaks a different
+          version. Update both halves of aimux to the same release.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>

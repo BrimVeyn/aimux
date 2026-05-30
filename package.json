@@ -62,6 +62,7 @@
     "bump": "bun run scripts/bump.ts"
   },
   "dependencies": {
+    "@aimux/gui-protocol": "workspace:*",
     "@brimveyn/aimux-config": "workspace:*",
     "@opentui/core": "^0.1.90",
     "@opentui/react": "^0.1.90",

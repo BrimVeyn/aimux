@@ -11,6 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
+      "@aimux/gui-protocol": ["../packages/gui-protocol/src/index.ts"],
       "@aimux/*": ["../src/*"],
       "@aimux-config/*": ["../packages/aimux-config/src/*"]
     },

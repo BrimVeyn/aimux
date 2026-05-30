@@ -26,6 +26,12 @@ export default defineConfig(async () => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Longest-match-first: the gui-protocol alias must come before the
+      // generic `@aimux` ../src mapping or Vite resolves it to `../src/gui-protocol`.
+      "@aimux/gui-protocol": path.resolve(
+        __dirname,
+        "../packages/gui-protocol/src/index.ts",
+      ),
       "@aimux": path.resolve(__dirname, "../src"),
       "@aimux-config": path.resolve(__dirname, "../packages/aimux-config/src"),
     },

@@ -5,6 +5,7 @@
     "": {
       "name": "@brimveyn/aimux",
       "dependencies": {
+        "@aimux/gui-protocol": "workspace:*",
         "@brimveyn/aimux-config": "workspace:*",
         "@opentui/core": "^0.1.90",
         "@opentui/react": "^0.1.90",
@@ -36,8 +37,14 @@
         "shiki": "^4.0.2",
       },
     },
+    "packages/gui-protocol": {
+      "name": "@aimux/gui-protocol",
+      "version": "0.1.0",
+    },
   },
   "packages": {
+    "@aimux/gui-protocol": ["@aimux/gui-protocol@workspace:packages/gui-protocol"],
+
     "@brimveyn/aimux-config": ["@brimveyn/aimux-config@workspace:packages/aimux-config"],
 
     "@dimforge/rapier2d-simd-compat": ["@dimforge/rapier2d-simd-compat@0.17.3", "", {}, "sha512-bijvwWz6NHsNj5e5i1vtd3dU2pDhthSaTUZSh14DUGGKJfw8eMnlWZsxwHBxB/a3AXVNDjL9abuHw1k9FGR+jg=="],

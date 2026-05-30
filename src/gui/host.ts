@@ -69,7 +69,7 @@ import { createPipeline } from './host-pipeline'
 import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
 import { launchShell } from './launch-shell'
 import { startMultiRepoDiscoveryDriver } from './multi-repo-discovery-driver'
-import { type GuiServerMessage, parseClientMessage } from './protocol'
+import { type GuiServerMessage, parseClientMessage, PROTOCOL_VERSION } from './protocol'
 import { createSnippetTriggerDriver } from './snippet-trigger-driver'
 import { projectAppState } from './state-projection'
 
@@ -938,6 +938,9 @@ export async function runGui(): Promise<void> {
         // TODO(P0.8): resume backend broadcast on first client connect; see
         // matching note in close(). Symmetric with the pause TODO above.
         // backend.setBroadcastEnabled?.(true)
+        // Handshake first: the renderer refuses to interpret any subsequent
+        // frame until it has seen `hello` and verified the protocol version.
+        send({ capabilities: [], t: 'hello', version: PROTOCOL_VERSION })
         // Push the initial state projection. Each xterm.js pane pulls its own
         // scrollback via requestBytes once it mounts, so there's nothing to
         // replay here.
