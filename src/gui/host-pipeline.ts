@@ -17,6 +17,16 @@ import { encodeKeyInput } from './key-encode'
 
 interface PipelineOptions {
   backend: SessionBackend
+  /**
+   * Optional pre-write hook. Called after the key was determined to be
+   * unbound in terminal-input mode AND a non-null byte sequence was
+   * produced. Return true to claim the bytes (no raw PTY write happens);
+   * return false to let the pipeline write them as usual.
+   *
+   * Used by the GUI host to plug snippet-trigger detection in without
+   * the driver knowing about modes or bindings.
+   */
+  beforeTerminalWrite?: (tabId: string, bytes: string) => boolean
   renderer: CliRenderer
   timeouts: TabTimeouts
   getThemeId: () => ThemeId
@@ -85,6 +95,9 @@ export function createPipeline(opts: PipelineOptions) {
     if (modeId === 'terminal-input' && state.activeTabId !== null) {
       const bytes = encodeKeyInput(key)
       if (bytes !== null) {
+        if (opts.beforeTerminalWrite?.(state.activeTabId, bytes) === true) {
+          return
+        }
         opts.backend.write(state.activeTabId, bytes)
       }
     }

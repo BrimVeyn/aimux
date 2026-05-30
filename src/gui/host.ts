@@ -66,6 +66,7 @@ import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
 import { launchShell } from './launch-shell'
 import { startMultiRepoDiscoveryDriver } from './multi-repo-discovery-driver'
 import { type GuiServerMessage, parseClientMessage } from './protocol'
+import { createSnippetTriggerDriver } from './snippet-trigger-driver'
 import { projectAppState } from './state-projection'
 
 const GUI_PORT = 7878
@@ -251,8 +252,26 @@ export async function runGui(): Promise<void> {
   // rebroadcast so the browser recolors live as the user moves in the picker.
   subscribeThemeChanges(() => scheduleBroadcast())
 
+  const snippetDriver = createSnippetTriggerDriver({
+    backend,
+    getBranch: () => null,
+    getSnippets: () => getState().snippets,
+    getTab: (tabId) => getState().tabs.find((entry) => entry.id === tabId),
+    getTriggerChar: () => resolvedConfig.snippetTriggerChar,
+  })
+
   const pipeline = createPipeline({
     backend,
+    beforeTerminalWrite: (tabId, bytes) => {
+      // Snippet trigger detection: only react when the user typed exactly
+      // one printable char. Multi-byte sequences (arrow keys, function
+      // keys, escape sequences) bypass the detector and flow to PTY.
+      if (bytes.length !== 1) return false
+      const code = bytes.codePointAt(0) ?? 0
+      // Skip control chars (0-31) and DEL (127) — only feed printables.
+      if (code < 32 || code === 127) return false
+      return snippetDriver.feedKey(tabId, bytes)
+    },
     getThemeId: () => themeId,
     renderer,
     setThemeId: (id) => {
@@ -308,6 +327,13 @@ export async function runGui(): Promise<void> {
     // a re-dump. The initial scrollback still comes via the frontend's
     // requestBytes (one dump per instance creation).
     send({ data, t: 'bytes', tabId })
+  })
+  // Tab can die without a closeTab message (PTY crash, daemon eviction).
+  // Drop the per-tab detector + in-flight guard so a recycled tabId doesn't
+  // inherit stale state. The existing bindBackendRuntimeEvents call also
+  // registers an 'exit' listener — multiple EventEmitter listeners are fine.
+  backend.on('exit', (tabId) => {
+    snippetDriver.dispose(tabId)
   })
 
   // React to session/active-tab changes (attach + setActiveTab), like the TUI runtime.
@@ -609,6 +635,7 @@ export async function runGui(): Promise<void> {
           case 'closeTab':
             dispatch({ tabId: message.tabId, type: 'close-tab' })
             backend.disposeSession(message.tabId)
+            snippetDriver.dispose(message.tabId)
             break
           case 'switchSession': {
             const session = state.sessions.find((entry) => entry.id === message.sessionId)
