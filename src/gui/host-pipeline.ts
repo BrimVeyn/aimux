@@ -142,9 +142,7 @@ export function createPipeline(opts: PipelineOptions) {
   function selectModalIndex(index: number): void {
     dispatch({ index, type: 'set-modal-selection-index' })
     if (getState().modal.type === 'theme-picker') {
-      // The preview effect reads state.modal.selectedIndex (set above), not the
-      // delta; `delta` is required by the effect's type but inert for this path.
-      runEffect({ action: 'preview', delta: 1, type: 'apply-theme' })
+      runEffect({ action: 'preview', type: 'apply-theme' })
     }
   }
 

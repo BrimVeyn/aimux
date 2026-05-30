@@ -44,7 +44,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'open' }
   | { type: 'apply-theme'; action: 'restore' }
   | { type: 'apply-theme'; action: 'confirm' }
-  | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
+  | { type: 'apply-theme'; action: 'preview' }
   | { type: 'rename-session'; sessionId: string; name: string }
   | {
       type: 'split-pane'
