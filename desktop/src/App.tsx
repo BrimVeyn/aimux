@@ -11,6 +11,7 @@ import { SplitLayout } from "@/components/SplitLayout";
 import { StatusBar } from "@/components/StatusBar";
 import { TerminalPane } from "@/components/TerminalPane";
 import { normalizeKey } from "@/lib/keys";
+import { disposeTerminal, liveTerminalIds } from "@/lib/terminal-registry";
 import { theme } from "@/lib/theme";
 import { useTheme } from "@/lib/use-theme";
 import type { AppStateProjection, LayoutNode, ProjectedTab } from "@/lib/types";
@@ -26,6 +27,19 @@ function App() {
 
   useTheme(projection?.themeId, projection?.themeMode);
 
+  // Keep-alive terminals persist in a module-level registry across tab switches.
+  // Dispose an instance only when its tab actually disappears from the projection
+  // (closed), so the registry doesn't leak xterm instances / WebGL contexts.
+  useEffect(() => {
+    if (projection === null) return;
+    const open = new Set(projection.tabs.map((t) => t.id));
+    for (const tabId of liveTerminalIds()) {
+      if (!open.has(tabId)) {
+        disposeTerminal(tabId, bytesEmitterRef.current);
+      }
+    }
+  }, [projection]);
+
   useEffect(() => {
     document.documentElement.classList.add("dark");
     const socket = new GuiSocket((message) => {
@@ -36,6 +50,11 @@ function App() {
         case "bytes":
           bytesEmitterRef.current.dispatchEvent(
             new CustomEvent(`bytes-${message.tabId}`, { detail: message.data }),
+          );
+          break;
+        case "bytesReset":
+          bytesEmitterRef.current.dispatchEvent(
+            new CustomEvent(`bytesReset-${message.tabId}`, { detail: message.data }),
           );
           break;
         case "render":
