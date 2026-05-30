@@ -299,6 +299,9 @@ function App() {
   const unstageGitFile = useCallback((path: string) => {
     socketRef.current?.send({ intent: { kind: 'git.unstageFile', path }, t: 'intent' })
   }, [])
+  const toggleGitFolder = useCallback((key: string) => {
+    socketRef.current?.send({ intent: { kind: 'git.toggleFolder', key }, t: 'intent' })
+  }, [])
   const tabsById: Record<string, ProjectedTab> = {}
   for (const t of projection?.tabs ?? []) {
     tabsById[t.id] = t
@@ -342,6 +345,7 @@ function App() {
           gitPane={gitPane}
           gitPanel={projection.gitPanel}
           onStageFile={stageGitFile}
+          onToggleFolder={toggleGitFolder}
           onUnstageFile={unstageGitFile}
           projectPath={currentSession?.projectPath}
         />
@@ -377,6 +381,7 @@ function App() {
         gitPanel={projection.gitPanel}
         onExit={exitGitMode}
         onStageFile={stageGitFile}
+        onToggleFolder={toggleGitFolder}
         onUnstageFile={unstageGitFile}
         projectPath={currentSession?.projectPath}
         themeId={projection.themeId}

@@ -15,6 +15,7 @@ interface GitViewProps {
   gitPanel: GitPanelLite;
   onExit?: () => void;
   onStageFile?: (path: string) => void;
+  onToggleFolder?: (key: string) => void;
   onUnstageFile?: (path: string) => void;
   projectPath?: string;
   themeId: string;
@@ -26,6 +27,7 @@ export function GitView({
   gitPanel,
   onExit,
   onStageFile,
+  onToggleFolder,
   onUnstageFile,
   projectPath,
   themeId,
@@ -102,6 +104,7 @@ export function GitView({
               gitPane={gitPane}
               gitPanel={gitPanel}
               onStageFile={onStageFile}
+              onToggleFolder={onToggleFolder}
               onUnstageFile={onUnstageFile}
               projectPath={projectPath}
             />

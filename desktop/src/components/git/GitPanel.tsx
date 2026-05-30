@@ -18,6 +18,7 @@ interface GitPanelProps {
   gitPane: GitPaneLite;
   gitPanel: GitPanelLite;
   onStageFile?: (path: string) => void;
+  onToggleFolder?: (key: string) => void;
   onUnstageFile?: (path: string) => void;
   projectPath?: string;
 }
@@ -83,6 +84,7 @@ export function GitPanel({
   gitPane,
   gitPanel,
   onStageFile,
+  onToggleFolder,
   onUnstageFile,
   projectPath,
 }: GitPanelProps): ReactNode {
@@ -167,7 +169,11 @@ export function GitPanel({
                 <Fragment key={row.key}>
                   <div ref={isSelected ? selectedRowRef : undefined}>
                     {row.kind === "folder" ? (
-                      <FolderRow isSelected={isSelected} row={row} />
+                      <FolderRow
+                        isSelected={isSelected}
+                        onToggleFolder={onToggleFolder}
+                        row={row}
+                      />
                     ) : (
                       <FileRow
                         addedW={addedW}

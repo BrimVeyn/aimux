@@ -44,6 +44,11 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'git.discardFile':
       handleGitDiscard(intent.path, runtime)
       return
+    case 'git.toggleFolder':
+      // Mirrors the TUI FolderRow onMouseDown handler (src/ui/components/git/git-panel.tsx:183-185):
+      // a bare `git-mode-toggle-folder` dispatch with the row's key.
+      runtime.dispatch({ key: intent.key, type: 'git-mode-toggle-folder' })
+      return
   }
 }
 

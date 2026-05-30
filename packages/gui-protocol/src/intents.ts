@@ -25,6 +25,9 @@ export type GuiIntent =
   | { kind: 'git.stageFile'; path: string }
   | { kind: 'git.unstageFile'; path: string }
   | { kind: 'git.discardFile'; path: string }
+  // `key` is the composite `${section}:dir:${folderPath}` from `gitFolderKey`
+  // — same identity the reducer's `git-mode-toggle-folder` action expects.
+  | { kind: 'git.toggleFolder'; key: string }
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -66,6 +69,9 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
     case 'git.discardFile':
       if (typeof obj.path !== 'string') return null
       return { kind: 'git.discardFile', path: obj.path }
+    case 'git.toggleFolder':
+      if (typeof obj.key !== 'string') return null
+      return { key: obj.key, kind: 'git.toggleFolder' }
     default:
       return null
   }

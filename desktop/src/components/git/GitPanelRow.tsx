@@ -46,18 +46,32 @@ export function SectionHeader({
 
 interface FolderRowProps {
   isSelected: boolean;
+  onToggleFolder?: (key: string) => void;
   row: GitTreeFolderRow;
 }
 
-// Mirrors FolderRow (~line 170). Display-only for Stage 2a: no onClick, no toggle.
-export function FolderRow({ isSelected, row }: FolderRowProps): ReactNode {
+// Mirrors FolderRow (~line 170). Click toggles collapse via the
+// `git.toggleFolder` intent, matching the TUI's onMouseDown chevron.
+export function FolderRow({ isSelected, onToggleFolder, row }: FolderRowProps): ReactNode {
   const bg = isSelected ? theme.backgroundElement : undefined;
+  const handleClick = (e: MouseEvent<HTMLDivElement>): void => {
+    if (onToggleFolder === undefined) return;
+    e.preventDefault();
+    onToggleFolder(row.key);
+  };
+  const title = row.isCollapsed ? "Click to expand" : "Click to collapse";
   // The TUI prepends a row marker (›/space) via selection bg only; the GUI keeps
   // parity by tinting the bg the same way (no extra glyph for folders).
   return (
     <div
       className="flex items-center gap-[1ch] whitespace-nowrap"
-      style={{ backgroundColor: bg, paddingLeft: `${row.depth * 2}ch` }}
+      onClick={onToggleFolder !== undefined ? handleClick : undefined}
+      style={{
+        backgroundColor: bg,
+        cursor: onToggleFolder !== undefined ? "pointer" : undefined,
+        paddingLeft: `${row.depth * 2}ch`,
+      }}
+      title={onToggleFolder !== undefined ? title : undefined}
     >
       <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "▸" : "▾"}</span>
       <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "" : ""}</span>

@@ -152,6 +152,25 @@ describe('parseClientMessage intent envelope', () => {
     })
   })
 
+  test('accepts git.toggleFolder with a key', () => {
+    const raw = JSON.stringify({
+      intent: { key: 'unstaged:dir:src/ui', kind: 'git.toggleFolder' },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toEqual({
+      intent: { key: 'unstaged:dir:src/ui', kind: 'git.toggleFolder' },
+      t: 'intent',
+    })
+  })
+
+  test('rejects git.toggleFolder with missing key', () => {
+    const raw = JSON.stringify({
+      intent: { kind: 'git.toggleFolder' },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toBeNull()
+  })
+
   test('rejects intent with unknown kind', () => {
     const raw = JSON.stringify({
       intent: { kind: 'mystery.verb' },
