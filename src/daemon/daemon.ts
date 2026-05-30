@@ -164,6 +164,10 @@ export async function runDaemon(): Promise<void> {
   const sockets = new Set<Socket>()
   const attachedSessions = new Map<Socket, string>()
   const negotiatedVersions = new Map<Socket, number>()
+  // Per-client opt-in for raw PTY byte streaming. Only the GUI (xterm.js)
+  // currently asks for bytes — the TUI consumes render snapshots and would
+  // waste socket bandwidth if it got them too.
+  const bytesSubscribers = new Set<Socket>()
 
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
@@ -233,6 +237,15 @@ export async function runDaemon(): Promise<void> {
     })
     const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
     broadcastForSession(sessionId, event)
+  })
+  manager.on('bytes', (sessionId, tabId, data) => {
+    if (bytesSubscribers.size === 0) return
+    const event: ServerEvent = { payload: { data, tabId }, type: 'tabBytes' }
+    for (const socket of bytesSubscribers) {
+      if (attachedSessions.get(socket) === sessionId) {
+        send(socket, event)
+      }
+    }
   })
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
@@ -305,8 +318,27 @@ export async function runDaemon(): Promise<void> {
     })()
   }
 
+  /**
+   * Mirror of {@link updateTmBroadcastForClientCount} for the raw-bytes
+   * channel. Toggled on 0↔1 transitions of {@link bytesSubscribers}: when no
+   * client has opted in, the TM skips per-chunk forwarding entirely.
+   */
+  const updateTmBytesForSubscriberCount = (count: number): void => {
+    void (async () => {
+      try {
+        await manager.setBytesEnabled(count > 0)
+      } catch (error) {
+        logDebug('daemon.setBytesEnabled.error', {
+          count,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })()
+  }
+
   // Initial state: no clients yet, ask the TM to suspend broadcast.
   updateTmBroadcastForClientCount(0)
+  updateTmBytesForSubscriberCount(0)
 
   const server = createServer((socket) => {
     logDebug('daemon.client.connected')
@@ -532,6 +564,31 @@ export async function runDaemon(): Promise<void> {
                 case 'ping':
                   sendOk(socket, message.id)
                   break
+                case 'setBytesEnabled': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const wasSubscribed = bytesSubscribers.has(socket)
+                  if (message.payload.enabled) {
+                    bytesSubscribers.add(socket)
+                  } else {
+                    bytesSubscribers.delete(socket)
+                  }
+                  if (wasSubscribed !== bytesSubscribers.has(socket)) {
+                    updateTmBytesForSubscriberCount(bytesSubscribers.size)
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'serializeBuffer': {
+                  const sessionId = requireSession(socket, attachedSessions)
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const data = await manager.serializeBuffer(sessionId, message.payload.tabId)
+                  send(socket, {
+                    id: message.id,
+                    payload: { data },
+                    type: 'serializeBufferResult',
+                  })
+                  break
+                }
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error)
@@ -554,17 +611,25 @@ export async function runDaemon(): Promise<void> {
 
     socket.on('close', () => {
       logDebug('daemon.client.close', { sessionId: attachedSessions.get(socket) ?? null })
+      const hadBytesSubscription = bytesSubscribers.delete(socket)
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
+      if (hadBytesSubscription && bytesSubscribers.size === 0) {
+        updateTmBytesForSubscriberCount(0)
+      }
     })
     socket.on('error', () => {
       logDebug('daemon.client.error', { sessionId: attachedSessions.get(socket) ?? null })
+      const hadBytesSubscription = bytesSubscribers.delete(socket)
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
+      if (hadBytesSubscription && bytesSubscribers.size === 0) {
+        updateTmBytesForSubscriberCount(0)
+      }
     })
   })
 

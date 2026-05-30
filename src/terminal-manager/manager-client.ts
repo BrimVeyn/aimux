@@ -8,6 +8,7 @@ import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
   MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
+  MANAGER_PROTOCOL_BYTES_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
   type ManagerAttachResult,
@@ -25,6 +26,7 @@ interface ManagerClientEvents {
     viewport: TerminalSnapshot,
     terminalModes: TerminalModeState,
   ]
+  bytes: [sessionId: string, tabId: string, data: string]
   exit: [sessionId: string, tabId: string, exitCode: number]
   error: [sessionId: string, tabId: string, message: string]
 }
@@ -134,6 +136,9 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
           message.payload.viewport,
           message.payload.terminalModes
         )
+        break
+      case 'tabBytes':
+        this.emit('bytes', message.payload.sessionId, message.payload.tabId, message.payload.data)
         break
       case 'tabExit':
         this.emit(
@@ -379,6 +384,51 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       payload: { enabled },
       type: 'setBroadcastEnabled',
     })
+  }
+
+  /**
+   * Tell the TM whether to forward raw PTY byte chunks over the wire. No-op on
+   * TMs that negotiated a pre-bytes protocol version — the GUI then has to
+   * fall back to render snapshots only (no live xterm.js).
+   */
+  async setBytesEnabled(enabled: boolean): Promise<void> {
+    if (
+      this.selectedProtocolVersion === null ||
+      this.selectedProtocolVersion < MANAGER_PROTOCOL_BYTES_VERSION
+    ) {
+      logDebug('managerClient.setBytesEnabled.skipped', {
+        enabled,
+        selectedVersion: this.selectedProtocolVersion,
+      })
+      return
+    }
+    await this.sendExpectOk({
+      id: crypto.randomUUID(),
+      payload: { enabled },
+      type: 'setBytesEnabled',
+    })
+  }
+
+  async serializeBuffer(sessionId: string, tabId: string): Promise<string> {
+    if (
+      this.selectedProtocolVersion === null ||
+      this.selectedProtocolVersion < MANAGER_PROTOCOL_BYTES_VERSION
+    ) {
+      return ''
+    }
+    const response = await this.send({
+      id: crypto.randomUUID(),
+      payload: { sessionId, tabId },
+      type: 'serializeBuffer',
+    })
+    if (response.type !== 'serializeBufferResult') {
+      throw new Error(
+        response.type === 'error'
+          ? response.payload.message
+          : `Unexpected serializeBuffer response: ${response.type}`
+      )
+    }
+    return response.payload.data
   }
 
   destroy(): void {

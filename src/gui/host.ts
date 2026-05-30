@@ -65,15 +65,14 @@ const GUI_PORT = 7878
 
 export async function runGui(): Promise<void> {
   // The GUI streams raw PTY bytes to a client-side xterm.js for pixel-perfect
-  // rendering. That `bytes` event only flows in the in-process backend — the
-  // daemon-based RemoteSessionBackend's IPC protocol doesn't carry it (see
-  // RemoteSessionBackend.handleServerEvent: only tabRender/tabExit/tabError/
-  // tabStatus/sessionStatus are decoded). Force the local backend so the GUI
-  // host owns the PTYs directly and bytes reach the WS. The TUI is unaffected
-  // — it consumes `render` snapshots which work over IPC.
-  if (process.env.AIMUX_LOCAL_BACKEND === undefined) {
-    process.env.AIMUX_LOCAL_BACKEND = '1'
-  }
+  // rendering. The daemon now forwards a `tabBytes` event when a client opts
+  // in via `setBytesEnabled` (`RemoteSessionBackend` does that automatically
+  // when constructed with `streamBytes: true`). PTYs live in the shared
+  // terminal-manager process and survive GUI restarts — same model as the
+  // TUI, so switching between the two preserves all live sessions.
+  //
+  // `AIMUX_LOCAL_BACKEND=1` still forces the in-process backend for tests/dev
+  // (honored by `createSessionBackend`); it is no longer the default.
 
   const resolvedConfig = await loadUserConfig()
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
@@ -127,11 +126,14 @@ export async function runGui(): Promise<void> {
     workspaceSnapshot: initialSession.workspaceSnapshot,
   })
 
-  const backend = await createSessionBackend()
+  const backend = await createSessionBackend({ streamBytes: true })
+  const isLocalBackend = process.env.AIMUX_LOCAL_BACKEND === '1'
 
-  // Reap every PTY when the host goes away. In local-backend mode the
-  // PtyManager lives in this process, so without an explicit disposeAll the
-  // child claude/shell processes would be reparented to init and leak.
+  // Reap every PTY when the host goes away — but only in local-backend mode.
+  // With the daemon, PTYs live in terminal-manager and must survive a GUI
+  // exit so reopening the GUI (or the TUI) reattaches to the live state.
+  // Calling disposeAll() against the daemon would tear every session down,
+  // which is exactly the behaviour this rework is meant to eliminate.
   let backendDisposed = false
   let stopAIUsage: (() => void) | null = null
   const disposeBackend = (): void => {
@@ -140,10 +142,27 @@ export async function runGui(): Promise<void> {
     }
     backendDisposed = true
     stopAIUsage?.()
-    backend.disposeAll()
+    if (isLocalBackend) {
+      backend.disposeAll()
+    }
+  }
+  // Flush the workspace-autosave disposer on signal exits so any pending
+  // debounced save lands on disk before we die. Otherwise a tab created
+  // within the 250ms window vanishes from the snapshot — the daemon still
+  // has the live PTY, but the GUI can't preserve its layout/title across
+  // restarts. Defined here so the signal handlers can reach it; assigned
+  // below once `disposers.autosave` is set up.
+  const flushAutosave = (): void => {
+    try {
+      disposers.autosave?.()
+      disposers.autosave = null
+    } catch {
+      // Best-effort: failing to flush shouldn't block shutdown.
+    }
   }
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(sig, () => {
+      flushAutosave()
       disposeBackend()
       process.exit(0)
     })
@@ -256,8 +275,8 @@ export async function runGui(): Promise<void> {
   // request per fresh terminal instance) so the host never has to guess when a
   // dump is needed. This avoids the double-paint bug where pushing a dump into
   // an xterm that already holds the scrollback stacks duplicate splash screens.
-  const sendBytesDump = (tabId: string): void => {
-    let data = backend.serializeBuffer(tabId)
+  const sendBytesDump = async (tabId: string): Promise<void> => {
+    let data = await backend.serializeBuffer(tabId)
     if (data === '') {
       // PTY not running for this tab (typically restored from a workspace
       // snapshot in 'disconnected' state). Fall back to the persisted ANSI
@@ -511,7 +530,9 @@ export async function runGui(): Promise<void> {
           case 'requestBytes':
             // The frontend xterm.js pulls its scrollback on mount (one request
             // per fresh instance). Serialize the current buffer and send it.
-            sendBytesDump(message.tabId)
+            // The remote backend's serialize is async (IPC round-trip); fire
+            // and forget — the client already RIS-resets before applying.
+            void sendBytesDump(message.tabId)
             break
           case 'modalSelect':
             pipeline.selectModalIndex(message.index)

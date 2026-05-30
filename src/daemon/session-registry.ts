@@ -111,11 +111,21 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       return { activeTabId: this.activeTabId, tabs }
     }
 
+    // The daemon's live registry is the source of truth for which tabs exist
+    // — the snapshot only informs ordering/layout/titles. Tabs created by
+    // another frontend (or by the same frontend within the autosave debounce
+    // window before kill) are NOT in the caller's snapshot but ARE in the
+    // registry; they must still surface so both frontends see identical
+    // state. Append them after the snapshot-ordered ones so the user's saved
+    // order is preserved for everything that was persisted.
     const { layoutTrees, tabGroupMap } = restoreLayoutTrees(snapshot, tabs)
+    const snapshotTabIds = new Set(snapshot.tabs.map((persisted) => persisted.id))
     const orderedSnapshotTabs = snapshot.tabs
       .map((persistedTab) => this.tabs.get(persistedTab.id))
       .filter((tab): tab is TabSession => tab !== undefined)
-    const normalizedTabs = normalizeGroupedTabOrder(orderedSnapshotTabs, layoutTrees, tabGroupMap)
+    const liveOnlyTabs = tabs.filter((tab) => !snapshotTabIds.has(tab.id))
+    const mergedTabs = [...orderedSnapshotTabs, ...liveOnlyTabs]
+    const normalizedTabs = normalizeGroupedTabOrder(mergedTabs, layoutTrees, tabGroupMap)
 
     return { activeTabId: this.activeTabId, tabs: normalizedTabs }
   }

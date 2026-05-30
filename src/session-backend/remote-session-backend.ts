@@ -22,6 +22,16 @@ import {
 const IPC_REQUEST_TIMEOUT_MS = 10_000
 const RECONNECT_DELAY_MS = 250
 
+export interface RemoteSessionBackendOptions {
+  /**
+   * If true, automatically opt into the raw PTY byte stream after every
+   * successful attach (including reconnects). Required for the GUI host so
+   * xterm.js gets live updates; the TUI leaves it false and consumes render
+   * snapshots only.
+   */
+  streamBytes?: boolean
+}
+
 export class RemoteSessionBackend
   extends EventEmitter<SessionBackendEvents>
   implements SessionBackend
@@ -47,6 +57,12 @@ export class RemoteSessionBackend
   private selectedProtocolVersion: number | null = null
   private reconnectPromise: Promise<void> | null = null
   private shouldReconnect = false
+  private readonly streamBytes: boolean
+
+  constructor(options: RemoteSessionBackendOptions = {}) {
+    super()
+    this.streamBytes = options.streamBytes ?? false
+  }
 
   private rejectPendingRequests(error: Error): void {
     for (const [id, pending] of this.pending.entries()) {
@@ -165,6 +181,9 @@ export class RemoteSessionBackend
           message.payload.viewport,
           message.payload.terminalModes
         )
+        break
+      case 'tabBytes':
+        this.emit('bytes', message.payload.tabId, message.payload.data)
         break
       case 'tabExit':
         this.emit('exit', message.payload.tabId, message.payload.exitCode)
@@ -286,6 +305,12 @@ export class RemoteSessionBackend
     }
 
     this.attached = true
+    if (this.streamBytes) {
+      // Fire-and-forget: re-arm the byte subscription after every attach so
+      // reconnects (daemon restart, socket flap) restore the live stream
+      // without the host having to remember to call setBytesEnabled again.
+      void this.setBytesEnabled(true)
+    }
     return response.payload
   }
 
@@ -404,14 +429,44 @@ export class RemoteSessionBackend
     )
   }
 
+  async serializeBuffer(tabId: string): Promise<string> {
+    if (!this.attached) return ''
+    try {
+      const response = await this.send({
+        id: crypto.randomUUID(),
+        payload: { tabId },
+        type: 'serializeBuffer',
+      })
+      if (response.type !== 'serializeBufferResult') {
+        logDebug('backend.remote.serializeBuffer.unexpected', { type: response.type })
+        return ''
+      }
+      return response.payload.data
+    } catch (error) {
+      logDebug('backend.remote.serializeBuffer.error', {
+        error: error instanceof Error ? error.message : String(error),
+        tabId,
+      })
+      return ''
+    }
+  }
+
   /**
-   * The remote/daemon path does not yet stream raw PTY bytes back over IPC,
-   * so there's no client-side buffer to serialize. Return '' — the GUI host
-   * just skips the replay dump for tabs whose backend has no buffer. v2 of
-   * the daemon protocol can add this if the GUI ever needs remote sessions.
+   * Opt into the raw PTY byte stream. The GUI host calls this after attach
+   * so xterm.js gets live updates; the TUI never calls it and the daemon
+   * skips wire forwarding entirely (per-client subscription).
    */
-  serializeBuffer(_tabId: string): string {
-    return ''
+  async setBytesEnabled(enabled: boolean): Promise<void> {
+    if (!this.attached) return
+    try {
+      await this.sendExpectOk({
+        id: crypto.randomUUID(),
+        payload: { enabled },
+        type: 'setBytesEnabled',
+      })
+    } catch (error) {
+      this.reportCommandError('setBytesEnabled', error)
+    }
   }
 
   setActiveTab(tabId: string | null): void {

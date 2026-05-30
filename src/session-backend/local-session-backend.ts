@@ -146,10 +146,15 @@ export class LocalSessionBackend
     this.sessionManager.scrollToBottom(this.currentSessionId, tabId)
   }
 
-  serializeBuffer(tabId: string): string {
+  async serializeBuffer(tabId: string): Promise<string> {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return ''
     return this.sessionManager.serializeBuffer(this.currentSessionId, tabId)
   }
+
+  // No-op: the local backend always emits raw PTY bytes via the in-process
+  // SessionManager. The opt-in only matters for the remote (daemon) backend
+  // where bytes traverse a Unix socket.
+  async setBytesEnabled(_enabled: boolean): Promise<void> {}
 
   setActiveTab(tabId: string | null): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return

@@ -9,13 +9,19 @@ import type {
 
 import { isWorkspaceSnapshotV1 } from '../state/validation'
 
+// v10: raw PTY bytes can flow daemon → client (`tabBytes` event + per-client
+// opt-in via `setBytesEnabled`), and `serializeBuffer` exposes the ANSI dump
+// xterm.js needs to repaint on attach. Lockstep MIN bump matches v9 — a stale
+// client triggers the auto-restart path in bootstrap so the daemon and the
+// frontends agree on the wire shape.
+//
 // v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
 // `reapplyScrollIntent` message — the frontend no longer derives or sends it.
 // (v8 was the unfilled-viewport status-detector change; this is a further
 // breaking wire change, so the version steps again.)
-export const IPC_PROTOCOL_MIN_VERSION = 9
-export const IPC_PROTOCOL_VERSION = 9
+export const IPC_PROTOCOL_MIN_VERSION = 10
+export const IPC_PROTOCOL_VERSION = 10
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -84,11 +90,14 @@ export type ClientRequest =
   | { id: string; type: 'closeTab'; payload: { tabId: string } }
   | { id: string; type: 'disposeAll'; payload: Record<string, never> }
   | { id: string; type: 'ping'; payload: Record<string, never> }
+  | { id: string; type: 'setBytesEnabled'; payload: { enabled: boolean } }
+  | { id: string; type: 'serializeBuffer'; payload: { tabId: string } }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
   | { id: string; type: 'attachResult'; payload: AttachResult }
+  | { id: string; type: 'serializeBufferResult'; payload: { data: string } }
   | { id: string; type: 'error'; payload: { message: string } }
 
 export type ServerEvent =
@@ -96,6 +105,7 @@ export type ServerEvent =
       type: 'tabRender'
       payload: { tabId: string; viewport: TerminalSnapshot; terminalModes: TerminalModeState }
     }
+  | { type: 'tabBytes'; payload: { tabId: string; data: string } }
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
@@ -337,6 +347,15 @@ export function parseClientRequest(value: unknown): ClientRequest {
     case 'disposeAll':
     case 'ping':
       return value as ClientRequest
+    case 'setBytesEnabled':
+      assert(
+        typeof value.payload.enabled === 'boolean',
+        'setBytesEnabled.enabled must be a boolean'
+      )
+      return value as ClientRequest
+    case 'serializeBuffer':
+      assert(isString(value.payload.tabId), 'serializeBuffer.tabId must be a string')
+      return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -359,6 +378,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.id), 'attachResult.id must be a string')
       assert(isAttachResult(value.payload), 'attachResult.payload is invalid')
       return value as ServerResponse
+    case 'serializeBufferResult':
+      assert(isString(value.id), 'serializeBufferResult.id must be a string')
+      assert(isString(value.payload.data), 'serializeBufferResult.data must be a string')
+      return value as ServerResponse
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')
@@ -367,6 +390,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')
       assert(isTerminalSnapshot(value.payload.viewport), 'tabRender.viewport is invalid')
       assert(isTerminalModeState(value.payload.terminalModes), 'tabRender.terminalModes is invalid')
+      return value as ServerEvent
+    case 'tabBytes':
+      assert(isString(value.payload.tabId), 'tabBytes.tabId must be a string')
+      assert(isString(value.payload.data), 'tabBytes.data must be a string')
       return value as ServerEvent
     case 'tabExit':
       assert(isString(value.payload.tabId), 'tabExit.tabId must be a string')

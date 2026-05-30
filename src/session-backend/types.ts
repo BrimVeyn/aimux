@@ -49,7 +49,13 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
   write(tabId: string, input: string): void
   scrollViewport(tabId: string, deltaLines: number): void
   scrollViewportToBottom(tabId: string): void
-  serializeBuffer(tabId: string): string
+  serializeBuffer(tabId: string): Promise<string>
+  /**
+   * Opt-in to the raw PTY byte stream (`bytes` events). Only the GUI host
+   * needs them — the TUI consumes render snapshots. Optional because the
+   * local backend always emits bytes regardless.
+   */
+  setBytesEnabled?(enabled: boolean): Promise<void>
   setActiveTab(tabId: string | null): void
   resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void
   resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void

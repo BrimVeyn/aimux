@@ -13,18 +13,30 @@ import {
   negotiateProtocolVersion,
 } from './protocol'
 
+// v6: raw PTY bytes can flow over the wire (`tabBytes` event + per-client
+// opt-in via `setBytesEnabled`), and `serializeBuffer` exposes the ANSI dump
+// xterm.js needs to repaint on attach. MIN stays at 5: older TMs simply lack
+// the new event/requests (`setBytesEnabled` is a no-op on the client side
+// when the negotiated version is below `MANAGER_PROTOCOL_BYTES_VERSION`).
+//
 // v5: backend owns scroll position end to end. Removed the per-tab scroll
 // `intent`/`intents` from resize messages and the `reapplyScrollIntent`
 // message. Min is raised in lockstep so a pre-v5 peer (which could still send
 // the dropped message) can't negotiate a now-incompatible version.
 export const MANAGER_PROTOCOL_MIN_VERSION = 5
-export const MANAGER_PROTOCOL_VERSION = 5
+export const MANAGER_PROTOCOL_VERSION = 6
 /**
  * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
  * not understand the message; the daemon must check the negotiated version
  * before sending and fall back to always-on broadcast.
  */
 export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
+/**
+ * Minimum version required to stream raw PTY bytes (`tabBytes`) and call
+ * `setBytesEnabled` / `serializeBuffer`. Below this version those calls are
+ * no-ops on the client side and the GUI falls back to render snapshots only.
+ */
+export const MANAGER_PROTOCOL_BYTES_VERSION = 6
 
 export interface ManagerHelloRequest {
   minVersion: number
@@ -105,11 +117,14 @@ export type ManagerRequest =
   | { id: string; type: 'disposeSession'; payload: { sessionId: string } }
   | { id: string; type: 'ping'; payload: Record<string, never> }
   | { id: string; type: 'setBroadcastEnabled'; payload: { enabled: boolean } }
+  | { id: string; type: 'setBytesEnabled'; payload: { enabled: boolean } }
+  | { id: string; type: 'serializeBuffer'; payload: { sessionId: string; tabId: string } }
 
 export type ManagerResponse =
   | { id: string; type: 'helloResult'; payload: ManagerHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
   | { id: string; type: 'attachResult'; payload: ManagerAttachResult }
+  | { id: string; type: 'serializeBufferResult'; payload: { data: string } }
   | { id: string; type: 'error'; payload: { message: string } }
 
 export type ManagerEvent =
@@ -121,6 +136,10 @@ export type ManagerEvent =
         viewport: TerminalSnapshot
         terminalModes: TerminalModeState
       }
+    }
+  | {
+      type: 'tabBytes'
+      payload: { sessionId: string; tabId: string; data: string }
     }
   | { type: 'tabExit'; payload: { sessionId: string; tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { sessionId: string; tabId: string; message: string } }
@@ -322,6 +341,16 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
         'setBroadcastEnabled.enabled must be a boolean'
       )
       return value as ManagerRequest
+    case 'setBytesEnabled':
+      assert(
+        typeof value.payload.enabled === 'boolean',
+        'setBytesEnabled.enabled must be a boolean'
+      )
+      return value as ManagerRequest
+    case 'serializeBuffer':
+      assert(isString(value.payload.sessionId), 'serializeBuffer.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'serializeBuffer.tabId must be a string')
+      return value as ManagerRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -344,6 +373,10 @@ export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEv
       assert(isString(value.id), 'attachResult.id must be a string')
       assert(isAttachResult(value.payload), 'attachResult.payload is invalid')
       return value as ManagerResponse
+    case 'serializeBufferResult':
+      assert(isString(value.id), 'serializeBufferResult.id must be a string')
+      assert(isString(value.payload.data), 'serializeBufferResult.data must be a string')
+      return value as ManagerResponse
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')
@@ -353,6 +386,11 @@ export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEv
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')
       assert(isTerminalSnapshot(value.payload.viewport), 'tabRender.viewport is invalid')
       assert(isTerminalModeState(value.payload.terminalModes), 'tabRender.terminalModes is invalid')
+      return value as ManagerEvent
+    case 'tabBytes':
+      assert(isString(value.payload.sessionId), 'tabBytes.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'tabBytes.tabId must be a string')
+      assert(isString(value.payload.data), 'tabBytes.data must be a string')
       return value as ManagerEvent
     case 'tabExit':
       assert(isString(value.payload.sessionId), 'tabExit.sessionId must be a string')

@@ -225,6 +225,11 @@ async function stopTerminalManager(): Promise<void> {
 
 export async function createSessionBackend(opts?: {
   onBreakingUpdateRequired?: () => Promise<void>
+  /**
+   * Opt into the raw PTY byte stream after attach. The GUI host needs this
+   * for xterm.js; the TUI does not.
+   */
+  streamBytes?: boolean
 }): Promise<SessionBackend> {
   if (process.env.AIMUX_LOCAL_BACKEND === '1') {
     logDebug('backend.create.localExplicit')
@@ -276,6 +281,6 @@ export async function createSessionBackend(opts?: {
     }
   }
 
-  logDebug('backend.create.remote', { socketPath })
-  return new RemoteSessionBackend()
+  logDebug('backend.create.remote', { socketPath, streamBytes: opts?.streamBytes ?? false })
+  return new RemoteSessionBackend({ streamBytes: opts?.streamBytes ?? false })
 }

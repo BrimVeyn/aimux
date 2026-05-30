@@ -51,6 +51,10 @@ export async function runTerminalManager(): Promise<void> {
   const sessionManager = new SessionManager()
   const sockets = new Set<Socket>()
   const negotiatedVersions = new Map<Socket, number>()
+  // Raw PTY bytes forwarding is opt-in (the daemon only enables it when at
+  // least one client — e.g. the GUI — has subscribed). Avoids burning socket
+  // bandwidth on TUI-only sessions that only consume render snapshots.
+  let bytesBroadcastEnabled = false
 
   /**
    * Auto-exit when fully idle: no clients connected AND no live PTY sessions.
@@ -100,6 +104,13 @@ export async function runTerminalManager(): Promise<void> {
       payload: { sessionId, tabId, terminalModes, viewport },
       type: 'tabRender',
     }
+    for (const socket of sockets) {
+      send(socket, event)
+    }
+  })
+  sessionManager.on('bytes', (sessionId, tabId, data) => {
+    if (!bytesBroadcastEnabled) return
+    const event: ManagerEvent = { payload: { data, sessionId, tabId }, type: 'tabBytes' }
     for (const socket of sockets) {
       send(socket, event)
     }
@@ -266,6 +277,24 @@ export async function runTerminalManager(): Promise<void> {
                 sessionManager.setBroadcastEnabled(message.payload.enabled)
                 sendOk(socket, message.id)
                 break
+              case 'setBytesEnabled':
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                bytesBroadcastEnabled = message.payload.enabled
+                sendOk(socket, message.id)
+                break
+              case 'serializeBuffer': {
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                const data = sessionManager.serializeBuffer(
+                  message.payload.sessionId,
+                  message.payload.tabId
+                )
+                send(socket, {
+                  id: message.id,
+                  payload: { data },
+                  type: 'serializeBufferResult',
+                })
+                break
+              }
             }
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error)
