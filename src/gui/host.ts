@@ -61,6 +61,17 @@ import { projectAppState } from './state-projection'
 const GUI_PORT = 7878
 
 export async function runGui(): Promise<void> {
+  // The GUI streams raw PTY bytes to a client-side xterm.js for pixel-perfect
+  // rendering. That `bytes` event only flows in the in-process backend — the
+  // daemon-based RemoteSessionBackend's IPC protocol doesn't carry it (see
+  // RemoteSessionBackend.handleServerEvent: only tabRender/tabExit/tabError/
+  // tabStatus/sessionStatus are decoded). Force the local backend so the GUI
+  // host owns the PTYs directly and bytes reach the WS. The TUI is unaffected
+  // — it consumes `render` snapshots which work over IPC.
+  if (process.env.AIMUX_LOCAL_BACKEND === undefined) {
+    process.env.AIMUX_LOCAL_BACKEND = '1'
+  }
+
   const resolvedConfig = await loadUserConfig()
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
   setMultiRepoConfig(resolvedConfig.multiRepo)
@@ -204,8 +215,17 @@ export async function runGui(): Promise<void> {
   let dumpedTabIds = new Set<string>()
   const sendBytesDump = (tabId: string): void => {
     if (dumpedTabIds.has(tabId)) return
-    const data = backend.serializeBuffer(tabId)
     dumpedTabIds.add(tabId)
+    let data = backend.serializeBuffer(tabId)
+    if (data === '') {
+      // PTY not running for this tab (typically restored from a workspace
+      // snapshot in 'disconnected' state). Fall back to the persisted ANSI
+      // buffer so xterm.js rebuilds the visible scrollback — matches the
+      // legacy DOM renderer behaviour. The user can press Ctrl+r to
+      // actually respawn the PTY when they want to interact.
+      const tab = getState().tabs.find((entry) => entry.id === tabId)
+      data = tab?.buffer ?? ''
+    }
     if (data !== '') {
       send({ data, t: 'bytes', tabId })
     }
@@ -522,18 +542,8 @@ export async function runGui(): Promise<void> {
         activeWs = ws
         // Fresh client → empty xterm.js → re-dump every visible tab.
         dumpedTabIds = new Set<string>()
-        try {
-          broadcastState()
-        } catch (error) {
-          process.stderr.write(`gui.host.open.broadcastState threw: ${String(error)}\n`)
-          logDebug('gui.host.open.broadcastStateThrew', { error: String(error) })
-        }
-        try {
-          replayVisible()
-        } catch (error) {
-          process.stderr.write(`gui.host.open.replayVisible threw: ${String(error)}\n`)
-          logDebug('gui.host.open.replayVisibleThrew', { error: String(error) })
-        }
+        broadcastState()
+        replayVisible()
       },
     },
   })
