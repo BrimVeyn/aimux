@@ -34,14 +34,31 @@ function getActiveTabLabel(tab?: TabSession): string {
 }
 
 const STAGING_DESCRIPTIONS = ['Stage', 'Unstage/delete', 'Commit', 'Push']
+const HINT_JOINER = '  ·  '
 
 function hintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
   return buildHintText(config, modeId, HINT_LIMIT, { excludeDescriptions: [HELP_DESCRIPTION] })
 }
 
 function hintForGitMode(config: ResolvedKeymapConfig, headOffset: number): string {
-  const exclude = headOffset > 0 ? [HELP_DESCRIPTION, ...STAGING_DESCRIPTIONS] : [HELP_DESCRIPTION]
-  return buildHintText(config, 'git-mode', HINT_LIMIT, { excludeDescriptions: exclude })
+  if (headOffset === 0) {
+    return buildHintText(config, 'git-mode', HINT_LIMIT, {
+      excludeDescriptions: [HELP_DESCRIPTION],
+    })
+  }
+  const base = buildHintText(config, 'git-mode', HINT_LIMIT, {
+    excludeDescriptions: [HELP_DESCRIPTION, ...STAGING_DESCRIPTIONS],
+  })
+  const bindings = describeBindings(config, 'git-mode', {
+    dedupeByDescription: true,
+    withDescriptionOnly: true,
+  })
+  const stagingKeys = STAGING_DESCRIPTIONS.map(
+    (desc) => bindings.find((b) => b.description === desc)?.keysDisplay
+  ).filter((k): k is string => k != null && k !== '')
+  if (stagingKeys.length === 0) return base
+  const suffix = `${stagingKeys.join('/')} disabled — press 0 or ] to return`
+  return base !== '' ? `${base}${HINT_JOINER}${suffix}` : suffix
 }
 
 function helpHintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
