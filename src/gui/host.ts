@@ -28,6 +28,7 @@ import { startGitPanelPolling } from '../git/git-poller'
 import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
+import { ensureClaudeSettingsThemePref, syncClaudeTheme } from '../integrations/claude-theme-sync'
 import { getProfileName } from '../profile-paths'
 import { startAIUsageService } from '../services/ai-usage/provider'
 import { createSessionBackend } from '../session-backend/bootstrap'
@@ -47,6 +48,7 @@ import { getStatusBarModel } from '../ui/status-bar-model'
 import {
   applyTheme,
   getCurrentMode,
+  getCurrentTheme,
   getCurrentThemeId,
   getTransparent,
   setMode,
@@ -103,6 +105,39 @@ export async function runGui(): Promise<void> {
     setMode(json.themeMode)
   }
   setTransparent(json.themeTransparent ?? false)
+
+  // Cleanup slots — declared up front so any boot-time subscriber (e.g. the
+  // Claude-theme sync below) can stash its disposer. Slots populated lazily
+  // further down (autosave / diff / divergence / multi-repo / panel) just
+  // mutate this object; assignment order doesn't matter, only that the
+  // declaration is in source order before the first write.
+  const disposers: {
+    autosave: (() => void) | null
+    claudeThemeSync: (() => void) | null
+    diff: (() => void) | null
+    divergence: (() => void) | null
+    multiRepo: (() => void) | null
+    panel: (() => void) | null
+  } = {
+    autosave: null,
+    claudeThemeSync: null,
+    diff: null,
+    divergence: null,
+    multiRepo: null,
+    panel: null,
+  }
+
+  // Claude Code theme harmonisation (beta) — port of src/app.tsx:186-193.
+  // Writes ~/.claude/themes/aimux.json once at boot and on every theme change
+  // so Claude Code's watcher picks up the live aimux theme. No-op when the
+  // beta flag is off.
+  if (resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true) {
+    ensureClaudeSettingsThemePref()
+    syncClaudeTheme(getCurrentTheme(), getCurrentMode())
+    disposers.claudeThemeSync = subscribeThemeChanges((resolved, mode) => {
+      syncClaudeTheme(resolved, mode)
+    })
+  }
 
   // Initial AppState (port of app.tsx's lazy init, trimmed for the GUI).
   let sessionCatalog = loadSessionCatalog()
@@ -172,6 +207,7 @@ export async function runGui(): Promise<void> {
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(sig, () => {
       updateCheckCancelled = true
+      disposers.claudeThemeSync?.()
       flushAutosave()
       disposeBackend()
       process.exit(0)
@@ -367,19 +403,6 @@ export async function runGui(): Promise<void> {
     const id = state.currentSessionId
     const session = id != null && id !== '' ? state.sessions.find((s) => s.id === id) : undefined
     return getSessionProjectPath(session)
-  }
-  const disposers: {
-    autosave: (() => void) | null
-    diff: (() => void) | null
-    divergence: (() => void) | null
-    multiRepo: (() => void) | null
-    panel: (() => void) | null
-  } = {
-    autosave: null,
-    diff: null,
-    divergence: null,
-    multiRepo: null,
-    panel: null,
   }
   let lastPanelProjectPath = projectPathOf(getState())
   let lastPanelHeadOffset = getState().gitMode.headOffset
@@ -693,6 +716,7 @@ export async function runGui(): Promise<void> {
     disposers.divergence?.()
     disposers.diff?.()
     disposers.multiRepo?.()
+    disposers.claudeThemeSync?.()
     disposers.autosave?.()
     disposeBackend()
     await backend.destroy()
