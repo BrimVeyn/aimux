@@ -14,6 +14,10 @@ interface SidebarProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onNewTab: () => void;
+  // Fires before any button inside the sidebar. The shell wires this to
+  // leaveInsertMode so any sidebar interaction drops out of terminal-input,
+  // including clicks on whitespace / labels that aren't buttons themselves.
+  onInteract?: () => void;
   embeddedRatio?: number;
   gitPanelPosition?: "top" | "bottom";
   gitPanelSlot?: React.ReactNode;
@@ -44,6 +48,7 @@ export function Sidebar({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onInteract,
   embeddedRatio = 0.4,
   gitPanelPosition,
   gitPanelSlot,
@@ -60,6 +65,7 @@ export function Sidebar({
     <div
       className="relative z-[60] flex h-full w-56 shrink-0 flex-col overflow-hidden border-r font-mono text-xs"
       style={{ backgroundColor: theme.background, borderColor: theme.border }}
+      onMouseDownCapture={onInteract}
     >
       <div className="flex flex-col gap-0.5 px-3 pt-2 pb-1">
         <span className="font-bold" style={{ color: theme.text }}>

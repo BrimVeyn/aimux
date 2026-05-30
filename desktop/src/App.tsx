@@ -204,12 +204,10 @@ function App() {
   }, [])
 
   // Chrome (SessionBar/Sidebar/StatusBar) sits above the modal backdrop via
-  // z-index, so its buttons stay clickable in any mode. Before the action
-  // runs, return the host to navigation: close any open modal (same Esc path
-  // the backdrop uses) or leave terminal-input mode if we're typing into a
-  // pane. Mirrors the TUI's implicit "modes don't outlive a mouse click on
-  // chrome" expectation.
-  const prepareForChromeAction = useCallback(() => {
+  // z-index, so its buttons stay clickable in any mode. To avoid leaving an
+  // open picker/editor visible behind the chrome action, dismiss it first via
+  // the same Esc path the backdrop click already uses.
+  const dismissModalIfOpen = useCallback(() => {
     if (modalTypeRef.current !== null) {
       socketRef.current?.send({
         ctrl: false,
@@ -219,10 +217,6 @@ function App() {
         shift: false,
         t: 'key',
       })
-      return
-    }
-    if (focusModeRef.current === 'terminal-input') {
-      socketRef.current?.send({ t: 'leaveInsertMode' })
     }
   }, [])
 
@@ -232,46 +226,56 @@ function App() {
     }
   }, [])
 
+  // Sidebar (the workspace's navigation bar — tab list + "+ New assistant")
+  // is the one piece of chrome that means "I'm done typing, take me back".
+  // Mouse-down anywhere inside it drops out of terminal-input — separate from
+  // SessionBar/StatusBar interactions, which stay neutral.
+  const leaveInsertMode = useCallback(() => {
+    if (focusModeRef.current === 'terminal-input') {
+      socketRef.current?.send({ t: 'leaveInsertMode' })
+    }
+  }, [])
+
   const activateTab = useCallback(
     (tabId: string) => {
-      prepareForChromeAction()
+      dismissModalIfOpen()
       socketRef.current?.send({ t: 'paneActivate', tabId })
     },
-    [prepareForChromeAction]
+    [dismissModalIfOpen]
   )
 
   const closeTab = useCallback(
     (tabId: string) => {
-      prepareForChromeAction()
+      dismissModalIfOpen()
       socketRef.current?.send({ t: 'closeTab', tabId })
     },
-    [prepareForChromeAction]
+    [dismissModalIfOpen]
   )
 
   const newTab = useCallback(() => {
-    prepareForChromeAction()
+    dismissModalIfOpen()
     socketRef.current?.send({ t: 'openNewTab' })
-  }, [prepareForChromeAction])
+  }, [dismissModalIfOpen])
 
   const openUsage = useCallback(() => {
-    prepareForChromeAction()
+    dismissModalIfOpen()
     socketRef.current?.send({ t: 'openAiUsageModal' })
-  }, [prepareForChromeAction])
+  }, [dismissModalIfOpen])
 
   const switchSession = useCallback(
     (sessionId: string) => {
-      prepareForChromeAction()
+      dismissModalIfOpen()
       socketRef.current?.send({ sessionId, t: 'switchSession' })
     },
-    [prepareForChromeAction]
+    [dismissModalIfOpen]
   )
 
   const deleteSession = useCallback(
     (sessionId: string) => {
-      prepareForChromeAction()
+      dismissModalIfOpen()
       socketRef.current?.send({ sessionId, t: 'deleteSession' })
     },
-    [prepareForChromeAction]
+    [dismissModalIfOpen]
   )
 
   const selectModal = useCallback((index: number) => {
@@ -283,7 +287,7 @@ function App() {
   }, [])
 
   const newSession = useCallback(() => {
-    prepareForChromeAction()
+    dismissModalIfOpen()
     void (async () => {
       let path: string | null = null
       try {
@@ -296,7 +300,7 @@ function App() {
         socketRef.current?.send({ path, t: 'createSession' })
       }
     })()
-  }, [prepareForChromeAction])
+  }, [dismissModalIfOpen])
 
   const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
     socketRef.current?.send({ cols, rows, t: 'resizeTab', tabId })
@@ -482,6 +486,7 @@ function App() {
               onSelectTab={activateTab}
               onCloseTab={closeTab}
               onNewTab={newTab}
+              onInteract={leaveInsertMode}
               embeddedRatio={showPanelEmbedded ? gitPane?.embeddedRatio : undefined}
               gitPanelPosition={
                 showPanelEmbedded ? (gitPane?.position as 'top' | 'bottom') : undefined
