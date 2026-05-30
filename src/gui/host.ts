@@ -290,7 +290,7 @@ export async function runGui(): Promise<void> {
 
   const snippetDriver = createSnippetTriggerDriver({
     backend,
-    getBranch: () => null,
+    getBranch: () => getState().gitPanel.branch,
     getSnippets: () => getState().snippets,
     getTab: (tabId) => getState().tabs.find((entry) => entry.id === tabId),
     getTriggerChar: () => resolvedConfig.snippetTriggerChar,
