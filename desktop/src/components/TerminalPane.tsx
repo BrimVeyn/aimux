@@ -6,6 +6,7 @@ interface TerminalPaneProps {
   bytesEmitter: EventTarget;
   isActive: boolean;
   onActivate: (tabId: string) => void;
+  onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
   tab: ProjectedTab | undefined;
   tabId: string;
@@ -19,6 +20,7 @@ export function TerminalPane({
   bytesEmitter,
   isActive,
   onActivate,
+  onRequestBytes,
   onResizeTab,
   tab,
   tabId,
@@ -53,6 +55,7 @@ export function TerminalPane({
         <XtermPane
           key={tabId}
           bytesEmitter={bytesEmitter}
+          onRequestBytes={onRequestBytes}
           onResize={onResizeTab}
           tabId={tabId}
           themeId={themeId}

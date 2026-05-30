@@ -217,24 +217,14 @@ export async function runGui(): Promise<void> {
     },
   })
 
-  // Forward renders for every VISIBLE pane (all leaves of the active group's tree).
-  const lastRender = new Map<string, GuiServerMessage & { t: 'render' }>()
   const visibleTabIds = (): string[] =>
     computeVisibleTabIds(getState().layoutTrees, getState().tabGroupMap, getState().activeTabId)
-  backend.on('render', (tabId, viewport, modes) => {
-    const message: GuiServerMessage & { t: 'render' } = { modes, t: 'render', tabId, viewport }
-    lastRender.set(tabId, message)
-    if (visibleTabIds().includes(tabId)) {
-      send(message)
-    }
-  })
-  // Per-WS-connection set of tabs we've already sent a serialized buffer dump
-  // for, so live `bytes` events don't double-paint the scrollback. Cleared on
-  // every new connection (the client xterm.js is empty at that point).
-  let dumpedTabIds = new Set<string>()
+  // Serialize a tab's current scrollback as an ANSI dump and push it to the
+  // client. Pull-based: the frontend xterm.js requests this on mount (one
+  // request per fresh terminal instance) so the host never has to guess when a
+  // dump is needed. This avoids the double-paint bug where pushing a dump into
+  // an xterm that already holds the scrollback stacks duplicate splash screens.
   const sendBytesDump = (tabId: string): void => {
-    if (dumpedTabIds.has(tabId)) return
-    dumpedTabIds.add(tabId)
     let data = backend.serializeBuffer(tabId)
     if (data === '') {
       // PTY not running for this tab (typically restored from a workspace
@@ -250,26 +240,11 @@ export async function runGui(): Promise<void> {
     }
   }
   backend.on('bytes', (tabId, data) => {
-    // Live PTY output: only forward once the initial dump has been sent for
-    // this tab on the current connection, so the client xterm.js never sees
-    // a delta before the buffer it belongs to.
+    // Live PTY output: forward to the client for every visible pane. The
+    // initial scrollback comes separately via the frontend's requestBytes.
     if (!visibleTabIds().includes(tabId)) return
-    if (!dumpedTabIds.has(tabId)) {
-      sendBytesDump(tabId)
-    }
     send({ data, t: 'bytes', tabId })
   })
-  const replayVisible = (): void => {
-    for (const tabId of visibleTabIds()) {
-      // Always replay the serialized buffer first — it's the source of truth
-      // for the visible scrollback after a reconnect / tab switch.
-      sendBytesDump(tabId)
-      const cached = lastRender.get(tabId)
-      if (cached) {
-        send(cached)
-      }
-    }
-  }
 
   // React to session/active-tab changes (attach + setActiveTab), like the TUI runtime.
   const layoutRef: { current: LayoutState } = { current: getState().layout }
@@ -414,7 +389,6 @@ export async function runGui(): Promise<void> {
     }
     directorySearch.onModal(state.modal)
     scheduleBroadcast()
-    replayVisible()
   })
 
   // Initial attach (load-session above fired before subscribe was wired).
@@ -456,9 +430,6 @@ export async function runGui(): Promise<void> {
       close(ws) {
         if (activeWs === ws) {
           activeWs = null
-          // Drop the per-connection dump set so the next client gets a fresh
-          // serialized buffer for each visible tab on connect.
-          dumpedTabIds = new Set<string>()
         }
       },
       message(ws, raw) {
@@ -499,12 +470,12 @@ export async function runGui(): Promise<void> {
             backend.resizeTab(message.tabId, message.cols, message.rows)
             break
           case 'paneActivate':
-            // The frontend remounts xterm.js per tabId (TerminalPane keys on
-            // tabId), so the newly-active tab's xterm starts empty. Forget the
-            // dump-sent marker so the next replayVisible re-streams the
-            // serialized buffer into the fresh terminal.
-            dumpedTabIds.delete(message.tabId)
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
+            break
+          case 'requestBytes':
+            // The frontend xterm.js pulls its scrollback on mount (one request
+            // per fresh instance). Serialize the current buffer and send it.
+            sendBytesDump(message.tabId)
             break
           case 'modalSelect':
             pipeline.selectModalIndex(message.index)
@@ -564,10 +535,10 @@ export async function runGui(): Promise<void> {
       },
       open(ws) {
         activeWs = ws
-        // Fresh client → empty xterm.js → re-dump every visible tab.
-        dumpedTabIds = new Set<string>()
+        // Push the initial state projection. Each xterm.js pane pulls its own
+        // scrollback via requestBytes once it mounts, so there's nothing to
+        // replay here.
         broadcastState()
-        replayVisible()
       },
     },
   })

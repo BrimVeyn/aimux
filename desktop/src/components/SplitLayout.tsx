@@ -8,6 +8,7 @@ interface SplitLayoutProps {
   bytesEmitter: EventTarget;
   node: LayoutNode;
   onActivate: (tabId: string) => void;
+  onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
   onSetSplitRatio: (tabId: string, ratio: number, axis: "horizontal" | "vertical") => void;
   tabsById: Record<string, ProjectedTab>;
@@ -26,6 +27,7 @@ export function SplitLayout(props: SplitLayoutProps) {
         bytesEmitter={props.bytesEmitter}
         isActive={node.tabId === props.activeTabId}
         onActivate={props.onActivate}
+        onRequestBytes={props.onRequestBytes}
         onResizeTab={props.onResizeTab}
         tab={props.tabsById[node.tabId]}
         tabId={node.tabId}

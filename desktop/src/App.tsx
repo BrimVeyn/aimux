@@ -141,6 +141,10 @@ function App() {
     socketRef.current?.send({ cols, rows, t: "resizeTab", tabId });
   }, []);
 
+  const requestBytes = useCallback((tabId: string) => {
+    socketRef.current?.send({ t: "requestBytes", tabId });
+  }, []);
+
   const setSplitRatio = useCallback(
     (tabId: string, ratio: number, axis: "horizontal" | "vertical") => {
       socketRef.current?.send({ axis, ratio, t: "setSplitRatio", tabId });
@@ -274,6 +278,7 @@ function App() {
                   bytesEmitter={bytesEmitterRef.current}
                   node={activeTree}
                   onActivate={activateTab}
+                  onRequestBytes={requestBytes}
                   onResizeTab={resizeTab}
                   onSetSplitRatio={setSplitRatio}
                   tabsById={tabsById}
@@ -284,6 +289,7 @@ function App() {
                   bytesEmitter={bytesEmitterRef.current}
                   isActive
                   onActivate={activateTab}
+                  onRequestBytes={requestBytes}
                   onResizeTab={resizeTab}
                   tab={tabsById[activeTabId]}
                   tabId={activeTabId}

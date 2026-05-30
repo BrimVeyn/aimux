@@ -9,6 +9,7 @@ import "@xterm/xterm/css/xterm.css";
 
 interface XtermPaneProps {
   bytesEmitter: EventTarget;
+  onRequestBytes: (tabId: string) => void;
   onResize: (tabId: string, cols: number, rows: number) => void;
   tabId: string;
   themeId: string;
@@ -30,7 +31,13 @@ function readXtermTheme(): ITheme {
   };
 }
 
-export function XtermPane({ bytesEmitter, onResize, tabId, themeId }: XtermPaneProps) {
+export function XtermPane({
+  bytesEmitter,
+  onRequestBytes,
+  onResize,
+  tabId,
+  themeId,
+}: XtermPaneProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -81,6 +88,11 @@ export function XtermPane({ bytesEmitter, onResize, tabId, themeId }: XtermPaneP
     };
     bytesEmitter.addEventListener(`bytes-${tabId}`, onBytes);
 
+    // Pull the scrollback dump for this tab now that the listener is attached.
+    // Pull-based (vs the host pushing on paneActivate) so a fresh xterm mount
+    // is the single trigger — no duplicate splash when clicking the active tab.
+    onRequestBytes(tabId);
+
     const ro = new ResizeObserver(() => {
       try {
         fit.fit();
@@ -98,7 +110,8 @@ export function XtermPane({ bytesEmitter, onResize, tabId, themeId }: XtermPaneP
       termRef.current = null;
       fitRef.current = null;
     };
-    // tabId / bytesEmitter / onResize stable for the pane's lifetime.
+    // tabId / bytesEmitter / onResize / onRequestBytes stable for the pane's
+    // lifetime (TerminalPane keys on tabId, so a switch remounts).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

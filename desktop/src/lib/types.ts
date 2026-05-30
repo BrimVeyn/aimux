@@ -269,6 +269,7 @@ export type GuiClientMessage =
   | { t: "createSession"; path: string }
   | { t: "deleteSession"; sessionId: string }
   | { t: "openWorktreeMove"; sourceWorktreeId: string }
+  | { t: "requestBytes"; tabId: string }
   | { t: "toggleWorktreeMoveDelete" };
 
 export type ToastLevel = "info" | "success" | "error";
