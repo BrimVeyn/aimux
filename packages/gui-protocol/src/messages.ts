@@ -1,5 +1,7 @@
 import type { AppStateProjection, SplitDirection } from './projection'
 
+import { type GuiIntent, parseGuiIntent } from './intents'
+
 // Thin WebSocket contract between the GUI host and the browser/WebView renderer.
 // The host runs aimux's real brain (reducer + keymaps + modes + side-effects);
 // the browser sends normalized input and renders the streamed AppState. This is
@@ -39,6 +41,7 @@ export type GuiClientMessage =
   | { t: 'toggleWorktreeMoveDelete' }
   | { t: 'openAiUsageModal' }
   | { t: 'openSnippetEditor'; snippetId?: string }
+  | { t: 'intent'; intent: GuiIntent }
 
 export type ToastLevel = 'info' | 'success' | 'error'
 
@@ -155,6 +158,10 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return value.snippetId === undefined
         ? { t: 'openSnippetEditor' }
         : { snippetId: value.snippetId, t: 'openSnippetEditor' }
+    case 'intent': {
+      const intent = parseGuiIntent(value.intent)
+      return intent === null ? null : { intent, t: 'intent' }
+    }
     default:
       return null
   }

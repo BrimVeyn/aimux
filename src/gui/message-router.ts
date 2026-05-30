@@ -12,6 +12,7 @@ import {
   handleSwitchSessionEffect,
 } from '../app-runtime/session-actions'
 import { logDebug } from '../debug/input-log'
+import { dispatchIntent } from './intent-handlers'
 
 /** Per-connection state held by the transport for rate limiting. */
 export interface ActiveWsState {
@@ -145,6 +146,9 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
       break
     case 'openSnippetEditor':
       dispatch({ snippetId: message.snippetId, type: 'open-snippet-editor' })
+      break
+    case 'intent':
+      dispatchIntent(message.intent, runtime)
       break
     default:
       break

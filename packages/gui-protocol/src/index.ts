@@ -5,6 +5,7 @@
 // The host MUST produce the explicit AppStateProjection — adding a field to
 // the projection requires adding it here first.
 
+export * from './intents'
 export * from './messages'
 export * from './projection'
 
