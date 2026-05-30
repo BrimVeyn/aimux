@@ -73,7 +73,6 @@ function resolveSessionBar(
 ): ResolvedConfig['sessionBar'] {
   if (!userConfig) return {}
   return {
-    initialPosition: userConfig.initialPosition ?? userConfig.position,
     initialVisible: userConfig.initialVisible ?? userConfig.visible,
   }
 }

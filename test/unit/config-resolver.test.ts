@@ -6,7 +6,6 @@ describe('resolveConfig startup override aliases', () => {
   test('normalizes deprecated theme and session bar fields', () => {
     const config = resolveConfig({
       sessionBar: {
-        position: 'bottom',
         visible: false,
       },
       theme: {
@@ -16,7 +15,6 @@ describe('resolveConfig startup override aliases', () => {
 
     expect(config.theme).toEqual({ initialId: undefined, initialMode: 'light' })
     expect(config.sessionBar).toEqual({
-      initialPosition: 'bottom',
       initialVisible: false,
     })
   })
@@ -40,9 +38,7 @@ describe('resolveConfig startup override aliases', () => {
         visible: true,
       },
       sessionBar: {
-        initialPosition: 'top',
         initialVisible: true,
-        position: 'bottom',
         visible: false,
       },
       theme: {
@@ -53,7 +49,6 @@ describe('resolveConfig startup override aliases', () => {
 
     expect(config.theme?.initialMode).toBe('dark')
     expect(config.sessionBar).toEqual({
-      initialPosition: 'top',
       initialVisible: true,
     })
     expect(config.gitPane).toEqual({

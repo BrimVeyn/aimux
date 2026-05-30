@@ -175,8 +175,7 @@ export function useTerminalResize({
   const terminalSize = useMemo(() => {
     const sidebarWidth = state.sidebar.visible ? state.sidebar.width : 0
     const sessionBarRows = state.sessionBar.visible ? 1 : 0
-    const sessionBarTopOffset =
-      state.sessionBar.visible && state.sessionBar.position === 'top' ? 1 : 0
+    const sessionBarTopOffset = sessionBarRows
     const reservedRows =
       MAIN_AREA_VERTICAL_PADDING +
       STATUS_BAR_HEIGHT +
@@ -205,7 +204,6 @@ export function useTerminalResize({
     state.sidebar.visible,
     state.sidebar.width,
     state.sessionBar.visible,
-    state.sessionBar.position,
     gitPaneInPaneMode,
     state.gitPane.position,
     state.gitPane.paneRatio,
@@ -233,7 +231,6 @@ export function useTerminalResize({
     state.sidebar.visible,
     state.sidebar.width,
     state.sessionBar.visible,
-    state.sessionBar.position,
     gitPaneInPaneMode,
     state.gitPane.position,
     state.gitPane.paneRatio,

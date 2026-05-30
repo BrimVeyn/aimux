@@ -141,11 +141,8 @@ export interface SessionRecord {
   activeWorktreeId?: string
 }
 
-export type SessionBarPosition = 'top' | 'bottom'
-
 export interface SessionBarState {
   visible: boolean
-  position: SessionBarPosition
 }
 
 export interface TabSession {
@@ -619,7 +616,6 @@ export type UIAction =
   | { type: 'set-git-pane-position'; position: GitPanePosition }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
-  | { type: 'set-session-bar-position'; position: SessionBarPosition }
 
 // -- Git panel actions --
 export interface GitRefreshPayload {

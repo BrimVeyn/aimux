@@ -34,9 +34,6 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
         ...state,
         sessionBar: { ...state.sessionBar, visible: !state.sessionBar.visible },
       }
-    case 'set-session-bar-position':
-      if (state.sessionBar.position === action.position) return state
-      return { ...state, sessionBar: { ...state.sessionBar, position: action.position } }
     default:
       return null
   }

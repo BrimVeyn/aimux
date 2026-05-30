@@ -100,8 +100,6 @@ export function App({
     const json = loadConfig()
     const sessionBarVisible =
       resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
-    const sessionBarPosition =
-      resolvedConfig.sessionBar?.initialPosition ?? json.sessionBarPosition ?? 'top'
     const sidebarOverrides = json.sidebar
 
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
@@ -149,7 +147,6 @@ export function App({
       sessionCatalog.length === 0,
       {
         gitPane: gitPaneOverrides,
-        sessionBarPosition,
         sessionBarVisible,
         sidebar: sidebarOverrides,
       }

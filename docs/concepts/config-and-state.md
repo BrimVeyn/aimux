@@ -60,7 +60,6 @@ Today it is used for values such as:
 - `themeId`
 - `gitPane` (`{ visible, mode, position, ratio, diffModeRatio, fileListMode }`)
 - `sessionBarVisible`
-- `sessionBarPosition`
 - `workspaceSnapshot` for legacy migration
 - `skippedUpdateVersion`
 
