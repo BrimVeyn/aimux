@@ -9,37 +9,35 @@ import { type GitFileStatus, statusColor, statusGlyph } from "./git-status-color
 
 interface SectionHeaderProps {
   count: number;
-  fileListMode: "flat" | "tree";
-  showListModeToggle: boolean;
   title: string;
 }
 
-// Mirrors the section header row (~line 295 in src/ui/components/git/git-panel.tsx).
-export function SectionHeader({
-  count,
-  fileListMode,
-  showListModeToggle,
-  title,
-}: SectionHeaderProps): ReactNode {
+// Quiet section divider: title and a tabular count, separated by a fine dot.
+// No chip, no pill — the typography alone carries the hierarchy.
+export function SectionHeader({ count, title }: SectionHeaderProps): ReactNode {
   return (
-    <div
-      className="flex items-center justify-between"
-      style={{ color: theme.text, paddingRight: "0.5ch" }}
-    >
-      <span className="font-bold">
-        {title} ({count})
+    <div className="flex items-baseline gap-1.5 px-1 py-1">
+      <span
+        className="chrome-meta uppercase"
+        style={{
+          color: theme.textMuted,
+          letterSpacing: "0.08em",
+          fontWeight: 600,
+        }}
+      >
+        {title}
       </span>
-      {showListModeToggle ? (
-        <span className="flex gap-[1ch]">
-          <span style={{ color: fileListMode === "tree" ? theme.primary : theme.textMuted }}>
-            tree
-          </span>
-          <span style={{ color: theme.textMuted }}>|</span>
-          <span style={{ color: fileListMode === "flat" ? theme.primary : theme.textMuted }}>
-            flat
-          </span>
-        </span>
-      ) : null}
+      <span
+        aria-hidden
+        className="inline-block h-[3px] w-[3px] rounded-full"
+        style={{ backgroundColor: theme.textMuted, opacity: 0.4 }}
+      />
+      <span
+        className="chrome-code tabular-nums"
+        style={{ color: theme.textMuted, opacity: 0.85 }}
+      >
+        {count}
+      </span>
     </div>
   );
 }
@@ -50,32 +48,52 @@ interface FolderRowProps {
   row: GitTreeFolderRow;
 }
 
-// Mirrors FolderRow (~line 170). Click toggles collapse via the
-// `git.toggleFolder` intent, matching the TUI's onMouseDown chevron.
 export function FolderRow({ isSelected, onToggleFolder, row }: FolderRowProps): ReactNode {
-  const bg = isSelected ? theme.backgroundElement : undefined;
   const handleClick = (e: MouseEvent<HTMLDivElement>): void => {
     if (onToggleFolder === undefined) return;
     e.preventDefault();
     onToggleFolder(row.key);
   };
   const title = row.isCollapsed ? "Click to expand" : "Click to collapse";
-  // The TUI prepends a row marker (›/space) via selection bg only; the GUI keeps
-  // parity by tinting the bg the same way (no extra glyph for folders).
   return (
     <div
-      className="flex items-center gap-[1ch] whitespace-nowrap"
+      className="group relative flex items-center gap-1.5 whitespace-nowrap px-1 py-[2px] transition-[background-color] duration-150 ease-out"
       onClick={onToggleFolder !== undefined ? handleClick : undefined}
       style={{
-        backgroundColor: bg,
+        backgroundColor: isSelected ? theme.backgroundElement : "transparent",
         cursor: onToggleFolder !== undefined ? "pointer" : undefined,
-        paddingLeft: `${row.depth * 2}ch`,
+        paddingLeft: `calc(${row.depth * 1.25}rem + 4px)`,
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected && onToggleFolder !== undefined) {
+          e.currentTarget.style.backgroundColor = `color-mix(in oklab, ${theme.backgroundElement} 40%, transparent)`;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
       }}
       title={onToggleFolder !== undefined ? title : undefined}
     >
-      <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "▸" : "▾"}</span>
-      <span style={{ color: theme.textMuted }}>{row.isCollapsed ? "" : ""}</span>
-      <span className="overflow-hidden text-ellipsis" style={{ color: theme.textMuted }}>
+      {isSelected ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0.5 bottom-0.5 left-0 w-[2px] rounded-r-full"
+          style={{ backgroundColor: theme.primary }}
+        />
+      ) : null}
+      <span
+        aria-hidden
+        className="inline-block w-2.5 text-center"
+        style={{ color: theme.textMuted, fontSize: "10px", lineHeight: 1 }}
+      >
+        {row.isCollapsed ? "▸" : "▾"}
+      </span>
+      <span
+        className="chrome-code overflow-hidden text-ellipsis"
+        style={{ color: theme.textMuted }}
+      >
         {row.name}
       </span>
     </div>
@@ -109,9 +127,6 @@ function stripTrailingSlash(prefix: string): string {
   return prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
 }
 
-// Mirrors FileRow + renderFileLabel + renderDiffCount (~line 100–260). Stage 2a:
-// skip the repo-prefix tag (multi-repo disambiguation is a later stage) and the
-// renamedFrom path (the wire shape uses `oldPath` which isn't exposed yet).
 export function FileRow({
   addedW,
   diffCountEnabled,
@@ -123,17 +138,14 @@ export function FileRow({
   row,
 }: FileRowProps): ReactNode {
   const file = row.file as GitFileEntryLite;
-  const bg = isSelected ? theme.backgroundElement : undefined;
   const isUntracked = file.section === "untracked";
   const glyph = statusGlyph(file.status as GitFileStatus, isUntracked);
+  const glyphColor = statusColor(file.status as GitFileStatus);
   const hasNumstat = file.added != null || file.removed != null;
   const { basename, prefix } = splitPath(file.path);
   const dir = stripTrailingSlash(prefix);
   const showDir = fileListMode === "flat" && dir !== "";
-  const depthPad = fileListMode === "tree" ? `${row.depth * 2}ch` : "0";
-  // P2.1: double-click toggles staged-ness. `historical` rows are read-only
-  // (HEAD~N walk) so we no-op there. Single-click is unchanged (selection
-  // remains keyboard-driven for now).
+  const depthPad = fileListMode === "tree" ? `calc(${row.depth * 1.25}rem + 4px)` : "4px";
   const isStaged = file.section === "staged";
   const isToggleable =
     file.section === "staged" || file.section === "unstaged" || file.section === "untracked";
@@ -146,7 +158,6 @@ export function FileRow({
     if (!isToggleable) {
       return;
     }
-    // Avoid the browser's double-click text-selection side effect on the row.
     e.preventDefault();
     if (isStaged) {
       onDoubleClickUnstage?.(file.path);
@@ -156,32 +167,65 @@ export function FileRow({
   };
   return (
     <div
-      className="flex items-center gap-[1ch] whitespace-nowrap"
+      className="group relative flex items-center gap-1.5 whitespace-nowrap py-[2px] pr-1 transition-[background-color] duration-150 ease-out"
       onDoubleClick={handleDoubleClick}
-      style={{ backgroundColor: bg }}
+      style={{
+        backgroundColor: isSelected ? theme.backgroundElement : "transparent",
+        paddingLeft: depthPad,
+      }}
+      onMouseEnter={(e) => {
+        if (!isSelected && isToggleable) {
+          e.currentTarget.style.backgroundColor = `color-mix(in oklab, ${theme.backgroundElement} 35%, transparent)`;
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isSelected) {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }
+      }}
       title={doubleClickTitle}
     >
+      {isSelected ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-0.5 bottom-0.5 left-0 w-[2px] rounded-r-full"
+          style={{ backgroundColor: theme.primary }}
+        />
+      ) : null}
       <span
-        className="inline-flex w-[2ch] shrink-0 justify-center font-bold"
-        style={{ color: statusColor(file.status as GitFileStatus) }}
+        aria-hidden
+        className="inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-[4px]"
+        style={{
+          backgroundColor: `color-mix(in oklab, ${glyphColor} 16%, transparent)`,
+          color: glyphColor,
+          fontFamily: "'JetBrainsMono Nerd Font Mono', monospace",
+          fontSize: "9.5px",
+          fontWeight: 600,
+          lineHeight: 1,
+        }}
       >
         {glyph}
       </span>
-      <span
-        className="min-w-0 flex-1 overflow-hidden text-ellipsis"
-        style={{ paddingLeft: depthPad }}
-      >
+      <span className="chrome-code min-w-0 flex-1 overflow-hidden text-ellipsis">
         <span style={{ color: theme.text }}>{basename}</span>
-        {showDir ? <span style={{ color: theme.textMuted }}>{" "}{dir}</span> : null}
+        {showDir ? (
+          <span style={{ color: theme.textMuted, opacity: 0.75 }}>
+            {" "}
+            {dir}
+          </span>
+        ) : null}
       </span>
       {diffCountEnabled ? (
         hasNumstat ? (
-          <span className="flex shrink-0 gap-[1ch]">
+          <span className="chrome-code flex shrink-0 gap-1.5 tabular-nums">
             <span style={{ color: theme.diffAdded }}>{`+${padStart(file.added, addedW)}`}</span>
             <span style={{ color: theme.diffRemoved }}>{`−${padStart(file.removed, removedW)}`}</span>
           </span>
         ) : (
-          <span className="shrink-0" style={{ color: theme.textMuted }}>
+          <span
+            className="chrome-code shrink-0"
+            style={{ color: theme.textMuted, opacity: 0.6 }}
+          >
             —
           </span>
         )
