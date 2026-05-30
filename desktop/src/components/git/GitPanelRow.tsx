@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import type { GitTreeFileRow, GitTreeFolderRow } from "@aimux/state/git-tree";
 
@@ -73,6 +73,8 @@ interface FileRowProps {
   diffCountEnabled: boolean;
   fileListMode: "flat" | "tree";
   isSelected: boolean;
+  onDoubleClickStage?: (path: string) => void;
+  onDoubleClickUnstage?: (path: string) => void;
   removedW: number;
   row: GitTreeFileRow;
 }
@@ -101,6 +103,8 @@ export function FileRow({
   diffCountEnabled,
   fileListMode,
   isSelected,
+  onDoubleClickStage,
+  onDoubleClickUnstage,
   removedW,
   row,
 }: FileRowProps): ReactNode {
@@ -113,10 +117,35 @@ export function FileRow({
   const dir = stripTrailingSlash(prefix);
   const showDir = fileListMode === "flat" && dir !== "";
   const depthPad = fileListMode === "tree" ? `${row.depth * 2}ch` : "0";
+  // P2.1: double-click toggles staged-ness. `historical` rows are read-only
+  // (HEAD~N walk) so we no-op there. Single-click is unchanged (selection
+  // remains keyboard-driven for now).
+  const isStaged = file.section === "staged";
+  const isToggleable =
+    file.section === "staged" || file.section === "unstaged" || file.section === "untracked";
+  const doubleClickTitle = isStaged
+    ? "Double-click to unstage"
+    : isToggleable
+      ? "Double-click to stage"
+      : "";
+  const handleDoubleClick = (e: MouseEvent<HTMLDivElement>): void => {
+    if (!isToggleable) {
+      return;
+    }
+    // Avoid the browser's double-click text-selection side effect on the row.
+    e.preventDefault();
+    if (isStaged) {
+      onDoubleClickUnstage?.(file.path);
+    } else {
+      onDoubleClickStage?.(file.path);
+    }
+  };
   return (
     <div
       className="flex items-center gap-[1ch] whitespace-nowrap"
+      onDoubleClick={handleDoubleClick}
       style={{ backgroundColor: bg }}
+      title={doubleClickTitle}
     >
       <span
         className="inline-flex w-[2ch] shrink-0 justify-center font-bold"

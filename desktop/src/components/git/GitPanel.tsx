@@ -17,6 +17,8 @@ interface GitPanelProps {
   gitMode: GitModeLite;
   gitPane: GitPaneLite;
   gitPanel: GitPanelLite;
+  onStageFile?: (path: string) => void;
+  onUnstageFile?: (path: string) => void;
   projectPath?: string;
 }
 
@@ -76,7 +78,14 @@ function computeStatusPlaceholder(
   return null;
 }
 
-export function GitPanel({ gitMode, gitPane, gitPanel, projectPath }: GitPanelProps): ReactNode {
+export function GitPanel({
+  gitMode,
+  gitPane,
+  gitPanel,
+  onStageFile,
+  onUnstageFile,
+  projectPath,
+}: GitPanelProps): ReactNode {
   const selectedEntryKey = gitMode.selectedEntryKey;
   // GitFileEntryLite is the wire-side projection of GitFileEntry; the optional
   // fields differ (e.g. `added: number | null` vs `added?: number`) but
@@ -165,6 +174,8 @@ export function GitPanel({ gitMode, gitPane, gitPanel, projectPath }: GitPanelPr
                         diffCountEnabled={gitPane.diffCount.enabled}
                         fileListMode={gitPane.fileListMode}
                         isSelected={isSelected}
+                        onDoubleClickStage={onStageFile}
+                        onDoubleClickUnstage={onUnstageFile}
                         removedW={removedW}
                         row={row}
                       />

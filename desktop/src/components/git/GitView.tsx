@@ -14,6 +14,8 @@ interface GitViewProps {
   gitPane: GitPaneLite;
   gitPanel: GitPanelLite;
   onExit?: () => void;
+  onStageFile?: (path: string) => void;
+  onUnstageFile?: (path: string) => void;
   projectPath?: string;
   themeId: string;
 }
@@ -23,6 +25,8 @@ export function GitView({
   gitPane,
   gitPanel,
   onExit,
+  onStageFile,
+  onUnstageFile,
   projectPath,
   themeId,
 }: GitViewProps): ReactNode {
@@ -97,6 +101,8 @@ export function GitView({
               gitMode={gitMode}
               gitPane={gitPane}
               gitPanel={gitPanel}
+              onStageFile={onStageFile}
+              onUnstageFile={onUnstageFile}
               projectPath={projectPath}
             />
           </div>
