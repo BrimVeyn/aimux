@@ -1,9 +1,10 @@
 import type { GuiIntent } from '@aimux/gui-protocol'
 
-import type { AppAction, GitFileSection } from '../state/types'
+import type { AppAction, AppState, GitFileSection, SnippetRecord } from '../state/types'
 import type { GuiRuntime } from './runtime'
 
-import { applySnippetSubmit } from '../app-runtime/snippet-actions'
+import { createPrefixedId } from '../platform/id'
+import { isConfigSnippetId, saveSnippetCatalog } from '../state/snippet-catalog'
 
 // Discriminated intent → existing reducer-action / pipeline-call dispatch.
 // Hard rule (roadmap, DB1): "Tout intent GUI doit aboutir à une action du
@@ -53,7 +54,7 @@ function handleSnippetSubmit(
   if (snippetId === undefined && state.modal.type === 'snippet-editor') {
     snippetId = state.modal.sessionTargetId ?? undefined
   }
-  applySnippetSubmit(
+  persistSnippetSubmit(
     {
       content: intent.content,
       name: intent.name,
@@ -64,6 +65,39 @@ function handleSnippetSubmit(
     runtime.dispatch
   )
   runtime.dispatch({ type: 'close-modal' })
+}
+
+// GUI-local persistence for the client-authoritative snippet editor (P1.3).
+// Mirrors the validation rules of saveSnippetEditorState (trim, skip empty,
+// config-pinned read-only) but reads from a caller-provided payload instead
+// of state.modal.* — the modal owns its in-flight buffers in React. Reuses
+// the same persistence tail (saveSnippetCatalog + set-snippets action) as
+// the TUI's handleSaveSnippetEditorEffect, so both flows converge on the
+// same on-disk + in-memory shape.
+function persistSnippetSubmit(
+  payload: { name: string; trigger: string; content: string; snippetId?: string },
+  state: AppState,
+  dispatch: (action: AppAction) => void
+): void {
+  const name = payload.name.trim()
+  const content = payload.content.trim()
+  const trimmedTrigger = payload.trigger.trim()
+  if (name === '' || content === '') return
+
+  const snippetId = payload.snippetId
+  if (snippetId !== undefined && snippetId !== '' && isConfigSnippetId(snippetId)) return
+
+  const trigger = trimmedTrigger.length > 0 ? trimmedTrigger : undefined
+
+  const updated: SnippetRecord[] =
+    snippetId !== undefined && snippetId !== ''
+      ? state.snippets.map((snippet) =>
+          snippet.id === snippetId ? { ...snippet, content, name, trigger } : snippet
+        )
+      : [...state.snippets, { content, id: createPrefixedId('snip'), name, trigger }]
+
+  saveSnippetCatalog(updated)
+  dispatch({ snippets: updated, type: 'set-snippets' })
 }
 
 // Mirrors `gitToggleSelected` in packages/aimux-config/src/actions.ts:611-628:

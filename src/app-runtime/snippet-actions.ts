@@ -102,37 +102,3 @@ export function handleSaveSnippetEditorEffect(
   saveSnippetCatalog(updated)
   dispatch({ snippets: updated, type: 'set-snippets' })
 }
-
-// Client-authoritative variant used by the GUI snippet-editor pilot (roadmap
-// P1.3). The TUI's `handleSaveSnippetEditorEffect` reads buffers from
-// `state.modal`; the GUI carries the committed values in the intent payload
-// instead, so the in-flight UI state never has to round-trip through the
-// host. Trim/validation rules mirror `getSnippetEditorValue` +
-// `saveSnippetEditorState`: empty name or empty content → no-op (matches the
-// TUI's silent-skip semantics, see `saveSnippetEditorState` guards).
-// Config-pinned snippets stay read-only.
-export function applySnippetSubmit(
-  payload: { name: string; trigger: string; content: string; snippetId?: string },
-  state: AppState,
-  dispatch: (action: AppAction) => void
-): void {
-  const name = payload.name.trim()
-  const content = payload.content.trim()
-  const trimmedTrigger = payload.trigger.trim()
-  if (name === '' || content === '') return
-
-  const snippetId = payload.snippetId
-  if (snippetId !== undefined && snippetId !== '' && isConfigSnippetId(snippetId)) return
-
-  const trigger = trimmedTrigger.length > 0 ? trimmedTrigger : undefined
-
-  const updated: SnippetRecord[] =
-    snippetId !== undefined && snippetId !== ''
-      ? state.snippets.map((snippet) =>
-          snippet.id === snippetId ? { ...snippet, content, name, trigger } : snippet
-        )
-      : [...state.snippets, { content, id: createSnippetId(), name, trigger }]
-
-  saveSnippetCatalog(updated)
-  dispatch({ snippets: updated, type: 'set-snippets' })
-}
