@@ -16,7 +16,6 @@ import {
   type GitPaneMode,
   type GitPanePosition,
   type GitPaneState,
-  type SessionBarPosition,
   type SessionRecord,
   type SnippetRecord,
 } from './types'
@@ -32,7 +31,6 @@ export interface InitialStateOverrides {
   gitPane?: Partial<GitPaneState>
   sidebar?: Pick<AppState['sidebar'], 'visible' | 'width'>
   sessionBarVisible?: boolean
-  sessionBarPosition?: SessionBarPosition
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -103,7 +101,6 @@ export function createInitialState(
     multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
     sessionBar: {
-      position: overrides.sessionBarPosition ?? 'top',
       visible: overrides.sessionBarVisible ?? true,
     },
     sessions,

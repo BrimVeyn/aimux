@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-import type { GitFileListMode, SessionBarPosition, WorkspaceSnapshotV1 } from './state/types'
+import type { GitFileListMode, WorkspaceSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
@@ -41,7 +41,6 @@ export interface AimuxConfig {
   gitPane?: PersistedGitPane
   sidebar?: PersistedSidebar
   sessionBarVisible?: boolean
-  sessionBarPosition?: SessionBarPosition
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
 }
@@ -161,7 +160,6 @@ export function loadConfigResult(): ConfigLoadResult {
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       sessionBarVisible?: unknown
-      sessionBarPosition?: unknown
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
     }
@@ -233,14 +231,6 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid sessionBarVisible')
     }
 
-    const validSessionBarPosition =
-      parsed.sessionBarPosition === 'top' || parsed.sessionBarPosition === 'bottom'
-        ? parsed.sessionBarPosition
-        : undefined
-    if (parsed.sessionBarPosition !== undefined && validSessionBarPosition === undefined) {
-      issues.push('ignored invalid sessionBarPosition')
-    }
-
     if (
       parsed.workspaceSnapshot !== undefined &&
       !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
@@ -264,7 +254,6 @@ export function loadConfigResult(): ConfigLoadResult {
       config: {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
-        sessionBarPosition: validSessionBarPosition,
         sessionBarVisible: validSessionBarVisible,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,

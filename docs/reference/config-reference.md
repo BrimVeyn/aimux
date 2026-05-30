@@ -127,7 +127,6 @@ Type:
 ```ts
 sessionBar?: {
   initialVisible?: boolean
-  initialPosition?: 'top' | 'bottom'
 }
 ```
 
@@ -135,15 +134,13 @@ Runtime behavior:
 
 - consumed during app initialization
 - used as a higher-priority source than `aimux.json.sessionBarVisible`
-- used as a higher-priority source than `aimux.json.sessionBarPosition`
-- reapplied on every launch while these config entries remain set
+- reapplied on every launch while this config entry remains set
 
 Example:
 
 ```ts
 export default defineConfig({
   sessionBar: {
-    initialPosition: 'bottom',
     initialVisible: true,
   },
 })

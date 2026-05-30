@@ -315,7 +315,6 @@ export function RootView({
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
-  const sessionBarPosition = useAppStore((s) => s.sessionBar.position)
   const gitPaneMode = useAppStore((s) => s.gitPane.mode)
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
   const gitPanePosition = useAppStore((s) => s.gitPane.position)
@@ -389,9 +388,8 @@ export function RootView({
   if (inGitMode) {
     return (
       <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
-        {sessionBarPosition === 'top' && <SessionBar forceVisible />}
+        <SessionBar forceVisible />
         <GitView themeId={themeId} />
-        {sessionBarPosition === 'bottom' && <SessionBar forceVisible />}
         <StatusBar />
         <PendingChordOverlay />
         <ContextMenuOverlay />
@@ -422,7 +420,6 @@ export function RootView({
       onMouseDrag={handleRootMouseDrag}
       onMouseUp={handleRootMouseUp}
     >
-      {sessionBarPosition === 'top' && <SessionBar />}
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar
           onTabActivate={onPaneActivate}
@@ -430,64 +427,68 @@ export function RootView({
           onResizeDrag={onSeparatorDrag}
           onResizeDragEnd={onSeparatorDragEnd}
         />
-        {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
-          <GitPaneInPaneMode
-            position="left"
-            ratio={gitPaneRatio}
-            onGitPaneResizeStart={onGitPaneResizeStart}
-          />
-        ) : null}
-        {activeTree && activeTree.type === 'split' ? (
-          <SplitLayout
-            node={activeTree}
-            tabs={tabs}
-            activeTabId={activeTabId}
-            focusMode={focusMode}
-            contentOrigin={splitContentOrigin}
-            mouseForwardingEnabled={mouseForwardingEnabled}
-            localScrollbackEnabled={localScrollbackEnabled}
-            onTerminalMouseEvent={onTerminalMouseEvent}
-            onTerminalScrollEvent={onTerminalScrollEvent}
-            onTerminalClick={onTerminalClick}
-            onTerminalDrag={onTerminalDrag}
-            onTerminalMouseUp={onTerminalMouseUp}
-            onPaneActivate={onPaneActivate}
-            onSplitResize={onSplitResize}
-            onSeparatorDragStart={onSeparatorDragStart}
-            onSeparatorDrag={onSeparatorDrag}
-            onSeparatorDragEnd={onSeparatorDragEnd}
-            onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
-            onMeasure={onMeasure}
-            bounds={splitBounds}
-          />
-        ) : (
-          <TerminalPane
-            tab={activeTab}
-            tabId={activeTabId ?? undefined}
-            isActive
-            focusMode={focusMode}
-            contentOrigin={contentOrigin}
-            mouseForwardingEnabled={mouseForwardingEnabled}
-            localScrollbackEnabled={localScrollbackEnabled}
-            onTerminalMouseEvent={onTerminalMouseEvent}
-            onTerminalScrollEvent={onTerminalScrollEvent}
-            onTerminalClick={onTerminalClick}
-            onTerminalDrag={onTerminalDrag}
-            onTerminalMouseUp={onTerminalMouseUp}
-            onPaneActivate={onPaneActivate}
-            onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
-            onMeasure={onMeasure}
-          />
-        )}
-        {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (
-          <GitPaneInPaneMode
-            position="right"
-            ratio={gitPaneRatio}
-            onGitPaneResizeStart={onGitPaneResizeStart}
-          />
-        ) : null}
+        <box flexDirection="column" flexGrow={1}>
+          <SessionBar />
+          <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
+            {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
+              <GitPaneInPaneMode
+                position="left"
+                ratio={gitPaneRatio}
+                onGitPaneResizeStart={onGitPaneResizeStart}
+              />
+            ) : null}
+            {activeTree && activeTree.type === 'split' ? (
+              <SplitLayout
+                node={activeTree}
+                tabs={tabs}
+                activeTabId={activeTabId}
+                focusMode={focusMode}
+                contentOrigin={splitContentOrigin}
+                mouseForwardingEnabled={mouseForwardingEnabled}
+                localScrollbackEnabled={localScrollbackEnabled}
+                onTerminalMouseEvent={onTerminalMouseEvent}
+                onTerminalScrollEvent={onTerminalScrollEvent}
+                onTerminalClick={onTerminalClick}
+                onTerminalDrag={onTerminalDrag}
+                onTerminalMouseUp={onTerminalMouseUp}
+                onPaneActivate={onPaneActivate}
+                onSplitResize={onSplitResize}
+                onSeparatorDragStart={onSeparatorDragStart}
+                onSeparatorDrag={onSeparatorDrag}
+                onSeparatorDragEnd={onSeparatorDragEnd}
+                onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
+                onMeasure={onMeasure}
+                bounds={splitBounds}
+              />
+            ) : (
+              <TerminalPane
+                tab={activeTab}
+                tabId={activeTabId ?? undefined}
+                isActive
+                focusMode={focusMode}
+                contentOrigin={contentOrigin}
+                mouseForwardingEnabled={mouseForwardingEnabled}
+                localScrollbackEnabled={localScrollbackEnabled}
+                onTerminalMouseEvent={onTerminalMouseEvent}
+                onTerminalScrollEvent={onTerminalScrollEvent}
+                onTerminalClick={onTerminalClick}
+                onTerminalDrag={onTerminalDrag}
+                onTerminalMouseUp={onTerminalMouseUp}
+                onPaneActivate={onPaneActivate}
+                onLeftEdgeMouseDown={handleTerminalLeftEdgeMouseDown}
+                onMeasure={onMeasure}
+              />
+            )}
+            {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (
+              <GitPaneInPaneMode
+                position="right"
+                ratio={gitPaneRatio}
+                onGitPaneResizeStart={onGitPaneResizeStart}
+              />
+            ) : null}
+          </box>
+        </box>
       </box>
-      {sessionBarPosition === 'bottom' && <SessionBar />}
       <StatusBar />
       <PendingChordOverlay />
       <ContextMenuOverlay />

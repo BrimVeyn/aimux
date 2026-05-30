@@ -33,7 +33,6 @@ export function saveCurrentWorkspace(state: AppState): void {
       position: state.gitPane.position,
       visible: state.gitPane.visible,
     },
-    sessionBarPosition: state.sessionBar.position,
     sessionBarVisible: state.sessionBar.visible,
     sidebar: {
       visible: state.sidebar.visible,

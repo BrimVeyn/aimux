@@ -388,11 +388,8 @@ export interface LayoutState {
   terminalRows: number
 }
 
-export type SessionBarPosition = 'top' | 'bottom'
-
 export interface SessionBarState {
   visible: boolean
-  position: SessionBarPosition
 }
 
 export type AutoCommitSuggestion =
@@ -578,7 +575,6 @@ export type UIAction =
   | { type: 'set-git-pane-position'; position: 'top' | 'bottom' | 'left' | 'right' }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
-  | { type: 'set-session-bar-position'; position: SessionBarPosition }
 
 export interface GitRefreshPayload {
   branch: string | null
@@ -857,12 +853,8 @@ export interface KeymapBuilderApi {
 export interface SessionBarConfig {
   /** Startup override for the session bar visibility. Reapplied on each launch. */
   initialVisible?: boolean
-  /** Startup override for the session bar position. Reapplied on each launch. */
-  initialPosition?: SessionBarPosition
   /** @deprecated Use `initialVisible` instead. */
   visible?: boolean
-  /** @deprecated Use `initialPosition` instead. */
-  position?: SessionBarPosition
 }
 
 // ─── Git pane config (discriminated union) ────────────────────────────────────
@@ -1055,7 +1047,6 @@ export interface ResolvedConfig {
   sidebar: SidebarConfig
   sessionBar: {
     initialVisible?: boolean
-    initialPosition?: SessionBarPosition
   }
   gitPane:
     | {

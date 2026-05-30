@@ -25,15 +25,6 @@ describe('session bar reducer', () => {
     expect(s2.sessionBar.visible).toBe(true)
   })
 
-  test('set-session-bar-position updates position only when changed', () => {
-    const s0 = createInitialState({}, [], [], false)
-    expect(s0.sessionBar.position).toBe('top')
-    const s1 = appReducer(s0, { position: 'bottom', type: 'set-session-bar-position' })
-    expect(s1.sessionBar.position).toBe('bottom')
-    const s2 = appReducer(s1, { position: 'bottom', type: 'set-session-bar-position' })
-    expect(s2).toBe(s1)
-  })
-
   test('set-session-status records per-session working/waiting flags', () => {
     const s0 = createInitialState({}, [], [], false)
     const working = { waiting: false, working: true }
