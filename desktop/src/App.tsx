@@ -353,8 +353,11 @@ function App() {
       ? { flexBasis: `${gitPane.paneRatio * 100}%`, flexShrink: 0, minWidth: 0 }
       : {}
 
-  const exitGitMode = useCallback(() => {
-    // The host runs aimux's git-mode keymap; sending Escape exits the mode.
+  const sendEscape = useCallback(() => {
+    // Single Esc transport for click-driven affordances (git-mode back button,
+    // modal backdrop click). The host's per-mode keymap decides what Esc does,
+    // so the GUI mirrors the keyboard path instead of dispatching mode-specific
+    // actions itself.
     socketRef.current?.send({
       ctrl: false,
       meta: false,
@@ -364,6 +367,7 @@ function App() {
       t: 'key',
     })
   }, [])
+  const exitGitMode = sendEscape
 
   const gitViewElement =
     projection !== null && gitPane !== undefined ? (
@@ -490,6 +494,7 @@ function App() {
           onOpenSnippetEditor={openSnippetEditor}
           onSnippetSubmit={submitSnippetEditor}
           onSnippetCancel={cancelSnippetEditor}
+          onBackdropClick={sendEscape}
         />
       ) : null}
     </div>

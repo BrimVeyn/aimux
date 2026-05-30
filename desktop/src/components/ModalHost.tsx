@@ -54,6 +54,10 @@ interface ModalHostProps {
     snippetId?: string;
   }) => void;
   onSnippetCancel: () => void;
+  // Backdrop click → same effect as Esc on the host (closes / cancels). The
+  // TUI has no notion of "click outside", so this is GUI-only UX polish that
+  // routes through the same keymap path Esc would take.
+  onBackdropClick: () => void;
 }
 
 // Renders modal overlays. Input is driven by the host's keymap pipeline (the
@@ -78,13 +82,18 @@ export function ModalHost({
   onOpenSnippetEditor,
   onSnippetSubmit,
   onSnippetCancel,
+  onBackdropClick,
 }: ModalHostProps) {
   if (modal.type === null) {
     return null;
   }
   return (
     <div className="absolute inset-0 z-50 flex items-start justify-center pt-[8vh]">
-      <div className="absolute inset-0" style={{ backgroundColor: "rgba(0,0,0,0.5)" }} />
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+        onClick={onBackdropClick}
+      />
       <div
         className="relative flex max-h-[84vh] w-[34rem] max-w-[92vw] flex-col overflow-hidden rounded-lg border font-mono text-xs shadow-2xl"
         style={{
