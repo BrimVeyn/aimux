@@ -64,6 +64,7 @@ import { computeGuiHelpEntries } from './gui-help-entries'
 import { createPipeline } from './host-pipeline'
 import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
 import { launchShell } from './launch-shell'
+import { startMultiRepoDiscoveryDriver } from './multi-repo-discovery-driver'
 import { type GuiServerMessage, parseClientMessage } from './protocol'
 import { projectAppState } from './state-projection'
 
@@ -345,11 +346,13 @@ export async function runGui(): Promise<void> {
     autosave: (() => void) | null
     diff: (() => void) | null
     divergence: (() => void) | null
+    multiRepo: (() => void) | null
     panel: (() => void) | null
   } = {
     autosave: null,
     diff: null,
     divergence: null,
+    multiRepo: null,
     panel: null,
   }
   let lastPanelProjectPath = projectPathOf(getState())
@@ -374,6 +377,9 @@ export async function runGui(): Promise<void> {
       getSessions: () => appStore.getState().sessions,
     })
   }
+  const multiRepoDriver = startMultiRepoDiscoveryDriver({ dispatch })
+  multiRepoDriver.update(lastPanelProjectPath)
+  disposers.multiRepo = () => multiRepoDriver.dispose()
   restartPanelPoll()
   restartDivergencePoll()
 
@@ -438,6 +444,7 @@ export async function runGui(): Promise<void> {
       lastPanelHeadOffset = nextOffset
       lastPanelRepos = nextRepos
       restartPanelPoll()
+      multiRepoDriver.update(nextPath)
     }
     // Divergence poller — restart when session identity or sessions array changes
     // (worktrees live inside sessions, so any worktree change comes with a new
@@ -658,6 +665,7 @@ export async function runGui(): Promise<void> {
     disposers.panel?.()
     disposers.divergence?.()
     disposers.diff?.()
+    disposers.multiRepo?.()
     disposers.autosave?.()
     disposeBackend()
     await backend.destroy()
