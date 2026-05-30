@@ -33,6 +33,7 @@ export function SplitLayout(props: SplitLayoutProps) {
         onEnterInsert={props.onEnterInsert}
         onRequestBytes={props.onRequestBytes}
         onResizeTab={props.onResizeTab}
+        showActiveIndicator
         tab={props.tabsById[node.tabId]}
         tabId={node.tabId}
         themeId={props.themeId}

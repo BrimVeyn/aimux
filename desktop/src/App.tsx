@@ -2,6 +2,7 @@ import { open } from '@tauri-apps/plugin-dialog'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { FocusModeRail } from '@/components/FocusModeRail'
 import { GitPanel } from '@/components/git/GitPanel'
 import { GitView } from '@/components/git/GitView'
 import { ModalHost } from '@/components/ModalHost'
@@ -499,35 +500,38 @@ function App() {
             {showPanelLeftOrRight && !panelOnRight ? (
               <div style={paneWrapperStyle}>{gitPanelElement}</div>
             ) : null}
-            <main className="min-w-0 flex-1 p-1">
-              {activeTree !== null && activeTree.type === 'split' ? (
-                <SplitLayout
-                  activeTabId={activeTabId}
-                  bytesEmitter={bytesEmitterRef.current}
-                  focusMode={projection?.focusMode ?? 'navigation'}
-                  node={activeTree}
-                  onActivate={activateTab}
-                  onEnterInsert={enterInsertMode}
-                  onRequestBytes={requestBytes}
-                  onResizeTab={resizeTab}
-                  onSetSplitRatio={setSplitRatio}
-                  tabsById={tabsById}
-                  themeId={projection?.themeId ?? ''}
-                />
-              ) : activeTabId !== null ? (
-                <TerminalPane
-                  bytesEmitter={bytesEmitterRef.current}
-                  focusMode={projection?.focusMode ?? 'navigation'}
-                  isActive
-                  onActivate={activateTab}
-                  onEnterInsert={enterInsertMode}
-                  onRequestBytes={requestBytes}
-                  onResizeTab={resizeTab}
-                  tab={tabsById[activeTabId]}
-                  tabId={activeTabId}
-                  themeId={projection?.themeId ?? ''}
-                />
-              ) : null}
+            <main className="flex min-w-0 flex-1 flex-col">
+              <div className="min-h-0 flex-1">
+                {activeTree !== null && activeTree.type === 'split' ? (
+                  <SplitLayout
+                    activeTabId={activeTabId}
+                    bytesEmitter={bytesEmitterRef.current}
+                    focusMode={projection?.focusMode ?? 'navigation'}
+                    node={activeTree}
+                    onActivate={activateTab}
+                    onEnterInsert={enterInsertMode}
+                    onRequestBytes={requestBytes}
+                    onResizeTab={resizeTab}
+                    onSetSplitRatio={setSplitRatio}
+                    tabsById={tabsById}
+                    themeId={projection?.themeId ?? ''}
+                  />
+                ) : activeTabId !== null ? (
+                  <TerminalPane
+                    bytesEmitter={bytesEmitterRef.current}
+                    focusMode={projection?.focusMode ?? 'navigation'}
+                    isActive
+                    onActivate={activateTab}
+                    onEnterInsert={enterInsertMode}
+                    onRequestBytes={requestBytes}
+                    onResizeTab={resizeTab}
+                    tab={tabsById[activeTabId]}
+                    tabId={activeTabId}
+                    themeId={projection?.themeId ?? ''}
+                  />
+                ) : null}
+              </div>
+              <FocusModeRail focusMode={projection?.focusMode ?? 'navigation'} />
             </main>
             {showPanelLeftOrRight && panelOnRight ? (
               <div style={paneWrapperStyle}>{gitPanelElement}</div>

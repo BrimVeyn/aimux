@@ -10,14 +10,16 @@ interface TerminalPaneProps {
   onEnterInsert: () => void;
   onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
+  // Show a thin left-edge accent on the active pane, so split layouts can
+  // disambiguate which pane has keyboard focus. Pure pane-level info: the
+  // global focus mode (nav vs input) is communicated by FocusModeRail at
+  // the top of <main>, on a different axis to avoid visual conflict.
+  showActiveIndicator?: boolean;
   tab: ProjectedTab | undefined;
   tabId: string;
   themeId: string;
 }
 
-// One split pane: title bar + bordered xterm.js terminal. Input stays
-// host-driven (window-level keymap in App.tsx); clicking the pane sends
-// paneActivate. Sizing and scrolling are owned by xterm + FitAddon.
 export function TerminalPane({
   bytesEmitter,
   focusMode,
@@ -26,39 +28,30 @@ export function TerminalPane({
   onEnterInsert,
   onRequestBytes,
   onResizeTab,
+  showActiveIndicator = false,
   tab,
   tabId,
   themeId,
 }: TerminalPaneProps) {
-  // TUI parity (src/ui/components/layout/terminal-pane.tsx getBorderColor):
-  // inactive → border; active + terminal-input → accent; active otherwise → primary.
-  const borderColor = !isActive
-    ? theme.border
-    : focusMode === "terminal-input"
-      ? theme.accent
-      : theme.primary;
-  const title = tab ? `${tab.title} · ${tab.status}` : tabId;
+  void focusMode;
+  void tab;
+  const showLeftRail = showActiveIndicator && isActive;
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden rounded border"
-      style={{ borderColor }}
+      className="relative flex h-full w-full flex-col overflow-hidden"
       onMouseDown={() => {
         onActivate(tabId);
         onEnterInsert();
       }}
     >
-      <div
-        className="flex items-center gap-1 px-2 py-0.5 font-mono text-xs"
-        style={{
-          backgroundColor: theme.backgroundPanel,
-          borderBottom: `1px solid ${theme.border}`,
-          color: isActive ? theme.primary : theme.textMuted,
-        }}
-      >
-        <span>{isActive ? "▸" : " "}</span>
-        <span className="truncate">{title}</span>
-      </div>
+      {showLeftRail ? (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute top-1 bottom-1 left-0 z-10 w-[2px] rounded-r-full"
+          style={{ backgroundColor: theme.primary, opacity: 0.6 }}
+        />
+      ) : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         {/* key={tabId}: when the active tab changes, mount a fresh xterm.js
             instance bound to the new tabId. The XtermPane effect captures the
