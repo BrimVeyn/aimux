@@ -18,23 +18,14 @@ export function SectionHeader({ count, title }: SectionHeaderProps): ReactNode {
   return (
     <div className="flex items-baseline gap-1.5 px-1 py-1">
       <span
-        className="chrome-meta uppercase"
-        style={{
-          color: theme.textMuted,
-          letterSpacing: "0.08em",
-          fontWeight: 600,
-        }}
+        className="chrome-label"
+        style={{ color: theme.text, fontWeight: 600 }}
       >
         {title}
       </span>
       <span
-        aria-hidden
-        className="inline-block h-[3px] w-[3px] rounded-full"
-        style={{ backgroundColor: theme.textMuted, opacity: 0.4 }}
-      />
-      <span
-        className="chrome-code tabular-nums"
-        style={{ color: theme.textMuted, opacity: 0.85 }}
+        className="chrome-meta tabular-nums"
+        style={{ color: theme.textMuted, opacity: 0.7 }}
       >
         {count}
       </span>

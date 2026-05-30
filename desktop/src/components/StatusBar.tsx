@@ -60,12 +60,11 @@ export function StatusBar({
     >
       <div className="flex flex-row items-center gap-2 whitespace-pre">
         <span
-          className="chrome-meta inline-flex h-5 items-center rounded-full px-2 uppercase tracking-wide transition-[background-color,color] duration-200 ease-out"
+          className="chrome-meta inline-flex h-5 items-center rounded-full px-2 transition-[background-color,color] duration-200 ease-out"
           style={{
             backgroundColor: `color-mix(in oklab, ${color} 14%, transparent)`,
             color,
             fontWeight: 500,
-            letterSpacing: "0.04em",
           }}
         >
           {label}
