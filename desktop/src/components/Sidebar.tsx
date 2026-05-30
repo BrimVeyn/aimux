@@ -58,7 +58,7 @@ export function Sidebar({
 
   return (
     <div
-      className="flex h-full w-56 shrink-0 flex-col overflow-hidden border-r font-mono text-xs"
+      className="relative z-[60] flex h-full w-56 shrink-0 flex-col overflow-hidden border-r font-mono text-xs"
       style={{ backgroundColor: theme.background, borderColor: theme.border }}
     >
       <div className="flex flex-col gap-0.5 px-3 pt-2 pb-1">

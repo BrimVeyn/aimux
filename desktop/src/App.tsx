@@ -31,6 +31,10 @@ function App() {
   // Singleton fan-out for per-tab PTY byte streams. The host emits `bytes`
   // messages; each XtermPane subscribes via `bytes-<tabId>`.
   const bytesEmitterRef = useRef<EventTarget>(new EventTarget())
+  // Latest open-modal type, read by chrome click handlers without re-creating
+  // the callback on every projection frame.
+  const modalTypeRef = useRef<string | null>(null)
+  modalTypeRef.current = projection?.modal.type ?? null
 
   useTheme(projection?.themeId, projection?.themeMode)
 
@@ -197,29 +201,64 @@ function App() {
     }
   }, [])
 
-  const activateTab = useCallback((tabId: string) => {
-    socketRef.current?.send({ t: 'paneActivate', tabId })
+  // Chrome (SessionBar/Sidebar/StatusBar) sits above the modal backdrop via
+  // z-index, so its buttons stay clickable in any mode. To avoid leaving an
+  // open picker/editor visible behind the chrome action, dismiss it first via
+  // the same Esc path the backdrop click already uses.
+  const dismissModalIfOpen = useCallback(() => {
+    if (modalTypeRef.current !== null) {
+      socketRef.current?.send({
+        ctrl: false,
+        meta: false,
+        name: 'escape',
+        sequence: '',
+        shift: false,
+        t: 'key',
+      })
+    }
   }, [])
 
-  const closeTab = useCallback((tabId: string) => {
-    socketRef.current?.send({ t: 'closeTab', tabId })
-  }, [])
+  const activateTab = useCallback(
+    (tabId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({ t: 'paneActivate', tabId })
+    },
+    [dismissModalIfOpen]
+  )
+
+  const closeTab = useCallback(
+    (tabId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({ t: 'closeTab', tabId })
+    },
+    [dismissModalIfOpen]
+  )
 
   const newTab = useCallback(() => {
+    dismissModalIfOpen()
     socketRef.current?.send({ t: 'openNewTab' })
-  }, [])
+  }, [dismissModalIfOpen])
 
   const openUsage = useCallback(() => {
+    dismissModalIfOpen()
     socketRef.current?.send({ t: 'openAiUsageModal' })
-  }, [])
+  }, [dismissModalIfOpen])
 
-  const switchSession = useCallback((sessionId: string) => {
-    socketRef.current?.send({ sessionId, t: 'switchSession' })
-  }, [])
+  const switchSession = useCallback(
+    (sessionId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({ sessionId, t: 'switchSession' })
+    },
+    [dismissModalIfOpen]
+  )
 
-  const deleteSession = useCallback((sessionId: string) => {
-    socketRef.current?.send({ sessionId, t: 'deleteSession' })
-  }, [])
+  const deleteSession = useCallback(
+    (sessionId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({ sessionId, t: 'deleteSession' })
+    },
+    [dismissModalIfOpen]
+  )
 
   const selectModal = useCallback((index: number) => {
     socketRef.current?.send({ index, t: 'modalSelect' })
@@ -230,6 +269,7 @@ function App() {
   }, [])
 
   const newSession = useCallback(() => {
+    dismissModalIfOpen()
     void (async () => {
       let path: string | null = null
       try {
@@ -242,7 +282,7 @@ function App() {
         socketRef.current?.send({ path, t: 'createSession' })
       }
     })()
-  }, [])
+  }, [dismissModalIfOpen])
 
   const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
     socketRef.current?.send({ cols, rows, t: 'resizeTab', tabId })

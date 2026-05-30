@@ -51,7 +51,7 @@ export function StatusBar({
 
   return (
     <div
-      className="flex shrink-0 flex-col overflow-hidden px-2 py-0.5 font-mono text-xs"
+      className="relative z-[60] flex shrink-0 flex-col overflow-hidden px-2 py-0.5 font-mono text-xs"
       style={{ backgroundColor: theme.backgroundPanel }}
     >
       <div className="flex flex-row items-center whitespace-pre">

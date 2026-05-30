@@ -33,7 +33,7 @@ export function SessionBar({
 }: SessionBarProps) {
   return (
     <div
-      className="flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b px-2 font-mono text-xs"
+      className="relative z-[60] flex h-8 shrink-0 items-center gap-1 overflow-x-auto border-b px-2 font-mono text-xs"
       style={{ backgroundColor: theme.backgroundPanel, borderColor: theme.border }}
     >
       {sessions.map((session, index) => {
