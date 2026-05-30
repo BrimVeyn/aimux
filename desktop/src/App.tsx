@@ -119,6 +119,20 @@ function App() {
   // keymap/mode pipeline (and forwards unbound keys to the PTY in terminal-input).
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      // Roadmap P1.3 boundary: when the focused element is a real form input
+      // (a client-authoritative modal like SnippetEditorModal owns it),
+      // never forward to the host. Doing so would (a) double-handle each
+      // keystroke and (b) feed the dead per-keystroke modal flow that no
+      // longer drives any visible state for this modal.
+      const target = e.target as HTMLElement | null;
+      if (
+        target !== null &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       // ctrl-u/d in git-mode = page up/down in the diff. The TUI mutates a
       // scroll offset in its own renderer; in the GUI we own the scroll via
       // native DOM, so the host action is a no-op for us. Intercept and scroll
@@ -144,6 +158,18 @@ function App() {
       socketRef.current?.send({ t: "key", ...key });
     };
     const onPaste = (e: ClipboardEvent) => {
+      // Same client-authoritative carve-out as onKeyDown: native paste into
+      // a form input must stay native (browser inserts text + fires change),
+      // not route to the host's PTY-paste pipeline.
+      const target = e.target as HTMLElement | null;
+      if (
+        target !== null &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       const text = e.clipboardData?.getData("text") ?? "";
       if (text !== "") {
         e.preventDefault();
@@ -237,6 +263,24 @@ function App() {
         ? { snippetId, t: "openSnippetEditor" }
         : { t: "openSnippetEditor" },
     );
+  }, []);
+
+  // Roadmap P1.3: client-authoritative SnippetEditorModal commits its in-flight
+  // buffers in a single intent on submit; cancel reuses the generic
+  // `modal.cancel` (close-modal semantics suffice — Esc in the TUI re-opens
+  // the snippet picker, but the GUI flow returns to whatever was under the
+  // modal, matching every other GUI Esc).
+  const submitSnippetEditor = useCallback(
+    (payload: { name: string; trigger: string; content: string; snippetId?: string }) => {
+      socketRef.current?.send({
+        intent: { kind: "modal.snippet.submit", ...payload },
+        t: "intent",
+      });
+    },
+    [],
+  );
+  const cancelSnippetEditor = useCallback(() => {
+    socketRef.current?.send({ intent: { kind: "modal.cancel" }, t: "intent" });
   }, []);
   const tabsById: Record<string, ProjectedTab> = {};
   for (const t of projection?.tabs ?? []) {
@@ -428,6 +472,8 @@ function App() {
           onConfirm={confirmModal}
           onToggleDeleteSource={toggleWorktreeMoveDelete}
           onOpenSnippetEditor={openSnippetEditor}
+          onSnippetSubmit={submitSnippetEditor}
+          onSnippetCancel={cancelSnippetEditor}
         />
       ) : null}
     </div>

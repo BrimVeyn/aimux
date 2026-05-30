@@ -4,47 +4,22 @@
 // calls — the GUI does NOT own a parallel state machine. New kinds added here
 // require a matching branch in `src/gui/intent-handlers.ts`.
 
-/** Modal field identifier (matches `modal.activeField` unions in src/state/types.ts). */
-export type ModalFieldId =
-  // shared
-  | 'assistant'
-  | 'branch-name'
-  | 'target-worktree'
-  | 'worktree-name'
-  // git-commit
-  | 'title'
-  | 'body'
-  // create-session
-  | 'directory'
-  // snippet-editor
-  | 'name'
-  | 'trigger'
-  | 'content'
-
 export type GuiIntent =
-  | { kind: 'modal.setField'; field: ModalFieldId; value: string }
+  | {
+      kind: 'modal.snippet.submit'
+      name: string
+      trigger: string
+      content: string
+      // Present when editing an existing snippet (host populated
+      // `modal.sessionTargetId` from the `openSnippetEditor` message);
+      // absent for creation.
+      snippetId?: string
+    }
   | { kind: 'modal.submit' }
   | { kind: 'modal.cancel' }
   | { kind: 'git.stageFile'; path: string }
   | { kind: 'git.unstageFile'; path: string }
   | { kind: 'git.discardFile'; path: string }
-
-const MODAL_FIELD_IDS = new Set<ModalFieldId>([
-  'assistant',
-  'body',
-  'branch-name',
-  'content',
-  'directory',
-  'name',
-  'target-worktree',
-  'title',
-  'trigger',
-  'worktree-name',
-])
-
-function isModalFieldId(value: unknown): value is ModalFieldId {
-  return typeof value === 'string' && MODAL_FIELD_IDS.has(value as ModalFieldId)
-}
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -52,9 +27,25 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
   const obj = value as Record<string, unknown>
   if (typeof obj.kind !== 'string') return null
   switch (obj.kind) {
-    case 'modal.setField':
-      if (!isModalFieldId(obj.field) || typeof obj.value !== 'string') return null
-      return { field: obj.field, kind: 'modal.setField', value: obj.value }
+    case 'modal.snippet.submit': {
+      if (
+        typeof obj.name !== 'string' ||
+        typeof obj.trigger !== 'string' ||
+        typeof obj.content !== 'string'
+      )
+        return null
+      // `snippetId` is optional but, when present, must be a string. A
+      // wrong-typed value is a client bug; reject rather than silently coerce.
+      if (obj.snippetId !== undefined && typeof obj.snippetId !== 'string') return null
+      const intent: GuiIntent = {
+        content: obj.content,
+        kind: 'modal.snippet.submit',
+        name: obj.name,
+        trigger: obj.trigger,
+      }
+      if (typeof obj.snippetId === 'string') intent.snippetId = obj.snippetId
+      return intent
+    }
     case 'modal.submit':
       return { kind: 'modal.submit' }
     case 'modal.cancel':

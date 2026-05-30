@@ -3,28 +3,91 @@ import { describe, expect, test } from 'bun:test'
 import { parseClientMessage } from '../../src/gui/protocol'
 
 describe('parseClientMessage intent envelope', () => {
-  test('accepts modal.setField with a known field id', () => {
+  test('accepts modal.snippet.submit with full payload + snippetId (edit)', () => {
     const raw = JSON.stringify({
-      intent: { field: 'title', kind: 'modal.setField', value: 'wip: foo' },
+      intent: {
+        content: 'echo hi',
+        kind: 'modal.snippet.submit',
+        name: 'greet',
+        snippetId: 'snip_123',
+        trigger: 'gr',
+      },
       t: 'intent',
     })
     expect(parseClientMessage(raw)).toEqual({
-      intent: { field: 'title', kind: 'modal.setField', value: 'wip: foo' },
+      intent: {
+        content: 'echo hi',
+        kind: 'modal.snippet.submit',
+        name: 'greet',
+        snippetId: 'snip_123',
+        trigger: 'gr',
+      },
       t: 'intent',
     })
   })
 
-  test('rejects modal.setField with an unknown field id', () => {
+  test('accepts modal.snippet.submit without snippetId (create)', () => {
     const raw = JSON.stringify({
-      intent: { field: 'not-a-field', kind: 'modal.setField', value: 'x' },
+      intent: {
+        content: 'echo hi',
+        kind: 'modal.snippet.submit',
+        name: 'greet',
+        trigger: '',
+      },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toEqual({
+      intent: {
+        content: 'echo hi',
+        kind: 'modal.snippet.submit',
+        name: 'greet',
+        trigger: '',
+      },
+      t: 'intent',
+    })
+  })
+
+  test('rejects modal.snippet.submit with missing name', () => {
+    const raw = JSON.stringify({
+      intent: { content: 'x', kind: 'modal.snippet.submit', trigger: '' },
       t: 'intent',
     })
     expect(parseClientMessage(raw)).toBeNull()
   })
 
-  test('rejects modal.setField when value is not a string', () => {
+  test('rejects modal.snippet.submit with missing trigger', () => {
     const raw = JSON.stringify({
-      intent: { field: 'title', kind: 'modal.setField', value: 42 },
+      intent: { content: 'x', kind: 'modal.snippet.submit', name: 'n' },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toBeNull()
+  })
+
+  test('rejects modal.snippet.submit with missing content', () => {
+    const raw = JSON.stringify({
+      intent: { kind: 'modal.snippet.submit', name: 'n', trigger: '' },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toBeNull()
+  })
+
+  test('rejects modal.snippet.submit with non-string name', () => {
+    const raw = JSON.stringify({
+      intent: { content: 'x', kind: 'modal.snippet.submit', name: 42, trigger: '' },
+      t: 'intent',
+    })
+    expect(parseClientMessage(raw)).toBeNull()
+  })
+
+  test('rejects modal.snippet.submit with non-string snippetId', () => {
+    const raw = JSON.stringify({
+      intent: {
+        content: 'x',
+        kind: 'modal.snippet.submit',
+        name: 'n',
+        snippetId: 7,
+        trigger: '',
+      },
       t: 'intent',
     })
     expect(parseClientMessage(raw)).toBeNull()

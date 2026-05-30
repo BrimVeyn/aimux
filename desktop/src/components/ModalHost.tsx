@@ -43,6 +43,17 @@ interface ModalHostProps {
   onConfirm: (index: number) => void;
   onToggleDeleteSource: () => void;
   onOpenSnippetEditor: (snippetId?: string) => void;
+  // Roadmap P1.3: SnippetEditorModal is client-authoritative — buffers stay
+  // local React state, only the committed payload travels back via these
+  // intent callbacks. See desktop/src/components/modals/SnippetEditorModal.tsx
+  // for the pattern.
+  onSnippetSubmit: (payload: {
+    name: string;
+    trigger: string;
+    content: string;
+    snippetId?: string;
+  }) => void;
+  onSnippetCancel: () => void;
 }
 
 // Renders modal overlays. Input is driven by the host's keymap pipeline (the
@@ -65,6 +76,8 @@ export function ModalHost({
   onConfirm,
   onToggleDeleteSource,
   onOpenSnippetEditor,
+  onSnippetSubmit,
+  onSnippetCancel,
 }: ModalHostProps) {
   if (modal.type === null) {
     return null;
@@ -151,7 +164,7 @@ export function ModalHost({
             stagedCount={gitFiles.filter((f) => f.section === "staged").length}
           />
         ) : modal.type === "snippet-editor" ? (
-          <SnippetEditorModal modal={modal} />
+          <SnippetEditorModal modal={modal} onSubmit={onSnippetSubmit} onCancel={onSnippetCancel} />
         ) : modal.type === "update-available" ? (
           <UpdateAvailableModal modal={modal} onSelect={onSelect} onConfirm={onConfirm} />
         ) : (

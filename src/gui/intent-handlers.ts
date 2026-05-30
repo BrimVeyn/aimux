@@ -3,7 +3,7 @@ import type { GuiIntent } from '@aimux/gui-protocol'
 import type { AppAction, GitFileSection } from '../state/types'
 import type { GuiRuntime } from './runtime'
 
-import { logDebug } from '../debug/input-log'
+import { applySnippetSubmit } from '../app-runtime/snippet-actions'
 
 // Discriminated intent → existing reducer-action / pipeline-call dispatch.
 // Hard rule (roadmap, DB1): "Tout intent GUI doit aboutir à une action du
@@ -12,17 +12,15 @@ import { logDebug } from '../debug/input-log'
 // side-effects through `runtime.dispatch` and `runtime.pipeline`.
 export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
   switch (intent.kind) {
-    case 'modal.setField':
-      // The existing reducer has no `(field, value)` setter — modal buffers are
-      // mutated char-by-char through `update-command-edit`. P1.3 will migrate
-      // the snippet-editor pilot to a client-authoritative `useState` buffer
-      // with a single committed-value intent (`modal.snippet.submit`); the
-      // generic per-field setter has no host-side semantics until then.
-      // Until P1.3 lands, this branch is a logged no-op rather than a guess.
-      logDebug('gui.intent.modalSetField.unimplemented', {
-        field: intent.field,
-        valueLen: intent.value.length,
-      })
+    case 'modal.snippet.submit':
+      // Roadmap P1.3 — client-authoritative snippet editor. The committed
+      // values are carried in the intent payload (the React modal owns the
+      // in-flight buffers), so this branch can't go through
+      // `actions.saveSnippetEditor` (which reads buffers from `state.modal`).
+      // We mirror the TUI's reducer/side-effect tail (catalog write +
+      // `set-snippets` dispatch) via `applySnippetSubmit`, then close the
+      // modal — same observable outcome as the keyboard-driven save.
+      handleSnippetSubmit(intent, runtime)
       return
     case 'modal.submit':
       runtime.pipeline.confirmActiveModal()
@@ -40,6 +38,32 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
       handleGitDiscard(intent.path, runtime)
       return
   }
+}
+
+function handleSnippetSubmit(
+  intent: Extract<GuiIntent, { kind: 'modal.snippet.submit' }>,
+  runtime: GuiRuntime
+): void {
+  const state = runtime.getState()
+  // The host owns `modal.sessionTargetId` (set by `openSnippetEditor`); when
+  // the intent omits `snippetId` (creation), we fall back to whatever the
+  // open modal recorded. The intent value still wins when present — that's
+  // the contract documented in `parseGuiIntent`.
+  let snippetId: string | undefined = intent.snippetId
+  if (snippetId === undefined && state.modal.type === 'snippet-editor') {
+    snippetId = state.modal.sessionTargetId ?? undefined
+  }
+  applySnippetSubmit(
+    {
+      content: intent.content,
+      name: intent.name,
+      snippetId,
+      trigger: intent.trigger,
+    },
+    state,
+    runtime.dispatch
+  )
+  runtime.dispatch({ type: 'close-modal' })
 }
 
 // Mirrors `gitToggleSelected` in packages/aimux-config/src/actions.ts:611-628:
