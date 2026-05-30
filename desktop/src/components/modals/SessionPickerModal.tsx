@@ -1,4 +1,4 @@
-import { Empty, FilterField, Footer, Row } from "@/components/ModalHost";
+import { FilterField, Footer, Row } from "@/components/ModalHost";
 import type { ModalProjection, SessionRecordLite } from "@/lib/types";
 
 // Mirrors aimux filterSessions (name OR projectPath substring match).
@@ -44,9 +44,15 @@ export function SessionPickerModal({
             onConfirm={() => onConfirm(index)}
           />
         ))}
-        {options.length === 0 ? <Empty /> : null}
+        <Row
+          key="__create-new__"
+          selected={modal.selectedIndex === options.length}
+          label="Create new workspace"
+          onSelect={() => onSelect(options.length)}
+          onConfirm={() => onConfirm(options.length)}
+        />
       </div>
-      <Footer text="↑/↓ select · Enter switch · C-n new · Esc cancel" />
+      <Footer text="↑/↓ select · Enter open/create · Esc cancel" />
     </div>
   );
 }
