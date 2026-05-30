@@ -28,6 +28,7 @@ import { startGitPanelPolling } from '../git/git-poller'
 import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
+import { getProfileName } from '../profile-paths'
 import { startAIUsageService } from '../services/ai-usage/provider'
 import { createSessionBackend } from '../session-backend/bootstrap'
 import { aiUsageStore } from '../state/ai-usage-store'
@@ -53,6 +54,11 @@ import {
   subscribeThemeChanges,
 } from '../ui/theme'
 import { isKnownThemeId, type ThemeId } from '../ui/themes'
+import {
+  fetchLatestNpmVersion,
+  getCurrentPackageVersion,
+  isNewerVersion,
+} from '../update/version-check'
 import { createDirectorySearchRunner } from './gui-directory-search'
 import { computeGuiHelpEntries } from './gui-help-entries'
 import { createPipeline } from './host-pipeline'
@@ -160,8 +166,10 @@ export async function runGui(): Promise<void> {
       // Best-effort: failing to flush shouldn't block shutdown.
     }
   }
+  let updateCheckCancelled = false
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(sig, () => {
+      updateCheckCancelled = true
       flushAutosave()
       disposeBackend()
       process.exit(0)
@@ -449,6 +457,37 @@ export async function runGui(): Promise<void> {
   // Initial attach (load-session above fired before subscribe was wired).
   if (lastSessionId !== null && lastSessionId !== '') {
     attachSession(lastSessionId)
+  }
+
+  // Mirror the TUI's npm-version probe (src/app.tsx) so the GUI's already-
+  // rendered UpdateAvailableModal pops when a newer version exists. Guards
+  // match the TUI: env opt-out, dev profile, and the per-version skip the
+  // user toggles from the modal itself.
+  if (process.env.AIMUX_DISABLE_UPDATE_CHECK !== '1' && getProfileName() !== 'dev') {
+    void (async () => {
+      try {
+        const [current, latest] = await Promise.all([
+          getCurrentPackageVersion(),
+          fetchLatestNpmVersion('@brimveyn/aimux'),
+        ])
+        if (updateCheckCancelled || !(latest != null && latest !== '')) return
+        if (!isNewerVersion(latest, current)) return
+        if (loadConfig().skippedUpdateVersion === latest) return
+        logDebug('gui.host.updateAvailable', { current, latest })
+        dispatch({
+          currentVersion: current,
+          latestVersion: latest,
+          type: 'open-update-available-modal',
+        })
+      } catch (error) {
+        // Best-effort: a registry hiccup or DNS failure must not crash the
+        // host. React swallows the rejection in the TUI; the host has no
+        // such safety net.
+        logDebug('gui.host.updateCheckFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    })()
   }
 
   // Fail loudly if a stale GUI host still holds the port, instead of silently
