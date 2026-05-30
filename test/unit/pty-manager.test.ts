@@ -491,6 +491,65 @@ describe('PtyManager', () => {
     manager.disposeAll()
   })
 
+  test('disposeSession force-kills a PTY command that ignores SIGHUP/SIGTERM (e.g. claude)', async () => {
+    const manager = new PtyManager()
+    let buffer = ''
+    manager.on('render', (tabId, viewport) => {
+      if (tabId !== 'tab-reap') {
+        return
+      }
+      buffer = viewport.lines.map((line) => line.spans.map((s) => s.text).join('')).join('\n')
+    })
+
+    // The PTY command itself ignores SIGHUP and SIGTERM, just like claude/TUI
+    // apps. bun-pty's pty.kill() only closes the master (SIGHUP), so without an
+    // explicit SIGKILL escalation this process leaks. $$ is the pty leader pid
+    // (== pty.pid), which is what disposeSession targets.
+    manager.createSession({
+      args: ['-c', 'trap "" HUP TERM; echo PID:$$; sleep 100'],
+      cols: 80,
+      command: '/bin/sh',
+      cwd: process.cwd(),
+      rows: 24,
+      tabId: 'tab-reap',
+    })
+
+    const pid = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('never saw pid')), 5_000)
+      const poll = setInterval(() => {
+        const match = buffer.match(/PID:(\d+)/)
+        if (match) {
+          clearTimeout(timeout)
+          clearInterval(poll)
+          resolve(Number(match[1]))
+        }
+      }, 20)
+    })
+
+    expect(pid).toBeGreaterThan(1)
+    // Sanity: alive before disposal.
+    expect(() => process.kill(pid, 0)).not.toThrow()
+
+    manager.disposeSession('tab-reap')
+
+    // SIGTERM is ignored; the SIGKILL escalation fires after ~2s.
+    const dead = await new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 4_000)
+      const poll = setInterval(() => {
+        try {
+          process.kill(pid, 0)
+        } catch {
+          clearTimeout(timeout)
+          clearInterval(poll)
+          resolve(true)
+        }
+      }, 50)
+    })
+
+    expect(dead).toBe(true)
+    manager.disposeAll()
+  })
+
   test('re-enabling broadcast flushes a fresh viewport per active session', async () => {
     const manager = new PtyManager()
     const renderViewports: string[] = []

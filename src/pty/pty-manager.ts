@@ -461,7 +461,9 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
     this.clearTimers(tabId)
     this.sessions.delete(tabId)
+    const pid = session.pty.pid
     session.pty.kill()
+    this.reapPtyProcess(pid, { escalate: true })
     session.emulator.dispose()
   }
 
@@ -470,10 +472,64 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       this.clearTimers(tabId)
     }
     for (const session of this.sessions.values()) {
+      const pid = session.pty.pid
       session.pty.kill()
+      // Called on host shutdown: a deferred SIGKILL escalation may never fire
+      // because the host exits first, so force-kill synchronously instead.
+      this.reapPtyProcess(pid, { escalate: false })
       session.emulator.dispose()
     }
 
     this.sessions.clear()
+  }
+
+  /**
+   * Actually terminate the PTY's child process. bun-pty's `pty.kill()` only
+   * closes the master fd (delivering SIGHUP) and fires a synthetic exit, so a
+   * child that ignores SIGHUP — claude and many TUI apps do — survives and
+   * leaks. aimux spawns the command directly, so `pty.pid` *is* that child; we
+   * signal the pid itself. A best-effort group signal is added for same-group
+   * descendants (it ESRCHes harmlessly when there is no such group).
+   *
+   * Per-tab close escalates SIGTERM -> SIGKILL after a grace period so the
+   * process can exit cleanly; shutdown kills outright since nothing will be
+   * around to run the deferred escalation.
+   */
+  private reapPtyProcess(pid: number, options: { escalate: boolean }): void {
+    if (!Number.isInteger(pid) || pid <= 1) {
+      return
+    }
+
+    const send = (sig: NodeJS.Signals): void => {
+      try {
+        process.kill(pid, sig)
+      } catch {
+        // already gone
+      }
+      try {
+        process.kill(-pid, sig)
+      } catch {
+        // no such group (common) — the direct kill above is what matters
+      }
+    }
+
+    send('SIGTERM')
+
+    if (!options.escalate) {
+      send('SIGKILL')
+      return
+    }
+
+    setTimeout(() => {
+      let alive = true
+      try {
+        process.kill(pid, 0)
+      } catch {
+        alive = false
+      }
+      if (alive) {
+        send('SIGKILL')
+      }
+    }, 2_000).unref?.()
   }
 }

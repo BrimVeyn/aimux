@@ -125,6 +125,25 @@ export async function runGui(): Promise<void> {
   })
 
   const backend = await createSessionBackend()
+
+  // Reap every PTY when the host goes away. In local-backend mode the
+  // PtyManager lives in this process, so without an explicit disposeAll the
+  // child claude/shell processes would be reparented to init and leak.
+  let backendDisposed = false
+  const disposeBackend = (): void => {
+    if (backendDisposed) {
+      return
+    }
+    backendDisposed = true
+    backend.disposeAll()
+  }
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
+    process.on(sig, () => {
+      disposeBackend()
+      process.exit(0)
+    })
+  }
+
   setActiveKeymap(resolvedConfig.keymaps)
   const handlers = registerAllModes(resolvedConfig.keymaps)
   const helpEntries = computeGuiHelpEntries(resolvedConfig.keymaps)
@@ -565,6 +584,7 @@ export async function runGui(): Promise<void> {
     disposers.divergence?.()
     disposers.diff?.()
     disposers.autosave?.()
+    disposeBackend()
     await backend.destroy()
     void server.stop()
     process.exit(0)
