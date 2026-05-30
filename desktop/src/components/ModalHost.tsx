@@ -2,11 +2,14 @@ import { useEffect, useRef } from "react";
 
 import { AIUsageModal } from "@/components/AIUsageModal";
 import { CreateSessionModal } from "@/components/modals/CreateSessionModal";
+import { GitCommitModal } from "@/components/modals/GitCommitModal";
 import { HelpModal } from "@/components/modals/HelpModal";
 import { SessionPickerModal } from "@/components/modals/SessionPickerModal";
+import { SnippetEditorModal } from "@/components/modals/SnippetEditorModal";
 import { SnippetPickerModal } from "@/components/modals/SnippetPickerModal";
 import { TextFieldModal } from "@/components/modals/TextFieldModal";
 import { ThemePickerModal } from "@/components/modals/ThemePickerModal";
+import { UpdateAvailableModal } from "@/components/modals/UpdateAvailableModal";
 import { WorktreeMoveModal } from "@/components/modals/WorktreeMoveModal";
 import { allAssistants, filterAssistants } from "@/lib/assistants";
 import { formatDivergence } from "@/lib/git";
@@ -14,6 +17,7 @@ import { theme } from "@/lib/theme";
 import type {
   AIUsageTool,
   DirectoryResultLite,
+  GitFileEntryLite,
   GuiHelpEntry,
   ModalProjection,
   SessionRecordLite,
@@ -34,9 +38,11 @@ interface ModalHostProps {
   helpEntries: GuiHelpEntry[];
   aiUsageSnapshots: Partial<Record<AIUsageTool, UsageSnapshot>>;
   directoryResults: DirectoryResultLite[];
+  gitFiles: GitFileEntryLite[];
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
   onToggleDeleteSource: () => void;
+  onOpenSnippetEditor: (snippetId?: string) => void;
 }
 
 // Renders modal overlays. Input is driven by the host's keymap pipeline (the
@@ -54,9 +60,11 @@ export function ModalHost({
   helpEntries,
   aiUsageSnapshots,
   directoryResults,
+  gitFiles,
   onSelect,
   onConfirm,
   onToggleDeleteSource,
+  onOpenSnippetEditor,
 }: ModalHostProps) {
   if (modal.type === null) {
     return null;
@@ -103,6 +111,7 @@ export function ModalHost({
             snippets={snippets}
             onSelect={onSelect}
             onConfirm={onConfirm}
+            onOpenEditor={onOpenSnippetEditor}
           />
         ) : modal.type === "theme-picker" ? (
           <ThemePickerModal
@@ -136,6 +145,15 @@ export function ModalHost({
             onConfirm={onConfirm}
             onToggleDeleteSource={onToggleDeleteSource}
           />
+        ) : modal.type === "git-commit" ? (
+          <GitCommitModal
+            modal={modal}
+            stagedCount={gitFiles.filter((f) => f.section === "staged").length}
+          />
+        ) : modal.type === "snippet-editor" ? (
+          <SnippetEditorModal modal={modal} />
+        ) : modal.type === "update-available" ? (
+          <UpdateAvailableModal modal={modal} onSelect={onSelect} onConfirm={onConfirm} />
         ) : (
             <div style={{ color: theme.textMuted }}>{modal.type} (UI coming soon)</div>
           )}

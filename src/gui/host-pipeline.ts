@@ -136,6 +136,7 @@ export function createPipeline(opts: PipelineOptions) {
     'snippet-picker': actions.snippetFilterPaste as KeyResult,
     'split-picker': actions.confirmSplit as KeyResult,
     'theme-picker': actions.confirmTheme as KeyResult,
+    'update-available': actions.confirmUpdateSelection as KeyResult,
     'worktree-move': actions.confirmWorktreeMove as ActionFn,
   }
 

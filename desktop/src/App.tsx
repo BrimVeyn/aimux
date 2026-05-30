@@ -186,6 +186,14 @@ function App() {
   const toggleWorktreeMoveDelete = useCallback(() => {
     socketRef.current?.send({ t: "toggleWorktreeMoveDelete" });
   }, []);
+
+  const openSnippetEditor = useCallback((snippetId?: string) => {
+    socketRef.current?.send(
+      snippetId !== undefined
+        ? { snippetId, t: "openSnippetEditor" }
+        : { t: "openSnippetEditor" },
+    );
+  }, []);
   const tabsById: Record<string, ProjectedTab> = {};
   for (const t of projection?.tabs ?? []) {
     tabsById[t.id] = t;
@@ -354,9 +362,11 @@ function App() {
           helpEntries={projection.helpEntries}
           aiUsageSnapshots={projection.aiUsage.snapshots}
           directoryResults={projection.modal.directoryResults ?? []}
+          gitFiles={projection.gitPanel.files}
           onSelect={selectModal}
           onConfirm={confirmModal}
           onToggleDeleteSource={toggleWorktreeMoveDelete}
+          onOpenSnippetEditor={openSnippetEditor}
         />
       ) : null}
     </div>

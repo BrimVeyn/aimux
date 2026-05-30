@@ -570,6 +570,9 @@ export async function runGui(): Promise<void> {
           case 'toggleWorktreeMoveDelete':
             dispatch({ type: 'toggle-worktree-move-delete' })
             break
+          case 'openSnippetEditor':
+            dispatch({ snippetId: message.snippetId, type: 'open-snippet-editor' })
+            break
           default:
             break
         }

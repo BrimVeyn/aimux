@@ -264,13 +264,14 @@ export interface MultiRepoLite {
 /** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
 export interface ModalProjection {
   // `type` is open-ended: includes "new-tab", "session-picker", "snippet-picker",
-  // "split-picker", "theme-picker", "create-session", "worktree-move", etc.
+  // "split-picker", "theme-picker", "create-session", "worktree-move",
+  // "git-commit", "snippet-editor", "update-available", etc.
   type: string | null;
   editBuffer: string | null;
   selectedIndex: number;
   // Phase 3 additions
   actionMessage?: string | null;
-  activeField?: "directory" | "name";
+  activeField?: "directory" | "name" | "title" | "body" | "trigger" | "content";
   branchName?: string;
   createWorktree?: boolean;
   // worktree-move specific fields
@@ -282,6 +283,17 @@ export interface ModalProjection {
   sourceWorktreeId?: string;
   step?: "assistant" | "worktree" | "worktree-create";
   worktreeName?: string;
+  // git-commit (contentBuffer holds the inactive field) + snippet-editor (holds content when inactive)
+  contentBuffer?: string | null;
+  // snippet-editor
+  triggerBuffer?: string | null;
+  // git-commit (GUI renders edit + confirm only; generating is host-side only)
+  stage?: "edit" | "generating" | "confirm";
+  // snippet-editor: null => "Create snippet", non-null => "Edit snippet"
+  sessionTargetId?: string | null;
+  // update-available
+  currentVersion?: string;
+  latestVersion?: string;
 }
 
 /** The slice of aimux's AppState the GUI renders (full state is streamed). */
@@ -340,7 +352,8 @@ export type GuiClientMessage =
   | { t: "openWorktreeMove"; sourceWorktreeId: string }
   | { t: "requestBytes"; tabId: string }
   | { t: "toggleWorktreeMoveDelete" }
-  | { t: "openAiUsageModal" };
+  | { t: "openAiUsageModal" }
+  | { t: "openSnippetEditor"; snippetId?: string };
 
 export type ToastLevel = "info" | "success" | "error";
 

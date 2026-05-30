@@ -32,6 +32,7 @@ export type GuiClientMessage =
   | { t: 'requestBytes'; tabId: string }
   | { t: 'toggleWorktreeMoveDelete' }
   | { t: 'openAiUsageModal' }
+  | { t: 'openSnippetEditor'; snippetId?: string }
 
 export type ToastLevel = 'info' | 'success' | 'error'
 
@@ -143,6 +144,13 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return { t: 'toggleWorktreeMoveDelete' }
     case 'openAiUsageModal':
       return { t: 'openAiUsageModal' }
+    case 'openSnippetEditor':
+      if (value.snippetId !== undefined && typeof value.snippetId !== 'string') {
+        return null
+      }
+      return value.snippetId === undefined
+        ? { t: 'openSnippetEditor' }
+        : { snippetId: value.snippetId, t: 'openSnippetEditor' }
     default:
       return null
   }
