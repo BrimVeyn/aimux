@@ -2,10 +2,15 @@ pre-commit:
   parallel: true
   commands:
     lint:
-      run: bunx oxlint --type-aware --fix {staged_files} && git add {staged_files}
+      # --no-error-on-unmatched-pattern: when all staged files live under
+      # `desktop/` (excluded by .oxlintrc.json's ignorePatterns), oxlint
+      # would otherwise exit 1 on an empty filtered set and block the commit.
+      run: bunx oxlint --type-aware --fix --no-error-on-unmatched-pattern {staged_files} && git add {staged_files}
       glob: '*.{ts,tsx}'
     format-check:
-      run: bunx oxfmt --write {staged_files} && git add {staged_files}
+      # Same rationale: .prettierignore excludes `desktop/`, so a desktop-only
+      # commit would feed oxfmt 0 targets and fail. The flag makes that a no-op.
+      run: bunx oxfmt --write --no-error-on-unmatched-pattern {staged_files} && git add {staged_files}
       glob: '*.{ts,tsx,json}'
     knip:
       run: bun run knip
