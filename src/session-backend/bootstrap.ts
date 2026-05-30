@@ -22,7 +22,6 @@ import {
   killProcess,
   spawnDetachedIpcDaemon,
 } from '../platform/daemon-control'
-import { getProfileName } from '../profile-paths'
 import { LocalSessionBackend } from './local-session-backend'
 import { RemoteSessionBackend } from './remote-session-backend'
 
@@ -239,14 +238,14 @@ export async function createSessionBackend(opts?: {
 
   const socketPath = getIpcDaemonSocketPath()
 
-  // Dev profile: every host boot starts daemon + terminal-manager from a
-  // clean slate so source edits to either layer take effect without manual
-  // intervention. `bun --watch` only reloads the host process; the detached
-  // daemon/TM keep stale code in RAM otherwise. Other profiles preserve the
-  // daemon so PTYs survive frontend restarts (the whole point of the split).
-  // Opt-out via AIMUX_DEV_KEEP_DAEMON=1 for the rare case where you want to
-  // iterate on the host alone without dropping PTYs.
-  if (getProfileName() === 'dev' && process.env.AIMUX_DEV_KEEP_DAEMON !== '1') {
+  // Opt-in fresh-spawn for protocol-breaking dev work. `bun --watch` only
+  // reloads the host process; the detached daemon/TM keep stale code in RAM,
+  // so editing the IPC wire shape leaves the host on v(n+1) talking to a
+  // daemon on v(n). Run `AIMUX_DEV_FRESH_DAEMON=1 bun gui` to force a clean
+  // restart of all three layers. Default behaviour keeps the daemon so PTYs
+  // survive frontend restarts — the whole point of the split process model
+  // (the IPC handshake auto-restarts on a hard mismatch anyway).
+  if (process.env.AIMUX_DEV_FRESH_DAEMON === '1') {
     logDebug('backend.create.devFreshSpawn', { socketPath })
     await stopTerminalManager()
     await restartDaemon(socketPath)
