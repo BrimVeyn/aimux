@@ -1,3 +1,5 @@
+import type { Subprocess } from 'bun'
+
 import {
   setAutoCommitEnabled,
   setExternalEditorConfig,
@@ -16,6 +18,7 @@ import {
   isNewerVersion,
 } from '../update/version-check'
 import { launchShell } from './launch-shell'
+import { launchViteDev } from './launch-vite-dev'
 import { createGuiRuntime } from './runtime'
 import { serveGuiRuntime } from './transport'
 
@@ -60,11 +63,21 @@ export async function runGui(): Promise<void> {
 
   let updateCheckCancelled = false
   let shuttingDown = false
+  let viteProcess: Subprocess | null = null
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return
     shuttingDown = true
     logDebug('gui.host.shutdown', { signal })
     updateCheckCancelled = true
+    if (viteProcess !== null) {
+      try {
+        viteProcess.kill('SIGTERM')
+      } catch (error) {
+        logDebug('gui.host.viteKillFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
     await runtime.dispose()
     disposeBackend()
     try {
@@ -152,10 +165,33 @@ export async function runGui(): Promise<void> {
     process.exit(0)
   }
 
-  process.stdout.write(
-    'Running GUI host without a window. Open the frontend yourself:\n' +
-      '  Browser (HMR):  cd desktop && bun run dev   -> http://localhost:1420\n' +
-      '  Native window:  cd desktop && bun run tauri build, then `bun run gui`\n'
-  )
+  // Browser-dev mode (no native shell): start Vite alongside the host so a
+  // single `bun run gui:dev` boots everything. Gated on the dev profile inside
+  // launchViteDev — production runs of `aimux --gui` without a built binary
+  // never end up here with vite.
+  viteProcess = launchViteDev()
+  if (viteProcess !== null) {
+    process.stdout.write(
+      `[gui-dev] host  ${url}  (WS at ${url}/ws)\n` +
+        '[gui-dev] vite  http://localhost:1420  (open in browser)\n'
+    )
+    // Vite crashing must not bring the host down — log loudly and keep going.
+    // The user can restart vite manually (or Ctrl-C and re-run gui:dev).
+    const viteHandle = viteProcess
+    void (async () => {
+      const code = await viteHandle.exited
+      if (shuttingDown) return
+      process.stderr.write(
+        `[gui-dev] vite exited with code ${String(code)} — host still running. ` +
+          'Restart it via `cd desktop && bun run dev`.\n'
+      )
+    })()
+  } else {
+    process.stdout.write(
+      'Running GUI host without a window. Open the frontend yourself:\n' +
+        '  Browser (HMR):  cd desktop && bun run dev   -> http://localhost:1420\n' +
+        '  Native window:  cd desktop && bun run tauri build, then `bun run gui`\n'
+    )
+  }
   await new Promise<never>(() => {})
 }

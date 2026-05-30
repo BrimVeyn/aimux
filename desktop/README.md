@@ -42,18 +42,19 @@ bun run tauri build   # standalone release binary (auto-launched by `bun run gui
 
 ### Live development (HMR)
 
-For iterating on the React UI with hot reload:
+For iterating on the React UI with hot reload, a single command boots both the
+host and the Vite dev server:
 
 ```sh
-# terminal 1 — backend + WS host
-bun run gui
-
-# terminal 2 — Vite dev server + debug Tauri window
-cd desktop && bun run tauri dev
+bun run gui:dev   # from the repo root
 ```
 
-The debug window loads from the Vite dev server (port 1420); the release binary
-embeds the built frontend and runs standalone.
+This runs the GUI host on `:7878` (with `bun --watch` auto-restart) and spawns
+Vite in `desktop/` on `:1420` as a child process. Open
+[http://localhost:1420](http://localhost:1420) in a browser. Ctrl-C kills both.
+
+The release binary path (Tauri-built shell, port 1420 embedded) still works via
+`bun run gui` if `tauri build` has been run.
 
 ## Scope (v1)
 
