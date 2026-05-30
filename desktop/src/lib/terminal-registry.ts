@@ -63,7 +63,11 @@ function getParkingLot(): HTMLElement {
 function createTerminal(tabId: string, deps: CreateDeps): XtermHandle {
   const term = new Terminal({
     allowProposedApi: true,
-    cursorBlink: true,
+    // No xterm-driven blink: the inner program (shell prompt, Claude, vim…)
+    // already renders its own cursor and may also drive DECSCUSR. A second,
+    // xterm-side blink on top of that flashed cursor/cursorAccent over the
+    // app's own colors — looked broken, especially in terminal-input mode.
+    cursorBlink: false,
     fontFamily: "'JetBrainsMono Nerd Font Mono', ui-monospace, Menlo, monospace",
     fontSize: 13,
     lineHeight: 1.1,
