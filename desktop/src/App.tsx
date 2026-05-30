@@ -196,10 +196,13 @@ function App() {
       }
     }
     window.addEventListener('keydown', onKeyDown)
-    window.addEventListener('paste', onPaste)
+    // Capture phase: xterm.js registers its own paste handler on the
+    // xterm-helper-textarea and may stopPropagation, so a bubble-phase listener
+    // at window can be silently bypassed. Capture fires before xterm sees it.
+    window.addEventListener('paste', onPaste, true)
     return () => {
       window.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('paste', onPaste)
+      window.removeEventListener('paste', onPaste, true)
     }
   }, [])
 

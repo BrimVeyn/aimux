@@ -199,7 +199,13 @@ function handlePaste(
     dispatch({ char: sanitized, type: 'update-command-edit' })
     return
   }
-  if (state.focusMode === 'terminal-input' && state.activeTabId !== null) {
+  // GUI-only behaviour: a user-driven Cmd+V is unambiguous — they want the
+  // text in the active terminal regardless of which mode the host happens to
+  // be in. The TUI never sees this path (paste there is keystroke-driven
+  // through the keymap), so writing in nav/modal/git mode here can't break
+  // any TUI invariant; it just spares the user from "click pane first to
+  // enter insert" before every paste.
+  if (state.activeTabId !== null) {
     const tab = state.tabs.find((entry) => entry.id === state.activeTabId)
     const wrapped =
       tab?.terminalModes.bracketedPasteMode === true

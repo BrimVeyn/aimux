@@ -1,3 +1,4 @@
+import { writeText as tauriWriteText } from "@tauri-apps/plugin-clipboard-manager";
 import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -5,6 +6,58 @@ import type { ITheme } from "@xterm/xterm";
 import { Terminal } from "@xterm/xterm";
 
 import "@xterm/xterm/css/xterm.css";
+
+// Tauri's WebView blocks navigator.clipboard without the clipboard-manager
+// permission, so inside the desktop bundle we route writes through the
+// plugin (allow-listed in capabilities/default.json) — it shares the real
+// macOS NSPasteboard, so Cmd+V in any other app pastes what was copied here.
+// In plain browser dev (Vite at localhost) the Tauri import isn't available,
+// so we call navigator.clipboard SYNCHRONOUSLY inside the same gesture frame
+// — awaiting a Tauri-attempt first would lose the gesture and the browser
+// would silently refuse the write.
+const IS_TAURI =
+  typeof window !== "undefined" &&
+  ("__TAURI_INTERNALS__" in window || "__TAURI__" in window);
+
+// Last-resort fallback when navigator.clipboard refuses (no permission,
+// document not focused, …): the legacy execCommand('copy') path that pre-dates
+// the modern async clipboard API and tends to work in more contexts.
+function legacyCopy(text: string): boolean {
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.append(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (err) {
+    console.warn("[aimux] legacy copy failed", err);
+    return false;
+  }
+}
+
+function writeClipboard(text: string): void {
+  if (IS_TAURI) {
+    void tauriWriteText(text).catch((err: unknown) => {
+      console.warn("[aimux] tauri clipboard write failed, trying legacy", err);
+      legacyCopy(text);
+    });
+    return;
+  }
+  if (typeof navigator !== "undefined" && navigator.clipboard !== undefined) {
+    void navigator.clipboard.writeText(text).catch((err: unknown) => {
+      console.warn("[aimux] navigator clipboard write failed, trying legacy", err);
+      legacyCopy(text);
+    });
+    return;
+  }
+  legacyCopy(text);
+}
 
 // Keep-alive terminal registry (VSCode-style). One xterm instance lives per
 // tabId for the whole page session; switching tabs MOVES its DOM element into
@@ -90,8 +143,21 @@ function createTerminal(tabId: string, deps: CreateDeps): XtermHandle {
     console.warn("xterm WebGL addon failed to load; falling back", err);
   }
   // Don't let xterm consume keys — all input flows through the window keydown
-  // listener in App.tsx and the host's keymap pipeline.
+  // listener in App.tsx and the host's keymap pipeline. Copy is wired to
+  // selection-change (drag-to-copy) below; paste stays on the window-level
+  // `paste` listener so the host bracket-wraps it.
   term.attachCustomKeyEventHandler(() => false);
+
+  // TUI parity (src/app-runtime/use-renderer-bindings.ts:256-257): drag-to-copy.
+  // Pushing the current selection to the OS clipboard on each selection-change
+  // mirrors the TUI mouseup behaviour, so there's nothing for the user to
+  // remember — finishing a drag IS the copy.
+  term.onSelectionChange(() => {
+    if (!term.hasSelection()) return;
+    const text = term.getSelection();
+    if (text === "") return;
+    writeClipboard(text);
+  });
 
   const onBytes = (e: Event): void => {
     term.write((e as CustomEvent<string>).detail);
