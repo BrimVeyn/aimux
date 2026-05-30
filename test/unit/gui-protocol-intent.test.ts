@@ -109,6 +109,14 @@ describe('parseClientMessage intent envelope', () => {
     })
   })
 
+  test('accepts modal.snippet.cancel (no payload)', () => {
+    const raw = JSON.stringify({ intent: { kind: 'modal.snippet.cancel' }, t: 'intent' })
+    expect(parseClientMessage(raw)).toEqual({
+      intent: { kind: 'modal.snippet.cancel' },
+      t: 'intent',
+    })
+  })
+
   test('accepts git.stageFile with a path', () => {
     const raw = JSON.stringify({
       intent: { kind: 'git.stageFile', path: 'src/foo.ts' },

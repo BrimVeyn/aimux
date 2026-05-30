@@ -20,8 +20,8 @@ import type { ModalProjection } from "@/lib/types";
 //   2. All per-keystroke input is handled locally by React on the input
 //      elements — zero WS round-trips.
 //   3. Submit / cancel send a single intent (modal.snippet.submit /
-//      modal.cancel); the host updates AppState and tears the modal down,
-//      which unmounts this component.
+//      modal.snippet.cancel); the host updates AppState and tears the modal
+//      down, which unmounts this component.
 //
 // THE BOUNDARY
 //   - Never dispatch a per-keystroke message to the host for this modal.

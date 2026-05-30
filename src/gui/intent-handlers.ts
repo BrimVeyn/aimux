@@ -29,6 +29,12 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'modal.cancel':
       runtime.dispatch({ type: 'close-modal' })
       return
+    case 'modal.snippet.cancel':
+      // Mirrors TUI `backToSnippetPicker` (packages/aimux-config/src/actions.ts:306):
+      // single reducer action that transitions modal.type from snippet-editor
+      // back to snippet-picker, preserving the picker context.
+      runtime.dispatch({ type: 'open-snippet-picker' })
+      return
     case 'git.stageFile':
       handleGitStage(intent.path, runtime)
       return

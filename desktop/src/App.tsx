@@ -266,10 +266,9 @@ function App() {
   }, []);
 
   // Roadmap P1.3: client-authoritative SnippetEditorModal commits its in-flight
-  // buffers in a single intent on submit; cancel reuses the generic
-  // `modal.cancel` (close-modal semantics suffice — Esc in the TUI re-opens
-  // the snippet picker, but the GUI flow returns to whatever was under the
-  // modal, matching every other GUI Esc).
+  // buffers in a single intent on submit. Cancel mirrors the TUI's
+  // `backToSnippetPicker` — returning to the picker rather than closing the
+  // modal stack — via the `modal.snippet.cancel` intent.
   const submitSnippetEditor = useCallback(
     (payload: { name: string; trigger: string; content: string; snippetId?: string }) => {
       socketRef.current?.send({
@@ -280,7 +279,7 @@ function App() {
     [],
   );
   const cancelSnippetEditor = useCallback(() => {
-    socketRef.current?.send({ intent: { kind: "modal.cancel" }, t: "intent" });
+    socketRef.current?.send({ intent: { kind: "modal.snippet.cancel" }, t: "intent" });
   }, []);
   const tabsById: Record<string, ProjectedTab> = {};
   for (const t of projection?.tabs ?? []) {

@@ -17,6 +17,11 @@ export type GuiIntent =
     }
   | { kind: 'modal.submit' }
   | { kind: 'modal.cancel' }
+  // Esc inside the snippet-editor: mirrors the TUI's `backToSnippetPicker`
+  // which dispatches `open-snippet-picker` (transitions modal.type from
+  // snippet-editor back to snippet-picker). `modal.cancel` would just close
+  // the modal and lose the picker context.
+  | { kind: 'modal.snippet.cancel' }
   | { kind: 'git.stageFile'; path: string }
   | { kind: 'git.unstageFile'; path: string }
   | { kind: 'git.discardFile'; path: string }
@@ -50,6 +55,8 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
       return { kind: 'modal.submit' }
     case 'modal.cancel':
       return { kind: 'modal.cancel' }
+    case 'modal.snippet.cancel':
+      return { kind: 'modal.snippet.cancel' }
     case 'git.stageFile':
       if (typeof obj.path !== 'string') return null
       return { kind: 'git.stageFile', path: obj.path }
