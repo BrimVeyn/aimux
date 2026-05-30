@@ -234,7 +234,17 @@ export interface ModalProjection {
   editBuffer: string | null
   selectedIndex: number
   actionMessage?: string | null
-  activeField?: 'directory' | 'name' | 'title' | 'body' | 'trigger' | 'content'
+  activeField?:
+    | 'directory'
+    | 'name'
+    | 'title'
+    | 'body'
+    | 'trigger'
+    | 'content'
+    | 'worktree-name'
+    | 'branch-name'
+    | 'target-worktree'
+    | 'assistant'
   branchName?: string
   createWorktree?: boolean
   // worktree-move specific fields

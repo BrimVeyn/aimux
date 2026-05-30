@@ -326,12 +326,37 @@ function NewTabModal({
   // Step 2: choose a worktree to launch in (or create a new one).
   if (modal.step === "worktree" || modal.step === "worktree-create") {
     const assistant = modal.selectedAssistantId ?? "assistant";
+    // TUI parity: worktree-create has two host-driven fields (name + branch);
+    // active one shows the cursor, inactive is dimmed. Tab cycles via host.
+    const isCreateStep = modal.step === "worktree-create";
+    const branchActive = modal.activeField === "branch-name";
     return (
       <div className="flex flex-col gap-2">
         <div className="font-bold">
           New {assistant} tab <span style={{ color: theme.textMuted }}>· choose worktree</span>
         </div>
-        {modal.createWorktree === true ? (
+        {isCreateStep ? (
+          <div className="flex flex-col gap-1">
+            <span style={{ color: branchActive ? theme.textMuted : theme.primary }}>
+              Worktree
+            </span>
+            <div
+              className="rounded px-2 py-1"
+              style={{ backgroundColor: theme.backgroundElement, color: theme.text }}
+            >
+              {modal.worktreeName ?? ""}
+              {!branchActive ? <span style={{ color: theme.primary }}>▏</span> : null}
+            </div>
+            <span style={{ color: branchActive ? theme.primary : theme.textMuted }}>Branch</span>
+            <div
+              className="rounded px-2 py-1"
+              style={{ backgroundColor: theme.backgroundElement, color: theme.text }}
+            >
+              {modal.branchName ?? ""}
+              {branchActive ? <span style={{ color: theme.primary }}>▏</span> : null}
+            </div>
+          </div>
+        ) : modal.createWorktree === true ? (
           <div
             className="rounded px-2 py-1"
             style={{ backgroundColor: theme.backgroundElement }}
@@ -364,7 +389,9 @@ function NewTabModal({
           </div>
         )}
         <div className="pt-1" style={{ color: theme.textMuted }}>
-          Enter: launch · C-w: toggle new worktree · ↑/↓: select · Esc: back
+          {isCreateStep
+            ? "Enter: launch · Tab: switch field · Esc: back"
+            : "Enter: launch · C-w: toggle new worktree · ↑/↓: select · Esc: back"}
         </div>
       </div>
     );
