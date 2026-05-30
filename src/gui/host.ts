@@ -61,6 +61,7 @@ import {
   getCurrentPackageVersion,
   isNewerVersion,
 } from '../update/version-check'
+import { startDiffPrefetchDriver } from './diff-prefetch-driver'
 import { createDirectorySearchRunner } from './gui-directory-search'
 import { computeGuiHelpEntries } from './gui-help-entries'
 import { createPipeline } from './host-pipeline'
@@ -115,6 +116,7 @@ export async function runGui(): Promise<void> {
     autosave: (() => void) | null
     claudeThemeSync: (() => void) | null
     diff: (() => void) | null
+    diffPrefetch: (() => void) | null
     divergence: (() => void) | null
     multiRepo: (() => void) | null
     panel: (() => void) | null
@@ -122,6 +124,7 @@ export async function runGui(): Promise<void> {
     autosave: null,
     claudeThemeSync: null,
     diff: null,
+    diffPrefetch: null,
     divergence: null,
     multiRepo: null,
     panel: null,
@@ -208,6 +211,9 @@ export async function runGui(): Promise<void> {
     process.on(sig, () => {
       updateCheckCancelled = true
       disposers.claudeThemeSync?.()
+      // Abort any in-flight prefetch work so the queue doesn't keep firing
+      // git subprocesses while the host is tearing down.
+      disposers.diffPrefetch?.()
       flushAutosave()
       disposeBackend()
       process.exit(0)
@@ -422,6 +428,15 @@ export async function runGui(): Promise<void> {
   }
   let lastDivergenceSessionId = getState().currentSessionId
   let lastDivergenceSessions = getState().sessions
+  // Prefetch driver tracks — the queue dedupes by key so we just need to
+  // call `update()` whenever any input might have changed. These four
+  // references cover all the hook's deps: `gitMode` carries selectedEntryKey
+  // / diffs / parsed / loading / collapsedFolders / headOffset, `gitPanel`
+  // carries files, `gitPane` carries radius / fileListMode / treeCompaction.
+  let lastPrefetchProjectPath = projectPathOf(getState())
+  let lastPrefetchGitMode = getState().gitMode
+  let lastPrefetchGitPanel = getState().gitPanel
+  let lastPrefetchGitPane = getState().gitPane
   const restartDivergencePoll = (): void => {
     disposers.divergence?.()
     disposers.divergence = startWorktreeDivergencePolling({
@@ -469,6 +484,32 @@ export async function runGui(): Promise<void> {
     getSelectedKey: () => appStore.getState().gitMode.selectedEntryKey,
   })
 
+  // Radius prefetch — fetches the diffs ±gitPane.prefetchRadius around the
+  // selected entry so j/k-style navigation hits the cache. Mirrors the TUI's
+  // `useDiffPrefetch` hook; both delegate to the shared `PrefetchQueue` in
+  // `src/git/diff-prefetch-queue.ts`. The driver itself doesn't subscribe to
+  // the store — the main `appStore.subscribe` below calls `update()` whenever
+  // a tracked input changes (selection, files, radius, cache, …).
+  const diffPrefetchDriver = startDiffPrefetchDriver({
+    getCollapsedFolders: () => appStore.getState().gitMode.collapsedFolders,
+    getCompareRef: (): string | undefined => undefined,
+    getDiffs: () => appStore.getState().gitMode.diffs,
+    getEnabled: () => true,
+    getFileListMode: () => appStore.getState().gitPane.fileListMode,
+    getFiles: () => appStore.getState().gitPanel.files,
+    getHeadOffset: () => appStore.getState().gitMode.headOffset,
+    getLoading: () => appStore.getState().gitMode.loading,
+    getParsed: () => appStore.getState().gitMode.parsedFiles,
+    getProjectPath: () => projectPathOf(appStore.getState()),
+    getRadius: () => appStore.getState().gitPane.prefetchRadius,
+    getSelectedKey: () => appStore.getState().gitMode.selectedEntryKey,
+    getTreeCompaction: () => appStore.getState().gitPane.treeCompaction,
+  })
+  disposers.diffPrefetch = () => diffPrefetchDriver.dispose()
+  // Kick the initial pass so a workspace that boots straight into a selected
+  // entry warms the neighbours before the user starts pressing j/k.
+  diffPrefetchDriver.update()
+
   appStore.subscribe(() => {
     const state = getState()
     layoutRef.current = state.layout
@@ -509,6 +550,21 @@ export async function runGui(): Promise<void> {
       lastDivergenceSessionId = state.currentSessionId
       lastDivergenceSessions = state.sessions
       restartDivergencePoll()
+    }
+    // Diff radius prefetch — recompute the window whenever any tracked input
+    // shifts. `update()` is cheap when nothing meaningful changed because the
+    // queue dedupes by key and skips already-cached / inflight entries.
+    if (
+      nextPath !== lastPrefetchProjectPath ||
+      state.gitMode !== lastPrefetchGitMode ||
+      state.gitPanel !== lastPrefetchGitPanel ||
+      state.gitPane !== lastPrefetchGitPane
+    ) {
+      lastPrefetchProjectPath = nextPath
+      lastPrefetchGitMode = state.gitMode
+      lastPrefetchGitPanel = state.gitPanel
+      lastPrefetchGitPane = state.gitPane
+      diffPrefetchDriver.update()
     }
     directorySearch.onModal(state.modal)
     scheduleBroadcast()
@@ -724,6 +780,7 @@ export async function runGui(): Promise<void> {
     disposers.panel?.()
     disposers.divergence?.()
     disposers.diff?.()
+    disposers.diffPrefetch?.()
     disposers.multiRepo?.()
     disposers.claudeThemeSync?.()
     disposers.autosave?.()
