@@ -124,8 +124,18 @@ function App() {
       // never forward to the host. Doing so would (a) double-handle each
       // keystroke and (b) feed the dead per-keystroke modal flow that no
       // longer drives any visible state for this modal.
+      // C2 fix: xterm.js owns a hidden helper <textarea> (`xterm-helper-textarea`)
+      // for IME/a11y. It holds focus across tab switches and even while detached
+      // to the parking lot, so without an exception every host-bound key
+      // (git-mode, navigation, modal nav) would be silently swallowed once the
+      // user had clicked into any terminal. Treat it as not-a-form-input.
       const target = e.target as HTMLElement | null
+      const isXtermHelper =
+        target !== null &&
+        target.tagName === 'TEXTAREA' &&
+        target.classList.contains('xterm-helper-textarea')
       if (
+        !isXtermHelper &&
         target !== null &&
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       ) {
@@ -158,9 +168,16 @@ function App() {
     const onPaste = (e: ClipboardEvent) => {
       // Same client-authoritative carve-out as onKeyDown: native paste into
       // a form input must stay native (browser inserts text + fires change),
-      // not route to the host's PTY-paste pipeline.
+      // not route to the host's PTY-paste pipeline. xterm-helper-textarea is
+      // pseudo-input (IME proxy) — treat it as not-a-form-input so paste
+      // continues to route into the PTY for terminal panes.
       const target = e.target as HTMLElement | null
+      const isXtermHelper =
+        target !== null &&
+        target.tagName === 'TEXTAREA' &&
+        target.classList.contains('xterm-helper-textarea')
       if (
+        !isXtermHelper &&
         target !== null &&
         (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       ) {
