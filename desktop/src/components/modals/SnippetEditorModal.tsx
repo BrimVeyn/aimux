@@ -120,6 +120,12 @@ export function SnippetEditorModal({
     return FIELD_ORDER[(i + 1) % FIELD_ORDER.length] ?? "name";
   }
 
+  function prevField(current: Field): Field {
+    const i = FIELD_ORDER.indexOf(current);
+    const n = FIELD_ORDER.length;
+    return FIELD_ORDER[(i - 1 + n) % n] ?? "name";
+  }
+
   function submit(): void {
     const id = snippetIdRef.current;
     onSubmit({
@@ -139,7 +145,7 @@ export function SnippetEditorModal({
     e.stopPropagation();
     if (e.key === "Tab") {
       e.preventDefault();
-      setActiveField(nextField(field));
+      setActiveField(e.shiftKey ? prevField(field) : nextField(field));
       return;
     }
     if (e.key === "Enter") {
@@ -162,7 +168,8 @@ export function SnippetEditorModal({
     e.stopPropagation();
     if (e.key === "Tab") {
       e.preventDefault();
-      setActiveField("name");
+      // From content: forward Tab → name (wraps), Shift+Tab → trigger (previous).
+      setActiveField(e.shiftKey ? prevField("content") : nextField("content"));
       return;
     }
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
