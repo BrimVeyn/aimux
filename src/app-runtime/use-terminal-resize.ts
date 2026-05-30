@@ -38,7 +38,7 @@ function getTerminalBounds(cols: number, rows: number) {
   return createTerminalBounds(cols, rows)
 }
 
-function resizeSplitTabs(
+export function resizeSplitTabs(
   backend: SessionBackend,
   layoutTrees: AppState['layoutTrees'],
   tabIds: string[],

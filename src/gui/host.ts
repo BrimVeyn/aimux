@@ -19,6 +19,7 @@ import {
   handleDeleteSessionEffect,
   handleSwitchSessionEffect,
 } from '../app-runtime/session-actions'
+import { resizeSplitTabs } from '../app-runtime/use-terminal-resize'
 import { startWorkspaceAutosave } from '../app-runtime/use-workspace-autosave'
 import { loadConfig } from '../config'
 import { loadUserConfig } from '../config/loader'
@@ -510,6 +511,30 @@ export async function runGui(): Promise<void> {
   // entry warms the neighbours before the user starts pressing j/k.
   diffPrefetchDriver.update()
 
+  // Resize cascade for hidden tabs — port of the TUI's useTerminalResize hook
+  // (src/app-runtime/use-terminal-resize.ts). The frontend xterm.js panes
+  // re-measure and push `resizeTab` only for VISIBLE panes; tabs the GUI keeps
+  // alive but unmounted (background xterm registry) would stay stuck at their
+  // last-applied PTY size until activated, rendering wrapped/clipped until the
+  // next focus event. Mirror the TUI cascade so toggling sidebar/gitPane (or
+  // any layout-tree mutation) propagates the new main-area size to every tab.
+  //
+  // `state.layout.terminalCols/Rows` is kept in sync by the `resizeTab` WS
+  // handler above (single-leaf active tab) — only cascade once that's happened
+  // at least once, otherwise we'd push the 80×24 default into every PTY.
+  const initialLayout = getState().layout
+  let lastLayoutCols = initialLayout.terminalCols
+  let lastLayoutRows = initialLayout.terminalRows
+  let lastSidebarVisible = getState().sidebar.visible
+  let lastSidebarWidth = getState().sidebar.width
+  let lastGitPaneMode = getState().gitPane.mode
+  let lastGitPaneVisible = getState().gitPane.visible
+  let lastGitPanePosition = getState().gitPane.position
+  let lastGitPaneRatio = getState().gitPane.paneRatio
+  let lastLayoutTrees = getState().layoutTrees
+  let lastTabsRef = getState().tabs
+  let terminalSizeKnown = false
+
   appStore.subscribe(() => {
     const state = getState()
     layoutRef.current = state.layout
@@ -565,6 +590,58 @@ export async function runGui(): Promise<void> {
       lastPrefetchGitPanel = state.gitPanel
       lastPrefetchGitPane = state.gitPane
       diffPrefetchDriver.update()
+    }
+    // Resize cascade — fires when any layout-driven input changes. Reference
+    // equality on layoutTrees/tabs is enough (reducers replace these on every
+    // structural mutation); for primitives we compare values. Without this
+    // guard the cascade would fire on every tab-activity / git-poll tick and
+    // flood the daemon with no-op resize commands.
+    const nextCols = state.layout.terminalCols
+    const nextRows = state.layout.terminalRows
+    const colsChanged = nextCols !== lastLayoutCols
+    const rowsChanged = nextRows !== lastLayoutRows
+    const sidebarChanged =
+      state.sidebar.visible !== lastSidebarVisible || state.sidebar.width !== lastSidebarWidth
+    const gitPaneChanged =
+      state.gitPane.mode !== lastGitPaneMode ||
+      state.gitPane.visible !== lastGitPaneVisible ||
+      state.gitPane.position !== lastGitPanePosition ||
+      state.gitPane.paneRatio !== lastGitPaneRatio
+    const treesChanged = state.layoutTrees !== lastLayoutTrees
+    const tabsChanged = state.tabs !== lastTabsRef
+    if (colsChanged || rowsChanged) {
+      // First real size from the frontend (via the resizeTab → set-terminal-size
+      // bridge above) unlocks the cascade. Before this, terminalCols/Rows are
+      // still the 80×24 store defaults and pushing them would corrupt PTYs.
+      terminalSizeKnown = true
+    }
+    if (
+      terminalSizeKnown &&
+      (colsChanged ||
+        rowsChanged ||
+        sidebarChanged ||
+        gitPaneChanged ||
+        treesChanged ||
+        tabsChanged)
+    ) {
+      lastLayoutCols = nextCols
+      lastLayoutRows = nextRows
+      lastSidebarVisible = state.sidebar.visible
+      lastSidebarWidth = state.sidebar.width
+      lastGitPaneMode = state.gitPane.mode
+      lastGitPaneVisible = state.gitPane.visible
+      lastGitPanePosition = state.gitPane.position
+      lastGitPaneRatio = state.gitPane.paneRatio
+      lastLayoutTrees = state.layoutTrees
+      lastTabsRef = state.tabs
+      const trees = Object.values(state.layoutTrees)
+      const hasSplits = trees.some((t) => t.type === 'split')
+      const tabIds = state.tabs.map((t) => t.id)
+      if (hasSplits) {
+        resizeSplitTabs(backend, state.layoutTrees, tabIds, nextCols, nextRows)
+      } else {
+        backend.resizeAll(nextCols, nextRows)
+      }
     }
     directorySearch.onModal(state.modal)
     scheduleBroadcast()
@@ -681,9 +758,27 @@ export async function runGui(): Promise<void> {
           case 'resizeWindow':
             dispatch({ cols: message.cols, rows: message.rows, type: 'set-terminal-size' })
             break
-          case 'resizeTab':
+          case 'resizeTab': {
             backend.resizeTab(message.tabId, message.cols, message.rows)
+            // The frontend measures each xterm pane pixel-perfectly and pushes
+            // resizeTab per visible pane. For a single-leaf active tab, that
+            // measurement IS the current main-area size — recording it in
+            // `layout` lets the subscribe-driven cascade below propagate it to
+            // hidden tabs (which the frontend can't measure). Skip split tabs:
+            // their resizeTab carries a sub-pane size, not the full area.
+            const groupId = state.tabGroupMap[message.tabId]
+            const tree = groupId != null && groupId !== '' ? state.layoutTrees[groupId] : undefined
+            const isSingleLeaf = tree !== undefined && tree.type === 'leaf'
+            if (
+              message.tabId === state.activeTabId &&
+              isSingleLeaf &&
+              (state.layout.terminalCols !== message.cols ||
+                state.layout.terminalRows !== message.rows)
+            ) {
+              dispatch({ cols: message.cols, rows: message.rows, type: 'set-terminal-size' })
+            }
             break
+          }
           case 'paneActivate':
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
