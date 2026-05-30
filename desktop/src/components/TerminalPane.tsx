@@ -1,9 +1,10 @@
 import { XtermPane } from "@/components/XtermPane";
 import { theme } from "@/lib/theme";
-import type { ProjectedTab } from "@/lib/types";
+import type { FocusMode, ProjectedTab } from "@/lib/types";
 
 interface TerminalPaneProps {
   bytesEmitter: EventTarget;
+  focusMode: FocusMode;
   isActive: boolean;
   onActivate: (tabId: string) => void;
   onRequestBytes: (tabId: string) => void;
@@ -18,6 +19,7 @@ interface TerminalPaneProps {
 // paneActivate. Sizing and scrolling are owned by xterm + FitAddon.
 export function TerminalPane({
   bytesEmitter,
+  focusMode,
   isActive,
   onActivate,
   onRequestBytes,
@@ -26,7 +28,13 @@ export function TerminalPane({
   tabId,
   themeId,
 }: TerminalPaneProps) {
-  const borderColor = isActive ? theme.primary : theme.border;
+  // TUI parity (src/ui/components/layout/terminal-pane.tsx getBorderColor):
+  // inactive → border; active + terminal-input → accent; active otherwise → primary.
+  const borderColor = !isActive
+    ? theme.border
+    : focusMode === "terminal-input"
+      ? theme.accent
+      : theme.primary;
   const title = tab ? `${tab.title} · ${tab.status}` : tabId;
 
   return (

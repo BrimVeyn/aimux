@@ -1,11 +1,12 @@
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TerminalPane } from "@/components/TerminalPane";
 import { aimuxToRrpDirection } from "@/lib/split";
-import type { LayoutNode, ProjectedTab } from "@/lib/types";
+import type { FocusMode, LayoutNode, ProjectedTab } from "@/lib/types";
 
 interface SplitLayoutProps {
   activeTabId: string | null;
   bytesEmitter: EventTarget;
+  focusMode: FocusMode;
   node: LayoutNode;
   onActivate: (tabId: string) => void;
   onRequestBytes: (tabId: string) => void;
@@ -25,6 +26,7 @@ export function SplitLayout(props: SplitLayoutProps) {
     return (
       <TerminalPane
         bytesEmitter={props.bytesEmitter}
+        focusMode={props.focusMode}
         isActive={node.tabId === props.activeTabId}
         onActivate={props.onActivate}
         onRequestBytes={props.onRequestBytes}

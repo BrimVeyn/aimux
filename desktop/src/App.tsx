@@ -442,6 +442,7 @@ function App() {
                 <SplitLayout
                   activeTabId={activeTabId}
                   bytesEmitter={bytesEmitterRef.current}
+                  focusMode={projection?.focusMode ?? 'navigation'}
                   node={activeTree}
                   onActivate={activateTab}
                   onRequestBytes={requestBytes}
@@ -453,6 +454,7 @@ function App() {
               ) : activeTabId !== null ? (
                 <TerminalPane
                   bytesEmitter={bytesEmitterRef.current}
+                  focusMode={projection?.focusMode ?? 'navigation'}
                   isActive
                   onActivate={activateTab}
                   onRequestBytes={requestBytes}

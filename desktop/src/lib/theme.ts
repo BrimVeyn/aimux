@@ -2,6 +2,7 @@
 // useTheme. Same keys as before so components don't change. Tokens verified
 // against packages/aimux-config/src/tui/tokens.ts.
 export const theme = {
+  accent: "var(--aimux-accent)",
   background: "var(--aimux-background)",
   backgroundElement: "var(--aimux-backgroundElement)",
   backgroundPanel: "var(--aimux-backgroundPanel)",
