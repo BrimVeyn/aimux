@@ -532,21 +532,45 @@ describe('PtyManager', () => {
 
     manager.disposeSession('tab-reap')
 
-    // SIGTERM is ignored; the SIGKILL escalation fires after ~2s.
-    const dead = await new Promise<boolean>((resolve) => {
-      const timeout = setTimeout(() => resolve(false), 4_000)
-      const poll = setInterval(() => {
-        try {
-          process.kill(pid, 0)
-        } catch {
+    // SIGTERM is trapped; the SIGKILL escalation fires after ~2s and the
+    // read-loop must observe CHILD_EXITED and waitpid the dying child. If
+    // bun-pty's master fd were closed first (the previous regression),
+    // the read-loop would have already stopped — the child would die but
+    // linger as `Z <defunct>` because nobody runs waitpid. ps with no
+    // matching pid exits non-zero and prints nothing; that is what we want.
+    // Bare `kill(pid, 0)` alone isn't enough here: it returns success on a
+    // zombie on macOS/Linux and would mask a regression.
+    const readStat = async (): Promise<string> => {
+      const proc = Bun.spawn(['ps', '-o', 'stat=', '-p', String(pid)], {
+        stderr: 'ignore',
+        stdout: 'pipe',
+      })
+      await proc.exited
+      return (await new Response(proc.stdout).text()).trim()
+    }
+
+    let sawZombie = false
+    const fullyReaped = await new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => resolve(false), 5_000)
+      const tick = async (): Promise<void> => {
+        const stat = await readStat()
+        if (stat === '') {
           clearTimeout(timeout)
-          clearInterval(poll)
           resolve(true)
+          return
         }
-      }, 50)
+        if (stat.includes('Z')) {
+          sawZombie = true
+        }
+        setTimeout(() => {
+          void tick()
+        }, 50)
+      }
+      void tick()
     })
 
-    expect(dead).toBe(true)
+    expect(sawZombie).toBe(false)
+    expect(fullyReaped).toBe(true)
     manager.disposeAll()
   })
 

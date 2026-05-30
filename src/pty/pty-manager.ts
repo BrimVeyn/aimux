@@ -32,6 +32,13 @@ interface SessionHandle {
   /** Set when a resize landed while writes were in flight; the viewport is
    *  re-anchored once pendingWrites reaches 0. */
   reanchorAfterDrain: boolean
+  /** Latched once onExit fires (either via the read-loop's CHILD_EXITED path
+   *  or via the synthetic exit pty.kill() fires). Used to (a) dedupe the
+   *  second onExit when finalizeSession closes the FFI handle via pty.kill(),
+   *  and (b) skip the deferred SIGKILL escalation once the child has been
+   *  reaped (the only safe signal that the pid we are targeting is still
+   *  ours and not an OS-recycled pid). */
+  reaped: boolean
 }
 
 const ESC = '\x1b'
@@ -229,6 +236,14 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     this.sessions.delete(session.tabId)
     this.flushRenderNow(session)
     session.emulator.dispose()
+    // Release the FFI handle now that the child is reaped and the emulator is
+    // dropped. pty.kill() fires a synthetic onExit; session.reaped is already
+    // true so the listener returns early.
+    try {
+      session.pty.kill()
+    } catch {
+      // handle already closed — fine
+    }
     logDebug('ptyManager.finalize', { exitCode, tabId: session.tabId })
     this.emit('exit', session.tabId, exitCode)
   }
@@ -282,10 +297,19 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         pendingWrites: 0,
         pty,
         reanchorAfterDrain: false,
+        reaped: false,
         tabId: options.tabId,
       }
 
       pty.onData((data) => {
+        // If the session has been replaced (createSession fired again for
+        // this tabId while the old child was still being torn down), the old
+        // child's residual output must NOT be emitted on the new session's
+        // tabId — it would corrupt the new stream. The old emulator is
+        // disposed in the onExit "replaced" branch.
+        if (this.sessions.get(options.tabId) !== session) {
+          return
+        }
         logDebug('ptyManager.data', {
           byteLength: Buffer.byteLength(data, 'utf8'),
           pendingWrites: session.pendingWrites,
@@ -326,9 +350,26 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       })
 
       pty.onExit(({ exitCode }) => {
+        // Dedupe: pty.kill() fires a synthetic onExit. finalizeSession calls
+        // pty.kill() to release the FFI handle after a real exit, so we will
+        // see this callback twice for the same session. First-write wins.
+        if (session.reaped) {
+          return
+        }
+        session.reaped = true
+
         logDebug('ptyManager.exit', { exitCode, tabId: options.tabId })
         const current = this.sessions.get(options.tabId)
         if (!current || current.pty !== pty) {
+          // Session was replaced (createSession called again for this tabId)
+          // while the old child was still being torn down. We still own the
+          // orphan's emulator + FFI handle; drop them so they don't leak.
+          session.emulator.dispose()
+          try {
+            session.pty.kill()
+          } catch {
+            // handle already closed — fine
+          }
           return
         }
 
@@ -460,11 +501,14 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     }
 
     this.clearTimers(tabId)
-    this.sessions.delete(tabId)
-    const pid = session.pty.pid
-    session.pty.kill()
-    this.reapPtyProcess(pid, { escalate: true })
-    session.emulator.dispose()
+    // Do NOT delete from this.sessions, do NOT dispose the emulator, do NOT
+    // call pty.kill() yet. The read-loop must stay alive to observe
+    // CHILD_EXITED and waitpid the child — otherwise the child becomes a
+    // <defunct> zombie after the eventual SIGKILL because nobody reaps it.
+    // SIGTERM directly to the pid; escalate to SIGKILL at +2s if still alive.
+    // The natural onExit path runs finalizeSession, which releases the FFI
+    // handle and disposes the emulator.
+    this.reapPtyProcess(session, { escalate: true })
   }
 
   disposeAll(): void {
@@ -472,63 +516,66 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
       this.clearTimers(tabId)
     }
     for (const session of this.sessions.values()) {
-      const pid = session.pty.pid
-      session.pty.kill()
-      // Called on host shutdown: a deferred SIGKILL escalation may never fire
-      // because the host exits first, so force-kill synchronously instead.
-      this.reapPtyProcess(pid, { escalate: false })
-      session.emulator.dispose()
+      // Host shutdown: send SIGTERM then SIGKILL synchronously. The host is
+      // about to process.exit(0); even if the read-loop is killed before it
+      // can waitpid, the children are reparented to init which reaps them, so
+      // no long-lived defunct. We do NOT call pty.kill() (which would close
+      // the master fd and trigger SIGHUP that claude ignores).
+      this.reapPtyProcess(session, { escalate: false })
     }
-
-    this.sessions.clear()
   }
 
   /**
-   * Actually terminate the PTY's child process. bun-pty's `pty.kill()` only
-   * closes the master fd (delivering SIGHUP) and fires a synthetic exit, so a
-   * child that ignores SIGHUP — claude and many TUI apps do — survives and
-   * leaks. aimux spawns the command directly, so `pty.pid` *is* that child; we
-   * signal the pid itself. A best-effort group signal is added for same-group
-   * descendants (it ESRCHes harmlessly when there is no such group).
+   * Send SIGTERM (and, on escalation, SIGKILL) to the PTY's child process pid.
+   *
+   * Critical: this MUST be called while the bun-pty read-loop is still alive.
+   * The read-loop is the only place bun-pty calls waitpid (via its
+   * CHILD_EXITED branch); if we close the master fd first (pty.kill() sets
+   * _closing = true and stops the loop), the dying child has nobody to reap
+   * it and lingers as `Z <defunct>` under the host until host shutdown.
+   *
+   * The deferred SIGKILL is guarded by session.reaped — set by onExit. This is
+   * the only reliable signal that the pid we are about to escalate to is
+   * still OUR child and not an OS-recycled pid (which is possible on macOS
+   * within the 2-second window). The group-kill `process.kill(-pid, ...)`
+   * that used to live here was removed for the same reason: aimux spawns the
+   * command as its own process leader so pty.pid IS the only target, and
+   * group-killing a recycled pid would target an unrelated session group.
    *
    * Per-tab close escalates SIGTERM -> SIGKILL after a grace period so the
    * process can exit cleanly; shutdown kills outright since nothing will be
    * around to run the deferred escalation.
    */
-  private reapPtyProcess(pid: number, options: { escalate: boolean }): void {
+  private reapPtyProcess(session: SessionHandle, options: { escalate: boolean }): void {
+    const pid = session.pty.pid
     if (!Number.isInteger(pid) || pid <= 1) {
       return
     }
 
-    const send = (sig: NodeJS.Signals): void => {
+    try {
+      process.kill(pid, 'SIGTERM')
+    } catch {
+      // already gone (raced with a natural exit) — read-loop will fire onExit
+    }
+
+    if (!options.escalate) {
       try {
-        process.kill(pid, sig)
+        process.kill(pid, 'SIGKILL')
       } catch {
         // already gone
       }
-      try {
-        process.kill(-pid, sig)
-      } catch {
-        // no such group (common) — the direct kill above is what matters
-      }
-    }
-
-    send('SIGTERM')
-
-    if (!options.escalate) {
-      send('SIGKILL')
       return
     }
 
     setTimeout(() => {
-      let alive = true
-      try {
-        process.kill(pid, 0)
-      } catch {
-        alive = false
+      if (session.reaped) {
+        // SIGTERM was respected; read-loop already waitpid'd. No zombie.
+        return
       }
-      if (alive) {
-        send('SIGKILL')
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        // gone between the check and the kill — fine
       }
     }, 2_000).unref?.()
   }
