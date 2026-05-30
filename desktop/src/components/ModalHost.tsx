@@ -95,7 +95,7 @@ export function ModalHost({
         onClick={onBackdropClick}
       />
       <div
-        className="relative flex max-h-[84vh] w-[34rem] max-w-[92vw] flex-col overflow-hidden rounded-lg border font-mono text-xs shadow-2xl"
+        className="relative flex max-h-[84vh] w-auto min-w-[22rem] max-w-[min(34rem,92vw)] flex-col overflow-hidden rounded-lg border font-mono text-xs shadow-2xl"
         style={{
           backgroundColor: theme.backgroundPanel,
           borderColor: theme.border,
