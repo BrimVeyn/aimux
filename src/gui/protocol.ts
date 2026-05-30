@@ -22,7 +22,7 @@ export type GuiClientMessage =
   | { t: 'paneActivate'; tabId: string }
   | { t: 'modalSelect'; index: number }
   | { t: 'modalConfirm'; index?: number }
-  | { t: 'setSplitRatio'; tabId: string; ratio: number; axis?: SplitDirection }
+  | { t: 'setSplitRatio'; tabId: string; ratio: number; axis: SplitDirection }
   | { t: 'openNewTab' }
   | { t: 'closeTab'; tabId: string }
   | { t: 'switchSession'; sessionId: string }
@@ -113,12 +113,10 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       if (typeof value.tabId !== 'string' || typeof value.ratio !== 'number') {
         return null
       }
-      if (value.axis !== undefined && value.axis !== 'horizontal' && value.axis !== 'vertical') {
+      if (value.axis !== 'horizontal' && value.axis !== 'vertical') {
         return null
       }
-      return value.axis === undefined
-        ? { ratio: value.ratio, t: 'setSplitRatio', tabId: value.tabId }
-        : { axis: value.axis, ratio: value.ratio, t: 'setSplitRatio', tabId: value.tabId }
+      return { axis: value.axis, ratio: value.ratio, t: 'setSplitRatio', tabId: value.tabId }
     }
     case 'openNewTab':
       return { t: 'openNewTab' }

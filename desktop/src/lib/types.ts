@@ -343,7 +343,7 @@ export type GuiClientMessage =
   | { t: "paneActivate"; tabId: string }
   | { t: "modalSelect"; index: number }
   | { t: "modalConfirm"; index?: number }
-  | { t: "setSplitRatio"; tabId: string; ratio: number; axis?: SplitDirection }
+  | { t: "setSplitRatio"; tabId: string; ratio: number; axis: SplitDirection }
   | { t: "openNewTab" }
   | { t: "closeTab"; tabId: string }
   | { t: "switchSession"; sessionId: string }

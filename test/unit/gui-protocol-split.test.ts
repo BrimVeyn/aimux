@@ -18,13 +18,18 @@ describe('parseClientMessage setSplitRatio', () => {
     })
   })
 
-  test('accepts setSplitRatio without axis (optional)', () => {
+  test('rejects setSplitRatio without axis (now required)', () => {
     const raw = JSON.stringify({ ratio: 0.4, t: 'setSplitRatio', tabId: 'tab-b' })
-    expect(parseClientMessage(raw)).toEqual({ ratio: 0.4, t: 'setSplitRatio', tabId: 'tab-b' })
+    expect(parseClientMessage(raw)).toBeNull()
   })
 
   test('rejects setSplitRatio with non-number ratio', () => {
-    const raw = JSON.stringify({ ratio: 'half', t: 'setSplitRatio', tabId: 'tab-c' })
+    const raw = JSON.stringify({
+      axis: 'horizontal',
+      ratio: 'half',
+      t: 'setSplitRatio',
+      tabId: 'tab-c',
+    })
     expect(parseClientMessage(raw)).toBeNull()
   })
 

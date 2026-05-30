@@ -208,16 +208,32 @@ export async function runGui(): Promise<void> {
     }
   }
   let updateCheckCancelled = false
+  const shutdown = async (signal: string): Promise<void> => {
+    logDebug('gui.host.shutdown', { signal })
+    updateCheckCancelled = true
+    disposers.claudeThemeSync?.()
+    // Abort any in-flight prefetch work so the queue doesn't keep firing
+    // git subprocesses while the host is tearing down.
+    disposers.diffPrefetch?.()
+    flushAutosave()
+    disposeBackend()
+    try {
+      // Hard timeout so a hung IPC peer doesn't keep us from exiting; the
+      // 200ms window is enough for a clean FIN on the daemon socket.
+      await Promise.race([
+        backend.destroy?.() ?? Promise.resolve(),
+        new Promise((resolve) => setTimeout(resolve, 200)),
+      ])
+    } catch (error) {
+      logDebug('gui.host.destroyFailed', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+    process.exit(0)
+  }
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
     process.on(sig, () => {
-      updateCheckCancelled = true
-      disposers.claudeThemeSync?.()
-      // Abort any in-flight prefetch work so the queue doesn't keep firing
-      // git subprocesses while the host is tearing down.
-      disposers.diffPrefetch?.()
-      flushAutosave()
-      disposeBackend()
-      process.exit(0)
+      void shutdown(sig)
     })
   }
 
@@ -230,9 +246,41 @@ export async function runGui(): Promise<void> {
   const timeouts = createTabTimeouts()
   const renderer = createStubRenderer()
 
+  // Per-connection state for the single active WS client. Bundled together so
+  // close/open lifecycle clears them as a unit and can't drift apart.
+  interface ActiveWsState {
+    ws: ServerWebSocket<unknown>
+    // Token bucket for `requestBytes`: capacity 10, refill 10/s (1 per 100ms).
+    // Sized to the frontend's mount pattern (one dump per fresh xterm), with
+    // headroom for the StrictMode double-mount + brief re-mount bursts.
+    requestBytesTokens: number
+    requestBytesLastRefillMs: number
+  }
+  const REQUEST_BYTES_CAPACITY = 10
+  const REQUEST_BYTES_REFILL_PER_SEC = 10
   let activeWs: ServerWebSocket<unknown> | null = null
+  let activeWsState: ActiveWsState | null = null
   const send = (message: GuiServerMessage): void => {
     activeWs?.send(JSON.stringify(message))
+  }
+  const tryConsumeRequestBytesToken = (state: ActiveWsState): boolean => {
+    const now = performance.now()
+    const elapsed = now - state.requestBytesLastRefillMs
+    if (elapsed > 0) {
+      const refill = (elapsed / 1000) * REQUEST_BYTES_REFILL_PER_SEC
+      if (refill > 0) {
+        state.requestBytesTokens = Math.min(
+          REQUEST_BYTES_CAPACITY,
+          state.requestBytesTokens + refill
+        )
+        state.requestBytesLastRefillMs = now
+      }
+    }
+    if (state.requestBytesTokens >= 1) {
+      state.requestBytesTokens -= 1
+      return true
+    }
+    return false
   }
 
   let broadcastScheduled = false
@@ -637,11 +685,14 @@ export async function runGui(): Promise<void> {
       const trees = Object.values(state.layoutTrees)
       const hasSplits = trees.some((t) => t.type === 'split')
       const tabIds = state.tabs.map((t) => t.id)
-      if (hasSplits) {
-        resizeSplitTabs(backend, state.layoutTrees, tabIds, nextCols, nextRows)
-      } else {
-        backend.resizeAll(nextCols, nextRows)
-      }
+      // queueMicrotask: break reentrance if backend resize ever writes to the store
+      queueMicrotask(() => {
+        if (hasSplits) {
+          resizeSplitTabs(backend, state.layoutTrees, tabIds, nextCols, nextRows)
+        } else {
+          backend.resizeAll(nextCols, nextRows)
+        }
+      })
     }
     directorySearch.onModal(state.modal)
     scheduleBroadcast()
@@ -717,6 +768,13 @@ export async function runGui(): Promise<void> {
       close(ws) {
         if (activeWs === ws) {
           activeWs = null
+          activeWsState = null
+          // TODO(P0.8): pause backend broadcast when no client is connected.
+          // `setBroadcastEnabled` lives on pty-manager.ts but is not exposed
+          // through the SessionBackend interface; wiring it requires either
+          // an interface extension or a remote-backend IPC verb. Leaving
+          // commented to make the gap visible.
+          // backend.setBroadcastEnabled?.(false)
         }
       },
       message(ws, raw) {
@@ -782,13 +840,22 @@ export async function runGui(): Promise<void> {
           case 'paneActivate':
             dispatch({ tabId: message.tabId, type: 'set-active-tab' })
             break
-          case 'requestBytes':
+          case 'requestBytes': {
             // The frontend xterm.js pulls its scrollback on mount (one request
             // per fresh instance). Serialize the current buffer and send it.
             // The remote backend's serialize is async (IPC round-trip); fire
             // and forget — the client already RIS-resets before applying.
+            if (!state.tabs.some((t) => t.id === message.tabId)) {
+              logDebug('gui.host.requestBytes.unknownTab', { tabId: message.tabId })
+              break
+            }
+            if (activeWsState !== null && !tryConsumeRequestBytesToken(activeWsState)) {
+              logDebug('gui.host.requestBytes.rateLimited', { tabId: message.tabId })
+              break
+            }
             void sendBytesDump(message.tabId)
             break
+          }
           case 'modalSelect':
             pipeline.selectModalIndex(message.index)
             break
@@ -855,7 +922,22 @@ export async function runGui(): Promise<void> {
         }
       },
       open(ws) {
+        // Single-client host: a Tauri reload / HMR / second window arrives as
+        // a new socket without the old one closing first. Close the previous
+        // peer explicitly so we don't leak silently-dead clients.
+        if (activeWs !== null && activeWs !== ws) {
+          logDebug('gui.host.displacingPreviousClient', {})
+          activeWs.close(1000, 'displaced by new client')
+        }
         activeWs = ws
+        activeWsState = {
+          requestBytesLastRefillMs: performance.now(),
+          requestBytesTokens: REQUEST_BYTES_CAPACITY,
+          ws,
+        }
+        // TODO(P0.8): resume backend broadcast on first client connect; see
+        // matching note in close(). Symmetric with the pause TODO above.
+        // backend.setBroadcastEnabled?.(true)
         // Push the initial state projection. Each xterm.js pane pulls its own
         // scrollback via requestBytes once it mounts, so there's nothing to
         // replay here.
