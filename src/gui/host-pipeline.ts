@@ -6,6 +6,7 @@ import type { KeymapModeHandler } from '../input/keymap/keymap-mode-handler'
 import type { ActionFn, TrieBinding } from '../input/keymap/trie'
 import type { KeyInput, KeyResult, ModeContext, ModeId } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
+import type { AppState } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
 import { executeSideEffect } from '../app-runtime/side-effects'
@@ -41,11 +42,15 @@ export function createPipeline(opts: PipelineOptions) {
     action: Parameters<ReturnType<typeof appStore.getState>['dispatch']>[0]
   ): void => appStore.getState().dispatch(action)
   const getState = () => appStore.getState()
-  const makeCtx = () =>
+  // When `snapshot` is passed, the ctx's state AND `ctx.getState()` resolve to
+  // that pre-action snapshot. Mirrors the TUI's render-closure semantics where
+  // effects observe the state as it was when the KeyResult was produced — not
+  // the post-dispatch state. See processKeyResult below.
+  const makeCtx = (snapshot?: AppState) =>
     makeSideEffectContext({
       backend: opts.backend,
       dispatch,
-      getState,
+      getState: snapshot ? () => snapshot : getState,
       getThemeId: opts.getThemeId,
       renderer: opts.renderer,
       setThemeId: opts.setThemeId,
@@ -53,6 +58,11 @@ export function createPipeline(opts: PipelineOptions) {
     })
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
+    // Snapshot BEFORE dispatching actions: several effects (save-snippet-editor,
+    // confirm-update-selection, paste-selected-snippet…) read state.modal.*,
+    // and the actions they ship alongside frequently include `close-modal`,
+    // which would otherwise wipe modal state before the effect can read it.
+    const snapshot = getState()
     for (const action of result.actions) {
       dispatch(action)
     }
@@ -62,11 +72,11 @@ export function createPipeline(opts: PipelineOptions) {
         dispatch(action)
       }
       for (const effect of transResult.effects) {
-        executeSideEffect(effect, makeCtx())
+        executeSideEffect(effect, makeCtx(snapshot))
       }
     }
     for (const effect of result.effects) {
-      executeSideEffect(effect, makeCtx())
+      executeSideEffect(effect, makeCtx(snapshot))
     }
   }
 
