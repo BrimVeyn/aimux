@@ -348,6 +348,7 @@ export type GuiServerMessage =
   | { t: "state"; projection: AppStateProjection }
   | { t: "render"; tabId: string; viewport: TerminalSnapshot; modes: TerminalModeState }
   | { t: "bytes"; tabId: string; data: string }
+  | { t: "bytesReset"; tabId: string; data: string }
   | { t: "exit"; tabId: string; code: number }
   | { t: "error"; tabId: string; message: string }
   | { t: "toast"; level: ToastLevel; message: string };

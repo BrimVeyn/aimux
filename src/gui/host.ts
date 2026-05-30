@@ -57,7 +57,6 @@ import { createDirectorySearchRunner } from './gui-directory-search'
 import { computeGuiHelpEntries } from './gui-help-entries'
 import { createPipeline } from './host-pipeline'
 import { createStubRenderer, createTabTimeouts } from './host-side-effect-ctx'
-import { computeVisibleTabIds } from './host-visible'
 import { launchShell } from './launch-shell'
 import { type GuiServerMessage, parseClientMessage } from './protocol'
 import { projectAppState } from './state-projection'
@@ -252,8 +251,6 @@ export async function runGui(): Promise<void> {
     },
   })
 
-  const visibleTabIds = (): string[] =>
-    computeVisibleTabIds(getState().layoutTrees, getState().tabGroupMap, getState().activeTabId)
   // Serialize a tab's current scrollback as an ANSI dump and push it to the
   // client. Pull-based: the frontend xterm.js requests this on mount (one
   // request per fresh terminal instance) so the host never has to guess when a
@@ -271,13 +268,17 @@ export async function runGui(): Promise<void> {
       data = tab?.buffer ?? ''
     }
     if (data !== '') {
-      send({ data, t: 'bytes', tabId })
+      // Distinct from live `bytes`: the client RIS-resets its xterm before
+      // writing this, so receiving the dump any number of times (StrictMode
+      // double-mount, reconnect, …) converges to a single copy.
+      send({ data, t: 'bytesReset', tabId })
     }
   }
   backend.on('bytes', (tabId, data) => {
-    // Live PTY output: forward to the client for every visible pane. The
-    // initial scrollback comes separately via the frontend's requestBytes.
-    if (!visibleTabIds().includes(tabId)) return
+    // Live PTY output for every tab — the GUI keeps a persistent xterm instance
+    // per tab (alive across switches), so hidden tabs must stay current without
+    // a re-dump. The initial scrollback still comes via the frontend's
+    // requestBytes (one dump per instance creation).
     send({ data, t: 'bytes', tabId })
   })
 
