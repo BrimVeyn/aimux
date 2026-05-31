@@ -43,6 +43,7 @@ import {
   isCommandAvailable,
   parseCommand,
 } from '../pty/command-registry'
+import { appStore } from '../state/app-store'
 import { createTerminalBounds } from '../state/layout-resize'
 import {
   allLeafIds,
@@ -1110,7 +1111,11 @@ function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
 }
 
 function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void {
-  const { backend, dispatch, state } = ctx
+  const { backend, dispatch } = ctx
+  // Read fresh from the store, not ctx.state (which is a per-render
+  // snapshot). Rapid key presses fire before React re-renders, so ctx.state
+  // can lag the actual store.
+  const state = appStore.getState()
   const items = buildSidebarItems(state)
   if (items.length === 0) return
   const currentIdx = findCurrentSidebarItem(state, items)
@@ -1145,7 +1150,14 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   }
 
   if (session.id !== state.currentSessionId) {
-    handleSwitchSessionEffect(state, backend, dispatch, session)
+    // Re-read state DIRECTLY from the store after the dispatch.
+    // ctx.getState() reads a ref that's only updated on the next React
+    // render, so it would still hold the pre-dispatch snapshot. We need the
+    // freshly updated activeWorktreeId so handleSwitchSessionEffect's
+    // `set-sessions` round trip doesn't clobber it.
+    const freshState = appStore.getState()
+    const freshSession = freshState.sessions.find((s) => s.id === session.id) ?? session
+    handleSwitchSessionEffect(freshState, backend, dispatch, freshSession)
   }
 }
 
