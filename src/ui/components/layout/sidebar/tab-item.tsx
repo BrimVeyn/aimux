@@ -19,6 +19,8 @@ interface TabItemProps {
   moveWorktreeId?: string
   /** 1-based position in the visible tab list — rendered as `[N]` and matches Leader+N. */
   indexLabel?: string
+  /** Render the close × unconditionally instead of only on hover. */
+  alwaysShowClose?: boolean
 }
 
 function getStatusColor(status: TabSession['status']): string {
@@ -120,6 +122,7 @@ function ActivityGlyph({ tab }: { tab: TabSession }) {
 
 export function TabItem({
   active,
+  alwaysShowClose,
   focused,
   id,
   indexLabel,
@@ -212,7 +215,7 @@ export function TabItem({
         {tab.title}
       </text>
       <ActivityGlyph tab={tab} />
-      {hovered ? (
+      {alwaysShowClose === true || hovered ? (
         <box paddingLeft={1} onMouseDown={handleCloseMouseDown}>
           <text fg={t.textMuted} selectable={false}>
             ×

@@ -65,6 +65,7 @@ import {
 } from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { appReducer } from '../state/store'
+import { buildTabEntries } from '../state/tab-entries'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { toast } from '../state/toast-store'
 import { saveCurrentWorkspace } from '../state/workspace-save'
@@ -1192,13 +1193,15 @@ function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
       ? state.sessions.find((s) => s.id === state.currentSessionId)
       : undefined
   const visible = filterTabsForActiveWorktree(state.tabs, currentSession)
-  const target = visible[index - 1]
+  const entries = buildTabEntries(visible, state.layoutTrees, state.tabGroupMap, state.activeTabId)
+  const target = entries[index - 1]
   if (!target) {
-    logInputDebug('app.tabBar.switchOutOfRange', { index, total: visible.length })
+    logInputDebug('app.tabBar.switchOutOfRange', { index, total: entries.length })
     return
   }
-  if (target.id === state.activeTabId) return
-  dispatch({ tabId: target.id, type: 'set-active-tab' })
+  const targetTabId = target.kind === 'single' ? target.tab.id : target.activeLeafId
+  if (targetTabId === state.activeTabId) return
+  dispatch({ tabId: targetTabId, type: 'set-active-tab' })
 }
 
 function replaceSession(
