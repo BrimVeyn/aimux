@@ -20,11 +20,11 @@ import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout
 import { GitView } from './components/git/git-view'
 import { buildGitPaneContextMenu } from './components/git/pane/git-pane-context-menu'
 import { GitPaneWidget } from './components/git/pane/git-pane-widget'
-import { SessionBar } from './components/layout/session-bar'
 import { Sidebar } from './components/layout/sidebar/sidebar'
 import { SplitLayout } from './components/layout/split-layout'
 import { StatusBar } from './components/layout/status-bar'
 import { TerminalPane } from './components/layout/terminal-pane'
+import { TopTabBar } from './components/layout/top-tab-bar'
 import { AIUsageModal } from './components/modals/app/ai-usage-modal'
 import { HelpModal } from './components/modals/app/help-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
@@ -388,7 +388,7 @@ export function RootView({
   if (inGitMode) {
     return (
       <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
-        <SessionBar forceVisible />
+        <TopTabBar forceVisible />
         <GitView themeId={themeId} />
         <StatusBar />
         <PendingChordOverlay />
@@ -422,13 +422,12 @@ export function RootView({
     >
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Sidebar
-          onTabActivate={onPaneActivate}
           onEmbeddedGitResizeStart={onEmbeddedGitResizeStart}
           onResizeDrag={onSeparatorDrag}
           onResizeDragEnd={onSeparatorDragEnd}
         />
         <box flexDirection="column" flexGrow={1}>
-          <SessionBar />
+          <TopTabBar />
           <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
             {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
               <GitPaneInPaneMode
