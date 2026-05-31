@@ -115,8 +115,9 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const from = ids.indexOf(currentId)
       if (from < 0) return state
       const to = from + action.delta
-      if (to < 0 || to >= ids.length) return state
-      const nextIds = moveIdToIdPosition(ids, currentId, ids[to])
+      const targetId = ids[to]
+      if (targetId == null) return state
+      const nextIds = moveIdToIdPosition(ids, currentId, targetId)
       const byId = new Map(state.sessions.map((s) => [s.id, s]))
       const nextSessions = nextIds.map((id, idx) => {
         const s = byId.get(id)
