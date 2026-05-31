@@ -4,7 +4,7 @@ import type {
   ScrollBoxRenderable,
 } from '@opentui/core'
 
-import { memo, useCallback, useMemo, useRef, useState } from 'react'
+import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
 import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../state/types'
 
@@ -63,11 +63,26 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         : undefined,
     [currentSessionId, sessions]
   )
-  const activeWorktreeId = currentSession?.activeWorktreeId ?? null
+  // The active row can be either a worktree row OR the workspace row
+  // (when the primary worktree is active). Both must scroll into view —
+  // otherwise the cursor visually "disappears" off-screen when crossing
+  // a workspace boundary on a key press.
+  const currentWorktrees = currentSession?.worktrees ?? []
+  const currentPrimary = currentWorktrees.find((w) => w.source === 'primary') ?? currentWorktrees[0]
+  const rawActiveWorktreeId = currentSession?.activeWorktreeId
+  const activeOnNonPrimary =
+    rawActiveWorktreeId != null &&
+    rawActiveWorktreeId !== '' &&
+    rawActiveWorktreeId !== currentPrimary?.id
+  let activeRowId: string | null = null
+  if (activeOnNonPrimary) {
+    activeRowId = `sidebar-wt-${rawActiveWorktreeId}`
+  } else if (currentSessionId != null && currentSessionId !== '') {
+    activeRowId = `sidebar-ws-${currentSessionId}`
+  }
 
   useSidebarAutoScroll({
-    activeWorktreeId,
-    idPrefix: 'sidebar-wt-',
+    activeRowId,
     scrollRef,
     visible: true,
   })
@@ -161,33 +176,25 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         flexShrink={1}
         contentOptions={COLUMN_CONTENT_OPTIONS}
       >
-        {visibleSessions.map((session, visibleIdx) => {
-          const sessionIndex = baselineOrder.indexOf(session.id) + 1
-          const isCurrentSession = session.id === currentSessionId
-          const worktrees = session.worktrees ?? []
-          // sessionIndex is still passed to WorktreeRow for cross-workspace
-          // switching (it triggers switch-session-by-index on click).
-          // The primary worktree's branch is shown inline on the WorkspaceRow
-          // itself — no separate row for it. Extra worktrees (aimux-temp or
-          // external) get their own indented chip rows underneath.
-          const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-          const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
-          // Two-tier selection: the active cursor item gets a strong bg, and
-          // every row of the current workspace gets a subtle bg so the
-          // "you're in workspace X" scope reads as a continuous block.
-          const workspaceIsActiveItem =
-            isCurrentSession &&
-            (session.activeWorktreeId == null ||
-              session.activeWorktreeId === '' ||
-              session.activeWorktreeId === primaryWorktree?.id)
-          return (
-            <box
-              key={session.id}
-              flexDirection="column"
-              flexShrink={0}
-              marginTop={visibleIdx > 0 ? 1 : 0}
-            >
+        {(() => {
+          // Build a single flat list of items — workspace rows interleaved
+          // with their non-primary worktrees. One map, one React keypath per
+          // visible row; transitions are a single atomic reconciliation.
+          const rows: ReactNode[] = []
+          for (const [visibleIdx, session] of visibleSessions.entries()) {
+            const sessionIndex = baselineOrder.indexOf(session.id) + 1
+            const isCurrentSession = session.id === currentSessionId
+            const worktrees = session.worktrees ?? []
+            const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+            const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
+            const workspaceIsActiveItem =
+              isCurrentSession &&
+              (session.activeWorktreeId == null ||
+                session.activeWorktreeId === '' ||
+                session.activeWorktreeId === primaryWorktree?.id)
+            rows.push(
               <WorkspaceRow
+                key={`ws:${session.id}`}
                 session={session}
                 isActiveItem={workspaceIsActiveItem}
                 inCurrentGroup={isCurrentSession}
@@ -195,25 +202,29 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
                 dragging={draggingId === session.id}
                 contentWidth={contentWidth}
+                marginTop={visibleIdx > 0 ? 1 : 0}
                 setRowRef={setRowRef}
                 onDragStart={handleRowDragStart}
                 onDrag={handleRowDrag}
                 onDrop={commitDrop}
                 onDragCancel={cancelDrag}
               />
-              {extraWorktrees.map((worktree) => (
+            )
+            for (const worktree of extraWorktrees) {
+              rows.push(
                 <WorktreeRow
-                  key={worktree.id}
+                  key={`wt:${worktree.id}`}
                   session={session}
                   worktree={worktree}
                   sessionIndex={sessionIndex}
                   isActiveItem={isCurrentSession && worktree.id === session.activeWorktreeId}
                   inCurrentGroup={isCurrentSession}
                 />
-              ))}
-            </box>
-          )
-        })}
+              )
+            }
+          }
+          return rows
+        })()}
       </scrollbox>
       <box
         flexDirection="row"
@@ -242,6 +253,8 @@ interface WorkspaceRowProps {
   status: SessionStatus
   dragging: boolean
   contentWidth: number
+  /** Vertical spacing above this row — used to separate workspace blocks. */
+  marginTop: number
   setRowRef: (id: string, ref: BoxRenderable | null) => void
   onDragStart: (id: string) => void
   onDrag: (event: OtuiMouseEvent) => void
@@ -254,6 +267,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   dragging,
   inCurrentGroup,
   isActiveItem,
+  marginTop,
   onDrag,
   onDragCancel,
   onDragStart,
@@ -353,7 +367,10 @@ const WorkspaceRow = memo(function WorkspaceRow({
   return (
     <ContextMenuBox
       ref={handleRef}
+      id={`sidebar-ws-${session.id}`}
       flexDirection="column"
+      flexShrink={0}
+      marginTop={marginTop}
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}

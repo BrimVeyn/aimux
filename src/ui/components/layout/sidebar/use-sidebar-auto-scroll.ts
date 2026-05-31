@@ -5,21 +5,16 @@ import { useEffect } from 'react'
 interface Options {
   scrollRef: React.RefObject<ScrollBoxRenderable | null>
   visible: boolean
-  activeWorktreeId: string | null | undefined
-  idPrefix: string
+  /** Full id of the active row to bring into view (workspace OR worktree). */
+  activeRowId: string | null
 }
 
-export function useSidebarAutoScroll({
-  activeWorktreeId,
-  idPrefix,
-  scrollRef,
-  visible,
-}: Options): void {
+export function useSidebarAutoScroll({ activeRowId, scrollRef, visible }: Options): void {
   useEffect(() => {
     if (!visible) return
-    if (activeWorktreeId == null || activeWorktreeId === '') return
+    if (activeRowId == null || activeRowId === '') return
     const scrollbox = scrollRef.current
     if (!scrollbox) return
-    scrollbox.scrollChildIntoView(`${idPrefix}${activeWorktreeId}`)
-  }, [activeWorktreeId, idPrefix, scrollRef, visible])
+    scrollbox.scrollChildIntoView(activeRowId)
+  }, [activeRowId, scrollRef, visible])
 }

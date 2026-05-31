@@ -61,8 +61,10 @@ import {
   filterTabsForActiveWorktree,
   getActiveWorktree,
   getSessionProjectPath,
+  withActiveWorktree,
 } from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
+import { appReducer } from '../state/store'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { toast } from '../state/toast-store'
 import { saveCurrentWorkspace } from '../state/workspace-save'
@@ -76,6 +78,7 @@ import {
   handleRenameSessionEffect,
   handleSwitchSessionEffect,
   restartTabSession,
+  switchSessionRecords,
 } from './session-actions'
 import {
   handleDeleteSnippetEffect,
@@ -1139,25 +1142,46 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
   const targetWorktreeId = target.worktreeId ?? primary?.id
 
-  // Set the worktree on the session record first so a subsequent session
-  // switch loads with the right worktree active.
-  if (targetWorktreeId != null && targetWorktreeId !== session.activeWorktreeId) {
+  const isCrossWorkspace = session.id !== state.currentSessionId
+  const needsWorktreeChange =
+    targetWorktreeId != null && targetWorktreeId !== session.activeWorktreeId
+
+  if (isCrossWorkspace) {
+    // Bundle the worktree change into the session record AND fold the
+    // session switch's two dispatches (set-sessions + load-session) into a
+    // SINGLE Zustand setState call — otherwise each dispatch fires a
+    // separate subscription notification and the @opentui/react reconciler
+    // paints an intermediate frame where the new session is current but
+    // the old activeWorktreeId still holds, producing the visible flicker.
+    const patchedSession = needsWorktreeChange
+      ? withActiveWorktree(session, targetWorktreeId)
+      : session
+    const patchedState: AppState = needsWorktreeChange
+      ? {
+          ...state,
+          sessions: state.sessions.map((s) => (s.id === patchedSession.id ? patchedSession : s)),
+        }
+      : state
+    const sessions = switchSessionRecords(patchedState, patchedSession)
+    saveSessionCatalog(sessions)
+    void backend.destroy(true)
+    appStore.setState((current) => {
+      const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
+      return appReducer(afterSet, {
+        sessionId: patchedSession.id,
+        type: 'load-session',
+        workspaceSnapshot: patchedSession.workspaceSnapshot,
+      })
+    })
+    return
+  }
+
+  if (needsWorktreeChange) {
     dispatch({
       sessionId: session.id,
       type: 'set-active-worktree',
       worktreeId: targetWorktreeId,
     })
-  }
-
-  if (session.id !== state.currentSessionId) {
-    // Re-read state DIRECTLY from the store after the dispatch.
-    // ctx.getState() reads a ref that's only updated on the next React
-    // render, so it would still hold the pre-dispatch snapshot. We need the
-    // freshly updated activeWorktreeId so handleSwitchSessionEffect's
-    // `set-sessions` round trip doesn't clobber it.
-    const freshState = appStore.getState()
-    const freshSession = freshState.sessions.find((s) => s.id === session.id) ?? session
-    handleSwitchSessionEffect(freshState, backend, dispatch, freshSession)
   }
 }
 
