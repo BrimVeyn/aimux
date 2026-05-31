@@ -172,7 +172,14 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
           // external) get their own indented chip rows underneath.
           const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
           const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
-          const sessionActiveWorktreeId = session.activeWorktreeId
+          // Two-tier selection: the active cursor item gets a strong bg, and
+          // every row of the current workspace gets a subtle bg so the
+          // "you're in workspace X" scope reads as a continuous block.
+          const workspaceIsActiveItem =
+            isCurrentSession &&
+            (session.activeWorktreeId == null ||
+              session.activeWorktreeId === '' ||
+              session.activeWorktreeId === primaryWorktree?.id)
           return (
             <box
               key={session.id}
@@ -182,7 +189,8 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
             >
               <WorkspaceRow
                 session={session}
-                active={isCurrentSession}
+                isActiveItem={workspaceIsActiveItem}
+                inCurrentGroup={isCurrentSession}
                 primaryWorktree={primaryWorktree}
                 status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
                 dragging={draggingId === session.id}
@@ -199,7 +207,8 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                   session={session}
                   worktree={worktree}
                   sessionIndex={sessionIndex}
-                  active={isCurrentSession && worktree.id === sessionActiveWorktreeId}
+                  isActiveItem={isCurrentSession && worktree.id === session.activeWorktreeId}
+                  inCurrentGroup={isCurrentSession}
                 />
               ))}
             </box>
@@ -224,7 +233,10 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
 interface WorkspaceRowProps {
   session: SessionRecord
-  active: boolean
+  /** True when this row is the active cursor item (workspace's primary active). */
+  isActiveItem: boolean
+  /** True when this row belongs to the current workspace (selection scope). */
+  inCurrentGroup: boolean
   /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
   status: SessionStatus
@@ -238,9 +250,10 @@ interface WorkspaceRowProps {
 }
 
 const WorkspaceRow = memo(function WorkspaceRow({
-  active,
   contentWidth,
   dragging,
+  inCurrentGroup,
+  isActiveItem,
   onDrag,
   onDragCancel,
   onDragStart,
@@ -254,7 +267,12 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
-  const bgColor = dragging || active ? t.backgroundElement : undefined
+  let bgColor: string | undefined
+  if (dragging || isActiveItem) {
+    bgColor = t.backgroundElement
+  } else if (inCurrentGroup) {
+    bgColor = t.backgroundPanel
+  }
   const workingColor = t.primary
   const waitingColor = t.warning
   const divergence = useAppStore((s) =>
@@ -321,10 +339,16 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const branchText = primaryWorktree?.branch ?? ''
   const divergenceText = formatDivergence(divergence)
   const showBranch = branchText !== ''
-  const nameBudget = Math.max(0, contentWidth - 3)
-  const branchBudget = Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
-  const nameLabel = truncate(session.name, nameBudget)
-  const branchLabel = truncate(branchText, branchBudget)
+  const nameLabel = truncate(session.name, Math.max(0, contentWidth - 4))
+  const branchLabel = truncate(
+    branchText,
+    Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
+  )
+
+  // Tail divider: fill the rest of the workspace row with `─` so the eye can
+  // separate workspace blocks at a glance. Length is total width minus
+  // glyph(1) + ` `(1) + name + ` `(1) before the dashes.
+  const fillWidth = Math.max(0, contentWidth - (1 + 1 + nameLabel.length + 1))
 
   return (
     <ContextMenuBox
@@ -343,10 +367,16 @@ const WorkspaceRow = memo(function WorkspaceRow({
         <text fg={leadingColor} selectable={false} wrapMode="none">
           {leadingGlyph}
         </text>
-        <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
           {' '}
           {nameLabel}
         </text>
+        {fillWidth > 0 ? (
+          <text fg={t.textMuted} selectable={false} wrapMode="none">
+            {' '}
+            {'─'.repeat(fillWidth)}
+          </text>
+        ) : null}
       </box>
       {showBranch ? (
         <box flexDirection="row">

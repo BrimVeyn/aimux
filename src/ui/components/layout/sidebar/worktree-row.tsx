@@ -14,12 +14,15 @@ interface WorktreeRowProps {
   worktree: WorktreeRecord
   /** 1-based index of the workspace in the visible order (for switch-session-by-index). */
   sessionIndex: number
-  /** True when this row is the active worktree of the current session. */
-  active: boolean
+  /** True when this row is the active cursor item. */
+  isActiveItem: boolean
+  /** True when this row's workspace is the current session (selection scope). */
+  inCurrentGroup: boolean
 }
 
 export const WorktreeRow = memo(function WorktreeRow({
-  active,
+  inCurrentGroup,
+  isActiveItem,
   session,
   sessionIndex,
   worktree,
@@ -60,8 +63,13 @@ export const WorktreeRow = memo(function WorktreeRow({
     ]
   }, [session.id, worktree.id, worktree.source])
 
-  // `> name` — chevron + worktree name. No colored strip; worktrees are
-  // alternative work streams under their workspace, not chips.
+  let bgColor: string | undefined
+  if (isActiveItem) {
+    bgColor = t.backgroundElement
+  } else if (inCurrentGroup) {
+    bgColor = t.backgroundPanel
+  }
+
   return (
     <ContextMenuBox
       id={`sidebar-wt-${worktree.id}`}
@@ -69,14 +77,14 @@ export const WorktreeRow = memo(function WorktreeRow({
       paddingLeft={1}
       paddingRight={1}
       alignItems="center"
-      backgroundColor={active ? t.backgroundElement : undefined}
+      backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
       <text fg={t.textMuted} selectable={false} wrapMode="none">
         {'  > '}
       </text>
-      <text fg={t.text} selectable={false} wrapMode="none">
+      <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
         {worktree.name}
       </text>
     </ContextMenuBox>
