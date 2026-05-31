@@ -1,6 +1,6 @@
-import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 
-import { memo, type ReactNode, useCallback, useMemo } from 'react'
+import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
 
 import type { BranchDivergence, TabSession, WorktreeRecord } from '../../../state/types'
 
@@ -15,12 +15,18 @@ import {
 import { useTheme } from '../../theme'
 import { buildTabGroupInfo } from './sidebar/sidebar-group-metadata'
 import { TabItem } from './sidebar/tab-item'
+import { useTopTabBarAutoScroll } from './sidebar/use-top-tab-bar-auto-scroll'
 
 interface TopTabBarProps {
   forceVisible?: boolean
 }
 
 const WORKTREE_STRIP = '▍'
+const ROW_CONTENT_OPTIONS = {
+  flexDirection: 'row' as const,
+  gap: 0,
+  justifyContent: 'flex-start' as const,
+}
 
 function formatDivergence(divergence: BranchDivergence | undefined): string {
   if (divergence == null) return ''
@@ -164,6 +170,14 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
     [layoutTrees, groupedTabs]
   )
 
+  const scrollRef = useRef<ScrollBoxRenderable | null>(null)
+  useTopTabBarAutoScroll({
+    activeTabId,
+    idPrefix: 'top-tab-',
+    scrollRef,
+    visible: bar.visible || forceVisible,
+  })
+
   const handleTabActivate = useCallback((tabId: string) => {
     dispatchGlobal({ tabId, type: 'set-active-tab' })
     dispatchGlobal({ focusMode: 'terminal-input', type: 'set-focus-mode' })
@@ -179,65 +193,77 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   return (
     <box
       width="100%"
+      height={1}
       flexDirection="row"
       flexShrink={0}
       backgroundColor={headerBg}
       overflow="hidden"
     >
-      {groupedTabs.map((tab, index) => {
-        const isActive = tab.id === activeTabId
-        const info = tabGroupInfo.get(tab.id)
-        const inLayout = !!(info?.inLayout === true)
-        const prevTab = groupedTabs[index - 1]
-        const startsWorktreeGroup =
-          !prevTab ||
-          getRenderedTabWorktreeId(prevTab, worktrees) !== getRenderedTabWorktreeId(tab, worktrees)
+      <scrollbox
+        ref={scrollRef}
+        height={1}
+        flexGrow={1}
+        flexShrink={1}
+        flexBasis={0}
+        scrollX
+        viewportCulling
+        contentOptions={ROW_CONTENT_OPTIONS}
+      >
+        {groupedTabs.map((tab, index) => {
+          const isActive = tab.id === activeTabId
+          const info = tabGroupInfo.get(tab.id)
+          const inLayout = !!(info?.inLayout === true)
+          const prevTab = groupedTabs[index - 1]
+          const startsWorktreeGroup =
+            !prevTab ||
+            getRenderedTabWorktreeId(prevTab, worktrees) !==
+              getRenderedTabWorktreeId(tab, worktrees)
 
-        const { moveWorktreeId, tabWorktree } = getWorktreeContext(tab, {
-          worktreeById,
-          worktrees,
-        })
-        const worktreeColor = tabWorktree
-          ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
-          : t.textMuted
-        const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
-        const divergence = formatDivergence(
-          tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
-        )
+          const { moveWorktreeId, tabWorktree } = getWorktreeContext(tab, {
+            worktreeById,
+            worktrees,
+          })
+          const worktreeColor = tabWorktree
+            ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
+            : t.textMuted
+          const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
+          const divergence = formatDivergence(
+            tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
+          )
 
-        return (
-          <box key={tab.id} flexDirection="row" flexShrink={0}>
-            {showWorktreeSeparators && startsWorktreeGroup ? (
-              <WorktreeGroupChip
-                branch={worktreeLabel}
-                color={worktreeColor}
-                divergence={divergence}
-              />
-            ) : null}
-            <TopTabCell
-              tabId={tab.id}
-              active={isActive}
-              onActivate={handleTabActivate}
-              backgroundColor={isActive ? t.backgroundElement : undefined}
-            >
-              {showWorktreeSeparators ? (
-                <text fg={worktreeColor} selectable={false} wrapMode="none">
-                  {WORKTREE_STRIP}
-                </text>
+          return (
+            <box key={tab.id} flexDirection="row" flexShrink={0}>
+              {showWorktreeSeparators && startsWorktreeGroup ? (
+                <WorktreeGroupChip
+                  branch={worktreeLabel}
+                  color={worktreeColor}
+                  divergence={divergence}
+                />
               ) : null}
-              <TabItem
-                id={`top-tab-${tab.id}`}
-                tab={tab}
+              <TopTabCell
+                tabId={tab.id}
                 active={isActive}
-                focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
-                inLayout={inLayout}
-                moveWorktreeId={moveWorktreeId}
-              />
-            </TopTabCell>
-          </box>
-        )
-      })}
-      <box flexGrow={1} />
+                onActivate={handleTabActivate}
+                backgroundColor={isActive ? t.backgroundElement : undefined}
+              >
+                {showWorktreeSeparators ? (
+                  <text fg={worktreeColor} selectable={false} wrapMode="none">
+                    {WORKTREE_STRIP}
+                  </text>
+                ) : null}
+                <TabItem
+                  id={`top-tab-${tab.id}`}
+                  tab={tab}
+                  active={isActive}
+                  focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
+                  inLayout={inLayout}
+                  moveWorktreeId={moveWorktreeId}
+                />
+              </TopTabCell>
+            </box>
+          )
+        })}
+      </scrollbox>
       <box
         flexDirection="row"
         flexShrink={0}
