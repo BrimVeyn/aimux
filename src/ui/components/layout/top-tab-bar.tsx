@@ -2,16 +2,10 @@ import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui
 
 import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
 
-import type { BranchDivergence, TabSession, WorktreeRecord } from '../../../state/types'
-
 import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-poller'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
-import {
-  getRenderedTabWorktreeId,
-  getWorktreeColor,
-  orderTabsByWorktree,
-} from '../../../state/session-worktrees'
+import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
 import { useTheme } from '../../theme'
 import { buildTabGroupInfo } from './sidebar/sidebar-group-metadata'
 import { TabItem } from './sidebar/tab-item'
@@ -21,19 +15,10 @@ interface TopTabBarProps {
   forceVisible?: boolean
 }
 
-const WORKTREE_STRIP = '▍'
 const ROW_CONTENT_OPTIONS = {
   flexDirection: 'row' as const,
   gap: 0,
   justifyContent: 'flex-start' as const,
-}
-
-function formatDivergence(divergence: BranchDivergence | undefined): string {
-  if (divergence == null) return ''
-  const parts: string[] = []
-  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
-  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
-  return parts.join(' ')
 }
 
 const TopTabCell = memo(function TopTabCell({
@@ -62,7 +47,6 @@ const TopTabCell = memo(function TopTabCell({
       flexDirection="row"
       flexShrink={0}
       onMouseDown={handleMouseDown}
-      // marker prop so devtools can locate the active tab; harmless otherwise
       data-active={active ? 'true' : undefined}
     >
       {children}
@@ -70,71 +54,21 @@ const TopTabCell = memo(function TopTabCell({
   )
 })
 
-function WorktreeGroupChip({
-  branch,
-  color,
-  divergence,
-}: {
-  branch: string
-  color: string
-  divergence: string
-}) {
-  const t = useTheme()
-  return (
-    <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1} alignItems="center">
-      <text fg={color} selectable={false} wrapMode="none">
-        {WORKTREE_STRIP} {branch}
-      </text>
-      {divergence !== '' ? (
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {' '}
-          {divergence}
-        </text>
-      ) : null}
-    </box>
-  )
-}
-
-interface WorktreeContextOptions {
-  worktrees: WorktreeRecord[]
-  worktreeById: Map<string, WorktreeRecord>
-}
-
-function getWorktreeContext(
-  tab: TabSession,
-  options: WorktreeContextOptions
-): {
-  tabWorktree: WorktreeRecord | undefined
-  tabOwnWorktree: WorktreeRecord | undefined
-  moveWorktreeId: string | undefined
-} {
-  const { worktreeById, worktrees } = options
-  const tabOwnWorktree =
-    tab.worktreeId != null && tab.worktreeId !== '' ? worktreeById.get(tab.worktreeId) : undefined
-  let tabWorktree = tabOwnWorktree
-  if (!tabWorktree && worktrees.length > 1) {
-    tabWorktree = worktrees[0]
-  }
-  const moveWorktreeId =
-    tabOwnWorktree?.branch != null && tabOwnWorktree.branch !== '' && worktrees.length > 1
-      ? tabOwnWorktree.id
-      : undefined
-  return { moveWorktreeId, tabOwnWorktree, tabWorktree }
-}
-
 export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const t = useTheme()
   const headerBg = t.backgroundPanel
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const bar = useAppStore((s) => s.sessionBar)
+  const sidebar = useAppStore((s) => s.sidebar)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
-  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const focusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
 
-  useWorktreeDivergencePolling(bar.visible || forceVisible)
+  // Sidebar now also shows worktree chips with divergence — poll whenever
+  // either surface is visible.
+  useWorktreeDivergencePolling(bar.visible || sidebar.visible || forceVisible)
 
   const currentSession = useMemo(
     () =>
@@ -143,31 +77,15 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
         : undefined,
     [currentSessionId, sessions]
   )
-  const worktrees = useMemo(() => currentSession?.worktrees ?? [], [currentSession?.worktrees])
-  const worktreeById = useMemo(
-    () => new Map(worktrees.map((worktree) => [worktree.id, worktree])),
-    [worktrees]
-  )
 
-  const groupedTabs = useMemo(
-    () => orderTabsByWorktree(tabs, currentSession),
+  const visibleTabs = useMemo(
+    () => filterTabsForActiveWorktree(tabs, currentSession),
     [tabs, currentSession]
   )
 
-  const showWorktreeSeparators = useMemo(() => {
-    const ids = new Set<string>()
-    for (const tab of groupedTabs) {
-      ids.add(getRenderedTabWorktreeId(tab, worktrees))
-    }
-    if (currentSession?.activeWorktreeId != null && currentSession.activeWorktreeId !== '') {
-      ids.add(currentSession.activeWorktreeId)
-    }
-    return ids.size >= 2
-  }, [currentSession, groupedTabs, worktrees])
-
   const tabGroupInfo = useMemo(
-    () => buildTabGroupInfo(layoutTrees, groupedTabs),
-    [layoutTrees, groupedTabs]
+    () => buildTabGroupInfo(layoutTrees, visibleTabs),
+    [layoutTrees, visibleTabs]
   )
 
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -188,7 +106,8 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
     dispatchGlobal({ type: 'open-new-tab-modal' })
   }, [])
 
-  if ((!bar.visible && !forceVisible) || groupedTabs.length === 0) return null
+  if (!bar.visible && !forceVisible) return null
+  if (visibleTabs.length === 0) return null
 
   return (
     <box
@@ -209,58 +128,26 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
         viewportCulling
         contentOptions={ROW_CONTENT_OPTIONS}
       >
-        {groupedTabs.map((tab, index) => {
+        {visibleTabs.map((tab) => {
           const isActive = tab.id === activeTabId
           const info = tabGroupInfo.get(tab.id)
           const inLayout = !!(info?.inLayout === true)
-          const prevTab = groupedTabs[index - 1]
-          const startsWorktreeGroup =
-            !prevTab ||
-            getRenderedTabWorktreeId(prevTab, worktrees) !==
-              getRenderedTabWorktreeId(tab, worktrees)
-
-          const { moveWorktreeId, tabWorktree } = getWorktreeContext(tab, {
-            worktreeById,
-            worktrees,
-          })
-          const worktreeColor = tabWorktree
-            ? (tabWorktree.color ?? getWorktreeColor(tabWorktree.id))
-            : t.textMuted
-          const worktreeLabel = tabWorktree?.branch ?? tabWorktree?.name ?? 'main'
-          const divergence = formatDivergence(
-            tabWorktree != null ? worktreeDivergence[tabWorktree.id] : undefined
-          )
-
           return (
-            <box key={tab.id} flexDirection="row" flexShrink={0}>
-              {showWorktreeSeparators && startsWorktreeGroup ? (
-                <WorktreeGroupChip
-                  branch={worktreeLabel}
-                  color={worktreeColor}
-                  divergence={divergence}
-                />
-              ) : null}
-              <TopTabCell
-                tabId={tab.id}
+            <TopTabCell
+              key={tab.id}
+              tabId={tab.id}
+              active={isActive}
+              onActivate={handleTabActivate}
+              backgroundColor={isActive ? t.backgroundElement : undefined}
+            >
+              <TabItem
+                id={`top-tab-${tab.id}`}
+                tab={tab}
                 active={isActive}
-                onActivate={handleTabActivate}
-                backgroundColor={isActive ? t.backgroundElement : undefined}
-              >
-                {showWorktreeSeparators ? (
-                  <text fg={worktreeColor} selectable={false} wrapMode="none">
-                    {WORKTREE_STRIP}
-                  </text>
-                ) : null}
-                <TabItem
-                  id={`top-tab-${tab.id}`}
-                  tab={tab}
-                  active={isActive}
-                  focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
-                  inLayout={inLayout}
-                  moveWorktreeId={moveWorktreeId}
-                />
-              </TopTabCell>
-            </box>
+                focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
+                inLayout={inLayout}
+              />
+            </TopTabCell>
           )
         })}
       </scrollbox>

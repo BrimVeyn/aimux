@@ -1,23 +1,30 @@
-import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type {
+  BoxRenderable,
+  MouseEvent as OtuiMouseEvent,
+  ScrollBoxRenderable,
+} from '@opentui/core'
 
 import { memo, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord, SessionStatus } from '../../../../state/types'
+import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { getActiveWorktree, getSessionProjectPath } from '../../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
-import { useSidebarBranch } from './use-sidebar-branch'
+import { formatDivergence } from '../../worktree/worktree-chip'
+import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
+import { WorktreeRow } from './worktree-row'
 
 interface WorkspaceListProps {
   contentWidth: number
 }
+
+const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false
@@ -44,9 +51,26 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
   const lastSwapWithRef = useRef<string | null>(null)
   const rowRefs = useRef(new Map<string, BoxRenderable>())
+  const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 
   const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
   const baselineOrder = useMemo(() => ordered.map((s) => s.id), [ordered])
+
+  const currentSession = useMemo(
+    () =>
+      currentSessionId != null && currentSessionId !== ''
+        ? sessions.find((s) => s.id === currentSessionId)
+        : undefined,
+    [currentSessionId, sessions]
+  )
+  const activeWorktreeId = currentSession?.activeWorktreeId ?? null
+
+  useSidebarAutoScroll({
+    activeWorktreeId,
+    idPrefix: 'sidebar-wt-',
+    scrollRef,
+    visible: true,
+  })
 
   const setRowRef = useCallback((id: string, ref: BoxRenderable | null): void => {
     if (ref) rowRefs.current.set(id, ref)
@@ -130,22 +154,57 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
-      {visibleSessions.map((session) => (
-        <WorkspaceRow
-          key={session.id}
-          session={session}
-          index={baselineOrder.indexOf(session.id) + 1}
-          active={session.id === currentSessionId}
-          status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
-          dragging={draggingId === session.id}
-          contentWidth={contentWidth}
-          setRowRef={setRowRef}
-          onDragStart={handleRowDragStart}
-          onDrag={handleRowDrag}
-          onDrop={commitDrop}
-          onDragCancel={cancelDrag}
-        />
-      ))}
+      <scrollbox
+        ref={scrollRef}
+        scrollY
+        flexGrow={1}
+        flexShrink={1}
+        contentOptions={COLUMN_CONTENT_OPTIONS}
+      >
+        {visibleSessions.map((session, visibleIdx) => {
+          const sessionIndex = baselineOrder.indexOf(session.id) + 1
+          const isCurrentSession = session.id === currentSessionId
+          const worktrees = session.worktrees ?? []
+          // The primary worktree's branch is shown inline on the WorkspaceRow
+          // itself — no separate row for it. Extra worktrees (aimux-temp or
+          // external) get their own indented chip rows underneath.
+          const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+          const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
+          const sessionActiveWorktreeId = session.activeWorktreeId
+          return (
+            <box
+              key={session.id}
+              flexDirection="column"
+              flexShrink={0}
+              marginTop={visibleIdx > 0 ? 1 : 0}
+            >
+              <WorkspaceRow
+                session={session}
+                index={sessionIndex}
+                active={isCurrentSession}
+                primaryWorktree={primaryWorktree}
+                status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
+                dragging={draggingId === session.id}
+                contentWidth={contentWidth}
+                setRowRef={setRowRef}
+                onDragStart={handleRowDragStart}
+                onDrag={handleRowDrag}
+                onDrop={commitDrop}
+                onDragCancel={cancelDrag}
+              />
+              {extraWorktrees.map((worktree) => (
+                <WorktreeRow
+                  key={worktree.id}
+                  session={session}
+                  worktree={worktree}
+                  sessionIndex={sessionIndex}
+                  active={isCurrentSession && worktree.id === sessionActiveWorktreeId}
+                />
+              ))}
+            </box>
+          )
+        })}
+      </scrollbox>
       <box
         flexDirection="row"
         flexShrink={0}
@@ -166,6 +225,8 @@ interface WorkspaceRowProps {
   session: SessionRecord
   index: number
   active: boolean
+  /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
+  primaryWorktree: WorktreeRecord | undefined
   status: SessionStatus
   dragging: boolean
   contentWidth: number
@@ -185,6 +246,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   onDragCancel,
   onDragStart,
   onDrop,
+  primaryWorktree,
   session,
   setRowRef,
   status,
@@ -197,12 +259,9 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const idleColor = t.success
   const workingColor = t.primary
   const waitingColor = t.warning
-
-  const activeWorktree = getActiveWorktree(session)
-  const projectPath = getSessionProjectPath(session)
-  const polledBranch = useSidebarBranch(projectPath)
-  const branchText = polledBranch ?? activeWorktree?.branch ?? activeWorktree?.name ?? ''
-  const isTmp = activeWorktree?.source === 'aimux-temp'
+  const divergence = useAppStore((s) =>
+    primaryWorktree ? s.worktreeDivergence[primaryWorktree.id] : undefined
+  )
 
   const handleRef = useCallback(
     (r: BoxRenderable | null) => setRowRef(session.id, r),
@@ -253,18 +312,27 @@ const WorkspaceRow = memo(function WorkspaceRow({
     statusGlyph = renderGlyph('●', active ? workingColor : idleColor)
   }
 
-  // Name on top line, branch on second line — 2-line dense rows; works
-  // well in narrow sidebars where right-aligned branches would truncate the name.
   const indexLabel = `[${index}]`
-  const branchBudget = Math.max(0, contentWidth - 3)
-  const branchLabel = truncate(branchText, branchBudget)
-  const nameBudget = Math.max(0, contentWidth - indexLabel.length - 3)
+  const branchText = primaryWorktree?.branch ?? ''
+  const divergenceText = formatDivergence(divergence)
+  // Single dense line: ● [N] name  ⎇ branch ↑↓
+  // Chrome cost: 1 glyph + ` [N]` (3-4) + ` ` + ` ⎇ ` (3) + ` ` + divergence
+  const fixedChrome = 1 + indexLabel.length + 1 + (branchText !== '' ? 4 : 0)
+  const divergenceWidth = divergenceText !== '' ? divergenceText.length + 1 : 0
+  const available = Math.max(0, contentWidth - fixedChrome - divergenceWidth)
+  // Give the branch a slight edge — it's the volatile git state, the name
+  // is recognizable from a prefix.
+  const branchBudget = branchText !== '' ? Math.max(6, Math.floor(available * 0.55)) : 0
+  const nameBudget = Math.max(0, available - branchBudget)
   const nameLabel = truncate(session.name, nameBudget)
+  const branchLabel = truncate(branchText, branchBudget)
+  const showBranch = branchLabel !== ''
 
   return (
     <ContextMenuBox
       ref={handleRef}
-      flexDirection="column"
+      flexDirection="row"
+      alignItems="center"
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
@@ -274,25 +342,31 @@ const WorkspaceRow = memo(function WorkspaceRow({
       onMouseUp={handleMouseUp}
       onMouseDragEnd={onDragCancel}
     >
-      <box flexDirection="row" alignItems="center">
-        {statusGlyph}
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {' '}
-          {indexLabel}
-        </text>
-        <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
-          {' '}
-          {nameLabel}
-        </text>
-      </box>
-      {branchLabel !== '' ? (
-        <box flexDirection="row">
+      {statusGlyph}
+      <text fg={t.textMuted} selectable={false} wrapMode="none">
+        {' '}
+        {indexLabel}
+      </text>
+      <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        {' '}
+        {nameLabel}
+      </text>
+      {showBranch ? (
+        <>
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'  '}
-            {'\u{e702}'} {branchLabel}
-            {isTmp ? ' tmp' : ''}
+            {' '}
+            {'\u{e702}'}{' '}
           </text>
-        </box>
+          <text fg={t.text} selectable={false} wrapMode="none">
+            {branchLabel}
+          </text>
+          {divergenceText !== '' ? (
+            <text fg={t.textMuted} selectable={false} wrapMode="none">
+              {' '}
+              {divergenceText}
+            </text>
+          ) : null}
+        </>
       ) : null}
     </ContextMenuBox>
   )

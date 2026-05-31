@@ -13,6 +13,7 @@ import type {
 } from '../state/types'
 import type { ThemeId } from './themes'
 
+import { useWorktreeBranchPolling } from '../git/worktree-branch-poller'
 import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
@@ -324,6 +325,10 @@ export function RootView({
 
   const gitPaneInPaneOnLeft = gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left'
   const splitChrome = PANE_BORDER * 2
+
+  // Keep every worktree's `branch` in state synchronized with the on-disk
+  // HEAD so the sidebar (and divergence calc) never reads a stale value.
+  useWorktreeBranchPolling(true)
 
   const handleSidebarEdgeResize = useCallback(
     (event: MouseEvent): boolean => {
