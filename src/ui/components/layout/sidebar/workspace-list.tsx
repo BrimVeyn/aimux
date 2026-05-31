@@ -359,11 +359,6 @@ const WorkspaceRow = memo(function WorkspaceRow({
     Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
   )
 
-  // Tail divider: fill the rest of the workspace row with `─` so the eye can
-  // separate workspace blocks at a glance. Length is total width minus
-  // glyph(1) + ` `(1) + name + ` `(1) before the dashes.
-  const fillWidth = Math.max(0, contentWidth - (1 + 1 + nameLabel.length + 1))
-
   return (
     <ContextMenuBox
       ref={handleRef}
@@ -388,12 +383,6 @@ const WorkspaceRow = memo(function WorkspaceRow({
           {' '}
           {nameLabel}
         </text>
-        {fillWidth > 0 ? (
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {' '}
-            {'─'.repeat(fillWidth)}
-          </text>
-        ) : null}
       </box>
       {showBranch ? (
         <box flexDirection="row">
