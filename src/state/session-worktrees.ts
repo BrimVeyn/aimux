@@ -3,12 +3,20 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { SessionRecord, TabSession, WorktreeRecord } from './types'
+import type { BranchDivergence, SessionRecord, TabSession, WorktreeRecord } from './types'
 
 import { createPrefixedId } from '../platform/id'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
 const WORKTREE_COLORS = ['#7dd3fc', '#86efac', '#facc15', '#f0abfc', '#fb7185', '#c4b5fd']
+
+export function formatDivergence(divergence: BranchDivergence | undefined): string {
+  if (divergence == null) return ''
+  const parts: string[] = []
+  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
+  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
+  return parts.join(' ')
+}
 
 export function getWorktreeColor(worktreeId: string): string {
   let hash = 0
@@ -98,7 +106,24 @@ function mergeExistingGitWorktrees(worktrees: WorktreeRecord[], now: string): Wo
       ? primaryRepoRoot
       : (live[0]?.path ?? anchor.repoRoot)
   for (const entry of live) {
-    if (byPath.has(entry.path)) continue
+    const existing = byPath.get(entry.path)
+    if (existing) {
+      // Patch branch / commitSha from git for entries we already track —
+      // notably the primary worktree, whose `branch` is never set at creation
+      // time (createPrimaryWorktree doesn't run `git`). Without this, the UI
+      // and the divergence poller have no branch for primary worktrees.
+      const patchedBranch = entry.branch ?? existing.branch
+      const patchedSha = entry.head ?? existing.commitSha
+      if (patchedBranch !== existing.branch || patchedSha !== existing.commitSha) {
+        byPath.set(entry.path, {
+          ...existing,
+          branch: patchedBranch,
+          commitSha: patchedSha,
+          updatedAt: now,
+        })
+      }
+      continue
+    }
     if (isInsideAimuxWorktreeRoot(entry.path)) continue
     const worktree: WorktreeRecord = {
       branch: entry.branch,
@@ -202,6 +227,24 @@ export function getRenderedTabWorktreeId(
   worktrees: { id: string }[]
 ): string {
   return tab.worktreeId ?? worktrees[0]?.id ?? '__main__'
+}
+
+export function filterTabsForActiveWorktree(
+  tabs: TabSession[],
+  session: SessionRecord | undefined
+): TabSession[] {
+  if (!session) return tabs
+  const activeWorktreeId = session.activeWorktreeId
+  if (activeWorktreeId == null || activeWorktreeId === '') return tabs
+  const worktrees = session.worktrees ?? []
+  const primaryId = worktrees[0]?.id
+  const activeIsPrimary = primaryId != null && primaryId === activeWorktreeId
+  return tabs.filter((tab) => {
+    const owned = tab.worktreeId != null && tab.worktreeId !== ''
+    if (owned) return tab.worktreeId === activeWorktreeId
+    // Unbound (legacy) tabs surface only under the primary worktree.
+    return activeIsPrimary
+  })
 }
 
 export function orderTabsByWorktree(

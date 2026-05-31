@@ -1,63 +1,20 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
-import { getSidebarScrollTarget } from './sidebar-scroll'
-
-interface UseSidebarAutoScrollOptions {
+interface Options {
   scrollRef: React.RefObject<ScrollBoxRenderable | null>
   visible: boolean
-  activeTabId: string | null
-  activeIndex: number
-  tabCount: number
+  /** Full id of the active row to bring into view (workspace OR worktree). */
+  activeRowId: string | null
 }
 
-export function useSidebarAutoScroll({
-  activeIndex,
-  activeTabId,
-  scrollRef,
-  tabCount,
-  visible,
-}: UseSidebarAutoScrollOptions): void {
-  const previousActiveIndexRef = useRef(-1)
-  const previousVisibilityRef = useRef(visible)
-
+export function useSidebarAutoScroll({ activeRowId, scrollRef, visible }: Options): void {
   useEffect(() => {
-    if (!visible) {
-      previousVisibilityRef.current = false
-      previousActiveIndexRef.current = activeIndex
-      return
-    }
-
+    if (!visible) return
+    if (activeRowId == null || activeRowId === '') return
     const scrollbox = scrollRef.current
-    if (!scrollbox) {
-      previousVisibilityRef.current = visible
-      previousActiveIndexRef.current = activeIndex
-      return
-    }
-
-    if (!previousVisibilityRef.current && activeTabId != null && activeTabId !== '') {
-      scrollbox.scrollChildIntoView(`sidebar-tab-${activeTabId}`)
-      previousVisibilityRef.current = true
-      previousActiveIndexRef.current = activeIndex
-      return
-    }
-
-    const scrollTarget = getSidebarScrollTarget({
-      nextActiveIndex: activeIndex,
-      previousActiveIndex: previousActiveIndexRef.current,
-      tabCount,
-    })
-
-    if (scrollTarget === 'top') {
-      scrollbox.scrollTo({ x: 0, y: 0 })
-    } else if (scrollTarget === 'bottom') {
-      scrollbox.scrollTo({ x: 0, y: scrollbox.scrollHeight })
-    } else if (scrollTarget === 'active-item' && activeTabId != null && activeTabId !== '') {
-      scrollbox.scrollChildIntoView(`sidebar-tab-${activeTabId}`)
-    }
-
-    previousVisibilityRef.current = visible
-    previousActiveIndexRef.current = activeIndex
-  }, [activeIndex, activeTabId, scrollRef, tabCount, visible])
+    if (!scrollbox) return
+    scrollbox.scrollChildIntoView(activeRowId)
+  }, [activeRowId, scrollRef, visible])
 }

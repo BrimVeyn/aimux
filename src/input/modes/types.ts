@@ -68,6 +68,8 @@ export type SideEffect =
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
+  | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
+  | { type: 'switch-tab-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
   | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
   | {

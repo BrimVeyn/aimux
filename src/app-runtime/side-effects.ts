@@ -43,6 +43,7 @@ import {
   isCommandAvailable,
   parseCommand,
 } from '../pty/command-registry'
+import { appStore } from '../state/app-store'
 import { createTerminalBounds } from '../state/layout-resize'
 import {
   allLeafIds,
@@ -56,8 +57,14 @@ import {
 } from '../state/layout-tree'
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { saveSessionCatalog } from '../state/session-catalog'
-import { getActiveWorktree, getSessionProjectPath } from '../state/session-worktrees'
+import {
+  filterTabsForActiveWorktree,
+  getActiveWorktree,
+  getSessionProjectPath,
+  withActiveWorktree,
+} from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
+import { appReducer } from '../state/store'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { toast } from '../state/toast-store'
 import { saveCurrentWorkspace } from '../state/workspace-save'
@@ -71,6 +78,7 @@ import {
   handleRenameSessionEffect,
   handleSwitchSessionEffect,
   restartTabSession,
+  switchSessionRecords,
 } from './session-actions'
 import {
   handleDeleteSnippetEffect,
@@ -789,6 +797,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleSwitchSessionByIndex(ctx, effect.index)
       return
     }
+    case 'cycle-sidebar-item': {
+      handleCycleSidebarItem(ctx, effect.direction)
+      return
+    }
+    case 'switch-tab-by-index': {
+      handleSwitchTabByIndex(ctx, effect.index)
+      return
+    }
     case 'toggle-transparent': {
       const next = !getTransparent()
       setTransparent(next)
@@ -1058,6 +1074,131 @@ function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void
     return
   }
   handleSwitchSessionEffect(state, backend, dispatch, target)
+}
+
+interface SidebarItem {
+  sessionId: string
+  worktreeId: string | null
+}
+
+function buildSidebarItems(state: AppState): SidebarItem[] {
+  const ordered = [...state.sessions].sort(
+    (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+  )
+  const items: SidebarItem[] = []
+  for (const session of ordered) {
+    items.push({ sessionId: session.id, worktreeId: null })
+    const worktrees = session.worktrees ?? []
+    const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+    for (const wt of worktrees) {
+      if (wt.id === primary?.id) continue
+      items.push({ sessionId: session.id, worktreeId: wt.id })
+    }
+  }
+  return items
+}
+
+function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
+  const sessionId = state.currentSessionId
+  if (sessionId == null || sessionId === '') return -1
+  const session = state.sessions.find((s) => s.id === sessionId)
+  const worktrees = session?.worktrees ?? []
+  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+  const activeWtId = session?.activeWorktreeId ?? null
+  // The workspace row IS the primary worktree (no separate row), so an active
+  // primary or undefined active maps to the workspace-item.
+  const targetWorktreeId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
+  return items.findIndex(
+    (item) => item.sessionId === sessionId && item.worktreeId === targetWorktreeId
+  )
+}
+
+function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void {
+  const { backend, dispatch } = ctx
+  // Read fresh from the store, not ctx.state (which is a per-render
+  // snapshot). Rapid key presses fire before React re-renders, so ctx.state
+  // can lag the actual store.
+  const state = appStore.getState()
+  const items = buildSidebarItems(state)
+  if (items.length === 0) return
+  const currentIdx = findCurrentSidebarItem(state, items)
+  // If we don't know the current, jump to first/last depending on direction.
+  let startIdx: number
+  if (currentIdx >= 0) {
+    startIdx = currentIdx
+  } else {
+    startIdx = direction === 1 ? -1 : 0
+  }
+  const len = items.length
+  const target = items[(((startIdx + direction) % len) + len) % len]
+  if (!target) return
+
+  const session = state.sessions.find((s) => s.id === target.sessionId)
+  if (!session) return
+
+  // Determine the worktree to activate. For workspace-items, that's the
+  // primary; for worktree-items, the specific worktree.
+  const worktrees = session.worktrees ?? []
+  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+  const targetWorktreeId = target.worktreeId ?? primary?.id
+
+  const isCrossWorkspace = session.id !== state.currentSessionId
+  const needsWorktreeChange =
+    targetWorktreeId != null && targetWorktreeId !== session.activeWorktreeId
+
+  if (isCrossWorkspace) {
+    // Bundle the worktree change into the session record AND fold the
+    // session switch's two dispatches (set-sessions + load-session) into a
+    // SINGLE Zustand setState call — otherwise each dispatch fires a
+    // separate subscription notification and the @opentui/react reconciler
+    // paints an intermediate frame where the new session is current but
+    // the old activeWorktreeId still holds, producing the visible flicker.
+    const patchedSession = needsWorktreeChange
+      ? withActiveWorktree(session, targetWorktreeId)
+      : session
+    const patchedState: AppState = needsWorktreeChange
+      ? {
+          ...state,
+          sessions: state.sessions.map((s) => (s.id === patchedSession.id ? patchedSession : s)),
+        }
+      : state
+    const sessions = switchSessionRecords(patchedState, patchedSession)
+    saveSessionCatalog(sessions)
+    void backend.destroy(true)
+    appStore.setState((current) => {
+      const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
+      return appReducer(afterSet, {
+        sessionId: patchedSession.id,
+        type: 'load-session',
+        workspaceSnapshot: patchedSession.workspaceSnapshot,
+      })
+    })
+    return
+  }
+
+  if (needsWorktreeChange) {
+    dispatch({
+      sessionId: session.id,
+      type: 'set-active-worktree',
+      worktreeId: targetWorktreeId,
+    })
+  }
+}
+
+function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
+  const { dispatch, state } = ctx
+  const currentSession =
+    state.currentSessionId != null && state.currentSessionId !== ''
+      ? state.sessions.find((s) => s.id === state.currentSessionId)
+      : undefined
+  const visible = filterTabsForActiveWorktree(state.tabs, currentSession)
+  const target = visible[index - 1]
+  if (!target) {
+    logInputDebug('app.tabBar.switchOutOfRange', { index, total: visible.length })
+    return
+  }
+  if (target.id === state.activeTabId) return
+  dispatch({ tabId: target.id, type: 'set-active-tab' })
 }
 
 function replaceSession(

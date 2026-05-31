@@ -36,10 +36,16 @@ function requireValue<T>(value: T | null | undefined, message: string): T {
 }
 
 describe('mode handlers', () => {
-  test('navigation: maps j/k to move-active-tab', () => {
+  test('navigation: maps j/k to cycle-sidebar-item, h/l to move-active-tab', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
-    const result = requireValue(handler.handleKey(key('j'), ctx()), 'Expected navigation result')
-    expect(result.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    const j = requireValue(handler.handleKey(key('j'), ctx()), 'Expected j result')
+    expect(j.effects).toEqual([{ direction: 1, type: 'cycle-sidebar-item' }])
+    const k = requireValue(handler.handleKey(key('k'), ctx()), 'Expected k result')
+    expect(k.effects).toEqual([{ direction: -1, type: 'cycle-sidebar-item' }])
+    const l = requireValue(handler.handleKey(key('l'), ctx()), 'Expected l result')
+    expect(l.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    const h = requireValue(handler.handleKey(key('h'), ctx()), 'Expected h result')
+    expect(h.actions).toEqual([{ delta: -1, type: 'move-active-tab' }])
   })
 
   test('navigation: Ctrl+W is a leader prefix (no immediate action)', () => {
@@ -65,7 +71,8 @@ describe('mode handlers', () => {
     const context = ctx({ activeTabId: 'tab-1' })
     handler.handleKey(key('d'), context)
     const interrupt = requireValue(handler.handleKey(key('j'), context), 'Expected j result')
-    expect(interrupt.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    // After arming dd, j should fire the navigation key (sidebar item cycle).
+    expect(interrupt.effects).toEqual([{ direction: 1, type: 'cycle-sidebar-item' }])
     // Now a single d should only arm the chord, not close
     const armed = requireValue(handler.handleKey(key('d'), context), 'Expected armed result')
     expect(armed.actions).toEqual([])
@@ -137,19 +144,19 @@ describe('mode handlers', () => {
     expect(result.actions).toEqual([{ type: 'toggle-new-tab-worktree' }])
   })
 
-  test('navigation: Shift+J reorders tab', () => {
+  test('navigation: Shift+L reorders tab right', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('j', { shift: true }), ctx()),
+      handler.handleKey(key('l', { shift: true }), ctx()),
       'Expected reorder result'
     )
     expect(result.actions).toEqual([{ delta: 1, type: 'reorder-active-tab' }])
   })
 
-  test('navigation: Shift+K reorders tab up', () => {
+  test('navigation: Shift+H reorders tab left', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('k', { shift: true }), ctx()),
+      handler.handleKey(key('h', { shift: true }), ctx()),
       'Expected reorder-up result'
     )
     expect(result.actions).toEqual([{ delta: -1, type: 'reorder-active-tab' }])

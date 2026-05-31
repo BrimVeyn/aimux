@@ -499,6 +499,7 @@ export type SessionAction =
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
   | { type: 'reorder-sessions'; orderedIds: string[] }
+  | { type: 'reorder-active-session'; delta: number }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
   | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
   | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
@@ -713,6 +714,8 @@ export type SideEffect =
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
   | { type: 'switch-session-by-index'; index: number }
+  | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
+  | { type: 'switch-tab-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
   | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
   | {

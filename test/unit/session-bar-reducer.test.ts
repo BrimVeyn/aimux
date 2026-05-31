@@ -64,4 +64,44 @@ describe('session bar reducer', () => {
     // Orders are a stable 0..n-1 sequence
     expect(s1.sessions.map((s) => s.order)).toEqual([0, 1, 2])
   })
+
+  describe('reorder-active-session', () => {
+    const sessions = () => [makeSession('a', 0), makeSession('b', 1), makeSession('c', 2)]
+    const withCurrent = (id: string) => ({
+      ...createInitialState({}, sessions(), [], false),
+      currentSessionId: id,
+    })
+
+    test('moves current session down by one', () => {
+      const s0 = withCurrent('b')
+      const s1 = appReducer(s0, { delta: 1, type: 'reorder-active-session' })
+      expect(s1.sessions.map((s) => s.id)).toEqual(['a', 'c', 'b'])
+      expect(s1.sessions.map((s) => s.order)).toEqual([0, 1, 2])
+    })
+
+    test('moves current session up by one', () => {
+      const s0 = withCurrent('b')
+      const s1 = appReducer(s0, { delta: -1, type: 'reorder-active-session' })
+      expect(s1.sessions.map((s) => s.id)).toEqual(['b', 'a', 'c'])
+      expect(s1.sessions.map((s) => s.order)).toEqual([0, 1, 2])
+    })
+
+    test('no-op at top edge', () => {
+      const s0 = withCurrent('a')
+      const s1 = appReducer(s0, { delta: -1, type: 'reorder-active-session' })
+      expect(s1).toBe(s0)
+    })
+
+    test('no-op at bottom edge', () => {
+      const s0 = withCurrent('c')
+      const s1 = appReducer(s0, { delta: 1, type: 'reorder-active-session' })
+      expect(s1).toBe(s0)
+    })
+
+    test('no-op when no current session', () => {
+      const s0 = createInitialState({}, sessions(), [], false)
+      const s1 = appReducer(s0, { delta: 1, type: 'reorder-active-session' })
+      expect(s1).toBe(s0)
+    })
+  })
 })

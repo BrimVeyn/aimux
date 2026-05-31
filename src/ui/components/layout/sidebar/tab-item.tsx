@@ -17,6 +17,8 @@ interface TabItemProps {
   inLayout?: boolean
   /** When set, this tab's worktree can be moved — adds a "Move worktree" entry. */
   moveWorktreeId?: string
+  /** 1-based position in the visible tab list — rendered as `[N]` and matches Leader+N. */
+  indexLabel?: string
 }
 
 function getStatusColor(status: TabSession['status']): string {
@@ -50,31 +52,34 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
   return inLayout ? t.textMuted : t.textMuted
 }
 
-function BusyIndicator() {
+function BusyGlyph() {
   const t = useTheme()
   const frame = useBusySpinner()
   return (
     <text fg={t.primary} selectable={false}>
-      {frame} working
+      {' '}
+      {frame}
     </text>
   )
 }
 
-function WaitingIndicator() {
+function WaitingGlyph() {
   const t = useTheme()
   return (
     <text fg={t.warning} selectable={false}>
-      ? waiting
+      {' '}
+      ?
     </text>
   )
 }
 
-function ActivityIndicator({ tab }: { tab: TabSession }) {
+function ActivityGlyph({ tab }: { tab: TabSession }) {
   const t = useTheme()
   if (tab.status === 'error') {
     return (
       <text fg={t.error} selectable={false}>
-        ✗ error
+        {' '}
+        ✗
       </text>
     )
   }
@@ -82,37 +87,47 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   if (tab.status === 'disconnected') {
     return (
       <text fg={t.warning} selectable={false}>
-        ⏸ restore
+        {' '}
+        ⏸
       </text>
     )
   }
 
   if (tab.activity === 'working') {
-    return <BusyIndicator />
+    return <BusyGlyph />
   }
 
   if (tab.activity === 'waiting-input') {
-    return <WaitingIndicator />
+    return <WaitingGlyph />
   }
 
   if (tab.activity === 'idle') {
     return (
       <text fg={t.success} selectable={false}>
-        ● idle
+        {' '}
+        ●
       </text>
     )
   }
 
   return (
     <text fg={getStatusColor(tab.status)} selectable={false}>
-      {tab.status}
+      {' '}
+      ·
     </text>
   )
 }
 
-export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: TabItemProps) {
+export function TabItem({
+  active,
+  focused,
+  id,
+  indexLabel,
+  inLayout,
+  moveWorktreeId,
+  tab,
+}: TabItemProps) {
   const t = useTheme()
-  const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)
   const indicatorColor = getIndicatorColor(active, focused, isInLayout)
@@ -135,21 +150,19 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
         },
       ],
       [
-        'Move up',
+        'Move left',
         () => {
           dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
           dispatchGlobal({ delta: -1, type: 'reorder-active-tab' })
         },
       ],
       [
-        'Move down',
+        'Move right',
         () => {
           dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
           dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
         },
       ],
-      // Move this tab's worktree into another one. Opened from here it overlays
-      // the normal view (no git mode) since the open action doesn't touch focus.
       ...(moveWorktreeId != null && moveWorktreeId !== ''
         ? [
             [
@@ -181,38 +194,31 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
       id={id}
       paddingLeft={1}
       paddingRight={1}
-      paddingTop={0}
-      paddingBottom={0}
-      flexDirection="column"
-      gap={0}
+      flexDirection="row"
+      alignItems="center"
       rightClickMenu={rightClickMenu}
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
     >
-      <box flexDirection="row" alignItems="center">
-        <text fg={indicatorColor} selectable={false}>
-          {indicator}{' '}
+      <text fg={indicatorColor} selectable={false}>
+        {indicator}{' '}
+      </text>
+      {indexLabel != null && indexLabel !== '' ? (
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {indexLabel}{' '}
         </text>
-        <box flexGrow={1}>
-          <text fg={active ? t.text : t.textMuted} selectable={false}>
-            {tab.title}
+      ) : null}
+      <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        {tab.title}
+      </text>
+      <ActivityGlyph tab={tab} />
+      {hovered ? (
+        <box paddingLeft={1} onMouseDown={handleCloseMouseDown}>
+          <text fg={t.textMuted} selectable={false}>
+            ×
           </text>
         </box>
-        {hovered ? (
-          <box onMouseDown={handleCloseMouseDown}>
-            <text fg={t.textMuted} selectable={false}>
-              ×
-            </text>
-          </box>
-        ) : null}
-      </box>
-      <box flexDirection="row">
-        <text fg={t.textMuted} selectable={false}>
-          {' '}
-          {label}{' '}
-        </text>
-        <ActivityIndicator tab={tab} />
-      </box>
+      ) : null}
     </ContextMenuBox>
   )
 }

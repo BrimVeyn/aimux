@@ -199,7 +199,11 @@ function getCurrentSession(state: AppState) {
     : undefined
 }
 
-function withActiveTabWorktree(state: AppState, tabId: string | null): AppState {
+function withActiveTabWorktree(
+  state: AppState,
+  tabId: string | null,
+  opts?: { onlyIfMissing?: boolean }
+): AppState {
   if (
     tabId == null ||
     tabId === '' ||
@@ -209,6 +213,19 @@ function withActiveTabWorktree(state: AppState, tabId: string | null): AppState 
   const tab = state.tabs.find((entry) => entry.id === tabId)
   if (!(tab?.worktreeId != null && tab?.worktreeId !== '')) return state
   const worktreeId = tab.worktreeId
+  // When `onlyIfMissing` is set, we leave the session's worktree alone if it
+  // already points at a known worktree. Used by `hydrate-workspace` so that
+  // a backend re-attach after a user-initiated worktree switch (j/k cycling)
+  // doesn't clobber the freshly chosen worktree by re-syncing from the
+  // restored active tab.
+  if (opts?.onlyIfMissing === true) {
+    const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+    const hasValidWorktree =
+      session?.activeWorktreeId != null &&
+      session.activeWorktreeId !== '' &&
+      (session.worktrees?.some((w) => w.id === session.activeWorktreeId) ?? false)
+    if (hasValidWorktree) return state
+  }
   return {
     ...state,
     sessions: state.sessions.map((session) =>
@@ -345,7 +362,8 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           tabGroupMap: hydratedGroupMap,
           tabs: normalizeGroupedTabOrder(action.tabs, hydratedTrees, hydratedGroupMap),
         },
-        hydratedActiveTabId
+        hydratedActiveTabId,
+        { onlyIfMissing: true }
       )
     }
     case 'close-tab':
