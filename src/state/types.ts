@@ -536,6 +536,7 @@ export type SessionAction =
   | { type: 'rename-session-record'; sessionId: string; name: string }
   | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
   | { type: 'reorder-sessions'; orderedIds: string[] }
+  | { type: 'reorder-active-session'; delta: number }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
   | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
   | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }

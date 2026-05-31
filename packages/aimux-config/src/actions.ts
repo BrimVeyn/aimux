@@ -129,6 +129,10 @@ export function reorderTab(delta: number): KeyResult {
   return r([{ delta, type: 'reorder-active-tab' }])
 }
 
+export function reorderSession(delta: number): KeyResult {
+  return r([{ delta, type: 'reorder-active-session' }])
+}
+
 export function resizeSidebar(delta: number): KeyResult {
   return r([{ delta, type: 'resize-sidebar' }])
 }

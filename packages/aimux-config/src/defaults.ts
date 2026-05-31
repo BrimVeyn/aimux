@@ -51,6 +51,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('h', actions.prevTab, 'Prev tab')
         .map('L', actions.reorderTab(1), 'Move tab right')
         .map('H', actions.reorderTab(-1), 'Move tab left')
+        .map('J', actions.reorderSession(1), 'Move workspace down')
+        .map('K', actions.reorderSession(-1), 'Move workspace up')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
         .map('?', actions.helpModal(), 'Help')

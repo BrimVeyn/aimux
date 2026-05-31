@@ -1,5 +1,6 @@
 import type { AppAction, AppState } from '../types'
 
+import { moveIdToIdPosition, orderSessionsForDisplay } from '../../ui/session-ordering'
 import { filterSessions } from '../selectors'
 import { restoreWorkspaceState } from '../session-persistence'
 import { withActiveWorktree } from '../session-worktrees'
@@ -106,6 +107,24 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         ordered.push({ ...s, order: nextOrder++ })
       }
       return { ...state, sessions: ordered }
+    }
+    case 'reorder-active-session': {
+      const currentId = state.currentSessionId
+      if (currentId == null || currentId === '') return state
+      const ids = orderSessionsForDisplay(state.sessions).map((s) => s.id)
+      const from = ids.indexOf(currentId)
+      if (from < 0) return state
+      const to = from + action.delta
+      if (to < 0 || to >= ids.length) return state
+      const nextIds = moveIdToIdPosition(ids, currentId, ids[to])
+      const byId = new Map(state.sessions.map((s) => [s.id, s]))
+      const nextSessions = nextIds.map((id, idx) => {
+        const s = byId.get(id)
+        return s ? { ...s, order: idx } : s
+      })
+      const filtered = nextSessions.filter((s): s is NonNullable<typeof s> => s != null)
+      if (filtered.length !== state.sessions.length) return state
+      return { ...state, sessions: filtered }
     }
     case 'set-session-status': {
       const prev = state.sessionStatuses[action.sessionId]
