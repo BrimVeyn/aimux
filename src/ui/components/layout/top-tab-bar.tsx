@@ -1,6 +1,6 @@
 import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 
-import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
+import { Fragment, memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
 
 import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-poller'
 import { useAppStore } from '../../../state/app-store'
@@ -20,6 +20,22 @@ const ROW_CONTENT_OPTIONS = {
   gap: 0,
   justifyContent: 'flex-start' as const,
 }
+
+const GroupBracket = memo(function GroupBracket({
+  color,
+  side,
+}: {
+  color: string
+  side: 'open' | 'close'
+}) {
+  return (
+    <box flexDirection="row" flexShrink={0}>
+      <text fg={color} selectable={false}>
+        {side === 'open' ? '⌊' : '⌋'}
+      </text>
+    </box>
+  )
+})
 
 const TopTabCell = memo(function TopTabCell({
   active,
@@ -65,6 +81,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const sessions = useAppStore((s) => s.sessions)
   const focusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
+  const tabGroupMap = useAppStore((s) => s.tabGroupMap)
 
   // Sidebar now also shows worktree chips with divergence — poll whenever
   // either surface is visible.
@@ -135,38 +152,50 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
           // [N] is shown only for the first 9 visible tabs — that's the range
           // Leader+1..9 can address.
           const indexLabel = index < 9 ? `[${index + 1}]` : undefined
+          const currentGroup = inLayout ? (tabGroupMap[tab.id] ?? null) : null
+          const prevTab = index > 0 ? visibleTabs[index - 1] : undefined
+          const prevInLayout = prevTab ? tabGroupInfo.get(prevTab.id)?.inLayout === true : false
+          const prevGroup = prevTab && prevInLayout ? (tabGroupMap[prevTab.id] ?? null) : null
+          const nextTab = visibleTabs[index + 1]
+          const nextInLayout = nextTab ? tabGroupInfo.get(nextTab.id)?.inLayout === true : false
+          const nextGroup = nextTab && nextInLayout ? (tabGroupMap[nextTab.id] ?? null) : null
+          const isGroupStart = currentGroup !== null && currentGroup !== prevGroup
+          const isGroupEnd = currentGroup !== null && currentGroup !== nextGroup
           return (
-            <TopTabCell
-              key={tab.id}
-              tabId={tab.id}
-              active={isActive}
-              onActivate={handleTabActivate}
-              backgroundColor={isActive ? t.backgroundElement : undefined}
-            >
-              <TabItem
-                id={`top-tab-${tab.id}`}
-                tab={tab}
+            <Fragment key={tab.id}>
+              {isGroupStart ? <GroupBracket color={t.primary} side="open" /> : null}
+              <TopTabCell
+                tabId={tab.id}
                 active={isActive}
-                focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
-                inLayout={inLayout}
-                indexLabel={indexLabel}
-              />
-            </TopTabCell>
+                onActivate={handleTabActivate}
+                backgroundColor={isActive ? t.backgroundElement : undefined}
+              >
+                <TabItem
+                  id={`top-tab-${tab.id}`}
+                  tab={tab}
+                  active={isActive}
+                  focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
+                  inLayout={inLayout}
+                  indexLabel={indexLabel}
+                  alwaysShowClose
+                />
+              </TopTabCell>
+              {isGroupEnd ? <GroupBracket color={t.primary} side="close" /> : null}
+            </Fragment>
           )
         })}
+        <box
+          flexDirection="row"
+          flexShrink={0}
+          paddingLeft={1}
+          paddingRight={1}
+          onMouseDown={handleNewTab}
+        >
+          <text fg={t.textMuted} selectable={false}>
+            +
+          </text>
+        </box>
       </scrollbox>
-      <box
-        flexDirection="row"
-        flexShrink={0}
-        paddingLeft={1}
-        paddingRight={1}
-        backgroundColor={t.backgroundElement}
-        onMouseDown={handleNewTab}
-      >
-        <text fg={t.text} selectable={false}>
-          + New
-        </text>
-      </box>
     </box>
   )
 }
