@@ -10,13 +10,13 @@ import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../s
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
+import { formatDivergence, getWorktreeColor } from '../../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
-import { formatDivergence } from '../../worktree/worktree-chip'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
 import { WorktreeRow } from './worktree-row'
 
@@ -165,6 +165,8 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
           const sessionIndex = baselineOrder.indexOf(session.id) + 1
           const isCurrentSession = session.id === currentSessionId
           const worktrees = session.worktrees ?? []
+          // sessionIndex is still passed to WorktreeRow for cross-workspace
+          // switching (it triggers switch-session-by-index on click).
           // The primary worktree's branch is shown inline on the WorkspaceRow
           // itself — no separate row for it. Extra worktrees (aimux-temp or
           // external) get their own indented chip rows underneath.
@@ -180,7 +182,6 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
             >
               <WorkspaceRow
                 session={session}
-                index={sessionIndex}
                 active={isCurrentSession}
                 primaryWorktree={primaryWorktree}
                 status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
@@ -223,7 +224,6 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
 interface WorkspaceRowProps {
   session: SessionRecord
-  index: number
   active: boolean
   /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
@@ -241,7 +241,6 @@ const WorkspaceRow = memo(function WorkspaceRow({
   active,
   contentWidth,
   dragging,
-  index,
   onDrag,
   onDragCancel,
   onDragStart,
@@ -256,7 +255,6 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
   const bgColor = dragging || active ? t.backgroundElement : undefined
-  const idleColor = t.success
   const workingColor = t.primary
   const waitingColor = t.warning
   const divergence = useAppStore((s) =>
@@ -302,37 +300,36 @@ const WorkspaceRow = memo(function WorkspaceRow({
     [session.id, session.name]
   )
 
-  // Status glyph
-  let statusGlyph: ReturnType<typeof renderGlyph>
+  // Color of the left vertical bar — the workspace's stable accent (derived
+  // from its primary worktree id). Falls back to a tint for unhydrated sessions.
+  const barColor =
+    primaryWorktree != null
+      ? (primaryWorktree.color ?? getWorktreeColor(primaryWorktree.id))
+      : t.textMuted
+  // Working/waiting indicator overrides the colored bar — the user needs to
+  // see assistant activity from across the room.
+  let leadingGlyph = '▍'
+  let leadingColor = barColor
   if (showWaiting) {
-    statusGlyph = renderGlyph('?', waitingColor)
+    leadingGlyph = '?'
+    leadingColor = waitingColor
   } else if (showSpinner) {
-    statusGlyph = renderGlyph(spinner, workingColor)
-  } else {
-    statusGlyph = renderGlyph('●', active ? workingColor : idleColor)
+    leadingGlyph = spinner
+    leadingColor = workingColor
   }
 
-  const indexLabel = `[${index}]`
   const branchText = primaryWorktree?.branch ?? ''
   const divergenceText = formatDivergence(divergence)
-  // Single dense line: ● [N] name  ⎇ branch ↑↓
-  // Chrome cost: 1 glyph + ` [N]` (3-4) + ` ` + ` ⎇ ` (3) + ` ` + divergence
-  const fixedChrome = 1 + indexLabel.length + 1 + (branchText !== '' ? 4 : 0)
-  const divergenceWidth = divergenceText !== '' ? divergenceText.length + 1 : 0
-  const available = Math.max(0, contentWidth - fixedChrome - divergenceWidth)
-  // Give the branch a slight edge — it's the volatile git state, the name
-  // is recognizable from a prefix.
-  const branchBudget = branchText !== '' ? Math.max(6, Math.floor(available * 0.55)) : 0
-  const nameBudget = Math.max(0, available - branchBudget)
+  const showBranch = branchText !== ''
+  const nameBudget = Math.max(0, contentWidth - 3)
+  const branchBudget = Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
   const nameLabel = truncate(session.name, nameBudget)
   const branchLabel = truncate(branchText, branchBudget)
-  const showBranch = branchLabel !== ''
 
   return (
     <ContextMenuBox
       ref={handleRef}
-      flexDirection="row"
-      alignItems="center"
+      flexDirection="column"
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
@@ -342,40 +339,24 @@ const WorkspaceRow = memo(function WorkspaceRow({
       onMouseUp={handleMouseUp}
       onMouseDragEnd={onDragCancel}
     >
-      {statusGlyph}
-      <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {' '}
-        {indexLabel}
-      </text>
-      <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
-        {' '}
-        {nameLabel}
-      </text>
+      <box flexDirection="row" alignItems="center">
+        <text fg={leadingColor} selectable={false} wrapMode="none">
+          {leadingGlyph}
+        </text>
+        <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
+          {' '}
+          {nameLabel}
+        </text>
+      </box>
       {showBranch ? (
-        <>
+        <box flexDirection="row">
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {' '}
-            {'\u{e702}'}{' '}
+            {'  '}
+            {'\u{e702}'} {branchLabel}
+            {divergenceText !== '' ? ` ${divergenceText}` : ''}
           </text>
-          <text fg={t.text} selectable={false} wrapMode="none">
-            {branchLabel}
-          </text>
-          {divergenceText !== '' ? (
-            <text fg={t.textMuted} selectable={false} wrapMode="none">
-              {' '}
-              {divergenceText}
-            </text>
-          ) : null}
-        </>
+        </box>
       ) : null}
     </ContextMenuBox>
   )
 })
-
-function renderGlyph(glyph: string, color: string) {
-  return (
-    <text fg={color} selectable={false}>
-      {glyph}
-    </text>
-  )
-}

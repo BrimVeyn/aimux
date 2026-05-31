@@ -6,10 +6,8 @@ import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { getWorktreeColor } from '../../../../state/session-worktrees'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
-import { WorktreeChip } from '../../worktree/worktree-chip'
 
 interface WorktreeRowProps {
   session: SessionRecord
@@ -27,20 +25,14 @@ export const WorktreeRow = memo(function WorktreeRow({
   worktree,
 }: WorktreeRowProps) {
   const t = useTheme()
-  const divergence = useAppStore((s) => s.worktreeDivergence[worktree.id])
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const isCurrentSession = session.id === currentSessionId
-
-  const color = worktree.color ?? getWorktreeColor(worktree.id)
-  const branch = worktree.branch ?? worktree.name
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
       if (event.button !== 0) return
       event.preventDefault()
       event.stopPropagation()
-      // Set the desired worktree on the session record first so the
-      // subsequent session switch (if any) loads with it already active.
       dispatchGlobal({
         sessionId: session.id,
         type: 'set-active-worktree',
@@ -68,8 +60,8 @@ export const WorktreeRow = memo(function WorktreeRow({
     ]
   }, [session.id, worktree.id, worktree.source])
 
-  const showTmp = worktree.source === 'aimux-temp'
-
+  // `> name` — chevron + worktree name. No colored strip; worktrees are
+  // alternative work streams under their workspace, not chips.
   return (
     <ContextMenuBox
       id={`sidebar-wt-${worktree.id}`}
@@ -82,20 +74,11 @@ export const WorktreeRow = memo(function WorktreeRow({
       onMouseDown={handleMouseDown}
     >
       <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {'  '}
+        {'  > '}
       </text>
-      <WorktreeChip
-        branch={branch}
-        color={color}
-        divergence={divergence}
-        paddingLeft={0}
-        paddingRight={0}
-      />
-      {showTmp ? (
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {' tmp'}
-        </text>
-      ) : null}
+      <text fg={t.text} selectable={false} wrapMode="none">
+        {worktree.name}
+      </text>
     </ContextMenuBox>
   )
 })

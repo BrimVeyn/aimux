@@ -68,6 +68,13 @@ export function switchSessionByIndex(index: number): KeyResult {
   return r([], [{ index, type: 'switch-session-by-index' }])
 }
 
+export function switchTabByIndex(index: number): KeyResult {
+  return r([], [{ index, type: 'switch-tab-by-index' }])
+}
+
+export const nextSidebarItem: KeyResult = r([], [{ direction: 1, type: 'cycle-sidebar-item' }])
+export const prevSidebarItem: KeyResult = r([], [{ direction: -1, type: 'cycle-sidebar-item' }])
+
 export const splitVertical: KeyResult = r(
   [{ direction: 'vertical', type: 'open-split-picker' }],
   [],

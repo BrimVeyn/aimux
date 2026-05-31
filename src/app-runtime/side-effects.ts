@@ -56,7 +56,11 @@ import {
 } from '../state/layout-tree'
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { saveSessionCatalog } from '../state/session-catalog'
-import { getActiveWorktree, getSessionProjectPath } from '../state/session-worktrees'
+import {
+  filterTabsForActiveWorktree,
+  getActiveWorktree,
+  getSessionProjectPath,
+} from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { toast } from '../state/toast-store'
@@ -789,6 +793,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleSwitchSessionByIndex(ctx, effect.index)
       return
     }
+    case 'cycle-sidebar-item': {
+      handleCycleSidebarItem(ctx, effect.direction)
+      return
+    }
+    case 'switch-tab-by-index': {
+      handleSwitchTabByIndex(ctx, effect.index)
+      return
+    }
     case 'toggle-transparent': {
       const next = !getTransparent()
       setTransparent(next)
@@ -1058,6 +1070,99 @@ function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void
     return
   }
   handleSwitchSessionEffect(state, backend, dispatch, target)
+}
+
+interface SidebarItem {
+  sessionId: string
+  worktreeId: string | null
+}
+
+function buildSidebarItems(state: AppState): SidebarItem[] {
+  const ordered = [...state.sessions].sort(
+    (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+  )
+  const items: SidebarItem[] = []
+  for (const session of ordered) {
+    items.push({ sessionId: session.id, worktreeId: null })
+    const worktrees = session.worktrees ?? []
+    const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+    for (const wt of worktrees) {
+      if (wt.id === primary?.id) continue
+      items.push({ sessionId: session.id, worktreeId: wt.id })
+    }
+  }
+  return items
+}
+
+function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
+  const sessionId = state.currentSessionId
+  if (sessionId == null || sessionId === '') return -1
+  const session = state.sessions.find((s) => s.id === sessionId)
+  const worktrees = session?.worktrees ?? []
+  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+  const activeWtId = session?.activeWorktreeId ?? null
+  // The workspace row IS the primary worktree (no separate row), so an active
+  // primary or undefined active maps to the workspace-item.
+  const targetWorktreeId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
+  return items.findIndex(
+    (item) => item.sessionId === sessionId && item.worktreeId === targetWorktreeId
+  )
+}
+
+function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void {
+  const { backend, dispatch, state } = ctx
+  const items = buildSidebarItems(state)
+  if (items.length === 0) return
+  const currentIdx = findCurrentSidebarItem(state, items)
+  // If we don't know the current, jump to first/last depending on direction.
+  let startIdx: number
+  if (currentIdx >= 0) {
+    startIdx = currentIdx
+  } else {
+    startIdx = direction === 1 ? -1 : 0
+  }
+  const len = items.length
+  const target = items[(((startIdx + direction) % len) + len) % len]
+  if (!target) return
+
+  const session = state.sessions.find((s) => s.id === target.sessionId)
+  if (!session) return
+
+  // Determine the worktree to activate. For workspace-items, that's the
+  // primary; for worktree-items, the specific worktree.
+  const worktrees = session.worktrees ?? []
+  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+  const targetWorktreeId = target.worktreeId ?? primary?.id
+
+  // Set the worktree on the session record first so a subsequent session
+  // switch loads with the right worktree active.
+  if (targetWorktreeId != null && targetWorktreeId !== session.activeWorktreeId) {
+    dispatch({
+      sessionId: session.id,
+      type: 'set-active-worktree',
+      worktreeId: targetWorktreeId,
+    })
+  }
+
+  if (session.id !== state.currentSessionId) {
+    handleSwitchSessionEffect(state, backend, dispatch, session)
+  }
+}
+
+function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
+  const { dispatch, state } = ctx
+  const currentSession =
+    state.currentSessionId != null && state.currentSessionId !== ''
+      ? state.sessions.find((s) => s.id === state.currentSessionId)
+      : undefined
+  const visible = filterTabsForActiveWorktree(state.tabs, currentSession)
+  const target = visible[index - 1]
+  if (!target) {
+    logInputDebug('app.tabBar.switchOutOfRange', { index, total: visible.length })
+    return
+  }
+  if (target.id === state.activeTabId) return
+  dispatch({ tabId: target.id, type: 'set-active-tab' })
 }
 
 function replaceSession(

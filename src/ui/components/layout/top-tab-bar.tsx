@@ -128,10 +128,13 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
         viewportCulling
         contentOptions={ROW_CONTENT_OPTIONS}
       >
-        {visibleTabs.map((tab) => {
+        {visibleTabs.map((tab, index) => {
           const isActive = tab.id === activeTabId
           const info = tabGroupInfo.get(tab.id)
           const inLayout = !!(info?.inLayout === true)
+          // [N] is shown only for the first 9 visible tabs — that's the range
+          // Leader+1..9 can address.
+          const indexLabel = index < 9 ? `[${index + 1}]` : undefined
           return (
             <TopTabCell
               key={tab.id}
@@ -146,6 +149,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
                 active={isActive}
                 focused={focusMode === 'terminal-input' || focusMode === 'navigation'}
                 inLayout={inLayout}
+                indexLabel={indexLabel}
               />
             </TopTabCell>
           )

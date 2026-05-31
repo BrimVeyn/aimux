@@ -17,6 +17,8 @@ interface TabItemProps {
   inLayout?: boolean
   /** When set, this tab's worktree can be moved — adds a "Move worktree" entry. */
   moveWorktreeId?: string
+  /** 1-based position in the visible tab list — rendered as `[N]` and matches Leader+N. */
+  indexLabel?: string
 }
 
 function getStatusColor(status: TabSession['status']): string {
@@ -116,7 +118,15 @@ function ActivityGlyph({ tab }: { tab: TabSession }) {
   )
 }
 
-export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: TabItemProps) {
+export function TabItem({
+  active,
+  focused,
+  id,
+  indexLabel,
+  inLayout,
+  moveWorktreeId,
+  tab,
+}: TabItemProps) {
   const t = useTheme()
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)
@@ -193,6 +203,11 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
       <text fg={indicatorColor} selectable={false}>
         {indicator}{' '}
       </text>
+      {indexLabel != null && indexLabel !== '' ? (
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {indexLabel}{' '}
+        </text>
+      ) : null}
       <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
         {tab.title}
       </text>

@@ -3,12 +3,20 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { SessionRecord, TabSession, WorktreeRecord } from './types'
+import type { BranchDivergence, SessionRecord, TabSession, WorktreeRecord } from './types'
 
 import { createPrefixedId } from '../platform/id'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
 const WORKTREE_COLORS = ['#7dd3fc', '#86efac', '#facc15', '#f0abfc', '#fb7185', '#c4b5fd']
+
+export function formatDivergence(divergence: BranchDivergence | undefined): string {
+  if (divergence == null) return ''
+  const parts: string[] = []
+  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
+  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
+  return parts.join(' ')
+}
 
 export function getWorktreeColor(worktreeId: string): string {
   let hash = 0

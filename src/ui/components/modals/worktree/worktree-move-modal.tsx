@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react'
 import type { WorktreeRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import { formatDivergence } from '../../../../state/session-worktrees'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'
@@ -22,14 +23,6 @@ const MOVE_HINTS: [key: string, label: string][] = [
   ['j/k', 'change target'],
   ['esc', 'cancel'],
 ]
-
-function formatDivergence(divergence: { ahead: number; behind: number } | undefined): string {
-  if (divergence == null) return ''
-  const parts: string[] = []
-  if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
-  if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
-  return parts.join(' ')
-}
 
 export function WorktreeMoveModal({
   deleteSource,
