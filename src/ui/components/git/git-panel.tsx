@@ -33,6 +33,10 @@ interface GitPanelProps {
   // ("vs <base>") rather than a HEAD~N history walk.
   baseLabel?: string
   compact?: boolean
+  // When false, suppress the inline tree|flat toggle on section headers and the
+  // top ↑n ↓m remote-tracking line so a wrapper can own them at panel level.
+  showFileListToggle?: boolean
+  showRemoteTracking?: boolean
 }
 
 function sectionTitle(section: GitFileSection, headOffset: number, baseLabel?: string): string {
@@ -389,6 +393,8 @@ export const GitPanel = memo(function GitPanel({
   pathConfig = DEFAULT_PATH_CONFIG,
   projectPath,
   selectedEntryKey,
+  showFileListToggle = true,
+  showRemoteTracking = true,
 }: GitPanelProps) {
   const t = useTheme()
   useTransparent()
@@ -407,12 +413,13 @@ export const GitPanel = memo(function GitPanel({
 
   const statusNode = renderStatus(gitPanel, !!(projectPath != null && projectPath !== ''))
 
-  const hasRemoteTracking = gitPanel.ahead > 0 || gitPanel.behind > 0
-  const toggleSection =
-    tree.sections.find((section) => section.section === 'unstaged' && section.files.length > 0)
-      ?.section ??
-    tree.sections.find((section) => section.files.length > 0)?.section ??
-    null
+  const hasRemoteTracking = showRemoteTracking && (gitPanel.ahead > 0 || gitPanel.behind > 0)
+  const toggleSection = showFileListToggle
+    ? (tree.sections.find((section) => section.section === 'unstaged' && section.files.length > 0)
+        ?.section ??
+      tree.sections.find((section) => section.files.length > 0)?.section ??
+      null)
+    : null
 
   useEffect(() => {
     const scrollbox = scrollRef.current

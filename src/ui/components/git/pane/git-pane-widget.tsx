@@ -7,6 +7,7 @@ import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
 import { getSessionProjectPath } from '../../../../state/session-worktrees'
 import { GitPanel } from '../git-panel'
+import { GitPaneHeader } from './git-pane-header'
 
 interface GitPaneWidgetProps {
   pollingEnabled: boolean
@@ -43,15 +44,20 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
   const display = lastGoodRef.current ?? gitPanel
 
   return (
-    <GitPanel
-      collapsedFolders={gitMode.collapsedFolders}
-      compact={treeCompaction}
-      diffCountConfig={diffCountConfig}
-      fileListMode={gitFileListMode}
-      gitPanel={display}
-      pathConfig={pathConfig}
-      projectPath={projectPath}
-      selectedEntryKey={gitMode.selectedEntryKey}
-    />
+    <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
+      <GitPaneHeader gitPanel={display} projectPath={projectPath} />
+      <GitPanel
+        collapsedFolders={gitMode.collapsedFolders}
+        compact={treeCompaction}
+        diffCountConfig={diffCountConfig}
+        fileListMode={gitFileListMode}
+        gitPanel={display}
+        pathConfig={pathConfig}
+        projectPath={projectPath}
+        selectedEntryKey={gitMode.selectedEntryKey}
+        showFileListToggle={false}
+        showRemoteTracking={false}
+      />
+    </box>
   )
 })
