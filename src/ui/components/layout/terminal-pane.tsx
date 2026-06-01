@@ -3,6 +3,7 @@ import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 import { memo, type ReactNode, useCallback, useMemo } from 'react'
 
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
+import type { JunctionEdgeInfo, JunctionEdges } from '../../../state/layout-tree'
 import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
 
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
@@ -28,8 +29,10 @@ interface TerminalPaneProps {
   onPaneActivate?: (tabId: string) => void
   onSeparatorDrag?: (event: OtuiMouseEvent) => boolean
   onSeparatorDragEnd?: () => void
+  onSeparatorDragStart?: (info: JunctionEdgeInfo) => void
   onLeftEdgeMouseDown?: (event: OtuiMouseEvent) => boolean
   onMeasure?: (tabId: string, rect: MeasuredPaneRect) => void
+  junctionEdges?: JunctionEdges
 }
 
 function getTitle(
@@ -113,6 +116,7 @@ export function TerminalPane({
   contentOrigin,
   focusMode,
   isActive,
+  junctionEdges,
   localScrollbackEnabled,
   mouseForwardingEnabled,
   onLeftEdgeMouseDown,
@@ -120,6 +124,7 @@ export function TerminalPane({
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
+  onSeparatorDragStart,
   onTerminalClick,
   onTerminalDrag,
   onTerminalMouseEvent,
@@ -175,6 +180,16 @@ export function TerminalPane({
       event.y === contentOrigin.y + contentOrigin.rows,
     [contentOrigin]
   )
+  const getJunctionSideAt = useCallback(
+    (event: OtuiMouseEvent): keyof JunctionEdges | null => {
+      if (event.x === contentOrigin.x - 1) return 'left'
+      if (event.x === contentOrigin.x + contentOrigin.cols) return 'right'
+      if (event.y === contentOrigin.y - 1) return 'top'
+      if (event.y === contentOrigin.y + contentOrigin.rows) return 'bottom'
+      return null
+    },
+    [contentOrigin]
+  )
   const forwardMouseEvent = useCallback(
     (event: OtuiMouseEvent) => {
       if (event.type === 'down' && event.button === 2 && rightClickMenu) {
@@ -193,6 +208,18 @@ export function TerminalPane({
           event.preventDefault()
           event.stopPropagation()
           return
+        }
+      }
+      if (event.type === 'down' && event.button === 0 && junctionEdges && onSeparatorDragStart) {
+        const side = getJunctionSideAt(event)
+        if (side !== null) {
+          const info = junctionEdges[side]
+          if (info) {
+            event.preventDefault()
+            event.stopPropagation()
+            onSeparatorDragStart(info)
+            return
+          }
         }
       }
       // Absorb left-button clicks on pane borders — they should not focus the
@@ -248,11 +275,14 @@ export function TerminalPane({
     [
       canForwardMouse,
       contentOrigin,
+      getJunctionSideAt,
       isOnPaneBorder,
+      junctionEdges,
       onLeftEdgeMouseDown,
       onPaneActivate,
       onSeparatorDrag,
       onSeparatorDragEnd,
+      onSeparatorDragStart,
       onTerminalClick,
       onTerminalDrag,
       onTerminalMouseEvent,

@@ -1,6 +1,6 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { useCallback, useMemo } from 'react'
+import { useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../../../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
@@ -8,13 +8,14 @@ import type { FocusMode, TabSession } from '../../../state/types'
 
 import { logInputDebug } from '../../../debug/input-log'
 import {
+  computeJunctionEdges,
   computePaneRects,
+  type JunctionEdges,
   type LayoutNode,
   PANE_BORDER,
   type PaneRect,
   type SplitDirection,
 } from '../../../state/layout-tree'
-import { useTheme } from '../../theme'
 import { TerminalPane } from './terminal-pane'
 
 const PANE_CHROME = PANE_BORDER
@@ -45,6 +46,7 @@ interface SplitLayoutProps {
   onMeasure?: (tabId: string, rect: MeasuredPaneRect) => void
   contentOrigin: TerminalContentOrigin
   bounds: PaneRect
+  junctionEdgesMap?: Map<string, JunctionEdges>
 }
 
 export function SplitLayout({
@@ -52,6 +54,7 @@ export function SplitLayout({
   bounds,
   contentOrigin,
   focusMode,
+  junctionEdgesMap: providedJunctionEdgesMap,
   localScrollbackEnabled,
   mouseForwardingEnabled,
   node,
@@ -69,7 +72,12 @@ export function SplitLayout({
   onTerminalScrollEvent,
   tabs,
 }: SplitLayoutProps) {
-  const t = useTheme()
+  const junctionEdgesMap = useMemo(
+    () =>
+      providedJunctionEdgesMap ??
+      computeJunctionEdges(node, bounds, { x: contentOrigin.x, y: contentOrigin.y }),
+    [providedJunctionEdgesMap, node, bounds, contentOrigin]
+  )
   const paneOrigin = useMemo<TerminalContentOrigin>(
     () => ({
       cols: Math.max(1, bounds.cols - PANE_CHROME * 2),
@@ -78,22 +86,6 @@ export function SplitLayout({
       y: contentOrigin.y + bounds.y + PANE_CHROME,
     }),
     [bounds, contentOrigin]
-  )
-  const handleSeparatorMouseDown = useCallback(
-    (e: OtuiMouseEvent) => {
-      e.preventDefault()
-      if (node.type !== 'split' || !onSeparatorDragStart) return
-      const leafId = getFirstLeafId(node.first)
-      if (!(leafId != null && leafId !== '')) return
-      onSeparatorDragStart({
-        direction: node.direction,
-        screenStart:
-          node.direction === 'vertical' ? contentOrigin.x + bounds.x : contentOrigin.y + bounds.y,
-        tabId: leafId,
-        totalSize: node.direction === 'vertical' ? bounds.cols : bounds.rows,
-      })
-    },
-    [bounds, contentOrigin, node, onSeparatorDragStart]
   )
   if (node.type === 'leaf') {
     const tab = tabs.find((t) => t.id === node.tabId)
@@ -117,6 +109,7 @@ export function SplitLayout({
         focusMode={focusMode}
         isActive={isActive}
         contentOrigin={paneOrigin}
+        junctionEdges={junctionEdgesMap.get(node.tabId)}
         mouseForwardingEnabled={isActive && mouseForwardingEnabled}
         localScrollbackEnabled={isActive && localScrollbackEnabled}
         onTerminalMouseEvent={onTerminalMouseEvent}
@@ -127,6 +120,7 @@ export function SplitLayout({
         onPaneActivate={onPaneActivate}
         onSeparatorDrag={onSeparatorDrag}
         onSeparatorDragEnd={onSeparatorDragEnd}
+        onSeparatorDragStart={onSeparatorDragStart}
         onLeftEdgeMouseDown={onLeftEdgeMouseDown}
         onMeasure={onMeasure}
       />
@@ -134,23 +128,19 @@ export function SplitLayout({
   }
 
   const flexDir = node.direction === 'vertical' ? 'row' : 'column'
-  const firstGrow = Math.round(node.ratio * 100)
-  const secondGrow = 100 - firstGrow
 
-  // Compute sub-bounds for each child
   const rects = computePaneRects(node, bounds)
-
-  // Compute the bounding rect for each subtree
   const firstBounds = subtreeBounds(node.first, rects, bounds)
   const secondBounds = subtreeBounds(node.second, rects, bounds)
 
-  // For vertical splits only the first subtree is leftmost; for horizontal
-  // splits both first and second start at the same x.
+  const firstSize = node.direction === 'vertical' ? firstBounds.cols : firstBounds.rows
+  const firstSizeProp = node.direction === 'vertical' ? { width: firstSize } : { height: firstSize }
+
   const secondLeftEdgeMouseDown = node.direction === 'horizontal' ? onLeftEdgeMouseDown : undefined
 
   return (
     <box flexDirection={flexDir} flexGrow={1} gap={0}>
-      <box flexGrow={firstGrow} flexDirection="column" overflow="hidden">
+      <box {...firstSizeProp} flexShrink={0} flexDirection="column" overflow="hidden">
         <SplitLayout
           node={node.first}
           tabs={tabs}
@@ -172,15 +162,10 @@ export function SplitLayout({
           onMeasure={onMeasure}
           contentOrigin={contentOrigin}
           bounds={firstBounds}
+          junctionEdgesMap={junctionEdgesMap}
         />
       </box>
-      <box
-        minWidth={node.direction === 'vertical' ? 1 : undefined}
-        minHeight={node.direction === 'horizontal' ? 1 : undefined}
-        backgroundColor={t.border}
-        onMouseDown={handleSeparatorMouseDown}
-      />
-      <box flexGrow={secondGrow} flexDirection="column" overflow="hidden">
+      <box flexGrow={1} flexDirection="column" overflow="hidden">
         <SplitLayout
           node={node.second}
           tabs={tabs}
@@ -202,15 +187,11 @@ export function SplitLayout({
           onMeasure={onMeasure}
           contentOrigin={contentOrigin}
           bounds={secondBounds}
+          junctionEdgesMap={junctionEdgesMap}
         />
       </box>
     </box>
   )
-}
-
-function getFirstLeafId(node: LayoutNode): string | null {
-  if (node.type === 'leaf') return node.tabId
-  return getFirstLeafId(node.first)
 }
 
 function subtreeBounds(
