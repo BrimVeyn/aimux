@@ -29,7 +29,9 @@ function getScreenPosition(event: OtuiMouseEvent, axis: ScreenAxis): number {
 
 export function getSplitRatioFromDrag(event: OtuiMouseEvent, drag: SplitDragState): number {
   const position = getScreenPosition(event, drag.direction === 'vertical' ? 'x' : 'y')
-  return (position - drag.screenStart) / drag.totalSize
+  const total = Math.max(1, drag.totalSize)
+  const cells = Math.round(position - drag.screenStart)
+  return cells / total
 }
 
 export function getAxisDeltaFromDrag(event: OtuiMouseEvent, drag: AxisDragState): number {
