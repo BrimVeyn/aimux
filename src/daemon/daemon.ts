@@ -3,6 +3,7 @@ import { connect, createServer, type Socket } from 'node:net'
 import type { AssistantId, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
+import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
 import {
   type ClientRequest,
   encodeMessage,
@@ -282,6 +283,29 @@ export async function runDaemon(): Promise<void> {
     },
   })
 
+  // Local HTTP server that receives Claude Code hook callbacks for every PTY
+  // spawned by this daemon. The URL is injected per-tab as AIMUX_HOOK_URL so
+  // the shipped hook script knows where to POST; failure to start is
+  // non-fatal — detection falls back to the visual PTY scanner.
+  let hookServer: ClaudeHookServer | null = null
+  try {
+    hookServer = startClaudeHookServer({
+      onEvent: (event) => {
+        statusLoop.recordHookEvent({
+          hookEventName: event.hookEventName,
+          paneId: event.paneId,
+          payload: event.payload,
+          receivedAt: event.receivedAt,
+        })
+      },
+    })
+    logDebug('daemon.hookServer.started', { url: hookServer.url })
+  } catch (error) {
+    logDebug('daemon.hookServer.startFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+
   /**
    * Tell the TM whether to bother snapshotting + broadcasting. Toggled on
    * 0↔1 transitions of the client socket count: when no UI is watching, the
@@ -454,7 +478,12 @@ export async function runDaemon(): Promise<void> {
                     message.payload.assistant,
                     [message.payload.command, ...(message.payload.args ?? [])].join(' ')
                   )
-                  await manager.createTab({ ...message.payload, sessionId })
+                  // Inject the hook bridge env so Claude Code's hooks can
+                  // call back into our status loop. Safe to add for every
+                  // assistant: non-Claude binaries simply ignore the vars.
+                  const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
+                  if (hookServer) env.AIMUX_HOOK_URL = hookServer.url
+                  await manager.createTab({ ...message.payload, env, sessionId })
                   sendOk(socket, message.id)
                   logDebug('daemon.request.createTab.success', {
                     sessionId,
@@ -577,6 +606,9 @@ export async function runDaemon(): Promise<void> {
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
+    if (hookServer) {
+      void hookServer.stop()
+    }
     manager.destroy()
     server.close()
     process.exit(0)

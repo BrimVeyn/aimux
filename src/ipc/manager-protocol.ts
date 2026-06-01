@@ -68,6 +68,8 @@ export type ManagerRequest =
         cols: number
         rows: number
         cwd?: string
+        /** Extra env vars merged into the spawned PTY's environment. */
+        env?: Record<string, string>
       }
     }
   | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
@@ -145,6 +147,14 @@ function isFiniteNumber(value: unknown): value is number {
 
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString)
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  if (!isObjectRecord(value)) return false
+  for (const v of Object.values(value)) {
+    if (!isString(v)) return false
+  }
+  return true
 }
 
 function isTerminalSpan(value: unknown): boolean {
@@ -276,6 +286,10 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(
         value.payload.cwd === undefined || isString(value.payload.cwd),
         'createTab.cwd must be a string'
+      )
+      assert(
+        value.payload.env === undefined || isStringRecord(value.payload.env),
+        'createTab.env must be a string-keyed string record'
       )
       return value as ManagerRequest
     case 'write':

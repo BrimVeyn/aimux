@@ -238,6 +238,8 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     cols: number
     rows: number
     cwd?: string
+    /** Extra environment variables merged on top of `process.env` for this PTY. */
+    env?: Record<string, string>
   }): void {
     this.disposeSession(options.tabId)
     logDebug('ptyManager.create.start', {
@@ -263,6 +265,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         env: {
           ...process.env,
           TERM: 'xterm-256color',
+          ...options.env,
         },
         name: 'xterm-256color',
         rows: options.rows,

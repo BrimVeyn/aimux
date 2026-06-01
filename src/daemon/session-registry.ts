@@ -129,6 +129,8 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cols: number
     rows: number
     cwd?: string
+    /** Extra env injected into the spawned shell. Passed through to the PTY. */
+    env?: Record<string, string>
   }): void {
     logDebug('daemon.registry.createSession', {
       args: options.args ?? [],

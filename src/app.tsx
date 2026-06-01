@@ -27,6 +27,7 @@ import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
+import { ensureClaudeSettingsHooks } from './integrations/claude-hooks-install'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
@@ -190,6 +191,13 @@ export function App({
       syncClaudeTheme(resolved, mode)
     })
   }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
+
+  useEffect(() => {
+    // Idempotent: patches ~/.claude/settings.json so Claude Code's hooks call
+    // back into the daemon for per-tab activity detection. Silent on failure;
+    // the visual PTY detector is the fallback.
+    ensureClaudeSettingsHooks()
+  }, [])
 
   useEffect(() => {
     const aiUsage = resolvedConfig.statusBar?.aiUsage
