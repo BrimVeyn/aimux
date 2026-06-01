@@ -1,7 +1,12 @@
 import { EventEmitter } from 'node:events'
 
-import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
-import type { SessionBackend, SessionBackendEvents } from './types'
+import type {
+  AssistantId,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceSnapshotV1,
+} from '../state/types'
+import type { ResizeOptions, SessionBackend, SessionBackendEvents } from './types'
 
 import { SessionManager } from '../daemon/session-manager'
 import { logDebug } from '../debug/input-log'
@@ -20,13 +25,31 @@ export class LocalSessionBackend
   private readonly sessionManager = new SessionManager()
   private currentSessionId: string | null = null
   private readonly statusLoop: ReturnType<typeof runStatusDetectionLoop>
+  /**
+   * Per-tab snapshot gate. While `false`, render events from the underlying
+   * `sessionManager` are buffered (latest-wins) instead of being forwarded to
+   * the UI. The frontend lifts the gate once `usePaneSizeReport` has reported
+   * the *actual* rendered pane size via `resizeTab({ confirmedFromMeasurement })`,
+   * so the first snapshot the UI ever paints is sized against the real box —
+   * never against the open-loop chrome estimate used at session create / attach.
+   * A tab without an entry here is treated as ready (legacy paths, sessions
+   * not subject to the gate). See plan: il-y-a-eu-stateful-boot.md.
+   */
+  private readonly paneReady = new Map<string, boolean>()
+  private readonly pendingRender = new Map<
+    string,
+    { viewport: TerminalSnapshot; terminalModes: TerminalModeState }
+  >()
 
   constructor() {
     super()
     this.sessionManager.on('render', (sessionId, tabId, viewport, terminalModes) => {
-      if (sessionId === this.currentSessionId) {
-        this.emit('render', tabId, viewport, terminalModes)
+      if (sessionId !== this.currentSessionId) return
+      if (this.paneReady.get(tabId) === false) {
+        this.pendingRender.set(tabId, { terminalModes, viewport })
+        return
       }
+      this.emit('render', tabId, viewport, terminalModes)
     })
     this.sessionManager.on('exit', (sessionId, tabId, exitCode) => {
       if (sessionId === this.currentSessionId) {
@@ -71,6 +94,7 @@ export class LocalSessionBackend
       const bounds = createTerminalBounds(options.cols, options.rows)
       forEachSplitPaneRect(splitTrees, bounds, (tabId, rect) => {
         const size = toTerminalContentSize(rect)
+        this.gatePaneRender(tabId)
         this.sessionManager.resizeTab(options.sessionId, tabId, size.cols, size.rows)
       })
     } else {
@@ -80,6 +104,9 @@ export class LocalSessionBackend
       options.sessionId,
       options.workspaceSnapshot
     )
+    for (const tab of attachResult.tabs) {
+      this.gatePaneRender(tab.id)
+    }
     // Run a synchronous classification pass so every tab's activity and the
     // session-status snapshot are available to embed in the reply — mirrors
     // the remote backend's behavior and keeps hydrate dispatches atomic on
@@ -115,7 +142,25 @@ export class LocalSessionBackend
       tabId: options.tabId,
       title: options.title,
     })
+    this.gatePaneRender(options.tabId)
     this.sessionManager.createTab(this.currentSessionId, options)
+  }
+
+  /** Suppress render emission for this tab until the frontend acknowledges its
+   *  measured pane size via `resizeTab({ confirmedFromMeasurement: true })`. */
+  private gatePaneRender(tabId: string): void {
+    this.paneReady.set(tabId, false)
+    this.pendingRender.delete(tabId)
+  }
+
+  /** Lift the suppression and flush the most recent buffered snapshot, if any. */
+  private releasePaneRender(tabId: string): void {
+    if (this.paneReady.get(tabId) === true) return
+    this.paneReady.set(tabId, true)
+    const pending = this.pendingRender.get(tabId)
+    if (!pending) return
+    this.pendingRender.delete(tabId)
+    this.emit('render', tabId, pending.viewport, pending.terminalModes)
   }
 
   write(tabId: string, input: string): void {
@@ -147,25 +192,32 @@ export class LocalSessionBackend
     this.sessionManager.setActiveTab(this.currentSessionId, tabId)
   }
 
-  resizeAll(cols: number, rows: number, options?: { sync?: boolean }): void {
+  resizeAll(cols: number, rows: number, options?: ResizeOptions): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.resize(this.currentSessionId, cols, rows, options)
   }
 
-  resizeTab(tabId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
+  resizeTab(tabId: string, cols: number, rows: number, options?: ResizeOptions): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     this.sessionManager.resizeTab(this.currentSessionId, tabId, cols, rows, options)
+    if (options?.confirmedFromMeasurement === true) {
+      this.releasePaneRender(tabId)
+    }
   }
 
   disposeSession(tabId: string): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.disposeSession', { sessionId: this.currentSessionId, tabId })
+    this.paneReady.delete(tabId)
+    this.pendingRender.delete(tabId)
     this.sessionManager.closeTab(this.currentSessionId, tabId)
   }
 
   disposeAll(): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) return
     logDebug('backend.local.disposeAll', { sessionId: this.currentSessionId })
+    this.paneReady.clear()
+    this.pendingRender.clear()
     this.sessionManager.disposeSession(this.currentSessionId)
   }
 
