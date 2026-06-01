@@ -264,6 +264,7 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         cwd: options.cwd ?? process.cwd(),
         env: {
           ...process.env,
+          COLORTERM: 'truecolor',
           TERM: 'xterm-256color',
           ...options.env,
         },

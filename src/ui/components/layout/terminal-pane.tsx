@@ -10,6 +10,7 @@ import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/u
 import { logInputDebug } from '../../../debug/input-log'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
+import { resolvePaletteIndex } from '../../host-palette'
 import { getCurrentTheme, useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 
@@ -76,8 +77,16 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
     node = <strong>{node}</strong>
   }
 
+  // Palette indices are resolved here (not in the daemon) so they pick up
+  // the host terminal's actual ANSI palette queried at startup.
+  const fg =
+    span.fgPalette !== undefined
+      ? resolvePaletteIndex(span.fgPalette)
+      : (span.fg ?? getCurrentTheme().text)
+  const bg = span.bgPalette !== undefined ? resolvePaletteIndex(span.bgPalette) : span.bg
+
   return (
-    <span key={key} fg={span.fg ?? getCurrentTheme().text} bg={span.bg}>
+    <span key={key} fg={fg} bg={bg}>
       {node}
     </span>
   )

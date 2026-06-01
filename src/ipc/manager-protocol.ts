@@ -23,8 +23,17 @@ import {
 // `AIMUX_PANE_ID` for the Claude Code hook bridge. A pre-v6 TM silently
 // drops the field, so Min is raised in lockstep to force a fresh TM that
 // will actually forward env to the spawn.
-export const MANAGER_PROTOCOL_MIN_VERSION = 6
-export const MANAGER_PROTOCOL_VERSION = 6
+//
+// v7: `TerminalSpan` carries optional `fgPalette`/`bgPalette` (ANSI 0-255
+// indices) instead of pre-converting palette cells to hex. The client
+// resolves them against the host terminal's actual palette (queried via
+// OSC 4 at startup) so user themes (Ghostty, iTerm2, …) show through
+// instead of hardcoded xterm defaults. Cross-version mixing breaks colors
+// either way (pre-v7 TM → new client never sees the indices; new TM →
+// pre-v7 client ignores them and falls back to the theme default), so Min
+// is raised in lockstep to force matching binaries.
+export const MANAGER_PROTOCOL_MIN_VERSION = 7
+export const MANAGER_PROTOCOL_VERSION = 7
 /**
  * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
  * not understand the message; the daemon must check the negotiated version
@@ -169,6 +178,8 @@ function isTerminalSpan(value: unknown): boolean {
     isString(value.text) &&
     (value.fg === undefined || isString(value.fg)) &&
     (value.bg === undefined || isString(value.bg)) &&
+    (value.fgPalette === undefined || isFiniteNumber(value.fgPalette)) &&
+    (value.bgPalette === undefined || isFiniteNumber(value.bgPalette)) &&
     (value.bold === undefined || typeof value.bold === 'boolean') &&
     (value.italic === undefined || typeof value.italic === 'boolean') &&
     (value.underline === undefined || typeof value.underline === 'boolean') &&

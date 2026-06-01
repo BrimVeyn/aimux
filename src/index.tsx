@@ -13,6 +13,7 @@ import { runRestartTerminalManager } from './restart-terminal-manager'
 import { createSessionBackend } from './session-backend/bootstrap'
 import { runTerminalManager } from './terminal-manager/terminal-manager'
 import { BreakingUpdateScreen } from './ui/breaking-update-screen'
+import { setHostPalette } from './ui/host-palette'
 import { runUpdate } from './update'
 
 const command = process.argv[2]
@@ -64,6 +65,19 @@ const renderer = await createCliRenderer({
   screenMode: 'alternate-screen',
   useMouse: true,
 })
+
+// Query the host terminal's actual ANSI palette (OSC 4) so PTY cells that
+// emit indexed colors render with the user's configured terminal theme
+// instead of hardcoded xterm defaults. Best-effort: terminals that don't
+// respond keep the fallback xterm palette.
+try {
+  const { palette } = await renderer.getPalette({ size: 256, timeout: 200 })
+  setHostPalette(palette)
+} catch (error) {
+  logDebug('index.paletteDetectFailed', {
+    message: error instanceof Error ? error.message : String(error),
+  })
+}
 
 const root = createRoot(renderer)
 
