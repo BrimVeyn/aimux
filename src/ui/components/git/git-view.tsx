@@ -21,6 +21,7 @@ import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
+import { GitPaneHeader } from './pane/git-pane-header'
 
 interface DiffStageProps {
   diff: DiffData | undefined
@@ -287,34 +288,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           gap={0}
           overflow="hidden"
         >
-          <box flexDirection="column" flexShrink={0}>
-            <text fg={t.text}>
-              <strong>aimux · git</strong>
-            </text>
-            {gitPanel.branch != null && gitPanel.branch !== '' ? (
-              <box flexDirection="row">
-                <text fg={t.text}>{'\u{e702}'} </text>
-                <text fg={t.text}>{gitPanel.branch}</text>
-              </box>
-            ) : null}
-            {gitMode.headOffset > 0 ? (
-              <box flexDirection="row" gap={1}>
-                <text fg={t.warning}>
-                  <strong>HEAD~{gitMode.headOffset}</strong>
-                </text>
-                <text fg={t.textMuted}>[ newer · ] older</text>
-              </box>
-            ) : null}
-            {baseLabel != null ? (
-              <box flexDirection="row" gap={1}>
-                <text fg={t.primary}>
-                  <strong>{baseLabel}</strong>
-                </text>
-                <text fg={t.textMuted}>b: back</text>
-              </box>
-            ) : null}
-            <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
-          </box>
+          <GitPaneHeader
+            baseLabel={baseLabel}
+            gitPanel={gitPanel}
+            headOffset={gitMode.headOffset}
+            projectPath={projectPath}
+          />
           <GitPanel
             baseLabel={baseLabel}
             collapsedFolders={gitMode.collapsedFolders}
@@ -324,6 +303,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             headOffset={gitMode.headOffset}
             projectPath={projectPath}
             selectedEntryKey={gitMode.selectedEntryKey}
+            showFileListToggle={false}
+            showRemoteTracking={false}
           />
         </box>
         <box flexDirection="column" flexGrow={1} overflow="hidden">
