@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { connect, type Socket } from 'node:net'
 
 import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
-import type { SessionBackend, SessionBackendEvents } from './types'
+import type { ResizeOptions, SessionBackend, SessionBackendEvents } from './types'
 
 import { getIpcDaemonSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
@@ -414,7 +414,7 @@ export class RemoteSessionBackend
     )
   }
 
-  resizeAll(cols: number, rows: number, _options?: { sync?: boolean }): void {
+  resizeAll(cols: number, rows: number, _options?: ResizeOptions): void {
     if (!this.attached) {
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
@@ -426,7 +426,14 @@ export class RemoteSessionBackend
     )
   }
 
-  resizeTab(tabId: string, cols: number, rows: number, _options?: { sync?: boolean }): void {
+  // The remote backend forwards every resize over IPC; the daemon-side
+  // pty-manager is the authoritative emulator. `confirmedFromMeasurement` is
+  // not yet plumbed through the wire protocol — the local backend uses it to
+  // gate the per-tab render emission, but in the remote path the daemon emits
+  // snapshots based on its own emulator state, so the flag is intentionally
+  // ignored here. If the boot-time visual desync ever shows up against a
+  // daemon, plumb the flag through the resizeTab IPC message.
+  resizeTab(tabId: string, cols: number, rows: number, _options?: ResizeOptions): void {
     if (!this.attached) {
       return
     }

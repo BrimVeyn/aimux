@@ -44,21 +44,26 @@ function resizeSplitTabs(
   tabIds: string[],
   cols: number,
   rows: number,
-  options?: { sync?: boolean }
+  options?: { sync?: boolean },
+  skipTabId?: string | null
 ): void {
   const bounds = getTerminalBounds(cols, rows)
   const resizedTabIds = new Set<string>()
 
   forEachSplitPaneRect(Object.values(layoutTrees), bounds, (tabId, rect) => {
+    if (skipTabId != null && tabId === skipTabId) {
+      resizedTabIds.add(tabId)
+      return
+    }
     const size = toTerminalContentSize(rect)
     backend.resizeTab(tabId, size.cols, size.rows, options)
     resizedTabIds.add(tabId)
   })
 
   for (const id of tabIds) {
-    if (!resizedTabIds.has(id)) {
-      backend.resizeTab(id, cols, rows, options)
-    }
+    if (resizedTabIds.has(id)) continue
+    if (skipTabId != null && id === skipTabId) continue
+    backend.resizeTab(id, cols, rows, options)
   }
 }
 
@@ -81,6 +86,12 @@ interface RunResizeCascadeArgs {
   layoutTrees: AppState['layoutTrees']
   stableTabIds: string[]
   sync: boolean
+  /** Tab whose backend resize is owned exclusively by `usePaneSizeReport`. The
+   *  cascade still dispatches the global terminal-size update and resizes every
+   *  other tab, but the active pane is left to be sized by its measurement —
+   *  preventing the open-loop chrome estimate from competing with the closed
+   *  measurement loop and tearing the rendered viewport. */
+  skipTabId: string | null
 }
 
 function runResizeCascade({
@@ -91,6 +102,7 @@ function runResizeCascade({
   resizingRef,
   resizingTimerRef,
   rows,
+  skipTabId,
   stableTabIds,
   sync,
 }: RunResizeCascadeArgs): void {
@@ -104,9 +116,14 @@ function runResizeCascade({
       clearTimeout(resizingTimerRef.current)
     }
     if (hasSplits) {
-      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, options)
-    } else {
+      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, options, skipTabId)
+    } else if (skipTabId == null) {
       backend.resizeAll(cols, rows, options)
+    } else {
+      for (const id of stableTabIds) {
+        if (id === skipTabId) continue
+        backend.resizeTab(id, cols, rows, options)
+      }
     }
     resizingTimerRef.current = setTimeout(() => {
       resizingRef.current = false
@@ -162,11 +179,16 @@ export function useTerminalResize({
         contentOriginRef.current = { cols, rows, x: rect.x, y: rect.y }
       }
       const prev = measuredRef.current.get(tabId)
-      if (prev && prev.cols === cols && prev.rows === rows) {
+      if (prev !== undefined && prev.cols === cols && prev.rows === rows) {
         return
       }
+      // First measurement for this tab: even if it happens to match the
+      // open-loop bootstrap size, we still call resizeTab so the backend
+      // gate (snapshot suppression until measurement confirms the pane
+      // size) is lifted. confirmedFromMeasurement marks this call as the
+      // authoritative size for the rendered viewport.
       measuredRef.current.set(tabId, { cols, rows })
-      backend.resizeTab(tabId, cols, rows)
+      backend.resizeTab(tabId, cols, rows, { confirmedFromMeasurement: true })
     },
     [backend, contentOriginRef]
   )
@@ -222,6 +244,7 @@ export function useTerminalResize({
       resizingRef,
       resizingTimerRef,
       rows: terminalSize.rows,
+      skipTabId: activeTabIdRef.current ?? null,
       stableTabIds,
       sync: true,
     })
@@ -249,6 +272,7 @@ export function useTerminalResize({
       resizingRef,
       resizingTimerRef,
       rows: terminalSize.rows,
+      skipTabId: activeTabIdRef.current ?? null,
       stableTabIds,
       sync: false,
     })
