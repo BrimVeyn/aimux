@@ -7,8 +7,14 @@ import { getSessionProjectPath } from '../state/session-worktrees'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
+export interface IdentitySegment {
+  id: string
+  text: string
+  tone: 'primary' | 'muted'
+}
+
 export interface StatusBarModel {
-  left: string
+  identity: IdentitySegment[]
   right: string
   help: string
 }
@@ -16,6 +22,7 @@ export interface StatusBarModel {
 const MAX_TAB_LABEL_LENGTH = 24
 const HINT_LIMIT = 6
 const HELP_DESCRIPTION = 'Help'
+const SEP = '  ·  '
 
 function truncateLabel(label: string): string {
   if (label.length <= MAX_TAB_LABEL_LENGTH) {
@@ -25,12 +32,23 @@ function truncateLabel(label: string): string {
   return `${label.slice(0, MAX_TAB_LABEL_LENGTH - 3)}...`
 }
 
-function getActiveTabLabel(tab?: TabSession): string {
-  if (!tab) {
-    return 'no tab'
+function sessionSegments(
+  sessionName: string,
+  sessionPath: string | null | undefined
+): IdentitySegment[] {
+  const segs: IdentitySegment[] = [{ id: 'session', text: sessionName, tone: 'primary' }]
+  if (sessionPath != null && sessionPath !== '') {
+    segs.push({ id: 'sep-session-path', text: SEP, tone: 'muted' })
+    segs.push({ id: 'path', text: abbreviatePath(sessionPath), tone: 'muted' })
   }
+  return segs
+}
 
-  return `${truncateLabel(tab.title)} (${tab.status})`
+function tabSegments(tab?: TabSession): IdentitySegment[] {
+  if (!tab) {
+    return [{ id: 'tab-empty', text: 'no tab', tone: 'muted' }]
+  }
+  return [{ id: 'tab-title', text: truncateLabel(tab.title), tone: 'primary' }]
 }
 
 const STAGING_DESCRIPTIONS = ['Stage', 'Unstage/delete', 'Commit', 'Push']
@@ -65,36 +83,43 @@ export function getStatusBarModel(
       : undefined
   const sessionName = currentSession?.name ?? 'no workspace'
   const sessionPath = getSessionProjectPath(currentSession)
-  const sessionLabel =
-    sessionPath != null && sessionPath !== ''
-      ? `${sessionName} (${abbreviatePath(sessionPath)})`
-      : sessionName
+  const sessionSegs = sessionSegments(sessionName, sessionPath)
 
-  // \u{f0b1} = nf-fa-briefcase (session icon)
-  const sessionIcon = '\u{f0b1}'
+  const withTab: IdentitySegment[] = [
+    ...sessionSegs,
+    { id: 'sep-session-tab', text: SEP, tone: 'muted' },
+    ...tabSegments(activeTab),
+  ]
 
   switch (state.focusMode) {
     case 'terminal-input':
       return {
         help: '',
-        left: `${getActiveTabLabel(activeTab)}  ${sessionIcon}  ${sessionLabel}`,
+        identity: withTab,
         right: hintForMode(config, 'terminal-input'),
       }
     case 'modal': {
       const modalMode = deriveModalModeId(state.modal.type)
       return {
         help: '',
-        left: `${sessionIcon}  ${sessionLabel}`,
+        identity: sessionSegs,
         right: modalMode ? hintForMode(config, modalMode) : '',
       }
     }
     case 'git': {
       const headOffset = state.gitMode.headOffset
-      const offsetTag = headOffset > 0 ? `  HEAD~${headOffset}` : ''
-      const reviewTag = state.gitMode.reviewBase ? '  vs base' : ''
+      const extras: IdentitySegment[] = []
+      if (headOffset > 0) {
+        extras.push({ id: 'sep-head-offset', text: SEP, tone: 'muted' })
+        extras.push({ id: 'head-offset', text: `HEAD~${headOffset}`, tone: 'muted' })
+      }
+      if (state.gitMode.reviewBase) {
+        extras.push({ id: 'sep-review-base', text: SEP, tone: 'muted' })
+        extras.push({ id: 'review-base', text: 'vs base', tone: 'muted' })
+      }
       return {
         help: helpHintForMode(config, 'git-mode'),
-        left: `${sessionIcon}  ${sessionLabel}${offsetTag}${reviewTag}`,
+        identity: [...sessionSegs, ...extras],
         right: hintForGitMode(config, headOffset),
       }
     }
@@ -102,7 +127,7 @@ export function getStatusBarModel(
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {
         help: '',
-        left: `${sessionIcon}  ${sessionLabel}`,
+        identity: sessionSegs,
         right: commandEditMode ? hintForMode(config, commandEditMode) : '',
       }
     }
@@ -110,7 +135,7 @@ export function getStatusBarModel(
     default:
       return {
         help: helpHintForMode(config, 'navigation'),
-        left: `${sessionIcon}  ${sessionLabel}  ${getActiveTabLabel(activeTab)}`,
+        identity: withTab,
         right: hintForMode(config, 'navigation'),
       }
   }

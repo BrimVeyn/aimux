@@ -2,9 +2,13 @@ import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { describe, expect, test } from 'bun:test'
 
 import { createInitialState } from '../../src/state/store'
-import { getStatusBarModel } from '../../src/ui/status-bar-model'
+import { getStatusBarModel, type StatusBarModel } from '../../src/ui/status-bar-model'
 
 const CONFIG = getDefaultKeymapConfig()
+
+function identityText(model: StatusBarModel): string {
+  return model.identity.map((seg) => seg.text).join('')
+}
 
 function createTab(title: string) {
   return {
@@ -29,8 +33,8 @@ describe('getStatusBarModel', () => {
     const state = createInitialState()
     const model = getStatusBarModel(state, undefined, CONFIG)
 
-    expect(model.left).toContain('no workspace')
-    expect(model.left).toContain('no tab')
+    expect(identityText(model)).toContain('no workspace')
+    expect(identityText(model)).toContain('no tab')
     // Hints derive from default keymap descriptions.
     expect(model.right).toContain('Quit')
     expect(model.right).toContain('New tab')
@@ -44,8 +48,8 @@ describe('getStatusBarModel', () => {
       CONFIG
     )
 
-    expect(model.left).toContain('...')
-    expect(model.left.length).toBeLessThan(100)
+    expect(identityText(model)).toContain('...')
+    expect(identityText(model).length).toBeLessThan(100)
   })
 
   test('shows focused terminal hints for active tab', () => {
@@ -55,7 +59,7 @@ describe('getStatusBarModel', () => {
     }
     const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
 
-    expect(model.left).toContain('Claude')
+    expect(identityText(model)).toContain('Claude')
     expect(model.right).toContain('Leave insert')
   })
 
@@ -73,7 +77,7 @@ describe('getStatusBarModel', () => {
     }
     const model = getStatusBarModel(state, undefined, CONFIG)
 
-    expect(model.left).toContain('no workspace')
+    expect(identityText(model)).toContain('no workspace')
     expect(model.right).toContain('Open')
   })
 
@@ -92,7 +96,7 @@ describe('getStatusBarModel', () => {
     }
 
     const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
-    expect(model.left).toContain('Main Session')
+    expect(identityText(model)).toContain('Main Session')
   })
 
   test('shows git-mode hints when in git focus', () => {
