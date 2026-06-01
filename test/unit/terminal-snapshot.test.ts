@@ -15,7 +15,10 @@ describe('snapshotTerminal', () => {
     const firstLine = snapshot.lines[0]
 
     expect(firstLine?.spans[0]?.text.trim()).toBe('red')
-    expect(firstLine?.spans[0]?.fg).toBe('#cd0000')
+    // Palette indices are no longer pre-converted to hex; the renderer
+    // resolves them against the host terminal's queried OSC 4 palette.
+    expect(firstLine?.spans[0]?.fgPalette).toBe(1)
+    expect(firstLine?.spans[0]?.fg).toBeUndefined()
     expect(snapshot.viewportY).toBe(0)
     expect(snapshot.baseY).toBe(0)
     expect(snapshot.cursorVisible).toBe(true)

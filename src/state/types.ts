@@ -50,8 +50,16 @@ export type ModalType =
 
 export interface TerminalSpan {
   text: string
+  /** Hex color for RGB cells, or undefined for the "default" foreground. */
   fg?: string
+  /** Hex color for RGB cells, or undefined for the "default" background. */
   bg?: string
+  /** ANSI palette index (0-255) when the cell emitted an indexed color.
+   *  Resolved client-side against the host terminal's queried palette so
+   *  user themes (Ghostty, iTerm2, …) show through. Wins over `fg` if set. */
+  fgPalette?: number
+  /** ANSI palette index (0-255). Resolved client-side. Wins over `bg`. */
+  bgPalette?: number
   bold?: boolean
   italic?: boolean
   underline?: boolean

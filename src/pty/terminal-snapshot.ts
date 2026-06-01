@@ -6,66 +6,30 @@ import { getCurrentTheme } from '../ui/theme'
 
 const SNAPSHOT_TAIL_LINE_COUNT = 10
 
-const ANSI_PALETTE = [
-  '#000000',
-  '#cd0000',
-  '#00cd00',
-  '#cdcd00',
-  '#0000ee',
-  '#cd00cd',
-  '#00cdcd',
-  '#e5e5e5',
-  '#7f7f7f',
-  '#ff0000',
-  '#00ff00',
-  '#ffff00',
-  '#5c5cff',
-  '#ff00ff',
-  '#00ffff',
-  '#ffffff',
-]
+// CellColor preserves whether the cell emitted an indexed (ANSI 0-255) color
+// or an RGB color, so the renderer process can resolve indices against the
+// host terminal's actual palette (queried via OSC 4 at startup). Converting
+// indices to RGB here would lock in xterm defaults and silently override the
+// user's terminal theme — that's the very bug we're fixing.
+type CellColor = { kind: 'rgb'; hex: string } | { kind: 'palette'; index: number } | undefined
 
 function toHex(value: number): string {
   return `#${value.toString(16).padStart(6, '0')}`
 }
 
-function paletteToHex(index: number): string {
-  if (index < ANSI_PALETTE.length) {
-    return ANSI_PALETTE[index] ?? ANSI_PALETTE[0] ?? '#000000'
-  }
-
-  if (index >= 232) {
-    const shade = 8 + (index - 232) * 10
-    return toHex((shade << 16) | (shade << 8) | shade)
-  }
-
-  const normalized = index - 16
-  const r = Math.floor(normalized / 36)
-  const g = Math.floor((normalized % 36) / 6)
-  const b = normalized % 6
-  const channel = [0, 95, 135, 175, 215, 255]
-
-  return toHex(((channel[r] ?? 0) << 16) | ((channel[g] ?? 0) << 8) | (channel[b] ?? 0))
+function readCellColor(value: number, isRgb: boolean, isPalette: boolean): CellColor {
+  if (isRgb) return { hex: toHex(value), kind: 'rgb' }
+  if (isPalette) return { index: value, kind: 'palette' }
+  return undefined
 }
 
-function getColorHex(color: number, mode: 'rgb' | 'palette' | 'default'): string | undefined {
-  if (mode === 'default') {
-    return undefined
+function applySpanColor(span: TerminalSpan, color: CellColor, side: 'fg' | 'bg'): void {
+  if (!color) return
+  if (color.kind === 'rgb') {
+    span[side] = color.hex
+  } else {
+    span[side === 'fg' ? 'fgPalette' : 'bgPalette'] = color.index
   }
-
-  return mode === 'rgb' ? toHex(color) : paletteToHex(color)
-}
-
-function getColorMode(isRgb: boolean, isPalette: boolean): 'rgb' | 'palette' | 'default' {
-  if (isRgb) {
-    return 'rgb'
-  }
-
-  if (isPalette) {
-    return 'palette'
-  }
-
-  return 'default'
 }
 
 function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
@@ -74,6 +38,8 @@ function pushSpan(spans: TerminalSpan[], span: TerminalSpan): void {
     previous &&
     previous.fg === span.fg &&
     previous.bg === span.bg &&
+    previous.fgPalette === span.fgPalette &&
+    previous.bgPalette === span.bgPalette &&
     previous.bold === span.bold &&
     previous.italic === span.italic &&
     previous.underline === span.underline &&
@@ -109,36 +75,45 @@ function buildLine(
     }
 
     const text = current.getChars() || ' '
-    const fgMode = getColorMode(current.isFgRGB(), current.isFgPalette())
-    const bgMode = getColorMode(current.isBgRGB(), current.isBgPalette())
 
-    let fg = getColorHex(current.getFgColor(), fgMode)
-    let bg = getColorHex(current.getBgColor(), bgMode)
+    let fg: CellColor = readCellColor(
+      current.getFgColor(),
+      current.isFgRGB(),
+      current.isFgPalette()
+    )
+    let bg: CellColor = readCellColor(
+      current.getBgColor(),
+      current.isBgRGB(),
+      current.isBgPalette()
+    )
 
     if (current.isInverse()) {
       const tokens = getCurrentTheme()
-      const resolvedFg = fg ?? tokens.text
-      const resolvedBg = bg ?? tokens.background
-      ;[fg, bg] = [resolvedBg, resolvedFg]
+      const resolvedFg: CellColor = fg ?? { hex: tokens.text, kind: 'rgb' }
+      const resolvedBg: CellColor = bg ?? { hex: tokens.background, kind: 'rgb' }
+      fg = resolvedBg
+      bg = resolvedFg
     }
 
     const isCursorCell = cursorVisible && cursorColumn === column
     if (isCursorCell) {
       const tokens = getCurrentTheme()
-      const resolvedFg = fg ?? tokens.text
-      const resolvedBg = bg ?? tokens.background
-      ;[fg, bg] = [resolvedBg, resolvedFg]
+      const resolvedFg: CellColor = fg ?? { hex: tokens.text, kind: 'rgb' }
+      const resolvedBg: CellColor = bg ?? { hex: tokens.background, kind: 'rgb' }
+      fg = resolvedBg
+      bg = resolvedFg
     }
 
-    pushSpan(spans, {
-      bg,
+    const span: TerminalSpan = {
       bold: current.isBold() ? true : undefined,
       cursor: isCursorCell ? true : undefined,
-      fg,
       italic: current.isItalic() ? true : undefined,
       text,
       underline: current.isUnderline() ? true : undefined,
-    })
+    }
+    applySpanColor(span, fg, 'fg')
+    applySpanColor(span, bg, 'bg')
+    pushSpan(spans, span)
 
     visualColumns += current.getWidth()
   }
@@ -238,6 +213,8 @@ function areSpansEqual(left: TerminalSpan, right: TerminalSpan): boolean {
     left.text === right.text &&
     left.fg === right.fg &&
     left.bg === right.bg &&
+    left.fgPalette === right.fgPalette &&
+    left.bgPalette === right.bgPalette &&
     left.bold === right.bold &&
     left.italic === right.italic &&
     left.underline === right.underline &&
