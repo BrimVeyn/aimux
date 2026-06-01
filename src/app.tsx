@@ -193,11 +193,14 @@ export function App({
   }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
 
   useEffect(() => {
-    // Idempotent: patches ~/.claude/settings.json so Claude Code's hooks call
-    // back into the daemon for per-tab activity detection. Silent on failure;
-    // the visual PTY detector is the fallback.
-    ensureClaudeSettingsHooks()
-  }, [])
+    // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,
+    // idempotently patches ~/.claude/settings.json so Claude Code's hooks
+    // call back into the daemon for per-tab activity detection. Silent on
+    // failure; the visual PTY detector is the fallback either way.
+    if (resolvedConfig.integrations.claudeHooks) {
+      ensureClaudeSettingsHooks()
+    }
+  }, [resolvedConfig.integrations.claudeHooks])
 
   useEffect(() => {
     const aiUsage = resolvedConfig.statusBar?.aiUsage

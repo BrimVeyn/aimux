@@ -5,16 +5,38 @@ description: How aimux drives per-tab activity state from Claude Code's lifecycl
 
 # Claude Code Integration
 
-When the active assistant in a tab is Claude Code, aimux drives the tab's
+When the active assistant in a tab is Claude Code, aimux can drive the tab's
 activity indicator (`working` / `waiting-input` / `idle`) from Claude's own
-lifecycle hooks, not from scraping the terminal. Hooks fire deterministically
+lifecycle hooks, instead of scraping the terminal. Hooks fire deterministically
 on prompt submit, tool calls, completion, and notifications, which avoids the
 false-`idle` flicker the visual classifier produces when an overlay (e.g.
 **Ctrl+T** todo list) blanks the viewport.
 
-A small visual classifier still runs as a fallback — it owns the
-`waiting-input` verdict (permission prompts, `tab to amend`, yes/no dialogs)
-even when a Claude hook says `working`.
+The integration is **opt-in** and **off by default**: aimux will not touch
+your `~/.claude/settings.json` until you enable it. A small visual classifier
+keeps running as a fallback either way — it owns the `waiting-input` verdict
+(permission prompts, `tab to amend`, yes/no dialogs) even when a Claude hook
+says `working`.
+
+## Enabling It
+
+In your `aimux.config.ts`:
+
+```ts
+import { defineConfig } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  integrations: {
+    claudeHooks: true,
+  },
+})
+```
+
+On the next aimux launch the installer runs once, patches
+`~/.claude/settings.json`, and the daemon starts publishing its hook URL.
+Setting the flag back to `false` (or removing the key) stops aimux from
+_re-installing_ on subsequent launches — but already-installed entries stay
+until you remove them manually (see [Opting Out](#opting-out)).
 
 ## What aimux Installs
 
@@ -125,14 +147,13 @@ over.
 
 ## Opting Out
 
-aimux installs hooks unconditionally on every launch. To opt out:
-
-1. Stop aimux.
+1. In `aimux.config.ts`, set `integrations.claudeHooks` to `false` (or
+   remove the key). aimux will stop _re-installing_ on subsequent launches.
 2. Open `~/.claude/settings.json` and delete the entries carrying
    `"__aimux": true`. Other entries you may have added stay untouched.
-3. _Do not relaunch aimux_ — it will reinstall them on next mount.
 
-A configurable opt-out flag is a planned follow-up.
+The flag gates _the installer_, not the hook server itself: removing the
+entries in `settings.json` is what actually silences the callbacks.
 
 ## Verifying the Integration
 

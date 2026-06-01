@@ -39,6 +39,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     externalEditor: userConfig.externalEditor ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
+    integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
     sessionBar: resolveSessionBar(userConfig.sessionBar),
@@ -47,6 +48,14 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
+  }
+}
+
+function resolveIntegrations(
+  userConfig: AimuxUserConfig['integrations']
+): ResolvedConfig['integrations'] {
+  return {
+    claudeHooks: userConfig?.claudeHooks === true,
   }
 }
 
