@@ -1,3 +1,4 @@
+import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
 import type { AssistantId, TerminalSnapshot } from '../state/types'
@@ -20,6 +21,7 @@ import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
+  getClaudeHookUrlFilePath,
   getIpcDaemonSocketPath,
   getSocketSecurityIssue,
   getTerminalManagerSocketPath,
@@ -284,10 +286,12 @@ export async function runDaemon(): Promise<void> {
   })
 
   // Local HTTP server that receives Claude Code hook callbacks for every PTY
-  // spawned by this daemon. The URL is injected per-tab as AIMUX_HOOK_URL so
-  // the shipped hook script knows where to POST; failure to start is
-  // non-fatal — detection falls back to the visual PTY scanner.
+  // spawned by this daemon. We publish its URL to a stable file path that the
+  // shipped shell bridge reads on every invocation, so PTYs spawned by a
+  // *previous* daemon transparently follow URL changes after a restart.
+  // Failure to start is non-fatal — detection falls back to the visual PTY scanner.
   let hookServer: ClaudeHookServer | null = null
+  const hookUrlFilePath = getClaudeHookUrlFilePath()
   try {
     hookServer = startClaudeHookServer({
       onEvent: (event) => {
@@ -299,7 +303,15 @@ export async function runDaemon(): Promise<void> {
         })
       },
     })
-    logDebug('daemon.hookServer.started', { url: hookServer.url })
+    try {
+      writeFileSync(hookUrlFilePath, hookServer.url, { mode: 0o600 })
+      logDebug('daemon.hookServer.started', { path: hookUrlFilePath, url: hookServer.url })
+    } catch (error) {
+      logDebug('daemon.hookServer.urlFileWriteFailed', {
+        error: error instanceof Error ? error.message : String(error),
+        path: hookUrlFilePath,
+      })
+    }
   } catch (error) {
     logDebug('daemon.hookServer.startFailed', {
       error: error instanceof Error ? error.message : String(error),
@@ -481,8 +493,11 @@ export async function runDaemon(): Promise<void> {
                   // Inject the hook bridge env so Claude Code's hooks can
                   // call back into our status loop. Safe to add for every
                   // assistant: non-Claude binaries simply ignore the vars.
+                  // We pass the URL *file path*, not the URL itself, so the
+                  // bridge can pick up a fresh URL after a daemon restart
+                  // even on PTYs that outlive this daemon process.
                   const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
-                  if (hookServer) env.AIMUX_HOOK_URL = hookServer.url
+                  if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
                   await manager.createTab({ ...message.payload, env, sessionId })
                   sendOk(socket, message.id)
                   logDebug('daemon.request.createTab.success', {
@@ -608,6 +623,13 @@ export async function runDaemon(): Promise<void> {
     statusLoop.stop()
     if (hookServer) {
       void hookServer.stop()
+      try {
+        if (existsSync(hookUrlFilePath)) unlinkSync(hookUrlFilePath)
+      } catch (error) {
+        logDebug('daemon.hookServer.urlFileCleanupFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
     }
     manager.destroy()
     server.close()

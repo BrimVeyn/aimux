@@ -4,10 +4,26 @@
 # via env, and POSTs the merged JSON to the aimux daemon's local HTTP hook
 # server. Never blocks Claude: short timeout, all errors suppressed,
 # always exits 0.
+#
+# The hook URL is read from AIMUX_HOOK_URL_FILE on every invocation so that
+# PTYs spawned by a previous daemon transparently follow URL changes after a
+# daemon restart. AIMUX_HOOK_URL is honored as a legacy fallback.
 
 set -u
 
-[ -z "${AIMUX_HOOK_URL:-}" ] && exit 0
+resolve_url() {
+  if [ -n "${AIMUX_HOOK_URL_FILE:-}" ] && [ -r "${AIMUX_HOOK_URL_FILE}" ]; then
+    url=$(cat "${AIMUX_HOOK_URL_FILE}" 2>/dev/null) || url=""
+    if [ -n "$url" ]; then
+      printf '%s' "$url"
+      return
+    fi
+  fi
+  printf '%s' "${AIMUX_HOOK_URL:-}"
+}
+
+URL=$(resolve_url)
+[ -z "$URL" ] && exit 0
 
 payload=$(cat) || exit 0
 
@@ -33,6 +49,6 @@ fi
 curl -fsS -m 2 -X POST \
   -H 'Content-Type: application/json' \
   --data-raw "$body" \
-  "$AIMUX_HOOK_URL" >/dev/null 2>&1 || true
+  "$URL" >/dev/null 2>&1 || true
 
 exit 0
