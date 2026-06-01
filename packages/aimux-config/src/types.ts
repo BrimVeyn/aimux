@@ -964,8 +964,21 @@ export interface AIUsageToolConfig {
   tools?: AIUsageTool[]
 }
 
+export type StatusBarSeparator = 'arrow' | 'round' | 'slant' | 'flame' | 'none'
+
 export interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
+  /**
+   * Powerline-style glyph used between status bar sections.
+   * - `arrow` (default): solid triangles (    / )
+   * - `round`: solid semicircles (    / )
+   * - `slant`: solid slopes (    / )
+   * - `flame`: solid flame ribbons (    / )
+   * - `none`: no glyph, sections snap via background colour only
+   *
+   * All non-`none` options require a nerd-font / powerline-capable font.
+   */
+  separator?: StatusBarSeparator
 }
 
 export interface ExternalEditorConfig {

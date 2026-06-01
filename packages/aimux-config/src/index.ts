@@ -29,6 +29,7 @@ export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
+export { getStatusBarSeparator, setStatusBarSeparator } from './status-bar-runtime'
 export {
   DEFAULT_EDITOR_ARGS,
   getExternalEditorConfig,
@@ -84,5 +85,6 @@ export type {
   SnippetVar,
   SplitDirection,
   StatusBarConfig,
+  StatusBarSeparator,
   TabSession,
 } from './types'

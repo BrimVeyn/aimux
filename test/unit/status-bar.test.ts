@@ -7,59 +7,27 @@ import { getStatusBarModel, type StatusBarModel } from '../../src/ui/status-bar-
 const CONFIG = getDefaultKeymapConfig()
 
 function identityText(model: StatusBarModel): string {
-  return model.identity.map((seg) => seg.text).join('')
-}
-
-function createTab(title: string) {
-  return {
-    assistant: 'claude' as const,
-    buffer: '',
-    command: 'claude',
-    id: 'tab-1',
-    status: 'running' as const,
-    terminalModes: {
-      alternateScrollMode: false,
-      bracketedPasteMode: false,
-      isAlternateBuffer: false,
-      mouseTrackingMode: 'none' as const,
-      sendFocusMode: false,
-    },
-    title,
-  }
+  return model.sessionSegments.map((seg) => seg.text).join('')
 }
 
 describe('getStatusBarModel', () => {
   test('shows navigation hints when browsing tabs', () => {
     const state = createInitialState()
-    const model = getStatusBarModel(state, undefined, CONFIG)
+    const model = getStatusBarModel(state, CONFIG)
 
     expect(identityText(model)).toContain('no workspace')
-    expect(identityText(model)).toContain('no tab')
     // Hints derive from default keymap descriptions.
     expect(model.right).toContain('Quit')
     expect(model.right).toContain('New tab')
   })
 
-  test('truncates long active tab labels in footer model', () => {
-    const state = createInitialState()
-    const model = getStatusBarModel(
-      state,
-      createTab('Claude session with a very long descriptive title'),
-      CONFIG
-    )
-
-    expect(identityText(model)).toContain('...')
-    expect(identityText(model).length).toBeLessThan(100)
-  })
-
-  test('shows focused terminal hints for active tab', () => {
+  test('shows focused terminal hints in terminal-input mode', () => {
     const state = {
       ...createInitialState(),
       focusMode: 'terminal-input' as const,
     }
-    const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
+    const model = getStatusBarModel(state, CONFIG)
 
-    expect(identityText(model)).toContain('Claude')
     expect(model.right).toContain('Leave insert')
   })
 
@@ -75,7 +43,7 @@ describe('getStatusBarModel', () => {
         type: 'session-picker' as const,
       },
     }
-    const model = getStatusBarModel(state, undefined, CONFIG)
+    const model = getStatusBarModel(state, CONFIG)
 
     expect(identityText(model)).toContain('no workspace')
     expect(model.right).toContain('Open')
@@ -95,7 +63,7 @@ describe('getStatusBarModel', () => {
       currentSessionId: 'session-1',
     }
 
-    const model = getStatusBarModel(state, createTab('Claude'), CONFIG)
+    const model = getStatusBarModel(state, CONFIG)
     expect(identityText(model)).toContain('Main Session')
   })
 
@@ -104,7 +72,7 @@ describe('getStatusBarModel', () => {
       ...createInitialState(),
       focusMode: 'git' as const,
     }
-    const model = getStatusBarModel(state, undefined, CONFIG)
+    const model = getStatusBarModel(state, CONFIG)
 
     expect(model.right).toContain('Stage')
   })
