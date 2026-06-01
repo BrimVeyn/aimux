@@ -17,8 +17,14 @@ import {
 // `intent`/`intents` from resize messages and the `reapplyScrollIntent`
 // message. Min is raised in lockstep so a pre-v5 peer (which could still send
 // the dropped message) can't negotiate a now-incompatible version.
-export const MANAGER_PROTOCOL_MIN_VERSION = 5
-export const MANAGER_PROTOCOL_VERSION = 5
+//
+// v6: `createTab` carries an optional `env` payload that the TM merges into
+// the spawned PTY. Daemon uses it to inject `AIMUX_HOOK_URL_FILE` /
+// `AIMUX_PANE_ID` for the Claude Code hook bridge. A pre-v6 TM silently
+// drops the field, so Min is raised in lockstep to force a fresh TM that
+// will actually forward env to the spawn.
+export const MANAGER_PROTOCOL_MIN_VERSION = 6
+export const MANAGER_PROTOCOL_VERSION = 6
 /**
  * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
  * not understand the message; the daemon must check the negotiated version
