@@ -1004,6 +1004,20 @@ export interface ExternalEditorConfig {
   terminal?: string[]
 }
 
+export interface AimuxIntegrationsConfig {
+  /**
+   * Opt-in: install Claude Code lifecycle hooks into `~/.claude/settings.json`
+   * so per-tab activity (working / waiting-input / idle) is driven by Claude's
+   * own events rather than visual scraping of the terminal. Off by default.
+   *
+   * When enabled, aimux writes six entries marked `__aimux: true` into the
+   * user's settings file at startup, and the daemon publishes a hook URL on
+   * `127.0.0.1` for Claude to call back into. Unrelated hooks the user has
+   * configured are preserved. See `docs/guide/claude-integration.md`.
+   */
+  claudeHooks?: boolean
+}
+
 export interface AimuxUserConfig {
   theme?: AimuxThemeConfig
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
@@ -1023,6 +1037,7 @@ export interface AimuxUserConfig {
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
   externalEditor?: ExternalEditorConfig
+  integrations?: AimuxIntegrationsConfig
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -1096,4 +1111,7 @@ export interface ResolvedConfig {
   multiRepo: MultiRepoConfig
   statusBar: StatusBarConfig
   externalEditor: ExternalEditorConfig
+  integrations: {
+    claudeHooks: boolean
+  }
 }

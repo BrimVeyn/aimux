@@ -76,6 +76,18 @@ Examples for the default profile when `XDG_RUNTIME_DIR=/run/user/1000`:
 /run/user/1000/aimux-default/terminal-manager.sock
 ```
 
+## Claude Hook URL File
+
+When the daemon starts its [Claude Code hook server](../guide/claude-integration.md),
+it writes the live URL to a stable file inside the runtime directory:
+
+| Path              | Purpose                                                         |
+| ----------------- | --------------------------------------------------------------- |
+| `claude-hook.url` | Current HTTP URL of the daemon's Claude hook server (mode 0600) |
+
+The shipped hook bridge reads this file on every invocation, so PTYs that
+outlive a daemon restart automatically reach the new daemon's port.
+
 Example for a sanitized profile name `Dev Sandbox`:
 
 ```text

@@ -38,6 +38,15 @@ export function getTerminalManagerSocketPath(): string {
   return join(ensureRuntimeDir(), 'terminal-manager.sock')
 }
 
+/**
+ * File the daemon writes its current Claude hook server URL into. Stable path
+ * per profile, so PTYs spawned by a previous daemon can still resolve the
+ * URL of a freshly-restarted daemon by reading this file on every invocation.
+ */
+export function getClaudeHookUrlFilePath(): string {
+  return join(ensureRuntimeDir(), 'claude-hook.url')
+}
+
 export function ensureParentDir(filePath: string): void {
   mkdirSync(dirname(filePath), { recursive: true })
 }

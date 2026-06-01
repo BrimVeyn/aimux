@@ -17,6 +17,7 @@ import type { AssistantId, SessionStatus, TabActivity, TerminalSnapshot } from '
 
 import { logDebug } from '../debug/input-log'
 import { getLineText } from '../input/terminal-text-extraction'
+import { AssistantStatusArbiter, type RecordHookEventInput } from './assistant-status-arbiter'
 import { AssistantStatusDetector } from './assistant-status-detector'
 
 function tailPreview(viewport: TerminalSnapshot | undefined): string {
@@ -67,6 +68,12 @@ export interface StatusDetectionLoopHandle {
    * rather than relying on the next scheduled tick.
    */
   classifyNow: (sessionId: string, tabs: LoopTabView[]) => void
+  /**
+   * Feed a Claude Code hook event into the arbiter. The next tick will
+   * combine it with the visual detector's verdict. Called by the daemon's
+   * hook HTTP server.
+   */
+  recordHookEvent: (input: RecordHookEventInput) => void
 }
 
 export function runStatusDetectionLoop(
@@ -74,6 +81,7 @@ export function runStatusDetectionLoop(
 ): StatusDetectionLoopHandle {
   const tickMs = options.tickMs ?? DEFAULT_TICK_MS
   const detector = new AssistantStatusDetector()
+  const arbiter = new AssistantStatusArbiter()
   const lastTabStatus = new Map<string, { status: TabActivity; sessionId: string }>()
   const lastSessionStatus = new Map<string, SessionStatus>()
 
@@ -99,13 +107,14 @@ export function runStatusDetectionLoop(
     let waiting = false
     for (const tab of tabs) {
       seenTabs?.add(tab.id)
-      const status = detector.classify({
+      const visual = detector.classify({
         assistant: tab.assistant,
         command: tab.command,
         now,
         tabId: tab.id,
         viewport: tab.viewport,
       })
+      const status = arbiter.arbitrate(tab.id, visual, now)
       if (status === 'working') working = true
       if (status === 'waiting-input') waiting = true
       const prev = lastTabStatus.get(tab.id)
@@ -158,6 +167,7 @@ export function runStatusDetectionLoop(
     for (const tabId of lastTabStatus.keys()) {
       if (!seenTabs.has(tabId)) {
         detector.forget(tabId)
+        arbiter.forget(tabId)
         lastTabStatus.delete(tabId)
       }
     }
@@ -174,6 +184,14 @@ export function runStatusDetectionLoop(
     },
     getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
+    recordHookEvent: (input) => {
+      const mapped = arbiter.recordHookEvent(input)
+      logDebug('statusLoop.recordHookEvent', {
+        hookEventName: input.hookEventName,
+        mapped,
+        paneId: input.paneId,
+      })
+    },
     snapshotSessions: () =>
       [...lastSessionStatus.entries()].map(([sessionId, status]) => ({ sessionId, status })),
     snapshotTabs: () =>
@@ -185,6 +203,7 @@ export function runStatusDetectionLoop(
     stop: () => {
       clearInterval(timer)
       detector.clear()
+      arbiter.clear()
       lastTabStatus.clear()
       lastSessionStatus.clear()
     },
