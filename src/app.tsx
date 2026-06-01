@@ -3,6 +3,7 @@ import {
   setAutoCommitEnabled,
   setExternalEditorConfig,
   setMultiRepoConfig,
+  setStatusBarSeparator,
 } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -68,6 +69,7 @@ export function App({
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
   setMultiRepoConfig(resolvedConfig.multiRepo)
   setExternalEditorConfig(resolvedConfig.externalEditor)
+  setStatusBarSeparator(resolvedConfig.statusBar?.separator)
 
   const keymapHandlers = useMemo(
     () => {

@@ -14,26 +14,24 @@ spawned, no network calls happen, and nothing is rendered.
 
 ## What It Shows
 
-For each enabled tool the indicator renders a compact line:
+For each enabled tool the indicator renders a compact dot + percent in the
+right-hand tile of the status bar:
 
 ```
-CC ━━━─ 48% · 00:07h    CO ━━━━ 92% · 04:12h
+● 48%    ● 92%
 ```
 
-- a **label** (`CC` for Claude Code, `CO` for Codex) — short text until Nerd
-  Fonts ships dedicated Anthropic / OpenAI brand glyphs
-- a **4-segment bar** (25% per segment) using box-drawing characters
+- a **colored dot** signalling the utilisation tier
 - the **percentage** used in the current session (5-hour window)
-- a **reset countdown** in `HH:MMh` until the window rolls over
 
-Colors come from the active theme palette:
+The dot color comes from the active theme palette:
 
 - `< 60%` → `success` tone (muted-positive)
 - `60–84%` → `warning` tone
 - `≥ 85%` → `error` tone
 
 Click the indicator to open a popover with per-tool details (tokens, cost,
-burn rate, reset time). Press `Esc` to close.
+burn rate, reset countdown, full segmented bar). Press `Esc` to close.
 
 ## Enabling It
 

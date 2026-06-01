@@ -69,7 +69,7 @@ defineConfig({
 | `snippetTriggerChar` | Supported          | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                           |
 | `autoCommit`         | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                                 |
 | `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces`    |
-| `statusBar`          | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                        |
+| `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
 
 ## `defineConfig`
 
@@ -484,6 +484,7 @@ Type:
 ```ts
 interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
+  separator?: 'arrow' | 'round' | 'slant' | 'flame' | 'none' // default 'arrow'
 }
 
 interface AIUsageToolConfig {
@@ -506,14 +507,31 @@ Runtime behavior:
   token stored in `~/.codex/auth.json`
 - all colors are pulled from the active theme palette; no hardcoded colors
 
+### `separator`
+
+Powerline-style glyph rendered between the status bar sections (mode badge,
+session/path tile, AI usage tile, version tile). All non-`none` options require
+a nerd-font / powerline-capable font.
+
+| Value   | Right glyph | Left glyph | Codepoints                                           |
+| ------- | :---------: | :--------: | ---------------------------------------------------- |
+| `arrow` |             |            | U+E0B0 / U+E0B2                                      |
+| `round` |             |            | U+E0B4 / U+E0B6                                      |
+| `slant` |             |            | U+E0BC / U+E0BA                                      |
+| `flame` |             |            | U+E0C0 / U+E0C2                                      |
+| `none`  |      —      |     —      | (no glyph; sections snap via background colour only) |
+
+Resolved once at app startup and persisted for the session.
+
 See [`../guide/ai-usage-indicator.md`](../guide/ai-usage-indicator.md) for the
-full guide, field reference, and platform requirements.
+full AI usage guide, field reference, and platform requirements.
 
 Example:
 
 ```ts
 export default defineConfig({
   statusBar: {
+    separator: 'round',
     aiUsage: {
       enabled: true,
       pollSeconds: 60,
