@@ -165,6 +165,18 @@ export function useTerminalResize({
   // loop so an unchanged box never re-triggers a resize.
   const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
 
+  // Drop the dedupe cache when the workspace changes. attach() re-gates every
+  // restored tab's paneReady to false; if a tabId carries the same dimensions
+  // across workspaces, handleMeasure's prev-match would short-circuit and
+  // never call resizeTab({confirmedFromMeasurement:true}), leaving the gate
+  // closed forever — the new pane then paints a stale buffered snapshot from
+  // the old workspace, which is the 2–3 row offset users see.
+  const lastSessionIdRef = useRef(state.currentSessionId)
+  if (lastSessionIdRef.current !== state.currentSessionId) {
+    lastSessionIdRef.current = state.currentSessionId
+    measuredRef.current.clear()
+  }
+
   // Closed measurement loop: the rendered terminal content box reports its
   // real geometry; that — not the hardcoded chrome model below — is the
   // authority for the PTY/xterm size and the mouse-mapping origin. The model
