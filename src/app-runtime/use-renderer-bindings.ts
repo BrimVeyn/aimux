@@ -23,6 +23,7 @@ import {
 import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
 import { writeMacroExpansionToTab, writePasteToTab, writeToTab } from './pty-write'
 import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
+import { clearSelectionLines, getSelectionLines } from './selection-lines-snapshot'
 import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
 
 const BRACKETED_PASTE_ENABLE_SEQUENCE = '\x1b[?2004h'
@@ -226,9 +227,16 @@ export function useRendererBindings({
     }
 
     const handleSelection = (selection: OtuiSelection) => {
+      // Use the viewport.lines snapshot captured at mouseDown — see
+      // selection-lines-snapshot.ts. Without this, output that lands between
+      // mouseDown and mouseUp shifts the live tab.viewport.lines array and the
+      // stream extraction grabs the line BELOW what the user actually clicked.
+      const tabId = activeTabIdRef.current
+      const capturedLines = tabId != null && tabId !== '' ? getSelectionLines(tabId) : null
       const { fallbackLength, selectedText, streamLength } = resolveSelectionClipboardText(
         selection,
-        activeTabRef.current
+        activeTabRef.current,
+        capturedLines
       )
 
       logInputDebug('app.selection', {
@@ -237,10 +245,17 @@ export function useRendererBindings({
         osc52Supported: renderer.isOsc52Supported(),
         streamLength,
         textLength: selectedText.length,
+        usedCapturedLines: capturedLines !== null,
       })
 
       if (selection.isDragging === true || selectedText.length === 0) {
         return
+      }
+
+      // mouseUp reached — the snapshot has served its purpose, clear it so the
+      // next selection starts fresh.
+      if (tabId != null && tabId !== '') {
+        clearSelectionLines(tabId)
       }
 
       // After a multi-click drag, handleTerminalMouseUp has just copied the

@@ -6,6 +6,7 @@ import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { JunctionEdgeInfo, JunctionEdges } from '../../../state/layout-tree'
 import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
 
+import { captureSelectionLines } from '../../../app-runtime/selection-lines-snapshot'
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
 import { useAppStore } from '../../../state/app-store'
@@ -277,6 +278,19 @@ export function TerminalPane({
           x: event.x,
           y: event.y,
         })
+      }
+      // Snapshot viewport.lines at mouseDown so handleSelection at mouseUp can
+      // run stream extraction against the frame the user actually clicked on —
+      // even if a new render landed in between. Mirrors opentui's own snapshot
+      // of the rendered text used by selection.getSelectedText().
+      if (
+        event.type === 'down' &&
+        event.button === 0 &&
+        tabId != null &&
+        tabId !== '' &&
+        tab?.viewport?.lines
+      ) {
+        captureSelectionLines(tabId, tab.viewport.lines)
       }
       if (event.type === 'drag') {
         if (onTerminalDrag?.(event, contentOrigin, tabId) === true) {

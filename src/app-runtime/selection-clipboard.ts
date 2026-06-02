@@ -1,4 +1,4 @@
-import type { TabSession } from '../state/types'
+import type { TabSession, TerminalLine } from '../state/types'
 
 import { extractStreamText } from '../input/terminal-text-extraction'
 
@@ -27,7 +27,7 @@ function isPositionedNode(value: unknown): value is PositionedNode {
 
 export function computeStreamSelectedText(
   selection: OtuiSelection,
-  lines: { spans: { text: string }[] }[]
+  lines: readonly { spans: { text: string }[] }[]
 ): string | null {
   const touched = selection.touchedRenderables
   if (!touched || touched.length === 0) return null
@@ -54,13 +54,12 @@ export function computeStreamSelectedText(
 
 export function resolveSelectionClipboardText(
   selection: OtuiSelection,
-  tab: TabSession | undefined
+  tab: TabSession | undefined,
+  linesOverride?: readonly TerminalLine[] | null
 ): { selectedText: string; streamLength: number | null; fallbackLength: number } {
   const fallback = selection.getSelectedText()
-  const streamText =
-    tab?.viewport && tab.viewport.lines.length > 0
-      ? computeStreamSelectedText(selection, tab.viewport.lines)
-      : null
+  const lines = linesOverride ?? tab?.viewport?.lines ?? null
+  const streamText = lines && lines.length > 0 ? computeStreamSelectedText(selection, lines) : null
   return {
     fallbackLength: fallback.length,
     selectedText: streamText ?? fallback,

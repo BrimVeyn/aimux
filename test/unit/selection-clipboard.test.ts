@@ -102,3 +102,26 @@ test('resolveSelectionClipboardText normalises reversed drag', () => {
 
   expect(result.selectedText).toBe('pha\nbeta\ngam')
 })
+
+test('resolveSelectionClipboardText uses linesOverride over tab.viewport.lines', () => {
+  // The tab's live viewport has scrolled by one row since mouseDown — anchor
+  // y=1 in the live state points at "beta" but the user clicked when the
+  // pre-scroll snapshot was on screen and anchor y=1 was "alpha". Passing the
+  // captured snapshot as override must trump the live state.
+  const liveTab = makeTab([makeLine('beta-new-top'), makeLine('beta'), makeLine('gamma')])
+  const capturedAtMouseDown: TerminalLine[] = [
+    makeLine('captured-zero'),
+    makeLine('captured-one'),
+    makeLine('captured-two'),
+  ]
+  const selection = makeSelection({
+    anchor: { x: 0, y: 1 },
+    focus: { x: 13, y: 1 },
+  })
+
+  const withOverride = resolveSelectionClipboardText(selection, liveTab, capturedAtMouseDown)
+  const withoutOverride = resolveSelectionClipboardText(selection, liveTab)
+
+  expect(withOverride.selectedText).toBe('captured-one')
+  expect(withoutOverride.selectedText).toBe('beta')
+})
