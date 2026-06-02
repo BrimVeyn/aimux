@@ -281,12 +281,22 @@ export function useRendererBindings({
             const parentIsObject = typeof parent === 'object' && parent !== null
             const parentId = parentIsObject ? Reflect.get(parent, 'id') : null
             const parentY = parentIsObject ? Reflect.get(parent, 'y') : null
+            const scrollY = Reflect.get(node, 'scrollY')
+            const scrollX = Reflect.get(node, 'scrollX')
+            const lineCount = Reflect.get(node, 'lineCount')
+            const plainTextRaw = Reflect.get(node, 'plainText')
+            const plainTextPreview =
+              typeof plainTextRaw === 'string' ? plainTextRaw.slice(0, 300) : null
             return {
               height: typeof height === 'number' ? height : null,
               id: typeof id === 'string' ? id : null,
               idx,
+              lineCount: typeof lineCount === 'number' ? lineCount : null,
               parentId: typeof parentId === 'string' ? parentId : null,
               parentY: typeof parentY === 'number' ? parentY : null,
+              plainTextPreview,
+              scrollX: typeof scrollX === 'number' ? scrollX : null,
+              scrollY: typeof scrollY === 'number' ? scrollY : null,
               width: typeof width === 'number' ? width : null,
               x: typeof x === 'number' ? x : null,
               y: typeof y === 'number' ? y : null,
