@@ -18,9 +18,24 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const snapshot =
         action.workspaceSnapshot ??
         state.sessions.find((entry) => entry.id === action.sessionId)?.workspaceSnapshot
+      const restored = restoreWorkspaceState(state, snapshot)
+      // The session's activeWorktreeId may have been patched right before
+      // this load (e.g. the cross-workspace branch of handleCycleSidebarItem
+      // sets it to the worktree the user just clicked). The snapshot's
+      // activeTabId still reflects the *last* worktree they were on, so
+      // honor the patched worktree by filtering the restored tab list.
+      const loadedSession = state.sessions.find((entry) => entry.id === action.sessionId)
+      const visible = filterTabsForActiveWorktree(restored.tabs, loadedSession)
+      const activeTabId =
+        restored.activeTabId != null &&
+        restored.activeTabId !== '' &&
+        visible.some((t) => t.id === restored.activeTabId)
+          ? restored.activeTabId
+          : (visible[0]?.id ?? null)
       return {
         ...state,
-        ...restoreWorkspaceState(state, snapshot),
+        ...restored,
+        activeTabId,
         currentSessionId: action.sessionId,
         focusMode: 'navigation',
         modal: CLOSED_MODAL,
