@@ -8,6 +8,7 @@ import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../.
 
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
+import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
 import { resolvePaletteIndex } from '../../host-palette'
@@ -39,10 +40,16 @@ interface TerminalPaneProps {
 function getTitle(
   tab: TabSession | undefined,
   isActive: boolean,
-  focusMode: TerminalPaneProps['focusMode']
+  focusMode: TerminalPaneProps['focusMode'],
+  emptyContext: { workspaceName: string; worktreeName: string }
 ): string {
   if (!tab) {
-    return 'No active workspace'
+    const { workspaceName, worktreeName } = emptyContext
+    if (workspaceName === '' && worktreeName === '') return 'No active workspace'
+    if (worktreeName === '' || worktreeName === workspaceName) {
+      return `${workspaceName} · no tabs`
+    }
+    return `${workspaceName} / ${worktreeName} · no tabs`
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -146,6 +153,26 @@ export function TerminalPane({
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
+  // These are only used when this pane is rendered without a tab (the
+  // top-level pane on a worktree with zero tabs). Selectors return plain
+  // strings so re-renders are cheap and bounded to actual name changes.
+  const emptyWorkspaceName = useAppStore((s) => {
+    const id = s.currentSessionId
+    if (id == null || id === '') return ''
+    return s.sessions.find((sess) => sess.id === id)?.name ?? ''
+  })
+  const emptyWorktreeName = useAppStore((s) => {
+    const id = s.currentSessionId
+    if (id == null || id === '') return ''
+    const session = s.sessions.find((sess) => sess.id === id)
+    if (!session) return ''
+    const activeId =
+      session.activeWorktreeId != null && session.activeWorktreeId !== ''
+        ? session.activeWorktreeId
+        : session.worktrees?.[0]?.id
+    if (activeId == null || activeId === '') return ''
+    return session.worktrees?.find((w) => w.id === activeId)?.name ?? ''
+  })
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
   const rightClickMenu = useMemo<ContextMenuItem[] | undefined>(
@@ -341,7 +368,10 @@ export function TerminalPane({
       <ContextMenuBox
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
-        title={getTitle(tab, paneIsActive, focusMode)}
+        title={getTitle(tab, paneIsActive, focusMode, {
+          workspaceName: emptyWorkspaceName,
+          worktreeName: emptyWorktreeName,
+        })}
         padding={0}
         flexDirection="column"
         flexGrow={1}
@@ -355,6 +385,19 @@ export function TerminalPane({
         {!tab ? (
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
             <text fg={t.textMuted}>· · ·</text>
+            <text fg={t.textMuted}> </text>
+            {emptyWorkspaceName !== '' ? (
+              <box flexDirection="row">
+                <text fg={t.text}>{emptyWorkspaceName}</text>
+                {emptyWorktreeName !== '' && emptyWorktreeName !== emptyWorkspaceName ? (
+                  <>
+                    <text fg={t.textMuted}> / </text>
+                    <text fg={t.text}>{emptyWorktreeName}</text>
+                  </>
+                ) : null}
+              </box>
+            ) : null}
+            <text fg={t.textMuted}>has no tabs</text>
             <text fg={t.textMuted}> </text>
             <box flexDirection="row">
               <text fg={t.textMuted}>Press </text>

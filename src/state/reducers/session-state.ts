@@ -3,7 +3,7 @@ import type { AppAction, AppState } from '../types'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../ui/session-ordering'
 import { filterSessions } from '../selectors'
 import { restoreWorkspaceState } from '../session-persistence'
-import { withActiveWorktree } from '../session-worktrees'
+import { filterTabsForActiveWorktree, withActiveWorktree } from '../session-worktrees'
 
 const CLOSED_MODAL = {
   editBuffer: null,
@@ -175,13 +175,30 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           )
         }),
       }
-    case 'set-active-worktree':
-      return {
-        ...state,
-        sessions: state.sessions.map((session) =>
-          session.id === action.sessionId ? withActiveWorktree(session, action.worktreeId) : session
-        ),
+    case 'set-active-worktree': {
+      const sessions = state.sessions.map((session) =>
+        session.id === action.sessionId ? withActiveWorktree(session, action.worktreeId) : session
+      )
+      // Changing the worktree of a non-current session has no effect on
+      // which tab the user is looking at — leave activeTabId alone.
+      if (action.sessionId !== state.currentSessionId) {
+        return { ...state, sessions }
       }
+      // For the current session: if the existing activeTabId belongs to
+      // the new worktree, keep it. Otherwise hop to the first tab visible
+      // under that worktree (or clear it if the worktree is empty — the
+      // pane then renders the "this worktree has no tabs" placeholder).
+      const updated = sessions.find((s) => s.id === action.sessionId)
+      const visible = filterTabsForActiveWorktree(state.tabs, updated)
+      const currentStillVisible =
+        state.activeTabId != null &&
+        state.activeTabId !== '' &&
+        visible.some((t) => t.id === state.activeTabId)
+      if (currentStillVisible) {
+        return { ...state, sessions }
+      }
+      return { ...state, activeTabId: visible[0]?.id ?? null, sessions }
+    }
     case 'update-worktree-record':
       return {
         ...state,
