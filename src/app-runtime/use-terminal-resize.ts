@@ -13,6 +13,7 @@ import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
+import { logInputDebug } from '../debug/input-log'
 import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
 import {
   createTerminalBounds,
@@ -191,6 +192,21 @@ export function useTerminalResize({
         contentOriginRef.current = { cols, rows, x: rect.x, y: rect.y }
       }
       const prev = measuredRef.current.get(tabId)
+      const clamped = cols !== rect.cols || rows !== rect.rows
+      logInputDebug('app.handleMeasure', {
+        clamped,
+        isActive,
+        measuredCols: rect.cols,
+        measuredRows: rect.rows,
+        prevCols: prev?.cols ?? null,
+        prevRows: prev?.rows ?? null,
+        rectX: rect.x,
+        rectY: rect.y,
+        sentCols: cols,
+        sentRows: rows,
+        skipped: prev !== undefined && prev.cols === cols && prev.rows === rows,
+        tabId,
+      })
       if (prev !== undefined && prev.cols === cols && prev.rows === rows) {
         return
       }
