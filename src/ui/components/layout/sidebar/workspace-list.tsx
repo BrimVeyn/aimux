@@ -10,7 +10,7 @@ import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../s
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence, getWorktreeColor } from '../../../../state/session-worktrees'
+import { formatDivergence } from '../../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
@@ -337,16 +337,10 @@ const WorkspaceRow = memo(function WorkspaceRow({
     [session.id, session.name]
   )
 
-  // Color of the left vertical bar — the workspace's stable accent (derived
-  // from its primary worktree id). Falls back to a tint for unhydrated sessions.
-  const barColor =
-    primaryWorktree != null
-      ? (primaryWorktree.color ?? getWorktreeColor(primaryWorktree.id))
-      : t.textMuted
-  // Working/waiting indicator overrides the colored bar — the user needs to
-  // see assistant activity from across the room.
-  let leadingGlyph = '▍'
-  let leadingColor = barColor
+  // Neutral muted marker; working/waiting overrides it. Keeping a glyph
+  // in the slot avoids name shifts when state indicators come and go.
+  let leadingGlyph = '•'
+  let leadingColor = t.textMuted
   if (showWaiting) {
     leadingGlyph = '?'
     leadingColor = waitingColor
