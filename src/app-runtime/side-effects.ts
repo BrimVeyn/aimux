@@ -1060,12 +1060,12 @@ async function openEditorInline(
 
 function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void {
   const { backend, dispatch } = ctx
-  // Read fresh from the store. ctx.state is captured at the previous render
-  // and lags behind any dispatches that happened in the same JS turn (e.g. a
-  // worktree-row click first dispatches set-active-worktree then fires this
-  // side effect — we need to pick up that just-applied activeWorktreeId so
-  // we land on the right worktree in the new session, not its last-saved one.
-  const state = appStore.getState()
+  // Read fresh state. ctx.state is the snapshot from the previous render and
+  // lags behind dispatches that happened in the same JS turn (a worktree-row
+  // click first dispatches set-active-worktree then fires this side effect —
+  // we need to see that just-applied activeWorktreeId so the new session
+  // lands on the right worktree, not its last-saved one).
+  const state = ctx.getState()
   const ordered = [...state.sessions].sort(
     (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
   )
