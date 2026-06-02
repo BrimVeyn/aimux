@@ -6,6 +6,7 @@ import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
+import { formatDivergence } from '../../../../state/session-worktrees'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -18,11 +19,14 @@ interface WorktreeRowProps {
   isActiveItem: boolean
   /** True when this row's workspace is the current session (selection scope). */
   inCurrentGroup: boolean
+  /** True when this is the last non-primary worktree of its workspace. Drives └─ vs ├─. */
+  isLast: boolean
 }
 
 export const WorktreeRow = memo(function WorktreeRow({
   inCurrentGroup,
   isActiveItem,
+  isLast,
   session,
   sessionIndex,
   worktree,
@@ -30,6 +34,7 @@ export const WorktreeRow = memo(function WorktreeRow({
   const t = useTheme()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const isCurrentSession = session.id === currentSessionId
+  const divergence = useAppStore((s) => s.worktreeDivergence[worktree.id])
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -70,23 +75,40 @@ export const WorktreeRow = memo(function WorktreeRow({
     bgColor = t.backgroundPanel
   }
 
+  const connector = isLast ? '└─' : '├─'
+  const branchCont = isLast ? '   ' : '│  '
+  const branchText = worktree.branch ?? ''
+  const showBranch = branchText !== ''
+  const divergenceText = formatDivergence(divergence)
+
   return (
     <ContextMenuBox
       id={`sidebar-wt-${worktree.id}`}
-      flexDirection="row"
+      flexDirection="column"
+      flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
-      alignItems="center"
       backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
-      <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {'  > '}
-      </text>
-      <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
-        {worktree.name}
-      </text>
+      <box flexDirection="row" alignItems="center">
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {connector}{' '}
+        </text>
+        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+          {worktree.name}
+        </text>
+      </box>
+      {showBranch ? (
+        <box flexDirection="row">
+          <text fg={t.textMuted} selectable={false} wrapMode="none">
+            {branchCont}
+            {'\u{e702}'} {branchText}
+            {divergenceText !== '' ? ` ${divergenceText}` : ''}
+          </text>
+        </box>
+      ) : null}
     </ContextMenuBox>
   )
 })

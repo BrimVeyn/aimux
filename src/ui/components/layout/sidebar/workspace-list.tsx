@@ -199,6 +199,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 isActiveItem={workspaceIsActiveItem}
                 inCurrentGroup={isCurrentSession}
                 primaryWorktree={primaryWorktree}
+                hasExtraWorktrees={extraWorktrees.length > 0}
                 status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
                 dragging={draggingId === session.id}
                 contentWidth={contentWidth}
@@ -210,7 +211,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 onDragCancel={cancelDrag}
               />
             )
-            for (const worktree of extraWorktrees) {
+            for (const [wtIdx, worktree] of extraWorktrees.entries()) {
               rows.push(
                 <WorktreeRow
                   key={`wt:${worktree.id}`}
@@ -219,6 +220,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                   sessionIndex={sessionIndex}
                   isActiveItem={isCurrentSession && worktree.id === session.activeWorktreeId}
                   inCurrentGroup={isCurrentSession}
+                  isLast={wtIdx === extraWorktrees.length - 1}
                 />
               )
             }
@@ -250,6 +252,8 @@ interface WorkspaceRowProps {
   inCurrentGroup: boolean
   /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
+  /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
+  hasExtraWorktrees: boolean
   status: SessionStatus
   dragging: boolean
   contentWidth: number
@@ -265,6 +269,7 @@ interface WorkspaceRowProps {
 const WorkspaceRow = memo(function WorkspaceRow({
   contentWidth,
   dragging,
+  hasExtraWorktrees,
   inCurrentGroup,
   isActiveItem,
   marginTop,
@@ -387,7 +392,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
       {showBranch ? (
         <box flexDirection="row">
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'  '}
+            {hasExtraWorktrees ? '│ ' : '  '}
             {'\u{e702}'} {branchLabel}
             {divergenceText !== '' ? ` ${divergenceText}` : ''}
           </text>
