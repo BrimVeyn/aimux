@@ -247,8 +247,14 @@ export function App({
   }, [])
 
   const resizingRef = useRef(false)
+  // Seeded with state.layout's DEFAULT 80x24; reassigned below once
+  // useTerminalResize has produced the open-loop estimate from real dimensions.
+  // Reading state.layout here is wrong: on the first render state.layout is
+  // still the bootstrap default, and useBackendRuntime's attach effect would
+  // then hand 80x24 to the backend, resizing the daemon-persisted PTYs (or
+  // newly-spawned ones) to the wrong size and stranding the assistant's
+  // already-drawn content in the top-left until a workspace switch.
   const layoutRef = useRef(state.layout)
-  layoutRef.current = state.layout
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeTabId),
     [state.activeTabId, state.tabs]
@@ -281,6 +287,18 @@ export function App({
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
+
+  // Must run before useBackendRuntime so its open-loop terminalSize seeds
+  // layoutRef before the attach effect reads it. See the comment on layoutRef.
+  const terminalSize = useTerminalResize({
+    backend,
+    contentOriginRef,
+    dimensions,
+    dispatch,
+    resizingRef,
+    state,
+  })
+  layoutRef.current = { terminalCols: terminalSize.cols, terminalRows: terminalSize.rows }
 
   const syntaxOverlayFlag = resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true
   const syntaxOverlayFlagRef = useRef(syntaxOverlayFlag)
@@ -332,15 +350,6 @@ export function App({
     getProfileConfigRoot: getProfileConfigDir,
     state,
     stateRef,
-  })
-
-  const terminalSize = useTerminalResize({
-    backend,
-    contentOriginRef,
-    dimensions,
-    dispatch,
-    resizingRef,
-    state,
   })
 
   const {
