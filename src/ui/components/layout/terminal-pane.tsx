@@ -330,12 +330,21 @@ export function TerminalPane({
   )
   const forwardScrollEvent = useCallback(
     (event: OtuiMouseEvent) => {
+      // Always consume scroll events that land inside the pane, even when we
+      // have nothing to do with them (focus mode is not terminal-input, no tab,
+      // mouse forwarding disabled while the TUI doesn't ask for scrollback, …).
+      // Without this preventDefault/stopPropagation, the wheel event bubbles
+      // into opentui's TextBufferRenderable inside the pane, which silently
+      // scrolls its own internal _scrollY. That scroll persists for the lifetime
+      // of the renderable (no React prop resets it), shifting the rendered text
+      // N rows from state.viewport.lines — the persistent copy-offset users hit
+      // that only goes away on a full aimux refresh.
+      event.preventDefault()
+      event.stopPropagation()
+
       if (!canForwardMouse && !canUseLocalScrollback) {
         return
       }
-
-      event.preventDefault()
-      event.stopPropagation()
 
       if (canForwardMouse) {
         onTerminalMouseEvent(event, contentOrigin)
