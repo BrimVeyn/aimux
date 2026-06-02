@@ -96,7 +96,7 @@ export const WorktreeRow = memo(function WorktreeRow({
         <text fg={t.textMuted} selectable={false} wrapMode="none">
           {connector}{' '}
         </text>
-        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        <text fg={t.text} selectable={false} wrapMode="none">
           {worktree.name}
         </text>
       </box>

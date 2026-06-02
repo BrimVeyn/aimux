@@ -378,7 +378,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
         <text fg={leadingColor} selectable={false} wrapMode="none">
           {leadingGlyph}
         </text>
-        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        <text fg={t.text} selectable={false} wrapMode="none">
           {' '}
           {nameLabel}
         </text>
