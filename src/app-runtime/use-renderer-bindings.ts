@@ -239,6 +239,63 @@ export function useRendererBindings({
         textLength: selectedText.length,
       })
 
+      // Diag-only: dump every value that could explain a copy-vs-highlight
+      // offset, fired only on the final mouseUp (not while dragging). When the
+      // user reports the bug, the latest `app.selection.diag` block in the
+      // input-debug log pins which layer is off by N rows.
+      if (selection.isDragging !== true) {
+        const tab = activeTabRef.current
+        const touched = selection.touchedRenderables ?? []
+        logInputDebug('app.selection.diag', {
+          activeTabId: activeTabIdRef.current,
+          anchor: { x: selection.anchor.x, y: selection.anchor.y },
+          fallbackPreview: selection.getSelectedText().slice(0, 200),
+          focus: { x: selection.focus.x, y: selection.focus.y },
+          selectedTextPreview: selectedText.slice(0, 200),
+          tabBaseY: tab?.viewport?.baseY,
+          tabLine0Preview:
+            tab?.viewport?.lines[0]?.spans
+              .map((s) => s.text)
+              .join('')
+              .slice(0, 80) ?? null,
+          tabLine1Preview:
+            tab?.viewport?.lines[1]?.spans
+              .map((s) => s.text)
+              .join('')
+              .slice(0, 80) ?? null,
+          tabLine2Preview:
+            tab?.viewport?.lines[2]?.spans
+              .map((s) => s.text)
+              .join('')
+              .slice(0, 80) ?? null,
+          tabLinesCount: tab?.viewport?.lines.length ?? null,
+          tabViewportY: tab?.viewport?.viewportY,
+          touched: touched.slice(0, 5).map((node, idx) => {
+            if (typeof node !== 'object' || node === null) return { idx, kind: typeof node }
+            const id = Reflect.get(node, 'id')
+            const x = Reflect.get(node, 'x')
+            const y = Reflect.get(node, 'y')
+            const width = Reflect.get(node, 'width')
+            const height = Reflect.get(node, 'height')
+            const parent = Reflect.get(node, 'parent')
+            const parentIsObject = typeof parent === 'object' && parent !== null
+            const parentId = parentIsObject ? Reflect.get(parent, 'id') : null
+            const parentY = parentIsObject ? Reflect.get(parent, 'y') : null
+            return {
+              height: typeof height === 'number' ? height : null,
+              id: typeof id === 'string' ? id : null,
+              idx,
+              parentId: typeof parentId === 'string' ? parentId : null,
+              parentY: typeof parentY === 'number' ? parentY : null,
+              width: typeof width === 'number' ? width : null,
+              x: typeof x === 'number' ? x : null,
+              y: typeof y === 'number' ? y : null,
+            }
+          }),
+          touchedCount: touched.length,
+        })
+      }
+
       if (selection.isDragging === true || selectedText.length === 0) {
         return
       }
