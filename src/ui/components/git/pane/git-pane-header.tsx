@@ -76,7 +76,7 @@ export const GitPaneHeader = memo(function GitPaneHeader({
             </box>
           ) : null}
           {showToggle ? (
-            <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
+            <box flexDirection="row" gap={1} paddingLeft={1} onMouseDown={toggleListMode}>
               <text
                 selectable={false}
                 fg={fileListMode === 'tree' ? t.primary : t.textMuted}

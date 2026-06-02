@@ -409,7 +409,11 @@ export function App({
       if (!(state.currentSessionId != null && state.currentSessionId !== '')) return
       return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
     },
-    getState: () => stateRef.current,
+    // Read straight from the store, not stateRef. stateRef is only refreshed
+    // on render, so within a single JS turn (a click handler that dispatches
+    // then fires a side effect) it lags one step behind. appStore.getState
+    // reflects every dispatch synchronously.
+    getState: () => appStore.getState(),
     renderer,
     setThemeId,
     startStartupGrace,

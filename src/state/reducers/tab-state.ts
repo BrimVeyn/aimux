@@ -15,7 +15,11 @@ import {
   splitNode,
 } from '../layout-tree'
 import { normalizeGroupedTabOrder } from '../session-persistence'
-import { orderTabsByWorktree, withActiveWorktree } from '../session-worktrees'
+import {
+  filterTabsForActiveWorktree,
+  orderTabsByWorktree,
+  withActiveWorktree,
+} from '../session-worktrees'
 import { createDefaultTerminalModes } from '../terminal-modes'
 
 const MAX_BUFFER_LENGTH = 50_000
@@ -317,12 +321,23 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       )
     }
     case 'hydrate-workspace': {
+      // The session's activeWorktreeId may have just been switched by the
+      // user (j/k cycle, sidebar click) before the backend attached. Honor
+      // that choice by only considering tabs visible in that worktree —
+      // otherwise we'd land the active tab on whatever the backend picked
+      // (typically the worktree we *last* persisted, not the current one).
+      const currentSession =
+        state.currentSessionId != null && state.currentSessionId !== ''
+          ? state.sessions.find((s) => s.id === state.currentSessionId)
+          : undefined
+      const visibleForWorktree = filterTabsForActiveWorktree(action.tabs, currentSession)
+      const visibleIds = new Set(visibleForWorktree.map((t) => t.id))
       const hydratedActiveTabId =
         action.activeTabId != null &&
         action.activeTabId !== '' &&
-        action.tabs.some((tab) => tab.id === action.activeTabId)
+        visibleIds.has(action.activeTabId)
           ? action.activeTabId
-          : (action.tabs[0]?.id ?? null)
+          : (visibleForWorktree[0]?.id ?? null)
       const tabIds = new Set(action.tabs.map((t) => t.id))
 
       // Restore from new multi-tree format or migrate from legacy single tree

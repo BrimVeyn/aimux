@@ -10,7 +10,7 @@ import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../s
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence, getWorktreeColor } from '../../../../state/session-worktrees'
+import { formatDivergence } from '../../../../state/session-worktrees'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
@@ -199,6 +199,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 isActiveItem={workspaceIsActiveItem}
                 inCurrentGroup={isCurrentSession}
                 primaryWorktree={primaryWorktree}
+                hasExtraWorktrees={extraWorktrees.length > 0}
                 status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
                 dragging={draggingId === session.id}
                 contentWidth={contentWidth}
@@ -210,7 +211,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 onDragCancel={cancelDrag}
               />
             )
-            for (const worktree of extraWorktrees) {
+            for (const [wtIdx, worktree] of extraWorktrees.entries()) {
               rows.push(
                 <WorktreeRow
                   key={`wt:${worktree.id}`}
@@ -219,6 +220,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                   sessionIndex={sessionIndex}
                   isActiveItem={isCurrentSession && worktree.id === session.activeWorktreeId}
                   inCurrentGroup={isCurrentSession}
+                  isLast={wtIdx === extraWorktrees.length - 1}
                 />
               )
             }
@@ -250,6 +252,8 @@ interface WorkspaceRowProps {
   inCurrentGroup: boolean
   /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
+  /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
+  hasExtraWorktrees: boolean
   status: SessionStatus
   dragging: boolean
   contentWidth: number
@@ -265,6 +269,7 @@ interface WorkspaceRowProps {
 const WorkspaceRow = memo(function WorkspaceRow({
   contentWidth,
   dragging,
+  hasExtraWorktrees,
   inCurrentGroup,
   isActiveItem,
   marginTop,
@@ -332,16 +337,10 @@ const WorkspaceRow = memo(function WorkspaceRow({
     [session.id, session.name]
   )
 
-  // Color of the left vertical bar — the workspace's stable accent (derived
-  // from its primary worktree id). Falls back to a tint for unhydrated sessions.
-  const barColor =
-    primaryWorktree != null
-      ? (primaryWorktree.color ?? getWorktreeColor(primaryWorktree.id))
-      : t.textMuted
-  // Working/waiting indicator overrides the colored bar — the user needs to
-  // see assistant activity from across the room.
-  let leadingGlyph = '▍'
-  let leadingColor = barColor
+  // Neutral muted marker; working/waiting overrides it. Keeping a glyph
+  // in the slot avoids name shifts when state indicators come and go.
+  let leadingGlyph = '•'
+  let leadingColor = t.textMuted
   if (showWaiting) {
     leadingGlyph = '?'
     leadingColor = waitingColor
@@ -379,7 +378,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
         <text fg={leadingColor} selectable={false} wrapMode="none">
           {leadingGlyph}
         </text>
-        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        <text fg={t.text} selectable={false} wrapMode="none">
           {' '}
           {nameLabel}
         </text>
@@ -387,7 +386,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
       {showBranch ? (
         <box flexDirection="row">
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'  '}
+            {hasExtraWorktrees ? '│ ' : '  '}
             {'\u{e702}'} {branchLabel}
             {divergenceText !== '' ? ` ${divergenceText}` : ''}
           </text>

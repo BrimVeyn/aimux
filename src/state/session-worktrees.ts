@@ -8,22 +8,12 @@ import type { BranchDivergence, SessionRecord, TabSession, WorktreeRecord } from
 import { createPrefixedId } from '../platform/id'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
-const WORKTREE_COLORS = ['#7dd3fc', '#86efac', '#facc15', '#f0abfc', '#fb7185', '#c4b5fd']
-
 export function formatDivergence(divergence: BranchDivergence | undefined): string {
   if (divergence == null) return ''
   const parts: string[] = []
   if (divergence.ahead > 0) parts.push(`↑${divergence.ahead}`)
   if (divergence.behind > 0) parts.push(`↓${divergence.behind}`)
   return parts.join(' ')
-}
-
-export function getWorktreeColor(worktreeId: string): string {
-  let hash = 0
-  for (let i = 0; i < worktreeId.length; i++) {
-    hash = (hash * 31 + worktreeId.charCodeAt(i)) >>> 0
-  }
-  return WORKTREE_COLORS[hash % WORKTREE_COLORS.length] ?? '#7dd3fc'
 }
 
 export function createPrimaryWorktree(projectPath: string, now: string): WorktreeRecord {

@@ -220,7 +220,9 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   }, [])
 
   if (!bar.visible && !forceVisible) return null
-  if (entries.length === 0) return null
+  // Keep the bar visible even with zero entries — when the active worktree
+  // has no tabs, the lone "+" affordance is what tells the user "you're in
+  // an empty worktree, click here to start one".
 
   const isFocused = focusMode === 'terminal-input' || focusMode === 'navigation'
 
