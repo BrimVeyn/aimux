@@ -57,6 +57,7 @@ import {
 } from '../state/layout-tree'
 import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { saveSessionCatalog } from '../state/session-catalog'
+import { pruneSnapshotOfWorktree } from '../state/session-persistence'
 import {
   filterTabsForActiveWorktree,
   getActiveWorktree,
@@ -1524,6 +1525,7 @@ function removeWorktreeRecordFromSession(
     activeWorktreeId: nextActive?.id,
     projectPath: nextActive?.path ?? entry.projectPath,
     updatedAt: new Date().toISOString(),
+    workspaceSnapshot: pruneSnapshotOfWorktree(entry.workspaceSnapshot, worktreeId),
     worktrees: remaining,
   }))
   saveSessionCatalog(sessions)

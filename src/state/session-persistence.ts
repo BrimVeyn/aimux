@@ -126,6 +126,58 @@ export function restoreLayoutTrees(
   return { layoutTrees, tabGroupMap }
 }
 
+// When a worktree is removed, its tabs are killed live via disposeWorktreeTabs
+// — but the session's persisted workspaceSnapshot still references them by
+// worktreeId. Without this pruning, a subsequent load-session (session switch
+// or restart) resurrects the dead tabs and they reappear in h-l navigation.
+export function pruneSnapshotOfWorktree(
+  snapshot: WorkspaceSnapshotV1 | undefined,
+  worktreeId: string
+): WorkspaceSnapshotV1 | undefined {
+  if (!snapshot) return snapshot
+  const keptTabs = snapshot.tabs.filter((tab) => tab.worktreeId !== worktreeId)
+  if (keptTabs.length === snapshot.tabs.length) return snapshot
+  const validTabIds = new Set(keptTabs.map((tab) => tab.id))
+
+  let nextLayoutTrees: typeof snapshot.layoutTrees
+  let nextTabGroupMap: typeof snapshot.tabGroupMap
+  if (snapshot.layoutTrees) {
+    const trees: Record<string, LayoutNode> = {}
+    const groupMap: Record<string, string> = {}
+    for (const [groupId, tree] of Object.entries(snapshot.layoutTrees)) {
+      const pruned = pruneLayoutTree(tree, validTabIds)
+      if (pruned && pruned.type === 'split') {
+        trees[groupId] = pruned
+        for (const leafId of allLeafIds(pruned)) {
+          groupMap[leafId] = groupId
+        }
+      }
+    }
+    nextLayoutTrees = Object.keys(trees).length > 0 ? trees : undefined
+    nextTabGroupMap = Object.keys(groupMap).length > 0 ? groupMap : undefined
+  }
+
+  let nextLayoutTree = snapshot.layoutTree
+  if (nextLayoutTree) {
+    const pruned = pruneLayoutTree(nextLayoutTree, validTabIds)
+    nextLayoutTree = pruned && pruned.type === 'split' ? pruned : undefined
+  }
+
+  const nextActiveTabId =
+    snapshot.activeTabId != null && validTabIds.has(snapshot.activeTabId)
+      ? snapshot.activeTabId
+      : (keptTabs[0]?.id ?? null)
+
+  return {
+    ...snapshot,
+    activeTabId: nextActiveTabId,
+    layoutTree: nextLayoutTree,
+    layoutTrees: nextLayoutTrees,
+    tabGroupMap: nextTabGroupMap,
+    tabs: keptTabs,
+  }
+}
+
 export function normalizeGroupedTabOrder(
   tabs: TabSession[],
   layoutTrees: Record<string, LayoutNode>,
