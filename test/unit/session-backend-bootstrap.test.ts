@@ -59,6 +59,7 @@ describe('session backend bootstrap handshake', () => {
               payload: {
                 activeTabId: null,
                 initialSessionStatuses: [],
+                initialWorktreeStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -129,6 +130,7 @@ describe('session backend bootstrap handshake', () => {
               payload: {
                 activeTabId: null,
                 initialSessionStatuses: [],
+                initialWorktreeStatuses: [],
                 protocolVersion: 1,
                 tabs: [],
               },

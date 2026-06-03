@@ -433,6 +433,7 @@ export interface AppState {
   sessions: SessionRecord[]
   currentSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
+  worktreeStatuses: Record<string, SessionStatus>
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode

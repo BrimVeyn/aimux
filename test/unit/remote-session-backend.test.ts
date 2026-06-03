@@ -87,6 +87,7 @@ describe('RemoteSessionBackend', () => {
                 payload: {
                   activeTabId: null,
                   initialSessionStatuses: [],
+                  initialWorktreeStatuses: [],
                   protocolVersion: IPC_PROTOCOL_VERSION,
                   tabs: [],
                 },
@@ -204,6 +205,7 @@ describe('RemoteSessionBackend', () => {
               payload: {
                 activeTabId: null,
                 initialSessionStatuses: [],
+                initialWorktreeStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -291,6 +293,7 @@ describe('RemoteSessionBackend', () => {
               payload: {
                 activeTabId: null,
                 initialSessionStatuses: [],
+                initialWorktreeStatuses: [],
                 protocolVersion: 999,
                 tabs: [],
               },

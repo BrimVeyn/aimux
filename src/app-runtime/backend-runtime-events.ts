@@ -83,6 +83,11 @@ export function bindBackendRuntimeEvents({
     dispatch({ sessionId, status, type: 'set-session-status' })
   }
 
+  const handleWorktreeActivity = (worktreeId: string, status: SessionStatus, sessionId: string) => {
+    logInputDebug('app.backend.event.worktreeActivity', { sessionId, status, worktreeId })
+    dispatch({ status, type: 'set-worktree-status', worktreeId })
+  }
+
   const handleTabActivity = (tabId: string, activity: TabActivity) => {
     logInputDebug('app.backend.event.tabActivity', { activity, tabId })
     dispatch({ activity, tabId, type: 'set-tab-activity' })
@@ -92,6 +97,7 @@ export function bindBackendRuntimeEvents({
   backend.on('exit', handleExit)
   backend.on('error', handleError)
   backend.on('sessionActivity', handleSessionActivity)
+  backend.on('worktreeActivity', handleWorktreeActivity)
   backend.on('tabActivity', handleTabActivity)
 
   return () => {
@@ -100,6 +106,7 @@ export function bindBackendRuntimeEvents({
     backend.off('exit', handleExit)
     backend.off('error', handleError)
     backend.off('sessionActivity', handleSessionActivity)
+    backend.off('worktreeActivity', handleWorktreeActivity)
     backend.off('tabActivity', handleTabActivity)
     void backend.destroy(true)
   }

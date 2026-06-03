@@ -47,6 +47,7 @@ function startMockDaemon() {
             payload: {
               activeTabId: null,
               initialSessionStatuses: [],
+              initialWorktreeStatuses: [],
               protocolVersion: IPC_PROTOCOL_VERSION,
               tabs: [],
             },

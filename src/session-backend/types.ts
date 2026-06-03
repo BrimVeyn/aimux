@@ -14,6 +14,7 @@ export interface SessionBackendEvents {
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
   sessionActivity: [sessionId: string, status: SessionStatus]
+  worktreeActivity: [worktreeId: string, status: SessionStatus, sessionId: string]
   tabActivity: [tabId: string, activity: TabActivity]
 }
 
@@ -40,6 +41,12 @@ export interface BackendAttachResult {
    * separate `sessionActivity` events.
    */
   initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
+  /**
+   * Per-worktree status snapshot taken at attach time. Same rationale
+   * as `initialSessionStatuses` — hydrate atomically with tabs so the
+   * sidebar's per-worktree glyphs are correct on first paint.
+   */
+  initialWorktreeStatuses: { worktreeId: string; sessionId: string; status: SessionStatus }[]
 }
 
 export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
@@ -58,6 +65,7 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void
   write(tabId: string, input: string): void
   scrollViewport(tabId: string, deltaLines: number): void

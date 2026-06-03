@@ -472,6 +472,13 @@ export interface AppState {
   sessions: SessionRecord[]
   currentSessionId: string | null
   sessionStatuses: Record<string, SessionStatus>
+  /**
+   * Per-worktree status, keyed by worktree id. Updated by the backend's
+   * `worktreeActivity` event. Tabs without a `worktreeId` are aggregated
+   * under the empty-string key by the detection loop; the sidebar merges
+   * that bucket into the primary worktree's effective status.
+   */
+  worktreeStatuses: Record<string, SessionStatus>
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
@@ -551,6 +558,7 @@ export type SessionAction =
   | { type: 'reorder-sessions'; orderedIds: string[] }
   | { type: 'reorder-active-session'; delta: number }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
+  | { type: 'set-worktree-status'; worktreeId: string; status: SessionStatus }
   | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
   | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
   | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }

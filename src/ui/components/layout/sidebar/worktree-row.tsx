@@ -7,6 +7,7 @@ import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/session-worktrees'
+import { useStatusGlyph, useWorktreeStatus } from '../../../hooks/use-worktree-status'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -35,6 +36,8 @@ export const WorktreeRow = memo(function WorktreeRow({
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const isCurrentSession = session.id === currentSessionId
   const divergence = useAppStore((s) => s.worktreeDivergence[worktree.id])
+  const status = useWorktreeStatus(worktree.id)
+  const { color: glyphColor, glyph } = useStatusGlyph(status)
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -105,7 +108,11 @@ export const WorktreeRow = memo(function WorktreeRow({
         <text fg={t.textMuted} selectable={false} wrapMode="none">
           {connector}{' '}
         </text>
+        <text fg={glyphColor} selectable={false} wrapMode="none">
+          {glyph}
+        </text>
         <text fg={t.text} selectable={false} wrapMode="none">
+          {' '}
           {worktree.name}
         </text>
       </box>

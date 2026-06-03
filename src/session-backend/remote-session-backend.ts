@@ -187,6 +187,19 @@ export class RemoteSessionBackend
         })
         this.emit('sessionActivity', message.payload.sessionId, message.payload.status)
         break
+      case 'worktreeStatus':
+        logDebug('backend.remote.worktreeStatus', {
+          sessionId: message.payload.sessionId,
+          status: message.payload.status,
+          worktreeId: message.payload.worktreeId,
+        })
+        this.emit(
+          'worktreeActivity',
+          message.payload.worktreeId,
+          message.payload.status,
+          message.payload.sessionId
+        )
+        break
     }
   }
 
@@ -357,6 +370,7 @@ export class RemoteSessionBackend
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void {
     if (!this.attached) {
       logDebug('backend.remote.skipCreateBeforeAttach', { tabId: options.tabId })

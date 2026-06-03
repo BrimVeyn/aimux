@@ -44,6 +44,7 @@ describe('LocalSessionBackend.attach', () => {
         classifyNow: ReturnType<typeof mock>
         getTabStatus: ReturnType<typeof mock>
         snapshotSessions: ReturnType<typeof mock>
+        snapshotWorktrees: ReturnType<typeof mock>
       }
     }
 
@@ -59,6 +60,7 @@ describe('LocalSessionBackend.attach', () => {
       classifyNow: mock(() => {}),
       getTabStatus: mock(() => {}),
       snapshotSessions: mock(() => []),
+      snapshotWorktrees: mock(() => []),
     }
 
     await backend.attach({

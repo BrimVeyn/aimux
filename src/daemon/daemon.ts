@@ -35,6 +35,7 @@ export interface DaemonTabEntry {
   assistant: AssistantId
   command: string
   viewport: TerminalSnapshot | undefined
+  worktreeId: string | undefined
   /**
    * Monotonic viewport sequence. Incremented on every render-event write so
    * stale writers (e.g. `attach` returning a pre-await snapshot) can refuse
@@ -62,7 +63,8 @@ export function mergeTabRegistryEntry(
   assistant: AssistantId,
   command: string,
   initialViewport: TerminalSnapshot | undefined,
-  allocateSeq: () => number
+  allocateSeq: () => number,
+  worktreeId?: string
 ): DaemonTabEntry {
   const existing = registry.get(tabId)
   const viewport = existing?.viewport ?? initialViewport
@@ -72,6 +74,9 @@ export function mergeTabRegistryEntry(
     sessionId,
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
+    // Keep the previously-known worktreeId if the new entry omits it (e.g. a
+    // viewport-only re-remember). New non-empty values always win.
+    worktreeId: worktreeId ?? existing?.worktreeId,
   }
   registry.set(tabId, entry)
   return entry
@@ -179,7 +184,8 @@ export async function runDaemon(): Promise<void> {
     tabId: string,
     assistant: AssistantId,
     command: string,
-    initialViewport?: TerminalSnapshot
+    initialViewport?: TerminalSnapshot,
+    worktreeId?: string
   ): void => {
     const before = tabRegistry.get(tabId)
     const entry = mergeTabRegistryEntry(
@@ -189,7 +195,8 @@ export async function runDaemon(): Promise<void> {
       assistant,
       command,
       initialViewport,
-      allocateSeq
+      allocateSeq,
+      worktreeId
     )
     logDebug('daemon.rememberTab', {
       hadExistingEntry: before !== undefined,
@@ -258,6 +265,7 @@ export async function runDaemon(): Promise<void> {
         command: entry.command,
         id: tabId,
         viewport: entry.viewport,
+        worktreeId: entry.worktreeId,
       })
     }
     return result
@@ -282,6 +290,10 @@ export async function runDaemon(): Promise<void> {
       // removes a race where in-flight tab events could be dropped when a
       // client tears down its socket to switch sessions.
       broadcastAll({ payload: { sessionId, status, tabId }, type: 'tabStatus' })
+    },
+    onWorktreeStatus: (worktreeId, status, sessionId) => {
+      logDebug('daemon.status.worktree', { sessionId, status, worktreeId })
+      broadcastAll({ payload: { sessionId, status, worktreeId }, type: 'worktreeStatus' })
     },
   })
 
@@ -428,7 +440,8 @@ export async function runDaemon(): Promise<void> {
                       tab.id,
                       tab.assistant,
                       tab.command,
-                      tab.viewport
+                      tab.viewport,
+                      tab.worktreeId
                     )
                   }
                   // Classify synchronously BEFORE sending attachResult so
@@ -453,16 +466,19 @@ export async function runDaemon(): Promise<void> {
                     activity: statusLoop.getTabStatus(tab.id) ?? tab.activity,
                   }))
                   const initialSessionStatuses = statusLoop.snapshotSessions()
+                  const initialWorktreeStatuses = statusLoop.snapshotWorktrees()
                   logDebug('daemon.attach.replay', {
                     sessionId: message.payload.sessionId,
                     sessions: initialSessionStatuses,
                     tabs: tabsWithActivity.map((t) => ({ activity: t.activity, id: t.id })),
+                    worktrees: initialWorktreeStatuses,
                   })
                   send(socket, {
                     id: message.id,
                     payload: {
                       activeTabId: attachResult.activeTabId,
                       initialSessionStatuses,
+                      initialWorktreeStatuses,
                       protocolVersion: negotiatedVersion,
                       tabs: tabsWithActivity,
                     },
@@ -488,7 +504,9 @@ export async function runDaemon(): Promise<void> {
                     sessionId,
                     message.payload.tabId,
                     message.payload.assistant,
-                    [message.payload.command, ...(message.payload.args ?? [])].join(' ')
+                    [message.payload.command, ...(message.payload.args ?? [])].join(' '),
+                    undefined,
+                    message.payload.worktreeId
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
                   // call back into our status loop. Safe to add for every

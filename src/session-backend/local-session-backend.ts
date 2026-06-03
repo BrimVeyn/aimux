@@ -72,6 +72,9 @@ export class LocalSessionBackend
           this.emit('tabActivity', tabId, status)
         }
       },
+      onWorktreeStatus: (worktreeId, status, sessionId) => {
+        this.emit('worktreeActivity', worktreeId, status, sessionId)
+      },
     })
   }
 
@@ -119,6 +122,7 @@ export class LocalSessionBackend
     return {
       activeTabId: attachResult.activeTabId,
       initialSessionStatuses: this.statusLoop.snapshotSessions(),
+      initialWorktreeStatuses: this.statusLoop.snapshotWorktrees(),
       tabs: tabsWithActivity,
     }
   }
@@ -132,6 +136,7 @@ export class LocalSessionBackend
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) {
       logDebug('backend.local.skipCreateWithoutSession', { tabId: options.tabId })
