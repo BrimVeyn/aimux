@@ -51,10 +51,25 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
   }
 }
 
-export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefined): TabSession[] {
+export interface RestoreOptions {
+  // Force any running/starting tab to 'disconnected' on restore. True for
+  // cold-start (daemon may not own the sessions yet) and the daemon's own
+  // catalog hydration. False for live in-app workspace switches where an
+  // attach() is guaranteed to follow within a frame and hydrate-workspace
+  // will overwrite the status with daemon truth — leaving the flag on would
+  // briefly flash the "Restored snapshot" hint on every j/k cycle.
+  forceDisconnected?: boolean
+}
+
+export function restoreTabsFromWorkspace(
+  snapshot: WorkspaceSnapshotV1 | undefined,
+  options: RestoreOptions = {}
+): TabSession[] {
   if (!snapshot || snapshot.version !== 1) {
     return []
   }
+
+  const forceDisconnected = options.forceDisconnected ?? true
 
   return snapshot.tabs
     .filter(
@@ -69,7 +84,7 @@ export function restoreTabsFromWorkspace(snapshot: WorkspaceSnapshotV1 | undefin
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
       id: tab.id,
-      status: getDisconnectedStatus(tab.status),
+      status: forceDisconnected ? getDisconnectedStatus(tab.status) : tab.status,
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
@@ -169,12 +184,13 @@ export function normalizeGroupedTabOrder(
 
 export function restoreWorkspaceState(
   state: AppState,
-  workspaceSnapshot: WorkspaceSnapshotV1 | undefined
+  workspaceSnapshot: WorkspaceSnapshotV1 | undefined,
+  options: RestoreOptions = {}
 ): Pick<
   AppState,
   'tabs' | 'activeTabId' | 'focusMode' | 'sidebar' | 'layoutTrees' | 'tabGroupMap'
 > {
-  const tabs = restoreTabsFromWorkspace(workspaceSnapshot)
+  const tabs = restoreTabsFromWorkspace(workspaceSnapshot, options)
   const activeTabId =
     workspaceSnapshot?.activeTabId != null &&
     workspaceSnapshot?.activeTabId !== '' &&

@@ -1175,6 +1175,10 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
     appStore.setState((current) => {
       const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
       return appReducer(afterSet, {
+        // Daemon is alive and attach() will hydrate real statuses within a
+        // frame, so skip the snapshot's running→disconnected downgrade —
+        // otherwise the "Restored snapshot" hint flashes on every j/k cycle.
+        forceDisconnected: false,
         sessionId: patchedSession.id,
         type: 'load-session',
         workspaceSnapshot: patchedSession.workspaceSnapshot,
