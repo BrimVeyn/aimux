@@ -1,4 +1,4 @@
-import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
+import type { MouseEvent as OtuiMouseEvent, TextRenderable } from '@opentui/core'
 
 import { memo, type ReactNode, useCallback, useMemo } from 'react'
 
@@ -104,6 +104,27 @@ interface TerminalViewportProps {
   buffer: string
 }
 
+const NOOP = (): void => {}
+
+// aimux renders the exact visible window and owns scrollback through the backend
+// xterm buffer (viewportY); opentui's built-in text scroll (_scrollY) must never
+// engage. During any transient where the rendered content is briefly taller than
+// the box (resize lag, or — with the old default wrapMode="word" — a line that
+// wraps) a wheel event bumps _scrollY, and opentui's onResize never re-clamps it,
+// so the offset sticks for the renderable's life: the viewport shifts up, dead
+// rows appear at the bottom, and the prompt scrolls off-screen after `clear`.
+// Pin the offset to 0 and disable the built-in wheel handler outright (it also
+// drives horizontal scroll once wrapMode is "none"). The event still bubbles to
+// forwardScrollEvent, so local scrollback / mouse-forwarding keep working, and
+// selection is unaffected (it's driven by the renderer, not handleScroll).
+// handleScroll is protected; reach it via Reflect, mirroring the scrollY reset
+// already used in TerminalPane.
+const pinTerminalScroll = (node: TextRenderable | null): void => {
+  if (!node) return
+  Reflect.set(node, 'handleScroll', NOOP)
+  if (node.scrollY !== 0) node.scrollY = 0
+}
+
 const TerminalViewport = memo(function TerminalViewport({
   buffer,
   viewport,
@@ -112,7 +133,7 @@ const TerminalViewport = memo(function TerminalViewport({
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
     return (
-      <text fg={t.text}>
+      <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
         {lines.map((line, lineIndex) => (
           // Terminal rows are a fixed positional grid; the row index is the identity.
           // eslint-disable-next-line react/no-array-index-key
@@ -125,7 +146,11 @@ const TerminalViewport = memo(function TerminalViewport({
     )
   }
 
-  return <text fg={t.text}>{buffer.length > 0 ? buffer : 'Waiting for workspace output...'}</text>
+  return (
+    <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
+      {buffer.length > 0 ? buffer : 'Waiting for workspace output...'}
+    </text>
+  )
 })
 
 export function TerminalPane({
