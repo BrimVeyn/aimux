@@ -60,6 +60,11 @@ if (command === '--help' || command === '-h') {
 
 const renderer = await createCliRenderer({
   autoFocus: true,
+  // Transparent clear color so cells untouched by BoxRenderable paints (e.g.
+  // when transparent mode overrides all chrome bg tokens to alpha=0) flush to
+  // the terminal with no bg, letting the host terminal's background show
+  // through. With an opaque clear color, transparent mode is a no-op.
+  backgroundColor: '#00000000',
   consoleMode: 'disabled',
   exitOnCtrlC: false,
   screenMode: 'alternate-screen',
