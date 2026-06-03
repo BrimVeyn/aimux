@@ -538,7 +538,12 @@ export type ModalAction =
 
 // -- Session actions --
 export type SessionAction =
-  | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
+  | {
+      type: 'load-session'
+      sessionId: string
+      workspaceSnapshot?: WorkspaceSnapshotV1
+      forceDisconnected?: boolean
+    }
   | { type: 'set-sessions'; sessions: SessionRecord[] }
   | { type: 'create-session-record'; session: SessionRecord }
   | { type: 'rename-session-record'; sessionId: string; name: string }

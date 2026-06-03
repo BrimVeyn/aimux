@@ -18,7 +18,9 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const snapshot =
         action.workspaceSnapshot ??
         state.sessions.find((entry) => entry.id === action.sessionId)?.workspaceSnapshot
-      const restored = restoreWorkspaceState(state, snapshot)
+      const restored = restoreWorkspaceState(state, snapshot, {
+        forceDisconnected: action.forceDisconnected ?? true,
+      })
       // The session's activeWorktreeId may have been patched right before
       // this load (e.g. the cross-workspace branch of handleCycleSidebarItem
       // sets it to the worktree the user just clicked). The snapshot's
