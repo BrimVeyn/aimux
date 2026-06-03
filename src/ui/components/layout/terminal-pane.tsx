@@ -330,6 +330,37 @@ export function TerminalPane({
   )
   const forwardScrollEvent = useCallback(
     (event: OtuiMouseEvent) => {
+      // opentui's processMouseEvent dispatches a scroll to the deepest renderable
+      // (the <text> inside this box) BEFORE bubbling up to our handler.
+      // TextBufferRenderable's built-in onMouseEvent unconditionally calls
+      // handleScroll, which mutates its private _scrollY. preventDefault on the
+      // bubbled event can't roll that back — the scroll already happened. And
+      // nothing in React ever resets _scrollY for the lifetime of the renderable.
+      //
+      // Net effect: every wheel event over the terminal nudges the rendered
+      // text away from state.viewport.lines by one wheel step. The drift
+      // accumulates until the user refreshes aimux (re-mounts the text).
+      // Reset _scrollY here, right after the child finished scrolling.
+      const scrollTarget = event.target
+      if (scrollTarget !== null && typeof scrollTarget === 'object') {
+        const currentScrollY = Reflect.get(scrollTarget, 'scrollY')
+        if (typeof currentScrollY === 'number' && currentScrollY !== 0) {
+          try {
+            Reflect.set(scrollTarget, 'scrollY', 0)
+          } catch {
+            // Not all renderables expose a setter; best-effort only.
+          }
+        }
+        const currentScrollX = Reflect.get(scrollTarget, 'scrollX')
+        if (typeof currentScrollX === 'number' && currentScrollX !== 0) {
+          try {
+            Reflect.set(scrollTarget, 'scrollX', 0)
+          } catch {
+            // Not all renderables expose a setter; best-effort only.
+          }
+        }
+      }
+
       if (!canForwardMouse && !canUseLocalScrollback) {
         return
       }
