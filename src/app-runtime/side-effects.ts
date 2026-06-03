@@ -795,7 +795,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'switch-session-by-index': {
-      handleSwitchSessionByIndex(ctx, effect.index)
+      handleSwitchSessionByIndex(ctx, effect.index, effect.worktreeId)
       return
     }
     case 'cycle-sidebar-item': {
@@ -1058,13 +1058,14 @@ async function openEditorInline(
   }
 }
 
-function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void {
+function handleSwitchSessionByIndex(
+  ctx: SideEffectContext,
+  index: number,
+  worktreeId?: string
+): void {
   const { backend, dispatch } = ctx
   // Read fresh state. ctx.state is the snapshot from the previous render and
-  // lags behind dispatches that happened in the same JS turn (a worktree-row
-  // click first dispatches set-active-worktree then fires this side effect —
-  // we need to see that just-applied activeWorktreeId so the new session
-  // lands on the right worktree, not its last-saved one).
+  // lags behind dispatches that happened in the same JS turn.
   const state = ctx.getState()
   const ordered = [...state.sessions].sort(
     (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
@@ -1074,13 +1075,60 @@ function handleSwitchSessionByIndex(ctx: SideEffectContext, index: number): void
     logInputDebug('app.sessionBar.switchOutOfRange', { index, total: ordered.length })
     return
   }
+
+  // Resolve which worktree to land on. If the caller passed an explicit
+  // `worktreeId` (workspace-row tap → its primary, worktree-row tap → that
+  // worktree), honor it; otherwise let the target session keep its persisted
+  // activeWorktreeId.
+  const resolvedWorktreeId =
+    worktreeId != null &&
+    worktreeId !== '' &&
+    (target.worktrees?.some((w) => w.id === worktreeId) ?? false)
+      ? worktreeId
+      : undefined
+  const needsWorktreeChange =
+    resolvedWorktreeId != null && resolvedWorktreeId !== target.activeWorktreeId
+
   if (target.id === state.currentSessionId) {
+    if (needsWorktreeChange) {
+      dispatch({
+        sessionId: target.id,
+        type: 'set-active-worktree',
+        worktreeId: resolvedWorktreeId,
+      })
+    }
     if (state.focusMode === 'git') {
       dispatch({ type: 'exit-git-mode' })
     }
     return
   }
-  handleSwitchSessionEffect(state, backend, dispatch, target)
+
+  // Cross-workspace: bundle the worktree change into the session record AND
+  // fold set-sessions + load-session into a SINGLE setState call. Otherwise
+  // any subscriber notification (re-render, useEffect, backend re-attach)
+  // between dispatches can re-assert the session's previously-persisted
+  // activeWorktreeId, dropping the user back on the last-visited worktree.
+  const patchedSession = needsWorktreeChange
+    ? withActiveWorktree(target, resolvedWorktreeId)
+    : target
+  const patchedState: AppState = needsWorktreeChange
+    ? {
+        ...state,
+        sessions: state.sessions.map((s) => (s.id === patchedSession.id ? patchedSession : s)),
+      }
+    : state
+  const sessions = switchSessionRecords(patchedState, patchedSession)
+  saveSessionCatalog(sessions)
+  void backend.destroy(true)
+  appStore.setState((current) => {
+    const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
+    return appReducer(afterSet, {
+      forceDisconnected: false,
+      sessionId: patchedSession.id,
+      type: 'load-session',
+      workspaceSnapshot: patchedSession.workspaceSnapshot,
+    })
+  })
 }
 
 interface SidebarItem {
