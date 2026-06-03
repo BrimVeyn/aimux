@@ -41,14 +41,23 @@ export const WorktreeRow = memo(function WorktreeRow({
       if (event.button !== 0) return
       event.preventDefault()
       event.stopPropagation()
-      dispatchGlobal({
-        sessionId: session.id,
-        type: 'set-active-worktree',
+      if (isCurrentSession) {
+        dispatchGlobal({
+          sessionId: session.id,
+          type: 'set-active-worktree',
+          worktreeId: worktree.id,
+        })
+        return
+      }
+      // Cross-workspace click: send the worktree id along with the switch so
+      // the side effect can apply it atomically. Splitting it into a separate
+      // dispatch+switch leaves a window where subscribers/re-renders can
+      // re-assert the target session's last-persisted worktree.
+      runSideEffectGlobal({
+        index: sessionIndex,
+        type: 'switch-session-by-index',
         worktreeId: worktree.id,
       })
-      if (!isCurrentSession) {
-        runSideEffectGlobal({ index: sessionIndex, type: 'switch-session-by-index' })
-      }
     },
     [isCurrentSession, session.id, sessionIndex, worktree.id]
   )

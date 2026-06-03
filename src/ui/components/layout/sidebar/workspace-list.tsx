@@ -144,9 +144,23 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      runSideEffectGlobal({ index: idx + 1, type: 'switch-session-by-index' })
+      // The workspace row visually anchors the session's primary worktree
+      // (its branch line shows the primary's branch). Clicking it should
+      // land on the primary — same semantics as j/k cycling onto a workspace
+      // item — instead of preserving whatever non-primary worktree happened
+      // to be active last time we left this session.
+      const sourceSession = ordered.find((s) => s.id === source)
+      const sourceWorktrees = sourceSession?.worktrees ?? []
+      const sourcePrimaryId = (
+        sourceWorktrees.find((w) => w.source === 'primary') ?? sourceWorktrees[0]
+      )?.id
+      runSideEffectGlobal({
+        index: idx + 1,
+        type: 'switch-session-by-index',
+        worktreeId: sourcePrimaryId,
+      })
     }
-  }, [baselineOrder, dragOrder, draggingId])
+  }, [baselineOrder, dragOrder, draggingId, ordered])
 
   const cancelDrag = useCallback(() => {
     setDraggingId(null)

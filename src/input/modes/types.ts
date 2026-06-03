@@ -67,7 +67,7 @@ export type SideEffect =
   | { type: 'generate-auto-commit-now'; sessionId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
-  | { type: 'switch-session-by-index'; index: number }
+  | { type: 'switch-session-by-index'; index: number; worktreeId?: string }
   | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
   | { type: 'switch-tab-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
