@@ -115,6 +115,7 @@ export function createInitialState(
     tabGroupMap: {},
     tabs: [],
     worktreeDivergence: {},
+    worktreeStatuses: {},
   }
 }
 

@@ -40,7 +40,15 @@ export interface LoopTabView {
   assistant: AssistantId
   command: string
   viewport?: TerminalSnapshot
+  worktreeId?: string
 }
+
+/**
+ * Sentinel worktree id for tabs without a `worktreeId`. The frontend merges
+ * this bucket into the primary worktree's status — keeps legacy/pre-worktree
+ * tabs from disappearing from the sidebar indicator.
+ */
+export const UNASSIGNED_WORKTREE_ID = ''
 
 export interface StatusDetectionLoopOptions {
   listSessions: () => string[]
@@ -49,6 +57,11 @@ export interface StatusDetectionLoopOptions {
   onTabStatus: (tabId: string, status: TabActivity, sessionId: string) => void
   /** Emitted when either flag on a session changes. */
   onSessionStatus: (sessionId: string, status: SessionStatus) => void
+  /**
+   * Emitted when either flag on a worktree changes. The `worktreeId` is the
+   * tab's `worktreeId`, or `UNASSIGNED_WORKTREE_ID` for tabs without one.
+   */
+  onWorktreeStatus: (worktreeId: string, status: SessionStatus, sessionId: string) => void
   tickMs?: number
 }
 
@@ -58,8 +71,12 @@ export interface StatusDetectionLoopHandle {
   getTabStatus: (tabId: string) => TabActivity | undefined
   /** Last session flags, for on-attach replay. */
   getSessionStatus: (sessionId: string) => SessionStatus | undefined
+  /** Last worktree flags, for on-attach replay. */
+  getWorktreeStatus: (worktreeId: string) => SessionStatus | undefined
   /** Snapshot of every known session's flags. */
   snapshotSessions: () => { sessionId: string; status: SessionStatus }[]
+  /** Snapshot of every known worktree's flags. */
+  snapshotWorktrees: () => { worktreeId: string; sessionId: string; status: SessionStatus }[]
   /** Snapshot of every known tab's status plus its session. */
   snapshotTabs: () => { tabId: string; sessionId: string; status: TabActivity }[]
   /**
@@ -84,6 +101,7 @@ export function runStatusDetectionLoop(
   const arbiter = new AssistantStatusArbiter()
   const lastTabStatus = new Map<string, { status: TabActivity; sessionId: string }>()
   const lastSessionStatus = new Map<string, SessionStatus>()
+  const lastWorktreeStatus = new Map<string, { status: SessionStatus; sessionId: string }>()
 
   const timer = setInterval(() => {
     try {
@@ -101,10 +119,16 @@ export function runStatusDetectionLoop(
     tabs: LoopTabView[],
     now: number,
     source: 'tick' | 'classifyNow',
-    seenTabs?: Set<string>
+    seenTabs?: Set<string>,
+    seenWorktrees?: Set<string>
   ): void {
     let working = false
     let waiting = false
+    // Worktrees this session contributes to this tick — used to clear any
+    // worktree bucket that no longer has matching tabs (e.g. last tab moved
+    // to another worktree). We seed every observed bucket with idle so it
+    // gets emitted as `{working: false, waiting: false}` rather than vanishing.
+    const worktreeAgg = new Map<string, SessionStatus>()
     for (const tab of tabs) {
       seenTabs?.add(tab.id)
       const visual = detector.classify({
@@ -117,6 +141,12 @@ export function runStatusDetectionLoop(
       const status = arbiter.arbitrate(tab.id, visual, now)
       if (status === 'working') working = true
       if (status === 'waiting-input') waiting = true
+      const worktreeKey = tab.worktreeId ?? UNASSIGNED_WORKTREE_ID
+      const prevAgg = worktreeAgg.get(worktreeKey) ?? { waiting: false, working: false }
+      worktreeAgg.set(worktreeKey, {
+        waiting: prevAgg.waiting || status === 'waiting-input',
+        working: prevAgg.working || status === 'working',
+      })
       const prev = lastTabStatus.get(tab.id)
       const changed = !prev || prev.status !== status || prev.sessionId !== sessionId
       logDebug('statusLoop.classify', {
@@ -151,6 +181,19 @@ export function runStatusDetectionLoop(
       lastSessionStatus.set(sessionId, next)
       options.onSessionStatus(sessionId, next)
     }
+    for (const [worktreeId, status] of worktreeAgg) {
+      seenWorktrees?.add(worktreeId)
+      const prevWt = lastWorktreeStatus.get(worktreeId)
+      const wtChanged =
+        !prevWt ||
+        prevWt.sessionId !== sessionId ||
+        prevWt.status.working !== status.working ||
+        prevWt.status.waiting !== status.waiting
+      if (wtChanged) {
+        lastWorktreeStatus.set(worktreeId, { sessionId, status })
+        options.onWorktreeStatus(worktreeId, status, sessionId)
+      }
+    }
   }
 
   function tick(): void {
@@ -158,10 +201,11 @@ export function runStatusDetectionLoop(
     const sessionIds = options.listSessions()
     const seenSessions = new Set<string>()
     const seenTabs = new Set<string>()
+    const seenWorktrees = new Set<string>()
 
     for (const sessionId of sessionIds) {
       seenSessions.add(sessionId)
-      classifySession(sessionId, options.listTabs(sessionId), now, 'tick', seenTabs)
+      classifySession(sessionId, options.listTabs(sessionId), now, 'tick', seenTabs, seenWorktrees)
     }
 
     for (const tabId of lastTabStatus.keys()) {
@@ -176,6 +220,16 @@ export function runStatusDetectionLoop(
         lastSessionStatus.delete(sessionId)
       }
     }
+    for (const [worktreeId, entry] of lastWorktreeStatus) {
+      if (!seenWorktrees.has(worktreeId)) {
+        // Worktree no longer has any tabs — clear it to idle so the UI drops
+        // any stale spinner/waiting glyph, then remove from the map.
+        if (entry.status.working || entry.status.waiting) {
+          options.onWorktreeStatus(worktreeId, { waiting: false, working: false }, entry.sessionId)
+        }
+        lastWorktreeStatus.delete(worktreeId)
+      }
+    }
   }
 
   return {
@@ -184,6 +238,7 @@ export function runStatusDetectionLoop(
     },
     getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
+    getWorktreeStatus: (worktreeId) => lastWorktreeStatus.get(worktreeId)?.status,
     recordHookEvent: (input) => {
       const mapped = arbiter.recordHookEvent(input)
       logDebug('statusLoop.recordHookEvent', {
@@ -200,12 +255,19 @@ export function runStatusDetectionLoop(
         status: entry.status,
         tabId,
       })),
+    snapshotWorktrees: () =>
+      [...lastWorktreeStatus.entries()].map(([worktreeId, entry]) => ({
+        sessionId: entry.sessionId,
+        status: entry.status,
+        worktreeId,
+      })),
     stop: () => {
       clearInterval(timer)
       detector.clear()
       arbiter.clear()
       lastTabStatus.clear()
       lastSessionStatus.clear()
+      lastWorktreeStatus.clear()
     },
   }
 }

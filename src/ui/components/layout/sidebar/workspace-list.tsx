@@ -6,14 +6,12 @@ import type {
 
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../state/types'
+import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/session-worktrees'
-// eslint-disable-next-line no-duplicate-imports
-import { IDLE_SESSION_STATUS } from '../../../../state/types'
-import { useBusySpinner } from '../../../hooks/use-busy-spinner'
+import { useStatusGlyph, useWorktreeStatus } from '../../../hooks/use-worktree-status'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
 import { useTheme } from '../../../theme'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
@@ -45,7 +43,6 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
   const t = useTheme()
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const statusMap = useAppStore((s) => s.sessionStatuses)
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
@@ -214,7 +211,6 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
                 inCurrentGroup={isCurrentSession}
                 primaryWorktree={primaryWorktree}
                 hasExtraWorktrees={extraWorktrees.length > 0}
-                status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
                 dragging={draggingId === session.id}
                 contentWidth={contentWidth}
                 marginTop={visibleIdx > 0 ? 1 : 0}
@@ -268,7 +264,6 @@ interface WorkspaceRowProps {
   primaryWorktree: WorktreeRecord | undefined
   /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
   hasExtraWorktrees: boolean
-  status: SessionStatus
   dragging: boolean
   contentWidth: number
   /** Vertical spacing above this row — used to separate workspace blocks. */
@@ -294,20 +289,20 @@ const WorkspaceRow = memo(function WorkspaceRow({
   primaryWorktree,
   session,
   setRowRef,
-  status,
 }: WorkspaceRowProps) {
   const t = useTheme()
-  const showSpinner = status.working
-  const showWaiting = status.waiting
-  const spinner = useBusySpinner(showSpinner)
+  // The workspace row glyph reflects the *primary* worktree's status only —
+  // each non-primary worktree owns its own row + glyph below. Tabs without a
+  // `worktreeId` (legacy) are merged into the primary bucket via the
+  // `includeUnassigned` flag.
+  const status = useWorktreeStatus(primaryWorktree?.id, true)
+  const { color: leadingColor, glyph: leadingGlyph } = useStatusGlyph(status)
   let bgColor: string | undefined
   if (dragging || isActiveItem) {
     bgColor = t.backgroundElement
   } else if (inCurrentGroup) {
     bgColor = t.backgroundPanel
   }
-  const workingColor = t.primary
-  const waitingColor = t.warning
   const divergence = useAppStore((s) =>
     primaryWorktree ? s.worktreeDivergence[primaryWorktree.id] : undefined
   )
@@ -350,18 +345,6 @@ const WorkspaceRow = memo(function WorkspaceRow({
     ],
     [session.id, session.name]
   )
-
-  // Neutral muted marker; working/waiting overrides it. Keeping a glyph
-  // in the slot avoids name shifts when state indicators come and go.
-  let leadingGlyph = '•'
-  let leadingColor = t.textMuted
-  if (showWaiting) {
-    leadingGlyph = '?'
-    leadingColor = waitingColor
-  } else if (showSpinner) {
-    leadingGlyph = spinner
-    leadingColor = workingColor
-  }
 
   const branchText = primaryWorktree?.branch ?? ''
   const divergenceText = formatDivergence(divergence)

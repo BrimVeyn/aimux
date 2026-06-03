@@ -70,6 +70,9 @@ function hydrateAttachedSession(
     for (const entry of result.initialSessionStatuses) {
       dispatch({ sessionId: entry.sessionId, status: entry.status, type: 'set-session-status' })
     }
+    for (const entry of result.initialWorktreeStatuses) {
+      dispatch({ status: entry.status, type: 'set-worktree-status', worktreeId: entry.worktreeId })
+    }
     resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
     return
   }

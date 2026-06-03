@@ -73,9 +73,14 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       }
     case 'delete-session-record': {
       const deletingCurrent = action.sessionId === state.currentSessionId
+      const deletedSession = state.sessions.find((s) => s.id === action.sessionId)
       const newSessions = state.sessions.filter((session) => session.id !== action.sessionId)
       const nextStatuses = { ...state.sessionStatuses }
       delete nextStatuses[action.sessionId]
+      const nextWorktreeStatuses = { ...state.worktreeStatuses }
+      for (const wt of deletedSession?.worktrees ?? []) {
+        delete nextWorktreeStatuses[wt.id]
+      }
       if (action.openSessionPicker === true) {
         const filteredNew = filterSessions(newSessions, state.modal.editBuffer)
         const maxIndex = filteredNew.length
@@ -94,6 +99,7 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           sessions: newSessions,
           sessionStatuses: nextStatuses,
           tabs: deletingCurrent ? [] : state.tabs,
+          worktreeStatuses: nextWorktreeStatuses,
         }
       }
       return {
@@ -105,6 +111,7 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         sessions: newSessions,
         sessionStatuses: nextStatuses,
         tabs: deletingCurrent ? [] : state.tabs,
+        worktreeStatuses: nextWorktreeStatuses,
       }
     }
     case 'reorder-sessions': {
@@ -156,6 +163,20 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       return {
         ...state,
         sessionStatuses: { ...state.sessionStatuses, [action.sessionId]: action.status },
+      }
+    }
+    case 'set-worktree-status': {
+      const prev = state.worktreeStatuses[action.worktreeId]
+      if (
+        prev !== undefined &&
+        prev.working === action.status.working &&
+        prev.waiting === action.status.waiting
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        worktreeStatuses: { ...state.worktreeStatuses, [action.worktreeId]: action.status },
       }
     }
     case 'add-worktree-record':

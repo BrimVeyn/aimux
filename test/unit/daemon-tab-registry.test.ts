@@ -37,6 +37,7 @@ describe('mergeTabRegistryEntry', () => {
       sessionId: 'S',
       viewport: fresh,
       viewportSeq: 42,
+      worktreeId: undefined,
     })
 
     // Now the attach handler runs with the attach-time (older) viewport.
@@ -58,6 +59,7 @@ describe('mergeTabRegistryEntry', () => {
       sessionId: 'S-old',
       viewport: snapshot('preserved'),
       viewportSeq: 7,
+      worktreeId: undefined,
     })
     mergeTabRegistryEntry(
       registry,

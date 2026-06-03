@@ -48,6 +48,12 @@ export interface AttachResult {
    * `sessionStatus` event could arrive before the session was in state.
    */
   initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
+  /**
+   * Snapshot of every known worktree's status at attach time. Same atomic-
+   * hydrate rationale as `initialSessionStatuses` — keeps the sidebar's
+   * per-worktree glyphs correct on first paint.
+   */
+  initialWorktreeStatuses: { worktreeId: string; sessionId: string; status: SessionStatus }[]
 }
 
 export type ClientRequest =
@@ -65,6 +71,7 @@ export type ClientRequest =
         cols: number
         rows: number
         cwd?: string
+        worktreeId?: string
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
@@ -100,6 +107,10 @@ export type ServerEvent =
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
   | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
+  | {
+      type: 'worktreeStatus'
+      payload: { sessionId: string; worktreeId: string; status: SessionStatus }
+    }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
 
@@ -235,6 +246,14 @@ function isAttachResult(value: unknown): value is AttachResult {
     Array.isArray(value.initialSessionStatuses) &&
     value.initialSessionStatuses.every(
       (entry) => isObjectRecord(entry) && isString(entry.sessionId) && isSessionStatus(entry.status)
+    ) &&
+    Array.isArray(value.initialWorktreeStatuses) &&
+    value.initialWorktreeStatuses.every(
+      (entry) =>
+        isObjectRecord(entry) &&
+        isString(entry.worktreeId) &&
+        isString(entry.sessionId) &&
+        isSessionStatus(entry.status)
     )
   )
 }
@@ -306,6 +325,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(
         value.payload.cwd === undefined || isString(value.payload.cwd),
         'createTab.cwd must be a string'
+      )
+      assert(
+        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
+        'createTab.worktreeId must be a string'
       )
       return value as ClientRequest
     case 'write':
@@ -384,6 +407,11 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
       assert(isSessionStatus(value.payload.status), 'sessionStatus.status is invalid')
+      return value as ServerEvent
+    case 'worktreeStatus':
+      assert(isString(value.payload.sessionId), 'worktreeStatus.sessionId must be a string')
+      assert(isString(value.payload.worktreeId), 'worktreeStatus.worktreeId must be a string')
+      assert(isSessionStatus(value.payload.status), 'worktreeStatus.status is invalid')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

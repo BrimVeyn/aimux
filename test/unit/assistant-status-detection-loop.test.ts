@@ -46,6 +46,9 @@ function makeHarness(initialTabsBySession: Map<string, FakeTab[]>) {
     onTabStatus: (tabId, status, sessionId) => {
       tabStatusEvents.push({ sessionId, status, tabId })
     },
+    onWorktreeStatus: () => {
+      // Per-worktree status is exercised in dedicated tests; ignored here.
+    },
     // 0 disables the ticker — tests drive via classifyNow.
     tickMs: 10_000,
   })

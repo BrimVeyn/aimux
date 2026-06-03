@@ -131,6 +131,9 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cwd?: string
     /** Extra env injected into the spawned shell. Passed through to the PTY. */
     env?: Record<string, string>
+    /** Worktree this tab belongs to — kept on the TabSession for per-worktree
+     *  status aggregation in the detection loop. */
+    worktreeId?: string
   }): void {
     logDebug('daemon.registry.createSession', {
       args: options.args ?? [],
@@ -150,6 +153,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         status: 'starting',
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
+        worktreeId: options.worktreeId,
       })
     } else {
       existing.status = 'starting'
@@ -161,6 +165,9 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.assistant = options.assistant
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
+      if (options.worktreeId !== undefined) {
+        existing.worktreeId = options.worktreeId
+      }
     }
 
     this.activeTabId = options.tabId
