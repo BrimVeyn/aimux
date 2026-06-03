@@ -25,27 +25,54 @@ const themeStore = createStore<ThemeStore>(() => ({
 
 let cachedId: ThemeId | null = null
 let cachedMode: ThemeMode | null = null
-let cachedResolved: ResolvedTuiTheme | null = null
+let cachedBase: ResolvedTuiTheme | null = null
+let cachedTransparent: boolean | null = null
+let cachedFinal: ResolvedTuiTheme | null = null
 
-function derive(id: ThemeId, mode: ThemeMode): ResolvedTuiTheme {
-  if (cachedResolved && cachedId === id && cachedMode === mode) return cachedResolved
+// Chrome surface tokens: when transparent mode is on we replace these with
+// 'transparent' so opentui's BoxRenderable skips its fill (alpha=0 early-returns
+// in setCellWithAlphaBlending) and the host terminal background shows through
+// every chrome site (root, sidebar, tabs, status bar, modals, …) without
+// patching ~30 components one-by-one.
+const CHROME_BG_TOKENS = [
+  'background',
+  'backgroundPanel',
+  'backgroundElement',
+  'backgroundMenu',
+] as const
+
+function derive(id: ThemeId, mode: ThemeMode, transparent: boolean): ResolvedTuiTheme {
+  if (cachedFinal && cachedId === id && cachedMode === mode && cachedTransparent === transparent)
+    return cachedFinal
+
+  if (!cachedBase || cachedId !== id || cachedMode !== mode) {
+    const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
+    if (!json) throw new Error(`No theme JSON for ${id}`)
+    cachedBase = resolveTuiTheme(json, mode)
+  }
   cachedId = id
   cachedMode = mode
-  const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
-  if (!json) throw new Error(`No theme JSON for ${id}`)
-  cachedResolved = resolveTuiTheme(json, mode)
-  return cachedResolved
+  cachedTransparent = transparent
+
+  if (transparent) {
+    const overlay: ResolvedTuiTheme = { ...cachedBase }
+    for (const key of CHROME_BG_TOKENS) overlay[key] = 'transparent'
+    cachedFinal = overlay
+  } else {
+    cachedFinal = cachedBase
+  }
+  return cachedFinal
 }
 
-/** Subscribe to the resolved TUI theme for the active id+mode. */
+/** Subscribe to the resolved TUI theme for the active id+mode (+transparent overlay). */
 export function useTheme(): ResolvedTuiTheme {
-  return useStore(themeStore, (s) => derive(s.id, s.mode))
+  return useStore(themeStore, (s) => derive(s.id, s.mode, s.transparent))
 }
 
 /** Synchronous snapshot of the resolved theme for non-React callers. */
 export function getCurrentTheme(): ResolvedTuiTheme {
   const s = themeStore.getState()
-  return derive(s.id, s.mode)
+  return derive(s.id, s.mode, s.transparent)
 }
 
 export function getCurrentThemeId(): ThemeId {
@@ -96,6 +123,9 @@ export function subscribeThemeChanges(
     if (s.id === lastId && s.mode === lastMode) return
     lastId = s.id
     lastMode = s.mode
-    listener(derive(s.id, s.mode), s.mode)
+    // Pass base theme (transparent=false): the only subscriber today is the
+    // Claude Code theme bridge, which has no transparency concept and wants
+    // the resolved palette.
+    listener(derive(s.id, s.mode, false), s.mode)
   })
 }
