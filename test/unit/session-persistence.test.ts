@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  pruneSnapshotOfWorktree,
   restoreTabsFromWorkspace,
   restoreWorkspaceState,
   serializeWorkspace,
@@ -194,5 +195,110 @@ describe('session persistence', () => {
     })
 
     expect(restored.tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2', 'tab-3', 'tab-4'])
+  })
+
+  test('prunes snapshot tabs belonging to a removed worktree', () => {
+    const terminalModes = {
+      alternateScrollMode: false,
+      bracketedPasteMode: false,
+      isAlternateBuffer: false,
+      mouseTrackingMode: 'none' as const,
+      sendFocusMode: false,
+    }
+    const snapshot = {
+      activeTabId: 'feature-1',
+      layoutTrees: {
+        'group-1': {
+          direction: 'vertical' as const,
+          first: { tabId: 'feature-1', type: 'leaf' as const },
+          ratio: 0.5,
+          second: { tabId: 'feature-2', type: 'leaf' as const },
+          type: 'split' as const,
+        },
+        'group-2': {
+          direction: 'horizontal' as const,
+          first: { tabId: 'main-1', type: 'leaf' as const },
+          ratio: 0.4,
+          second: { tabId: 'main-2', type: 'leaf' as const },
+          type: 'split' as const,
+        },
+      },
+      savedAt: new Date().toISOString(),
+      sidebar: { visible: true, width: 28 },
+      tabGroupMap: {
+        'feature-1': 'group-1',
+        'feature-2': 'group-1',
+        'main-1': 'group-2',
+        'main-2': 'group-2',
+      },
+      tabs: [
+        {
+          assistant: 'claude' as const,
+          buffer: '',
+          command: 'claude',
+          id: 'main-1',
+          status: 'running' as const,
+          terminalModes,
+          title: 'Main 1',
+          worktreeId: 'wt-main',
+        },
+        {
+          assistant: 'codex' as const,
+          buffer: '',
+          command: 'codex',
+          id: 'main-2',
+          status: 'running' as const,
+          terminalModes,
+          title: 'Main 2',
+          worktreeId: 'wt-main',
+        },
+        {
+          assistant: 'claude' as const,
+          buffer: '',
+          command: 'claude',
+          id: 'feature-1',
+          status: 'running' as const,
+          terminalModes,
+          title: 'Feature 1',
+          worktreeId: 'wt-feature',
+        },
+        {
+          assistant: 'opencode' as const,
+          buffer: '',
+          command: 'opencode',
+          id: 'feature-2',
+          status: 'running' as const,
+          terminalModes,
+          title: 'Feature 2',
+          worktreeId: 'wt-feature',
+        },
+      ],
+      version: 1 as const,
+    }
+
+    const pruned = pruneSnapshotOfWorktree(snapshot, 'wt-feature')
+    expect(pruned).toBeDefined()
+    expect(pruned?.tabs.map((tab) => tab.id)).toEqual(['main-1', 'main-2'])
+    expect(pruned?.tabs.some((tab) => tab.worktreeId === 'wt-feature')).toBe(false)
+    // The group whose leaves were all from wt-feature is gone; the main group survives.
+    expect(Object.keys(pruned?.layoutTrees ?? {})).toEqual(['group-2'])
+    expect(pruned?.tabGroupMap).toEqual({ 'main-1': 'group-2', 'main-2': 'group-2' })
+    // activeTabId pointed at a pruned tab → falls back to first surviving tab.
+    expect(pruned?.activeTabId).toBe('main-1')
+  })
+
+  test('returns the same snapshot reference when no tab matches the removed worktree', () => {
+    const snapshot = {
+      activeTabId: null,
+      savedAt: new Date().toISOString(),
+      sidebar: { visible: true, width: 28 },
+      tabs: [],
+      version: 1 as const,
+    }
+    expect(pruneSnapshotOfWorktree(snapshot, 'wt-anything')).toBe(snapshot)
+  })
+
+  test('returns undefined when snapshot is undefined', () => {
+    expect(pruneSnapshotOfWorktree(undefined, 'wt-x')).toBeUndefined()
   })
 })

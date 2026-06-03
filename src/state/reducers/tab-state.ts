@@ -394,7 +394,12 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       if (state.tabs.length === 0) {
         return state
       }
-      const orderedTabs = orderTabsByWorktree(state.tabs, getCurrentSession(state))
+      const session = getCurrentSession(state)
+      const visibleTabs = filterTabsForActiveWorktree(state.tabs, session)
+      if (visibleTabs.length === 0) {
+        return state
+      }
+      const orderedTabs = orderTabsByWorktree(visibleTabs, session)
       const currentIndex = orderedTabs.findIndex((tab) => tab.id === state.activeTabId)
       const safeIndex = currentIndex === -1 ? 0 : currentIndex
       const nextIndex = (safeIndex + action.delta + orderedTabs.length) % orderedTabs.length

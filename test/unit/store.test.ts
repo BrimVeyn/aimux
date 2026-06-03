@@ -550,6 +550,106 @@ describe('appReducer', () => {
     expect(next.activeTabId).toBe('main-2')
   })
 
+  test('cycles only within the active worktree (does not cross worktrees)', () => {
+    const now = '2024-01-01T00:00:00.000Z'
+    const sessionWithTwoWorktrees = {
+      activeWorktreeId: 'wt-main',
+      createdAt: now,
+      id: 'session-1',
+      lastOpenedAt: now,
+      name: 'Main',
+      projectPath: '/repo/main',
+      updatedAt: now,
+      worktrees: [
+        {
+          createdAt: now,
+          createdByAimux: false,
+          id: 'wt-main',
+          name: 'main',
+          path: '/repo/main',
+          repoRoot: '/repo/main',
+          source: 'primary' as const,
+          updatedAt: now,
+        },
+        {
+          createdAt: now,
+          createdByAimux: true,
+          id: 'wt-feature',
+          name: 'feature',
+          path: '/repo/feature',
+          repoRoot: '/repo/main',
+          source: 'aimux-temp' as const,
+          updatedAt: now,
+        },
+      ],
+    }
+    const tabs = [
+      createTab({
+        assistant: 'claude',
+        command: 'claude',
+        id: 'main-1',
+        status: 'running' as const,
+        title: 'Main 1',
+        worktreeId: 'wt-main',
+      }),
+      createTab({
+        assistant: 'codex',
+        command: 'codex',
+        id: 'main-2',
+        status: 'running' as const,
+        title: 'Main 2',
+        worktreeId: 'wt-main',
+      }),
+      createTab({
+        assistant: 'opencode',
+        command: 'opencode',
+        id: 'feature-1',
+        status: 'running' as const,
+        title: 'Feature 1',
+        worktreeId: 'wt-feature',
+      }),
+      createTab({
+        assistant: 'terminal',
+        command: 'bash',
+        id: 'feature-2',
+        status: 'running' as const,
+        title: 'Feature 2',
+        worktreeId: 'wt-feature',
+      }),
+    ]
+
+    // From last tab of active worktree, +1 wraps to FIRST of same worktree
+    // (must not cross to feature-1).
+    const fromLastOfActive = {
+      ...createInitialState({}, [sessionWithTwoWorktrees], [], false),
+      activeTabId: 'main-2',
+      currentSessionId: 'session-1',
+      tabs,
+    }
+    const wrapped = appReducer(fromLastOfActive, { delta: 1, type: 'move-active-tab' })
+    expect(wrapped.activeTabId).toBe('main-1')
+
+    // Switching the active worktree to wt-feature scopes h/l to its tabs.
+    const onFeature = {
+      ...createInitialState(
+        {},
+        [{ ...sessionWithTwoWorktrees, activeWorktreeId: 'wt-feature' }],
+        [],
+        false
+      ),
+      activeTabId: 'feature-1',
+      currentSessionId: 'session-1',
+      tabs,
+    }
+    const nextOnFeature = appReducer(onFeature, { delta: 1, type: 'move-active-tab' })
+    expect(nextOnFeature.activeTabId).toBe('feature-2')
+    const wrappedOnFeature = appReducer(
+      { ...onFeature, activeTabId: 'feature-2' },
+      { delta: 1, type: 'move-active-tab' }
+    )
+    expect(wrappedOnFeature.activeTabId).toBe('feature-1')
+  })
+
   test('wraps from last tab to first tab', () => {
     const initial = {
       ...createInitialState(),
