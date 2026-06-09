@@ -29,7 +29,6 @@ import {
   removeGitWorktree,
 } from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
-import { linkNodeModules } from '../platform/worktree-deps'
 import {
   assertSafeAimuxWorktreePath,
   isInsideAimuxWorktreeRoot,
@@ -1337,9 +1336,6 @@ async function createAimuxTempWorktree(
   await mkdir(dirname(targetPath), { recursive: true })
   await assertSafeAimuxWorktreePath(targetPath)
   await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
-  // For JS projects, reuse the source checkout's installed dependencies instead
-  // of forcing a fresh install in the new worktree.
-  const linkedModules = await linkNodeModules(sourcePath, targetPath).catch(() => false)
   const now = new Date().toISOString()
 
   const worktree: WorktreeRecord = {
@@ -1364,11 +1360,7 @@ async function createAimuxTempWorktree(
   }))
   saveSessionCatalog(sessions)
   ctx.dispatch({ sessions, type: 'set-sessions' })
-  toast.success(
-    linkedModules
-      ? `Created worktree ${branchName} (linked node_modules)`
-      : `Created worktree ${branchName}`
-  )
+  toast.success(`Created worktree ${branchName}`)
   return worktree
 }
 

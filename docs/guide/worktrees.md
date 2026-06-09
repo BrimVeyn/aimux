@@ -37,8 +37,7 @@ Worktrees are created from the **new-assistant modal** (`+ New assistant`, or
    `aimux/<name>-<id>`. Press `Enter` to create the worktree and launch the
    assistant in it.
 
-aimux links the source checkout's `node_modules` into the new worktree (instead
-of a fresh install) and confirms with a **Created worktree** toast.
+aimux confirms with a **Created worktree** toast.
 
 ## In the sidebar
 
