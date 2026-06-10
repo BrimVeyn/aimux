@@ -980,3 +980,129 @@ describe('appReducer', () => {
     })
   })
 })
+
+describe('set-active-worktree remembers the last viewed tab per worktree', () => {
+  const now = '2024-01-01T00:00:00.000Z'
+
+  function twoWorktreeSession(activeWorktreeId: 'wt-main' | 'wt-feature') {
+    return {
+      activeWorktreeId,
+      createdAt: now,
+      id: 'session-1',
+      lastOpenedAt: now,
+      name: 'Main',
+      projectPath: activeWorktreeId === 'wt-main' ? '/repo/main' : '/repo/feature',
+      updatedAt: now,
+      worktrees: [
+        {
+          createdAt: now,
+          createdByAimux: false,
+          id: 'wt-main',
+          name: 'main',
+          path: '/repo/main',
+          repoRoot: '/repo/main',
+          source: 'primary' as const,
+          updatedAt: now,
+        },
+        {
+          createdAt: now,
+          createdByAimux: true,
+          id: 'wt-feature',
+          name: 'feature',
+          path: '/repo/feature',
+          repoRoot: '/repo/main',
+          source: 'aimux-temp' as const,
+          updatedAt: now,
+        },
+      ],
+    }
+  }
+
+  const tabs = [
+    createTab({
+      assistant: 'claude',
+      command: 'claude',
+      id: 'main-1',
+      status: 'running',
+      title: 'Main 1',
+      worktreeId: 'wt-main',
+    }),
+    createTab({
+      assistant: 'codex',
+      command: 'codex',
+      id: 'main-2',
+      status: 'running',
+      title: 'Main 2',
+      worktreeId: 'wt-main',
+    }),
+    createTab({
+      assistant: 'opencode',
+      command: 'opencode',
+      id: 'feature-1',
+      status: 'running',
+      title: 'Feature 1',
+      worktreeId: 'wt-feature',
+    }),
+  ]
+
+  test('restores the last viewed tab when switching back to a worktree', () => {
+    // On wt-main viewing main-2 (the second tab, not the first).
+    const onMain = {
+      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      activeTabId: 'main-2',
+      currentSessionId: 'session-1',
+      tabs,
+    }
+
+    // Switch to wt-feature → lands on its first tab and remembers main-2.
+    const onFeature = appReducer(onMain, {
+      sessionId: 'session-1',
+      type: 'set-active-worktree',
+      worktreeId: 'wt-feature',
+    })
+    expect(onFeature.activeTabId).toBe('feature-1')
+    expect(onFeature.lastActiveTabByWorktree['wt-main']).toBe('main-2')
+
+    // Switch back to wt-main → restores main-2 instead of snapping to main-1.
+    const backOnMain = appReducer(onFeature, {
+      sessionId: 'session-1',
+      type: 'set-active-worktree',
+      worktreeId: 'wt-main',
+    })
+    expect(backOnMain.activeTabId).toBe('main-2')
+  })
+
+  test('falls back to the first visible tab when no tab is remembered', () => {
+    const onMain = {
+      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      activeTabId: 'main-1',
+      currentSessionId: 'session-1',
+      tabs,
+    }
+
+    const onFeature = appReducer(onMain, {
+      sessionId: 'session-1',
+      type: 'set-active-worktree',
+      worktreeId: 'wt-feature',
+    })
+    expect(onFeature.activeTabId).toBe('feature-1')
+  })
+
+  test('falls back to the first visible tab when the remembered tab is gone', () => {
+    const onMain = {
+      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      activeTabId: 'main-2',
+      currentSessionId: 'session-1',
+      lastActiveTabByWorktree: { 'wt-feature': 'feature-removed' },
+      tabs,
+    }
+
+    const onFeature = appReducer(onMain, {
+      sessionId: 'session-1',
+      type: 'set-active-worktree',
+      worktreeId: 'wt-feature',
+    })
+    // Remembered feature tab no longer exists → first visible feature tab.
+    expect(onFeature.activeTabId).toBe('feature-1')
+  })
+})

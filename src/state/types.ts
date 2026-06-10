@@ -489,6 +489,12 @@ export interface AppState {
    * keyed by worktree id. Ephemeral (polled); not persisted to the catalog.
    */
   worktreeDivergence: Record<string, BranchDivergence>
+  /**
+   * Last active tab a user viewed within each worktree, keyed by worktree id.
+   * Lets switching back to a worktree restore its last-viewed tab instead of
+   * snapping to the first one. Ephemeral (in-memory); not persisted to the catalog.
+   */
+  lastActiveTabByWorktree: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
