@@ -87,4 +87,6 @@ export type {
   StatusBarConfig,
   StatusBarSeparator,
   TabSession,
+  WorktreeTemplate,
+  WorktreeTemplatePane,
 } from './types'

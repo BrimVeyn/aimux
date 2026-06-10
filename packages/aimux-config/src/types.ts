@@ -294,7 +294,7 @@ export interface ModalNewTab extends ModalBase {
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create'
+  step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
   targetWorktreeIndex: number
   worktreeDeleteConfirmId: string | null
   worktreeDeleteMessage: string | null
@@ -447,6 +447,7 @@ export interface AppState {
   multiRepo: MultiRepoState
   worktreeDivergence: Record<string, BranchDivergence>
   pendingChords: string[] | null
+  worktreeTemplates: WorktreeTemplate[]
 }
 
 // ─── AppAction union ──────────────────────────────────────────────────────────
@@ -588,6 +589,22 @@ export interface GitRefreshPayload {
 export interface BranchDivergence {
   ahead: number
   behind: number
+}
+
+export interface WorktreeTemplatePane {
+  id: string
+  assistant: string
+  splitFrom?: string
+  direction?: SplitDirection
+  ratio?: number
+  send?: string
+}
+
+export interface WorktreeTemplate {
+  id: string
+  name: string
+  description?: string
+  panes: WorktreeTemplatePane[]
 }
 
 export type GitPanelAction =
@@ -1038,6 +1055,11 @@ export interface AimuxUserConfig {
   statusBar?: StatusBarConfig
   externalEditor?: ExternalEditorConfig
   integrations?: AimuxIntegrationsConfig
+  /**
+   * Worktree templates: layouts (multi-pane + initial commands) applied at
+   * worktree creation. Selected from a picker in the new-tab modal.
+   */
+  worktreeTemplates?: WorktreeTemplate[]
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -1114,4 +1136,5 @@ export interface ResolvedConfig {
   integrations: {
     claudeHooks: boolean
   }
+  worktreeTemplates: WorktreeTemplate[]
 }
