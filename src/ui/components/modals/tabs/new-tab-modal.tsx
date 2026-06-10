@@ -1,10 +1,11 @@
 import { useCallback, useMemo } from 'react'
 
+import type { WorktreeTemplate } from '../../../../config'
 import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterAssistants } from '../../../../state/selectors'
+import { filterAssistants, getTemplateNoneOffset } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
@@ -23,12 +24,21 @@ interface NewTabModalProps {
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create'
+  step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
   worktreeDeleteConfirmId: string | null
   worktreeDeleteMessage: string | null
   worktrees: WorktreeRecord[]
   worktreeName: string
+  worktreeTemplates: WorktreeTemplate[]
+  /**
+   * True when this modal is the worktree-aware new-tab flow. False when the
+   * component is reused for `split-picker`, which can only choose an
+   * assistant — the template shortcut entry must be hidden there.
+   */
+  allowTemplateShortcut: boolean
 }
+
+const TEMPLATE_SHORTCUT_KEY = '__template-shortcut__'
 
 function getDeleteBlockedReason({
   currentSessionId,
@@ -52,6 +62,7 @@ function getDeleteBlockedReason({
 
 export function NewTabModal({
   activeField,
+  allowTemplateShortcut,
   branchError,
   branchName,
   createWorktree,
@@ -68,6 +79,7 @@ export function NewTabModal({
   worktreeDeleteMessage,
   worktreeName,
   worktrees,
+  worktreeTemplates,
 }: NewTabModalProps) {
   const t = useTheme()
   const options = useMemo(() => getAllAssistantOptions(customCommands), [customCommands])
@@ -123,30 +135,86 @@ export function NewTabModal({
     [createWorktree, currentSessionId, selectedIndex, t, worktreeDeleteConfirmId, worktrees]
   )
 
-  const items = useMemo<PickerItem[]>(
-    () =>
-      filtered.map((option, index) => {
-        const active = index === selectedIndex
-        const customCmd = customCommands[option.id]
+  const noneOffset = getTemplateNoneOffset(selectedAssistantId)
+  const showNoneOption = noneOffset === 1
+  const templateItems = useMemo<PickerItem[]>(() => {
+    const noneItem: PickerItem[] = showNoneOption
+      ? [
+          {
+            key: '__none__',
+            onClick: () => {
+              dispatchGlobal({ index: 0, type: 'set-modal-selection-index' })
+              runSideEffectGlobal({ type: 'launch-selected-assistant' })
+            },
+            subtitle: <text fg={t.textMuted}>Single pane — current assistant only</text>,
+            title: <text fg={selectedIndex === 0 ? t.text : t.textMuted}>None</text>,
+          },
+        ]
+      : []
+    return [
+      ...noneItem,
+      ...worktreeTemplates.map((template, idx) => {
+        const itemIndex = idx + noneOffset
+        const active = itemIndex === selectedIndex
+        const tabCount = template.tabs.length
+        const paneCount = template.tabs.reduce((sum, tab) => sum + tab.panes.length, 0)
         return {
-          key: option.id,
-          onClick: () =>
-            dispatchGlobal({ assistantId: option.id, type: 'select-new-tab-assistant' }),
-          onEdit: () =>
-            dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
-          subtitle: (
-            <box flexDirection="column">
-              <text fg={t.textMuted}>{option.description}</text>
-              {customCmd != null && customCmd !== '' ? (
-                <text fg={t.primary}>{customCmd}</text>
-              ) : null}
-            </box>
-          ),
-          title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+          key: template.id,
+          onClick: () => {
+            dispatchGlobal({ index: itemIndex, type: 'set-modal-selection-index' })
+            runSideEffectGlobal({ type: 'launch-selected-assistant' })
+          },
+          subtitle:
+            template.description != null && template.description !== '' ? (
+              <text fg={t.textMuted}>{template.description}</text>
+            ) : (
+              <text fg={t.textMuted}>
+                {tabCount} tab{tabCount === 1 ? '' : 's'}, {paneCount} pane
+                {paneCount === 1 ? '' : 's'}
+              </text>
+            ),
+          title: <text fg={active ? t.text : t.textMuted}>{template.name}</text>,
         }
       }),
-    [customCommands, filtered, selectedIndex, t]
-  )
+    ]
+  }, [noneOffset, selectedIndex, showNoneOption, t, worktreeTemplates])
+
+  const showShortcutEntry = allowTemplateShortcut && worktreeTemplates.length > 0
+  const items = useMemo<PickerItem[]>(() => {
+    const assistantItems: PickerItem[] = filtered.map((option, index) => {
+      const active = index === selectedIndex
+      const customCmd = customCommands[option.id]
+      return {
+        key: option.id,
+        onClick: () => dispatchGlobal({ assistantId: option.id, type: 'select-new-tab-assistant' }),
+        onEdit: () => dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
+        subtitle: (
+          <box flexDirection="column">
+            <text fg={t.textMuted}>{option.description}</text>
+            {customCmd != null && customCmd !== '' ? <text fg={t.primary}>{customCmd}</text> : null}
+          </box>
+        ),
+        title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+      }
+    })
+    if (!showShortcutEntry) return assistantItems
+    const shortcutIndex = filtered.length
+    const shortcutActive = shortcutIndex === selectedIndex
+    return [
+      ...assistantItems,
+      {
+        key: TEMPLATE_SHORTCUT_KEY,
+        onClick: () => {
+          dispatchGlobal({ index: shortcutIndex, type: 'set-modal-selection-index' })
+          dispatchGlobal({ type: 'enter-new-tab-template-shortcut' })
+        },
+        subtitle: (
+          <text fg={t.textMuted}>Create a worktree and pick a template — no assistant step</text>
+        ),
+        title: <text fg={shortcutActive ? t.text : t.textMuted}>Worktree from template…</text>,
+      },
+    ]
+  }, [customCommands, filtered, showShortcutEntry, selectedIndex, t])
 
   if (editingCommand !== null) {
     const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)
@@ -164,6 +232,28 @@ export function NewTabModal({
           placeholder={option.command}
         />
       </Form>
+    )
+  }
+
+  if (step === 'template') {
+    return (
+      <Picker
+        title="Pick worktree template"
+        keybindsModeId="modal.new-tab.command-edit"
+        width={uiTokens.modalWidth.md}
+        gap={1}
+        filter={null}
+        items={templateItems}
+        selectedIndex={selectedIndex}
+        emptyState={<text fg={t.textMuted}>No templates configured.</text>}
+        onHover={handleHover}
+        footer={
+          <box flexDirection="column">
+            <text fg={t.textMuted}>Step 4/4: choose template</text>
+            <text fg={t.textMuted}>Enter launches, Esc returns to worktree settings</text>
+          </box>
+        }
+      />
     )
   }
 

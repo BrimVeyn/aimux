@@ -51,6 +51,7 @@ defineConfig({
   autoCommit?: Partial<AutoCommitConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
+  worktreeTemplates?: WorktreeTemplate[]
 })
 ```
 
@@ -70,6 +71,7 @@ defineConfig({
 | `autoCommit`         | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                                 |
 | `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces`    |
 | `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
+| `worktreeTemplates`  | Supported          | Multi-tab / multi-pane layouts spawned at worktree creation. See `../guide/worktrees.md#templates`                      |
 
 ## `defineConfig`
 
@@ -540,6 +542,69 @@ export default defineConfig({
   },
 })
 ```
+
+## `worktreeTemplates`
+
+A list of reusable layouts spawned when the user creates a new worktree.
+Each template appears in a picker at the end of the new-worktree flow; the
+chosen template's tabs and panes are created, sized, and (optionally)
+prefilled with an initial command.
+
+See `../guide/worktrees.md#templates` for the full walkthrough, including
+the picker UX, the "Worktree from template…" shortcut entry, and validation
+rules.
+
+```ts
+worktreeTemplates: [
+  {
+    id: 'lint-watch',
+    name: 'Claude + lint watch',
+    description: 'Claude on the left, bun lint --watch on the right',
+    tabs: [
+      {
+        panes: [
+          { id: 'main', assistant: 'claude' },
+          {
+            id: 'lint',
+            assistant: 'terminal',
+            splitFrom: 'main',
+            direction: 'horizontal',
+            ratio: 0.35,
+            send: 'bun lint --watch',
+          },
+        ],
+      },
+    ],
+  },
+]
+```
+
+Types:
+
+```ts
+interface WorktreeTemplate {
+  id: string
+  name: string
+  description?: string
+  tabs: WorktreeTemplateTab[]
+}
+
+interface WorktreeTemplateTab {
+  panes: WorktreeTemplatePane[]
+}
+
+interface WorktreeTemplatePane {
+  id: string
+  assistant: string
+  splitFrom?: string
+  direction?: 'horizontal' | 'vertical'
+  ratio?: number
+  send?: string
+}
+```
+
+`worktreeTemplates` can also be set in `aimux.json` under the same key
+(JSON form, same schema). The TS config wins when both are present.
 
 ## Actions
 

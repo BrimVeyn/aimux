@@ -152,6 +152,10 @@ export function App({
         gitPane: gitPaneOverrides,
         sessionBarVisible,
         sidebar: sidebarOverrides,
+        worktreeTemplates:
+          resolvedConfig.worktreeTemplates.length > 0
+            ? resolvedConfig.worktreeTemplates
+            : json.worktreeTemplates,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
