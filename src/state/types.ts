@@ -117,6 +117,13 @@ export interface WorkspaceSnapshotV1 {
   layoutTree?: LayoutNode
   layoutTrees?: Record<string, LayoutNode>
   tabGroupMap?: Record<string, string>
+  /**
+   * Last viewed tab per worktree, keyed by worktree id. Optional and additive
+   * (no version bump): older builds ignore it, newer builds tolerate its
+   * absence. Written now so the data accrues, but restoring it at startup is
+   * gated off until a future change flips RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE.
+   */
+  lastActiveTabByWorktree?: Record<string, string>
 }
 
 export type WorktreeSource = 'primary' | 'aimux-temp' | 'external'

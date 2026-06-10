@@ -15,6 +15,15 @@ export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
   }
 }
 
+/**
+ * The per-worktree last-tab memory is serialized into every snapshot now so the
+ * data accrues across sessions, but restoring it at startup stays dormant until
+ * a future (non-breaking) change is ready to consume it. Flipping this to true
+ * makes restart restore the last-viewed tab per worktree; until then restart
+ * behavior is unchanged and the live in-memory map is never clobbered on switch.
+ */
+const RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE: boolean = false
+
 function getDisconnectedStatus(status: TabStatus): TabStatus {
   if (status === 'running' || status === 'starting') {
     return 'disconnected'
@@ -26,6 +35,10 @@ function getDisconnectedStatus(status: TabStatus): TabStatus {
 export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
   return {
     activeTabId: state.activeTabId,
+    lastActiveTabByWorktree:
+      Object.keys(state.lastActiveTabByWorktree).length > 0
+        ? state.lastActiveTabByWorktree
+        : undefined,
     layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
     layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
     savedAt: new Date().toISOString(),
@@ -241,7 +254,8 @@ export function restoreWorkspaceState(
 ): Pick<
   AppState,
   'tabs' | 'activeTabId' | 'focusMode' | 'sidebar' | 'layoutTrees' | 'tabGroupMap'
-> {
+> &
+  Partial<Pick<AppState, 'lastActiveTabByWorktree'>> {
   const tabs = restoreTabsFromWorkspace(workspaceSnapshot, options)
   const activeTabId =
     workspaceSnapshot?.activeTabId != null &&
@@ -253,6 +267,14 @@ export function restoreWorkspaceState(
   const { layoutTrees, tabGroupMap } = restoreLayoutTrees(workspaceSnapshot, tabs)
   const orderedTabs = normalizeGroupedTabOrder(tabs, layoutTrees, tabGroupMap)
 
+  // Dormant until the gate flips: merge the persisted per-worktree memory over
+  // the live in-memory map. While off, the key is omitted entirely so callers
+  // that spread the result never overwrite their existing map on a switch.
+  const persistedLastActiveTab =
+    RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE && workspaceSnapshot?.lastActiveTabByWorktree
+      ? { ...state.lastActiveTabByWorktree, ...workspaceSnapshot.lastActiveTabByWorktree }
+      : undefined
+
   return {
     activeTabId,
     focusMode: 'navigation',
@@ -260,5 +282,6 @@ export function restoreWorkspaceState(
     sidebar: state.sidebar,
     tabGroupMap,
     tabs: orderedTabs,
+    ...(persistedLastActiveTab ? { lastActiveTabByWorktree: persistedLastActiveTab } : {}),
   }
 }
