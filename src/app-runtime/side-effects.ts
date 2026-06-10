@@ -455,60 +455,63 @@ function applyWorktreeTemplate(
   worktreeId: string,
   worktreePath: string
 ): void {
-  const localToTabId = new Map<string, string>()
-  let rootTabId: string | null = null
+  let firstTabId: string | null = null
 
-  for (let i = 0; i < template.panes.length; i++) {
-    const pane = template.panes[i]
-    if (!pane) continue
-    const tab = createPaneTab(ctx, pane, worktreeId)
-    localToTabId.set(pane.id, tab.id)
+  for (const templateTab of template.tabs) {
+    const localToTabId = new Map<string, string>()
 
-    if (i === 0) {
-      rootTabId = tab.id
-      ctx.dispatch({ tab, type: 'add-tab' })
-      startTabSession(
-        ctx.backend,
-        ctx.dispatch,
-        ctx.clearStartupGrace,
-        (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
-        tab,
-        ctx.state.layout.terminalCols,
-        ctx.state.layout.terminalRows,
-        worktreePath
-      )
-    } else {
-      const splitFromId =
-        pane.splitFrom != null && pane.splitFrom !== ''
-          ? localToTabId.get(pane.splitFrom)
-          : undefined
-      const direction: SplitDirection = pane.direction ?? 'vertical'
-      if (splitFromId == null || splitFromId === '') continue
-      splitFromTab(ctx, splitFromId, direction, tab, worktreePath)
-      if (pane.ratio != null) {
-        const sourceRatio = clampSplitRatio(1 - pane.ratio)
-        ctx.dispatch({
-          axis: direction,
-          ratio: sourceRatio,
-          tabId: tab.id,
-          type: 'set-split-ratio',
-        })
+    for (let i = 0; i < templateTab.panes.length; i++) {
+      const pane = templateTab.panes[i]
+      if (!pane) continue
+      const tab = createPaneTab(ctx, pane, worktreeId)
+      localToTabId.set(pane.id, tab.id)
+
+      if (i === 0) {
+        if (firstTabId == null) firstTabId = tab.id
+        ctx.dispatch({ tab, type: 'add-tab' })
+        startTabSession(
+          ctx.backend,
+          ctx.dispatch,
+          ctx.clearStartupGrace,
+          (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
+          tab,
+          ctx.state.layout.terminalCols,
+          ctx.state.layout.terminalRows,
+          worktreePath
+        )
+      } else {
+        const splitFromId =
+          pane.splitFrom != null && pane.splitFrom !== ''
+            ? localToTabId.get(pane.splitFrom)
+            : undefined
+        const direction: SplitDirection = pane.direction ?? 'vertical'
+        if (splitFromId == null || splitFromId === '') continue
+        splitFromTab(ctx, splitFromId, direction, tab, worktreePath)
+        if (pane.ratio != null) {
+          const sourceRatio = clampSplitRatio(1 - pane.ratio)
+          ctx.dispatch({
+            axis: direction,
+            ratio: sourceRatio,
+            tabId: tab.id,
+            type: 'set-split-ratio',
+          })
+        }
       }
-    }
 
-    if (pane.send != null && pane.send !== '') {
-      const payload = `${pane.send}\n`
-      const targetTabId = tab.id
-      setTimeout(() => {
-        const latest = ctx.getState()
-        const latestTab = latest.tabs.find((entry) => entry.id === targetTabId)
-        writeToTab(ctx.backend, targetTabId, latestTab, payload)
-      }, TEMPLATE_SEND_DELAY_MS)
+      if (pane.send != null && pane.send !== '') {
+        const payload = `${pane.send}\n`
+        const targetTabId = tab.id
+        setTimeout(() => {
+          const latest = ctx.getState()
+          const latestTab = latest.tabs.find((entry) => entry.id === targetTabId)
+          writeToTab(ctx.backend, targetTabId, latestTab, payload)
+        }, TEMPLATE_SEND_DELAY_MS)
+      }
     }
   }
 
-  if (rootTabId != null) {
-    ctx.dispatch({ tabId: rootTabId, type: 'set-active-tab' })
+  if (firstTabId != null) {
+    ctx.dispatch({ tabId: firstTabId, type: 'set-active-tab' })
   }
 }
 

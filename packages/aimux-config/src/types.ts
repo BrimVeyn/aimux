@@ -600,11 +600,15 @@ export interface WorktreeTemplatePane {
   send?: string
 }
 
+export interface WorktreeTemplateTab {
+  panes: WorktreeTemplatePane[]
+}
+
 export interface WorktreeTemplate {
   id: string
   name: string
   description?: string
-  panes: WorktreeTemplatePane[]
+  tabs: WorktreeTemplateTab[]
 }
 
 export type GitPanelAction =

@@ -42,11 +42,15 @@ export interface WorktreeTemplatePane {
   send?: string
 }
 
+export interface WorktreeTemplateTab {
+  panes: WorktreeTemplatePane[]
+}
+
 export interface WorktreeTemplate {
   id: string
   name: string
   description?: string
-  panes: WorktreeTemplatePane[]
+  tabs: WorktreeTemplateTab[]
 }
 
 export interface AimuxConfig {
@@ -127,12 +131,9 @@ function isRatioValid(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0.15 && value < 0.85
 }
 
-export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
+function isWorktreeTemplateTab(value: unknown): value is WorktreeTemplateTab {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  if (typeof v.id !== 'string' || v.id.length === 0) return false
-  if (typeof v.name !== 'string' || v.name.length === 0) return false
-  if (v.description !== undefined && typeof v.description !== 'string') return false
   if (!Array.isArray(v.panes) || v.panes.length === 0) return false
   const seenIds = new Set<string>()
   for (let i = 0; i < v.panes.length; i++) {
@@ -153,6 +154,19 @@ export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
     }
     if (pane.ratio !== undefined && !isRatioValid(pane.ratio)) return false
     if (pane.send !== undefined && typeof pane.send !== 'string') return false
+  }
+  return true
+}
+
+export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (typeof v.id !== 'string' || v.id.length === 0) return false
+  if (typeof v.name !== 'string' || v.name.length === 0) return false
+  if (v.description !== undefined && typeof v.description !== 'string') return false
+  if (!Array.isArray(v.tabs) || v.tabs.length === 0) return false
+  for (const tab of v.tabs) {
+    if (!isWorktreeTemplateTab(tab)) return false
   }
   return true
 }

@@ -89,4 +89,5 @@ export type {
   TabSession,
   WorktreeTemplate,
   WorktreeTemplatePane,
+  WorktreeTemplateTab,
 } from './types'

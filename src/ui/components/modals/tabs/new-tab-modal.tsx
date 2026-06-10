@@ -140,6 +140,8 @@ export function NewTabModal({
       ...worktreeTemplates.map((template, idx) => {
         const itemIndex = idx + 1
         const active = itemIndex === selectedIndex
+        const tabCount = template.tabs.length
+        const paneCount = template.tabs.reduce((sum, tab) => sum + tab.panes.length, 0)
         return {
           key: template.id,
           onClick: () => {
@@ -151,7 +153,8 @@ export function NewTabModal({
               <text fg={t.textMuted}>{template.description}</text>
             ) : (
               <text fg={t.textMuted}>
-                {template.panes.length} pane{template.panes.length === 1 ? '' : 's'}
+                {tabCount} tab{tabCount === 1 ? '' : 's'}, {paneCount} pane
+                {paneCount === 1 ? '' : 's'}
               </text>
             ),
           title: <text fg={active ? t.text : t.textMuted}>{template.name}</text>,
