@@ -644,8 +644,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const branchName = state.modal.branchName
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
         let templateId: string | undefined
-        if (state.modal.step === 'template' && state.modal.selectedIndex > 0) {
-          templateId = state.worktreeTemplates[state.modal.selectedIndex - 1]?.id
+        if (state.modal.step === 'template') {
+          const noneOffset = state.modal.selectedAssistantId == null ? 0 : 1
+          const templateIndex = state.modal.selectedIndex - noneOffset
+          if (templateIndex >= 0) {
+            templateId = state.worktreeTemplates[templateIndex]?.id
+          }
         }
         void (async () => {
           try {

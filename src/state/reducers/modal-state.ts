@@ -103,6 +103,23 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'enter-new-tab-template-shortcut': {
+      if (state.modal.type !== 'new-tab') return state
+      const defaultName = state.modal.worktreeName || 'wt-template'
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: 'worktree-name',
+          createWorktree: true,
+          cursorPos: defaultName.length,
+          selectedAssistantId: null,
+          selectedIndex: 0,
+          step: 'worktree-create',
+          worktreeName: defaultName,
+        },
+      }
+    }
     case 'set-new-tab-worktree-delete-state': {
       if (state.modal.type !== 'new-tab') return state
       return {
@@ -128,6 +145,32 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     }
     case 'select-new-tab-assistant': {
       if (state.modal.type !== 'new-tab' || state.modal.editingCommand !== null) return state
+      if (
+        action.assistantId === undefined &&
+        state.modal.step === 'assistant' &&
+        state.worktreeTemplates.length > 0
+      ) {
+        const filtered = filterAssistants(
+          getAllAssistantOptions(state.customCommands),
+          state.modal.editBuffer
+        )
+        if (state.modal.selectedIndex >= filtered.length) {
+          const defaultName = state.modal.worktreeName || 'wt-template'
+          return {
+            ...state,
+            modal: {
+              ...state.modal,
+              activeField: 'worktree-name',
+              createWorktree: true,
+              cursorPos: defaultName.length,
+              selectedAssistantId: null,
+              selectedIndex: 0,
+              step: 'worktree-create',
+              worktreeName: defaultName,
+            },
+          }
+        }
+      }
       const option = getSelectedNewTabAssistant(state, action.assistantId)
       if (!option) return state
       const targetWorktreeIndex = getCurrentWorktreeIndex(state)
@@ -576,12 +619,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           if (state.modal.activeField === 'worktree-name') return state
           optionCount = getCurrentWorktreeCount(state) + 1
         } else if (state.modal.step === 'template') {
-          optionCount = state.worktreeTemplates.length + 1
+          optionCount =
+            state.worktreeTemplates.length + (state.modal.selectedAssistantId == null ? 0 : 1)
         } else {
-          optionCount = filterAssistants(
-            getAllAssistantOptions(state.customCommands),
-            state.modal.editBuffer
-          ).length
+          optionCount =
+            filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)
+              .length + (state.worktreeTemplates.length > 0 ? 1 : 0)
         }
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
@@ -644,12 +687,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         if (state.modal.step === 'worktree') {
           optionCount = getCurrentWorktreeCount(state) + 1
         } else if (state.modal.step === 'template') {
-          optionCount = state.worktreeTemplates.length + 1
+          optionCount =
+            state.worktreeTemplates.length + (state.modal.selectedAssistantId == null ? 0 : 1)
         } else {
-          optionCount = filterAssistants(
-            getAllAssistantOptions(state.customCommands),
-            state.modal.editBuffer
-          ).length
+          optionCount =
+            filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)
+              .length + (state.worktreeTemplates.length > 0 ? 1 : 0)
         }
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length

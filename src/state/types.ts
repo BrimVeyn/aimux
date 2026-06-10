@@ -508,6 +508,7 @@ export type ModalAction =
     }
   | { type: 'enter-new-tab-worktree-create' }
   | { type: 'enter-new-tab-template-pick' }
+  | { type: 'enter-new-tab-template-shortcut' }
   | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
   | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
