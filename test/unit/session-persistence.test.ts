@@ -40,6 +40,40 @@ describe('session persistence', () => {
     expect(snapshot.tabs[0]?.status).toBe('running')
   })
 
+  test('persists per-worktree last-tab memory without bumping the version', () => {
+    const state = {
+      ...createInitialState(),
+      lastActiveTabByWorktree: { 'wt-feature': 'feature-2', 'wt-main': 'main-2' },
+    }
+
+    const snapshot = serializeWorkspace(state)
+    expect(snapshot.version).toBe(1)
+    expect(snapshot.lastActiveTabByWorktree).toEqual({
+      'wt-feature': 'feature-2',
+      'wt-main': 'main-2',
+    })
+  })
+
+  test('omits the per-worktree memory when empty', () => {
+    const snapshot = serializeWorkspace(createInitialState())
+    expect(snapshot.lastActiveTabByWorktree).toBeUndefined()
+  })
+
+  test('restoring stays dormant: does not surface the persisted per-worktree memory yet', () => {
+    const state = createInitialState()
+    const restored = restoreWorkspaceState(state, {
+      activeTabId: null,
+      lastActiveTabByWorktree: { 'wt-main': 'main-2' },
+      savedAt: new Date().toISOString(),
+      sidebar: { visible: true, width: 28 },
+      tabs: [],
+      version: 1,
+    })
+    // Gate is off → the key is omitted so spreading the result can't clobber a
+    // caller's live in-memory map on a session switch.
+    expect(restored.lastActiveTabByWorktree).toBeUndefined()
+  })
+
   test('restores running tabs as disconnected', () => {
     const tabs = restoreTabsFromWorkspace({
       activeTabId: 'tab-1',

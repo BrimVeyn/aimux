@@ -84,6 +84,7 @@ export function createInitialState(
       position: gitPanePosition,
     },
     gitPanel: emptyGitPanel(),
+    lastActiveTabByWorktree: {},
     layout: {
       terminalCols: DEFAULT_TERMINAL_COLS,
       terminalRows: DEFAULT_TERMINAL_ROWS,

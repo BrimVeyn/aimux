@@ -28,12 +28,24 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       // honor the patched worktree by filtering the restored tab list.
       const loadedSession = state.sessions.find((entry) => entry.id === action.sessionId)
       const visible = filterTabsForActiveWorktree(restored.tabs, loadedSession)
-      const activeTabId =
+      // Prefer the snapshot's tab; if it isn't visible under the active
+      // worktree (e.g. a multi-worktree session restored onto a different
+      // worktree), fall back to the last tab we viewed in that worktree,
+      // then to the first visible tab.
+      const rememberedForWorktree =
+        loadedSession?.activeWorktreeId != null && loadedSession.activeWorktreeId !== ''
+          ? state.lastActiveTabByWorktree[loadedSession.activeWorktreeId]
+          : undefined
+      const snapshotTabVisible =
         restored.activeTabId != null &&
         restored.activeTabId !== '' &&
         visible.some((t) => t.id === restored.activeTabId)
-          ? restored.activeTabId
-          : (visible[0]?.id ?? null)
+      const rememberedTabVisible =
+        rememberedForWorktree != null &&
+        rememberedForWorktree !== '' &&
+        visible.some((t) => t.id === rememberedForWorktree)
+      const fallbackTabId = rememberedTabVisible ? rememberedForWorktree : (visible[0]?.id ?? null)
+      const activeTabId = snapshotTabVisible ? restored.activeTabId : fallbackTabId
       return {
         ...state,
         ...restored,
@@ -196,15 +208,29 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const sessions = state.sessions.map((session) =>
         session.id === action.sessionId ? withActiveWorktree(session, action.worktreeId) : session
       )
+      // Remember the tab we're leaving so coming back to this worktree later
+      // restores it instead of snapping to the first tab. Keyed by the
+      // worktree we're departing (the current session's active one).
+      const leavingSession = state.sessions.find((s) => s.id === action.sessionId)
+      const leavingWorktreeId = leavingSession?.activeWorktreeId
+      const lastActiveTabByWorktree =
+        action.sessionId === state.currentSessionId &&
+        leavingWorktreeId != null &&
+        leavingWorktreeId !== '' &&
+        state.activeTabId != null &&
+        state.activeTabId !== ''
+          ? { ...state.lastActiveTabByWorktree, [leavingWorktreeId]: state.activeTabId }
+          : state.lastActiveTabByWorktree
       // Changing the worktree of a non-current session has no effect on
       // which tab the user is looking at — leave activeTabId alone.
       if (action.sessionId !== state.currentSessionId) {
-        return { ...state, sessions }
+        return { ...state, lastActiveTabByWorktree, sessions }
       }
       // For the current session: if the existing activeTabId belongs to
-      // the new worktree, keep it. Otherwise hop to the first tab visible
-      // under that worktree (or clear it if the worktree is empty — the
-      // pane then renders the "this worktree has no tabs" placeholder).
+      // the new worktree, keep it. Otherwise restore the last tab we viewed
+      // in that worktree, falling back to the first visible tab (or clearing
+      // it if the worktree is empty — the pane then renders the "this
+      // worktree has no tabs" placeholder).
       const updated = sessions.find((s) => s.id === action.sessionId)
       const visible = filterTabsForActiveWorktree(state.tabs, updated)
       const currentStillVisible =
@@ -212,9 +238,14 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
         state.activeTabId !== '' &&
         visible.some((t) => t.id === state.activeTabId)
       if (currentStillVisible) {
-        return { ...state, sessions }
+        return { ...state, lastActiveTabByWorktree, sessions }
       }
-      return { ...state, activeTabId: visible[0]?.id ?? null, sessions }
+      const remembered = lastActiveTabByWorktree[action.worktreeId]
+      const nextActiveTabId =
+        remembered != null && remembered !== '' && visible.some((t) => t.id === remembered)
+          ? remembered
+          : (visible[0]?.id ?? null)
+      return { ...state, activeTabId: nextActiveTabId, lastActiveTabByWorktree, sessions }
     }
     case 'update-worktree-record':
       return {

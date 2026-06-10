@@ -117,6 +117,13 @@ export interface WorkspaceSnapshotV1 {
   layoutTree?: LayoutNode
   layoutTrees?: Record<string, LayoutNode>
   tabGroupMap?: Record<string, string>
+  /**
+   * Last viewed tab per worktree, keyed by worktree id. Optional and additive
+   * (no version bump): older builds ignore it, newer builds tolerate its
+   * absence. Written now so the data accrues, but restoring it at startup is
+   * gated off until a future change flips RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE.
+   */
+  lastActiveTabByWorktree?: Record<string, string>
 }
 
 export type WorktreeSource = 'primary' | 'aimux-temp' | 'external'
@@ -489,6 +496,12 @@ export interface AppState {
    * keyed by worktree id. Ephemeral (polled); not persisted to the catalog.
    */
   worktreeDivergence: Record<string, BranchDivergence>
+  /**
+   * Last active tab a user viewed within each worktree, keyed by worktree id.
+   * Lets switching back to a worktree restore its last-viewed tab instead of
+   * snapping to the first one. Ephemeral (in-memory); not persisted to the catalog.
+   */
+  lastActiveTabByWorktree: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
