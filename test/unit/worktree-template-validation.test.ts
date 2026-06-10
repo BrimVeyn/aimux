@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isWorktreeTemplate } from '../../src/config'
+import { isWorktreeTemplate, parseWorktreeTemplates } from '../../src/config'
 
 const validMinimal = {
   id: 'solo',
@@ -207,5 +207,47 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects template missing tabs field', () => {
     expect(isWorktreeTemplate({ id: 'x', name: 'X' })).toBe(false)
+  })
+
+  test('rejects a root pane that declares ratio', () => {
+    expect(
+      isWorktreeTemplate({
+        ...validMinimal,
+        tabs: [{ panes: [{ assistant: 'claude', id: 'main', ratio: 0.5 }] }],
+      })
+    ).toBe(false)
+  })
+})
+
+describe('parseWorktreeTemplates', () => {
+  test('returns undefined when value is missing', () => {
+    const issues: string[] = []
+    expect(parseWorktreeTemplates(undefined, issues)).toBeUndefined()
+    expect(issues).toEqual([])
+  })
+
+  test('reports and ignores non-array input', () => {
+    const issues: string[] = []
+    expect(parseWorktreeTemplates({ not: 'an array' }, issues)).toBeUndefined()
+    expect(issues).toHaveLength(1)
+  })
+
+  test('drops invalid entries individually and keeps valid ones', () => {
+    const issues: string[] = []
+    const result = parseWorktreeTemplates(
+      [validMinimal, { id: 'bad', name: 'Bad' /* missing tabs */ }, validMultiTab],
+      issues
+    )
+    expect(result?.map((t) => t.id)).toEqual(['solo', 'fullstack'])
+    expect(issues).toHaveLength(1)
+  })
+
+  test('dedups by id, keeping the first occurrence', () => {
+    const issues: string[] = []
+    const dup = { ...validMultiTab, id: 'solo' }
+    const result = parseWorktreeTemplates([validMinimal, dup], issues)
+    expect(result?.map((t) => t.id)).toEqual(['solo'])
+    expect(result?.[0]?.name).toBe('Solo')
+    expect(issues.some((m) => m.includes('duplicate'))).toBe(true)
   })
 })

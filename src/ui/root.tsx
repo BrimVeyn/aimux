@@ -124,6 +124,7 @@ function renderModal(
           }
           worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
           worktreeTemplates={options.worktreeTemplates}
+          allowTemplateShortcut={modal.type === 'new-tab'}
         />
       )
     case 'session-picker':

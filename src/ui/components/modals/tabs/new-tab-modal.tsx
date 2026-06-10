@@ -5,7 +5,7 @@ import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterAssistants } from '../../../../state/selectors'
+import { filterAssistants, getTemplateNoneOffset } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
@@ -30,6 +30,12 @@ interface NewTabModalProps {
   worktrees: WorktreeRecord[]
   worktreeName: string
   worktreeTemplates: WorktreeTemplate[]
+  /**
+   * True when this modal is the worktree-aware new-tab flow. False when the
+   * component is reused for `split-picker`, which can only choose an
+   * assistant — the template shortcut entry must be hidden there.
+   */
+  allowTemplateShortcut: boolean
 }
 
 const TEMPLATE_SHORTCUT_KEY = '__template-shortcut__'
@@ -56,6 +62,7 @@ function getDeleteBlockedReason({
 
 export function NewTabModal({
   activeField,
+  allowTemplateShortcut,
   branchError,
   branchName,
   createWorktree,
@@ -128,9 +135,9 @@ export function NewTabModal({
     [createWorktree, currentSessionId, selectedIndex, t, worktreeDeleteConfirmId, worktrees]
   )
 
-  const showNoneOption = selectedAssistantId != null
+  const noneOffset = getTemplateNoneOffset(selectedAssistantId)
+  const showNoneOption = noneOffset === 1
   const templateItems = useMemo<PickerItem[]>(() => {
-    const noneOffset = showNoneOption ? 1 : 0
     const noneItem: PickerItem[] = showNoneOption
       ? [
           {
@@ -170,9 +177,9 @@ export function NewTabModal({
         }
       }),
     ]
-  }, [selectedIndex, showNoneOption, t, worktreeTemplates])
+  }, [noneOffset, selectedIndex, showNoneOption, t, worktreeTemplates])
 
-  const hasTemplates = worktreeTemplates.length > 0
+  const showShortcutEntry = allowTemplateShortcut && worktreeTemplates.length > 0
   const items = useMemo<PickerItem[]>(() => {
     const assistantItems: PickerItem[] = filtered.map((option, index) => {
       const active = index === selectedIndex
@@ -190,7 +197,7 @@ export function NewTabModal({
         title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
       }
     })
-    if (!hasTemplates) return assistantItems
+    if (!showShortcutEntry) return assistantItems
     const shortcutIndex = filtered.length
     const shortcutActive = shortcutIndex === selectedIndex
     return [
@@ -207,7 +214,7 @@ export function NewTabModal({
         title: <text fg={shortcutActive ? t.text : t.textMuted}>Worktree from template…</text>,
       },
     ]
-  }, [customCommands, filtered, hasTemplates, selectedIndex, t])
+  }, [customCommands, filtered, showShortcutEntry, selectedIndex, t])
 
   if (editingCommand !== null) {
     const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)

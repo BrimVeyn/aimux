@@ -147,12 +147,13 @@ function isWorktreeTemplateTab(value: unknown): value is WorktreeTemplateTab {
     if (i === 0) {
       if (pane.splitFrom !== undefined) return false
       if (pane.direction !== undefined) return false
+      if (pane.ratio !== undefined) return false
     } else {
       if (typeof pane.splitFrom !== 'string' || !seenIds.has(pane.splitFrom)) return false
       if (pane.splitFrom === pane.id) return false
       if (pane.direction !== 'horizontal' && pane.direction !== 'vertical') return false
+      if (pane.ratio !== undefined && !isRatioValid(pane.ratio)) return false
     }
-    if (pane.ratio !== undefined && !isRatioValid(pane.ratio)) return false
     if (pane.send !== undefined && typeof pane.send !== 'string') return false
   }
   return true
@@ -171,7 +172,10 @@ export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
   return true
 }
 
-function parseWorktreeTemplates(value: unknown, issues: string[]): WorktreeTemplate[] | undefined {
+export function parseWorktreeTemplates(
+  value: unknown,
+  issues: string[]
+): WorktreeTemplate[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) {
     issues.push('ignored invalid worktreeTemplates (not an array)')

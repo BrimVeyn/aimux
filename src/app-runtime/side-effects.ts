@@ -54,7 +54,12 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
+import {
+  filterAssistants,
+  filterSessions,
+  filterSnippets,
+  getTemplateNoneOffset,
+} from '../state/selectors'
 import { saveSessionCatalog } from '../state/session-catalog'
 import { pruneSnapshotOfWorktree } from '../state/session-persistence'
 import {
@@ -89,6 +94,14 @@ import {
 } from './snippet-actions'
 
 const STARTUP_GRACE_MS = 5_000
+/**
+ * Delay before injecting a template pane's `send` payload into its PTY.
+ * Short enough that shells (which print a prompt within ~100 ms) receive the
+ * command after their prompt is drawn; long enough to clear most PTY init
+ * races. Not tied to STARTUP_GRACE_MS because that is the assistant timeout,
+ * not a readiness signal. See review note: a `tab.status === 'running'`
+ * subscription would be more robust and is the planned follow-up.
+ */
 const TEMPLATE_SEND_DELAY_MS = 600
 
 export interface SideEffectContext {
@@ -485,7 +498,14 @@ function applyWorktreeTemplate(
             ? localToTabId.get(pane.splitFrom)
             : undefined
         const direction: SplitDirection = pane.direction ?? 'vertical'
-        if (splitFromId == null || splitFromId === '') continue
+        if (splitFromId == null || splitFromId === '') {
+          logInputDebug('template.splitFrom.unresolved', {
+            paneId: pane.id,
+            splitFrom: pane.splitFrom ?? null,
+            templateId: template.id,
+          })
+          continue
+        }
         splitFromTab(ctx, splitFromId, direction, tab, worktreePath)
         if (pane.ratio != null) {
           const sourceRatio = clampSplitRatio(1 - pane.ratio)
@@ -520,7 +540,10 @@ function createPaneTab(
   pane: WorktreeTemplatePane,
   worktreeId: string
 ): TabSession {
-  const assistantId = pane.assistant as AssistantId
+  // Accept `'shell'` as an alias for the registered `'terminal'` assistant so
+  // template examples using the more intuitive name don't silently fall back
+  // to Claude (createTabSession's unknown-id fallback resolves to index 0).
+  const assistantId = (pane.assistant === 'shell' ? 'terminal' : pane.assistant) as AssistantId
   const customCommand = ctx.state.customCommands[assistantId]
   return createTabSession(assistantId, customCommand, ctx.state.customCommands, worktreeId)
 }
@@ -645,8 +668,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
         let templateId: string | undefined
         if (state.modal.step === 'template') {
-          const noneOffset = state.modal.selectedAssistantId == null ? 0 : 1
-          const templateIndex = state.modal.selectedIndex - noneOffset
+          const templateIndex =
+            state.modal.selectedIndex - getTemplateNoneOffset(state.modal.selectedAssistantId)
           if (templateIndex >= 0) {
             templateId = state.worktreeTemplates[templateIndex]?.id
           }

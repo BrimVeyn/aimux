@@ -6,7 +6,12 @@ import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
-import { filterAssistants, filterSessions, filterSnippets } from '../selectors'
+import {
+  filterAssistants,
+  filterSessions,
+  filterSnippets,
+  getTemplateNoneOffset,
+} from '../selectors'
 import { reduceAutoCommitState } from './auto-commit-state'
 
 function emptyModal() {
@@ -620,7 +625,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           optionCount = getCurrentWorktreeCount(state) + 1
         } else if (state.modal.step === 'template') {
           optionCount =
-            state.worktreeTemplates.length + (state.modal.selectedAssistantId == null ? 0 : 1)
+            state.worktreeTemplates.length + getTemplateNoneOffset(state.modal.selectedAssistantId)
         } else {
           optionCount =
             filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)
@@ -688,7 +693,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           optionCount = getCurrentWorktreeCount(state) + 1
         } else if (state.modal.step === 'template') {
           optionCount =
-            state.worktreeTemplates.length + (state.modal.selectedAssistantId == null ? 0 : 1)
+            state.worktreeTemplates.length + getTemplateNoneOffset(state.modal.selectedAssistantId)
         } else {
           optionCount =
             filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)
