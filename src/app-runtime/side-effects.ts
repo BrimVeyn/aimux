@@ -560,22 +560,34 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           )
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          const forceable = isForceableWorktreeDeleteError(message)
+          // Real errors surface as a toast. Recoverable failures (dirty tree,
+          // active tabs, …) open a confirmation so the user can opt into a
+          // force-delete: in-place inside the new-tab worktree picker (preserving
+          // it), or as a standalone modal elsewhere (e.g. the sidebar's "Remove
+          // worktree").
+          if (!isForceableWorktreeDeleteError(message)) {
+            toast.error(`Could not delete worktree: ${message}`)
+            return
+          }
           const latest = ctx.getState()
           if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
-            const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
-            const selected = session?.worktrees?.[latest.modal.selectedIndex]
-            if (selected && selected.id !== effect.worktreeId) {
-              ctx.dispatch({ message, type: 'git-mode-set-message' })
-              return
-            }
+            ctx.dispatch({
+              prompt: { reason: message, worktreeId: effect.worktreeId },
+              type: 'set-new-tab-worktree-delete-prompt',
+            })
+            return
           }
+          const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
+          const worktree = session?.worktrees?.find((entry) => entry.id === effect.worktreeId)
           ctx.dispatch({
-            confirmWorktreeId: forceable ? effect.worktreeId : null,
-            message: forceable ? message : `Could not delete worktree: ${message}`,
-            type: 'set-new-tab-worktree-delete-state',
+            closeTabs: effect.closeTabs === true,
+            force: true,
+            reason: message,
+            sessionId: effect.sessionId,
+            type: 'open-worktree-delete-confirm',
+            worktreeId: effect.worktreeId,
+            worktreeLabel: worktree?.branch ?? worktree?.name ?? 'this worktree',
           })
-          ctx.dispatch({ message, type: 'git-mode-set-message' })
         }
       })()
       return
@@ -1534,7 +1546,7 @@ function removeWorktreeRecordFromSession(
       type: 'set-modal-selection-index',
     })
   }
-  ctx.dispatch({ message: null, type: 'set-new-tab-worktree-delete-state' })
+  ctx.dispatch({ prompt: null, type: 'set-new-tab-worktree-delete-prompt' })
 }
 
 function isForceableWorktreeDeleteError(message: string): boolean {
@@ -1546,7 +1558,7 @@ function isForceableWorktreeDeleteError(message: string): boolean {
 class ActiveWorktreeTabsError extends Error {
   constructor(tabCount: number) {
     super(
-      `active assistant tabs are using this worktree (${tabCount}). Click [del] again to close them and delete the worktree.`
+      `active assistant tabs are using this worktree (${tabCount}) — they will be closed if you confirm.`
     )
   }
 }

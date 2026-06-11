@@ -70,8 +70,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           step: 'assistant',
           targetWorktreeIndex,
           type: 'new-tab',
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: '',
         },
       }
@@ -90,14 +89,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'set-new-tab-worktree-delete-state': {
+    case 'set-new-tab-worktree-delete-prompt': {
       if (state.modal.type !== 'new-tab') return state
       return {
         ...state,
         modal: {
           ...state.modal,
-          worktreeDeleteConfirmId: action.confirmWorktreeId ?? null,
-          worktreeDeleteMessage: action.message,
+          worktreeDeletePrompt: action.prompt,
         },
       }
     }
@@ -131,8 +129,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           selectedIndex: worktreeCount === 0 ? 0 : targetWorktreeIndex,
           step: 'worktree',
           targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: state.modal.worktreeName || `wt-${option.label}`,
         },
       }
@@ -167,8 +164,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
             : Math.min(state.modal.selectedIndex, Math.max(0, worktreeCount - 1)),
           step: option && createWorktree ? 'worktree' : state.modal.step,
           targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: defaultName,
         },
       }
@@ -221,6 +217,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
+      }
+    }
+    case 'open-worktree-delete-confirm': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          closeTabs: action.closeTabs,
+          editBuffer: null,
+          force: action.force,
+          reason: action.reason,
+          selectedIndex: 0,
+          sessionId: action.sessionId,
+          sessionTargetId: null,
+          type: 'worktree-delete-confirm',
+          worktreeId: action.worktreeId,
+          worktreeLabel: action.worktreeLabel,
+        },
       }
     }
     case 'open-help-modal': {
@@ -598,8 +612,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
                 createWorktree:
                   (state.modal.selectedIndex + action.delta + optionCount) % optionCount ===
                   optionCount - 1,
-                worktreeDeleteConfirmId: null,
-                worktreeDeleteMessage: null,
+                worktreeDeletePrompt: null,
               }
             : null),
         },
@@ -656,8 +669,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
             ...state.modal,
             createWorktree: clamped === optionCount - 1,
             selectedIndex: clamped,
-            worktreeDeleteConfirmId: null,
-            worktreeDeleteMessage: null,
+            worktreeDeletePrompt: null,
           },
         }
       }
@@ -821,8 +833,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
               cursorPos: state.modal.editBuffer?.length ?? 0,
               selectedIndex: Math.max(0, assistantIndex),
               step: 'assistant',
-              worktreeDeleteConfirmId: null,
-              worktreeDeleteMessage: null,
+              worktreeDeletePrompt: null,
             },
           }
         }

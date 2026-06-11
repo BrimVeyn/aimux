@@ -9,6 +9,8 @@ export type ModeId =
   | 'git-mode'
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
+  | 'modal.new-tab.worktree-delete-confirm'
+  | 'modal.worktree-delete-confirm'
   | 'modal.session-picker.filtering'
   | 'modal.session-name'
   | 'modal.create-session'

@@ -46,6 +46,7 @@ export type ModalType =
   | 'update-available'
   | 'ai-usage'
   | 'worktree-move'
+  | 'worktree-delete-confirm'
   | null
 
 export interface TerminalSpan {
@@ -329,8 +330,7 @@ export interface ModalNewTab extends ModalBase {
   selectedAssistantId: AssistantId | null
   step: 'assistant' | 'worktree' | 'worktree-create'
   targetWorktreeIndex: number
-  worktreeDeleteConfirmId: string | null
-  worktreeDeleteMessage: string | null
+  worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktreeName: string
 }
 
@@ -416,6 +416,22 @@ export interface ModalWorktreeMove extends ModalBase {
   deleteSource: boolean
 }
 
+/**
+ * Standalone confirmation for a recoverable worktree delete failure triggered
+ * outside the new-tab picker (e.g. the sidebar's "Remove worktree"). Carries the
+ * params needed to re-run the delete with force once confirmed.
+ */
+export interface ModalWorktreeDeleteConfirm extends ModalBase {
+  type: 'worktree-delete-confirm'
+  sessionId: string
+  worktreeId: string
+  worktreeLabel: string
+  reason: string
+  closeTabs: boolean
+  /** Whether confirming force-deletes — true only after a recoverable failure. */
+  force: boolean
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -439,6 +455,7 @@ export type ModalState =
   | ModalUpdateAvailable
   | ModalAIUsage
   | ModalWorktreeMove
+  | ModalWorktreeDeleteConfirm
 
 export interface LayoutState {
   terminalCols: number
@@ -512,9 +529,8 @@ export type ModalAction =
   | { type: 'open-new-tab-modal' }
   | { type: 'set-new-tab-branch-error'; message: string | null }
   | {
-      type: 'set-new-tab-worktree-delete-state'
-      confirmWorktreeId?: string | null
-      message: string | null
+      type: 'set-new-tab-worktree-delete-prompt'
+      prompt: { worktreeId: string; reason: string } | null
     }
   | { type: 'enter-new-tab-worktree-create' }
   | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
@@ -548,6 +564,15 @@ export type ModalAction =
   | { type: 'open-ai-usage-modal' }
   | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
   | { type: 'toggle-worktree-move-delete' }
+  | {
+      type: 'open-worktree-delete-confirm'
+      sessionId: string
+      worktreeId: string
+      worktreeLabel: string
+      reason: string
+      closeTabs: boolean
+      force: boolean
+    }
 
 // -- Session actions --
 export type SessionAction =

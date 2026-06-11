@@ -210,19 +210,49 @@ export const deleteSelectedWorktree: ActionFn = (ctx: ModeContext) => {
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const worktree = session?.worktrees?.[modal.selectedIndex]
   if (!worktree) return null
+  // First attempt is never forced — a recoverable failure opens the confirm
+  // dialog (see set-new-tab-worktree-delete-prompt), where confirmDeleteWorktree
+  // retries with force.
   return r(
-    [
-      { index: modal.selectedIndex, type: 'set-modal-selection-index' },
-      { message: null, type: 'set-new-tab-worktree-delete-state' },
-    ],
+    [{ index: modal.selectedIndex, type: 'set-modal-selection-index' }],
+    [{ force: false, sessionId, type: 'delete-worktree', worktreeId: worktree.id }]
+  )
+}
+
+export const confirmDeleteWorktree: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  const sessionId = ctx.state.currentSessionId
+  if (modal.type !== 'new-tab' || modal.worktreeDeletePrompt == null) return null
+  if (!(sessionId != null && sessionId !== '')) return null
+  const { worktreeId } = modal.worktreeDeletePrompt
+  return r(
+    [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
+    [{ force: true, sessionId, type: 'delete-worktree', worktreeId }],
+    'modal.new-tab.command-edit'
+  )
+}
+
+export const cancelDeleteWorktree: KeyResult = r(
+  [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
+  [],
+  'modal.new-tab.command-edit'
+)
+
+export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'worktree-delete-confirm') return null
+  return r(
+    [{ type: 'close-modal' }],
     [
       {
-        force: modal.worktreeDeleteConfirmId === worktree.id,
-        sessionId,
+        closeTabs: modal.closeTabs,
+        force: modal.force,
+        sessionId: modal.sessionId,
         type: 'delete-worktree',
-        worktreeId: worktree.id,
+        worktreeId: modal.worktreeId,
       },
-    ]
+    ],
+    'navigation'
   )
 }
 

@@ -68,23 +68,24 @@ export const WorktreeRow = memo(function WorktreeRow({
       [
         'Remove worktree',
         () =>
-          // Route through the full delete side effect (closes the worktree's
-          // tabs, disposes their PTYs, prunes the snapshot, removes the git
-          // worktree). Removing only the worktree record would orphan its tabs,
-          // whose stale worktree id a later delete could collide with — closing
-          // "another worktree's" windows. closeTabs (not force) cleans up the
-          // tabs while keeping the non-force `git worktree remove`, so
-          // uncommitted work in a temp worktree is still protected.
-          runSideEffectGlobal({
+          // Always confirm first. Confirming routes through the full delete side
+          // effect (closes the worktree's tabs, disposes their PTYs, prunes the
+          // snapshot, removes the git worktree). closeTabs (not force) cleans up
+          // the tabs while keeping the non-force `git worktree remove`, so
+          // uncommitted work in a temp worktree is still protected — a dirty
+          // worktree re-prompts for an explicit force-delete.
+          dispatchGlobal({
             closeTabs: true,
             force: false,
+            reason: 'Its assistant tabs will be closed and the worktree removed.',
             sessionId: session.id,
-            type: 'delete-worktree',
+            type: 'open-worktree-delete-confirm',
             worktreeId: worktree.id,
+            worktreeLabel: worktree.branch ?? worktree.name,
           }),
       ],
     ]
-  }, [session.id, worktree.id, worktree.source])
+  }, [session.id, worktree.branch, worktree.id, worktree.name, worktree.source])
 
   let bgColor: string | undefined
   if (isActiveItem) {

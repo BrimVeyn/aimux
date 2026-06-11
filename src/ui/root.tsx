@@ -33,6 +33,7 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateSessionModal } from './components/modals/sessions/create-session-modal'
 import { SessionNameModal } from './components/modals/sessions/session-name-modal'
 import { SessionPickerModal } from './components/modals/sessions/session-picker-modal'
+import { WorktreeDeleteConfirm } from './components/modals/shared/worktree-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
@@ -112,8 +113,7 @@ function renderModal(
           createWorktree={modal.type === 'new-tab' ? modal.createWorktree : false}
           selectedAssistantId={modal.type === 'new-tab' ? modal.selectedAssistantId : null}
           step={modal.type === 'new-tab' ? modal.step : 'assistant'}
-          worktreeDeleteConfirmId={modal.type === 'new-tab' ? modal.worktreeDeleteConfirmId : null}
-          worktreeDeleteMessage={modal.type === 'new-tab' ? modal.worktreeDeleteMessage : null}
+          worktreeDeletePrompt={modal.type === 'new-tab' ? modal.worktreeDeletePrompt : null}
           worktrees={
             options.currentSessionId != null && options.currentSessionId !== ''
               ? (options.sessions.find((session) => session.id === options.currentSessionId)
@@ -221,6 +221,14 @@ function renderModal(
       )
     case 'ai-usage':
       return <AIUsageModal />
+    case 'worktree-delete-confirm':
+      return (
+        <WorktreeDeleteConfirm
+          keybindsModeId="modal.worktree-delete-confirm"
+          reason={modal.reason}
+          worktreeLabel={modal.worktreeLabel}
+        />
+      )
     case 'git-commit': {
       const titleText =
         modal.activeField === 'title' ? (modal.editBuffer ?? '') : modal.contentBuffer
