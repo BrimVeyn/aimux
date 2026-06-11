@@ -195,7 +195,7 @@ export const launchSelectedAssistant: ActionFn = (ctx: ModeContext) => {
     ctx.state.modal.step === 'worktree' &&
     ctx.state.modal.createWorktree
   ) {
-    return r([{ type: 'enter-new-tab-worktree-create' }])
+    return r([{ type: 'enter-new-tab-worktree-create' }], [{ type: 'load-new-tab-base-branches' }])
   }
   return r([], [{ type: 'launch-selected-assistant' }])
 }

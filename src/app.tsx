@@ -22,7 +22,9 @@ import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
 import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
-import { loadConfig } from './config'
+import { loadConfig, saveConfig } from './config'
+import { enqueueGitOp } from './git/command-queue'
+import { pruneOrphanAimuxBranches } from './git/worktree'
 import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
@@ -39,6 +41,7 @@ import { findMostRecentSession, loadSessionCatalog } from './state/session-catal
 import { getSessionProjectPath } from './state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
+import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import {
@@ -244,6 +247,28 @@ export function App({
     }
     // dispatch is stable (same fn reference from the store) — safe to omit
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    // One-shot cleanup: prune `aimux/` branches orphaned by temp worktrees that
+    // were deleted before delete-time branch cleanup existed. Gated by a config
+    // flag so it runs once per machine. All git calls are best-effort (nothrow)
+    // and git protects branches still checked out in a live worktree.
+    if (loadConfig().prunedOrphanAimuxBranches === true) return
+    void (async () => {
+      const repoRoots = new Set<string>()
+      for (const session of loadSessionCatalog()) {
+        for (const worktree of session.worktrees ?? []) {
+          if (worktree.repoRoot !== '') repoRoots.add(worktree.repoRoot)
+        }
+      }
+      let removed = 0
+      for (const repoRoot of repoRoots) {
+        removed += await enqueueGitOp(() => pruneOrphanAimuxBranches(repoRoot))
+      }
+      saveConfig({ ...loadConfig(), prunedOrphanAimuxBranches: true })
+      if (removed > 0) toast.success(`Cleaned ${removed} orphaned aimux branch(es)`)
+    })()
   }, [])
 
   const resizingRef = useRef(false)

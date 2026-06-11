@@ -43,6 +43,8 @@ export interface AimuxConfig {
   sessionBarVisible?: boolean
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
+  /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
+  prunedOrphanAimuxBranches?: boolean
 }
 
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
@@ -162,6 +164,7 @@ export function loadConfigResult(): ConfigLoadResult {
       sessionBarVisible?: unknown
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
+      prunedOrphanAimuxBranches?: unknown
     }
 
     const issues: string[] = []
@@ -254,6 +257,7 @@ export function loadConfigResult(): ConfigLoadResult {
       config: {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
+        prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
         sessionBarVisible: validSessionBarVisible,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,

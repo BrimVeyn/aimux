@@ -4,10 +4,10 @@ import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterAssistants } from '../../../../state/selectors'
+import { buildBaseRefOptions, filterAssistants } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
-import { Form, TextField } from '../shared/form'
+import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
 import { WorktreeDeleteConfirm } from '../shared/worktree-delete-confirm'
 
@@ -19,7 +19,7 @@ interface NewTabModalProps {
   currentSessionId: string | null
   editingCommand: AssistantId | null
   editBuffer: string
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name' | 'base'
   branchError: string | null
   branchName: string
   createWorktree: boolean
@@ -28,6 +28,9 @@ interface NewTabModalProps {
   worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktrees: WorktreeRecord[]
   worktreeName: string
+  baseQuery: string
+  baseRef: string
+  baseBranches: string[]
 }
 
 function getDeleteBlockedReason({
@@ -52,6 +55,9 @@ function getDeleteBlockedReason({
 
 export function NewTabModal({
   activeField,
+  baseBranches,
+  baseQuery,
+  baseRef,
   branchError,
   branchName,
   createWorktree,
@@ -113,7 +119,10 @@ export function NewTabModal({
       }),
       {
         key: '__create-worktree__',
-        onClick: () => dispatchGlobal({ type: 'enter-new-tab-worktree-create' }),
+        onClick: () => {
+          dispatchGlobal({ type: 'enter-new-tab-worktree-create' })
+          runSideEffectGlobal({ type: 'load-new-tab-base-branches' })
+        },
         subtitle: <text fg={t.textMuted}>Create an Aimux temp worktree</text>,
         title: <text fg={createWorktree ? t.text : t.textMuted}>Create new worktree</text>,
       },
@@ -146,6 +155,24 @@ export function NewTabModal({
     [customCommands, filtered, selectedIndex, t]
   )
 
+  const baseItems = useMemo<FormOptionItem[]>(
+    () =>
+      buildBaseRefOptions(worktrees, baseBranches, baseQuery).map((option) => ({
+        key: option.ref,
+        leading: (
+          <text fg={option.kind === 'worktree' ? t.warning : t.textMuted}>
+            {option.kind === 'worktree' ? '\u{e728}' : '\u{e702}'}
+          </text>
+        ),
+        subtitle:
+          option.kind === 'worktree' ? (
+            <text fg={t.textMuted}>worktree: {option.detail}</text>
+          ) : null,
+        title: (active) => <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+      })),
+    [baseBranches, baseQuery, t, worktrees]
+  )
+
   if (editingCommand !== null) {
     const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)
     return (
@@ -168,6 +195,7 @@ export function NewTabModal({
   if (step === 'worktree-create') {
     const selectedAssistant =
       options.find((option) => option.id === selectedAssistantId) ?? options[0]
+    const baseActive = activeField === 'base'
     return (
       <Form
         title={`New worktree: ${selectedAssistant?.label ?? 'assistant'}`}
@@ -194,7 +222,20 @@ export function NewTabModal({
               <text fg={t.error}>{branchError}</text>
             ) : null}
           </box>
-          <text fg={t.textMuted}>Step 3/3: configure new worktree</text>
+          <AutoComplete
+            active={baseActive}
+            label="Base (fork from)"
+            placeholder="branch or worktree to fork from..."
+            value={baseQuery}
+            displayValue={baseRef !== '' ? baseRef : 'current branch'}
+            items={baseItems}
+            selectedIndex={selectedIndex}
+            cursorPos={baseActive ? cursorPos : undefined}
+            maxVisibleRows={6}
+            onHover={handleHover}
+            emptyState={<text fg={t.textMuted}>No branches found</text>}
+          />
+          <text fg={t.textMuted}>Step 3/3: configure new worktree · Tab switches fields</text>
         </box>
       </Form>
     )

@@ -22,10 +22,13 @@ import { enqueueGitOp } from '../git/command-queue'
 import { moveWorktree } from '../git/move-worktree'
 import {
   createGitWorktree,
+  deleteGitBranch,
   getCurrentBranch,
   getHeadSha,
   getMainWorktreeRoot,
   listGitWorktrees,
+  listLocalBranches,
+  pruneGitWorktrees,
   removeGitWorktree,
 } from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
@@ -403,7 +406,8 @@ async function launchAssistantInNewWorktree(
   assistant: AssistantId,
   worktreeName: string,
   branchName?: string,
-  sourceWorktreeId?: string
+  sourceWorktreeId?: string,
+  baseRef?: string
 ): Promise<void> {
   const sessionId = ctx.state.currentSessionId
   if (!(sessionId != null && sessionId !== '')) return
@@ -412,7 +416,7 @@ async function launchAssistantInNewWorktree(
     sessionId,
     worktreeName,
     branchName,
-    undefined,
+    baseRef,
     sourceWorktreeId
   )
   if (!worktree) return
@@ -508,6 +512,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       if (state.modal.type === 'new-tab' && state.modal.createWorktree) {
         const worktreeName = state.modal.worktreeName
         const branchName = state.modal.branchName
+        const baseRef = state.modal.baseRef
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
         void (async () => {
           try {
@@ -517,7 +522,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
                 option.id,
                 worktreeName,
                 branchName,
-                sourceWorktreeId
+                sourceWorktreeId,
+                baseRef !== '' ? baseRef : undefined
               )
             )
           } catch (error) {
@@ -532,6 +538,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'edit-selected-assistant': {
       const option = getSelectedAssistantOption(state)
       dispatch({ assistantId: option.id, type: 'open-edit-custom-command' })
+      return
+    }
+    case 'load-new-tab-base-branches': {
+      void (async () => {
+        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+        const sourcePath = getActiveWorktree(session)?.path ?? getSessionProjectPath(session)
+        if (!(sourcePath != null && sourcePath !== '')) return
+        const branches = await listLocalBranches(sourcePath)
+        if (ctx.getState().modal.type !== 'new-tab') return
+        ctx.dispatch({ branches, type: 'set-new-tab-base-branches' })
+      })()
       return
     }
     case 'confirm-selected-session': {
@@ -1411,31 +1428,34 @@ async function runDeleteWorktree(
   }
   disposeWorktreeTabs(ctx, worktreeId)
 
-  if (
-    worktree.source === 'aimux-temp' &&
-    worktree.createdByAimux &&
-    isInsideAimuxWorktreeRoot(worktree.path) &&
-    !existsSync(worktree.path)
-  ) {
+  const repoPath = resolveWorktreeGitDir(session, worktree)
+  const isAimuxTemp = worktree.source === 'aimux-temp' && worktree.createdByAimux
+  // Drop the throwaway aimux branch alongside the worktree so deleted temp
+  // worktrees don't accumulate in the repo or haunt the base picker. Scoped to
+  // the `aimux/` namespace (matches the picker filter); best-effort.
+  const cleanupAimuxBranch = async (): Promise<void> => {
+    const branch = worktree.branch
+    if (isAimuxTemp && branch != null && branch !== '' && branch.startsWith('aimux/')) {
+      await deleteGitBranch(repoPath, branch)
+    }
+  }
+
+  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path) && !existsSync(worktree.path)) {
+    // The dir vanished but git may still pin the branch to a stale worktree entry.
+    await pruneGitWorktrees(repoPath)
+    await cleanupAimuxBranch()
     removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
     return
   }
 
-  if (
-    worktree.source === 'aimux-temp' &&
-    worktree.createdByAimux &&
-    isInsideAimuxWorktreeRoot(worktree.path)
-  ) {
+  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path)) {
     await assertSafeAimuxWorktreePath(worktree.path)
-    await removeGitWorktree({
-      force,
-      repoPath: resolveWorktreeGitDir(session, worktree),
-      targetPath: worktree.path,
-    })
+    await removeGitWorktree({ force, repoPath, targetPath: worktree.path })
   } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
     throw new Error(`refusing unsafe worktree delete: ${worktree.path}`)
   }
 
+  await cleanupAimuxBranch()
   removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
 }
 

@@ -33,6 +33,24 @@ export async function getHeadSha(cwd: string): Promise<string | undefined> {
   return result.text().trim() || undefined
 }
 
+// Local branch names, ordered most-recently-committed first so the likely base
+// surfaces near the top of the picker.
+export async function listLocalBranches(cwd: string): Promise<string[]> {
+  // The format must be interpolated, not inlined: Bun's shell parses a bare
+  // `%(refname:short)` and chokes on the parentheses.
+  const format = '%(refname:short)'
+  const result =
+    await $`git -C ${cwd} for-each-ref --sort=-committerdate refs/heads --format=${format}`
+      .quiet()
+      .nothrow()
+  if (result.exitCode !== 0) return []
+  return result
+    .text()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+}
+
 export async function createGitWorktree({
   baseRef,
   branchName,
@@ -50,6 +68,33 @@ export async function createGitWorktree({
   if (result.exitCode !== 0) {
     throw new Error(result.stderr.toString().trim() || 'failed to create git worktree')
   }
+}
+
+// Force-delete a local branch. Returns false (without throwing) when git
+// refuses — notably when the branch is still checked out in a live worktree,
+// which is exactly how orphan-pruning stays safe.
+export async function deleteGitBranch(repoPath: string, branch: string): Promise<boolean> {
+  const result = await $`git -C ${repoPath} branch -D ${branch}`.quiet().nothrow()
+  return result.exitCode === 0
+}
+
+export async function pruneGitWorktrees(repoPath: string): Promise<void> {
+  await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
+}
+
+// Drop every `aimux/` branch left behind by deleted temp worktrees. git refuses
+// to delete branches still checked out in a live worktree, so this only removes
+// true orphans. Returns the number of branches removed.
+export async function pruneOrphanAimuxBranches(repoPath: string): Promise<number> {
+  await pruneGitWorktrees(repoPath)
+  const branches = (await listLocalBranches(repoPath)).filter((branch) =>
+    branch.startsWith('aimux/')
+  )
+  let removed = 0
+  for (const branch of branches) {
+    if (await deleteGitBranch(repoPath, branch)) removed++
+  }
+  return removed
 }
 
 export async function removeGitWorktree({

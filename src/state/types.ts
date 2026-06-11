@@ -323,7 +323,7 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name' | 'base'
   branchError: string | null
   branchName: string
   createWorktree: boolean
@@ -332,6 +332,12 @@ export interface ModalNewTab extends ModalBase {
   targetWorktreeIndex: number
   worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktreeName: string
+  /** Filter text typed into the "Base" picker on the worktree-create step. */
+  baseQuery: string
+  /** Resolved base ref the new worktree is forked from (branch of a worktree or a local branch). */
+  baseRef: string
+  /** Local branches available as base refs, loaded when the create step opens. */
+  baseBranches: string[]
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -532,6 +538,7 @@ export type ModalAction =
       type: 'set-new-tab-worktree-delete-prompt'
       prompt: { worktreeId: string; reason: string } | null
     }
+  | { type: 'set-new-tab-base-branches'; branches: string[] }
   | { type: 'enter-new-tab-worktree-create' }
   | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
   | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
