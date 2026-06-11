@@ -68,9 +68,18 @@ export const WorktreeRow = memo(function WorktreeRow({
       [
         'Remove worktree',
         () =>
-          dispatchGlobal({
+          // Route through the full delete side effect (closes the worktree's
+          // tabs, disposes their PTYs, prunes the snapshot, removes the git
+          // worktree). Removing only the worktree record would orphan its tabs,
+          // whose stale worktree id a later delete could collide with — closing
+          // "another worktree's" windows. closeTabs (not force) cleans up the
+          // tabs while keeping the non-force `git worktree remove`, so
+          // uncommitted work in a temp worktree is still protected.
+          runSideEffectGlobal({
+            closeTabs: true,
+            force: false,
             sessionId: session.id,
-            type: 'remove-worktree-record',
+            type: 'delete-worktree',
             worktreeId: worktree.id,
           }),
       ],

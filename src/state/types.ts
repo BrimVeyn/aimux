@@ -565,7 +565,6 @@ export type SessionAction =
   | { type: 'reorder-active-session'; delta: number }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
   | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
-  | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
   | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
   | {
       type: 'update-worktree-record'

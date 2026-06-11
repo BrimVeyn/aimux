@@ -554,7 +554,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
               { ...ctx, state: ctx.getState() },
               effect.sessionId,
               effect.worktreeId,
-              !!(effect.force === true)
+              !!(effect.force === true),
+              !!(effect.closeTabs === true)
             )
           )
         } catch (error) {
@@ -1378,7 +1379,8 @@ async function runDeleteWorktree(
   ctx: SideEffectContext,
   sessionId: string,
   worktreeId: string,
-  force: boolean
+  force: boolean,
+  closeTabs = false
 ): Promise<void> {
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
@@ -1388,7 +1390,11 @@ async function runDeleteWorktree(
   if (worktree.source === 'primary') throw new Error('root worktree cannot be deleted')
 
   const tabsInWorktree = ctx.state.tabs.filter((tab) => tab.worktreeId === worktreeId)
-  if (tabsInWorktree.length > 0 && !force) {
+  // The active-tabs guard asks the modal user to confirm before closing tabs.
+  // `closeTabs` (the sidebar's "Remove worktree") opts into closing them
+  // directly without forcing the git removal, so dirty temp worktrees are still
+  // protected by the non-force `git worktree remove`.
+  if (tabsInWorktree.length > 0 && !force && !closeTabs) {
     throw new ActiveWorktreeTabsError(tabsInWorktree.length)
   }
   disposeWorktreeTabs(ctx, worktreeId)

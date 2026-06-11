@@ -18,15 +18,23 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
       const snapshot =
         action.workspaceSnapshot ??
         state.sessions.find((entry) => entry.id === action.sessionId)?.workspaceSnapshot
-      const restored = restoreWorkspaceState(state, snapshot, {
-        forceDisconnected: action.forceDisconnected ?? true,
-      })
       // The session's activeWorktreeId may have been patched right before
       // this load (e.g. the cross-workspace branch of handleCycleSidebarItem
       // sets it to the worktree the user just clicked). The snapshot's
       // activeTabId still reflects the *last* worktree they were on, so
       // honor the patched worktree by filtering the restored tab list.
       const loadedSession = state.sessions.find((entry) => entry.id === action.sessionId)
+      const loadedWorktrees = loadedSession?.worktrees ?? []
+      const restored = restoreWorkspaceState(state, snapshot, {
+        forceDisconnected: action.forceDisconnected ?? true,
+        // Drop tabs bound to worktrees this session no longer owns so a stale
+        // id can't be caught by a later worktree delete (closing "another
+        // worktree's" tabs) and so corrupted catalogs self-heal on load. Only
+        // prune once the session has worktrees — an empty list means it hasn't
+        // been initialized yet, and pruning then would wrongly drop bound tabs.
+        validWorktreeIds:
+          loadedWorktrees.length > 0 ? new Set(loadedWorktrees.map((w) => w.id)) : undefined,
+      })
       const visible = filterTabsForActiveWorktree(restored.tabs, loadedSession)
       // Prefer the snapshot's tab; if it isn't visible under the active
       // worktree (e.g. a multi-worktree session restored onto a different
@@ -186,22 +194,6 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
           return next.activeWorktreeId != null && next.activeWorktreeId !== ''
             ? next
             : withActiveWorktree(next, action.worktree.id)
-        }),
-      }
-    case 'remove-worktree-record':
-      return {
-        ...state,
-        sessions: state.sessions.map((session) => {
-          if (session.id !== action.sessionId) return session
-          const remaining = (session.worktrees ?? []).filter((w) => w.id !== action.worktreeId)
-          if (remaining.length === 0) return session
-          if (session.activeWorktreeId !== action.worktreeId) {
-            return { ...session, updatedAt: new Date().toISOString(), worktrees: remaining }
-          }
-          return withActiveWorktree(
-            { ...session, activeWorktreeId: remaining[0]?.id, worktrees: remaining },
-            remaining[0]?.id ?? ''
-          )
         }),
       }
     case 'set-active-worktree': {

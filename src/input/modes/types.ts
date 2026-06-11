@@ -71,7 +71,18 @@ export type SideEffect =
   | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
   | { type: 'switch-tab-by-index'; index: number }
   | { type: 'delete-session'; sessionId: string }
-  | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | {
+      type: 'delete-worktree'
+      sessionId: string
+      worktreeId: string
+      // Force the git worktree removal (discards uncommitted changes in the
+      // worktree). Also implies closing the worktree's tabs.
+      force?: boolean
+      // Close the worktree's tabs without forcing the git removal. Lets the
+      // sidebar "Remove worktree" clean up tabs (avoiding orphans) while still
+      // refusing to discard uncommitted work in a temp worktree.
+      closeTabs?: boolean
+    }
   | {
       type: 'move-worktree'
       sessionId: string

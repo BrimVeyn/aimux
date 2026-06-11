@@ -72,6 +72,27 @@ export interface RestoreOptions {
   // will overwrite the status with daemon truth — leaving the flag on would
   // briefly flash the "Restored snapshot" hint on every j/k cycle.
   forceDisconnected?: boolean
+  // When provided, drop tabs pinned to a worktree id that the session no
+  // longer owns. Some delete paths (notably the sidebar's "Remove worktree")
+  // historically removed the worktree record without closing its tabs, leaving
+  // orphans bound to a vanished id. Those orphans are invisible (filtered out
+  // by the active-worktree filter) yet keep a worktree id that a *future*
+  // delete can collide with — exactly what closes "another worktree's" tabs.
+  // Pruning them on restore both repairs corrupted catalogs and prevents the
+  // collision. Tabs with no worktree id (legacy/unbound) are always kept.
+  validWorktreeIds?: ReadonlySet<string>
+}
+
+// Drop tabs bound to a worktree id the session no longer owns. Unbound tabs
+// (no worktreeId) are kept — they surface under the primary worktree.
+function pruneOrphanedTabs(
+  tabs: TabSession[],
+  validWorktreeIds: ReadonlySet<string> | undefined
+): TabSession[] {
+  if (!validWorktreeIds) return tabs
+  return tabs.filter(
+    (tab) => tab.worktreeId == null || tab.worktreeId === '' || validWorktreeIds.has(tab.worktreeId)
+  )
 }
 
 export function restoreTabsFromWorkspace(
@@ -84,7 +105,7 @@ export function restoreTabsFromWorkspace(
 
   const forceDisconnected = options.forceDisconnected ?? true
 
-  return snapshot.tabs
+  const restored: TabSession[] = snapshot.tabs
     .filter(
       (tab): tab is typeof tab & { status: Exclude<typeof tab.status, 'exited'> } =>
         tab.status !== 'exited'
@@ -103,6 +124,7 @@ export function restoreTabsFromWorkspace(
       viewport: tab.viewport,
       worktreeId: tab.worktreeId,
     }))
+  return pruneOrphanedTabs(restored, options.validWorktreeIds)
 }
 
 export function restoreLayoutTrees(
