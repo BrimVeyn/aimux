@@ -614,6 +614,7 @@ export type TabAction =
   | { type: 'set-active-tab'; tabId: string }
   | { type: 'move-active-tab'; delta: number }
   | { type: 'reorder-active-tab'; delta: number }
+  | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-session'; tabId: string }
   | { type: 'rename-tab'; tabId: string; title: string }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }
