@@ -205,6 +205,17 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: standalone worktree delete confirmation (sidebar "Remove worktree")
+    // -----------------------------------------------------------------------
+    .mode('modal.worktree-delete-confirm', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('n', actions.closeModal, 'Cancel')
+        .map('<CR>', actions.confirmWorktreeDeleteModal, 'Delete worktree')
+        .map('y', actions.confirmWorktreeDeleteModal, 'Delete worktree')
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: rename-tab
     // -----------------------------------------------------------------------
     .mode('modal.rename-tab', (m) =>
@@ -237,6 +248,17 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.cancelEditCustomCommand, 'Cancel')
         .map('<CR>', actions.saveCustomCommand, 'Save')
         .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: new-tab worktree delete confirmation dialog
+    // -----------------------------------------------------------------------
+    .mode('modal.new-tab.worktree-delete-confirm', (m) =>
+      m
+        .map('<Esc>', actions.cancelDeleteWorktree, 'Cancel')
+        .map('n', actions.cancelDeleteWorktree, 'Cancel')
+        .map('<CR>', actions.confirmDeleteWorktree, 'Delete worktree')
+        .map('y', actions.confirmDeleteWorktree, 'Delete worktree')
     )
 
     // -----------------------------------------------------------------------

@@ -1,6 +1,10 @@
-import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
+import type {
+  BoxRenderable,
+  MouseEvent as OtuiMouseEvent,
+  ScrollBoxRenderable,
+} from '@opentui/core'
 
-import { memo, type ReactNode, useCallback, useMemo, useRef } from 'react'
+import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
 import type { FocusMode, TabSession } from '../../../state/types'
 
@@ -8,7 +12,8 @@ import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-p
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
-import { buildTabEntries, type GroupEntry } from '../../../state/tab-entries'
+import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
+import { moveIdToIdPosition } from '../../session-ordering'
 import { useTheme } from '../../theme'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { TabItem } from './sidebar/tab-item'
@@ -43,27 +48,51 @@ const TopTabCell = memo(function TopTabCell({
   backgroundColor,
   children,
   entryId,
-  onActivate,
+  onDrag,
+  onDragCancel,
+  onDragStart,
+  onDrop,
+  setCellRef,
 }: {
   entryId: string
   active: boolean
   backgroundColor: string | undefined
-  onActivate?: (entryId: string) => void
+  setCellRef: (entryId: string, ref: BoxRenderable | null) => void
+  onDragStart: (entryId: string) => void
+  onDrag: (event: OtuiMouseEvent) => void
+  onDrop: () => void
+  onDragCancel: () => void
   children: ReactNode
 }) {
+  const handleRef = useCallback(
+    (r: BoxRenderable | null) => setCellRef(entryId, r),
+    [setCellRef, entryId]
+  )
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
+      event.preventDefault()
       event.stopPropagation()
-      onActivate?.(entryId)
+      onDragStart(entryId)
     },
-    [onActivate, entryId]
+    [onDragStart, entryId]
+  )
+  const handleMouseUp = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.preventDefault()
+      onDrop()
+    },
+    [onDrop]
   )
   return (
     <box
+      ref={handleRef}
       backgroundColor={backgroundColor}
       flexDirection="row"
       flexShrink={0}
       onMouseDown={handleMouseDown}
+      onMouseDrag={onDrag}
+      onMouseUp={handleMouseUp}
+      onMouseDragEnd={onDragCancel}
       data-active={active ? 'true' : undefined}
     >
       {children}
@@ -147,6 +176,19 @@ function GroupTabItem({
   )
 }
 
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false
+  }
+  return true
+}
+
+/** Flatten an entry into the underlying tab ids, in display order. */
+function entryTabIds(entry: TabEntry): string[] {
+  return entry.kind === 'single' ? [entry.tab.id] : entry.tabs.map((tab) => tab.id)
+}
+
 export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const t = useTheme()
   const headerBg = t.backgroundPanel
@@ -214,6 +256,89 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
     [entries, activeTabId]
   )
 
+  // --- Drag-and-drop reorder of the tab strip ---------------------------------
+  // Mirrors the workspace-list drag, but on the horizontal axis: entries are
+  // laid out left-to-right inside a scrollX box, so hit-testing is on x/width.
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
+  const lastSwapWithRef = useRef<string | null>(null)
+  const cellRefs = useRef(new Map<string, BoxRenderable>())
+
+  const baselineOrder = useMemo(() => entries.map((e) => e.id), [entries])
+
+  const setCellRef = useCallback((id: string, ref: BoxRenderable | null): void => {
+    if (ref) cellRefs.current.set(id, ref)
+    else cellRefs.current.delete(id)
+  }, [])
+
+  const findEntryAtX = useCallback((x: number): string | null => {
+    for (const [id, ref] of cellRefs.current) {
+      if (x >= ref.x && x < ref.x + ref.width) return id
+    }
+    return null
+  }, [])
+
+  const handleDragStart = useCallback(
+    (id: string) => {
+      setDraggingId(id)
+      setDragOrder(baselineOrder)
+      lastSwapWithRef.current = null
+    },
+    [baselineOrder]
+  )
+
+  const handleDrag = useCallback(
+    (event: OtuiMouseEvent) => {
+      if (!(draggingId != null && draggingId !== '')) return
+      const hit = findEntryAtX(event.x)
+      if (hit === null || hit === draggingId) {
+        lastSwapWithRef.current = null
+        return
+      }
+      if (hit === lastSwapWithRef.current) return
+      setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hit) : prev))
+      lastSwapWithRef.current = hit
+    },
+    [draggingId, findEntryAtX]
+  )
+
+  const commitDrop = useCallback(() => {
+    const source = draggingId
+    const finalOrder = dragOrder
+    setDraggingId(null)
+    setDragOrder(null)
+    lastSwapWithRef.current = null
+
+    if (source == null || source === '' || !finalOrder) return
+
+    if (!arraysEqual(finalOrder, baselineOrder)) {
+      // Expand entries (groups collapse multiple tabs) back into a flat tab-id
+      // order, then let the reducer rewrite only the visible tabs' slots.
+      const byId = new Map(entries.map((e) => [e.id, e]))
+      const orderedTabIds = finalOrder.flatMap((id) => {
+        const entry = byId.get(id)
+        return entry ? entryTabIds(entry) : []
+      })
+      dispatchGlobal({ orderedTabIds, type: 'reorder-tabs' })
+      return
+    }
+
+    // No reorder happened → treat as a plain click on the entry.
+    handleEntryActivate(source)
+  }, [baselineOrder, dragOrder, draggingId, entries, handleEntryActivate])
+
+  const cancelDrag = useCallback(() => {
+    setDraggingId(null)
+    setDragOrder(null)
+    lastSwapWithRef.current = null
+  }, [])
+
+  const visibleEntries = useMemo(() => {
+    if (dragOrder === null) return entries
+    const byId = new Map(entries.map((e) => [e.id, e]))
+    return dragOrder.map((id) => byId.get(id)).filter((e): e is TabEntry => e != null)
+  }, [dragOrder, entries])
+
   const handleNewTab = useCallback((e: OtuiMouseEvent) => {
     e.stopPropagation()
     dispatchGlobal({ type: 'open-new-tab-modal' })
@@ -245,10 +370,11 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
         viewportCulling
         contentOptions={ROW_CONTENT_OPTIONS}
       >
-        {entries.map((entry, index) => {
+        {visibleEntries.map((entry, index) => {
           // [N] is shown only for the first 9 entries — that's the range
           // Leader+1..9 can address.
           const indexLabel = index < 9 ? `[${index + 1}]` : undefined
+          const dragging = entry.id === draggingId
           if (entry.kind === 'single') {
             const tab: TabSession = entry.tab
             const isActive = tab.id === activeTabId
@@ -257,8 +383,12 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
                 key={entry.id}
                 entryId={entry.id}
                 active={isActive}
-                onActivate={handleEntryActivate}
-                backgroundColor={isActive ? t.backgroundElement : undefined}
+                setCellRef={setCellRef}
+                onDragStart={handleDragStart}
+                onDrag={handleDrag}
+                onDrop={commitDrop}
+                onDragCancel={cancelDrag}
+                backgroundColor={isActive || dragging ? t.backgroundElement : undefined}
               >
                 <TabItem
                   id={`top-tab-${tab.id}`}
@@ -277,8 +407,12 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
               key={entry.id}
               entryId={entry.id}
               active={isActive}
-              onActivate={handleEntryActivate}
-              backgroundColor={isActive ? t.backgroundElement : undefined}
+              setCellRef={setCellRef}
+              onDragStart={handleDragStart}
+              onDrag={handleDrag}
+              onDrop={commitDrop}
+              onDragCancel={cancelDrag}
+              backgroundColor={isActive || dragging ? t.backgroundElement : undefined}
             >
               <GroupTabItem
                 entry={entry}

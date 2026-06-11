@@ -103,6 +103,72 @@ describe('session persistence', () => {
     expect(tabs[0]?.activity).toBe('idle')
   })
 
+  test('prunes tabs pinned to worktrees the session no longer owns', () => {
+    const mkTab = (id: string, worktreeId?: string) => ({
+      assistant: 'claude' as const,
+      buffer: '',
+      command: 'claude',
+      id,
+      status: 'running' as const,
+      terminalModes: {
+        alternateScrollMode: false,
+        bracketedPasteMode: false,
+        isAlternateBuffer: false,
+        mouseTrackingMode: 'none' as const,
+        sendFocusMode: false,
+      },
+      title: 'Claude',
+      worktreeId,
+    })
+
+    const tabs = restoreTabsFromWorkspace(
+      {
+        activeTabId: 'tab-live',
+        savedAt: new Date().toISOString(),
+        sidebar: { visible: true, width: 28 },
+        tabs: [
+          mkTab('tab-live', 'wt-main'),
+          mkTab('tab-orphan', 'wt-deleted'),
+          mkTab('tab-unbound'),
+        ],
+        version: 1,
+      },
+      { validWorktreeIds: new Set(['wt-main']) }
+    )
+
+    // Orphan dropped; live + unbound (legacy) tabs kept.
+    expect(tabs.map((t) => t.id)).toEqual(['tab-live', 'tab-unbound'])
+  })
+
+  test('keeps all tabs when no valid worktree set is provided', () => {
+    const mkTab = (id: string, worktreeId?: string) => ({
+      assistant: 'claude' as const,
+      buffer: '',
+      command: 'claude',
+      id,
+      status: 'running' as const,
+      terminalModes: {
+        alternateScrollMode: false,
+        bracketedPasteMode: false,
+        isAlternateBuffer: false,
+        mouseTrackingMode: 'none' as const,
+        sendFocusMode: false,
+      },
+      title: 'Claude',
+      worktreeId,
+    })
+
+    const tabs = restoreTabsFromWorkspace({
+      activeTabId: 'tab-1',
+      savedAt: new Date().toISOString(),
+      sidebar: { visible: true, width: 28 },
+      tabs: [mkTab('tab-1', 'wt-a'), mkTab('tab-2', 'wt-gone')],
+      version: 1,
+    })
+
+    expect(tabs.map((t) => t.id)).toEqual(['tab-1', 'tab-2'])
+  })
+
   test('drops legacy exited tabs from snapshots', () => {
     const initialState = createInitialState()
     const baseState = {

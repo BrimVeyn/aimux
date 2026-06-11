@@ -7,6 +7,8 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import {
+  type BaseRefOption,
+  buildBaseRefOptions,
   filterAssistants,
   filterSessions,
   filterSnippets,
@@ -44,6 +46,17 @@ function getCurrentWorktreeIndex(state: AppState): number {
   )
 }
 
+function getNewTabBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
+  if (state.modal.type !== 'new-tab') return []
+  const worktrees =
+    state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees ?? []
+  return buildBaseRefOptions(
+    worktrees,
+    state.modal.baseBranches,
+    queryOverride ?? state.modal.baseQuery
+  )
+}
+
 function getSelectedNewTabAssistant(state: AppState, assistantId?: string) {
   if (assistantId != null && assistantId !== '') {
     return getAllAssistantOptions(state.customCommands).find((entry) => entry.id === assistantId)
@@ -63,6 +76,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         focusMode: 'command-edit',
         modal: {
           activeField: 'assistant',
+          baseBranches: [],
+          baseQuery: '',
+          baseRef: '',
           branchError: null,
           branchName: '',
           createWorktree: false,
@@ -75,24 +91,42 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           step: 'assistant',
           targetWorktreeIndex,
           type: 'new-tab',
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: '',
         },
       }
     }
     case 'enter-new-tab-worktree-create': {
       if (state.modal.type !== 'new-tab') return state
+      // Default the base to the branch of the worktree we're forking from (the
+      // current target), preserving the previous always-fork-from-source
+      // behaviour until the user picks another base.
+      const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+      const sourceWorktree = session?.worktrees?.[state.modal.targetWorktreeIndex]
       return {
         ...state,
         modal: {
           ...state.modal,
           activeField: 'worktree-name',
+          baseQuery: '',
+          baseRef: sourceWorktree?.branch ?? '',
           createWorktree: true,
           cursorPos: state.modal.worktreeName.length,
           selectedIndex: 0,
           step: 'worktree-create',
         },
+      }
+    }
+    case 'set-new-tab-base-branches': {
+      if (state.modal.type !== 'new-tab') return state
+      const modalWithBranches = { ...state.modal, baseBranches: action.branches }
+      const withBranches: AppState = { ...state, modal: modalWithBranches }
+      // Backfill a default base if none resolved yet (e.g. detached source).
+      if (state.modal.baseRef !== '') return withBranches
+      const firstOption = getNewTabBaseOptions(withBranches)[0]
+      return {
+        ...withBranches,
+        modal: { ...modalWithBranches, baseRef: firstOption?.ref ?? '' },
       }
     }
     case 'enter-new-tab-template-pick': {
@@ -125,14 +159,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'set-new-tab-worktree-delete-state': {
+    case 'set-new-tab-worktree-delete-prompt': {
       if (state.modal.type !== 'new-tab') return state
       return {
         ...state,
         modal: {
           ...state.modal,
-          worktreeDeleteConfirmId: action.confirmWorktreeId ?? null,
-          worktreeDeleteMessage: action.message,
+          worktreeDeletePrompt: action.prompt,
         },
       }
     }
@@ -192,8 +225,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           selectedIndex: worktreeCount === 0 ? 0 : targetWorktreeIndex,
           step: 'worktree',
           targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: state.modal.worktreeName || `wt-${option.label}`,
         },
       }
@@ -228,8 +260,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
             : Math.min(state.modal.selectedIndex, Math.max(0, worktreeCount - 1)),
           step: option && createWorktree ? 'worktree' : state.modal.step,
           targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
+          worktreeDeletePrompt: null,
           worktreeName: defaultName,
         },
       }
@@ -282,6 +313,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
+      }
+    }
+    case 'open-worktree-delete-confirm': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          closeTabs: action.closeTabs,
+          editBuffer: null,
+          force: action.force,
+          reason: action.reason,
+          selectedIndex: 0,
+          sessionId: action.sessionId,
+          sessionTargetId: null,
+          type: 'worktree-delete-confirm',
+          worktreeId: action.worktreeId,
+          worktreeLabel: action.worktreeLabel,
+        },
       }
     }
     case 'open-help-modal': {
@@ -616,7 +665,18 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return state
       }
       if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
-        return state
+        if (state.modal.activeField !== 'base') return state
+        const options = getNewTabBaseOptions(state)
+        if (options.length === 0) return state
+        const next = (state.modal.selectedIndex + action.delta + options.length) % options.length
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseRef: options[next]?.ref ?? state.modal.baseRef,
+            selectedIndex: next,
+          },
+        }
       }
       let optionCount: number
       if (state.modal.type === 'new-tab') {
@@ -661,8 +721,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
                 createWorktree:
                   (state.modal.selectedIndex + action.delta + optionCount) % optionCount ===
                   optionCount - 1,
-                worktreeDeleteConfirmId: null,
-                worktreeDeleteMessage: null,
+                worktreeDeletePrompt: null,
               }
             : null),
         },
@@ -683,7 +742,19 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return state
       }
       if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
-        return state
+        if (state.modal.activeField !== 'base') return state
+        const options = getNewTabBaseOptions(state)
+        if (options.length === 0) return state
+        const clamped = Math.max(0, Math.min(options.length - 1, action.index))
+        if (clamped === state.modal.selectedIndex) return state
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseRef: options[clamped]?.ref ?? state.modal.baseRef,
+            selectedIndex: clamped,
+          },
+        }
       }
       let optionCount: number
       if (state.modal.type === 'help') {
@@ -724,8 +795,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
             ...state.modal,
             createWorktree: clamped === optionCount - 1,
             selectedIndex: clamped,
-            worktreeDeleteConfirmId: null,
-            worktreeDeleteMessage: null,
+            worktreeDeletePrompt: null,
           },
         }
       }
@@ -770,6 +840,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           buffer = state.modal.worktreeName
         } else if (state.modal.activeField === 'branch-name') {
           buffer = state.modal.branchName
+        } else if (state.modal.activeField === 'base') {
+          buffer = state.modal.baseQuery
         }
       }
       if (
@@ -818,6 +890,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
             branchError: null,
             branchName: nextBuffer,
             cursorPos: nextCursor,
+          },
+        }
+      }
+      if (
+        state.modal.type === 'new-tab' &&
+        state.modal.editingCommand === null &&
+        state.modal.activeField === 'base'
+      ) {
+        // Re-filter and snap the selection/base to the top match as the query changes.
+        const topOption = getNewTabBaseOptions(state, nextBuffer)[0]
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseQuery: nextBuffer,
+            baseRef: topOption?.ref ?? state.modal.baseRef,
+            cursorPos: nextCursor,
+            selectedIndex: 0,
           },
         }
       }
@@ -901,8 +991,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
               cursorPos: state.modal.editBuffer?.length ?? 0,
               selectedIndex: Math.max(0, assistantIndex),
               step: 'assistant',
-              worktreeDeleteConfirmId: null,
-              worktreeDeleteMessage: null,
+              worktreeDeletePrompt: null,
             },
           }
         }
@@ -991,8 +1080,38 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'new-tab') {
         if (state.modal.step === 'assistant') return state
         if (state.modal.step === 'worktree-create') {
-          const nextField: typeof state.modal.activeField =
-            state.modal.activeField === 'worktree-name' ? 'branch-name' : 'worktree-name'
+          const cycle: Record<
+            'worktree-name' | 'branch-name' | 'base',
+            typeof state.modal.activeField
+          > = {
+            'base': 'worktree-name',
+            'branch-name': 'base',
+            'worktree-name': 'branch-name',
+          }
+          const nextField =
+            state.modal.activeField === 'worktree-name' ||
+            state.modal.activeField === 'branch-name' ||
+            state.modal.activeField === 'base'
+              ? cycle[state.modal.activeField]
+              : 'worktree-name'
+          if (nextField === 'base') {
+            // Highlight the row matching the resolved base ref when entering it.
+            const currentBaseRef = state.modal.baseRef
+            const options = getNewTabBaseOptions(state)
+            const baseIndex = Math.max(
+              0,
+              options.findIndex((option) => option.ref === currentBaseRef)
+            )
+            return {
+              ...state,
+              modal: {
+                ...state.modal,
+                activeField: nextField,
+                cursorPos: state.modal.baseQuery.length,
+                selectedIndex: baseIndex,
+              },
+            }
+          }
           const nextValue =
             nextField === 'branch-name' ? state.modal.branchName : state.modal.worktreeName
           return {

@@ -22,10 +22,13 @@ import { enqueueGitOp } from '../git/command-queue'
 import { moveWorktree } from '../git/move-worktree'
 import {
   createGitWorktree,
+  deleteGitBranch,
   getCurrentBranch,
   getHeadSha,
   getMainWorktreeRoot,
   listGitWorktrees,
+  listLocalBranches,
+  pruneGitWorktrees,
   removeGitWorktree,
 } from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
@@ -419,6 +422,7 @@ async function launchAssistantInNewWorktree(
   worktreeName: string,
   branchName?: string,
   sourceWorktreeId?: string,
+  baseRef?: string,
   templateId?: string
 ): Promise<void> {
   const sessionId = ctx.state.currentSessionId
@@ -428,7 +432,7 @@ async function launchAssistantInNewWorktree(
     sessionId,
     worktreeName,
     branchName,
-    undefined,
+    baseRef,
     sourceWorktreeId
   )
   if (!worktree) return
@@ -665,6 +669,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       if (state.modal.type === 'new-tab' && state.modal.createWorktree) {
         const worktreeName = state.modal.worktreeName
         const branchName = state.modal.branchName
+        const baseRef = state.modal.baseRef
         const sourceWorktreeId = getNewTabTargetWorktreeId(state)
         let templateId: string | undefined
         if (state.modal.step === 'template') {
@@ -683,6 +688,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
                 worktreeName,
                 branchName,
                 sourceWorktreeId,
+                baseRef !== '' ? baseRef : undefined,
                 templateId
               )
             )
@@ -698,6 +704,17 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'edit-selected-assistant': {
       const option = getSelectedAssistantOption(state)
       dispatch({ assistantId: option.id, type: 'open-edit-custom-command' })
+      return
+    }
+    case 'load-new-tab-base-branches': {
+      void (async () => {
+        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+        const sourcePath = getActiveWorktree(session)?.path ?? getSessionProjectPath(session)
+        if (!(sourcePath != null && sourcePath !== '')) return
+        const branches = await listLocalBranches(sourcePath)
+        if (ctx.getState().modal.type !== 'new-tab') return
+        ctx.dispatch({ branches, type: 'set-new-tab-base-branches' })
+      })()
       return
     }
     case 'confirm-selected-session': {
@@ -720,27 +737,40 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
               { ...ctx, state: ctx.getState() },
               effect.sessionId,
               effect.worktreeId,
-              !!(effect.force === true)
+              !!(effect.force === true),
+              !!(effect.closeTabs === true)
             )
           )
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          const forceable = isForceableWorktreeDeleteError(message)
+          // Real errors surface as a toast. Recoverable failures (dirty tree,
+          // active tabs, …) open a confirmation so the user can opt into a
+          // force-delete: in-place inside the new-tab worktree picker (preserving
+          // it), or as a standalone modal elsewhere (e.g. the sidebar's "Remove
+          // worktree").
+          if (!isForceableWorktreeDeleteError(message)) {
+            toast.error(`Could not delete worktree: ${message}`)
+            return
+          }
           const latest = ctx.getState()
           if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
-            const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
-            const selected = session?.worktrees?.[latest.modal.selectedIndex]
-            if (selected && selected.id !== effect.worktreeId) {
-              ctx.dispatch({ message, type: 'git-mode-set-message' })
-              return
-            }
+            ctx.dispatch({
+              prompt: { reason: message, worktreeId: effect.worktreeId },
+              type: 'set-new-tab-worktree-delete-prompt',
+            })
+            return
           }
+          const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
+          const worktree = session?.worktrees?.find((entry) => entry.id === effect.worktreeId)
           ctx.dispatch({
-            confirmWorktreeId: forceable ? effect.worktreeId : null,
-            message: forceable ? message : `Could not delete worktree: ${message}`,
-            type: 'set-new-tab-worktree-delete-state',
+            closeTabs: effect.closeTabs === true,
+            force: true,
+            reason: message,
+            sessionId: effect.sessionId,
+            type: 'open-worktree-delete-confirm',
+            worktreeId: effect.worktreeId,
+            worktreeLabel: worktree?.branch ?? worktree?.name ?? 'this worktree',
           })
-          ctx.dispatch({ message, type: 'git-mode-set-message' })
         }
       })()
       return
@@ -1544,7 +1574,8 @@ async function runDeleteWorktree(
   ctx: SideEffectContext,
   sessionId: string,
   worktreeId: string,
-  force: boolean
+  force: boolean,
+  closeTabs = false
 ): Promise<void> {
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
@@ -1554,36 +1585,43 @@ async function runDeleteWorktree(
   if (worktree.source === 'primary') throw new Error('root worktree cannot be deleted')
 
   const tabsInWorktree = ctx.state.tabs.filter((tab) => tab.worktreeId === worktreeId)
-  if (tabsInWorktree.length > 0 && !force) {
+  // The active-tabs guard asks the modal user to confirm before closing tabs.
+  // `closeTabs` (the sidebar's "Remove worktree") opts into closing them
+  // directly without forcing the git removal, so dirty temp worktrees are still
+  // protected by the non-force `git worktree remove`.
+  if (tabsInWorktree.length > 0 && !force && !closeTabs) {
     throw new ActiveWorktreeTabsError(tabsInWorktree.length)
   }
   disposeWorktreeTabs(ctx, worktreeId)
 
-  if (
-    worktree.source === 'aimux-temp' &&
-    worktree.createdByAimux &&
-    isInsideAimuxWorktreeRoot(worktree.path) &&
-    !existsSync(worktree.path)
-  ) {
+  const repoPath = resolveWorktreeGitDir(session, worktree)
+  const isAimuxTemp = worktree.source === 'aimux-temp' && worktree.createdByAimux
+  // Drop the throwaway aimux branch alongside the worktree so deleted temp
+  // worktrees don't accumulate in the repo or haunt the base picker. Scoped to
+  // the `aimux/` namespace (matches the picker filter); best-effort.
+  const cleanupAimuxBranch = async (): Promise<void> => {
+    const branch = worktree.branch
+    if (isAimuxTemp && branch != null && branch !== '' && branch.startsWith('aimux/')) {
+      await deleteGitBranch(repoPath, branch)
+    }
+  }
+
+  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path) && !existsSync(worktree.path)) {
+    // The dir vanished but git may still pin the branch to a stale worktree entry.
+    await pruneGitWorktrees(repoPath)
+    await cleanupAimuxBranch()
     removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
     return
   }
 
-  if (
-    worktree.source === 'aimux-temp' &&
-    worktree.createdByAimux &&
-    isInsideAimuxWorktreeRoot(worktree.path)
-  ) {
+  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path)) {
     await assertSafeAimuxWorktreePath(worktree.path)
-    await removeGitWorktree({
-      force,
-      repoPath: resolveWorktreeGitDir(session, worktree),
-      targetPath: worktree.path,
-    })
+    await removeGitWorktree({ force, repoPath, targetPath: worktree.path })
   } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
     throw new Error(`refusing unsafe worktree delete: ${worktree.path}`)
   }
 
+  await cleanupAimuxBranch()
   removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
 }
 
@@ -1694,7 +1732,7 @@ function removeWorktreeRecordFromSession(
       type: 'set-modal-selection-index',
     })
   }
-  ctx.dispatch({ message: null, type: 'set-new-tab-worktree-delete-state' })
+  ctx.dispatch({ prompt: null, type: 'set-new-tab-worktree-delete-prompt' })
 }
 
 function isForceableWorktreeDeleteError(message: string): boolean {
@@ -1706,7 +1744,7 @@ function isForceableWorktreeDeleteError(message: string): boolean {
 class ActiveWorktreeTabsError extends Error {
   constructor(tabCount: number) {
     super(
-      `active assistant tabs are using this worktree (${tabCount}). Click [del] again to close them and delete the worktree.`
+      `active assistant tabs are using this worktree (${tabCount}) — they will be closed if you confirm.`
     )
   }
 }

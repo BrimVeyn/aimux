@@ -6,6 +6,7 @@
     "commit",
     "rev-parse",
     "rev-list",
+    "for-each-ref",
     "push",
     "diff",
     "show",
@@ -17,8 +18,7 @@
     "merge-base",
     "merge",
     "reset",
-    "add",
-    "ls-files"
+    "add"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {

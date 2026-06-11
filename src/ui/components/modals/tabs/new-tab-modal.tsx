@@ -5,11 +5,16 @@ import type { AssistantId, WorktreeRecord } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterAssistants, getTemplateNoneOffset } from '../../../../state/selectors'
+import {
+  buildBaseRefOptions,
+  filterAssistants,
+  getTemplateNoneOffset,
+} from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
-import { Form, TextField } from '../shared/form'
+import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
+import { WorktreeDeleteConfirm } from '../shared/worktree-delete-confirm'
 
 interface NewTabModalProps {
   selectedIndex: number
@@ -19,16 +24,18 @@ interface NewTabModalProps {
   currentSessionId: string | null
   editingCommand: AssistantId | null
   editBuffer: string
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name' | 'base'
   branchError: string | null
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
   step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
-  worktreeDeleteConfirmId: string | null
-  worktreeDeleteMessage: string | null
+  worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktrees: WorktreeRecord[]
   worktreeName: string
+  baseQuery: string
+  baseRef: string
+  baseBranches: string[]
   worktreeTemplates: WorktreeTemplate[]
   /**
    * True when this modal is the worktree-aware new-tab flow. False when the
@@ -63,6 +70,9 @@ function getDeleteBlockedReason({
 export function NewTabModal({
   activeField,
   allowTemplateShortcut,
+  baseBranches,
+  baseQuery,
+  baseRef,
   branchError,
   branchName,
   createWorktree,
@@ -75,8 +85,7 @@ export function NewTabModal({
   selectedAssistantId,
   selectedIndex,
   step,
-  worktreeDeleteConfirmId,
-  worktreeDeleteMessage,
+  worktreeDeletePrompt,
   worktreeName,
   worktrees,
   worktreeTemplates,
@@ -107,9 +116,8 @@ export function NewTabModal({
             active && canDelete && currentSessionId != null && currentSessionId !== ''
               ? () => {
                   dispatchGlobal({ index, type: 'set-modal-selection-index' })
-                  dispatchGlobal({ message: null, type: 'set-new-tab-worktree-delete-state' })
                   runSideEffectGlobal({
-                    force: worktreeDeleteConfirmId === worktree.id,
+                    force: false,
                     sessionId: currentSessionId,
                     type: 'delete-worktree',
                     worktreeId: worktree.id,
@@ -127,12 +135,15 @@ export function NewTabModal({
       }),
       {
         key: '__create-worktree__',
-        onClick: () => dispatchGlobal({ type: 'enter-new-tab-worktree-create' }),
+        onClick: () => {
+          dispatchGlobal({ type: 'enter-new-tab-worktree-create' })
+          runSideEffectGlobal({ type: 'load-new-tab-base-branches' })
+        },
         subtitle: <text fg={t.textMuted}>Create an Aimux temp worktree</text>,
         title: <text fg={createWorktree ? t.text : t.textMuted}>Create new worktree</text>,
       },
     ],
-    [createWorktree, currentSessionId, selectedIndex, t, worktreeDeleteConfirmId, worktrees]
+    [createWorktree, currentSessionId, selectedIndex, t, worktrees]
   )
 
   const noneOffset = getTemplateNoneOffset(selectedAssistantId)
@@ -216,6 +227,24 @@ export function NewTabModal({
     ]
   }, [customCommands, filtered, showShortcutEntry, selectedIndex, t])
 
+  const baseItems = useMemo<FormOptionItem[]>(
+    () =>
+      buildBaseRefOptions(worktrees, baseBranches, baseQuery).map((option) => ({
+        key: option.ref,
+        leading: (
+          <text fg={option.kind === 'worktree' ? t.warning : t.textMuted}>
+            {option.kind === 'worktree' ? '\u{e728}' : '\u{e702}'}
+          </text>
+        ),
+        subtitle:
+          option.kind === 'worktree' ? (
+            <text fg={t.textMuted}>worktree: {option.detail}</text>
+          ) : null,
+        title: (active) => <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+      })),
+    [baseBranches, baseQuery, t, worktrees]
+  )
+
   if (editingCommand !== null) {
     const option = options.find((o) => o.id === editingCommand) ?? getAssistantOption(0)
     return (
@@ -260,6 +289,7 @@ export function NewTabModal({
   if (step === 'worktree-create') {
     const selectedAssistant =
       options.find((option) => option.id === selectedAssistantId) ?? options[0]
+    const baseActive = activeField === 'base'
     return (
       <Form
         title={`New worktree: ${selectedAssistant?.label ?? 'assistant'}`}
@@ -286,7 +316,20 @@ export function NewTabModal({
               <text fg={t.error}>{branchError}</text>
             ) : null}
           </box>
-          <text fg={t.textMuted}>Step 3/3: configure new worktree</text>
+          <AutoComplete
+            active={baseActive}
+            label="Base (fork from)"
+            placeholder="branch or worktree to fork from..."
+            value={baseQuery}
+            displayValue={baseRef !== '' ? baseRef : 'current branch'}
+            items={baseItems}
+            selectedIndex={selectedIndex}
+            cursorPos={baseActive ? cursorPos : undefined}
+            maxVisibleRows={6}
+            onHover={handleHover}
+            emptyState={<text fg={t.textMuted}>No branches found</text>}
+          />
+          <text fg={t.textMuted}>Step 3/3: configure new worktree · Tab switches fields</text>
         </box>
       </Form>
     )
@@ -297,6 +340,19 @@ export function NewTabModal({
       options.find((option) => option.id === selectedAssistantId) ??
       filtered[selectedIndex] ??
       options[0]
+
+    if (worktreeDeletePrompt != null) {
+      const target = worktrees.find((worktree) => worktree.id === worktreeDeletePrompt.worktreeId)
+      const label = target?.branch ?? target?.name ?? 'this worktree'
+      return (
+        <WorktreeDeleteConfirm
+          keybindsModeId="modal.new-tab.worktree-delete-confirm"
+          reason={worktreeDeletePrompt.reason}
+          worktreeLabel={label}
+        />
+      )
+    }
+
     const selectedWorktree = worktrees[selectedIndex]
     const deleteBlockedReason = getDeleteBlockedReason({
       currentSessionId,
@@ -316,17 +372,8 @@ export function NewTabModal({
         onHover={handleHover}
         footer={
           <box flexDirection="column">
-            {(worktreeDeleteMessage != null && worktreeDeleteMessage !== '') ||
-            (deleteBlockedReason != null && deleteBlockedReason !== '') ? (
-              <text
-                fg={
-                  worktreeDeleteMessage != null && worktreeDeleteMessage !== ''
-                    ? t.error
-                    : t.textMuted
-                }
-              >
-                {worktreeDeleteMessage ?? deleteBlockedReason}
-              </text>
+            {deleteBlockedReason != null && deleteBlockedReason !== '' ? (
+              <text fg={t.textMuted}>{deleteBlockedReason}</text>
             ) : null}
             <text fg={t.textMuted}>Step 2/2: choose worktree</text>
             <text fg={t.textMuted}>Enter launches, Ctrl+d deletes selected worktree</text>

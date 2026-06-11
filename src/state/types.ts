@@ -47,6 +47,7 @@ export type ModalType =
   | 'update-available'
   | 'ai-usage'
   | 'worktree-move'
+  | 'worktree-delete-confirm'
   | null
 
 export interface TerminalSpan {
@@ -323,16 +324,21 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
+  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name' | 'base'
   branchError: string | null
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
   step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
   targetWorktreeIndex: number
-  worktreeDeleteConfirmId: string | null
-  worktreeDeleteMessage: string | null
+  worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktreeName: string
+  /** Filter text typed into the "Base" picker on the worktree-create step. */
+  baseQuery: string
+  /** Resolved base ref the new worktree is forked from (branch of a worktree or a local branch). */
+  baseRef: string
+  /** Local branches available as base refs, loaded when the create step opens. */
+  baseBranches: string[]
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -417,6 +423,22 @@ export interface ModalWorktreeMove extends ModalBase {
   deleteSource: boolean
 }
 
+/**
+ * Standalone confirmation for a recoverable worktree delete failure triggered
+ * outside the new-tab picker (e.g. the sidebar's "Remove worktree"). Carries the
+ * params needed to re-run the delete with force once confirmed.
+ */
+export interface ModalWorktreeDeleteConfirm extends ModalBase {
+  type: 'worktree-delete-confirm'
+  sessionId: string
+  worktreeId: string
+  worktreeLabel: string
+  reason: string
+  closeTabs: boolean
+  /** Whether confirming force-deletes — true only after a recoverable failure. */
+  force: boolean
+}
+
 export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
 
 export interface DirectoryResult {
@@ -440,6 +462,7 @@ export type ModalState =
   | ModalUpdateAvailable
   | ModalAIUsage
   | ModalWorktreeMove
+  | ModalWorktreeDeleteConfirm
 
 export interface LayoutState {
   terminalCols: number
@@ -515,10 +538,10 @@ export type ModalAction =
   | { type: 'open-new-tab-modal' }
   | { type: 'set-new-tab-branch-error'; message: string | null }
   | {
-      type: 'set-new-tab-worktree-delete-state'
-      confirmWorktreeId?: string | null
-      message: string | null
+      type: 'set-new-tab-worktree-delete-prompt'
+      prompt: { worktreeId: string; reason: string } | null
     }
+  | { type: 'set-new-tab-base-branches'; branches: string[] }
   | { type: 'enter-new-tab-worktree-create' }
   | { type: 'enter-new-tab-template-pick' }
   | { type: 'enter-new-tab-template-shortcut' }
@@ -553,6 +576,15 @@ export type ModalAction =
   | { type: 'open-ai-usage-modal' }
   | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
   | { type: 'toggle-worktree-move-delete' }
+  | {
+      type: 'open-worktree-delete-confirm'
+      sessionId: string
+      worktreeId: string
+      worktreeLabel: string
+      reason: string
+      closeTabs: boolean
+      force: boolean
+    }
 
 // -- Session actions --
 export type SessionAction =
@@ -570,7 +602,6 @@ export type SessionAction =
   | { type: 'reorder-active-session'; delta: number }
   | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
   | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
-  | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
   | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
   | {
       type: 'update-worktree-record'
@@ -595,6 +626,7 @@ export type TabAction =
   | { type: 'set-active-tab'; tabId: string }
   | { type: 'move-active-tab'; delta: number }
   | { type: 'reorder-active-tab'; delta: number }
+  | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-session'; tabId: string }
   | { type: 'rename-tab'; tabId: string; title: string }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }

@@ -469,6 +469,23 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       }
       return { ...state, tabs }
     }
+    case 'reorder-tabs': {
+      // Drag-and-drop reorder of the visible tab strip. `orderedTabIds` is the
+      // flattened new order of the currently-visible tabs (group members already
+      // expanded into contiguous runs). We only rewrite the slots those tabs
+      // occupy in `state.tabs`, leaving tabs from other worktrees anchored in
+      // place. Because group members arrive contiguous, splits stay intact.
+      const visibleSet = new Set(action.orderedTabIds)
+      const byId = new Map(state.tabs.map((tab) => [tab.id, tab]))
+      let cursor = 0
+      const tabs = state.tabs.map((tab) => {
+        if (!visibleSet.has(tab.id)) return tab
+        const nextId = action.orderedTabIds[cursor]
+        cursor++
+        return (nextId != null ? byId.get(nextId) : undefined) ?? tab
+      })
+      return { ...state, tabs }
+    }
     case 'reset-tab-session':
       return withActiveTabWorktree(
         {

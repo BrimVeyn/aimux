@@ -64,6 +64,8 @@ export interface AimuxConfig {
   sessionBarVisible?: boolean
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
+  /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
+  prunedOrphanAimuxBranches?: boolean
   worktreeTemplates?: WorktreeTemplate[]
 }
 
@@ -255,6 +257,7 @@ export function loadConfigResult(): ConfigLoadResult {
       sessionBarVisible?: unknown
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
+      prunedOrphanAimuxBranches?: unknown
       worktreeTemplates?: unknown
     }
 
@@ -350,6 +353,7 @@ export function loadConfigResult(): ConfigLoadResult {
       config: {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
+        prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
         sessionBarVisible: validSessionBarVisible,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
