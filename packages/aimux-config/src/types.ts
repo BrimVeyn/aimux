@@ -303,7 +303,7 @@ export interface ModalNewTab extends ModalBase {
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create'
+  step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
   targetWorktreeIndex: number
   worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktreeName: string
@@ -479,6 +479,7 @@ export interface AppState {
   worktreeDivergence: Record<string, BranchDivergence>
   lastActiveTabByWorktree: Record<string, string>
   pendingChords: string[] | null
+  worktreeTemplates: WorktreeTemplate[]
 }
 
 // ─── AppAction union ──────────────────────────────────────────────────────────
@@ -492,6 +493,8 @@ export type ModalAction =
     }
   | { type: 'set-new-tab-base-branches'; branches: string[] }
   | { type: 'enter-new-tab-worktree-create' }
+  | { type: 'enter-new-tab-template-pick' }
+  | { type: 'enter-new-tab-template-shortcut' }
   | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
   | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
@@ -628,6 +631,26 @@ export interface GitRefreshPayload {
 export interface BranchDivergence {
   ahead: number
   behind: number
+}
+
+export interface WorktreeTemplatePane {
+  id: string
+  assistant: string
+  splitFrom?: string
+  direction?: SplitDirection
+  ratio?: number
+  send?: string
+}
+
+export interface WorktreeTemplateTab {
+  panes: WorktreeTemplatePane[]
+}
+
+export interface WorktreeTemplate {
+  id: string
+  name: string
+  description?: string
+  tabs: WorktreeTemplateTab[]
 }
 
 export type GitPanelAction =
@@ -1090,6 +1113,11 @@ export interface AimuxUserConfig {
   statusBar?: StatusBarConfig
   externalEditor?: ExternalEditorConfig
   integrations?: AimuxIntegrationsConfig
+  /**
+   * Worktree templates: layouts (multi-pane + initial commands) applied at
+   * worktree creation. Selected from a picker in the new-tab modal.
+   */
+  worktreeTemplates?: WorktreeTemplate[]
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -1166,4 +1194,5 @@ export interface ResolvedConfig {
   integrations: {
     claudeHooks: boolean
   }
+  worktreeTemplates: WorktreeTemplate[]
 }

@@ -3,6 +3,7 @@ import type { MouseEvent } from '@opentui/core'
 import { useCallback, useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
+import type { WorktreeTemplate } from '../config'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type {
   FocusMode,
@@ -94,6 +95,7 @@ function renderModal(
     activeAssistant?: string
     autoCommitModel?: string
     worktreeDivergence: Record<string, { ahead: number; behind: number }>
+    worktreeTemplates: WorktreeTemplate[]
   }
 ) {
   switch (modal.type) {
@@ -125,6 +127,8 @@ function renderModal(
               : EMPTY_WORKTREES
           }
           worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
+          worktreeTemplates={options.worktreeTemplates}
+          allowTemplateShortcut={modal.type === 'new-tab'}
         />
       )
     case 'session-picker':
@@ -328,6 +332,7 @@ export function RootView({
   const sessions = useAppStore((s) => s.sessions)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
+  const worktreeTemplates = useAppStore((s) => s.worktreeTemplates)
   const gitPaneMode = useAppStore((s) => s.gitPane.mode)
   const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
   const gitPanePosition = useAppStore((s) => s.gitPane.position)
@@ -422,6 +427,7 @@ export function RootView({
           snippets,
           themeId,
           worktreeDivergence,
+          worktreeTemplates,
         })}
         <ToastViewport />
       </box>
@@ -519,6 +525,7 @@ export function RootView({
         snippets,
         themeId,
         worktreeDivergence,
+        worktreeTemplates,
       })}
       <ToastViewport />
     </box>

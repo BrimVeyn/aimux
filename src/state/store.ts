@@ -1,3 +1,5 @@
+import type { WorktreeTemplate } from '../config'
+
 import { reduceAutoCommit } from './reducers/auto-commit-state'
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
@@ -31,6 +33,7 @@ export interface InitialStateOverrides {
   gitPane?: Partial<GitPaneState>
   sidebar?: Pick<AppState['sidebar'], 'visible' | 'width'>
   sessionBarVisible?: boolean
+  worktreeTemplates?: WorktreeTemplate[]
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -116,6 +119,7 @@ export function createInitialState(
     tabGroupMap: {},
     tabs: [],
     worktreeDivergence: {},
+    worktreeTemplates: overrides.worktreeTemplates ?? [],
   }
 }
 

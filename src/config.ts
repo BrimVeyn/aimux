@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
+import type { SplitDirection } from './state/layout-tree'
 import type { GitFileListMode, WorkspaceSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
@@ -32,6 +33,26 @@ export interface PersistedSidebar {
   width: number
 }
 
+export interface WorktreeTemplatePane {
+  id: string
+  assistant: string
+  splitFrom?: string
+  direction?: SplitDirection
+  ratio?: number
+  send?: string
+}
+
+export interface WorktreeTemplateTab {
+  panes: WorktreeTemplatePane[]
+}
+
+export interface WorktreeTemplate {
+  id: string
+  name: string
+  description?: string
+  tabs: WorktreeTemplateTab[]
+}
+
 export interface AimuxConfig {
   version: 2
   customCommands: Record<string, string>
@@ -45,6 +66,7 @@ export interface AimuxConfig {
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
   prunedOrphanAimuxBranches?: boolean
+  worktreeTemplates?: WorktreeTemplate[]
 }
 
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
@@ -107,6 +129,77 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   return true
 }
 
+function isRatioValid(value: unknown): boolean {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0.15 && value < 0.85
+}
+
+function isWorktreeTemplateTab(value: unknown): value is WorktreeTemplateTab {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (!Array.isArray(v.panes) || v.panes.length === 0) return false
+  const seenIds = new Set<string>()
+  for (let i = 0; i < v.panes.length; i++) {
+    const rawPane = v.panes[i]
+    if (typeof rawPane !== 'object' || rawPane === null) return false
+    const pane = rawPane as Record<string, unknown>
+    if (typeof pane.id !== 'string' || pane.id.length === 0) return false
+    if (seenIds.has(pane.id)) return false
+    seenIds.add(pane.id)
+    if (typeof pane.assistant !== 'string' || pane.assistant.length === 0) return false
+    if (i === 0) {
+      if (pane.splitFrom !== undefined) return false
+      if (pane.direction !== undefined) return false
+      if (pane.ratio !== undefined) return false
+    } else {
+      if (typeof pane.splitFrom !== 'string' || !seenIds.has(pane.splitFrom)) return false
+      if (pane.splitFrom === pane.id) return false
+      if (pane.direction !== 'horizontal' && pane.direction !== 'vertical') return false
+      if (pane.ratio !== undefined && !isRatioValid(pane.ratio)) return false
+    }
+    if (pane.send !== undefined && typeof pane.send !== 'string') return false
+  }
+  return true
+}
+
+export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (typeof v.id !== 'string' || v.id.length === 0) return false
+  if (typeof v.name !== 'string' || v.name.length === 0) return false
+  if (v.description !== undefined && typeof v.description !== 'string') return false
+  if (!Array.isArray(v.tabs) || v.tabs.length === 0) return false
+  for (const tab of v.tabs) {
+    if (!isWorktreeTemplateTab(tab)) return false
+  }
+  return true
+}
+
+export function parseWorktreeTemplates(
+  value: unknown,
+  issues: string[]
+): WorktreeTemplate[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    issues.push('ignored invalid worktreeTemplates (not an array)')
+    return undefined
+  }
+  const seen = new Set<string>()
+  const valid: WorktreeTemplate[] = []
+  for (const entry of value) {
+    if (!isWorktreeTemplate(entry)) {
+      issues.push('ignored invalid worktreeTemplate entry')
+      continue
+    }
+    if (seen.has(entry.id)) {
+      issues.push(`ignored duplicate worktreeTemplate id "${entry.id}"`)
+      continue
+    }
+    seen.add(entry.id)
+    valid.push(entry)
+  }
+  return valid.length > 0 ? valid : undefined
+}
+
 function isPersistedSidebar(value: unknown): value is PersistedSidebar {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
@@ -165,6 +258,7 @@ export function loadConfigResult(): ConfigLoadResult {
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
+      worktreeTemplates?: unknown
     }
 
     const issues: string[] = []
@@ -249,6 +343,8 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid skippedUpdateVersion')
     }
 
+    const validWorktreeTemplates = parseWorktreeTemplates(parsed.worktreeTemplates, issues)
+
     if (issues.length > 0) {
       logDebug('config.load.validationIssue', { issues, path: CONFIG_PATH })
     }
@@ -268,6 +364,7 @@ export function loadConfigResult(): ConfigLoadResult {
         workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
           ? parsed.workspaceSnapshot
           : undefined,
+        worktreeTemplates: validWorktreeTemplates,
       },
       issues,
       source: 'file',

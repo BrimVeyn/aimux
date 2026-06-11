@@ -39,6 +39,112 @@ Worktrees are created from the **new-assistant modal** (`+ New assistant`, or
 
 aimux confirms with a **Created worktree** toast.
 
+## Templates
+
+A **worktree template** is a reusable layout — one or more tabs, each with
+one or more split panes, and optional commands typed into each pane — that
+spawns automatically when you create a worktree. Use them to stamp out the
+same dev environment (assistant + lint watcher + dev server + …) every time
+you start work on a new branch.
+
+Templates are declared in `aimux.config.ts`:
+
+```ts
+import { defineConfig } from '@brimveyn/aimux-config'
+
+export default defineConfig({
+  worktreeTemplates: [
+    {
+      id: 'rainpath',
+      name: 'Rainpath',
+      description: 'Claude + a shell with git status',
+      tabs: [
+        {
+          panes: [{ id: 'main', assistant: 'claude' }],
+        },
+        {
+          panes: [{ id: 'shell', assistant: 'terminal', send: 'git status' }],
+        },
+      ],
+    },
+  ],
+})
+```
+
+They can also live in `aimux.json` under the same key (JSON form, same
+schema) — the TS config wins when both define `worktreeTemplates`.
+
+When at least one template is loaded, the new-tab flow gains a final
+**Step 4/4 — choose template** step after worktree-create. Pick `None` to
+keep the single-pane behaviour (the assistant you picked at Step 1 becomes
+the worktree's only pane); pick a template to spawn its full layout.
+
+### Skipping the assistant pick
+
+When you're going to use a template, the assistant chosen at Step 1 is
+irrelevant — the template defines its own panes. The bottom of the
+Step 1 assistant picker therefore shows an extra entry:
+
+```
+Worktree from template…
+  Create a worktree and pick a template — no assistant step
+```
+
+Pick it (or click it) to jump straight to the worktree-name form, then to
+the template picker. `None` is hidden in that picker because no assistant
+was chosen as a fallback.
+
+### Schema
+
+A template is a top-level object plus an ordered list of tabs:
+
+| Field         | Required | Notes                               |
+| ------------- | -------- | ----------------------------------- |
+| `id`          | yes      | unique among templates              |
+| `name`        | yes      | label shown in the picker           |
+| `description` | no       | subtitle shown in the picker        |
+| `tabs[]`      | yes      | ≥ 1 tab; each becomes a top-bar tab |
+
+Each tab is just `{ panes: WorktreeTemplatePane[] }` with ≥ 1 pane. The
+first pane of a tab is its root (the visible pane); subsequent panes are
+splits of a previous pane in the same tab.
+
+| Pane field  | Required        | Notes                                                                                       |
+| ----------- | --------------- | ------------------------------------------------------------------------------------------- |
+| `id`        | yes             | unique within its tab; referenced by `splitFrom`                                            |
+| `assistant` | yes             | `claude`, `codex`, `opencode`, `antigravity`, `terminal`, `shell`, or any custom command id |
+| `splitFrom` | only after root | id of an earlier pane in the **same** tab                                                   |
+| `direction` | only after root | `horizontal` (side-by-side) or `vertical` (top/bottom)                                      |
+| `ratio`     | no              | fraction of space taken by the **new** pane, between 0.15 and 0.85                          |
+| `send`      | no              | initial input typed into the pane shortly after spawn; newline appended automatically       |
+
+`'shell'` is accepted as an alias for the built-in `'terminal'` assistant
+(which spawns `$SHELL`).
+
+### Validation
+
+Every template is parsed through the same checks at load time. Invalid
+entries are dropped individually and logged via the [doctor](../reference/cli.md);
+the rest of the config keeps loading. Validation rejects:
+
+- empty `id`, `name`, or `tabs[]`
+- empty `panes[]` inside a tab
+- a root pane that declares `splitFrom`, `direction`, or `ratio`
+- a non-root pane missing `splitFrom`/`direction`, or referencing a pane
+  in another tab (or itself)
+- duplicate pane `id`s within the same tab
+- `direction` other than `horizontal` or `vertical`
+- `ratio` outside `(0.15, 0.85)`
+- duplicate template `id`s (the second occurrence is dropped)
+
+### Caveats
+
+- `send` is fired ~600 ms after the pane is spawned. That's enough for
+  shells (which print a prompt within ~100 ms) but can race with slower
+  AI CLIs — prefer `send` on terminal panes.
+- Templates only fire on new-worktree creation, not when aimux restarts
+  or reattaches to an existing worktree.
+
 ## In the sidebar
 
 Tabs are grouped by worktree. Each group has a colored header showing the

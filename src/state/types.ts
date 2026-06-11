@@ -1,6 +1,7 @@
 import type { ModeId, SnippetVar } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
+import type { WorktreeTemplate } from '../config'
 import type { LayoutNode, SplitDirection } from './layout-tree'
 
 export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
@@ -328,7 +329,7 @@ export interface ModalNewTab extends ModalBase {
   branchName: string
   createWorktree: boolean
   selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create'
+  step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
   targetWorktreeIndex: number
   worktreeDeletePrompt: { worktreeId: string; reason: string } | null
   worktreeName: string
@@ -527,6 +528,8 @@ export interface AppState {
   lastActiveTabByWorktree: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
+  /** User-defined templates applied at worktree creation. Loaded from aimux.json. */
+  worktreeTemplates: WorktreeTemplate[]
 }
 
 // -- Modal actions --
@@ -540,6 +543,8 @@ export type ModalAction =
     }
   | { type: 'set-new-tab-base-branches'; branches: string[] }
   | { type: 'enter-new-tab-worktree-create' }
+  | { type: 'enter-new-tab-template-pick' }
+  | { type: 'enter-new-tab-template-shortcut' }
   | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
   | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }

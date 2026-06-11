@@ -48,6 +48,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
+    worktreeTemplates: userConfig.worktreeTemplates ?? [],
   }
 }
 
