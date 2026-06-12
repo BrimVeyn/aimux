@@ -144,7 +144,10 @@ function useHardwareCursor(
   const cursorRow = viewport?.cursorRow
   const cursorCol = viewport?.cursorCol
   // cursorRow leaves [0, rows) when the user scrolls the viewport away from
-  // the active screen — the hardware cursor must vanish with the cell.
+  // the active screen — the hardware cursor must vanish with the cell. The
+  // contentOrigin bound matters separately: right after a resize the snapshot
+  // can be larger than the pane box, and a cursor parked past the border
+  // would render as a stray glyph over neighbouring UI.
   const show =
     active &&
     viewport !== undefined &&
@@ -152,7 +155,9 @@ function useHardwareCursor(
     cursorRow !== undefined &&
     cursorRow >= 0 &&
     cursorRow < rows &&
-    cursorCol !== undefined
+    cursorRow < contentOrigin.rows &&
+    cursorCol !== undefined &&
+    cursorCol < contentOrigin.cols
 
   useEffect(() => {
     if (!show || viewport === undefined || cursorRow === undefined || cursorCol === undefined) {
@@ -171,11 +176,18 @@ function useHardwareCursor(
       blinking: viewport.cursorBlink,
       style: OPENTUI_CURSOR_STYLES[viewport.cursorStyle ?? 'default'],
     })
+    // Cursor state only reaches the terminal with the next rendered frame
+    // (same reason opentui's editor calls requestRender() in focus/blur).
+    // Without it, a hide issued while the UI is static — e.g. switching to
+    // a workspace with no live PTY — never flushes and the host cursor
+    // stays stranded at its old position.
+    renderer.requestRender()
     // React runs all cleanups in a commit before all effects, so when focus
     // moves between panes the releasing pane always hides before the gaining
     // pane shows — no stomp regardless of tree order.
     return () => {
       renderer.setCursorPosition(0, 0, false)
+      renderer.requestRender()
     }
   }, [contentOrigin, cursorCol, cursorRow, renderer, show, viewport])
 
@@ -257,10 +269,14 @@ export function TerminalPane({
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
+  // Restored/disconnected tabs carry a frozen snapshot whose persisted
+  // cursorVisible/cursorRow/cursorCol never update again — parking the
+  // hardware cursor there would leave a stray blinking cursor at a stale
+  // position. Only live PTYs get the hardware cursor.
   const showHardwareCursor = useHardwareCursor(
     tab?.viewport,
     contentOrigin,
-    paneIsActive && focusMode === 'terminal-input' && tab !== undefined
+    paneIsActive && focusMode === 'terminal-input' && tab?.status === 'running'
   )
   // These are only used when this pane is rendered without a tab (the
   // top-level pane on a worktree with zero tabs). Selectors return plain
