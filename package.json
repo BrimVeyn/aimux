@@ -57,7 +57,9 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip-bun",
-    "bump": "bun run scripts/bump.ts"
+    "bump": "bun run scripts/bump.ts",
+    "bump:ipc": "bun run scripts/bump-protocol.ts ipc",
+    "bump:terminal_manager": "bun run scripts/bump-protocol.ts terminal-manager"
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",

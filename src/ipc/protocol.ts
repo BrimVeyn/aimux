@@ -14,8 +14,8 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 // `reapplyScrollIntent` message — the frontend no longer derives or sends it.
 // (v8 was the unfilled-viewport status-detector change; this is a further
 // breaking wire change, so the version steps again.)
-export const IPC_PROTOCOL_MIN_VERSION = 9
-export const IPC_PROTOCOL_VERSION = 9
+export const IPC_PROTOCOL_MIN_VERSION = 10
+export const IPC_PROTOCOL_VERSION = 10
 
 export interface ProtocolHelloRequest {
   minVersion: number
