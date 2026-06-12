@@ -1,6 +1,11 @@
 import type { Terminal } from '@xterm/headless'
 
-import type { TerminalLine, TerminalSnapshot, TerminalSpan } from '../state/types'
+import type {
+  TerminalCursorStyle,
+  TerminalLine,
+  TerminalSnapshot,
+  TerminalSpan,
+} from '../state/types'
 
 import { getCurrentTheme } from '../ui/theme'
 
@@ -95,14 +100,10 @@ function buildLine(
       bg = resolvedFg
     }
 
+    // The cursor cell is only flagged here; how it renders (soft inverted
+    // block vs. the host terminal's hardware cursor) is a presentation
+    // decision made in the renderer process (terminal-pane.tsx).
     const isCursorCell = cursorVisible && cursorColumn === column
-    if (isCursorCell) {
-      const tokens = getCurrentTheme()
-      const resolvedFg: CellColor = fg ?? { hex: tokens.text, kind: 'rgb' }
-      const resolvedBg: CellColor = bg ?? { hex: tokens.background, kind: 'rgb' }
-      fg = resolvedBg
-      bg = resolvedFg
-    }
 
     const span: TerminalSpan = {
       bold: current.isBold() ? true : undefined,
@@ -143,11 +144,8 @@ function buildLine(
       if (leading > 0) {
         pushSpan(spans, { text: ' '.repeat(leading) })
       }
-      const tokens = getCurrentTheme()
       pushSpan(spans, {
-        bg: tokens.text,
         cursor: true,
-        fg: tokens.background,
         text: ' ',
       })
       if (trailing > 0) {
@@ -161,7 +159,17 @@ function buildLine(
   return { spans }
 }
 
-export function snapshotTerminal(terminal: Terminal, cursorVisible = true): TerminalSnapshot {
+export interface SnapshotCursorOptions {
+  cursorVisible: boolean
+  cursorStyle?: TerminalCursorStyle
+  cursorBlink?: boolean
+}
+
+export function snapshotTerminal(
+  terminal: Terminal,
+  cursorOptions: SnapshotCursorOptions = { cursorVisible: true }
+): TerminalSnapshot {
+  const { cursorBlink, cursorStyle, cursorVisible } = cursorOptions
   const buffer = terminal.buffer.active
   const startLine = buffer.viewportY
   const tailStartLine = Math.max(0, buffer.baseY + terminal.rows - SNAPSHOT_TAIL_LINE_COUNT)
@@ -201,6 +209,10 @@ export function snapshotTerminal(terminal: Terminal, cursorVisible = true): Term
 
   return {
     baseY: buffer.baseY,
+    cursorBlink,
+    cursorCol: cursorColumn,
+    cursorRow: cursorLine - buffer.viewportY,
+    cursorStyle,
     cursorVisible,
     lines,
     tailLines,
@@ -255,7 +267,11 @@ export function areTerminalSnapshotsEqual(
   if (
     left.viewportY !== right.viewportY ||
     left.baseY !== right.baseY ||
-    left.cursorVisible !== right.cursorVisible
+    left.cursorVisible !== right.cursorVisible ||
+    left.cursorStyle !== right.cursorStyle ||
+    left.cursorBlink !== right.cursorBlink ||
+    left.cursorRow !== right.cursorRow ||
+    left.cursorCol !== right.cursorCol
   ) {
     return false
   }

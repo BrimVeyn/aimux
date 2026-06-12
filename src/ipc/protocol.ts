@@ -175,7 +175,15 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
     ) &&
     isFiniteNumber(value.viewportY) &&
     isFiniteNumber(value.baseY) &&
-    typeof value.cursorVisible === 'boolean'
+    typeof value.cursorVisible === 'boolean' &&
+    (value.cursorStyle === undefined ||
+      value.cursorStyle === 'block' ||
+      value.cursorStyle === 'underline' ||
+      value.cursorStyle === 'bar' ||
+      value.cursorStyle === 'default') &&
+    (value.cursorBlink === undefined || typeof value.cursorBlink === 'boolean') &&
+    (value.cursorRow === undefined || isFiniteNumber(value.cursorRow)) &&
+    (value.cursorCol === undefined || isFiniteNumber(value.cursorCol))
   )
 }
 

@@ -1,10 +1,17 @@
-import type { MouseEvent as OtuiMouseEvent, TextRenderable } from '@opentui/core'
+import type { CursorStyle, MouseEvent as OtuiMouseEvent, TextRenderable } from '@opentui/core'
 
-import { memo, type ReactNode, useCallback, useMemo } from 'react'
+import { useRenderer } from '@opentui/react'
+import { memo, type ReactNode, useCallback, useEffect, useMemo } from 'react'
 
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { JunctionEdgeInfo, JunctionEdges } from '../../../state/layout-tree'
-import type { FocusMode, TabSession, TerminalSnapshot, TerminalSpan } from '../../../state/types'
+import type {
+  FocusMode,
+  TabSession,
+  TerminalCursorStyle,
+  TerminalSnapshot,
+  TerminalSpan,
+} from '../../../state/types'
 
 import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { logInputDebug } from '../../../debug/input-log'
@@ -69,7 +76,7 @@ function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMo
   return focusMode === 'terminal-input' ? t.accent : t.primary
 }
 
-function renderSpan(span: TerminalSpan, key: string): ReactNode {
+function renderSpan(span: TerminalSpan, key: string, softCursor: boolean): ReactNode {
   let node: ReactNode = span.text
 
   if (span.underline === true) {
@@ -86,11 +93,20 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
 
   // Palette indices are resolved here (not in the daemon) so they pick up
   // the host terminal's actual ANSI palette queried at startup.
-  const fg =
+  let fg =
     span.fgPalette !== undefined
       ? resolvePaletteIndex(span.fgPalette)
       : (span.fg ?? getCurrentTheme().text)
-  const bg = span.bgPalette !== undefined ? resolvePaletteIndex(span.bgPalette) : span.bg
+  let bg = span.bgPalette !== undefined ? resolvePaletteIndex(span.bgPalette) : span.bg
+
+  // Soft cursor: inverted block drawn in the cell grid. Used only when the
+  // host terminal's hardware cursor is not parked on this pane (inactive
+  // pane, navigation mode) — otherwise both would show at once.
+  if (span.cursor === true && softCursor) {
+    const resolvedBg = bg ?? getCurrentTheme().background
+    bg = fg
+    fg = resolvedBg
+  }
 
   return (
     <span key={key} fg={fg} bg={bg}>
@@ -102,6 +118,68 @@ function renderSpan(span: TerminalSpan, key: string): ReactNode {
 interface TerminalViewportProps {
   viewport: TerminalSnapshot | undefined
   buffer: string
+  softCursor: boolean
+}
+
+const OPENTUI_CURSOR_STYLES: Record<TerminalCursorStyle, CursorStyle> = {
+  bar: 'line',
+  block: 'block',
+  default: 'default',
+  underline: 'underline',
+}
+
+/**
+ * Parks the host terminal's hardware cursor on this pane's cursor cell so the
+ * shape requested by the running program via DECSCUSR (nvim's insert bar, the
+ * shell's configured cursor, blinking) shows through, instead of the soft
+ * inverted block. Returns whether the hardware cursor is currently shown.
+ */
+function useHardwareCursor(
+  viewport: TerminalSnapshot | undefined,
+  contentOrigin: TerminalContentOrigin,
+  active: boolean
+): boolean {
+  const renderer = useRenderer()
+  const rows = viewport?.lines.length ?? 0
+  const cursorRow = viewport?.cursorRow
+  const cursorCol = viewport?.cursorCol
+  // cursorRow leaves [0, rows) when the user scrolls the viewport away from
+  // the active screen — the hardware cursor must vanish with the cell.
+  const show =
+    active &&
+    viewport !== undefined &&
+    viewport.cursorVisible &&
+    cursorRow !== undefined &&
+    cursorRow >= 0 &&
+    cursorRow < rows &&
+    cursorCol !== undefined
+
+  useEffect(() => {
+    if (!show || viewport === undefined || cursorRow === undefined || cursorCol === undefined) {
+      return
+    }
+    // Native cursor coordinates are 1-indexed (same convention as opentui's
+    // editor renderable). `viewport` is a dependency on purpose: every new
+    // snapshot re-asserts the position, so a modal input blurring (which
+    // hides the cursor) can never leave it lost for long.
+    renderer.setCursorPosition(
+      contentOrigin.x + cursorCol + 1,
+      contentOrigin.y + cursorRow + 1,
+      true
+    )
+    renderer.setCursorStyle({
+      blinking: viewport.cursorBlink,
+      style: OPENTUI_CURSOR_STYLES[viewport.cursorStyle ?? 'default'],
+    })
+    // React runs all cleanups in a commit before all effects, so when focus
+    // moves between panes the releasing pane always hides before the gaining
+    // pane shows — no stomp regardless of tree order.
+    return () => {
+      renderer.setCursorPosition(0, 0, false)
+    }
+  }, [contentOrigin, cursorCol, cursorRow, renderer, show, viewport])
+
+  return show
 }
 
 const NOOP = (): void => {}
@@ -127,6 +205,7 @@ const pinTerminalScroll = (node: TextRenderable | null): void => {
 
 const TerminalViewport = memo(function TerminalViewport({
   buffer,
+  softCursor,
   viewport,
 }: TerminalViewportProps) {
   const t = useTheme()
@@ -138,7 +217,7 @@ const TerminalViewport = memo(function TerminalViewport({
           // Terminal rows are a fixed positional grid; the row index is the identity.
           // eslint-disable-next-line react/no-array-index-key
           <span key={`line-${lineIndex}`}>
-            {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`))}
+            {line.spans.map((span, spanIndex) => renderSpan(span, `s-${spanIndex}`, softCursor))}
             {lineIndex < lines.length - 1 ? '\n' : ''}
           </span>
         ))}
@@ -178,6 +257,11 @@ export function TerminalPane({
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
+  const showHardwareCursor = useHardwareCursor(
+    tab?.viewport,
+    contentOrigin,
+    paneIsActive && focusMode === 'terminal-input' && tab !== undefined
+  )
   // These are only used when this pane is rendered without a tab (the
   // top-level pane on a worktree with zero tabs). Selectors return plain
   // strings so re-renders are cheap and bounded to actual name changes.
@@ -483,7 +567,11 @@ export function TerminalPane({
             onMouseDrag={forwardMouseEvent}
             onMouseScroll={forwardScrollEvent}
           >
-            <TerminalViewport viewport={tab.viewport} buffer={tab.buffer} />
+            <TerminalViewport
+              viewport={tab.viewport}
+              buffer={tab.buffer}
+              softCursor={!showHardwareCursor}
+            />
           </box>
         )}
       </ContextMenuBox>

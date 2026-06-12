@@ -45,6 +45,10 @@ function isTerminalLine(value: unknown): value is TerminalLine {
   })
 }
 
+function isTerminalCursorStyle(value: unknown): boolean {
+  return value === 'block' || value === 'underline' || value === 'bar' || value === 'default'
+}
+
 function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
   return (
     isObjectRecord(value) &&
@@ -52,7 +56,11 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
     value.lines.every(isTerminalLine) &&
     isFiniteNumber(value.viewportY) &&
     isFiniteNumber(value.baseY) &&
-    isBoolean(value.cursorVisible)
+    isBoolean(value.cursorVisible) &&
+    (value.cursorStyle === undefined || isTerminalCursorStyle(value.cursorStyle)) &&
+    (value.cursorBlink === undefined || isBoolean(value.cursorBlink)) &&
+    (value.cursorRow === undefined || isFiniteNumber(value.cursorRow)) &&
+    (value.cursorCol === undefined || isFiniteNumber(value.cursorCol))
   )
 }
 

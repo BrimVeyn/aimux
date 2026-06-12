@@ -72,12 +72,22 @@ export interface TerminalLine {
   spans: TerminalSpan[]
 }
 
+/** DECSCUSR cursor shape; 'default' restores the host terminal's configured cursor. */
+export type TerminalCursorStyle = 'block' | 'underline' | 'bar' | 'default'
+
 export interface TerminalSnapshot {
   lines: TerminalLine[]
   tailLines?: TerminalLine[]
   viewportY: number
   baseY: number
   cursorVisible: boolean
+  cursorStyle?: TerminalCursorStyle
+  /** Blink flag from DECSCUSR; undefined means "host terminal's default". */
+  cursorBlink?: boolean
+  /** Cursor row relative to the rendered viewport; outside [0, rows) when
+   *  the user scrolled the viewport away from the active screen. */
+  cursorRow?: number
+  cursorCol?: number
 }
 
 // The scroll position is owned end-to-end by the backend emulator; this type
