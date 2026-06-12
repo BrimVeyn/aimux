@@ -19,7 +19,7 @@ import type { ThemeId } from '../ui/themes'
 import { loadConfig, saveConfig, type WorktreeTemplate, type WorktreeTemplatePane } from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
-import { moveWorktree } from '../git/move-worktree'
+import { countDirtyFiles, moveWorktree } from '../git/move-worktree'
 import {
   createGitWorktree,
   deleteGitBranch,
@@ -784,12 +784,30 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
               effect.sessionId,
               effect.sourceWorktreeId,
               effect.targetWorktreeId,
-              effect.deleteSource === true
+              effect.deleteSource === true,
+              effect.stashTarget === true,
+              effect.keepConflicts === true
             )
           )
         } catch (error) {
           toast.error(error instanceof Error ? error.message : String(error))
         }
+      })()
+      return
+    }
+    case 'load-worktree-move-stats': {
+      void (async () => {
+        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+        const worktrees = session?.worktrees ?? []
+        if (worktrees.length === 0) return
+        const counts = await Promise.all(
+          worktrees.map(async (worktree) => [worktree.id, await countDirtyFiles(worktree.path)])
+        )
+        if (ctx.getState().modal.type !== 'worktree-move') return
+        ctx.dispatch({
+          dirtyFiles: Object.fromEntries(counts),
+          type: 'set-worktree-move-stats',
+        })
       })()
       return
     }
@@ -1648,7 +1666,9 @@ async function runMoveWorktree(
   sessionId: string,
   sourceWorktreeId: string,
   targetWorktreeId: string,
-  deleteSource: boolean
+  deleteSource: boolean,
+  stashTarget: boolean,
+  keepConflicts: boolean
 ): Promise<void> {
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const source = session?.worktrees?.find((entry) => entry.id === sourceWorktreeId)
@@ -1666,20 +1686,38 @@ async function runMoveWorktree(
   const sourceLabel = source.branch ?? source.name
   const targetLabel = target.branch ?? target.name
   const result = await moveWorktree({
+    keepConflicts,
     sourceBranch: source.branch,
     sourcePath: source.path,
+    stashTarget,
     targetPath: target.path,
   })
 
-  // Toasts surface the outcome everywhere — the picker can be opened outside git
-  // mode (from a tab menu), where the git-pane message would never be seen.
-  if (result.kind === 'dirty-target') {
-    toast.warning(`Target ${targetLabel} has uncommitted changes — commit or stash it first`)
+  // Recoverable failures open a confirm dialog carrying retry params; both
+  // worktrees are already back in their original state, so confirming simply
+  // re-dispatches move-worktree with the matching flag.
+  if (result.kind === 'needs-stash' || result.kind === 'conflict') {
+    ctx.dispatch({
+      deleteSource,
+      files: result.files,
+      sessionId,
+      sourceLabel,
+      sourceWorktreeId,
+      targetLabel,
+      targetWorktreeId,
+      type: 'open-worktree-move-confirm',
+      variant: result.kind === 'needs-stash' ? 'stash-target' : 'keep-conflicts',
+    })
     return
   }
-  if (result.kind === 'conflict') {
+  if (result.kind === 'conflict-kept') {
+    // Never delete the source here — its work only landed half-resolved. The
+    // auto-commit driver is safe against this state: git refuses to commit
+    // with unmerged index entries, so it fails loudly instead of committing
+    // conflict markers.
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
     toast.warning(
-      `Move hit conflicts in ${result.files.length} file(s) — left ${sourceLabel} untouched`
+      `Left conflict markers in ${targetLabel} (${result.files.length} file(s)) — resolve & commit there; ${sourceLabel} kept`
     )
     return
   }
@@ -1702,8 +1740,11 @@ async function runMoveWorktree(
   } else {
     handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
   }
+  const stashNote = result.stashedTarget
+    ? ` · target's previous changes stashed (recover with git stash pop)`
+    : ''
   toast.success(
-    `Moved ${sourceLabel} → ${targetLabel} · ${result.filesChanged} file(s) staged — review & commit`
+    `Moved ${sourceLabel} → ${targetLabel} · ${result.filesChanged} file(s) staged — review & commit${stashNote}`
   )
 }
 

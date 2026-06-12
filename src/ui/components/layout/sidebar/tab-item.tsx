@@ -170,11 +170,13 @@ export function TabItem({
         ? [
             [
               'Move worktree',
-              () =>
+              () => {
                 dispatchGlobal({
                   sourceWorktreeId: moveWorktreeId,
                   type: 'open-worktree-move-modal',
-                }),
+                })
+                runSideEffectGlobal({ type: 'load-worktree-move-stats' })
+              },
             ] as [string, () => void],
           ]
         : []),

@@ -205,6 +205,17 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: worktree-move recoverable-failure confirmation (stash / conflicts)
+    // -----------------------------------------------------------------------
+    .mode('modal.worktree-move-confirm', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('n', actions.closeModal, 'Cancel')
+        .map('<CR>', actions.confirmWorktreeMoveRetry, 'Confirm')
+        .map('y', actions.confirmWorktreeMoveRetry, 'Confirm')
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: standalone worktree delete confirmation (sidebar "Remove worktree")
     // -----------------------------------------------------------------------
     .mode('modal.worktree-delete-confirm', (m) =>

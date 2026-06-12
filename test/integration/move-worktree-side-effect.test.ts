@@ -157,3 +157,143 @@ test('move + delete leaves the target active (not snapped back to a default work
   expect(disposed).toContain('t-src')
   expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
 })
+
+function harness() {
+  const worktrees: WorktreeRecord[] = [
+    {
+      createdAt: NOW,
+      createdByAimux: false,
+      id: 'wt-main',
+      name: 'main',
+      path: main,
+      repoRoot: main,
+      source: 'primary',
+      updatedAt: NOW,
+    },
+    tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
+    tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
+  ]
+  const session: SessionRecord = {
+    activeWorktreeId: 'wt-src',
+    createdAt: NOW,
+    id: 's1',
+    lastOpenedAt: NOW,
+    name: 's1',
+    updatedAt: NOW,
+    worktrees,
+  }
+  let state: AppState = {
+    ...createInitialState({}, [session]),
+    activeTabId: 't-src',
+    currentSessionId: 's1',
+    tabs: [tab('t-main', 'wt-main'), tab('t-src', 'wt-src')],
+  }
+  const ctx: SideEffectContext = {
+    activeTab: undefined,
+    backend: { disposeSession: () => {} } as never,
+    clearIdleTimer: () => {},
+    clearStartupGrace: () => {},
+    dispatch: (action) => {
+      state = appReducer(state, action)
+    },
+    getCurrentSessionProjectPath: () => {},
+    getState: () => state,
+    renderer: { destroy() {} } as never,
+    setThemeId: () => {},
+    startStartupGrace: () => {},
+    state,
+    themeId: 'opencode',
+  }
+  return { ctx, getState: () => state }
+}
+
+test('overlapping dirty target opens the stash dialog; retry with stashTarget completes', async () => {
+  // Target edit overlaps the source change to file.txt.
+  writeFileSync(join(tgt, 'file.txt'), 'base\nlocal target edit\n')
+  const { ctx, getState } = harness()
+
+  executeSideEffect(
+    {
+      sessionId: 's1',
+      sourceWorktreeId: 'wt-src',
+      targetWorktreeId: 'wt-tgt',
+      type: 'move-worktree',
+    },
+    ctx
+  )
+  await enqueueGitOp(async () => {})
+
+  const modal = getState().modal
+  expect(modal.type).toBe('worktree-move-confirm')
+  if (modal.type !== 'worktree-move-confirm') return
+  expect(modal.variant).toBe('stash-target')
+  expect(modal.files).toContain('file.txt')
+  expect(modal.sourceWorktreeId).toBe('wt-src')
+  expect(modal.targetWorktreeId).toBe('wt-tgt')
+  // Nothing was touched on the first attempt.
+  expect(git(tgt, 'stash', 'list').trim()).toBe('')
+
+  executeSideEffect(
+    {
+      sessionId: 's1',
+      sourceWorktreeId: 'wt-src',
+      stashTarget: true,
+      targetWorktreeId: 'wt-tgt',
+      type: 'move-worktree',
+    },
+    ctx
+  )
+  await enqueueGitOp(async () => {})
+
+  expect(git(tgt, 'stash', 'list')).toContain('aimux: backup before move from feature')
+  expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
+  expect(getState().sessions[0]?.activeWorktreeId).toBe('wt-tgt')
+})
+
+test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps the source', async () => {
+  // Diverge the target with a conflicting commit (target stays clean).
+  writeFileSync(join(tgt, 'file.txt'), 'base\nfrom-target\n')
+  git(tgt, 'config', 'user.email', 't@e.com')
+  git(tgt, 'config', 'user.name', 'T')
+  git(tgt, 'commit', '-am', 'target change')
+  const { ctx, getState } = harness()
+
+  executeSideEffect(
+    {
+      sessionId: 's1',
+      sourceWorktreeId: 'wt-src',
+      targetWorktreeId: 'wt-tgt',
+      type: 'move-worktree',
+    },
+    ctx
+  )
+  await enqueueGitOp(async () => {})
+
+  const modal = getState().modal
+  expect(modal.type).toBe('worktree-move-confirm')
+  if (modal.type !== 'worktree-move-confirm') return
+  expect(modal.variant).toBe('keep-conflicts')
+  expect(modal.files).toContain('file.txt')
+  // First attempt fully restored the target.
+  expect(git(tgt, 'status', '--porcelain').trim()).toBe('')
+
+  executeSideEffect(
+    {
+      deleteSource: true,
+      keepConflicts: true,
+      sessionId: 's1',
+      sourceWorktreeId: 'wt-src',
+      targetWorktreeId: 'wt-tgt',
+      type: 'move-worktree',
+    },
+    ctx
+  )
+  await enqueueGitOp(async () => {})
+
+  // Conflict markers left in the target for manual resolution.
+  expect(git(tgt, 'diff', '--name-only', '--diff-filter=U')).toContain('file.txt')
+  const after = getState().sessions[0]
+  expect(after?.activeWorktreeId).toBe('wt-tgt')
+  // deleteSource is deliberately ignored: the source's work only landed half-resolved.
+  expect(after?.worktrees?.map((w) => w.id)).toContain('wt-src')
+})

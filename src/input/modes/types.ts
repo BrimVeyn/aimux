@@ -25,6 +25,7 @@ export type ModeId =
   | 'modal.git-commit.generating'
   | 'modal.update-available'
   | 'modal.worktree-move'
+  | 'modal.worktree-move-confirm'
   | 'modal.ai-usage'
 
 export type SideEffect =
@@ -92,7 +93,11 @@ export type SideEffect =
       sourceWorktreeId: string
       targetWorktreeId: string
       deleteSource?: boolean
+      // Retry flags set by the worktree-move-confirm dialog.
+      stashTarget?: boolean
+      keepConflicts?: boolean
     }
+  | { type: 'load-worktree-move-stats' }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }

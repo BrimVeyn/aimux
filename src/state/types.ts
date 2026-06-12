@@ -47,6 +47,7 @@ export type ModalType =
   | 'update-available'
   | 'ai-usage'
   | 'worktree-move'
+  | 'worktree-move-confirm'
   | 'worktree-delete-confirm'
   | null
 
@@ -431,6 +432,26 @@ export interface ModalWorktreeMove extends ModalBase {
   /** The worktree being moved (may differ from the active one, e.g. a tab menu). */
   sourceWorktreeId: string
   deleteSource: boolean
+  /** Per-worktree dirty file counts, loaded async when the modal opens. */
+  stats: { kind: 'loading' } | { kind: 'ready'; dirtyFiles: Record<string, number> }
+}
+
+/**
+ * Confirmation for a recoverable move failure: the target's dirty files
+ * overlap the incoming changes (stash-target) or the squash conflicts
+ * (keep-conflicts). Both worktrees are already restored; confirming re-runs
+ * move-worktree with the matching flag.
+ */
+export interface ModalWorktreeMoveConfirm extends ModalBase {
+  type: 'worktree-move-confirm'
+  variant: 'stash-target' | 'keep-conflicts'
+  files: string[]
+  sessionId: string
+  sourceWorktreeId: string
+  targetWorktreeId: string
+  deleteSource: boolean
+  sourceLabel: string
+  targetLabel: string
 }
 
 /**
@@ -472,6 +493,7 @@ export type ModalState =
   | ModalUpdateAvailable
   | ModalAIUsage
   | ModalWorktreeMove
+  | ModalWorktreeMoveConfirm
   | ModalWorktreeDeleteConfirm
 
 export interface LayoutState {
@@ -586,6 +608,18 @@ export type ModalAction =
   | { type: 'open-ai-usage-modal' }
   | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
   | { type: 'toggle-worktree-move-delete' }
+  | { type: 'set-worktree-move-stats'; dirtyFiles: Record<string, number> }
+  | {
+      type: 'open-worktree-move-confirm'
+      variant: 'stash-target' | 'keep-conflicts'
+      files: string[]
+      sessionId: string
+      sourceWorktreeId: string
+      targetWorktreeId: string
+      deleteSource: boolean
+      sourceLabel: string
+      targetLabel: string
+    }
   | {
       type: 'open-worktree-delete-confirm'
       sessionId: string

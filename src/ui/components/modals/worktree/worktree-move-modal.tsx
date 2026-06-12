@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 
-import type { WorktreeRecord } from '../../../../state/types'
+import type { ModalWorktreeMove, WorktreeRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/session-worktrees'
@@ -14,6 +14,7 @@ interface WorktreeMoveModalProps {
   divergence: Record<string, { ahead: number; behind: number }>
   selectedIndex: number
   sourceWorktreeId: string
+  stats: ModalWorktreeMove['stats']
   worktrees: WorktreeRecord[]
 }
 
@@ -29,6 +30,7 @@ export function WorktreeMoveModal({
   divergence,
   selectedIndex,
   sourceWorktreeId,
+  stats,
   worktrees,
 }: WorktreeMoveModalProps) {
   const t = useTheme()
@@ -42,6 +44,18 @@ export function WorktreeMoveModal({
   )
   const sourceLabel =
     source?.branch != null && source.branch !== '' ? source.branch : (source?.name ?? 'worktree')
+  // What the move would carry: commits ahead of the fork point (when known) plus
+  // uncommitted files, loaded async after the modal opens.
+  const sourcePreview = useMemo(() => {
+    const parts: string[] = []
+    const ahead = divergence[sourceWorktreeId]?.ahead ?? 0
+    if (ahead > 0) parts.push(`${ahead} commit(s)`)
+    if (stats.kind === 'ready') {
+      const dirty = stats.dirtyFiles[sourceWorktreeId] ?? 0
+      if (dirty > 0) parts.push(`${dirty} uncommitted file(s)`)
+    }
+    return parts.join(' · ')
+  }, [divergence, sourceWorktreeId, stats])
   const handleSelectIndex = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
     []
@@ -71,6 +85,7 @@ export function WorktreeMoveModal({
       }
     >
       <box flexDirection="column" marginTop={1}>
+        {sourcePreview !== '' ? <text fg={t.textMuted}>will move: {sourcePreview}</text> : null}
         {targets.length === 0 ? (
           <text fg={t.textMuted}>No other worktree to move into.</text>
         ) : (
@@ -79,6 +94,7 @@ export function WorktreeMoveModal({
             const label =
               worktree.branch != null && worktree.branch !== '' ? worktree.branch : worktree.name
             const ahead = formatDivergence(divergence[worktree.id])
+            const dirty = stats.kind === 'ready' && (stats.dirtyFiles[worktree.id] ?? 0) > 0
             return (
               <ListItem
                 key={worktree.id}
@@ -92,6 +108,7 @@ export function WorktreeMoveModal({
                     {label}
                     {worktree.source === 'primary' ? ' (primary)' : ''}
                     {ahead !== '' ? ` ${ahead}` : ''}
+                    {dirty ? <span fg={t.warning}> ●</span> : null}
                   </text>
                 }
               />

@@ -78,3 +78,57 @@ test('move-modal-selection navigates within the target list (worktrees minus act
   const s3 = appReducer(s2, { delta: 1, type: 'move-modal-selection' })
   expect(s3.modal.selectedIndex).toBe(0)
 })
+
+test('stats start loading and are filled by set-worktree-move-stats', () => {
+  const s1 = appReducer(seed(), { sourceWorktreeId: 'wt-a', type: 'open-worktree-move-modal' })
+  if (s1.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
+  expect(s1.modal.stats).toEqual({ kind: 'loading' })
+  const s2 = appReducer(s1, {
+    dirtyFiles: { 'wt-a': 2, 'wt-b': 0 },
+    type: 'set-worktree-move-stats',
+  })
+  if (s2.modal.type !== 'worktree-move') throw new Error('expected worktree-move modal')
+  expect(s2.modal.stats).toEqual({ dirtyFiles: { 'wt-a': 2, 'wt-b': 0 }, kind: 'ready' })
+})
+
+test('set-worktree-move-stats is ignored when another modal is open', () => {
+  const base = seed()
+  const s1 = appReducer(base, { dirtyFiles: { 'wt-a': 1 }, type: 'set-worktree-move-stats' })
+  expect(s1).toBe(base)
+})
+
+const CONFIRM_FIELDS = {
+  deleteSource: true,
+  files: ['file.txt'],
+  sessionId: 's1',
+  sourceLabel: 'feat/a',
+  sourceWorktreeId: 'wt-a',
+  targetLabel: 'feat/b',
+  targetWorktreeId: 'wt-b',
+}
+
+test('open-worktree-move-confirm takes modal focus and carries the retry params', () => {
+  const s1 = appReducer(seed(), {
+    ...CONFIRM_FIELDS,
+    type: 'open-worktree-move-confirm',
+    variant: 'stash-target',
+  })
+  if (s1.modal.type !== 'worktree-move-confirm') throw new Error('expected confirm modal')
+  expect(s1.focusMode).toBe('modal')
+  expect(s1.modal.variant).toBe('stash-target')
+  expect(s1.modal.files).toEqual(['file.txt'])
+  expect(s1.modal.deleteSource).toBe(true)
+  expect(s1.modal.sourceWorktreeId).toBe('wt-a')
+  expect(s1.modal.targetWorktreeId).toBe('wt-b')
+})
+
+test('closing the confirm modal lands on navigation', () => {
+  const s1 = appReducer(seed(), {
+    ...CONFIRM_FIELDS,
+    type: 'open-worktree-move-confirm',
+    variant: 'keep-conflicts',
+  })
+  const s2 = appReducer(s1, { type: 'close-modal' })
+  expect(s2.modal.type).toBeNull()
+  expect(s2.focusMode).toBe('navigation')
+})

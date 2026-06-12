@@ -39,6 +39,7 @@ import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
+import { WorktreeMoveConfirmModal } from './components/modals/worktree/worktree-move-confirm-modal'
 import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
 import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
@@ -214,10 +215,20 @@ function renderModal(
           divergence={options.worktreeDivergence}
           selectedIndex={modal.selectedIndex}
           sourceWorktreeId={modal.sourceWorktreeId}
+          stats={modal.stats}
           worktrees={session?.worktrees ?? EMPTY_WORKTREES}
         />
       )
     }
+    case 'worktree-move-confirm':
+      return (
+        <WorktreeMoveConfirmModal
+          variant={modal.variant}
+          files={modal.files}
+          sourceLabel={modal.sourceLabel}
+          targetLabel={modal.targetLabel}
+        />
+      )
     case 'help':
       return (
         <HelpModal

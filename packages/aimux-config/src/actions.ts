@@ -403,7 +403,10 @@ export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
   }
   // Overlay: no mode transition — deriveModeId routes input to the picker and
   // focusMode stays 'git' so the git view remains mounted underneath.
-  return r([{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }])
+  return r(
+    [{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }],
+    [{ type: 'load-worktree-move-stats' }]
+  )
 }
 
 export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
@@ -433,6 +436,27 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
         type: 'move-worktree',
       },
     ]
+  )
+}
+
+// Confirms the dialog opened after a recoverable move failure: re-runs the
+// move with the flag matching the failure (stash the target / keep conflicts).
+export const confirmWorktreeMoveRetry: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'worktree-move-confirm') return null
+  return r(
+    [{ type: 'close-modal' }],
+    [
+      {
+        deleteSource: modal.deleteSource,
+        sessionId: modal.sessionId,
+        sourceWorktreeId: modal.sourceWorktreeId,
+        targetWorktreeId: modal.targetWorktreeId,
+        type: 'move-worktree',
+        ...(modal.variant === 'stash-target' ? { stashTarget: true } : { keepConflicts: true }),
+      },
+    ],
+    'navigation'
   )
 }
 

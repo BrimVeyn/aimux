@@ -25,6 +25,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.update-available': ['navigation'],
   'modal.worktree-delete-confirm': ['navigation'],
   'modal.worktree-move': ['git-mode', 'navigation'],
+  'modal.worktree-move-confirm': ['navigation'],
   'navigation': [
     'terminal-input',
     'modal.new-tab.command-edit',
@@ -37,6 +38,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.update-available',
     'modal.ai-usage',
     'modal.worktree-delete-confirm',
+    'modal.worktree-move-confirm',
     'git-mode',
   ],
   'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage'],

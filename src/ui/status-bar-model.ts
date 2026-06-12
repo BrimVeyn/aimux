@@ -133,6 +133,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.update-available'
     case 'worktree-move':
       return 'modal.worktree-move'
+    case 'worktree-move-confirm':
+      return 'modal.worktree-move-confirm'
     default:
       return null
   }

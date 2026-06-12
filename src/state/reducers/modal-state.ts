@@ -304,6 +304,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           selectedIndex: 0,
           sessionTargetId: null,
           sourceWorktreeId: action.sourceWorktreeId,
+          stats: { kind: 'loading' },
           type: 'worktree-move',
         },
       }
@@ -313,6 +314,33 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
+      }
+    }
+    case 'set-worktree-move-stats': {
+      if (state.modal.type !== 'worktree-move') return state
+      return {
+        ...state,
+        modal: { ...state.modal, stats: { dirtyFiles: action.dirtyFiles, kind: 'ready' } },
+      }
+    }
+    case 'open-worktree-move-confirm': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          deleteSource: action.deleteSource,
+          editBuffer: null,
+          files: action.files,
+          selectedIndex: 0,
+          sessionId: action.sessionId,
+          sessionTargetId: null,
+          sourceLabel: action.sourceLabel,
+          sourceWorktreeId: action.sourceWorktreeId,
+          targetLabel: action.targetLabel,
+          targetWorktreeId: action.targetWorktreeId,
+          type: 'worktree-move-confirm',
+          variant: action.variant,
+        },
       }
     }
     case 'open-worktree-delete-confirm': {

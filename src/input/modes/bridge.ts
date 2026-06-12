@@ -28,6 +28,7 @@ const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'update-available': 'modal.update-available',
   'worktree-delete-confirm': 'modal.worktree-delete-confirm',
   'worktree-move': 'modal.worktree-move',
+  'worktree-move-confirm': 'modal.worktree-move-confirm',
 }
 
 export function deriveModeId(state: AppState): ModeId {

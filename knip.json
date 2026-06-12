@@ -18,7 +18,8 @@
     "merge-base",
     "merge",
     "reset",
-    "add"
+    "add",
+    "stash"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {
