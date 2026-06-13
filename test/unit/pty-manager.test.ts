@@ -330,6 +330,61 @@ describe('PtyManager', () => {
     manager.disposeAll()
   })
 
+  test('forwards emulator query replies back to the pty (CPR round-trip)', async () => {
+    const manager = new PtyManager()
+    let latestBuffer = ''
+
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Timed out waiting for PTY session'))
+      }, 5_000)
+
+      manager.on('render', (tabId, viewport) => {
+        if (tabId !== 'tab-cpr') return
+        latestBuffer = viewport.lines
+          .map((line) => line.spans.map((span) => span.text).join(''))
+          .join('\n')
+      })
+
+      manager.on('error', (_tabId, message) => {
+        clearTimeout(timeout)
+        reject(new Error(message))
+      })
+
+      manager.on('exit', (tabId, code) => {
+        if (tabId !== 'tab-cpr') return
+        clearTimeout(timeout)
+        resolve(code)
+      })
+
+      manager.createSession({
+        cols: 80,
+        command: '/bin/sh',
+        cwd: process.cwd(),
+        rows: 24,
+        tabId: 'tab-cpr',
+      })
+
+      // Ask for a Cursor Position Report (ESC[6n) and read the reply off our
+      // own stdin. It only arrives if the emulator's reply channel is wired
+      // back to the pty. The result is emitted as `>>OK<<` / `>>NO<<` — those
+      // exact strings only appear in the command's OUTPUT, never in the
+      // echoed command line (which holds `r=OK` / `r=NO` / `>>%s<<`), so the
+      // assertion can't be fooled by the shell echoing what we typed.
+      setTimeout(() => {
+        manager.write(
+          'tab-cpr',
+          "stty -echo; printf '\\033[6n'; IFS= read -r -d R -t 2 c && r=OK || r=NO; printf '\\n>>%s<<\\n' \"$r\"; exit\r"
+        )
+      }, 50)
+    })
+
+    expect(exitCode).toBe(0)
+    expect(latestBuffer).toContain('>>OK<<')
+    expect(latestBuffer).not.toContain('>>NO<<')
+    manager.disposeAll()
+  })
+
   test('scrollViewport exposes scrollback history', async () => {
     const manager = new PtyManager()
     let latestViewportText = ''

@@ -341,6 +341,25 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         return false
       })
 
+      // Wire the emulator's reply channel back to the pty. When a program
+      // writes a query sequence — CPR (ESC[6n), Device Attributes (ESC[c),
+      // Device Status (ESC[5n), DECRQM, OSC color queries — xterm generates
+      // the answer and emits it via onData. Without forwarding it the program
+      // waits forever for a response it never gets (e.g. AWS CLI / Python
+      // prompt_toolkit warns "terminal doesn't support cursor position
+      // requests (CPR)"). These replies are produced synchronously inside the
+      // emulator.write() below, so write straight to the pty rather than
+      // queueing through the render path. The listener is disposed together
+      // with the emulator in finalize/dispose, mirroring registerCsiHandler.
+      //
+      // onBinary (legacy non-UTF-8 mouse reports) is intentionally not wired:
+      // bun-pty.write() only accepts a UTF-8 string so byte values >127 can't
+      // be transmitted faithfully, and the headless emulator is never fed raw
+      // mouse input, so it never generates those reports in the first place.
+      emulator.onData((reply) => {
+        session.pty.write(reply)
+      })
+
       pty.onData((data) => {
         logDebug('ptyManager.data', {
           byteLength: Buffer.byteLength(data, 'utf8'),
