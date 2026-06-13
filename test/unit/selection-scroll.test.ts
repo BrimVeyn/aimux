@@ -279,6 +279,7 @@ describe('applyViewportObservation', () => {
 
     expect(result).toEqual(next)
     expect(renderer.startCalls).toHaveLength(0)
+    expect(renderer.clearCalls).toBe(0)
   })
 
   test('shifts selection by delta when viewportY changes within same tab', () => {
@@ -301,9 +302,10 @@ describe('applyViewportObservation', () => {
     applyViewportObservation(renderer, { tabId: 'tab-1', y: 10 }, { tabId: 'tab-1', y: 10 })
 
     expect(renderer.startCalls).toHaveLength(0)
+    expect(renderer.clearCalls).toBe(0)
   })
 
-  test('resets cache and skips shift on tab switch', () => {
+  test('clears selection and skips shift on tab switch', () => {
     const { renderer } = setupRenderer()
 
     const result = applyViewportObservation(
@@ -314,14 +316,16 @@ describe('applyViewportObservation', () => {
 
     expect(result).toEqual({ tabId: 'tab-2', y: 4 })
     expect(renderer.startCalls).toHaveLength(0)
+    expect(renderer.clearCalls).toBe(1)
   })
 
-  test('returns null and resets cache when next observation is null', () => {
+  test('clears selection and returns null when next observation is null', () => {
     const { renderer } = setupRenderer()
 
     const result = applyViewportObservation(renderer, { tabId: 'tab-1', y: 10 }, null)
 
     expect(result).toBeNull()
     expect(renderer.startCalls).toHaveLength(0)
+    expect(renderer.clearCalls).toBe(1)
   })
 })

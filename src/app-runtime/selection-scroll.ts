@@ -126,11 +126,15 @@ export function applyViewportObservation(
   next: ViewportObservation | null
 ): ViewportObservation | null {
   if (!next) {
-    if (prior !== null) resetSelectionShiftState(renderer)
+    if (prior !== null) {
+      renderer.clearSelection()
+      resetSelectionShiftState(renderer)
+    }
     return null
   }
 
   if (!prior || prior.tabId !== next.tabId) {
+    if (prior && prior.tabId !== next.tabId) renderer.clearSelection()
     resetSelectionShiftState(renderer)
     return next
   }
