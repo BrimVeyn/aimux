@@ -21,6 +21,7 @@ import {
 } from './click-selection-resolver'
 import { recordMultiClickClipboardWrite } from './multi-click-clipboard-guard'
 import { requestRenderUpTree } from './render-invalidation'
+import { shouldWriteSelectionToClipboard } from './selection-clipboard-dedup'
 import {
   type AnchoredRatioDragState,
   type AxisDragState,
@@ -146,7 +147,9 @@ function applyMultiClickInitialSelection(
     finishDragging: false,
   })
   requestRenderUpTree(selection.target)
-  copyToSystemClipboard(selection.selectedText)
+  if (shouldWriteSelectionToClipboard(selection.selectedText)) {
+    copyToSystemClipboard(selection.selectedText)
+  }
 }
 
 export function useMouseHandlers({
@@ -573,7 +576,7 @@ export function useMouseHandlers({
     const anchorIdx = drag.anchorAbsRow - startAbs
     const focusIdx = drag.focusAbsRow - startAbs
     const text = extractStreamText(lines, anchorIdx, anchorCol, focusIdx, drag.focusCol)
-    if (text.length > 0) {
+    if (text.length > 0 && shouldWriteSelectionToClipboard(text)) {
       copyToSystemClipboard(text)
       recordMultiClickClipboardWrite()
     }
