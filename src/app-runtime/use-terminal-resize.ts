@@ -19,6 +19,7 @@ import {
   forEachSplitPaneRect,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { getTreeForTab } from '../state/layout-tree'
 
 const MAIN_AREA_HORIZONTAL_CHROME = 2
 const MAIN_AREA_VERTICAL_PADDING = 0
@@ -161,6 +162,19 @@ export function useTerminalResize({
 
   const activeTabIdRef = useRef(state.activeTabId)
   activeTabIdRef.current = state.activeTabId
+  // Whether the active tab is part of a split. contentOriginRef must hold the
+  // whole terminal-area origin (root.tsx derives splitContentOrigin from it and
+  // SplitLayout re-adds each pane's bounds offset). When split, the active
+  // pane's measured box is pane-relative, so adopting it as the area origin
+  // would double-count the pane offset and push the hardware cursor off along
+  // the split axis. Track it so handleMeasure can skip the x/y overwrite.
+  const activeIsSplitRef = useRef(false)
+  {
+    const id = state.activeTabId
+    const tree =
+      id != null && id !== '' ? getTreeForTab(state.layoutTrees, state.tabGroupMap, id) : null
+    activeIsSplitRef.current = tree?.type === 'split'
+  }
   // Last size we pushed to the backend per tab, used to dedupe the measurement
   // loop so an unchanged box never re-triggers a resize.
   const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
@@ -187,7 +201,11 @@ export function useTerminalResize({
       const cols = Math.max(PTY_MIN_COLS, rect.cols)
       const rows = Math.max(PTY_MIN_ROWS, rect.rows)
       const isActive = tabId === activeTabIdRef.current
-      if (isActive) {
+      // Only adopt the measured box as the terminal-area origin when the active
+      // pane spans the whole area (no split). In a split the box is pane-local;
+      // keep the model-derived area origin from the terminalSize memo below so
+      // the hardware cursor isn't offset by the pane's bounds (see ref comment).
+      if (isActive && !activeIsSplitRef.current) {
         contentOriginRef.current = { cols, rows, x: rect.x, y: rect.y }
       }
       const prev = measuredRef.current.get(tabId)
