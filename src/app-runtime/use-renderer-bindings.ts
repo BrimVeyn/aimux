@@ -23,6 +23,10 @@ import {
 import { shouldSuppressSelectionCopy } from './multi-click-clipboard-guard'
 import { writeMacroExpansionToTab, writePasteToTab, writeToTab } from './pty-write'
 import { type OtuiSelection, resolveSelectionClipboardText } from './selection-clipboard'
+import {
+  resetSelectionClipboardDedup,
+  shouldWriteSelectionToClipboard,
+} from './selection-clipboard-dedup'
 import { applyViewportObservation, type ViewportObservation } from './selection-scroll'
 
 const BRACKETED_PASTE_ENABLE_SEQUENCE = '\x1b[?2004h'
@@ -239,7 +243,13 @@ export function useRendererBindings({
         textLength: selectedText.length,
       })
 
-      if (selection.isDragging === true || selectedText.length === 0) {
+      if (selection.isDragging === true) {
+        return
+      }
+      if (selectedText.length === 0) {
+        // Deselect → forget the last-written text so a deliberate reselection
+        // of the same text writes it again.
+        resetSelectionClipboardDedup()
         return
       }
 
@@ -254,7 +264,11 @@ export function useRendererBindings({
       }
 
       renderer.copyToClipboardOSC52(selectedText)
-      copyToSystemClipboard(selectedText)
+      if (shouldWriteSelectionToClipboard(selectedText)) {
+        copyToSystemClipboard(selectedText)
+      } else {
+        logInputDebug('app.selection.dedup', { textLength: selectedText.length })
+      }
     }
 
     renderer.prependInputHandler(handler)
