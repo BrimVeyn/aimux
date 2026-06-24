@@ -1610,7 +1610,6 @@ async function runDeleteWorktree(
   if (tabsInWorktree.length > 0 && !force && !closeTabs) {
     throw new ActiveWorktreeTabsError(tabsInWorktree.length)
   }
-  disposeWorktreeTabs(ctx, worktreeId)
 
   const repoPath = resolveWorktreeGitDir(session, worktree)
   const isAimuxTemp = worktree.source === 'aimux-temp' && worktree.createdByAimux
@@ -1624,15 +1623,14 @@ async function runDeleteWorktree(
     }
   }
 
+  // Run git ops FIRST. If any throws (dirty worktree, etc.) the catch in the
+  // delete-worktree side effect handler re-prompts force or toasts the error —
+  // tabs stay open and the row stays in the sidebar, so the UI matches reality
+  // instead of leaving tabs closed against a worktree that still exists.
   if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path) && !existsSync(worktree.path)) {
     // The dir vanished but git may still pin the branch to a stale worktree entry.
     await pruneGitWorktrees(repoPath)
-    await cleanupAimuxBranch()
-    removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
-    return
-  }
-
-  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path)) {
+  } else if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path)) {
     await assertSafeAimuxWorktreePath(worktree.path)
     await removeGitWorktree({ force, repoPath, targetPath: worktree.path })
   } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
@@ -1640,7 +1638,15 @@ async function runDeleteWorktree(
   }
 
   await cleanupAimuxBranch()
-  removeWorktreeRecordFromSession(ctx, sessionId, session, worktreeId)
+
+  // Only after git success: close tabs + retire the record. Re-read state so
+  // we don't operate on the snapshot captured before the awaits above.
+  disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, worktreeId)
+  const latest = ctx.getState()
+  const latestSession = latest.sessions.find((entry) => entry.id === sessionId)
+  if (latestSession) {
+    removeWorktreeRecordFromSession({ ...ctx, state: latest }, sessionId, latestSession, worktreeId)
+  }
 }
 
 // A worktree's stored repoRoot can point at a sibling worktree that was since
