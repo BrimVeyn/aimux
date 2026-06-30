@@ -63,9 +63,20 @@ export const WorktreeRow = memo(function WorktreeRow({
   )
 
   const rightClickMenu = useMemo<[string, () => void][] | undefined>(() => {
-    if (worktree.source === 'primary') return
-    return [
+    const entries: [string, () => void][] = [
       [
+        'Rename',
+        () =>
+          dispatchGlobal({
+            initialName: worktree.name,
+            sessionId: session.id,
+            type: 'open-rename-worktree-modal',
+            worktreeId: worktree.id,
+          }),
+      ],
+    ]
+    if (worktree.source !== 'primary') {
+      entries.push([
         'Remove worktree',
         () =>
           // Always confirm first. Confirming routes through the full delete side
@@ -83,8 +94,9 @@ export const WorktreeRow = memo(function WorktreeRow({
             worktreeId: worktree.id,
             worktreeLabel: worktree.branch ?? worktree.name,
           }),
-      ],
-    ]
+      ])
+    }
+    return entries
   }, [session.id, worktree.branch, worktree.id, worktree.name, worktree.source])
 
   let bgColor: string | undefined

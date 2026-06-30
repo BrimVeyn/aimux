@@ -1217,6 +1217,20 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-rename-worktree-modal': {
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: action.initialName.length,
+          editBuffer: action.initialName,
+          selectedIndex: 0,
+          sessionTargetId: action.worktreeId,
+          type: 'rename-worktree',
+          worktreeSessionId: action.sessionId,
+        },
+      }
+    }
     default:
       return null
   }

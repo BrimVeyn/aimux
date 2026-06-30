@@ -237,6 +237,16 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: rename-worktree
+    // -----------------------------------------------------------------------
+    .mode('modal.rename-worktree', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<CR>', actions.confirmRenameWorktree, 'Confirm')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: new-tab (always in filter mode via Picker)
     // -----------------------------------------------------------------------
     .mode('modal.new-tab.command-edit', (m) =>

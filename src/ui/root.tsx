@@ -156,6 +156,8 @@ function renderModal(
       )
     case 'rename-tab':
       return <SessionNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
+    case 'rename-worktree':
+      return <SessionNameModal title="Rename worktree" value={modal.editBuffer ?? ''} />
     case 'create-session':
       return (
         <CreateSessionModal
