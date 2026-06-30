@@ -174,6 +174,53 @@ describe('CLI DaemonClient', () => {
     expect(attach?.payload).toMatchObject({ cols: 0, rows: 0, thin: true })
   })
 
+  test('tabAdded events deliver the synthesized TabSession to subscribers', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const seen: { sessionId: string; tabId: string; worktreeId: string | undefined }[] = []
+    client.on('tabAdded', (payload) => {
+      seen.push({
+        sessionId: payload.sessionId,
+        tabId: payload.tab.id,
+        worktreeId: payload.tab.worktreeId,
+      })
+    })
+
+    mock.emit({
+      payload: {
+        sessionId: 'session-1',
+        tab: {
+          assistant: 'claude',
+          buffer: '',
+          command: 'claude',
+          id: 'tab-fresh',
+          status: 'starting',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Claude',
+          worktreeId: 'wt-42',
+        },
+      },
+      type: 'tabAdded',
+    })
+
+    const deadline = Date.now() + 500
+    while (seen.length === 0 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(seen).toEqual([{ sessionId: 'session-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
+  })
+
   test('tabStatus events fan out to subscribers', async () => {
     const socketPath = tempSocketPath()
     const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])

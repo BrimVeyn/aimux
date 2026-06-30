@@ -326,7 +326,7 @@ export function startTabSession(
   dispatch: (action: AppAction) => void,
   clearStartupGrace: (tabId: string) => void,
   startStartupGrace: (tabId: string) => void,
-  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command'>,
+  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'worktreeId'>,
   cols: number,
   rows: number,
   cwd?: string
@@ -338,6 +338,7 @@ export function startTabSession(
     rows,
     tabId: tab.id,
     title: tab.title,
+    worktreeId: tab.worktreeId ?? null,
   })
   startStartupGrace(tab.id)
 
@@ -362,6 +363,7 @@ export function startTabSession(
     rows,
     tabId: tab.id,
     title: tab.title,
+    worktreeId: tab.worktreeId,
   })
 }
 

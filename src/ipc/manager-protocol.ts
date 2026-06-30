@@ -41,7 +41,10 @@ export const MANAGER_PROTOCOL_VERSION = 8
  * — bumping MIN forces a fresh TM and kills every PTY. See
  * `src/ipc/README.md`.
  */
-export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = ['setBroadcastEnabled']
+export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
+  'setBroadcastEnabled',
+  'createTabWorktreeId',
+]
 
 /**
  * Capability name a daemon must observe on the TM's helloResult before
@@ -105,6 +108,13 @@ export type ManagerRequest =
         cwd?: string
         /** Extra env vars merged into the spawned PTY's environment. */
         env?: Record<string, string>
+        /**
+         * Worktree this tab belongs to (UI grouping). Capability-gated on
+         * `createTabWorktreeId`. Pre-cap TMs silently drop the field, which
+         * matches the previous behaviour where every new tab had
+         * `worktreeId = undefined`.
+         */
+        worktreeId?: string
       }
     }
   | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
@@ -345,6 +355,10 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(
         value.payload.env === undefined || isStringRecord(value.payload.env),
         'createTab.env must be a string-keyed string record'
+      )
+      assert(
+        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
+        'createTab.worktreeId must be a string when present'
       )
       return value as ManagerRequest
     case 'write':

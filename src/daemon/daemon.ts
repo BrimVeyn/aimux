@@ -1,7 +1,7 @@
 import { existsSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
-import type { AssistantId, TabStatus, TerminalSnapshot } from '../state/types'
+import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
@@ -21,6 +21,7 @@ import {
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
+import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
   consumeDaemonHandoff,
@@ -581,13 +582,21 @@ export async function runDaemon(): Promise<void> {
                     tabId: message.payload.tabId,
                     title: message.payload.title,
                   })
+                  const fullCommand = [
+                    message.payload.command,
+                    ...(message.payload.args ?? []),
+                  ].join(' ')
                   rememberTab(
                     sessionId,
                     message.payload.tabId,
                     message.payload.assistant,
-                    [message.payload.command, ...(message.payload.args ?? [])].join(' '),
+                    fullCommand,
                     undefined,
-                    { status: 'starting', title: message.payload.title }
+                    {
+                      status: 'starting',
+                      title: message.payload.title,
+                      worktreeId: message.payload.worktreeId,
+                    }
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
                   // call back into our status loop. Safe to add for every
@@ -599,6 +608,30 @@ export async function runDaemon(): Promise<void> {
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
                   await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
                   sendOk(socket, message.id)
+                  // Fan a `tabAdded` event to every client watching this
+                  // session so siblings (e.g. the UI when a CLI created the
+                  // tab) can `add-tab` to their store and start applying the
+                  // subsequent `tabRender` events. The capability gate is on
+                  // the receiver side — the wire shape is harmless for old
+                  // clients (their `parseServerMessage` doesn't recognise
+                  // `tabAdded` and would throw, so we ONLY send it to peers
+                  // that negotiated v11). Older clients on a v11 daemon
+                  // negotiate v11 too, so the parser knows the case.
+                  const synthesizedTab: TabSession = {
+                    activity: 'idle',
+                    assistant: message.payload.assistant,
+                    buffer: '',
+                    command: fullCommand,
+                    id: message.payload.tabId,
+                    status: 'starting',
+                    terminalModes: createDefaultTerminalModes(),
+                    title: message.payload.title,
+                    worktreeId: message.payload.worktreeId,
+                  }
+                  broadcastForSession(sessionId, {
+                    payload: { sessionId, tab: synthesizedTab },
+                    type: 'tabAdded',
+                  })
                   logDebug('daemon.request.createTab.success', {
                     sessionId,
                     tabId: message.payload.tabId,

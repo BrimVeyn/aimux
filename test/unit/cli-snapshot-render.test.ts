@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { TerminalSnapshot } from '../../src/state/types'
 
-import { snapshotTailLines, snapshotToLines } from '../../src/cli/snapshot-render'
+import { snapshotTailLines, snapshotToLines, snapshotToText } from '../../src/cli/snapshot-render'
 
 function snapshot(lines: string[]): TerminalSnapshot {
   return {
@@ -35,5 +35,21 @@ describe('snapshot-render', () => {
   test('tail with n=0 returns the whole non-blank prefix', () => {
     const snap = snapshot(['one', 'two', '', ''])
     expect(snapshotTailLines(snap, 0)).toEqual(['one', 'two'])
+  })
+
+  test('trims trailing whitespace per line by default', () => {
+    const snap: TerminalSnapshot = {
+      baseY: 0,
+      cursorVisible: true,
+      lines: [{ spans: [{ text: 'hello' }, { text: '     ' }] }],
+      viewportY: 0,
+    }
+    expect(snapshotToLines(snap)).toEqual(['hello'])
+    expect(snapshotToLines(snap, { trim: false })).toEqual(['hello     '])
+  })
+
+  test('snapshotToText joins lines with newlines + trailing newline', () => {
+    const snap = snapshot(['one', 'two'])
+    expect(snapshotToText(snap)).toBe('one\ntwo\n')
   })
 })

@@ -199,6 +199,13 @@ export class RemoteSessionBackend
         })
         this.emit('sessionActivity', message.payload.sessionId, message.payload.status)
         break
+      case 'tabAdded':
+        logDebug('backend.remote.tabAdded', {
+          sessionId: message.payload.sessionId,
+          tabId: message.payload.tab.id,
+        })
+        this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
+        break
     }
   }
 
@@ -375,6 +382,7 @@ export class RemoteSessionBackend
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void {
     if (!this.attached) {
       logDebug('backend.remote.skipCreateBeforeAttach', { tabId: options.tabId })

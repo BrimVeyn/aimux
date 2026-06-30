@@ -2,8 +2,10 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
+  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
   IPC_CAPABILITY_HOT_REEXEC,
   IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_MIN_VERSION,
@@ -18,11 +20,13 @@ describe('ipc protocol v11', () => {
     expect(IPC_PROTOCOL_MIN_VERSION).toBe(10)
   })
 
-  test('advertises the four v11 capabilities', () => {
+  test('advertises every v11 capability', () => {
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_HOT_REEXEC)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_LIST_TABS)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_THIN_ATTACH)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID)
   })
 
   test('listTabs round-trips with a string sessionId', () => {
@@ -110,5 +114,77 @@ describe('ipc protocol v11', () => {
         type: 'listTabsResult',
       })
     ).toThrow('listTabsResult.payload is invalid')
+  })
+
+  test('createTab.worktreeId parses when present', () => {
+    expect(() =>
+      parseClientRequest({
+        id: 'r6',
+        payload: {
+          assistant: 'claude',
+          cols: 80,
+          command: 'claude',
+          rows: 24,
+          tabId: 'tab-1',
+          title: 'Claude',
+          worktreeId: 'worktree-abc',
+        },
+        type: 'createTab',
+      })
+    ).not.toThrow()
+  })
+
+  test('createTab.worktreeId rejects a non-string value', () => {
+    expect(() =>
+      parseClientRequest({
+        id: 'r7',
+        payload: {
+          assistant: 'claude',
+          cols: 80,
+          command: 'claude',
+          rows: 24,
+          tabId: 'tab-1',
+          title: 'Claude',
+          worktreeId: 12,
+        },
+        type: 'createTab',
+      })
+    ).toThrow('createTab.worktreeId must be a string when present')
+  })
+
+  test('tabAdded event round-trips with a full TabSession', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: {
+          sessionId: 'session-1',
+          tab: {
+            assistant: 'claude',
+            buffer: '',
+            command: 'claude',
+            id: 'tab-1',
+            status: 'starting',
+            terminalModes: {
+              alternateScrollMode: false,
+              bracketedPasteMode: false,
+              isAlternateBuffer: false,
+              mouseTrackingMode: 'none',
+              sendFocusMode: false,
+            },
+            title: 'Claude',
+            worktreeId: 'wt-1',
+          },
+        },
+        type: 'tabAdded',
+      })
+    ).not.toThrow()
+  })
+
+  test('tabAdded rejects a malformed tab payload', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: { sessionId: 'session-1', tab: { id: 'tab-1' } },
+        type: 'tabAdded',
+      })
+    ).toThrow('tabAdded.tab is invalid')
   })
 })

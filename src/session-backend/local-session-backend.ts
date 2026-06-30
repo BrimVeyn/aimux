@@ -132,6 +132,7 @@ export class LocalSessionBackend
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void {
     if (!(this.currentSessionId != null && this.currentSessionId !== '')) {
       logDebug('backend.local.skipCreateWithoutSession', { tabId: options.tabId })
@@ -141,6 +142,7 @@ export class LocalSessionBackend
       sessionId: this.currentSessionId,
       tabId: options.tabId,
       title: options.title,
+      worktreeId: options.worktreeId ?? null,
     })
     this.gatePaneRender(options.tabId)
     this.sessionManager.createTab(this.currentSessionId, options)

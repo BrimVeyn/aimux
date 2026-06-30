@@ -13,6 +13,16 @@ export const tabSnapshot: CliCommand = {
   flags: [
     ...SHARED_FLAGS,
     { description: 'return only the last N non-blank lines', kind: 'number', name: 'tail' },
+    {
+      description: 'output format: json (default) or text (raw screen dump)',
+      kind: 'string',
+      name: 'format',
+    },
+    {
+      description: 'do not strip trailing whitespace from each line',
+      kind: 'boolean',
+      name: 'no-trim',
+    },
   ],
   group: 'tab',
   run: async (ctx) => {
@@ -21,6 +31,11 @@ export const tabSnapshot: CliCommand = {
       throw new Error('tabId is required')
     }
     const tail = typeof ctx.args.flags.tail === 'number' ? ctx.args.flags.tail : 0
+    const format = ctx.args.flags.format ?? 'json'
+    if (format !== 'json' && format !== 'text') {
+      throw new Error(`--format must be "json" or "text" (got: ${String(format)})`)
+    }
+    const renderOptions = { trim: ctx.args.flags['no-trim'] !== true }
 
     const workspace = ctx.getWorkspace()
     const daemon = await ctx.getDaemon()
@@ -77,7 +92,19 @@ export const tabSnapshot: CliCommand = {
       throw new Error('no snapshot available within timeout')
     }
 
-    const lines = tail > 0 ? snapshotTailLines(snapshot, tail) : snapshotToLines(snapshot)
+    const lines =
+      tail > 0
+        ? snapshotTailLines(snapshot, tail, renderOptions)
+        : snapshotToLines(snapshot, renderOptions)
+
+    if (format === 'text') {
+      // Raw screen dump: best fit when piping into an LLM prompt — no JSON
+      // escape noise, the model sees the terminal exactly as it appears.
+      // The tail-trim and per-line trim already ran above; just join.
+      process.stdout.write(`${lines.join('\n')}\n`)
+      return EXIT_OK
+    }
+
     let widest = 0
     for (const line of lines) {
       if (line.length > widest) widest = line.length

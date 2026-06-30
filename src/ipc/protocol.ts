@@ -56,6 +56,23 @@ export const IPC_CAPABILITY_THIN_ATTACH = 'thinAttach'
 export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
 
 /**
+ * Capability gating the `tabAdded` server event. When advertised, the daemon
+ * fans a `tabAdded` event out to every socket attached to the session after
+ * a successful `createTab` — that's how a UI process learns about tabs
+ * created by a sibling CLI invocation. Pre-cap UIs simply never see the
+ * event and continue to discover tabs only via the next `attachResult`.
+ */
+export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
+
+/**
+ * Capability gating the optional `worktreeId` on `createTab` payloads. With
+ * it, the CLI can spawn a tab inside a specific worktree of the active
+ * session so the UI groups it correctly. Older daemons ignore the field
+ * (the parser accepts it but the TM has no knob for it pre-bump).
+ */
+export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
+
+/**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
  * via a MIN bump. See `src/ipc/README.md` for the discipline.
@@ -70,6 +87,8 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
+  IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
 ]
 
 export interface ProtocolHelloRequest {
@@ -156,6 +175,14 @@ export type ClientRequest =
         cols: number
         rows: number
         cwd?: string
+        /**
+         * v11 / capability `createTabWorktreeId`. Lets the CLI spawn a tab
+         * inside a specific worktree so the UI groups it correctly. The
+         * field is parsed unconditionally — older daemons accepted no such
+         * field, so this is a true additive on the wire — but the daemon
+         * only forwards it to the TM when its own capability is in play.
+         */
+        worktreeId?: string
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
@@ -212,6 +239,14 @@ export type ServerEvent =
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
   | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
+  // Capability-gated on `tabLifecycleEvents`. Broadcast after a successful
+  // `createTab` so every UI/CLI client attached to the same session learns
+  // about the new tab without having to re-attach. The tab's `viewport` is
+  // intentionally omitted — the very next `tabRender` event carries it.
+  | {
+      type: 'tabAdded'
+      payload: { sessionId: string; tab: TabSession }
+    }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
 
@@ -357,33 +392,37 @@ function isListTabsResult(value: unknown): value is ListTabsResult {
   )
 }
 
+function isTabSession(value: unknown): value is TabSession {
+  return (
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.assistant) &&
+    value.assistant.length > 0 &&
+    isString(value.title) &&
+    (value.status === 'starting' ||
+      value.status === 'running' ||
+      value.status === 'disconnected' ||
+      value.status === 'error') &&
+    (value.activity === undefined ||
+      value.activity === 'working' ||
+      value.activity === 'waiting-input' ||
+      value.activity === 'idle') &&
+    isString(value.buffer) &&
+    isTerminalModeState(value.terminalModes) &&
+    isString(value.command) &&
+    (value.viewport === undefined || isTerminalSnapshot(value.viewport)) &&
+    (value.errorMessage === undefined || isString(value.errorMessage)) &&
+    (value.exitCode === undefined || isFiniteNumber(value.exitCode)) &&
+    (value.worktreeId === undefined || isString(value.worktreeId))
+  )
+}
+
 function isAttachResult(value: unknown): value is AttachResult {
   return (
     isObjectRecord(value) &&
     isFiniteNumber(value.protocolVersion) &&
     Array.isArray(value.tabs) &&
-    value.tabs.every(
-      (tab) =>
-        isObjectRecord(tab) &&
-        isString(tab.id) &&
-        isString(tab.assistant) &&
-        tab.assistant.length > 0 &&
-        isString(tab.title) &&
-        (tab.status === 'starting' ||
-          tab.status === 'running' ||
-          tab.status === 'disconnected' ||
-          tab.status === 'error') &&
-        (tab.activity === undefined ||
-          tab.activity === 'working' ||
-          tab.activity === 'waiting-input' ||
-          tab.activity === 'idle') &&
-        isString(tab.buffer) &&
-        isTerminalModeState(tab.terminalModes) &&
-        isString(tab.command) &&
-        (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
-        (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
-        (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
-    ) &&
+    value.tabs.every(isTabSession) &&
     isNullableString(value.activeTabId) &&
     Array.isArray(value.initialSessionStatuses) &&
     value.initialSessionStatuses.every(
@@ -472,6 +511,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(
         value.payload.cwd === undefined || isString(value.payload.cwd),
         'createTab.cwd must be a string'
+      )
+      assert(
+        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
+        'createTab.worktreeId must be a string when present'
       )
       return value as ClientRequest
     case 'write':
@@ -568,6 +611,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.sessionId), 'tabStatus.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
       assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
+      return value as ServerEvent
+    case 'tabAdded':
+      assert(isString(value.payload.sessionId), 'tabAdded.sessionId must be a string')
+      assert(isTabSession(value.payload.tab), 'tabAdded.tab is invalid')
       return value as ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')

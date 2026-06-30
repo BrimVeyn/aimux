@@ -30,6 +30,11 @@ export const tabCreate: CliCommand = {
       kind: 'string',
       name: 'command',
     },
+    {
+      description: 'worktree id the tab belongs to (defaults to the workspace’s active worktree)',
+      kind: 'string',
+      name: 'worktree',
+    },
   ],
   group: 'tab',
   run: async (ctx) => {
@@ -59,6 +64,20 @@ export const tabCreate: CliCommand = {
       )
     }
 
+    // Resolve worktreeId: explicit flag wins, otherwise the workspace's
+    // currently-active worktree, otherwise undefined (= no grouping).
+    const worktreeFlag =
+      typeof ctx.args.flags.worktree === 'string' ? ctx.args.flags.worktree : undefined
+    let worktreeId: string | undefined = worktreeFlag ?? workspace.activeWorktreeId
+    if (worktreeFlag !== undefined) {
+      const known = workspace.worktrees?.some((w) => w.id === worktreeFlag) ?? false
+      if (!known) {
+        const ids = workspace.worktrees?.map((w) => w.id).join(', ') ?? '(none)'
+        throw new Error(`unknown worktree id: ${worktreeFlag} (known: ${ids})`)
+      }
+      worktreeId = worktreeFlag
+    }
+
     // Thin-attach so we don't clobber the UI's dimensions on the same session.
     await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
 
@@ -79,9 +98,10 @@ export const tabCreate: CliCommand = {
       rows: useFallback ? 0 : FALLBACK_ROWS,
       tabId,
       title,
+      worktreeId,
     })
 
-    writeJson({ assistant: assistantId, command, tabId, title })
+    writeJson({ assistant: assistantId, command, tabId, title, worktreeId })
     return EXIT_OK
   },
   summary: 'Create a new tab in the active workspace',

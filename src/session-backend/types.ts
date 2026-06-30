@@ -15,6 +15,13 @@ export interface SessionBackendEvents {
   error: [tabId: string, message: string]
   sessionActivity: [sessionId: string, status: SessionStatus]
   tabActivity: [tabId: string, activity: TabActivity]
+  /**
+   * Fired when a tab was added by a sibling client (e.g. the CLI control
+   * plane creating a tab in the same session). The UI subscribes and
+   * dispatches `add-tab` so its store learns about the new tab before any
+   * `tabRender` event lands.
+   */
+  tabAdded: [sessionId: string, tab: TabSession]
 }
 
 export interface ResizeOptions {
@@ -58,6 +65,10 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
     cols: number
     rows: number
     cwd?: string
+    /** Worktree the tab belongs to. Passed through to the daemon so its
+     *  registry surfaces the right grouping in `listTabs` for headless
+     *  consumers (CLI control plane). */
+    worktreeId?: string
   }): void
   write(tabId: string, input: string): void
   scrollViewport(tabId: string, deltaLines: number): void
