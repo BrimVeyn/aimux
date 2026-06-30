@@ -33,6 +33,7 @@ export type ModeId =
   | 'modal.worktree-move'
   | 'modal.worktree-move-confirm'
   | 'modal.ai-usage'
+  | 'modal.flash-jump'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -422,6 +423,29 @@ export interface ModalWorktreeDeleteConfirm extends ModalBase {
   force: boolean
 }
 
+export type FlashJumpTargetKind = 'workspace' | 'worktree' | 'tab'
+
+export interface FlashJumpTarget {
+  kind: FlashJumpTargetKind
+  sessionIndex: number
+  sessionId: string
+  worktreeId?: string
+  tabId?: string
+}
+
+export interface FlashLabel {
+  key: string
+  label: string
+  target: FlashJumpTarget
+}
+
+export interface ModalFlashJump extends ModalBase {
+  type: 'flash-jump'
+  labels: FlashLabel[]
+  buffer: string
+  pendingJump: FlashJumpTarget | null
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -441,6 +465,7 @@ export type ModalState =
   | ModalWorktreeMove
   | ModalWorktreeMoveConfirm
   | ModalWorktreeDeleteConfirm
+  | ModalFlashJump
 
 export interface LayoutState {
   terminalCols: number
@@ -581,6 +606,8 @@ export type ModalAction =
       closeTabs: boolean
       force: boolean
     }
+  | { type: 'open-flash-jump-modal' }
+  | { type: 'clear-flash-jump-pending' }
 
 export type SessionAction =
   | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }

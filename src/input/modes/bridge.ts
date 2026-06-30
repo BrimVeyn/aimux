@@ -45,6 +45,12 @@ export function deriveModeId(state: AppState): ModeId {
     return 'modal.worktree-move'
   }
 
+  // Flash-jump overlay: same pattern — renders on top of navigation, all
+  // letter keys are passthrough'd to update-command-edit for buffer matching.
+  if (state.modal.type === 'flash-jump') {
+    return 'modal.flash-jump'
+  }
+
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]
   if (directMode) {
     return directMode

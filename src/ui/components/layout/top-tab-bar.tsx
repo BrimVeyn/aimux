@@ -15,6 +15,7 @@ import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
 import { moveIdToIdPosition } from '../../session-ordering'
 import { useTheme } from '../../theme'
+import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { TabItem } from './sidebar/tab-item'
 import { useTopTabBarAutoScroll } from './sidebar/use-top-tab-bar-auto-scroll'
@@ -161,6 +162,7 @@ function GroupTabItem({
                 {' | '}
               </text>
             ) : null}
+            <FlashLabelBadge rowKey={`tab:${tab.id}`} />
             <text fg={isLeafActive ? t.text : t.textMuted} selectable={false} wrapMode="none">
               {tab.title}
             </text>

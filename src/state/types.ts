@@ -50,6 +50,7 @@ export type ModalType =
   | 'worktree-move'
   | 'worktree-move-confirm'
   | 'worktree-delete-confirm'
+  | 'flash-jump'
   | null
 
 export interface TerminalSpan {
@@ -483,6 +484,42 @@ export interface DirectoryResult {
   type: DirectoryResultType
 }
 
+export type FlashJumpTargetKind = 'workspace' | 'worktree' | 'tab'
+
+export interface FlashJumpTarget {
+  kind: FlashJumpTargetKind
+  /**
+   * 1-based index of the workspace in the visible session ordering — fed to
+   * the existing `switch-session-by-index` side effect when jumping.
+   */
+  sessionIndex: number
+  sessionId: string
+  /** Set for kind 'worktree' (the non-primary target) and kind 'tab' (the tab's worktree). */
+  worktreeId?: string
+  /** Set for kind 'tab'. */
+  tabId?: string
+}
+
+export interface FlashLabel {
+  /** Stable identity of the labelled row (`ws:<id>`, `wt:<id>`, `tab:<id>`). */
+  key: string
+  /** 1- or 2-char lowercase ASCII label. */
+  label: string
+  target: FlashJumpTarget
+}
+
+export interface ModalFlashJump extends ModalBase {
+  type: 'flash-jump'
+  labels: FlashLabel[]
+  /** Letters typed so far, narrowing the matching label set. */
+  buffer: string
+  /**
+   * Set by the reducer once the buffer narrows to a single match — read by
+   * app.tsx in a useEffect to perform the actual jump and close the modal.
+   */
+  pendingJump: FlashJumpTarget | null
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -502,6 +539,7 @@ export type ModalState =
   | ModalWorktreeMove
   | ModalWorktreeMoveConfirm
   | ModalWorktreeDeleteConfirm
+  | ModalFlashJump
 
 export interface LayoutState {
   terminalCols: number
@@ -642,6 +680,8 @@ export type ModalAction =
       closeTabs: boolean
       force: boolean
     }
+  | { type: 'open-flash-jump-modal' }
+  | { type: 'clear-flash-jump-pending' }
 
 // -- Session actions --
 export type SessionAction =

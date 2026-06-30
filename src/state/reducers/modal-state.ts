@@ -6,6 +6,7 @@ import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
+import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
 import {
   type BaseRefOption,
   buildBaseRefOptions,
@@ -361,6 +362,30 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-flash-jump-modal': {
+      const labels = buildFlashJumpLabels(state)
+      // Even when there are zero jump targets we still open the overlay (the
+      // user pressed `S` expecting it); the next keystroke that matches
+      // nothing closes it via the empty-match path in update-command-edit.
+      return {
+        ...state,
+        modal: {
+          buffer: '',
+          cursorPos: 0,
+          editBuffer: '',
+          labels,
+          pendingJump: null,
+          selectedIndex: 0,
+          sessionTargetId: null,
+          type: 'flash-jump',
+        },
+      }
+    }
+    case 'clear-flash-jump-pending': {
+      if (state.modal.type !== 'flash-jump') return state
+      if (state.modal.pendingJump === null) return state
+      return { ...state, modal: { ...state.modal, pendingJump: null } }
+    }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
@@ -662,7 +687,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const closingType = state.modal.type
       // Pure overlays never flipped focusMode (they render on top of git mode),
       // so leave it alone — closing returns to whatever was underneath.
-      if (closingType === 'help' || closingType === 'worktree-move') {
+      if (
+        closingType === 'help' ||
+        closingType === 'worktree-move' ||
+        closingType === 'flash-jump'
+      ) {
         return { ...state, modal: emptyModal() }
       }
       const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
@@ -859,6 +888,42 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return { ...state, modal: { ...state.modal, cursorPos: next } }
     }
     case 'update-command-edit': {
+      // Flash-jump: each letter narrows the matching label set. Closing the
+      // modal on no-match mirrors the flash.nvim "miss = cancel" UX, and a
+      // unique match exposes a pendingJump for app.tsx to execute.
+      if (state.modal.type === 'flash-jump') {
+        const buffer = state.modal.buffer
+        if (action.char === '\b') {
+          if (buffer.length === 0) return state
+          return {
+            ...state,
+            modal: { ...state.modal, buffer: buffer.slice(0, -1), pendingJump: null },
+          }
+        }
+        // Restrict to single lowercase ASCII letters — anything else (digits,
+        // shift+letter, control sequences) closes the overlay rather than
+        // poisoning the buffer.
+        const ch = action.char.toLowerCase()
+        if (ch.length !== 1 || ch < 'a' || ch > 'z') {
+          return { ...state, focusMode: 'navigation', modal: emptyModal() }
+        }
+        const nextBuffer = buffer + ch
+        const matches = state.modal.labels.filter((l) => l.label.startsWith(nextBuffer))
+        if (matches.length === 0) {
+          return { ...state, focusMode: 'navigation', modal: emptyModal() }
+        }
+        const onlyMatch = matches[0]
+        if (matches.length === 1 && onlyMatch && onlyMatch.label === nextBuffer) {
+          // Single full match: keep the modal open one tick with pendingJump
+          // set — app.tsx consumes it, performs the jump, then clears the
+          // modal. Storing it on the modal keeps a single source of truth.
+          return {
+            ...state,
+            modal: { ...state.modal, buffer: nextBuffer, pendingJump: onlyMatch.target },
+          }
+        }
+        return { ...state, modal: { ...state.modal, buffer: nextBuffer, pendingJump: null } }
+      }
       if (state.modal.editBuffer === null) {
         return state
       }
