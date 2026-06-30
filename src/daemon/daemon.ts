@@ -1,7 +1,7 @@
 import { existsSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
-import type { AssistantId, TerminalSnapshot } from '../state/types'
+import type { AssistantId, TabStatus, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
@@ -17,6 +17,7 @@ import {
   parseClientRequest,
   type ServerEvent,
   type ServerResponse,
+  type TabSessionSummary,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
@@ -49,6 +50,15 @@ export interface DaemonTabEntry {
    * `attachSession` call was still in flight.
    */
   viewportSeq: number
+  /**
+   * Slim TabSession metadata cached so the `listTabs` request type can answer
+   * without round-tripping the TM. Populated on attach (full data from
+   * `attachResult.tabs`) and on createTab (title taken from the request,
+   * status defaulted to 'starting' until a render or status update lands).
+   */
+  title?: string
+  status?: TabStatus
+  worktreeId?: string
 }
 
 /**
@@ -69,7 +79,8 @@ export function mergeTabRegistryEntry(
   assistant: AssistantId,
   command: string,
   initialViewport: TerminalSnapshot | undefined,
-  allocateSeq: () => number
+  allocateSeq: () => number,
+  metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
 ): DaemonTabEntry {
   const existing = registry.get(tabId)
   const viewport = existing?.viewport ?? initialViewport
@@ -77,8 +88,11 @@ export function mergeTabRegistryEntry(
     assistant,
     command,
     sessionId,
+    status: metadata?.status ?? existing?.status,
+    title: metadata?.title ?? existing?.title,
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
+    worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
   }
   registry.set(tabId, entry)
   return entry
@@ -188,6 +202,14 @@ export async function runDaemon(): Promise<void> {
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
   const tabRegistry = new Map<string, DaemonTabEntry>()
+  // Active tab id per session, populated from attachResult and updated by
+  // setActiveTab. Surfaced by `listTabs` so a headless CLI doesn't need to
+  // attach just to know which tab the UI is focused on.
+  const sessionActiveTabIds = new Map<string, string | null>()
+  // Last (cols, rows) the session was attached with. `createTab` with
+  // cols/rows = 0 falls back to this when the `createTabSizeFallback`
+  // capability is in play.
+  const sessionDimensions = new Map<string, { cols: number; rows: number }>()
   let nextViewportSeq = 1
 
   const allocateSeq = (): number => nextViewportSeq++
@@ -196,7 +218,8 @@ export async function runDaemon(): Promise<void> {
     tabId: string,
     assistant: AssistantId,
     command: string,
-    initialViewport?: TerminalSnapshot
+    initialViewport?: TerminalSnapshot,
+    metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
   ): void => {
     const before = tabRegistry.get(tabId)
     const entry = mergeTabRegistryEntry(
@@ -206,7 +229,8 @@ export async function runDaemon(): Promise<void> {
       assistant,
       command,
       initialViewport,
-      allocateSeq
+      allocateSeq,
+      metadata
     )
     logDebug('daemon.rememberTab', {
       hadExistingEntry: before !== undefined,
@@ -257,6 +281,9 @@ export async function runDaemon(): Promise<void> {
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
     tabRegistry.delete(tabId)
+    if (sessionActiveTabIds.get(sessionId) === tabId) {
+      sessionActiveTabIds.set(sessionId, null)
+    }
     const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
     broadcastForSession(sessionId, event)
   })
@@ -425,6 +452,7 @@ export async function runDaemon(): Promise<void> {
                     rows: message.payload.rows,
                     sessionId: message.payload.sessionId,
                     snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                    thin: message.payload.thin === true,
                   })
                   const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
                   if (message.payload.protocolVersion !== negotiatedVersion) {
@@ -434,19 +462,48 @@ export async function runDaemon(): Promise<void> {
                   }
 
                   attachedSessions.set(socket, message.payload.sessionId)
+                  // thin: skip the implicit `manager.resize` inside
+                  // attachSession by telling the TM that this attach owns no
+                  // dimensions. The TM still resizes (because the entry-point
+                  // calls resize unconditionally inside `attachSession`), so
+                  // we re-attach with a special path: attach normally then,
+                  // for thin attachers, restore the previously-recorded
+                  // dimensions if a real attacher established them.
                   const attachResult = await manager.attachSession({
                     cols: message.payload.cols,
                     rows: message.payload.rows,
                     sessionId: message.payload.sessionId,
                     workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
+                  if (message.payload.thin === true) {
+                    const prior = sessionDimensions.get(message.payload.sessionId)
+                    if (
+                      prior &&
+                      (prior.cols !== message.payload.cols || prior.rows !== message.payload.rows)
+                    ) {
+                      try {
+                        await manager.resize(message.payload.sessionId, prior.cols, prior.rows)
+                      } catch (error) {
+                        logDebug('daemon.attach.thin.resizeRestoreFailed', {
+                          error: error instanceof Error ? error.message : String(error),
+                        })
+                      }
+                    }
+                  } else {
+                    sessionDimensions.set(message.payload.sessionId, {
+                      cols: message.payload.cols,
+                      rows: message.payload.rows,
+                    })
+                  }
+                  sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
                     rememberTab(
                       message.payload.sessionId,
                       tab.id,
                       tab.assistant,
                       tab.command,
-                      tab.viewport
+                      tab.viewport,
+                      { status: tab.status, title: tab.title, worktreeId: tab.worktreeId }
                     )
                   }
                   // Classify synchronously BEFORE sending attachResult so
@@ -496,9 +553,31 @@ export async function runDaemon(): Promise<void> {
                 case 'createTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  // Capability `createTabSizeFallback`: cols/rows = 0 means
+                  // "use the session's last attached dimensions". Headless
+                  // CLIs don't have a viewport of their own, so this lets
+                  // them spawn a PTY that lines up with the UI on the same
+                  // session. If we have no remembered size yet, the TM
+                  // would receive 0 and spawn a zero-sized PTY — surface a
+                  // clear error instead.
+                  let cols = message.payload.cols
+                  let rows = message.payload.rows
+                  if (cols === 0 || rows === 0) {
+                    const prior = sessionDimensions.get(sessionId)
+                    if (!prior) {
+                      throw new Error(
+                        'createTab requested size fallback (cols=0 or rows=0) but no UI has attached to this session yet'
+                      )
+                    }
+                    if (cols === 0) cols = prior.cols
+                    if (rows === 0) rows = prior.rows
+                  }
                   logDebug('daemon.request.createTab.start', {
+                    cols,
                     command: message.payload.command,
+                    rows,
                     sessionId,
+                    sizeFallback: message.payload.cols === 0 || message.payload.rows === 0,
                     tabId: message.payload.tabId,
                     title: message.payload.title,
                   })
@@ -506,7 +585,9 @@ export async function runDaemon(): Promise<void> {
                     sessionId,
                     message.payload.tabId,
                     message.payload.assistant,
-                    [message.payload.command, ...(message.payload.args ?? [])].join(' ')
+                    [message.payload.command, ...(message.payload.args ?? [])].join(' '),
+                    undefined,
+                    { status: 'starting', title: message.payload.title }
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
                   // call back into our status loop. Safe to add for every
@@ -516,7 +597,7 @@ export async function runDaemon(): Promise<void> {
                   // even on PTYs that outlive this daemon process.
                   const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
-                  await manager.createTab({ ...message.payload, env, sessionId })
+                  await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
                   sendOk(socket, message.id)
                   logDebug('daemon.request.createTab.success', {
                     sessionId,
@@ -534,6 +615,10 @@ export async function runDaemon(): Promise<void> {
                 case 'resizeClient': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  sessionDimensions.set(sessionId, {
+                    cols: message.payload.cols,
+                    rows: message.payload.rows,
+                  })
                   await manager.resize(sessionId, message.payload.cols, message.payload.rows)
                   sendOk(socket, message.id)
                   break
@@ -567,6 +652,7 @@ export async function runDaemon(): Promise<void> {
                 case 'setActiveTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
                   await manager.setActiveTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
@@ -575,8 +661,38 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   tabRegistry.delete(message.payload.tabId)
+                  if (sessionActiveTabIds.get(sessionId) === message.payload.tabId) {
+                    sessionActiveTabIds.set(sessionId, null)
+                  }
                   await manager.closeTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
+                  break
+                }
+                case 'listTabs': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const sessionId = message.payload.sessionId
+                  const tabs: TabSessionSummary[] = []
+                  for (const [tabId, entry] of tabRegistry) {
+                    if (entry.sessionId !== sessionId) continue
+                    tabs.push({
+                      activity: statusLoop.getTabStatus(tabId) ?? undefined,
+                      assistant: entry.assistant,
+                      command: entry.command,
+                      id: tabId,
+                      status: entry.status ?? 'running',
+                      title: entry.title ?? '',
+                      worktreeId: entry.worktreeId,
+                    })
+                  }
+                  send(socket, {
+                    id: message.id,
+                    payload: {
+                      activeTabId: sessionActiveTabIds.get(sessionId) ?? null,
+                      tabs,
+                    },
+                    type: 'listTabsResult',
+                  })
+                  logDebug('daemon.request.listTabs', { sessionId, tabs: tabs.length })
                   break
                 }
                 case 'disposeAll': {
@@ -586,6 +702,8 @@ export async function runDaemon(): Promise<void> {
                     for (const [tabId, entry] of tabRegistry) {
                       if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
                     }
+                    sessionActiveTabIds.delete(sessionId)
+                    sessionDimensions.delete(sessionId)
                     await manager.disposeSession(sessionId)
                   }
                   sendOk(socket, message.id)

@@ -1,7 +1,9 @@
 import type {
+  AssistantId,
   SessionStatus,
   TabActivity,
   TabSession,
+  TabStatus,
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
@@ -14,8 +16,15 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 // `reapplyScrollIntent` message — the frontend no longer derives or sends it.
 // (v8 was the unfilled-viewport status-detector change; this is a further
 // breaking wire change, so the version steps again.)
+//
+// v11: additive — exposes `listTabs` (read-only enumeration without `attach`),
+// `attach.thin` (skip server-side resize so a headless CLI can attach
+// alongside a UI without resizing PTYs), and `createTab` cols/rows=0 fallback
+// to the session's last attached size. All three are gated behind
+// capabilities; MIN stays at 10 so a v10 UI keeps talking to a v11 daemon
+// (and vice-versa).
 export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 10
+export const IPC_PROTOCOL_VERSION = 11
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -24,6 +33,27 @@ export const IPC_PROTOCOL_VERSION = 10
  * this — older daemons would respond with an unknown-request error.
  */
 export const IPC_CAPABILITY_HOT_REEXEC = 'hotReexec'
+
+/**
+ * Capability gating the `listTabs` request. CLI clients check for it before
+ * issuing the request; pre-v11 daemons would respond with `unknown request`.
+ */
+export const IPC_CAPABILITY_LIST_TABS = 'listTabs'
+
+/**
+ * Capability gating the `attach.thin` flag. When advertised, the daemon will
+ * skip the implicit `manager.resize` on attach so a headless CLI can attach
+ * to read state without clobbering the UI's dimensions on shared PTYs.
+ */
+export const IPC_CAPABILITY_THIN_ATTACH = 'thinAttach'
+
+/**
+ * Capability gating `createTab` with `cols: 0` or `rows: 0` meaning "use the
+ * session's last attached size". Older daemons would propagate 0 straight to
+ * the TM and spawn a zero-sized PTY, so the client only sends zeroes when
+ * this capability is advertised.
+ */
+export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
 
 /**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
@@ -35,7 +65,12 @@ export const IPC_CAPABILITY_HOT_REEXEC = 'hotReexec'
  * normalises a missing field to `[]`, so consumers can safely call
  * `.includes(...)` on it.
  */
-export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [IPC_CAPABILITY_HOT_REEXEC]
+export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
+  IPC_CAPABILITY_HOT_REEXEC,
+  IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_THIN_ATTACH,
+  IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
+]
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -60,6 +95,37 @@ export interface AttachRequest {
   cols: number
   rows: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+  /**
+   * v11 / capability `thinAttach`. When true, the daemon does not call
+   * `manager.resize` on the session — the headless attacher (CLI) does not
+   * own a viewport, so it must not clobber the dimensions a UI process is
+   * driving for the same session.
+   *
+   * Pre-v11 daemons ignore the field; the gate exists so the client knows
+   * to fall through to a full attach (with a sentinel size) when the daemon
+   * predates the flag.
+   */
+  thin?: boolean
+}
+
+/**
+ * Slim per-tab summary returned by `listTabs`. Subset of {@link TabSession}
+ * with the buffer/viewport/terminalModes intentionally omitted so the request
+ * stays cheap even on sessions with many tabs.
+ */
+export interface TabSessionSummary {
+  id: string
+  assistant: AssistantId
+  title: string
+  status: TabStatus
+  activity?: TabActivity
+  command: string
+  worktreeId?: string
+}
+
+export interface ListTabsResult {
+  tabs: TabSessionSummary[]
+  activeTabId: string | null
 }
 
 export interface AttachResult {
@@ -114,11 +180,16 @@ export type ClientRequest =
   // spawned successor binary can bind the canonical socket path while the
   // terminal-manager (and every PTY) keeps running.
   | { id: string; type: 'prepareReexec'; payload: { reason?: string } }
+  // Capability-gated on `listTabs`. Read-only enumeration of a session's
+  // tabs — does NOT attach. Lets a headless CLI inspect a session without
+  // implicit `manager.resize` or `setBroadcastEnabled` side effects.
+  | { id: string; type: 'listTabs'; payload: { sessionId: string } }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
   | { id: string; type: 'attachResult'; payload: AttachResult }
+  | { id: string; type: 'listTabsResult'; payload: ListTabsResult }
   | { id: string; type: 'error'; payload: { message: string } }
   | {
       id: string
@@ -257,6 +328,35 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
   )
 }
 
+function isTabSessionSummary(value: unknown): value is TabSessionSummary {
+  return (
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.assistant) &&
+    value.assistant.length > 0 &&
+    isString(value.title) &&
+    (value.status === 'starting' ||
+      value.status === 'running' ||
+      value.status === 'disconnected' ||
+      value.status === 'error') &&
+    (value.activity === undefined ||
+      value.activity === 'working' ||
+      value.activity === 'waiting-input' ||
+      value.activity === 'idle') &&
+    isString(value.command) &&
+    (value.worktreeId === undefined || isString(value.worktreeId))
+  )
+}
+
+function isListTabsResult(value: unknown): value is ListTabsResult {
+  return (
+    isObjectRecord(value) &&
+    Array.isArray(value.tabs) &&
+    value.tabs.every(isTabSessionSummary) &&
+    isNullableString(value.activeTabId)
+  )
+}
+
 function isAttachResult(value: unknown): value is AttachResult {
   return (
     isObjectRecord(value) &&
@@ -347,6 +447,13 @@ export function parseClientRequest(value: unknown): ClientRequest {
           isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
         'attach.workspaceSnapshot must be a valid workspace snapshot'
       )
+      assert(
+        value.payload.thin === undefined || typeof value.payload.thin === 'boolean',
+        'attach.thin must be a boolean when present'
+      )
+      return value as ClientRequest
+    case 'listTabs':
+      assert(isString(value.payload.sessionId), 'listTabs.sessionId must be a string')
       return value as ClientRequest
     case 'createTab':
       assert(isString(value.payload.tabId), 'createTab.tabId must be a string')
@@ -427,6 +534,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'attachResult':
       assert(isString(value.id), 'attachResult.id must be a string')
       assert(isAttachResult(value.payload), 'attachResult.payload is invalid')
+      return value as ServerResponse
+    case 'listTabsResult':
+      assert(isString(value.id), 'listTabsResult.id must be a string')
+      assert(isListTabsResult(value.payload), 'listTabsResult.payload is invalid')
       return value as ServerResponse
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
