@@ -74,6 +74,7 @@ describe('RemoteSessionBackend', () => {
               response = {
                 id: message.id,
                 payload: {
+                  capabilities: [],
                   maxVersion: IPC_PROTOCOL_VERSION,
                   minVersion: IPC_PROTOCOL_VERSION,
                   processVersion: 'test-daemon',
@@ -191,6 +192,7 @@ describe('RemoteSessionBackend', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',
@@ -278,6 +280,7 @@ describe('RemoteSessionBackend', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',

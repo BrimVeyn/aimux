@@ -7,7 +7,7 @@ import { getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
-  MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
+  MANAGER_CAPABILITY_SET_BROADCAST_ENABLED,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
   type ManagerAttachResult,
@@ -43,6 +43,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
   >()
   private readonly decoder = new MessageDecoder<ManagerResponse | ManagerEvent>(parseManagerMessage)
   private selectedProtocolVersion: number | null = null
+  private serverCapabilities: ReadonlySet<string> = new Set()
 
   private rejectPendingRequests(error: Error): void {
     for (const [id, pending] of this.pending.entries()) {
@@ -57,6 +58,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     const socket = this.socket
     this.socket = null
     this.selectedProtocolVersion = null
+    this.serverCapabilities = new Set()
     this.decoder.reset()
     this.rejectPendingRequests(new Error(reason))
 
@@ -175,7 +177,9 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     }
 
     this.selectedProtocolVersion = response.payload.selectedVersion
+    this.serverCapabilities = new Set(response.payload.capabilities)
     logDebug('managerClient.handshake.success', {
+      capabilities: response.payload.capabilities,
       processVersion: response.payload.processVersion,
       selectedVersion: this.selectedProtocolVersion,
     })
@@ -359,17 +363,15 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
 
   /**
    * Tell the TM whether to bother snapshotting and broadcasting renders.
-   * No-ops on TMs that negotiated a protocol version without the feature
-   * (older builds): the worst case is the daemon keeps receiving renders it
-   * doesn't strictly need, which matches the pre-fix behaviour.
+   * Gated on the TM advertising `setBroadcastEnabled` in its hello
+   * capabilities; older TMs that don't keep broadcasting unconditionally,
+   * which matches the pre-capability behaviour.
    */
   async setBroadcastEnabled(enabled: boolean): Promise<void> {
-    if (
-      this.selectedProtocolVersion === null ||
-      this.selectedProtocolVersion < MANAGER_PROTOCOL_BROADCAST_GATE_VERSION
-    ) {
+    if (!this.serverCapabilities.has(MANAGER_CAPABILITY_SET_BROADCAST_ENABLED)) {
       logDebug('managerClient.setBroadcastEnabled.skipped', {
         enabled,
+        reason: 'capability-not-advertised',
         selectedVersion: this.selectedProtocolVersion,
       })
       return

@@ -86,6 +86,7 @@ describe('ipc protocol framing', () => {
       parseServerMessage({
         id: '6',
         payload: {
+          capabilities: ['thinAttach'],
           maxVersion: IPC_PROTOCOL_VERSION,
           minVersion: 2,
           processVersion: '1.2.3',
@@ -93,7 +94,31 @@ describe('ipc protocol framing', () => {
         },
         type: 'helloResult',
       })
-    ).toMatchObject({ type: 'helloResult' })
+    ).toMatchObject({
+      payload: { capabilities: ['thinAttach'] },
+      type: 'helloResult',
+    })
+  })
+
+  test('normalises legacy hello responses without capabilities to an empty list', () => {
+    // Wire-back-compat: a pre-capability daemon sends `helloResult` with no
+    // `capabilities` field. The parser must accept it and surface
+    // `capabilities: []` so consumers can call `.includes(...)` without a
+    // null guard.
+    const parsed = parseServerMessage({
+      id: '7',
+      payload: {
+        maxVersion: IPC_PROTOCOL_VERSION,
+        minVersion: 2,
+        processVersion: '1.2.3',
+        selectedVersion: IPC_PROTOCOL_VERSION,
+      },
+      type: 'helloResult',
+    })
+    expect(parsed).toMatchObject({
+      payload: { capabilities: [] },
+      type: 'helloResult',
+    })
   })
 
   test('rejects malformed server event payloads', () => {

@@ -46,6 +46,7 @@ describe('session backend bootstrap handshake', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',
@@ -116,6 +117,7 @@ describe('session backend bootstrap handshake', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'old-daemon',

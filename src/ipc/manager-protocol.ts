@@ -34,12 +34,27 @@ import {
 // is raised in lockstep to force matching binaries.
 export const MANAGER_PROTOCOL_MIN_VERSION = 8
 export const MANAGER_PROTOCOL_VERSION = 8
+
 /**
- * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
- * not understand the message; the daemon must check the negotiated version
- * before sending and fall back to always-on broadcast.
+ * Capability strings advertised by *this* process in its `helloResult`. New
+ * additive TM features should be introduced here rather than via a MIN bump
+ * — bumping MIN forces a fresh TM and kills every PTY. See
+ * `src/ipc/README.md`.
  */
-export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
+export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = ['setBroadcastEnabled']
+
+/**
+ * Capability name a daemon must observe on the TM's helloResult before
+ * sending `setBroadcastEnabled`. Older TMs that don't advertise it silently
+ * always broadcast — same fallback as before, just gated on a capability
+ * string instead of a version number.
+ *
+ * Historical note: this used to be a version gate
+ * (`MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4`). The capability mechanism
+ * supersedes that; the version constant was removed in the additive-contract
+ * migration.
+ */
+export const MANAGER_CAPABILITY_SET_BROADCAST_ENABLED = 'setBroadcastEnabled'
 
 export interface ManagerHelloRequest {
   minVersion: number
@@ -51,6 +66,11 @@ export interface ManagerHelloResult {
   maxVersion: number
   processVersion: string
   selectedVersion: number
+  /**
+   * Feature flags. Always present on the typed shape; older peers that did
+   * not yet advertise capabilities are normalised to `[]` at parse time.
+   */
+  capabilities: string[]
 }
 
 export interface ManagerAttachRequest {
@@ -240,13 +260,22 @@ function isHelloResult(value: unknown): value is ManagerHelloResult {
     isFiniteNumber(value.minVersion) &&
     isFiniteNumber(value.maxVersion) &&
     isFiniteNumber(value.selectedVersion) &&
-    isString(value.processVersion)
+    isString(value.processVersion) &&
+    // Wire-back-compat: legacy peers omit capabilities entirely. The parser
+    // normalises that to `[]` before returning the typed shape.
+    (value.capabilities === undefined || isStringArray(value.capabilities))
   )
 }
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new IpcProtocolError(message)
+  }
+}
+
+function normaliseManagerCapabilities(payload: Record<string, unknown>): void {
+  if (!Array.isArray(payload.capabilities)) {
+    payload.capabilities = []
   }
 }
 
@@ -261,6 +290,7 @@ export function selectManagerProtocolVersion(payload: ManagerHelloRequest): numb
 
 export function createManagerHelloResult(selectedVersion: number): ManagerHelloResult {
   return {
+    capabilities: [...MANAGER_PROTOCOL_CAPABILITIES],
     maxVersion: MANAGER_PROTOCOL_VERSION,
     minVersion: MANAGER_PROTOCOL_MIN_VERSION,
     processVersion: getProcessVersion(),
@@ -375,6 +405,8 @@ export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEv
     case 'helloResult':
       assert(isString(value.id), 'helloResult.id must be a string')
       assert(isHelloResult(value.payload), 'helloResult.payload is invalid')
+      // Normalise wire-back-compat: pre-capability TMs omit the field.
+      normaliseManagerCapabilities(value.payload)
       return value as ManagerResponse
     case 'ok':
       assert(isString(value.id), 'ok.id must be a string')

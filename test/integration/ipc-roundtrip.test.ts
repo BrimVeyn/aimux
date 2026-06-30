@@ -33,6 +33,7 @@ function startMockDaemon() {
           const response: ServerResponse = {
             id: message.id,
             payload: {
+              capabilities: [],
               maxVersion: IPC_PROTOCOL_VERSION,
               minVersion: IPC_PROTOCOL_VERSION,
               processVersion: 'test-daemon',

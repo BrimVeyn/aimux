@@ -17,6 +17,18 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 export const IPC_PROTOCOL_MIN_VERSION = 10
 export const IPC_PROTOCOL_VERSION = 10
 
+/**
+ * Capabilities advertised by *this* process in its `helloResult`. Additive
+ * features should be introduced as new capability strings here rather than
+ * via a MIN bump. See `src/ipc/README.md` for the discipline.
+ *
+ * Capabilities are namespaced informally per-protocol (camelCase in this
+ * file). Legacy peers that predate the field omit it entirely; the parser
+ * normalises a missing field to `[]`, so consumers can safely call
+ * `.includes(...)` on it.
+ */
+export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = []
+
 export interface ProtocolHelloRequest {
   minVersion: number
   maxVersion: number
@@ -27,6 +39,11 @@ export interface ProtocolHelloResult {
   maxVersion: number
   processVersion: string
   selectedVersion: number
+  /**
+   * Feature flags. Always present on the typed shape; older peers that did
+   * not yet advertise capabilities are normalised to `[]` at parse time.
+   */
+  capabilities: string[]
 }
 
 export interface AttachRequest {
@@ -208,7 +225,11 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
     isFiniteNumber(value.minVersion) &&
     isFiniteNumber(value.maxVersion) &&
     isFiniteNumber(value.selectedVersion) &&
-    isString(value.processVersion)
+    isString(value.processVersion) &&
+    // Wire-back-compat: peers that predate the capabilities field omit it
+    // entirely. parseServerMessage normalises that to `[]` before the cast
+    // so the typed shape stays non-optional.
+    (value.capabilities === undefined || isStringArray(value.capabilities))
   )
 }
 
@@ -250,6 +271,12 @@ function isAttachResult(value: unknown): value is AttachResult {
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new IpcProtocolError(message)
+  }
+}
+
+function normaliseCapabilities(payload: Record<string, unknown>): void {
+  if (!Array.isArray(payload.capabilities)) {
+    payload.capabilities = []
   }
 }
 
@@ -359,6 +386,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'helloResult':
       assert(isString(value.id), 'helloResult.id must be a string')
       assert(isProtocolHelloResult(value.payload), 'helloResult.payload is invalid')
+      // Normalise wire-back-compat: older daemons omit `capabilities`. Force
+      // the field to `[]` so the typed shape ProtocolHelloResult.capabilities
+      // is always a real array — callers can `.includes(...)` without a guard.
+      normaliseCapabilities(value.payload)
       return value as ServerResponse
     case 'ok':
       assert(isString(value.id), 'ok.id must be a string')

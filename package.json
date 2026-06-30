@@ -54,6 +54,7 @@
     "restart-daemon": "AIMUX_PROFILE=dev bun run src/index.tsx restart-daemon",
     "restart-terminal-manager": "AIMUX_PROFILE=dev bun run src/index.tsx restart-terminal-manager",
     "lint": "oxlint --type-aware .",
+    "lint:protocol": "bun run scripts/check-protocol-discipline.ts",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip-bun",

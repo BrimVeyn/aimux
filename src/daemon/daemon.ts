@@ -9,6 +9,7 @@ import {
   type ClientRequest,
   encodeMessage,
   getProcessVersion,
+  IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -392,6 +393,7 @@ export async function runDaemon(): Promise<void> {
                   send(socket, {
                     id: message.id,
                     payload: {
+                      capabilities: [...IPC_PROTOCOL_CAPABILITIES],
                       maxVersion: IPC_PROTOCOL_VERSION,
                       minVersion: IPC_PROTOCOL_MIN_VERSION,
                       processVersion: getProcessVersion(),
