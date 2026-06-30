@@ -20,6 +20,7 @@ export type ModeId =
   | 'modal.session-name'
   | 'modal.create-session'
   | 'modal.rename-tab'
+  | 'modal.rename-worktree'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -325,6 +326,10 @@ export interface ModalSessionName extends ModalBase {
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
 }
+export interface ModalRenameWorktree extends ModalBase {
+  type: 'rename-worktree'
+  worktreeSessionId: string
+}
 export interface ModalSnippetPicker extends ModalBase {
   type: 'snippet-picker'
   actionMessage?: string | null
@@ -423,6 +428,7 @@ export type ModalState =
   | ModalSessionPicker
   | ModalSessionName
   | ModalRenameTab
+  | ModalRenameWorktree
   | ModalSnippetPicker
   | ModalThemePicker
   | ModalHelp
@@ -537,6 +543,12 @@ export type ModalAction =
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }
   | { type: 'open-rename-tab-modal' }
+  | {
+      type: 'open-rename-worktree-modal'
+      sessionId: string
+      worktreeId: string
+      initialName: string
+    }
   | { type: 'open-snippet-picker' }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'set-help-entry-count'; count: number }

@@ -15,6 +15,7 @@ export type ModeId =
   | 'modal.session-name'
   | 'modal.create-session'
   | 'modal.rename-tab'
+  | 'modal.rename-worktree'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'

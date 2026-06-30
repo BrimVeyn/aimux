@@ -15,6 +15,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
   'rename-tab': 'modal.rename-tab',
+  'rename-worktree': 'modal.rename-worktree',
   'session-name': 'modal.session-name',
   'session-picker': 'modal.session-picker.filtering',
   'snippet-editor': 'modal.snippet-editor',

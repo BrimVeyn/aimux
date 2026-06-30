@@ -525,6 +525,25 @@ export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   return r(actions, [], 'navigation')
 }
 
+// Rename worktree modal
+export const confirmRenameWorktree: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  const trimmed = (modal.editBuffer ?? '').trim()
+  const worktreeId = modal.sessionTargetId
+  const sessionId = modal.type === 'rename-worktree' ? modal.worktreeSessionId : null
+  const actions: KeyResult['actions'] = []
+  if (trimmed && worktreeId != null && worktreeId !== '' && sessionId != null && sessionId !== '') {
+    actions.push({
+      patch: { name: trimmed },
+      sessionId,
+      type: 'update-worktree-record',
+      worktreeId,
+    })
+  }
+  actions.push({ type: 'close-modal' })
+  return r(actions, [], 'navigation')
+}
+
 // Create session modal
 export const confirmCreateSession: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal as {

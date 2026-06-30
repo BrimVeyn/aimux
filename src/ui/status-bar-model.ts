@@ -150,6 +150,8 @@ function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId |
       return 'modal.new-tab.command-edit'
     case 'rename-tab':
       return 'modal.rename-tab'
+    case 'rename-worktree':
+      return 'modal.rename-worktree'
     case 'session-name':
       return 'modal.session-name'
     case 'session-picker':

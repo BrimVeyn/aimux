@@ -19,6 +19,7 @@ export const HELP_MODE_LABELS: { modeId: ModeId; label: string }[] = [
   { label: 'Workspace name', modeId: 'modal.session-name' },
   { label: 'Create workspace', modeId: 'modal.create-session' },
   { label: 'Rename tab', modeId: 'modal.rename-tab' },
+  { label: 'Rename worktree', modeId: 'modal.rename-worktree' },
   { label: 'Snippet picker', modeId: 'modal.snippet-picker.filtering' },
   { label: 'Snippet picker — filter', modeId: 'modal.snippet-picker.filtering' },
   { label: 'Snippet editor', modeId: 'modal.snippet-editor' },
