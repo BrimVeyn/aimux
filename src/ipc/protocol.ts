@@ -18,6 +18,14 @@ export const IPC_PROTOCOL_MIN_VERSION = 10
 export const IPC_PROTOCOL_VERSION = 10
 
 /**
+ * Capability advertised by a daemon that knows how to drain + handoff its
+ * socket to a freshly-spawned successor binary instead of dying outright.
+ * Clients only attempt `prepareReexec` against a daemon that advertises
+ * this — older daemons would respond with an unknown-request error.
+ */
+export const IPC_CAPABILITY_HOT_REEXEC = 'hotReexec'
+
+/**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
  * via a MIN bump. See `src/ipc/README.md` for the discipline.
@@ -27,7 +35,7 @@ export const IPC_PROTOCOL_VERSION = 10
  * normalises a missing field to `[]`, so consumers can safely call
  * `.includes(...)` on it.
  */
-export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = []
+export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [IPC_CAPABILITY_HOT_REEXEC]
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -101,12 +109,28 @@ export type ClientRequest =
   | { id: string; type: 'closeTab'; payload: { tabId: string } }
   | { id: string; type: 'disposeAll'; payload: Record<string, never> }
   | { id: string; type: 'ping'; payload: Record<string, never> }
+  // Capability-gated on `hotReexec`. The daemon drains, writes a handoff
+  // file, renames its socket out of the way, and exits cleanly so a freshly
+  // spawned successor binary can bind the canonical socket path while the
+  // terminal-manager (and every PTY) keeps running.
+  | { id: string; type: 'prepareReexec'; payload: { reason?: string } }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
   | { id: string; type: 'attachResult'; payload: AttachResult }
   | { id: string; type: 'error'; payload: { message: string } }
+  | {
+      id: string
+      type: 'reexecAck'
+      payload: {
+        /** Absolute path to the handoff file the successor should consume. */
+        handoffPath: string
+        /** Where the old daemon renamed its still-bound socket. Provided for
+         * diagnostics — the canonical socket path is now free. */
+        renamedSocketPath: string
+      }
+    }
 
 export type ServerEvent =
   | {
@@ -372,6 +396,12 @@ export function parseClientRequest(value: unknown): ClientRequest {
     case 'disposeAll':
     case 'ping':
       return value as ClientRequest
+    case 'prepareReexec':
+      assert(
+        value.payload.reason === undefined || isString(value.payload.reason),
+        'prepareReexec.reason must be a string when present'
+      )
+      return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -401,6 +431,14 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')
+      return value as ServerResponse
+    case 'reexecAck':
+      assert(isString(value.id), 'reexecAck.id must be a string')
+      assert(isString(value.payload.handoffPath), 'reexecAck.handoffPath must be a string')
+      assert(
+        isString(value.payload.renamedSocketPath),
+        'reexecAck.renamedSocketPath must be a string'
+      )
       return value as ServerResponse
     case 'tabRender':
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')

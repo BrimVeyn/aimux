@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
 import type { AssistantId, TerminalSnapshot } from '../state/types'
@@ -22,13 +22,19 @@ import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
+  consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
+  getDaemonOldSocketPath,
   getIpcDaemonSocketPath,
   getSocketSecurityIssue,
   getTerminalManagerSocketPath,
+  removeDaemonSidecars,
   removeDaemonSocketIfExists,
   removeTerminalManagerSocketIfExists,
   tightenSocketPermissions,
+  writeDaemonHandoff,
+  writeDaemonPidFile,
+  writeDaemonVersionFile,
 } from './runtime-paths'
 
 export interface DaemonTabEntry {
@@ -151,7 +157,17 @@ async function ensureTerminalManagerReady(manager: TerminalManagerClient): Promi
 
 export async function runDaemon(): Promise<void> {
   const socketPath = getIpcDaemonSocketPath()
-  logDebug('daemon.start', { pid: process.pid, socketPath })
+  // A handoff file means we were spawned to take over from a predecessor
+  // daemon that already drained and renamed its socket away. Consume the
+  // file so a later fresh boot won't see it. The TM is still running and
+  // we'll connect to it normally (no spawn needed).
+  const handoff = consumeDaemonHandoff()
+  logDebug('daemon.start', {
+    handoffFromPid: handoff?.fromPid ?? null,
+    handoffFromVersion: handoff?.fromProcessVersion ?? null,
+    pid: process.pid,
+    socketPath,
+  })
 
   const existingPid = await findSocketProcessPid(socketPath)
   if (existingPid !== null && existingPid !== process.pid) {
@@ -578,6 +594,14 @@ export async function runDaemon(): Promise<void> {
                 case 'ping':
                   sendOk(socket, message.id)
                   break
+                case 'prepareReexec': {
+                  // No version check needed: the requester observed the
+                  // `hotReexec` capability before sending this. The handler
+                  // itself enforces draining=false to keep concurrent
+                  // requests from corrupting the handoff.
+                  await handleReexecRequest(socket, message.id, message.payload.reason)
+                  break
+                }
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error)
@@ -620,6 +644,130 @@ export async function runDaemon(): Promise<void> {
   })
   tightenSocketPermissions(socketPath)
 
+  // Sidecar files let bystander processes detect "is the daemon running and
+  // what version is it?" without a handshake. Required by the hot-reexec
+  // path in bootstrap.ts (Ring 3).
+  try {
+    writeDaemonPidFile(process.pid)
+    writeDaemonVersionFile(getProcessVersion())
+  } catch (error) {
+    logDebug('daemon.sidecars.writeFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  let draining = false
+  // The renamed socket path is captured during drain so the shutdown handler
+  // can unlink the dirent (the listening fd still pins the inode until close;
+  // the dirent at daemon.old.sock would otherwise linger after exit).
+  let renamedSocketPath: string | null = null
+
+  /**
+   * Hot-reexec drain. The caller (bootstrap.ts on the new binary) sends this
+   * before spawning the successor daemon. We:
+   *   1. Stop accepting new client connections (`server.close()` only
+   *      refuses new conns; existing sockets keep ferrying until they idle).
+   *   2. Write the handoff sidecar so the successor can tell it was spawned
+   *      as a reexec target (not a fresh boot).
+   *   3. Rename the listening socket out of the canonical path. The OS keeps
+   *      the original inode pinned by our listening fd, so existing client
+   *      sockets stay live; the canonical path is freed for the successor
+   *      to bind. A new dirent appears at daemon.old.sock.
+   *   4. Ack the requester.
+   *   5. Shut down after a short grace so the ack flushes and clients can
+   *      observe socket close (which their reconnect logic interprets as
+   *      "daemon went away — try again," landing them on the successor).
+   *
+   * If anything fails before step 4, we surface an error response and stay
+   * up — the caller falls back to the legacy stopTerminalManager+restart
+   * path.
+   */
+  const handleReexecRequest = async (
+    requester: Socket,
+    requestId: string,
+    reason: string | undefined
+  ): Promise<void> => {
+    if (draining) {
+      send(requester, {
+        id: requestId,
+        payload: { message: 'Daemon is already draining for reexec' },
+        type: 'error',
+      })
+      return
+    }
+    draining = true
+    logDebug('daemon.reexec.start', { pid: process.pid, reason: reason ?? null })
+
+    const oldSocketPath = getDaemonOldSocketPath()
+    // Clear any stale dirent from a previous botched reexec.
+    if (existsSync(oldSocketPath)) {
+      try {
+        unlinkSync(oldSocketPath)
+      } catch {
+        // best-effort
+      }
+    }
+
+    let handoffPath: string
+    try {
+      handoffPath = writeDaemonHandoff({
+        fromPid: process.pid,
+        fromProcessVersion: getProcessVersion(),
+        renamedSocketPath: oldSocketPath,
+        version: 1,
+        writtenAt: Date.now(),
+      })
+    } catch (error) {
+      draining = false
+      const message = error instanceof Error ? error.message : String(error)
+      logDebug('daemon.reexec.handoffWriteFailed', { error: message })
+      send(requester, {
+        id: requestId,
+        payload: { message: `Handoff file write failed: ${message}` },
+        type: 'error',
+      })
+      return
+    }
+
+    try {
+      renameSync(socketPath, oldSocketPath)
+      renamedSocketPath = oldSocketPath
+    } catch (error) {
+      draining = false
+      // Clean up the handoff file we just wrote — the successor must not see
+      // a stale handoff if reexec didn't actually start.
+      try {
+        unlinkSync(handoffPath)
+      } catch {
+        // best-effort
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      logDebug('daemon.reexec.renameFailed', { error: message })
+      send(requester, {
+        id: requestId,
+        payload: { message: `Socket rename failed: ${message}` },
+        type: 'error',
+      })
+      return
+    }
+
+    // Refuse new connections from now on; the successor will bind the
+    // canonical path.
+    server.close()
+
+    send(requester, {
+      id: requestId,
+      payload: { handoffPath, renamedSocketPath: oldSocketPath },
+      type: 'reexecAck',
+    })
+    logDebug('daemon.reexec.ack', { handoffPath, renamedSocketPath: oldSocketPath })
+
+    // Give the ack a beat to flush over the socket, then bow out. Use the
+    // same shutdown path as a SIGTERM so hookServer/manager are torn down
+    // cleanly. `setTimeout` keeps the event loop alive long enough.
+    setTimeout(() => gracefulShutdown('reexec'), 250)
+  }
+
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
@@ -635,11 +783,40 @@ export async function runDaemon(): Promise<void> {
     }
     manager.destroy()
     server.close()
+    // Unlink the renamed-away socket dirent if we drained. Without this it
+    // lingers at daemon.old.sock as a dead AF_UNIX inode the next reexec
+    // would have to clean up itself.
+    if (renamedSocketPath !== null && existsSync(renamedSocketPath)) {
+      try {
+        unlinkSync(renamedSocketPath)
+      } catch (error) {
+        logDebug('daemon.reexec.oldSocketUnlinkFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    // Sidecars: a fresh boot would overwrite them, but if we exit cleanly
+    // we leave a clean state. The handoff file is intentionally left in
+    // place only by reexec (writeDaemonHandoff already did that); for any
+    // other shutdown we strip the lot.
+    if (signal !== 'reexec') {
+      removeDaemonSidecars()
+    }
     process.exit(0)
   }
 
   process.on('SIGTERM', () => gracefulShutdown('sigterm'))
   process.on('SIGINT', () => gracefulShutdown('sigint'))
+  process.on('SIGUSR2', () => {
+    // Out-of-band drain trigger. Useful for `kill -USR2 <pid>` debugging or
+    // when a caller wants to nudge the daemon without negotiating a hello
+    // first. We synthesise a fake requester whose writes go nowhere: the
+    // ack is discarded because there's no protocol partner waiting on the
+    // other side of a signal.
+    logDebug('daemon.signal.sigusr2')
+    const noopRequester = { write: () => true } as unknown as Socket
+    void handleReexecRequest(noopRequester, crypto.randomUUID(), 'sigusr2')
+  })
 
   process.on('uncaughtException', (error) => {
     logDebug('daemon.uncaughtException', { error: error.message, stack: error.stack })

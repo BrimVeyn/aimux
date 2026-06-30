@@ -83,3 +83,17 @@ export async function spawnDetachedIpcDaemon(): Promise<boolean> {
 export async function spawnDetachedTerminalManager(): Promise<boolean> {
   return spawnDetachedProcess('terminal-manager', getTerminalManagerSocketPath())
 }
+
+/**
+ * Spawn the daemon as a hot-reexec successor. Identical to the fresh spawn
+ * at the OS level — the new daemon detects the handoff file written by the
+ * predecessor and adopts the reexec path itself
+ * (`consumeDaemonHandoff()` in src/daemon/daemon.ts). The wrapper exists so
+ * the call site reads intent ("we're swapping the daemon binary") rather
+ * than reuse of the fresh-boot spawner, and so a future SCM_RIGHTS variant
+ * (Ring 4) has a place to slot in.
+ */
+export async function spawnDaemonReexec(): Promise<boolean> {
+  logDebug('platform.daemon.spawnReexec', { socketPath: getIpcDaemonSocketPath() })
+  return spawnDetachedDaemon()
+}

@@ -3,6 +3,8 @@ import { describe, expect, test } from 'bun:test'
 import {
   type ClientRequest,
   encodeMessage,
+  IPC_CAPABILITY_HOT_REEXEC,
+  IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_VERSION,
   type IpcMessage,
   MessageDecoder,
@@ -98,6 +100,64 @@ describe('ipc protocol framing', () => {
       payload: { capabilities: ['thinAttach'] },
       type: 'helloResult',
     })
+  })
+
+  test('advertises hotReexec in the default capability set', () => {
+    // The capability gate that bootstrap.ts checks before sending
+    // prepareReexec. If this constant ever drops from the default set, the
+    // hot-reexec path silently regresses to the legacy stopTM+restart flow
+    // — surface that loudly here so it's an obvious mistake.
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_HOT_REEXEC)
+  })
+
+  test('parses prepareReexec requests, with and without a reason', () => {
+    expect(
+      parseClientRequest({
+        id: 'r1',
+        payload: {},
+        type: 'prepareReexec',
+      })
+    ).toMatchObject({ type: 'prepareReexec' })
+
+    expect(
+      parseClientRequest({
+        id: 'r2',
+        payload: { reason: 'binary-update' },
+        type: 'prepareReexec',
+      })
+    ).toMatchObject({
+      payload: { reason: 'binary-update' },
+      type: 'prepareReexec',
+    })
+
+    expect(() =>
+      parseClientRequest({
+        id: 'r3',
+        payload: { reason: 42 },
+        type: 'prepareReexec',
+      })
+    ).toThrow('prepareReexec.reason must be a string when present')
+  })
+
+  test('parses reexecAck responses', () => {
+    expect(
+      parseServerMessage({
+        id: 'r4',
+        payload: { handoffPath: '/tmp/d.handoff', renamedSocketPath: '/tmp/d.old.sock' },
+        type: 'reexecAck',
+      })
+    ).toMatchObject({
+      payload: { handoffPath: '/tmp/d.handoff', renamedSocketPath: '/tmp/d.old.sock' },
+      type: 'reexecAck',
+    })
+
+    expect(() =>
+      parseServerMessage({
+        id: 'r5',
+        payload: { handoffPath: 42, renamedSocketPath: '/tmp/d.old.sock' },
+        type: 'reexecAck',
+      })
+    ).toThrow('reexecAck.handoffPath must be a string')
   })
 
   test('normalises legacy hello responses without capabilities to an empty list', () => {

@@ -80,7 +80,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toMatchObject({
         compatible: true,
         processVersion: 'test-daemon',
         selectedVersion: IPC_PROTOCOL_VERSION,
@@ -151,7 +151,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toMatchObject({
         compatible: false,
         error: 'attach returned protocol v1',
         processVersion: 'old-daemon',

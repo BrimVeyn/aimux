@@ -137,7 +137,7 @@ proven the additive discipline holds.
 | 0 ✅  | Audit current MIN bumps; reclassify which were truly required. Document the additive contract in `src/ipc/README.md`.                                                                                                                                  | None — paperwork.                                                                     |
 | 1 ✅  | Add `capabilities: string[]` to `hello` results on both protocols. Migrate the v11 CLI work (`cli-control-plan.md`) to use capability gates instead of bumping MIN.                                                                                    | Tiny — capability list is additive.                                                   |
 | 2 ✅  | Lint rule + CI check: forbid MIN bump in the same commit as MAX bump unless the PR body contains `BREAKING: <reason>`. Forbid `stopTerminalManager` outside the dedicated restart-terminal-manager command.                                            | Low — discipline, no runtime change.                                                  |
-| 3     | Daemon hot-reexec: drain protocol message, handoff file format, sidecar PID/version files, reconnect policy in `DaemonClient` and the UI `RemoteSessionBackend`. Aimux update path uses reexec by default; full restart only when TM protocol changed. | Medium — touches startup and update flow. Roll out behind `AIMUX_HOT_REEXEC=1` first. |
+| 3 ✅  | Daemon hot-reexec: drain protocol message, handoff file format, sidecar PID/version files, reconnect policy in `DaemonClient` and the UI `RemoteSessionBackend`. Aimux update path uses reexec by default; full restart only when TM protocol changed. | Medium — touches startup and update flow. Roll out behind `AIMUX_HOT_REEXEC=1` first. |
 | 4     | TM hot-reexec (FD passing). Native shim via Bun FFI or Node sidecar.                                                                                                                                                                                   | High — defer until justified.                                                         |
 
 Phases 0–2 landed together: the additive-contract README is at
@@ -175,6 +175,36 @@ and a CI step).
 - `aimux restart-daemon` invoked on a tree with no protocol changes performs
   a reexec (PTYs untouched), while the same command on a tree with a `BREAKING`
   marker performs the legacy full restart.
+
+## Manual repro for Ring 3
+
+The hot-reexec path is gated by `AIMUX_HOT_REEXEC=1` so the legacy
+breaking-update flow stays the default until we trust it. To exercise the
+new path end-to-end:
+
+```sh
+# Terminal A — start aimux with reexec on, attach a long-running PTY
+AIMUX_HOT_REEXEC=1 bun --watch src/index.tsx
+# (start a tab running `while true; do date; sleep 1; done`)
+
+# Terminal B — trigger the swap
+AIMUX_HOT_REEXEC=1 bun run src/index.tsx restart-daemon
+# Expect:
+#   Negotiating hot-reexec with daemon (pid N)…
+#   Spawning successor daemon…
+#   Daemon hot-reexec complete on …/daemon.sock. PTYs preserved.
+```
+
+Watch the tab in Terminal A: the date counter must not pause. If you see
+"Hot-reexec not available; falling back to full restart." the running
+daemon was built before the `hotReexec` capability landed — restart it
+once via the legacy path so the capability is advertised.
+
+Out-of-band variant: `kill -USR2 <daemon-pid>` triggers the same drain
+without a protocol partner — useful when debugging from outside the
+aimux process tree. The successor daemon will not be spawned for you in
+that case; signal-based drain is for poke-and-pry sessions, not regular
+upgrade flows.
 
 ## Open questions
 

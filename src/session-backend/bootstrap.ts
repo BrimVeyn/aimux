@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { connect } from 'node:net'
 
 import type { SessionBackend } from './types'
@@ -11,6 +12,7 @@ import {
 import { logDebug } from '../debug/input-log'
 import {
   encodeMessage,
+  IPC_CAPABILITY_HOT_REEXEC,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -20,6 +22,7 @@ import {
   findIpcDaemonPid,
   findTerminalManagerPid,
   killProcess,
+  spawnDaemonReexec,
   spawnDetachedIpcDaemon,
 } from '../platform/daemon-control'
 import { LocalSessionBackend } from './local-session-backend'
@@ -30,6 +33,13 @@ interface DaemonHandshakeProbeResult {
   error?: string
   processVersion?: string
   selectedVersion?: number
+  /**
+   * Capabilities the daemon advertised during the hello phase. Empty for
+   * legacy daemons that predate the capability field. Used to gate the
+   * hot-reexec attempt — we only send `prepareReexec` to a daemon that
+   * advertises `hotReexec`.
+   */
+  capabilities?: readonly string[]
 }
 
 async function spawnDaemon(): Promise<void> {
@@ -89,6 +99,7 @@ export async function probeDaemonProtocolCompatibility(
     const disposeRequestId = crypto.randomUUID()
     const probeSessionId = `probe-${crypto.randomUUID()}`
     let daemonProcessVersion: string | undefined
+    let daemonCapabilities: readonly string[] = []
     let settled = false
     const timer = setTimeout(() => {
       finish({ compatible: false, error: 'handshake timed out' })
@@ -138,6 +149,7 @@ export async function probeDaemonProtocolCompatibility(
             }
 
             daemonProcessVersion = message.payload.processVersion
+            daemonCapabilities = message.payload.capabilities
 
             socket.write(
               encodeMessage({
@@ -176,6 +188,7 @@ export async function probeDaemonProtocolCompatibility(
               })
             )
             finish({
+              capabilities: daemonCapabilities,
               compatible,
               error: compatible
                 ? undefined
@@ -208,6 +221,119 @@ async function restartDaemon(socketPath: string): Promise<void> {
   }
   removeDaemonSocketIfExists()
   await spawnDaemon()
+}
+
+/**
+ * Ask the running daemon to drain and rename its socket out of the way, then
+ * spawn the new daemon binary in its place. The terminal-manager (and every
+ * PTY it owns) stays alive throughout. Returns `true` if the swap succeeded
+ * AND the successor handshakes compatibly. On any failure the caller should
+ * fall through to the legacy restart path.
+ *
+ * Behind `AIMUX_HOT_REEXEC=1`. Only viable when the running daemon advertises
+ * the `hotReexec` capability — older daemons predate the wire and would
+ * respond with an unknown-request error.
+ */
+async function attemptHotReexec(socketPath: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const socket = connect(socketPath)
+    const decoder = new MessageDecoder(parseServerMessage)
+    const helloId = crypto.randomUUID()
+    const reexecId = crypto.randomUUID()
+    let settled = false
+
+    const finish = (success: boolean, reason: string) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      socket.removeAllListeners()
+      socket.destroy()
+      logDebug('backend.reexec.finish', { reason, success })
+      resolve(success)
+    }
+
+    const timer = setTimeout(() => finish(false, 'timeout'), 5_000)
+
+    socket.once('error', (error: NodeJS.ErrnoException) => {
+      // ECONNRESET / EPIPE during drain is expected if the daemon already
+      // closed the socket after the ack flushed. Treat the prior reexecAck
+      // as authoritative; that observation is captured below.
+      finish(settled, error.message)
+    })
+    socket.once('connect', () => {
+      socket.write(
+        encodeMessage({
+          id: helloId,
+          payload: {
+            maxVersion: IPC_PROTOCOL_VERSION,
+            minVersion: IPC_PROTOCOL_MIN_VERSION,
+          },
+          type: 'hello',
+        })
+      )
+    })
+    socket.on('data', (chunk) => {
+      try {
+        for (const message of decoder.push(chunk)) {
+          if (!('id' in message)) continue
+          if (message.id === helloId) {
+            if (message.type !== 'helloResult') {
+              finish(false, `hello: ${message.type}`)
+              return
+            }
+            if (!message.payload.capabilities.includes(IPC_CAPABILITY_HOT_REEXEC)) {
+              finish(false, 'daemon does not advertise hotReexec')
+              return
+            }
+            socket.write(
+              encodeMessage({
+                id: reexecId,
+                payload: { reason: 'protocol-mismatch' },
+                type: 'prepareReexec',
+              })
+            )
+            continue
+          }
+          if (message.id === reexecId) {
+            if (message.type === 'reexecAck') {
+              logDebug('backend.reexec.ack', {
+                handoffPath: message.payload.handoffPath,
+                renamedSocketPath: message.payload.renamedSocketPath,
+              })
+              // The daemon has renamed its socket away and is about to exit.
+              // We can't keep using this socket — close it cleanly and let
+              // the caller spawn the successor.
+              finish(true, 'ack received')
+              return
+            }
+            finish(false, `prepareReexec: ${message.type}`)
+            return
+          }
+        }
+      } catch (error) {
+        finish(false, error instanceof Error ? error.message : String(error))
+      }
+    })
+  })
+}
+
+async function waitForSocketRemoval(socketPath: string, deadlineMs = 2_000): Promise<boolean> {
+  const stop = Date.now() + deadlineMs
+  while (Date.now() < stop) {
+    if (!existsSync(socketPath)) return true
+    await new Promise((r) => setTimeout(r, 25))
+  }
+  return false
+}
+
+async function hotReexecAndRespawn(socketPath: string): Promise<boolean> {
+  if (!(await attemptHotReexec(socketPath))) {
+    return false
+  }
+  // Old daemon renamed the canonical path away; wait for the dirent to be
+  // unbound (it should already be — rename is atomic) before spawning.
+  await waitForSocketRemoval(socketPath, 1_000)
+  return spawnDaemonReexec()
 }
 
 // Kill the terminal-manager and clear its socket so the restarted daemon
@@ -259,6 +385,43 @@ export async function createSessionBackend(opts?: {
       socketPath,
     })
     await opts?.onBreakingUpdateRequired?.()
+
+    // Ring 3: prefer hot-reexec over the legacy stopTM+restart path when
+    // the running daemon advertises `hotReexec` and the operator has opted
+    // in via AIMUX_HOT_REEXEC=1. The terminal-manager and every PTY stay
+    // alive; the daemon binary swaps under them.
+    const reexecEnabled = process.env.AIMUX_HOT_REEXEC === '1'
+    const daemonSupportsReexec =
+      handshake.capabilities?.includes(IPC_CAPABILITY_HOT_REEXEC) ?? false
+    if (reexecEnabled && daemonSupportsReexec) {
+      logDebug('backend.create.tryReexec', { socketPath })
+      const reexecOk = await hotReexecAndRespawn(socketPath)
+      if (reexecOk) {
+        const afterReexec = await probeDaemonProtocolCompatibility(socketPath)
+        logDebug('backend.create.handshakeAfterReexec', {
+          compatible: afterReexec.compatible,
+          error: afterReexec.error ?? null,
+          processVersion: afterReexec.processVersion ?? null,
+          selectedVersion: afterReexec.selectedVersion ?? null,
+          socketPath,
+        })
+        if (afterReexec.compatible) {
+          logDebug('backend.create.remote', { reexec: true, socketPath })
+          return new RemoteSessionBackend()
+        }
+        // Reexec succeeded but the successor still mismatches. Fall through
+        // to the legacy path — at this point the TM is still alive but the
+        // daemon binary is the user's intended one, so the legacy stopTM
+        // wouldn't help anyway. Surface a clear error.
+        throw new Error(
+          `IPC daemon handshake failed after hot-reexec: ${
+            afterReexec.error ?? 'incompatible protocol'
+          }`
+        )
+      }
+      logDebug('backend.create.reexec.fallback', { reason: 'reexec attempt failed' })
+    }
+
     // AIMUX_ALLOW_KILL_PTYS: legacy breaking-update fallback. Ring 3 of
     // docs/developer/hot-migration-plan.md replaces this with daemon
     // hot-reexec so PTYs survive the upgrade. Until then, killing the TM is
