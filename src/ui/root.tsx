@@ -267,6 +267,9 @@ function renderModal(
         />
       )
     }
+    case 'flash-jump':
+      // Pure overlay — rendered inline by FlashLabelBadge inside the rows.
+      return null
     case null:
       return null
     default:

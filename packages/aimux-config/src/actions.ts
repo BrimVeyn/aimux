@@ -45,6 +45,12 @@ export function helpModal(scope?: ModeId): KeyResult {
   return r([{ scope, type: 'open-help-modal' }])
 }
 
+export const openFlashJump: KeyResult = r(
+  [{ type: 'open-flash-jump-modal' }],
+  [],
+  'modal.flash-jump'
+)
+
 export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
 export const toggleGitPane: KeyResult = r([{ type: 'toggle-git-pane' }])
 export const toggleSessionBar: KeyResult = r([{ type: 'toggle-session-bar' }])

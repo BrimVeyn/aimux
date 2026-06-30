@@ -28,6 +28,7 @@ export type ModeId =
   | 'modal.worktree-move'
   | 'modal.worktree-move-confirm'
   | 'modal.ai-usage'
+  | 'modal.flash-jump'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }

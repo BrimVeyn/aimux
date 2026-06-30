@@ -55,6 +55,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('K', actions.reorderSession(-1), 'Move workspace up')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
+        .map('S', actions.openFlashJump, 'Flash jump')
         .map('?', actions.helpModal(), 'Help')
     )
 
@@ -224,6 +225,16 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('n', actions.closeModal, 'Cancel')
         .map('<CR>', actions.confirmWorktreeDeleteModal, 'Delete worktree')
         .map('y', actions.confirmWorktreeDeleteModal, 'Delete worktree')
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: flash-jump (flash.nvim-style label jump)
+    // -----------------------------------------------------------------------
+    .mode('modal.flash-jump', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<Space>', actions.closeModal, 'Cancel')
+        .passthrough()
     )
 
     // -----------------------------------------------------------------------

@@ -502,6 +502,32 @@ export function App({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const flashPendingJump = useAppStore((s) =>
+    s.modal.type === 'flash-jump' ? s.modal.pendingJump : null
+  )
+  useEffect(() => {
+    if (flashPendingJump === null) return
+    // Snapshot before clearing the modal: closing rewrites state.modal so we
+    // need the target in hand before dispatching.
+    const target = flashPendingJump
+    dispatch({ type: 'close-modal' })
+    if (target.kind === 'tab' && target.tabId != null && target.tabId !== '') {
+      dispatch({ tabId: target.tabId, type: 'set-active-tab' })
+      return
+    }
+    if (target.kind === 'workspace' || target.kind === 'worktree') {
+      executeSideEffect(
+        {
+          index: target.sessionIndex,
+          type: 'switch-session-by-index',
+          worktreeId: target.worktreeId,
+        },
+        sideEffectCtx
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flashPendingJump])
+
   useKeyboard((key) => {
     const currentState = stateRef.current
     // Global quit: Ctrl+C in any mode except terminal-input

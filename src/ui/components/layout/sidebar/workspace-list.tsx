@@ -16,6 +16,7 @@ import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
 import { useTheme } from '../../../theme'
+import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
 import { WorktreeRow } from './worktree-row'
@@ -394,6 +395,9 @@ const WorkspaceRow = memo(function WorkspaceRow({
         </text>
         <text fg={t.text} selectable={false} wrapMode="none">
           {' '}
+        </text>
+        <FlashLabelBadge rowKey={`ws:${session.id}`} />
+        <text fg={t.text} selectable={false} wrapMode="none">
           {nameLabel}
         </text>
       </box>

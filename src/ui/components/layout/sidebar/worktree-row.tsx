@@ -8,6 +8,7 @@ import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/session-worktrees'
 import { useTheme } from '../../../theme'
+import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface WorktreeRowProps {
@@ -127,6 +128,7 @@ export const WorktreeRow = memo(function WorktreeRow({
         <text fg={t.textMuted} selectable={false} wrapMode="none">
           {connector}{' '}
         </text>
+        <FlashLabelBadge rowKey={`wt:${worktree.id}`} />
         <text fg={t.text} selectable={false} wrapMode="none">
           {worktree.name}
         </text>

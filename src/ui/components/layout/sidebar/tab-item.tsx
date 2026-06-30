@@ -7,6 +7,7 @@ import type { TabSession } from '../../../../state/types'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { getCurrentTheme, useTheme } from '../../../theme'
+import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface TabItemProps {
@@ -213,6 +214,7 @@ export function TabItem({
           {indexLabel}{' '}
         </text>
       ) : null}
+      <FlashLabelBadge rowKey={`tab:${tab.id}`} />
       <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
         {tab.title}
       </text>
