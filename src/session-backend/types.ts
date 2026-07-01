@@ -7,6 +7,7 @@ import type {
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
+  WorktreeRecord,
 } from '../state/types'
 
 export interface SessionBackendEvents {
@@ -22,6 +23,22 @@ export interface SessionBackendEvents {
    * `tabRender` event lands.
    */
   tabAdded: [sessionId: string, tab: TabSession]
+  /**
+   * v12 workspace-lifecycle events. Fired when a CLI issued
+   * `createWorkspace` / `switchWorkspace` / `closeWorkspace` and the daemon
+   * relays as an event because a UI is attached. The UI reducer owns the
+   * catalog write; see `backend-runtime-events.ts` for the wiring.
+   */
+  workspaceCreateRequested: [name: string, projectPath: string | undefined, doSwitch: boolean]
+  workspaceSwitchRequested: [targetSessionId: string]
+  workspaceCloseRequested: [targetSessionId: string, force: boolean]
+  workspaceSwitched: [sessionId: string]
+  /**
+   * v12 worktree-lifecycle events. Fired when a CLI issued
+   * `addWorktreeRecord` / `removeWorktreeRecord` and the daemon relays.
+   */
+  worktreeAdded: [sessionId: string, worktree: WorktreeRecord]
+  worktreeRemoved: [sessionId: string, worktreeId: string]
 }
 
 export interface ResizeOptions {

@@ -206,6 +206,33 @@ export class RemoteSessionBackend
         })
         this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
         break
+      case 'workspaceCreateRequested':
+        this.emit(
+          'workspaceCreateRequested',
+          message.payload.name,
+          message.payload.projectPath,
+          message.payload.switch === true
+        )
+        break
+      case 'workspaceSwitchRequested':
+        this.emit('workspaceSwitchRequested', message.payload.targetSessionId)
+        break
+      case 'workspaceCloseRequested':
+        this.emit(
+          'workspaceCloseRequested',
+          message.payload.targetSessionId,
+          message.payload.force === true
+        )
+        break
+      case 'workspaceSwitched':
+        this.emit('workspaceSwitched', message.payload.sessionId)
+        break
+      case 'worktreeAdded':
+        this.emit('worktreeAdded', message.payload.sessionId, message.payload.worktree)
+        break
+      case 'worktreeRemoved':
+        this.emit('worktreeRemoved', message.payload.sessionId, message.payload.worktreeId)
+        break
     }
   }
 
