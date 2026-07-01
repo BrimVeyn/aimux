@@ -230,10 +230,10 @@ The UI process has no control socket — it's a pure client of the daemon. So
 lifecycle CLI → UI coordination goes through daemon-broadcast events. Every
 new workspace/worktree op follows one of two paths at the daemon:
 
-| UI attached? | Path |
-| --- | --- |
-| Yes | Daemon broadcasts `*Requested` event; UI's `backend-runtime-events.ts` calls the existing side-effect from `session-actions.ts` (owns the live workspace snapshot + catalog write). |
-| No | Daemon writes catalog directly via `src/daemon/catalog-writer.ts`. |
+| UI attached? | Path                                                                                                                                                                                |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Yes          | Daemon broadcasts `*Requested` event; UI's `backend-runtime-events.ts` calls the existing side-effect from `session-actions.ts` (owns the live workspace snapshot + catalog write). |
+| No           | Daemon writes catalog directly via `src/daemon/catalog-writer.ts`.                                                                                                                  |
 
 Workspace events use a new `broadcastAllVersioned(minVersion, event)` helper
 (not `broadcastForSessionVersioned`) because the UI may be attached to a
@@ -252,8 +252,8 @@ aimux workspace create <name> [--project P] [--switch]
 aimux workspace switch <name|id> [--wait] [--timeout N]
 -> { name, targetSessionId }   # with --wait, exits when workspaceSwitched fires
 
-aimux workspace close <name|id> [--force]
--> { closedSessionId, name, force }
+aimux workspace close <name|id>
+-> { closedSessionId, name }
 
 aimux worktree list [--workspace W]
 -> { workspaceId, activeWorktreeId, worktrees: [...] }

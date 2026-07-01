@@ -257,9 +257,9 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('closeWorkspace', { force: true, targetSessionId: 'session-3' })
+    await client.expectOk('closeWorkspace', { targetSessionId: 'session-3' })
     const req = mock.received.find((m) => m.type === 'closeWorkspace')
-    expect(req?.payload).toEqual({ force: true, targetSessionId: 'session-3' })
+    expect(req?.payload).toEqual({ targetSessionId: 'session-3' })
   })
 
   test('workspaceSwitched broadcast lands on the subscriber', async () => {

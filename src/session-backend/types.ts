@@ -31,7 +31,7 @@ export interface SessionBackendEvents {
    */
   workspaceCreateRequested: [name: string, projectPath: string | undefined, doSwitch: boolean]
   workspaceSwitchRequested: [targetSessionId: string]
-  workspaceCloseRequested: [targetSessionId: string, force: boolean]
+  workspaceCloseRequested: [targetSessionId: string]
   workspaceSwitched: [sessionId: string]
   /**
    * v12 worktree-lifecycle events. Fired when a CLI issued

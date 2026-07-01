@@ -74,11 +74,11 @@ describe('ipc protocol v12', () => {
     ).toThrow('switchWorkspace.targetSessionId must be a string')
   })
 
-  test('closeWorkspace parses force flag', () => {
+  test('closeWorkspace round-trips with targetSessionId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r3',
-        payload: { force: true, targetSessionId: 'session-3' },
+        payload: { targetSessionId: 'session-3' },
         type: 'closeWorkspace',
       })
     ).not.toThrow()
@@ -145,7 +145,7 @@ describe('ipc protocol v12', () => {
   test('workspaceCloseRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { force: false, targetSessionId: 'session-1' },
+        payload: { targetSessionId: 'session-1' },
         type: 'workspaceCloseRequested',
       })
     ).not.toThrow()

@@ -262,11 +262,11 @@ export type ClientRequest =
   | { id: string; type: 'switchWorkspace'; payload: { targetSessionId: string } }
   // v12 / capability `workspaceLifecycle`. Ask the daemon to remove a
   // workspace. Broadcast → `workspaceCloseRequested`; headless deletes the
-  // catalog entry directly. `force` skips confirmation gates.
+  // catalog entry directly.
   | {
       id: string
       type: 'closeWorkspace'
-      payload: { targetSessionId: string; force?: boolean }
+      payload: { targetSessionId: string }
     }
   // v12 / capability `workspaceLifecycle`. UI announces that its own
   // `handleSwitchSessionEffect` has finished; the daemon relays as a
@@ -344,7 +344,7 @@ export type ServerEvent =
   // `closeWorkspace`; UI runs `handleDeleteSessionEffect`.
   | {
       type: 'workspaceCloseRequested'
-      payload: { targetSessionId: string; force?: boolean }
+      payload: { targetSessionId: string }
     }
   // v12 / capability `workspaceLifecycle`. Daemon relay of the UI's
   // `announceWorkspaceSwitched` so a `--wait`ing CLI can exit.
@@ -697,10 +697,6 @@ export function parseClientRequest(value: unknown): ClientRequest {
         isString(value.payload.targetSessionId),
         'closeWorkspace.targetSessionId must be a string'
       )
-      assert(
-        value.payload.force === undefined || typeof value.payload.force === 'boolean',
-        'closeWorkspace.force must be a boolean when present'
-      )
       return value as ClientRequest
     case 'announceWorkspaceSwitched':
       assert(
@@ -811,10 +807,6 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(
         isString(value.payload.targetSessionId),
         'workspaceCloseRequested.targetSessionId must be a string'
-      )
-      assert(
-        value.payload.force === undefined || typeof value.payload.force === 'boolean',
-        'workspaceCloseRequested.force must be a boolean when present'
       )
       return value as ServerEvent
     case 'workspaceSwitched':

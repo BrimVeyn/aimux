@@ -154,7 +154,7 @@ export function bindBackendRuntimeEvents({
     })
   }
 
-  const handleWorkspaceCloseRequested = (targetSessionId: string, _force: boolean) => {
+  const handleWorkspaceCloseRequested = (targetSessionId: string) => {
     enqueueLifecycle(() => {
       logInputDebug('app.backend.event.workspaceCloseRequested', { targetSessionId })
       const state = appStore.getState()

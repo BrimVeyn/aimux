@@ -874,13 +874,13 @@ export async function runDaemon(): Promise<void> {
                 }
                 case 'closeWorkspace': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { force, targetSessionId } = message.payload
+                  const { targetSessionId } = message.payload
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { force, targetSessionId },
+                      payload: { targetSessionId },
                       type: 'workspaceCloseRequested',
                     })
-                    logDebug('daemon.request.closeWorkspace.relay', { force, targetSessionId })
+                    logDebug('daemon.request.closeWorkspace.relay', { targetSessionId })
                   } else {
                     deleteFromCatalog(targetSessionId)
                     logDebug('daemon.request.closeWorkspace.direct', { targetSessionId })

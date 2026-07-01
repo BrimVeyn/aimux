@@ -218,11 +218,7 @@ export class RemoteSessionBackend
         this.emit('workspaceSwitchRequested', message.payload.targetSessionId)
         break
       case 'workspaceCloseRequested':
-        this.emit(
-          'workspaceCloseRequested',
-          message.payload.targetSessionId,
-          message.payload.force === true
-        )
+        this.emit('workspaceCloseRequested', message.payload.targetSessionId)
         break
       case 'workspaceSwitched':
         this.emit('workspaceSwitched', message.payload.sessionId)

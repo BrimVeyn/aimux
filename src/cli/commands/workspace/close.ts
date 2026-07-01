@@ -7,10 +7,7 @@ import { EXIT_OK, writeJson } from '../../output'
 
 export const workspaceClose: CliCommand = {
   args: [{ name: 'workspace', required: true }],
-  flags: [
-    ...SHARED_FLAGS,
-    { description: 'force close even when tabs are pinned', kind: 'boolean', name: 'force' },
-  ],
+  flags: SHARED_FLAGS,
   group: 'workspace',
   run: async (ctx) => {
     const target = ctx.args.positionals[0]
@@ -18,7 +15,6 @@ export const workspaceClose: CliCommand = {
       throw new Error('target workspace is required (id or name)')
     }
     const session = resolveWorkspace(target)
-    const force = ctx.args.flags.force === true
 
     const daemon = await ctx.getDaemon()
     if (!daemon.hasCapability(IPC_CAPABILITY_WORKSPACE_LIFECYCLE)) {
@@ -27,8 +23,8 @@ export const workspaceClose: CliCommand = {
       )
     }
 
-    await daemon.expectOk('closeWorkspace', { force, targetSessionId: session.id })
-    writeJson({ closedSessionId: session.id, force, name: session.name })
+    await daemon.expectOk('closeWorkspace', { targetSessionId: session.id })
+    writeJson({ closedSessionId: session.id, name: session.name })
     return EXIT_OK
   },
   summary: 'Close a workspace (via the UI when attached, otherwise the catalog)',
