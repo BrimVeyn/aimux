@@ -480,32 +480,40 @@ export async function runDaemon(): Promise<void> {
                   }
 
                   attachedSessions.set(socket, message.payload.sessionId)
-                  // thin: skip the implicit `manager.resize` inside
-                  // attachSession by telling the TM that this attach owns no
-                  // dimensions. The TM still resizes (because the entry-point
-                  // calls resize unconditionally inside `attachSession`), so
-                  // we re-attach with a special path: attach normally then,
-                  // for thin attachers, restore the previously-recorded
-                  // dimensions if a real attacher established them.
-                  const attachResult = await manager.attachSession({
-                    cols: message.payload.cols,
-                    rows: message.payload.rows,
-                    sessionId: message.payload.sessionId,
-                    workspaceSnapshot: message.payload.workspaceSnapshot,
-                  })
-                  if (message.payload.thin === true) {
+                  // A thin attacher (headless CLI) does not own a viewport, so
+                  // it must not resize PTYs on a session a UI is driving. TM's
+                  // attachSession always calls `sessionManager.resize` on the
+                  // incoming dimensions, so we substitute prior dims (or a
+                  // safe default when none exist) before calling it. That
+                  // makes the resize a no-op against the current PTY size
+                  // instead of clobbering it. We also seed sessionDimensions
+                  // on first-ever thin attach so `createTab`'s 0×0 fallback
+                  // works for headless bootstrap flows (no UI has ever
+                  // attached to this session).
+                  let attachCols = message.payload.cols
+                  let attachRows = message.payload.rows
+                  const isThin = message.payload.thin === true
+                  if (isThin) {
                     const prior = sessionDimensions.get(message.payload.sessionId)
-                    if (
-                      prior &&
-                      (prior.cols !== message.payload.cols || prior.rows !== message.payload.rows)
-                    ) {
-                      try {
-                        await manager.resize(message.payload.sessionId, prior.cols, prior.rows)
-                      } catch (error) {
-                        logDebug('daemon.attach.thin.resizeRestoreFailed', {
-                          error: error instanceof Error ? error.message : String(error),
-                        })
-                      }
+                    if (prior) {
+                      attachCols = prior.cols
+                      attachRows = prior.rows
+                    } else {
+                      // No UI has established dimensions yet. Seed a safe
+                      // default so PTYs don't spawn at 0×0 and so the
+                      // createTab fallback has something to work with. Any
+                      // real UI attach afterwards overwrites this.
+                      attachCols = 80
+                      attachRows = 24
+                      sessionDimensions.set(message.payload.sessionId, {
+                        cols: attachCols,
+                        rows: attachRows,
+                      })
+                      logDebug('daemon.attach.thin.seedDefaultDimensions', {
+                        cols: attachCols,
+                        rows: attachRows,
+                        sessionId: message.payload.sessionId,
+                      })
                     }
                   } else {
                     sessionDimensions.set(message.payload.sessionId, {
@@ -513,6 +521,12 @@ export async function runDaemon(): Promise<void> {
                       rows: message.payload.rows,
                     })
                   }
+                  const attachResult = await manager.attachSession({
+                    cols: attachCols,
+                    rows: attachRows,
+                    sessionId: message.payload.sessionId,
+                    workspaceSnapshot: message.payload.workspaceSnapshot,
+                  })
                   sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
                     rememberTab(
