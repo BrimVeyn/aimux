@@ -43,7 +43,25 @@ export const tabWait: CliCommand = {
       )
     }
 
-    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({
+      cols: 0,
+      rows: 0,
+      sessionId: workspace.id,
+      thin: true,
+    })
+
+    // Daemon only emits tabStatus on transitions, so a tab that is already at
+    // the target activity would never produce an event and this command would
+    // sit until timeout. Short-circuit on the activity we got from the attach
+    // replay when it already matches.
+    const currentTab = attach.tabs.find((t) => t.id === tabId)
+    if (!currentTab) {
+      throw new Error(`tab not found: ${tabId}`)
+    }
+    if (currentTab.activity === statusFlag) {
+      writeNdjson({ status: statusFlag, tabId, ts: 0 })
+      return EXIT_OK
+    }
 
     return new Promise<number>((resolve) => {
       const start = Date.now()
