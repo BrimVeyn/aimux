@@ -217,3 +217,73 @@ delivered via the next `attachResult`. Either:
   Tier 2 / a control socket on the UI process.
 - **`tab send --keys`** scope: vim-style subset (`<C-x>`, `<Esc>`, `<CR>`,
   `<Tab>`, arrows) + auto bracketed-paste for multi-line text.
+
+## Tier 2 additions
+
+Tier 2 fills the deferred items above and adds streaming output. IPC bumped
+to **v12** (additive; MIN stays at 10). New capabilities: `workspaceLifecycle`,
+`worktreeLifecycleEvents`, `tabTail`.
+
+### Coordination discipline (UI attached vs. headless)
+
+The UI process has no control socket — it's a pure client of the daemon. So
+lifecycle CLI → UI coordination goes through daemon-broadcast events. Every
+new workspace/worktree op follows one of two paths at the daemon:
+
+| UI attached? | Path |
+| --- | --- |
+| Yes | Daemon broadcasts `*Requested` event; UI's `backend-runtime-events.ts` calls the existing side-effect from `session-actions.ts` (owns the live workspace snapshot + catalog write). |
+| No | Daemon writes catalog directly via `src/daemon/catalog-writer.ts`. |
+
+Workspace events use a new `broadcastAllVersioned(minVersion, event)` helper
+(not `broadcastForSessionVersioned`) because the UI may be attached to a
+different session than the one being mutated.
+
+Lifecycle handlers on the UI side run behind a small FIFO promise chain so
+back-to-back broadcasts from multiple CLIs can't race the async switch
+effect.
+
+### Tier 2 surface
+
+```
+aimux workspace create <name> [--project P] [--switch]
+-> { name, projectPath, switch }
+
+aimux workspace switch <name|id> [--wait] [--timeout N]
+-> { name, targetSessionId }   # with --wait, exits when workspaceSwitched fires
+
+aimux workspace close <name|id> [--force]
+-> { closedSessionId, name, force }
+
+aimux worktree list [--workspace W]
+-> { workspaceId, activeWorktreeId, worktrees: [...] }
+   # each entry includes `gitTracked` to flag catalog rows git no longer sees
+
+aimux worktree create --name N [--branch B] [--base ref] [--workspace W]
+-> { id, name, branch, path, repoRoot }
+   # git worktree add first, THEN addWorktreeRecord to the daemon
+
+aimux worktree remove <id|path> [--force] [--workspace W]
+-> { id, name, path }
+   # git worktree remove first (respects dirty-check unless --force), THEN
+   # removeWorktreeRecord. Refuses to remove the primary worktree.
+
+aimux tab tail <tabId> [--raw] [--rate-limit-ms N] [--follow-status] [--timeout N]
+-> NDJSON stream: { ts, type: 'render'|'exit'|'error'|'status'|'timeout', ... }
+   # thin-attach + tabRender subscription
+   # exit 0 on tabExit, 3 on tabError, 124 on --timeout
+```
+
+### `--wait` on `workspace switch`
+
+The UI dispatches `announceWorkspaceSwitched` after `handleSwitchSessionEffect`
+finishes; the daemon relays that as `workspaceSwitched`. `--wait` subscribes
+before sending the request so the no-UI path (which the daemon fires
+synchronously) isn't missed.
+
+### Test surface
+
+`test/integration/cli-daemon-client.test.ts` was extended with wire tests for
+the new requests + `workspaceSwitched` broadcast + `tabRender`/`tabExit`
+subscription (the same wiring `tab tail` uses). `test/unit/ipc-protocol-v12.test.ts`
+covers parser branches for every new request/event variant.
