@@ -127,9 +127,14 @@ export async function runRestartDaemon(): Promise<number> {
     }
   }
 
-  if (pid !== null) {
-    process.stdout.write(`Stopping IPC daemon (pid ${pid})...\n`)
-    await killProcess(pid)
+  // Re-resolve the daemon pid: negotiateReexec above may have already
+  // drained the predecessor, which exits ~250ms after ack. Using the pre-
+  // negotiation pid to killProcess risks signalling an unrelated process
+  // that recycled that PID on a busy host.
+  const livePid = await findIpcDaemonPid()
+  if (livePid !== null) {
+    process.stdout.write(`Stopping IPC daemon (pid ${livePid})...\n`)
+    await killProcess(livePid)
     process.stdout.write('IPC daemon stopped.\n')
   } else {
     process.stdout.write('No running IPC daemon found.\n')
