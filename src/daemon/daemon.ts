@@ -711,8 +711,12 @@ export async function runDaemon(): Promise<void> {
                 case 'setActiveTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
+                  // Update the cache AFTER the TM confirms the change — if
+                  // manager.setActiveTab throws (tab doesn't exist, TM
+                  // rejects), the cache would otherwise retain the bogus tabId
+                  // and a subsequent listTabs would return a stale activeTabId.
                   await manager.setActiveTab(sessionId, message.payload.tabId)
+                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }
