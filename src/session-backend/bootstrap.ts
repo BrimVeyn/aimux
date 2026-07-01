@@ -365,10 +365,10 @@ export async function createSessionBackend(opts?: {
     // do die.
     await opts?.onBreakingUpdateRequired?.()
 
-    // AIMUX_ALLOW_KILL_PTYS: legacy breaking-update fallback. Ring 3 of
-    // docs/developer/hot-migration-plan.md replaces this with daemon
-    // hot-reexec so PTYs survive the upgrade. Until then, killing the TM is
-    // the only way to clear a daemon↔TM protocol mismatch.
+    // AIMUX_ALLOW_KILL_PTYS: legacy breaking-update fallback. Daemon
+    // hot-reexec (docs/developer/hot-reexec.md) preserves PTYs on ordinary
+    // daemon-only upgrades; when the TM protocol itself changes, killing
+    // the TM is still the only way to clear the mismatch.
     await stopTerminalManager()
     await restartDaemon(socketPath)
     const retriedHandshake = await probeDaemonProtocolCompatibility(socketPath)

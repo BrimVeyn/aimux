@@ -9,8 +9,7 @@ import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-
 /**
  * Catalog mutations invoked by the daemon when NO UI is attached. When a UI
  * is attached the daemon relays the request as an event and the UI's reducer
- * owns the write (so the live workspace snapshot is preserved). See
- * `docs/developer/cli-control-plan.md` for the discipline.
+ * owns the write (so the live workspace snapshot is preserved).
  *
  * Each helper is a pure read-modify-write against `aimux-sessions.json` —
  * safe to call from the daemon process, no React / dispatcher involved.

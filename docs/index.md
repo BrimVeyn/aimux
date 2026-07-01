@@ -39,7 +39,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 
 ## Reference
 
-- `reference/cli.md` - every CLI command and its behavior
+- `reference/cli.md` - every CLI command and its behavior, including the
+  headless control plane (`tab`, `workspace`, `worktree`)
 - `reference/config-reference.md` - exhaustive `@brimveyn/aimux-config` reference
 - `reference/runtime-paths.md` - config paths, catalog paths, runtime directories,
   and socket files
@@ -47,6 +48,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 ## Developer Notes
 
 - `developer/architecture.md` - app, daemon, terminal-manager, and state flow
+- `developer/hot-reexec.md` - additive protocol contract and the daemon
+  hot-reexec swap that keeps PTYs alive across upgrades
 - `developer/aimux-config-internals.md` - builder internals, merge rules, and
   support-status caveats
 - `developer/toasts.md` - the transient notification system: imperative API,

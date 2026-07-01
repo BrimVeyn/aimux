@@ -17,12 +17,12 @@ export function writeError(message: string): void {
   process.stderr.write(`aimux: ${message}\n`)
 }
 
-// Exit code contract from cli-control-plan.md:
+// Exit code contract (docs/reference/cli.md):
 //   0   success
 //   2   usage error (bad flags, unknown command, missing argument)
 //   3   runtime error (server replied with `error`, command failed)
 //   4   daemon unreachable (socket missing and autostart failed)
-//   124 timeout (only `tab wait`)
+//   124 timeout (`tab wait`, `tab tail --timeout`, `workspace switch --wait`)
 export const EXIT_OK = 0
 export const EXIT_USAGE = 2
 export const EXIT_RUNTIME = 3

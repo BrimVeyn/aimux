@@ -2,7 +2,7 @@
 /* eslint-disable no-console -- this IS the harness UI */
 //
 // Semi-manual end-to-end harness for the daemon hot-reexec path
-// (docs/developer/hot-migration-plan.md, Ring 3).
+// (docs/developer/hot-reexec.md).
 //
 // What it does (each step pauses for you to inspect, unless --auto):
 //

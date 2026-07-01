@@ -167,7 +167,7 @@ function checkStopTerminalManagerCallers(): void {
       if (hasMarker) continue
 
       findings.push({
-        hint: `If killing every PTY is intentional, add a comment containing '${STOP_TM_OPT_IN_MARKER}' on the call line or within ${STOP_TM_MARKER_LOOKBACK} lines above it. Otherwise move the work into src/restart-terminal-manager.ts or replace it with the reexec path (see docs/developer/hot-migration-plan.md, Ring 3).`,
+        hint: `If killing every PTY is intentional, add a comment containing '${STOP_TM_OPT_IN_MARKER}' on the call line or within ${STOP_TM_MARKER_LOOKBACK} lines above it. Otherwise move the work into src/restart-terminal-manager.ts or replace it with the reexec path (see docs/developer/hot-reexec.md).`,
         message: `${file}:${i + 1}: unmarked stopTerminalManager() call — this kills every running PTY.`,
         rule: 'stop-terminal-manager-discipline',
       })

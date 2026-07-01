@@ -106,7 +106,7 @@ of `stopTerminalManager` need explicit approval.
 
 ## See also
 
-- `docs/developer/hot-migration-plan.md` — the broader plan this README
-  implements Ring 1 of.
-- `docs/developer/cli-control-plan.md` — the v11 CLI work that originally
-  motivated the capability mechanism.
+- `docs/developer/hot-reexec.md` — the additive-contract discipline and the
+  daemon hot-reexec swap that keeps PTYs alive across upgrades.
+- `docs/reference/cli.md` — the headless control-plane surface that the
+  capability mechanism was originally introduced to serve.

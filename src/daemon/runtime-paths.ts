@@ -121,7 +121,7 @@ export function removeTerminalManagerSocketIfExists(): void {
 // --- Hot-reexec sidecars ---
 //
 // Three small files coordinate the daemon-hot-reexec handoff (see
-// docs/developer/hot-migration-plan.md, Ring 3):
+// docs/developer/hot-reexec.md):
 //
 //   daemon.pid          // current daemon's pid, written on bind
 //   daemon.version      // current daemon's process version (Bun version)
