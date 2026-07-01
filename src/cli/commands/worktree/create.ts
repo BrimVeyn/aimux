@@ -1,7 +1,7 @@
 import type { WorktreeRecord } from '../../../state/types'
 import type { CliCommand } from '../../registry'
 
-import { createGitWorktree } from '../../../git/worktree'
+import { createGitWorktree, removeGitWorktree } from '../../../git/worktree'
 import { IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
@@ -38,6 +38,16 @@ export const worktreeCreate: CliCommand = {
       )
     }
 
+    // Check the daemon's capability BEFORE mutating disk — otherwise a
+    // capability mismatch would leave a git worktree on disk with no
+    // catalog record to track it.
+    const daemon = await ctx.getDaemon()
+    if (!daemon.hasCapability(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)) {
+      throw new Error(
+        'daemon predates worktreeLifecycleEvents capability — restart aimux to pick up the new daemon'
+      )
+    }
+
     const worktreeId = createPrefixedId('worktree')
     const targetPath = makeWorktreePath({
       repoRoot: primary.repoRoot,
@@ -68,13 +78,26 @@ export const worktreeCreate: CliCommand = {
       updatedAt: now,
     }
 
-    const daemon = await ctx.getDaemon()
-    if (!daemon.hasCapability(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)) {
-      throw new Error(
-        'daemon predates worktreeLifecycleEvents capability — restart aimux to pick up the new daemon'
-      )
+    try {
+      await daemon.expectOk('addWorktreeRecord', { sessionId: workspace.id, worktree: record })
+    } catch (error) {
+      // Catalog registration failed — roll back the on-disk worktree so
+      // `worktree list` doesn't perpetually surface an orphan. Swallow
+      // rollback errors: report the original failure, which is the real
+      // problem the operator needs to see.
+      try {
+        await removeGitWorktree({
+          force: true,
+          repoPath: primary.repoRoot,
+          targetPath,
+        })
+      } catch {
+        // Best-effort rollback; leave the git-side worktree if it can't be
+        // removed cleanly. `worktree list --workspace` will flag it as
+        // `gitTracked: true, catalog: no` on the next inspection.
+      }
+      throw error
     }
-    await daemon.expectOk('addWorktreeRecord', { sessionId: workspace.id, worktree: record })
 
     writeJson({
       branch,
