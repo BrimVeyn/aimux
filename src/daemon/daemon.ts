@@ -816,38 +816,31 @@ export async function runDaemon(): Promise<void> {
   // the dirent at daemon.old.sock would otherwise linger after exit).
   let renamedSocketPath: string | null = null
 
+  type DrainOutcome =
+    | { ok: true; handoffPath: string; renamedSocketPath: string }
+    | { ok: false; message: string }
+
   /**
-   * Hot-reexec drain. The caller (bootstrap.ts on the new binary) sends this
-   * before spawning the successor daemon. We:
-   *   1. Stop accepting new client connections (`server.close()` only
-   *      refuses new conns; existing sockets keep ferrying until they idle).
-   *   2. Write the handoff sidecar so the successor can tell it was spawned
+   * Hot-reexec drain. Called by either an IPC `prepareReexec` request or
+   * by `kill -USR2 <pid>`. We:
+   *   1. Write the handoff sidecar so the successor can tell it was spawned
    *      as a reexec target (not a fresh boot).
-   *   3. Rename the listening socket out of the canonical path. The OS keeps
+   *   2. Rename the listening socket out of the canonical path. The OS keeps
    *      the original inode pinned by our listening fd, so existing client
    *      sockets stay live; the canonical path is freed for the successor
    *      to bind. A new dirent appears at daemon.old.sock.
-   *   4. Ack the requester.
-   *   5. Shut down after a short grace so the ack flushes and clients can
-   *      observe socket close (which their reconnect logic interprets as
-   *      "daemon went away — try again," landing them on the successor).
+   *   3. Stop accepting new client connections (`server.close()` only
+   *      refuses new conns; existing sockets keep ferrying until they idle).
+   *   4. Schedule shutdown on a short grace so any final replies flush and
+   *      clients observe socket close (their reconnect logic interprets it
+   *      as "daemon went away — try again," landing on the successor).
    *
-   * If anything fails before step 4, we surface an error response and stay
-   * up — the caller falls back to the legacy stopTerminalManager+restart
-   * path.
+   * Returns the outcome so the caller can send an ack (or error) over
+   * whatever channel is appropriate — an IPC socket or nothing at all.
    */
-  const handleReexecRequest = async (
-    requester: Socket,
-    requestId: string,
-    reason: string | undefined
-  ): Promise<void> => {
+  const drainAndHandoff = async (reason: string | undefined): Promise<DrainOutcome> => {
     if (draining) {
-      send(requester, {
-        id: requestId,
-        payload: { message: 'Daemon is already draining for reexec' },
-        type: 'error',
-      })
-      return
+      return { message: 'Daemon is already draining for reexec', ok: false }
     }
     draining = true
     logDebug('daemon.reexec.start', { pid: process.pid, reason: reason ?? null })
@@ -875,12 +868,7 @@ export async function runDaemon(): Promise<void> {
       draining = false
       const message = error instanceof Error ? error.message : String(error)
       logDebug('daemon.reexec.handoffWriteFailed', { error: message })
-      send(requester, {
-        id: requestId,
-        payload: { message: `Handoff file write failed: ${message}` },
-        type: 'error',
-      })
-      return
+      return { message: `Handoff file write failed: ${message}`, ok: false }
     }
 
     try {
@@ -897,29 +885,48 @@ export async function runDaemon(): Promise<void> {
       }
       const message = error instanceof Error ? error.message : String(error)
       logDebug('daemon.reexec.renameFailed', { error: message })
-      send(requester, {
-        id: requestId,
-        payload: { message: `Socket rename failed: ${message}` },
-        type: 'error',
-      })
-      return
+      return { message: `Socket rename failed: ${message}`, ok: false }
     }
 
     // Refuse new connections from now on; the successor will bind the
     // canonical path.
     server.close()
+    logDebug('daemon.reexec.drained', { handoffPath, renamedSocketPath: oldSocketPath })
 
-    send(requester, {
-      id: requestId,
-      payload: { handoffPath, renamedSocketPath: oldSocketPath },
-      type: 'reexecAck',
-    })
-    logDebug('daemon.reexec.ack', { handoffPath, renamedSocketPath: oldSocketPath })
-
-    // Give the ack a beat to flush over the socket, then bow out. Use the
+    // Give any in-flight replies a beat to flush, then bow out. Use the
     // same shutdown path as a SIGTERM so hookServer/manager are torn down
     // cleanly. `setTimeout` keeps the event loop alive long enough.
     setTimeout(() => gracefulShutdown('reexec'), 250)
+
+    return { handoffPath, ok: true, renamedSocketPath: oldSocketPath }
+  }
+
+  const handleReexecRequest = async (
+    requester: Socket,
+    requestId: string,
+    reason: string | undefined
+  ): Promise<void> => {
+    const outcome = await drainAndHandoff(reason)
+    if (!outcome.ok) {
+      send(requester, {
+        id: requestId,
+        payload: { message: outcome.message },
+        type: 'error',
+      })
+      return
+    }
+    send(requester, {
+      id: requestId,
+      payload: {
+        handoffPath: outcome.handoffPath,
+        renamedSocketPath: outcome.renamedSocketPath,
+      },
+      type: 'reexecAck',
+    })
+    logDebug('daemon.reexec.ack', {
+      handoffPath: outcome.handoffPath,
+      renamedSocketPath: outcome.renamedSocketPath,
+    })
   }
 
   const gracefulShutdown = (signal: string) => {
@@ -968,12 +975,15 @@ export async function runDaemon(): Promise<void> {
   process.on('SIGUSR2', () => {
     // Out-of-band drain trigger. Useful for `kill -USR2 <pid>` debugging or
     // when a caller wants to nudge the daemon without negotiating a hello
-    // first. We synthesise a fake requester whose writes go nowhere: the
-    // ack is discarded because there's no protocol partner waiting on the
-    // other side of a signal.
+    // first. No IPC partner is waiting for a reply — we call the drain
+    // directly instead of forging a fake Socket.
     logDebug('daemon.signal.sigusr2')
-    const noopRequester = { write: () => true } as unknown as Socket
-    void handleReexecRequest(noopRequester, crypto.randomUUID(), 'sigusr2')
+    void (async () => {
+      const outcome = await drainAndHandoff('sigusr2')
+      if (!outcome.ok) {
+        logDebug('daemon.signal.sigusr2.drainFailed', { message: outcome.message })
+      }
+    })()
   })
 
   process.on('uncaughtException', (error) => {
