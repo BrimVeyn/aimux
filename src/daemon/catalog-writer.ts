@@ -40,6 +40,19 @@ export function createWorkspaceInCatalog(name: string, projectPath?: string): Se
   return session
 }
 
+/**
+ * Throws when the target session isn't in the catalog. Used by the daemon
+ * before broadcasting a workspace-lifecycle request so the CLI's `expectOk`
+ * fails fast (with a meaningful message) instead of the `--wait` path
+ * hanging out for its timeout while the UI silently ignores an unknown id.
+ */
+export function assertSessionInCatalog(sessionId: string): void {
+  const sessions = loadSessionCatalog()
+  if (!sessions.some((s) => s.id === sessionId)) {
+    throw new Error(`workspace not found: ${sessionId}`)
+  }
+}
+
 export function bumpLastOpenedInCatalog(sessionId: string): void {
   const sessions = loadSessionCatalog()
   const now = new Date().toISOString()

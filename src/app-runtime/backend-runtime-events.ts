@@ -14,7 +14,7 @@ import type { TabRuntimeTimeouts } from './tab-runtime-timeouts'
 import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { appStore } from '../state/app-store'
-import { saveSessionCatalog } from '../state/session-catalog'
+import { loadSessionCatalog, saveSessionCatalog } from '../state/session-catalog'
 import {
   handleCreateSessionEffect,
   handleDeleteSessionEffect,
@@ -139,10 +139,24 @@ export function bindBackendRuntimeEvents({
   const handleWorkspaceSwitchRequested = (targetSessionId: string) => {
     enqueueLifecycle(async () => {
       logInputDebug('app.backend.event.workspaceSwitchRequested', { targetSessionId })
-      const state = appStore.getState()
-      const target = state.sessions.find((s) => s.id === targetSessionId)
+      let state = appStore.getState()
+      let target = state.sessions.find((s) => s.id === targetSessionId)
       if (!target) {
+        // In-memory list is stale (e.g. daemon just added a session via the
+        // headless path). Reload from disk and try once more before giving
+        // up — the daemon already validated the catalog, so this should hit.
+        const fresh = loadSessionCatalog()
+        target = fresh.find((s) => s.id === targetSessionId)
+        if (target) {
+          dispatch({ sessions: fresh, type: 'set-sessions' })
+          state = appStore.getState()
+        }
+      }
+      if (!target) {
+        // Announce anyway so any `--wait` CLI unblocks — better a spurious
+        // exit than a 30s hang while the caller retries.
         logInputDebug('app.backend.event.workspaceSwitchRequested.notFound', { targetSessionId })
+        backend.announceWorkspaceSwitched(targetSessionId)
         return
       }
       handleSwitchSessionEffect(state, backend, dispatch, target)

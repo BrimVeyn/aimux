@@ -25,6 +25,7 @@ import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
   addWorktreeToCatalog,
+  assertSessionInCatalog,
   bumpLastOpenedInCatalog,
   createWorkspaceInCatalog,
   deleteFromCatalog,
@@ -852,6 +853,10 @@ export async function runDaemon(): Promise<void> {
                 case 'switchWorkspace': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetSessionId } = message.payload
+                  // Fail fast when the target is unknown — otherwise a UI-
+                  // attached `--wait` CLI would sit until timeout while the
+                  // UI silently drops the broadcast.
+                  assertSessionInCatalog(targetSessionId)
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
                       payload: { targetSessionId },
@@ -875,6 +880,7 @@ export async function runDaemon(): Promise<void> {
                 case 'closeWorkspace': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetSessionId } = message.payload
+                  assertSessionInCatalog(targetSessionId)
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
                       payload: { targetSessionId },
