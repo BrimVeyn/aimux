@@ -131,6 +131,12 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cwd?: string
     /** Extra env injected into the spawned shell. Passed through to the PTY. */
     env?: Record<string, string>
+    /**
+     * Worktree this tab belongs to (for UI grouping). Stored on the
+     * TabSession so an attach-time replay surfaces it inside the right
+     * worktree column. Optional — tabs not bound to a worktree are valid.
+     */
+    worktreeId?: string
   }): void {
     logDebug('daemon.registry.createSession', {
       args: options.args ?? [],
@@ -150,6 +156,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         status: 'starting',
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
+        worktreeId: options.worktreeId,
       })
     } else {
       existing.status = 'starting'
@@ -161,10 +168,20 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.assistant = options.assistant
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
+      if (options.worktreeId !== undefined) existing.worktreeId = options.worktreeId
     }
 
     this.activeTabId = options.tabId
     this.ptyManager.createSession(options)
+  }
+
+  /**
+   * Read the in-memory TabSession for a tab. Returned by reference — used by
+   * the daemon's `tabAdded` broadcast path to publish the same shape the UI
+   * already knows how to ingest from `attachResult.tabs[]`.
+   */
+  getTab(tabId: string): TabSession | undefined {
+    return this.tabs.get(tabId)
   }
 
   write(tabId: string, data: string): void {

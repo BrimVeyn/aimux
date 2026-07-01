@@ -45,8 +45,19 @@ export class RemoteSessionBackend
     workspaceSnapshot?: WorkspaceSnapshotV1
   } | null = null
   private selectedProtocolVersion: number | null = null
+  private daemonCapabilities: ReadonlySet<string> = new Set()
   private reconnectPromise: Promise<void> | null = null
   private shouldReconnect = false
+
+  /**
+   * Capability strings advertised by the connected daemon on the last
+   * successful `hello`. Empty before the first handshake completes, and
+   * reset on connection loss. Callers should gate optional features on
+   * `daemonAdvertises('...')` rather than on the negotiated version number.
+   */
+  daemonAdvertises(capability: string): boolean {
+    return this.daemonCapabilities.has(capability)
+  }
 
   private rejectPendingRequests(error: Error): void {
     for (const [id, pending] of this.pending.entries()) {
@@ -61,6 +72,7 @@ export class RemoteSessionBackend
     this.socket = null
     this.attached = false
     this.selectedProtocolVersion = null
+    this.daemonCapabilities = new Set()
     this.decoder.reset()
     this.rejectPendingRequests(new Error(reason))
 
@@ -187,6 +199,13 @@ export class RemoteSessionBackend
         })
         this.emit('sessionActivity', message.payload.sessionId, message.payload.status)
         break
+      case 'tabAdded':
+        logDebug('backend.remote.tabAdded', {
+          sessionId: message.payload.sessionId,
+          tabId: message.payload.tab.id,
+        })
+        this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
+        break
     }
   }
 
@@ -251,6 +270,12 @@ export class RemoteSessionBackend
     }
 
     this.selectedProtocolVersion = response.payload.selectedVersion
+    this.daemonCapabilities = new Set(response.payload.capabilities)
+    logDebug('backend.remote.hello.success', {
+      capabilities: response.payload.capabilities,
+      processVersion: response.payload.processVersion,
+      selectedVersion: response.payload.selectedVersion,
+    })
   }
 
   private async performAttach(options: {
@@ -357,6 +382,7 @@ export class RemoteSessionBackend
     cols: number
     rows: number
     cwd?: string
+    worktreeId?: string
   }): void {
     if (!this.attached) {
       logDebug('backend.remote.skipCreateBeforeAttach', { tabId: options.tabId })

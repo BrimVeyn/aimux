@@ -1,7 +1,7 @@
-import { existsSync, unlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
-import type { AssistantId, TerminalSnapshot } from '../state/types'
+import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
@@ -9,6 +9,7 @@ import {
   type ClientRequest,
   encodeMessage,
   getProcessVersion,
+  IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -16,18 +17,27 @@ import {
   parseClientRequest,
   type ServerEvent,
   type ServerResponse,
+  type TabSessionSummary,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
+import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
+  consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
+  getDaemonOldSocketPath,
   getIpcDaemonSocketPath,
   getSocketSecurityIssue,
   getTerminalManagerSocketPath,
+  removeDaemonSidecars,
+  removeDaemonSidecarsForReexec,
   removeDaemonSocketIfExists,
   removeTerminalManagerSocketIfExists,
   tightenSocketPermissions,
+  writeDaemonHandoff,
+  writeDaemonPidFile,
+  writeDaemonVersionFile,
 } from './runtime-paths'
 
 export interface DaemonTabEntry {
@@ -42,6 +52,15 @@ export interface DaemonTabEntry {
    * `attachSession` call was still in flight.
    */
   viewportSeq: number
+  /**
+   * Slim TabSession metadata cached so the `listTabs` request type can answer
+   * without round-tripping the TM. Populated on attach (full data from
+   * `attachResult.tabs`) and on createTab (title taken from the request,
+   * status defaulted to 'starting' until a render or status update lands).
+   */
+  title?: string
+  status?: TabStatus
+  worktreeId?: string
 }
 
 /**
@@ -62,7 +81,8 @@ export function mergeTabRegistryEntry(
   assistant: AssistantId,
   command: string,
   initialViewport: TerminalSnapshot | undefined,
-  allocateSeq: () => number
+  allocateSeq: () => number,
+  metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
 ): DaemonTabEntry {
   const existing = registry.get(tabId)
   const viewport = existing?.viewport ?? initialViewport
@@ -70,8 +90,11 @@ export function mergeTabRegistryEntry(
     assistant,
     command,
     sessionId,
+    status: metadata?.status ?? existing?.status,
+    title: metadata?.title ?? existing?.title,
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
+    worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
   }
   registry.set(tabId, entry)
   return entry
@@ -150,7 +173,17 @@ async function ensureTerminalManagerReady(manager: TerminalManagerClient): Promi
 
 export async function runDaemon(): Promise<void> {
   const socketPath = getIpcDaemonSocketPath()
-  logDebug('daemon.start', { pid: process.pid, socketPath })
+  // A handoff file means we were spawned to take over from a predecessor
+  // daemon that already drained and renamed its socket away. Consume the
+  // file so a later fresh boot won't see it. The TM is still running and
+  // we'll connect to it normally (no spawn needed).
+  const handoff = consumeDaemonHandoff()
+  logDebug('daemon.start', {
+    handoffFromPid: handoff?.fromPid ?? null,
+    handoffFromVersion: handoff?.fromProcessVersion ?? null,
+    pid: process.pid,
+    socketPath,
+  })
 
   const existingPid = await findSocketProcessPid(socketPath)
   if (existingPid !== null && existingPid !== process.pid) {
@@ -171,6 +204,14 @@ export async function runDaemon(): Promise<void> {
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
   const tabRegistry = new Map<string, DaemonTabEntry>()
+  // Active tab id per session, populated from attachResult and updated by
+  // setActiveTab. Surfaced by `listTabs` so a headless CLI doesn't need to
+  // attach just to know which tab the UI is focused on.
+  const sessionActiveTabIds = new Map<string, string | null>()
+  // Last (cols, rows) the session was attached with. `createTab` with
+  // cols/rows = 0 falls back to this when the `createTabSizeFallback`
+  // capability is in play.
+  const sessionDimensions = new Map<string, { cols: number; rows: number }>()
   let nextViewportSeq = 1
 
   const allocateSeq = (): number => nextViewportSeq++
@@ -179,7 +220,8 @@ export async function runDaemon(): Promise<void> {
     tabId: string,
     assistant: AssistantId,
     command: string,
-    initialViewport?: TerminalSnapshot
+    initialViewport?: TerminalSnapshot,
+    metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
   ): void => {
     const before = tabRegistry.get(tabId)
     const entry = mergeTabRegistryEntry(
@@ -189,7 +231,8 @@ export async function runDaemon(): Promise<void> {
       assistant,
       command,
       initialViewport,
-      allocateSeq
+      allocateSeq,
+      metadata
     )
     logDebug('daemon.rememberTab', {
       hadExistingEntry: before !== undefined,
@@ -240,6 +283,9 @@ export async function runDaemon(): Promise<void> {
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
     tabRegistry.delete(tabId)
+    if (sessionActiveTabIds.get(sessionId) === tabId) {
+      sessionActiveTabIds.set(sessionId, null)
+    }
     const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
     broadcastForSession(sessionId, event)
   })
@@ -389,9 +435,12 @@ export async function runDaemon(): Promise<void> {
                   }
                   negotiatedVersions.set(socket, selectedVersion)
                   logDebug('daemon.request.hello.success', { selectedVersion })
+                  const managerSelectedVersion = manager.getSelectedProtocolVersion()
                   send(socket, {
                     id: message.id,
                     payload: {
+                      capabilities: [...IPC_PROTOCOL_CAPABILITIES],
+                      ...(managerSelectedVersion !== null && { managerSelectedVersion }),
                       maxVersion: IPC_PROTOCOL_VERSION,
                       minVersion: IPC_PROTOCOL_MIN_VERSION,
                       processVersion: getProcessVersion(),
@@ -407,6 +456,7 @@ export async function runDaemon(): Promise<void> {
                     rows: message.payload.rows,
                     sessionId: message.payload.sessionId,
                     snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                    thin: message.payload.thin === true,
                   })
                   const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
                   if (message.payload.protocolVersion !== negotiatedVersion) {
@@ -416,19 +466,48 @@ export async function runDaemon(): Promise<void> {
                   }
 
                   attachedSessions.set(socket, message.payload.sessionId)
+                  // thin: skip the implicit `manager.resize` inside
+                  // attachSession by telling the TM that this attach owns no
+                  // dimensions. The TM still resizes (because the entry-point
+                  // calls resize unconditionally inside `attachSession`), so
+                  // we re-attach with a special path: attach normally then,
+                  // for thin attachers, restore the previously-recorded
+                  // dimensions if a real attacher established them.
                   const attachResult = await manager.attachSession({
                     cols: message.payload.cols,
                     rows: message.payload.rows,
                     sessionId: message.payload.sessionId,
                     workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
+                  if (message.payload.thin === true) {
+                    const prior = sessionDimensions.get(message.payload.sessionId)
+                    if (
+                      prior &&
+                      (prior.cols !== message.payload.cols || prior.rows !== message.payload.rows)
+                    ) {
+                      try {
+                        await manager.resize(message.payload.sessionId, prior.cols, prior.rows)
+                      } catch (error) {
+                        logDebug('daemon.attach.thin.resizeRestoreFailed', {
+                          error: error instanceof Error ? error.message : String(error),
+                        })
+                      }
+                    }
+                  } else {
+                    sessionDimensions.set(message.payload.sessionId, {
+                      cols: message.payload.cols,
+                      rows: message.payload.rows,
+                    })
+                  }
+                  sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
                     rememberTab(
                       message.payload.sessionId,
                       tab.id,
                       tab.assistant,
                       tab.command,
-                      tab.viewport
+                      tab.viewport,
+                      { status: tab.status, title: tab.title, worktreeId: tab.worktreeId }
                     )
                   }
                   // Classify synchronously BEFORE sending attachResult so
@@ -478,17 +557,49 @@ export async function runDaemon(): Promise<void> {
                 case 'createTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  // Capability `createTabSizeFallback`: cols/rows = 0 means
+                  // "use the session's last attached dimensions". Headless
+                  // CLIs don't have a viewport of their own, so this lets
+                  // them spawn a PTY that lines up with the UI on the same
+                  // session. If we have no remembered size yet, the TM
+                  // would receive 0 and spawn a zero-sized PTY — surface a
+                  // clear error instead.
+                  let cols = message.payload.cols
+                  let rows = message.payload.rows
+                  if (cols === 0 || rows === 0) {
+                    const prior = sessionDimensions.get(sessionId)
+                    if (!prior) {
+                      throw new Error(
+                        'createTab requested size fallback (cols=0 or rows=0) but no UI has attached to this session yet'
+                      )
+                    }
+                    if (cols === 0) cols = prior.cols
+                    if (rows === 0) rows = prior.rows
+                  }
                   logDebug('daemon.request.createTab.start', {
+                    cols,
                     command: message.payload.command,
+                    rows,
                     sessionId,
+                    sizeFallback: message.payload.cols === 0 || message.payload.rows === 0,
                     tabId: message.payload.tabId,
                     title: message.payload.title,
                   })
+                  const fullCommand = [
+                    message.payload.command,
+                    ...(message.payload.args ?? []),
+                  ].join(' ')
                   rememberTab(
                     sessionId,
                     message.payload.tabId,
                     message.payload.assistant,
-                    [message.payload.command, ...(message.payload.args ?? [])].join(' ')
+                    fullCommand,
+                    undefined,
+                    {
+                      status: 'starting',
+                      title: message.payload.title,
+                      worktreeId: message.payload.worktreeId,
+                    }
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
                   // call back into our status loop. Safe to add for every
@@ -498,8 +609,32 @@ export async function runDaemon(): Promise<void> {
                   // even on PTYs that outlive this daemon process.
                   const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
-                  await manager.createTab({ ...message.payload, env, sessionId })
+                  await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
                   sendOk(socket, message.id)
+                  // Fan a `tabAdded` event to every client watching this
+                  // session so siblings (e.g. the UI when a CLI created the
+                  // tab) can `add-tab` to their store and start applying the
+                  // subsequent `tabRender` events. The capability gate is on
+                  // the receiver side — the wire shape is harmless for old
+                  // clients (their `parseServerMessage` doesn't recognise
+                  // `tabAdded` and would throw, so we ONLY send it to peers
+                  // that negotiated v11). Older clients on a v11 daemon
+                  // negotiate v11 too, so the parser knows the case.
+                  const synthesizedTab: TabSession = {
+                    activity: 'idle',
+                    assistant: message.payload.assistant,
+                    buffer: '',
+                    command: fullCommand,
+                    id: message.payload.tabId,
+                    status: 'starting',
+                    terminalModes: createDefaultTerminalModes(),
+                    title: message.payload.title,
+                    worktreeId: message.payload.worktreeId,
+                  }
+                  broadcastForSession(sessionId, {
+                    payload: { sessionId, tab: synthesizedTab },
+                    type: 'tabAdded',
+                  })
                   logDebug('daemon.request.createTab.success', {
                     sessionId,
                     tabId: message.payload.tabId,
@@ -516,6 +651,10 @@ export async function runDaemon(): Promise<void> {
                 case 'resizeClient': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  sessionDimensions.set(sessionId, {
+                    cols: message.payload.cols,
+                    rows: message.payload.rows,
+                  })
                   await manager.resize(sessionId, message.payload.cols, message.payload.rows)
                   sendOk(socket, message.id)
                   break
@@ -549,6 +688,7 @@ export async function runDaemon(): Promise<void> {
                 case 'setActiveTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
                   await manager.setActiveTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
@@ -557,8 +697,38 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   tabRegistry.delete(message.payload.tabId)
+                  if (sessionActiveTabIds.get(sessionId) === message.payload.tabId) {
+                    sessionActiveTabIds.set(sessionId, null)
+                  }
                   await manager.closeTab(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
+                  break
+                }
+                case 'listTabs': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const sessionId = message.payload.sessionId
+                  const tabs: TabSessionSummary[] = []
+                  for (const [tabId, entry] of tabRegistry) {
+                    if (entry.sessionId !== sessionId) continue
+                    tabs.push({
+                      activity: statusLoop.getTabStatus(tabId) ?? undefined,
+                      assistant: entry.assistant,
+                      command: entry.command,
+                      id: tabId,
+                      status: entry.status ?? 'running',
+                      title: entry.title ?? '',
+                      worktreeId: entry.worktreeId,
+                    })
+                  }
+                  send(socket, {
+                    id: message.id,
+                    payload: {
+                      activeTabId: sessionActiveTabIds.get(sessionId) ?? null,
+                      tabs,
+                    },
+                    type: 'listTabsResult',
+                  })
+                  logDebug('daemon.request.listTabs', { sessionId, tabs: tabs.length })
                   break
                 }
                 case 'disposeAll': {
@@ -568,6 +738,8 @@ export async function runDaemon(): Promise<void> {
                     for (const [tabId, entry] of tabRegistry) {
                       if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
                     }
+                    sessionActiveTabIds.delete(sessionId)
+                    sessionDimensions.delete(sessionId)
                     await manager.disposeSession(sessionId)
                   }
                   sendOk(socket, message.id)
@@ -576,6 +748,14 @@ export async function runDaemon(): Promise<void> {
                 case 'ping':
                   sendOk(socket, message.id)
                   break
+                case 'prepareReexec': {
+                  // No version check needed: the requester observed the
+                  // `hotReexec` capability before sending this. The handler
+                  // itself enforces draining=false to keep concurrent
+                  // requests from corrupting the handoff.
+                  await handleReexecRequest(socket, message.id, message.payload.reason)
+                  break
+                }
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error)
@@ -618,6 +798,137 @@ export async function runDaemon(): Promise<void> {
   })
   tightenSocketPermissions(socketPath)
 
+  // Sidecar files let bystander processes detect "is the daemon running and
+  // what version is it?" without a handshake. Required by the hot-reexec
+  // path in bootstrap.ts (Ring 3).
+  try {
+    writeDaemonPidFile(process.pid)
+    writeDaemonVersionFile(getProcessVersion())
+  } catch (error) {
+    logDebug('daemon.sidecars.writeFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  let draining = false
+  // The renamed socket path is captured during drain so the shutdown handler
+  // can unlink the dirent (the listening fd still pins the inode until close;
+  // the dirent at daemon.old.sock would otherwise linger after exit).
+  let renamedSocketPath: string | null = null
+
+  type DrainOutcome =
+    | { ok: true; handoffPath: string; renamedSocketPath: string }
+    | { ok: false; message: string }
+
+  /**
+   * Hot-reexec drain. Called by either an IPC `prepareReexec` request or
+   * by `kill -USR2 <pid>`. We:
+   *   1. Write the handoff sidecar so the successor can tell it was spawned
+   *      as a reexec target (not a fresh boot).
+   *   2. Rename the listening socket out of the canonical path. The OS keeps
+   *      the original inode pinned by our listening fd, so existing client
+   *      sockets stay live; the canonical path is freed for the successor
+   *      to bind. A new dirent appears at daemon.old.sock.
+   *   3. Stop accepting new client connections (`server.close()` only
+   *      refuses new conns; existing sockets keep ferrying until they idle).
+   *   4. Schedule shutdown on a short grace so any final replies flush and
+   *      clients observe socket close (their reconnect logic interprets it
+   *      as "daemon went away — try again," landing on the successor).
+   *
+   * Returns the outcome so the caller can send an ack (or error) over
+   * whatever channel is appropriate — an IPC socket or nothing at all.
+   */
+  const drainAndHandoff = async (reason: string | undefined): Promise<DrainOutcome> => {
+    if (draining) {
+      return { message: 'Daemon is already draining for reexec', ok: false }
+    }
+    draining = true
+    logDebug('daemon.reexec.start', { pid: process.pid, reason: reason ?? null })
+
+    const oldSocketPath = getDaemonOldSocketPath()
+    // Clear any stale dirent from a previous botched reexec.
+    if (existsSync(oldSocketPath)) {
+      try {
+        unlinkSync(oldSocketPath)
+      } catch {
+        // best-effort
+      }
+    }
+
+    let handoffPath: string
+    try {
+      handoffPath = writeDaemonHandoff({
+        fromPid: process.pid,
+        fromProcessVersion: getProcessVersion(),
+        renamedSocketPath: oldSocketPath,
+        version: 1,
+        writtenAt: Date.now(),
+      })
+    } catch (error) {
+      draining = false
+      const message = error instanceof Error ? error.message : String(error)
+      logDebug('daemon.reexec.handoffWriteFailed', { error: message })
+      return { message: `Handoff file write failed: ${message}`, ok: false }
+    }
+
+    try {
+      renameSync(socketPath, oldSocketPath)
+      renamedSocketPath = oldSocketPath
+    } catch (error) {
+      draining = false
+      // Clean up the handoff file we just wrote — the successor must not see
+      // a stale handoff if reexec didn't actually start.
+      try {
+        unlinkSync(handoffPath)
+      } catch {
+        // best-effort
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      logDebug('daemon.reexec.renameFailed', { error: message })
+      return { message: `Socket rename failed: ${message}`, ok: false }
+    }
+
+    // Refuse new connections from now on; the successor will bind the
+    // canonical path.
+    server.close()
+    logDebug('daemon.reexec.drained', { handoffPath, renamedSocketPath: oldSocketPath })
+
+    // Give any in-flight replies a beat to flush, then bow out. Use the
+    // same shutdown path as a SIGTERM so hookServer/manager are torn down
+    // cleanly. `setTimeout` keeps the event loop alive long enough.
+    setTimeout(() => gracefulShutdown('reexec'), 250)
+
+    return { handoffPath, ok: true, renamedSocketPath: oldSocketPath }
+  }
+
+  const handleReexecRequest = async (
+    requester: Socket,
+    requestId: string,
+    reason: string | undefined
+  ): Promise<void> => {
+    const outcome = await drainAndHandoff(reason)
+    if (!outcome.ok) {
+      send(requester, {
+        id: requestId,
+        payload: { message: outcome.message },
+        type: 'error',
+      })
+      return
+    }
+    send(requester, {
+      id: requestId,
+      payload: {
+        handoffPath: outcome.handoffPath,
+        renamedSocketPath: outcome.renamedSocketPath,
+      },
+      type: 'reexecAck',
+    })
+    logDebug('daemon.reexec.ack', {
+      handoffPath: outcome.handoffPath,
+      renamedSocketPath: outcome.renamedSocketPath,
+    })
+  }
+
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
@@ -633,11 +944,47 @@ export async function runDaemon(): Promise<void> {
     }
     manager.destroy()
     server.close()
+    // Unlink the renamed-away socket dirent if we drained. Without this it
+    // lingers at daemon.old.sock as a dead AF_UNIX inode the next reexec
+    // would have to clean up itself.
+    if (renamedSocketPath !== null && existsSync(renamedSocketPath)) {
+      try {
+        unlinkSync(renamedSocketPath)
+      } catch (error) {
+        logDebug('daemon.reexec.oldSocketUnlinkFailed', {
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    // Sidecars: any bystander (harness, CLI) that reads daemon.pid /
+    // daemon.version between our exit and the successor's writeDaemonPidFile
+    // would see the predecessor's now-dead PID. Strip those on every
+    // shutdown; reexec additionally preserves daemon.handoff.json so the
+    // successor can log the takeover, while a regular shutdown strips the
+    // lot.
+    if (signal === 'reexec') {
+      removeDaemonSidecarsForReexec()
+    } else {
+      removeDaemonSidecars()
+    }
     process.exit(0)
   }
 
   process.on('SIGTERM', () => gracefulShutdown('sigterm'))
   process.on('SIGINT', () => gracefulShutdown('sigint'))
+  process.on('SIGUSR2', () => {
+    // Out-of-band drain trigger. Useful for `kill -USR2 <pid>` debugging or
+    // when a caller wants to nudge the daemon without negotiating a hello
+    // first. No IPC partner is waiting for a reply — we call the drain
+    // directly instead of forging a fake Socket.
+    logDebug('daemon.signal.sigusr2')
+    void (async () => {
+      const outcome = await drainAndHandoff('sigusr2')
+      if (!outcome.ok) {
+        logDebug('daemon.signal.sigusr2.drainFailed', { message: outcome.message })
+      }
+    })()
+  })
 
   process.on('uncaughtException', (error) => {
     logDebug('daemon.uncaughtException', { error: error.message, stack: error.stack })

@@ -5,10 +5,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
+  consumeDaemonHandoff,
+  getDaemonHandoffFilePath,
+  getDaemonPidFilePath,
   getDaemonSocketPath,
   getDaemonSocketSecurityIssue,
+  getDaemonVersionFilePath,
   getRuntimeProfile,
   getTerminalManagerSocketPath,
+  readDaemonPidFile,
+  readDaemonVersionFile,
+  writeDaemonHandoff,
+  writeDaemonPidFile,
+  writeDaemonVersionFile,
 } from '../../src/daemon/runtime-paths'
 
 describe('daemon runtime paths', () => {
@@ -93,6 +102,56 @@ describe('daemon runtime paths', () => {
     expect(getDaemonSocketPath()).toBe(join(tempRuntimeDir, 'aimux-dev-sandbox', 'daemon.sock'))
     expect(getTerminalManagerSocketPath()).toBe(
       join(tempRuntimeDir, 'aimux-dev-sandbox', 'terminal-manager.sock')
+    )
+  })
+
+  test('round-trips the daemon handoff file and deletes it on consume', () => {
+    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-runtime-paths-handoff-'))
+    process.env.XDG_RUNTIME_DIR = tempRuntimeDir
+
+    // Nothing on disk → consume returns null without throwing.
+    expect(consumeDaemonHandoff()).toBeNull()
+
+    const handoffPath = writeDaemonHandoff({
+      fromPid: 12345,
+      fromProcessVersion: '1.2.3',
+      renamedSocketPath: '/tmp/old.sock',
+      version: 1,
+      writtenAt: 1_700_000_000_000,
+    })
+    expect(handoffPath).toBe(getDaemonHandoffFilePath())
+
+    const consumed = consumeDaemonHandoff()
+    expect(consumed).toMatchObject({
+      fromPid: 12345,
+      fromProcessVersion: '1.2.3',
+      renamedSocketPath: '/tmp/old.sock',
+      version: 1,
+    })
+
+    // Single-use semantics: a second consume returns null because the file
+    // was deleted. Without this, a fresh boot after a successful reexec
+    // would misclassify itself as a successor and skip TM-spawn shortcuts.
+    expect(consumeDaemonHandoff()).toBeNull()
+  })
+
+  test('pid + version sidecar files round-trip', () => {
+    tempRuntimeDir = mkdtempSync(join(tmpdir(), 'aimux-runtime-paths-sidecars-'))
+    process.env.XDG_RUNTIME_DIR = tempRuntimeDir
+
+    expect(readDaemonPidFile()).toBeNull()
+    expect(readDaemonVersionFile()).toBeNull()
+
+    writeDaemonPidFile(98765)
+    writeDaemonVersionFile('1.42.0')
+
+    expect(readDaemonPidFile()).toBe(98765)
+    expect(readDaemonVersionFile()).toBe('1.42.0')
+    expect(getDaemonPidFilePath()).toBe(
+      join(tempRuntimeDir, `aimux-${getRuntimeProfile()}`, 'daemon.pid')
+    )
+    expect(getDaemonVersionFilePath()).toBe(
+      join(tempRuntimeDir, `aimux-${getRuntimeProfile()}`, 'daemon.version')
     )
   })
 

@@ -1,7 +1,9 @@
 import type {
+  AssistantId,
   SessionStatus,
   TabActivity,
   TabSession,
+  TabStatus,
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
@@ -14,8 +16,80 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 // `reapplyScrollIntent` message — the frontend no longer derives or sends it.
 // (v8 was the unfilled-viewport status-detector change; this is a further
 // breaking wire change, so the version steps again.)
+//
+// v11: additive — exposes `listTabs` (read-only enumeration without `attach`),
+// `attach.thin` (skip server-side resize so a headless CLI can attach
+// alongside a UI without resizing PTYs), and `createTab` cols/rows=0 fallback
+// to the session's last attached size. All three are gated behind
+// capabilities; MIN stays at 10 so a v10 UI keeps talking to a v11 daemon
+// (and vice-versa).
 export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 10
+export const IPC_PROTOCOL_VERSION = 11
+
+/**
+ * Capability advertised by a daemon that knows how to drain + handoff its
+ * socket to a freshly-spawned successor binary instead of dying outright.
+ * Clients only attempt `prepareReexec` against a daemon that advertises
+ * this — older daemons would respond with an unknown-request error.
+ */
+export const IPC_CAPABILITY_HOT_REEXEC = 'hotReexec'
+
+/**
+ * Capability gating the `listTabs` request. CLI clients check for it before
+ * issuing the request; pre-v11 daemons would respond with `unknown request`.
+ */
+export const IPC_CAPABILITY_LIST_TABS = 'listTabs'
+
+/**
+ * Capability gating the `attach.thin` flag. When advertised, the daemon will
+ * skip the implicit `manager.resize` on attach so a headless CLI can attach
+ * to read state without clobbering the UI's dimensions on shared PTYs.
+ */
+export const IPC_CAPABILITY_THIN_ATTACH = 'thinAttach'
+
+/**
+ * Capability gating `createTab` with `cols: 0` or `rows: 0` meaning "use the
+ * session's last attached size". Older daemons would propagate 0 straight to
+ * the TM and spawn a zero-sized PTY, so the client only sends zeroes when
+ * this capability is advertised.
+ */
+export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
+
+/**
+ * Capability gating the `tabAdded` server event. When advertised, the daemon
+ * fans a `tabAdded` event out to every socket attached to the session after
+ * a successful `createTab` — that's how a UI process learns about tabs
+ * created by a sibling CLI invocation. Pre-cap UIs simply never see the
+ * event and continue to discover tabs only via the next `attachResult`.
+ */
+export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
+
+/**
+ * Capability gating the optional `worktreeId` on `createTab` payloads. With
+ * it, the CLI can spawn a tab inside a specific worktree of the active
+ * session so the UI groups it correctly. Older daemons ignore the field
+ * (the parser accepts it but the TM has no knob for it pre-bump).
+ */
+export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
+
+/**
+ * Capabilities advertised by *this* process in its `helloResult`. Additive
+ * features should be introduced as new capability strings here rather than
+ * via a MIN bump. See `src/ipc/README.md` for the discipline.
+ *
+ * Capabilities are namespaced informally per-protocol (camelCase in this
+ * file). Legacy peers that predate the field omit it entirely; the parser
+ * normalises a missing field to `[]`, so consumers can safely call
+ * `.includes(...)` on it.
+ */
+export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
+  IPC_CAPABILITY_HOT_REEXEC,
+  IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_THIN_ATTACH,
+  IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
+  IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
+]
 
 export interface ProtocolHelloRequest {
   minVersion: number
@@ -27,6 +101,20 @@ export interface ProtocolHelloResult {
   maxVersion: number
   processVersion: string
   selectedVersion: number
+  /**
+   * Feature flags. Always present on the typed shape; older peers that did
+   * not yet advertise capabilities are normalised to `[]` at parse time.
+   */
+  capabilities: string[]
+  /**
+   * Manager-protocol version currently negotiated between the daemon and
+   * its terminal-manager. `undefined` when the daemon has not yet connected
+   * (or when the peer predates the field). Bootstrap uses this to decide
+   * whether a hot-reexec attempt has any chance: if the caller's
+   * MANAGER_PROTOCOL_MIN_VERSION > this, the successor daemon would fail
+   * to speak to the existing TM and the reexec is doomed.
+   */
+  managerSelectedVersion?: number
 }
 
 export interface AttachRequest {
@@ -35,6 +123,37 @@ export interface AttachRequest {
   cols: number
   rows: number
   workspaceSnapshot?: WorkspaceSnapshotV1
+  /**
+   * v11 / capability `thinAttach`. When true, the daemon does not call
+   * `manager.resize` on the session — the headless attacher (CLI) does not
+   * own a viewport, so it must not clobber the dimensions a UI process is
+   * driving for the same session.
+   *
+   * Pre-v11 daemons ignore the field; the gate exists so the client knows
+   * to fall through to a full attach (with a sentinel size) when the daemon
+   * predates the flag.
+   */
+  thin?: boolean
+}
+
+/**
+ * Slim per-tab summary returned by `listTabs`. Subset of {@link TabSession}
+ * with the buffer/viewport/terminalModes intentionally omitted so the request
+ * stays cheap even on sessions with many tabs.
+ */
+export interface TabSessionSummary {
+  id: string
+  assistant: AssistantId
+  title: string
+  status: TabStatus
+  activity?: TabActivity
+  command: string
+  worktreeId?: string
+}
+
+export interface ListTabsResult {
+  tabs: TabSessionSummary[]
+  activeTabId: string | null
 }
 
 export interface AttachResult {
@@ -65,6 +184,14 @@ export type ClientRequest =
         cols: number
         rows: number
         cwd?: string
+        /**
+         * v11 / capability `createTabWorktreeId`. Lets the CLI spawn a tab
+         * inside a specific worktree so the UI groups it correctly. The
+         * field is parsed unconditionally — older daemons accepted no such
+         * field, so this is a true additive on the wire — but the daemon
+         * only forwards it to the TM when its own capability is in play.
+         */
+        worktreeId?: string
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
@@ -84,12 +211,33 @@ export type ClientRequest =
   | { id: string; type: 'closeTab'; payload: { tabId: string } }
   | { id: string; type: 'disposeAll'; payload: Record<string, never> }
   | { id: string; type: 'ping'; payload: Record<string, never> }
+  // Capability-gated on `hotReexec`. The daemon drains, writes a handoff
+  // file, renames its socket out of the way, and exits cleanly so a freshly
+  // spawned successor binary can bind the canonical socket path while the
+  // terminal-manager (and every PTY) keeps running.
+  | { id: string; type: 'prepareReexec'; payload: { reason?: string } }
+  // Capability-gated on `listTabs`. Read-only enumeration of a session's
+  // tabs — does NOT attach. Lets a headless CLI inspect a session without
+  // implicit `manager.resize` or `setBroadcastEnabled` side effects.
+  | { id: string; type: 'listTabs'; payload: { sessionId: string } }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
   | { id: string; type: 'ok'; payload: Record<string, never> }
   | { id: string; type: 'attachResult'; payload: AttachResult }
+  | { id: string; type: 'listTabsResult'; payload: ListTabsResult }
   | { id: string; type: 'error'; payload: { message: string } }
+  | {
+      id: string
+      type: 'reexecAck'
+      payload: {
+        /** Absolute path to the handoff file the successor should consume. */
+        handoffPath: string
+        /** Where the old daemon renamed its still-bound socket. Provided for
+         * diagnostics — the canonical socket path is now free. */
+        renamedSocketPath: string
+      }
+    }
 
 export type ServerEvent =
   | {
@@ -100,6 +248,14 @@ export type ServerEvent =
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
   | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
+  // Capability-gated on `tabLifecycleEvents`. Broadcast after a successful
+  // `createTab` so every UI/CLI client attached to the same session learns
+  // about the new tab without having to re-attach. The tab's `viewport` is
+  // intentionally omitted — the very next `tabRender` event carries it.
+  | {
+      type: 'tabAdded'
+      payload: { sessionId: string; tab: TabSession }
+    }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
 
@@ -208,7 +364,67 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
     isFiniteNumber(value.minVersion) &&
     isFiniteNumber(value.maxVersion) &&
     isFiniteNumber(value.selectedVersion) &&
-    isString(value.processVersion)
+    isString(value.processVersion) &&
+    // Wire-back-compat: peers that predate the capabilities field omit it
+    // entirely. parseServerMessage normalises that to `[]` before the cast
+    // so the typed shape stays non-optional.
+    (value.capabilities === undefined || isStringArray(value.capabilities)) &&
+    // Additive: peers that predate managerSelectedVersion omit it.
+    (value.managerSelectedVersion === undefined || isFiniteNumber(value.managerSelectedVersion))
+  )
+}
+
+function isTabSessionSummary(value: unknown): value is TabSessionSummary {
+  return (
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.assistant) &&
+    value.assistant.length > 0 &&
+    isString(value.title) &&
+    (value.status === 'starting' ||
+      value.status === 'running' ||
+      value.status === 'disconnected' ||
+      value.status === 'error') &&
+    (value.activity === undefined ||
+      value.activity === 'working' ||
+      value.activity === 'waiting-input' ||
+      value.activity === 'idle') &&
+    isString(value.command) &&
+    (value.worktreeId === undefined || isString(value.worktreeId))
+  )
+}
+
+function isListTabsResult(value: unknown): value is ListTabsResult {
+  return (
+    isObjectRecord(value) &&
+    Array.isArray(value.tabs) &&
+    value.tabs.every(isTabSessionSummary) &&
+    isNullableString(value.activeTabId)
+  )
+}
+
+function isTabSession(value: unknown): value is TabSession {
+  return (
+    isObjectRecord(value) &&
+    isString(value.id) &&
+    isString(value.assistant) &&
+    value.assistant.length > 0 &&
+    isString(value.title) &&
+    (value.status === 'starting' ||
+      value.status === 'running' ||
+      value.status === 'disconnected' ||
+      value.status === 'error') &&
+    (value.activity === undefined ||
+      value.activity === 'working' ||
+      value.activity === 'waiting-input' ||
+      value.activity === 'idle') &&
+    isString(value.buffer) &&
+    isTerminalModeState(value.terminalModes) &&
+    isString(value.command) &&
+    (value.viewport === undefined || isTerminalSnapshot(value.viewport)) &&
+    (value.errorMessage === undefined || isString(value.errorMessage)) &&
+    (value.exitCode === undefined || isFiniteNumber(value.exitCode)) &&
+    (value.worktreeId === undefined || isString(value.worktreeId))
   )
 }
 
@@ -217,28 +433,7 @@ function isAttachResult(value: unknown): value is AttachResult {
     isObjectRecord(value) &&
     isFiniteNumber(value.protocolVersion) &&
     Array.isArray(value.tabs) &&
-    value.tabs.every(
-      (tab) =>
-        isObjectRecord(tab) &&
-        isString(tab.id) &&
-        isString(tab.assistant) &&
-        tab.assistant.length > 0 &&
-        isString(tab.title) &&
-        (tab.status === 'starting' ||
-          tab.status === 'running' ||
-          tab.status === 'disconnected' ||
-          tab.status === 'error') &&
-        (tab.activity === undefined ||
-          tab.activity === 'working' ||
-          tab.activity === 'waiting-input' ||
-          tab.activity === 'idle') &&
-        isString(tab.buffer) &&
-        isTerminalModeState(tab.terminalModes) &&
-        isString(tab.command) &&
-        (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
-        (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
-        (tab.exitCode === undefined || isFiniteNumber(tab.exitCode))
-    ) &&
+    value.tabs.every(isTabSession) &&
     isNullableString(value.activeTabId) &&
     Array.isArray(value.initialSessionStatuses) &&
     value.initialSessionStatuses.every(
@@ -250,6 +445,12 @@ function isAttachResult(value: unknown): value is AttachResult {
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new IpcProtocolError(message)
+  }
+}
+
+function normaliseCapabilities(payload: Record<string, unknown>): void {
+  if (!Array.isArray(payload.capabilities)) {
+    payload.capabilities = []
   }
 }
 
@@ -296,6 +497,13 @@ export function parseClientRequest(value: unknown): ClientRequest {
           isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
         'attach.workspaceSnapshot must be a valid workspace snapshot'
       )
+      assert(
+        value.payload.thin === undefined || typeof value.payload.thin === 'boolean',
+        'attach.thin must be a boolean when present'
+      )
+      return value as ClientRequest
+    case 'listTabs':
+      assert(isString(value.payload.sessionId), 'listTabs.sessionId must be a string')
       return value as ClientRequest
     case 'createTab':
       assert(isString(value.payload.tabId), 'createTab.tabId must be a string')
@@ -314,6 +522,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(
         value.payload.cwd === undefined || isString(value.payload.cwd),
         'createTab.cwd must be a string'
+      )
+      assert(
+        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
+        'createTab.worktreeId must be a string when present'
       )
       return value as ClientRequest
     case 'write':
@@ -345,6 +557,12 @@ export function parseClientRequest(value: unknown): ClientRequest {
     case 'disposeAll':
     case 'ping':
       return value as ClientRequest
+    case 'prepareReexec':
+      assert(
+        value.payload.reason === undefined || isString(value.payload.reason),
+        'prepareReexec.reason must be a string when present'
+      )
+      return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -359,6 +577,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'helloResult':
       assert(isString(value.id), 'helloResult.id must be a string')
       assert(isProtocolHelloResult(value.payload), 'helloResult.payload is invalid')
+      // Normalise wire-back-compat: older daemons omit `capabilities`. Force
+      // the field to `[]` so the typed shape ProtocolHelloResult.capabilities
+      // is always a real array — callers can `.includes(...)` without a guard.
+      normaliseCapabilities(value.payload)
       return value as ServerResponse
     case 'ok':
       assert(isString(value.id), 'ok.id must be a string')
@@ -367,9 +589,21 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.id), 'attachResult.id must be a string')
       assert(isAttachResult(value.payload), 'attachResult.payload is invalid')
       return value as ServerResponse
+    case 'listTabsResult':
+      assert(isString(value.id), 'listTabsResult.id must be a string')
+      assert(isListTabsResult(value.payload), 'listTabsResult.payload is invalid')
+      return value as ServerResponse
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')
+      return value as ServerResponse
+    case 'reexecAck':
+      assert(isString(value.id), 'reexecAck.id must be a string')
+      assert(isString(value.payload.handoffPath), 'reexecAck.handoffPath must be a string')
+      assert(
+        isString(value.payload.renamedSocketPath),
+        'reexecAck.renamedSocketPath must be a string'
+      )
       return value as ServerResponse
     case 'tabRender':
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')
@@ -388,6 +622,10 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.sessionId), 'tabStatus.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
       assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
+      return value as ServerEvent
+    case 'tabAdded':
+      assert(isString(value.payload.sessionId), 'tabAdded.sessionId must be a string')
+      assert(isTabSession(value.payload.tab), 'tabAdded.tab is invalid')
       return value as ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')

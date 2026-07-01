@@ -34,10 +34,32 @@ import {
 // is raised in lockstep to force matching binaries.
 export const MANAGER_PROTOCOL_MIN_VERSION = 8
 export const MANAGER_PROTOCOL_VERSION = 8
+
 /**
- * Minimum version required to send `setBroadcastEnabled`. Older TMs (v3) will
- * not understand the message; the daemon must check the negotiated version
- * before sending and fall back to always-on broadcast.
+ * Capability strings advertised by *this* process in its `helloResult`. New
+ * additive TM features should be introduced here rather than via a MIN bump
+ * — bumping MIN forces a fresh TM and kills every PTY. See
+ * `src/ipc/README.md`.
+ */
+export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
+  'setBroadcastEnabled',
+  'createTabWorktreeId',
+]
+
+/**
+ * Capability name a daemon must observe on the TM's helloResult before
+ * sending `setBroadcastEnabled`.
+ */
+export const MANAGER_CAPABILITY_SET_BROADCAST_ENABLED = 'setBroadcastEnabled'
+
+/**
+ * Version-based fallback for `setBroadcastEnabled`. TM binaries that predate
+ * the capability field (built before the additive-contract migration) don't
+ * advertise capabilities, but any TM at v4+ speaks the request. Callers gate
+ * on `capabilities.has('setBroadcastEnabled') || selectedVersion >= this`.
+ *
+ * Rolling-upgrade window: new daemon + old TM (still v4+) would otherwise
+ * silently regress to always-broadcasting, spiking CPU and IPC traffic.
  */
 export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
 
@@ -51,6 +73,11 @@ export interface ManagerHelloResult {
   maxVersion: number
   processVersion: string
   selectedVersion: number
+  /**
+   * Feature flags. Always present on the typed shape; older peers that did
+   * not yet advertise capabilities are normalised to `[]` at parse time.
+   */
+  capabilities: string[]
 }
 
 export interface ManagerAttachRequest {
@@ -85,6 +112,13 @@ export type ManagerRequest =
         cwd?: string
         /** Extra env vars merged into the spawned PTY's environment. */
         env?: Record<string, string>
+        /**
+         * Worktree this tab belongs to (UI grouping). Capability-gated on
+         * `createTabWorktreeId`. Pre-cap TMs silently drop the field, which
+         * matches the previous behaviour where every new tab had
+         * `worktreeId = undefined`.
+         */
+        worktreeId?: string
       }
     }
   | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
@@ -240,13 +274,22 @@ function isHelloResult(value: unknown): value is ManagerHelloResult {
     isFiniteNumber(value.minVersion) &&
     isFiniteNumber(value.maxVersion) &&
     isFiniteNumber(value.selectedVersion) &&
-    isString(value.processVersion)
+    isString(value.processVersion) &&
+    // Wire-back-compat: legacy peers omit capabilities entirely. The parser
+    // normalises that to `[]` before returning the typed shape.
+    (value.capabilities === undefined || isStringArray(value.capabilities))
   )
 }
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new IpcProtocolError(message)
+  }
+}
+
+function normaliseManagerCapabilities(payload: Record<string, unknown>): void {
+  if (!Array.isArray(payload.capabilities)) {
+    payload.capabilities = []
   }
 }
 
@@ -261,6 +304,7 @@ export function selectManagerProtocolVersion(payload: ManagerHelloRequest): numb
 
 export function createManagerHelloResult(selectedVersion: number): ManagerHelloResult {
   return {
+    capabilities: [...MANAGER_PROTOCOL_CAPABILITIES],
     maxVersion: MANAGER_PROTOCOL_VERSION,
     minVersion: MANAGER_PROTOCOL_MIN_VERSION,
     processVersion: getProcessVersion(),
@@ -315,6 +359,10 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(
         value.payload.env === undefined || isStringRecord(value.payload.env),
         'createTab.env must be a string-keyed string record'
+      )
+      assert(
+        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
+        'createTab.worktreeId must be a string when present'
       )
       return value as ManagerRequest
     case 'write':
@@ -375,6 +423,8 @@ export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEv
     case 'helloResult':
       assert(isString(value.id), 'helloResult.id must be a string')
       assert(isHelloResult(value.payload), 'helloResult.payload is invalid')
+      // Normalise wire-back-compat: pre-capability TMs omit the field.
+      normaliseManagerCapabilities(value.payload)
       return value as ManagerResponse
     case 'ok':
       assert(isString(value.id), 'ok.id must be a string')

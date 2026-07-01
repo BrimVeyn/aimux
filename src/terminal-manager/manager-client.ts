@@ -7,6 +7,7 @@ import { getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
+  MANAGER_CAPABILITY_SET_BROADCAST_ENABLED,
   MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
@@ -43,6 +44,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
   >()
   private readonly decoder = new MessageDecoder<ManagerResponse | ManagerEvent>(parseManagerMessage)
   private selectedProtocolVersion: number | null = null
+  private serverCapabilities: ReadonlySet<string> = new Set()
 
   private rejectPendingRequests(error: Error): void {
     for (const [id, pending] of this.pending.entries()) {
@@ -57,6 +59,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     const socket = this.socket
     this.socket = null
     this.selectedProtocolVersion = null
+    this.serverCapabilities = new Set()
     this.decoder.reset()
     this.rejectPendingRequests(new Error(reason))
 
@@ -175,7 +178,9 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     }
 
     this.selectedProtocolVersion = response.payload.selectedVersion
+    this.serverCapabilities = new Set(response.payload.capabilities)
     logDebug('managerClient.handshake.success', {
+      capabilities: response.payload.capabilities,
       processVersion: response.payload.processVersion,
       selectedVersion: this.selectedProtocolVersion,
     })
@@ -359,17 +364,20 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
 
   /**
    * Tell the TM whether to bother snapshotting and broadcasting renders.
-   * No-ops on TMs that negotiated a protocol version without the feature
-   * (older builds): the worst case is the daemon keeps receiving renders it
-   * doesn't strictly need, which matches the pre-fix behaviour.
+   * Gated on the TM advertising `setBroadcastEnabled` in its hello
+   * capabilities; TMs built before the capabilities field existed still get
+   * the call when they speak protocol v≥4 (which is where the request
+   * shipped). Below that, keep the pre-existing broadcast-always behaviour.
    */
   async setBroadcastEnabled(enabled: boolean): Promise<void> {
-    if (
-      this.selectedProtocolVersion === null ||
-      this.selectedProtocolVersion < MANAGER_PROTOCOL_BROADCAST_GATE_VERSION
-    ) {
+    const advertised = this.serverCapabilities.has(MANAGER_CAPABILITY_SET_BROADCAST_ENABLED)
+    const versionImplies =
+      this.selectedProtocolVersion !== null &&
+      this.selectedProtocolVersion >= MANAGER_PROTOCOL_BROADCAST_GATE_VERSION
+    if (!advertised && !versionImplies) {
       logDebug('managerClient.setBroadcastEnabled.skipped', {
         enabled,
+        reason: 'capability-not-advertised',
         selectedVersion: this.selectedProtocolVersion,
       })
       return
@@ -379,6 +387,15 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       payload: { enabled },
       type: 'setBroadcastEnabled',
     })
+  }
+
+  /**
+   * The manager-protocol version negotiated with the running TM, or `null`
+   * if no handshake has completed. Used by the daemon's helloResult so
+   * bootstrap can decide whether a hot-reexec would land on a compatible TM.
+   */
+  getSelectedProtocolVersion(): number | null {
+    return this.selectedProtocolVersion
   }
 
   destroy(): void {

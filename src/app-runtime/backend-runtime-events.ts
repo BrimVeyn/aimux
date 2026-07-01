@@ -12,6 +12,7 @@ import type { TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
 import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
+import { appStore } from '../state/app-store'
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend
@@ -88,11 +89,34 @@ export function bindBackendRuntimeEvents({
     dispatch({ activity, tabId, type: 'set-tab-activity' })
   }
 
+  const handleTabAdded = (sessionId: string, tab: TabSession) => {
+    // Idempotent: the daemon broadcasts `tabAdded` for every createTab,
+    // including the ones this UI process initiated (which already dispatched
+    // `add-tab` locally). Skip the duplicate so we don't get two entries for
+    // the same tab id.
+    const current = appStore.getState()
+    if (current.tabs.some((t) => t.id === tab.id)) {
+      logInputDebug('app.backend.event.tabAdded.skipDuplicate', { sessionId, tabId: tab.id })
+      return
+    }
+    if (current.currentSessionId !== sessionId) {
+      logInputDebug('app.backend.event.tabAdded.skipForeignSession', {
+        currentSessionId: current.currentSessionId,
+        sessionId,
+        tabId: tab.id,
+      })
+      return
+    }
+    logInputDebug('app.backend.event.tabAdded', { sessionId, tabId: tab.id })
+    dispatch({ tab, type: 'add-tab' })
+  }
+
   backend.on('render', handleRender)
   backend.on('exit', handleExit)
   backend.on('error', handleError)
   backend.on('sessionActivity', handleSessionActivity)
   backend.on('tabActivity', handleTabActivity)
+  backend.on('tabAdded', handleTabAdded)
 
   return () => {
     timeouts.clearAllTimers()
@@ -101,6 +125,7 @@ export function bindBackendRuntimeEvents({
     backend.off('error', handleError)
     backend.off('sessionActivity', handleSessionActivity)
     backend.off('tabActivity', handleTabActivity)
+    backend.off('tabAdded', handleTabAdded)
     void backend.destroy(true)
   }
 }

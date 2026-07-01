@@ -27,3 +27,11 @@ jobs:
 
       - name: Type check
         run: bun run check
+
+      - name: Protocol discipline check
+        # Needs access to origin/main so the MIN-bump comparison can run.
+        # `actions/checkout@v4` only fetches the merge commit by default; fetch
+        # the main ref explicitly so the script can diff against it.
+        run: |
+          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main || true
+          bun run lint:protocol
