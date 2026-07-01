@@ -13,6 +13,19 @@ const SPAWN_BACKOFF_MS = 300
 const SPAWN_ATTEMPTS = 10
 
 /**
+ * Raised only from the bootstrap phase (connecting to / spawning the daemon).
+ * The top-level CLI runner catches this and maps to EXIT_DAEMON_UNREACHABLE,
+ * distinguishing genuine connection failures from downstream runtime errors
+ * whose messages might happen to mention "socket" or "daemon".
+ */
+export class DaemonUnreachableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'DaemonUnreachableError'
+  }
+}
+
+/**
  * Connect to the daemon, spawning it if necessary. Matches the UI's bootstrap
  * but stripped of the breaking-update path — a CLI invocation is not the
  * right place to surface "your binary is out of date" UX.
@@ -27,18 +40,22 @@ export async function connectToDaemon(options: ConnectOptions = {}): Promise<Dae
     try {
       return await DaemonClient.connect(socketPath)
     } catch (error) {
-      if (!autostart) throw error
+      if (!autostart) {
+        throw new DaemonUnreachableError(
+          `daemon socket unreachable: ${error instanceof Error ? error.message : String(error)}`
+        )
+      }
       // Fall through to spawn — the socket exists but the daemon is wedged.
     }
   }
 
   if (!autostart) {
-    throw new Error(`daemon socket missing: ${socketPath}`)
+    throw new DaemonUnreachableError(`daemon socket missing: ${socketPath}`)
   }
 
   const spawned = await spawnDetachedIpcDaemon()
   if (!spawned) {
-    throw new Error('failed to start aimux daemon')
+    throw new DaemonUnreachableError('failed to start aimux daemon')
   }
 
   let lastError: unknown
@@ -51,7 +68,7 @@ export async function connectToDaemon(options: ConnectOptions = {}): Promise<Dae
     }
   }
 
-  throw new Error(
+  throw new DaemonUnreachableError(
     `daemon spawned but unreachable after ${SPAWN_ATTEMPTS} attempts: ${
       lastError instanceof Error ? lastError.message : String(lastError)
     }`

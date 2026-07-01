@@ -260,6 +260,23 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
+  // Fan a server event only to sockets that negotiated a version supporting
+  // it. Older peers whose `parseServerMessage` doesn't recognise the type
+  // would throw on receipt and drop the connection — MIN_VERSION stays at 10
+  // for compat, so we can't rely on every attached socket being v11.
+  const broadcastForSessionVersioned = (
+    sessionId: string,
+    minVersion: number,
+    event: ServerEvent
+  ): void => {
+    for (const socket of sockets) {
+      if (attachedSessions.get(socket) !== sessionId) continue
+      const version = negotiatedVersions.get(socket)
+      if (version === undefined || version < minVersion) continue
+      send(socket, event)
+    }
+  }
+
   manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
     const existing = tabRegistry.get(tabId)
     let newSeq: number | null = null
@@ -466,32 +483,40 @@ export async function runDaemon(): Promise<void> {
                   }
 
                   attachedSessions.set(socket, message.payload.sessionId)
-                  // thin: skip the implicit `manager.resize` inside
-                  // attachSession by telling the TM that this attach owns no
-                  // dimensions. The TM still resizes (because the entry-point
-                  // calls resize unconditionally inside `attachSession`), so
-                  // we re-attach with a special path: attach normally then,
-                  // for thin attachers, restore the previously-recorded
-                  // dimensions if a real attacher established them.
-                  const attachResult = await manager.attachSession({
-                    cols: message.payload.cols,
-                    rows: message.payload.rows,
-                    sessionId: message.payload.sessionId,
-                    workspaceSnapshot: message.payload.workspaceSnapshot,
-                  })
-                  if (message.payload.thin === true) {
+                  // A thin attacher (headless CLI) does not own a viewport, so
+                  // it must not resize PTYs on a session a UI is driving. TM's
+                  // attachSession always calls `sessionManager.resize` on the
+                  // incoming dimensions, so we substitute prior dims (or a
+                  // safe default when none exist) before calling it. That
+                  // makes the resize a no-op against the current PTY size
+                  // instead of clobbering it. We also seed sessionDimensions
+                  // on first-ever thin attach so `createTab`'s 0×0 fallback
+                  // works for headless bootstrap flows (no UI has ever
+                  // attached to this session).
+                  let attachCols = message.payload.cols
+                  let attachRows = message.payload.rows
+                  const isThin = message.payload.thin === true
+                  if (isThin) {
                     const prior = sessionDimensions.get(message.payload.sessionId)
-                    if (
-                      prior &&
-                      (prior.cols !== message.payload.cols || prior.rows !== message.payload.rows)
-                    ) {
-                      try {
-                        await manager.resize(message.payload.sessionId, prior.cols, prior.rows)
-                      } catch (error) {
-                        logDebug('daemon.attach.thin.resizeRestoreFailed', {
-                          error: error instanceof Error ? error.message : String(error),
-                        })
-                      }
+                    if (prior) {
+                      attachCols = prior.cols
+                      attachRows = prior.rows
+                    } else {
+                      // No UI has established dimensions yet. Seed a safe
+                      // default so PTYs don't spawn at 0×0 and so the
+                      // createTab fallback has something to work with. Any
+                      // real UI attach afterwards overwrites this.
+                      attachCols = 80
+                      attachRows = 24
+                      sessionDimensions.set(message.payload.sessionId, {
+                        cols: attachCols,
+                        rows: attachRows,
+                      })
+                      logDebug('daemon.attach.thin.seedDefaultDimensions', {
+                        cols: attachCols,
+                        rows: attachRows,
+                        sessionId: message.payload.sessionId,
+                      })
                     }
                   } else {
                     sessionDimensions.set(message.payload.sessionId, {
@@ -499,6 +524,12 @@ export async function runDaemon(): Promise<void> {
                       rows: message.payload.rows,
                     })
                   }
+                  const attachResult = await manager.attachSession({
+                    cols: attachCols,
+                    rows: attachRows,
+                    sessionId: message.payload.sessionId,
+                    workspaceSnapshot: message.payload.workspaceSnapshot,
+                  })
                   sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
                     rememberTab(
@@ -611,15 +642,10 @@ export async function runDaemon(): Promise<void> {
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
                   await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
                   sendOk(socket, message.id)
-                  // Fan a `tabAdded` event to every client watching this
-                  // session so siblings (e.g. the UI when a CLI created the
-                  // tab) can `add-tab` to their store and start applying the
-                  // subsequent `tabRender` events. The capability gate is on
-                  // the receiver side — the wire shape is harmless for old
-                  // clients (their `parseServerMessage` doesn't recognise
-                  // `tabAdded` and would throw, so we ONLY send it to peers
-                  // that negotiated v11). Older clients on a v11 daemon
-                  // negotiate v11 too, so the parser knows the case.
+                  // Fan a `tabAdded` event only to peers that negotiated at
+                  // least v11 — older parsers throw on unknown message types
+                  // and would drop the connection. MIN_VERSION stays at 10
+                  // for backward compat, so we must gate this at send time.
                   const synthesizedTab: TabSession = {
                     activity: 'idle',
                     assistant: message.payload.assistant,
@@ -631,7 +657,7 @@ export async function runDaemon(): Promise<void> {
                     title: message.payload.title,
                     worktreeId: message.payload.worktreeId,
                   }
-                  broadcastForSession(sessionId, {
+                  broadcastForSessionVersioned(sessionId, 11, {
                     payload: { sessionId, tab: synthesizedTab },
                     type: 'tabAdded',
                   })
@@ -688,8 +714,12 @@ export async function runDaemon(): Promise<void> {
                 case 'setActiveTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
+                  // Update the cache AFTER the TM confirms the change — if
+                  // manager.setActiveTab throws (tab doesn't exist, TM
+                  // rejects), the cache would otherwise retain the bogus tabId
+                  // and a subsequent listTabs would return a stale activeTabId.
                   await manager.setActiveTab(sessionId, message.payload.tabId)
+                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }

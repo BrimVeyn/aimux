@@ -1,7 +1,7 @@
 import type { DaemonClient } from './client/daemon-client'
 import type { CliContext } from './context'
 
-import { connectToDaemon } from './client/bootstrap'
+import { connectToDaemon, DaemonUnreachableError } from './client/bootstrap'
 import { resolveWorkspace } from './client/workspace-resolver'
 import { CliUsageError, parseArgs } from './flags'
 import {
@@ -94,7 +94,12 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     return code
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    if (/daemon|socket|unreachable|ECONNREFUSED/i.test(message)) {
+    // Classify by error type, not by string-sniffing the message: a runtime
+    // error whose message happens to include "socket" (e.g. daemon reply
+    // "socket write failed for tab X") must not masquerade as
+    // daemon-unreachable, or CI that treats exit 4 as a "restart the daemon"
+    // signal will retry spuriously.
+    if (error instanceof DaemonUnreachableError) {
       writeError(message)
       writeJson({ error: message, kind: 'daemon-unreachable' })
       return EXIT_DAEMON_UNREACHABLE
