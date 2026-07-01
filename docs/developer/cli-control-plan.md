@@ -246,8 +246,9 @@ effect.
 ### Tier 2 surface
 
 ```
-aimux workspace create <name> [--project P] [--switch]
+aimux workspace create <name> [--project P] [--switch] [--wait] [--timeout N]
 -> { name, projectPath, switch }
+   # --wait (requires --switch) blocks until workspaceSwitched fires
 
 aimux workspace switch <name|id> [--wait] [--timeout N]
 -> { name, targetSessionId }   # with --wait, exits when workspaceSwitched fires

@@ -841,7 +841,15 @@ export async function runDaemon(): Promise<void> {
                     logDebug('daemon.request.createWorkspace.relay', { name, projectPath })
                   } else {
                     const created = createWorkspaceInCatalog(name, projectPath)
-                    if (doSwitch === true) bumpLastOpenedInCatalog(created.id)
+                    if (doSwitch === true) {
+                      bumpLastOpenedInCatalog(created.id)
+                      // Mirror the UI-attached path: an ack event so a
+                      // `--wait` CLI can exit even in the headless flow.
+                      broadcastAllVersioned(12, {
+                        payload: { sessionId: created.id },
+                        type: 'workspaceSwitched',
+                      })
+                    }
                     logDebug('daemon.request.createWorkspace.direct', {
                       name,
                       sessionId: created.id,
