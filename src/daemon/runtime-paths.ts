@@ -248,3 +248,23 @@ export function removeDaemonSidecars(): void {
     }
   }
 }
+
+/**
+ * Reexec-only variant: strip pid/version so no bystander (harness, CLI,
+ * anything that prefers the pidfile over `lsof`) reads a dead PID during
+ * the swap window. The handoff file is intentionally preserved — the
+ * successor consumes it on boot to log that it took over from the
+ * predecessor. The renamed socket dirent is handled by the shutdown path
+ * (which unlinks it after `server.close()` releases the inode).
+ */
+export function removeDaemonSidecarsForReexec(): void {
+  for (const path of [getDaemonPidFilePath(), getDaemonVersionFilePath()]) {
+    if (existsSync(path)) {
+      try {
+        unlinkSync(path)
+      } catch {
+        // best-effort cleanup
+      }
+    }
+  }
+}

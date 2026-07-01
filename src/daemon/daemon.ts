@@ -31,6 +31,7 @@ import {
   getSocketSecurityIssue,
   getTerminalManagerSocketPath,
   removeDaemonSidecars,
+  removeDaemonSidecarsForReexec,
   removeDaemonSocketIfExists,
   removeTerminalManagerSocketIfExists,
   tightenSocketPermissions,
@@ -948,11 +949,15 @@ export async function runDaemon(): Promise<void> {
         })
       }
     }
-    // Sidecars: a fresh boot would overwrite them, but if we exit cleanly
-    // we leave a clean state. The handoff file is intentionally left in
-    // place only by reexec (writeDaemonHandoff already did that); for any
-    // other shutdown we strip the lot.
-    if (signal !== 'reexec') {
+    // Sidecars: any bystander (harness, CLI) that reads daemon.pid /
+    // daemon.version between our exit and the successor's writeDaemonPidFile
+    // would see the predecessor's now-dead PID. Strip those on every
+    // shutdown; reexec additionally preserves daemon.handoff.json so the
+    // successor can log the takeover, while a regular shutdown strips the
+    // lot.
+    if (signal === 'reexec') {
+      removeDaemonSidecarsForReexec()
+    } else {
       removeDaemonSidecars()
     }
     process.exit(0)
