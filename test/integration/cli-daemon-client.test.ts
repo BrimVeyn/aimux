@@ -308,6 +308,55 @@ describe('CLI DaemonClient', () => {
     expect(req?.payload).toMatchObject({ sessionId: 'session-1', worktree: { id: 'wt-1' } })
   })
 
+  test('tabRender + tabExit stream through to subscribers (tab tail)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const events: string[] = []
+    client.on('tabRender', (payload) => {
+      events.push(`render:${payload.tabId}:${payload.viewport.lines.length}`)
+    })
+    client.on('tabExit', (payload) => {
+      events.push(`exit:${payload.tabId}:${payload.exitCode}`)
+    })
+
+    await client.attach({ cols: 0, rows: 0, sessionId: 'session-1', thin: true })
+
+    mock.emit({
+      payload: {
+        tabId: 'tab-1',
+        terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
+          mouseTrackingMode: 'none',
+          sendFocusMode: false,
+        },
+        viewport: {
+          baseY: 0,
+          cursorVisible: true,
+          lines: [{ spans: [{ text: 'hi' }] }, { spans: [{ text: 'there' }] }],
+          viewportY: 0,
+        },
+      },
+      type: 'tabRender',
+    })
+    mock.emit({
+      payload: { exitCode: 0, tabId: 'tab-1' },
+      type: 'tabExit',
+    })
+
+    const deadline = Date.now() + 500
+    while (events.length < 2 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(events).toEqual(['render:tab-1:2', 'exit:tab-1:0'])
+  })
+
   test('tabStatus events fan out to subscribers', async () => {
     const socketPath = tempSocketPath()
     const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])

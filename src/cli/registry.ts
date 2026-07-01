@@ -7,6 +7,7 @@ import { tabFocus } from './commands/tab/focus'
 import { tabList } from './commands/tab/list'
 import { tabSend } from './commands/tab/send'
 import { tabSnapshot } from './commands/tab/snapshot'
+import { tabTail } from './commands/tab/tail'
 import { tabWait } from './commands/tab/wait'
 import { workspaceClose } from './commands/workspace/close'
 import { workspaceCreate } from './commands/workspace/create'
@@ -33,6 +34,7 @@ export const COMMANDS: readonly CliCommand[] = [
   tabFocus,
   tabClose,
   tabSnapshot,
+  tabTail,
   tabWait,
   workspaceList,
   workspaceShow,
