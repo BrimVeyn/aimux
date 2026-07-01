@@ -427,17 +427,19 @@ export async function createSessionBackend(opts?: {
           logDebug('backend.create.remote', { reexec: true, socketPath })
           return new RemoteSessionBackend()
         }
-        // Reexec succeeded but the successor still mismatches. Fall through
-        // to the legacy path — at this point the TM is still alive but the
-        // daemon binary is the user's intended one, so the legacy stopTM
-        // wouldn't help anyway. Surface a clear error.
-        throw new Error(
-          `IPC daemon handshake failed after hot-reexec: ${
-            afterReexec.error ?? 'incompatible protocol'
-          }`
-        )
+        // Reexec succeeded but the successor still mismatches. This is the
+        // partial-update / PATH-skew case: the on-disk binary that spawned
+        // as the successor disagrees with what this process is running.
+        // Legacy stopTM+restart is exactly the recovery path — a fresh TM
+        // + a full daemon restart re-pin both protocols against the same
+        // binary. Fall through instead of throwing.
+        logDebug('backend.create.reexec.fallback', {
+          error: afterReexec.error ?? 'incompatible protocol',
+          reason: 'post-reexec handshake still mismatches',
+        })
+      } else {
+        logDebug('backend.create.reexec.fallback', { reason: 'reexec attempt failed' })
       }
-      logDebug('backend.create.reexec.fallback', { reason: 'reexec attempt failed' })
     } else if (reexecEnabled && daemonSupportsReexec && !managerCompatible) {
       logDebug('backend.create.reexec.skipped', {
         managerSelectedVersion: handshake.managerSelectedVersion ?? null,
