@@ -259,6 +259,23 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
+  // Fan a server event only to sockets that negotiated a version supporting
+  // it. Older peers whose `parseServerMessage` doesn't recognise the type
+  // would throw on receipt and drop the connection — MIN_VERSION stays at 10
+  // for compat, so we can't rely on every attached socket being v11.
+  const broadcastForSessionVersioned = (
+    sessionId: string,
+    minVersion: number,
+    event: ServerEvent
+  ): void => {
+    for (const socket of sockets) {
+      if (attachedSessions.get(socket) !== sessionId) continue
+      const version = negotiatedVersions.get(socket)
+      if (version === undefined || version < minVersion) continue
+      send(socket, event)
+    }
+  }
+
   manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
     const existing = tabRegistry.get(tabId)
     let newSeq: number | null = null
@@ -608,15 +625,10 @@ export async function runDaemon(): Promise<void> {
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
                   await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
                   sendOk(socket, message.id)
-                  // Fan a `tabAdded` event to every client watching this
-                  // session so siblings (e.g. the UI when a CLI created the
-                  // tab) can `add-tab` to their store and start applying the
-                  // subsequent `tabRender` events. The capability gate is on
-                  // the receiver side — the wire shape is harmless for old
-                  // clients (their `parseServerMessage` doesn't recognise
-                  // `tabAdded` and would throw, so we ONLY send it to peers
-                  // that negotiated v11). Older clients on a v11 daemon
-                  // negotiate v11 too, so the parser knows the case.
+                  // Fan a `tabAdded` event only to peers that negotiated at
+                  // least v11 — older parsers throw on unknown message types
+                  // and would drop the connection. MIN_VERSION stays at 10
+                  // for backward compat, so we must gate this at send time.
                   const synthesizedTab: TabSession = {
                     activity: 'idle',
                     assistant: message.payload.assistant,
@@ -628,7 +640,7 @@ export async function runDaemon(): Promise<void> {
                     title: message.payload.title,
                     worktreeId: message.payload.worktreeId,
                   }
-                  broadcastForSession(sessionId, {
+                  broadcastForSessionVersioned(sessionId, 11, {
                     payload: { sessionId, tab: synthesizedTab },
                     type: 'tabAdded',
                   })
