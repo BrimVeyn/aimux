@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { connect } from 'node:net'
 
 import { getDaemonSocketPath, removeDaemonSocketIfExists } from './daemon/runtime-paths'
+import { MANAGER_PROTOCOL_MIN_VERSION } from './ipc/manager-protocol'
 import {
   encodeMessage,
   IPC_CAPABILITY_HOT_REEXEC,
@@ -54,10 +55,21 @@ async function negotiateReexec(socketPath: string): Promise<boolean> {
         for (const message of decoder.push(chunk)) {
           if (!('id' in message)) continue
           if (message.id === helloId) {
-            if (
-              message.type !== 'helloResult' ||
-              !message.payload.capabilities.includes(IPC_CAPABILITY_HOT_REEXEC)
-            ) {
+            if (message.type !== 'helloResult') {
+              finish(false)
+              return
+            }
+            if (!message.payload.capabilities.includes(IPC_CAPABILITY_HOT_REEXEC)) {
+              finish(false)
+              return
+            }
+            // If the successor daemon's MANAGER_PROTOCOL_MIN_VERSION > what
+            // the live TM speaks, the successor will crash before binding.
+            // Bail early so the caller falls straight through to brute
+            // restart instead of paying the 250ms drain + 2s bind-wait for a
+            // guaranteed-failed reexec.
+            const managerSelected = message.payload.managerSelectedVersion
+            if (managerSelected === undefined || managerSelected < MANAGER_PROTOCOL_MIN_VERSION) {
               finish(false)
               return
             }

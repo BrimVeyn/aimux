@@ -389,6 +389,15 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     })
   }
 
+  /**
+   * The manager-protocol version negotiated with the running TM, or `null`
+   * if no handshake has completed. Used by the daemon's helloResult so
+   * bootstrap can decide whether a hot-reexec would land on a compatible TM.
+   */
+  getSelectedProtocolVersion(): number | null {
+    return this.selectedProtocolVersion
+  }
+
   destroy(): void {
     this.resetConnection('Terminal manager client destroyed')
   }

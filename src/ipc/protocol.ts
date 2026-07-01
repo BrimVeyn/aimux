@@ -106,6 +106,15 @@ export interface ProtocolHelloResult {
    * not yet advertise capabilities are normalised to `[]` at parse time.
    */
   capabilities: string[]
+  /**
+   * Manager-protocol version currently negotiated between the daemon and
+   * its terminal-manager. `undefined` when the daemon has not yet connected
+   * (or when the peer predates the field). Bootstrap uses this to decide
+   * whether a hot-reexec attempt has any chance: if the caller's
+   * MANAGER_PROTOCOL_MIN_VERSION > this, the successor daemon would fail
+   * to speak to the existing TM and the reexec is doomed.
+   */
+  managerSelectedVersion?: number
 }
 
 export interface AttachRequest {
@@ -359,7 +368,9 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
     // Wire-back-compat: peers that predate the capabilities field omit it
     // entirely. parseServerMessage normalises that to `[]` before the cast
     // so the typed shape stays non-optional.
-    (value.capabilities === undefined || isStringArray(value.capabilities))
+    (value.capabilities === undefined || isStringArray(value.capabilities)) &&
+    // Additive: peers that predate managerSelectedVersion omit it.
+    (value.managerSelectedVersion === undefined || isFiniteNumber(value.managerSelectedVersion))
   )
 }
 

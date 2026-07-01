@@ -10,6 +10,7 @@ import {
   removeTerminalManagerSocketIfExists,
 } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
+import { MANAGER_PROTOCOL_MIN_VERSION } from '../ipc/manager-protocol'
 import {
   encodeMessage,
   IPC_CAPABILITY_HOT_REEXEC,
@@ -40,6 +41,13 @@ interface DaemonHandshakeProbeResult {
    * advertises `hotReexec`.
    */
   capabilities?: readonly string[]
+  /**
+   * Manager-protocol version the daemon negotiated with the running TM.
+   * Undefined when the daemon hasn't reached the TM yet or predates the
+   * field. Bootstrap uses this to skip hot-reexec when the successor's
+   * MANAGER_PROTOCOL_MIN_VERSION would be higher than the live TM speaks.
+   */
+  managerSelectedVersion?: number
 }
 
 async function spawnDaemon(): Promise<void> {
@@ -100,6 +108,7 @@ export async function probeDaemonProtocolCompatibility(
     const probeSessionId = `probe-${crypto.randomUUID()}`
     let daemonProcessVersion: string | undefined
     let daemonCapabilities: readonly string[] = []
+    let daemonManagerSelectedVersion: number | undefined
     let settled = false
     const timer = setTimeout(() => {
       finish({ compatible: false, error: 'handshake timed out' })
@@ -150,6 +159,7 @@ export async function probeDaemonProtocolCompatibility(
 
             daemonProcessVersion = message.payload.processVersion
             daemonCapabilities = message.payload.capabilities
+            daemonManagerSelectedVersion = message.payload.managerSelectedVersion
 
             socket.write(
               encodeMessage({
@@ -193,6 +203,7 @@ export async function probeDaemonProtocolCompatibility(
               error: compatible
                 ? undefined
                 : `attach returned protocol v${message.payload.protocolVersion}`,
+              managerSelectedVersion: daemonManagerSelectedVersion,
               processVersion: daemonProcessVersion,
               selectedVersion: message.payload.protocolVersion,
             })
@@ -391,7 +402,16 @@ export async function createSessionBackend(opts?: {
     const reexecEnabled = process.env.AIMUX_HOT_REEXEC === '1'
     const daemonSupportsReexec =
       handshake.capabilities?.includes(IPC_CAPABILITY_HOT_REEXEC) ?? false
-    if (reexecEnabled && daemonSupportsReexec) {
+    // If the successor daemon's MANAGER_PROTOCOL_MIN_VERSION > what the
+    // running TM negotiated, the reexec is doomed: the successor will crash
+    // in ensureTerminalManagerReady() before binding the canonical socket.
+    // A legacy daemon that predates managerSelectedVersion returns undefined
+    // — treat that as "unknown, don't try" to avoid a 2-second wasted round-
+    // trip on a rolling upgrade that also bumps the manager protocol.
+    const managerCompatible =
+      handshake.managerSelectedVersion !== undefined &&
+      handshake.managerSelectedVersion >= MANAGER_PROTOCOL_MIN_VERSION
+    if (reexecEnabled && daemonSupportsReexec && managerCompatible) {
       logDebug('backend.create.tryReexec', { socketPath })
       const reexecOk = await hotReexecAndRespawn(socketPath)
       if (reexecOk) {
@@ -418,6 +438,12 @@ export async function createSessionBackend(opts?: {
         )
       }
       logDebug('backend.create.reexec.fallback', { reason: 'reexec attempt failed' })
+    } else if (reexecEnabled && daemonSupportsReexec && !managerCompatible) {
+      logDebug('backend.create.reexec.skipped', {
+        managerSelectedVersion: handshake.managerSelectedVersion ?? null,
+        minRequired: MANAGER_PROTOCOL_MIN_VERSION,
+        reason: 'manager-protocol-mismatch',
+      })
     }
 
     // We're about to kill the terminal-manager and every PTY — warn the UI

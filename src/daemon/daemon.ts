@@ -434,10 +434,12 @@ export async function runDaemon(): Promise<void> {
                   }
                   negotiatedVersions.set(socket, selectedVersion)
                   logDebug('daemon.request.hello.success', { selectedVersion })
+                  const managerSelectedVersion = manager.getSelectedProtocolVersion()
                   send(socket, {
                     id: message.id,
                     payload: {
                       capabilities: [...IPC_PROTOCOL_CAPABILITIES],
+                      ...(managerSelectedVersion !== null && { managerSelectedVersion }),
                       maxVersion: IPC_PROTOCOL_VERSION,
                       minVersion: IPC_PROTOCOL_MIN_VERSION,
                       processVersion: getProcessVersion(),
