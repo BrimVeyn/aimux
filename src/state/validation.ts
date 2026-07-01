@@ -107,7 +107,7 @@ function isStringRecord(value: unknown): boolean {
   return Object.values(value).every(isString)
 }
 
-function isWorktreeRecord(value: unknown): value is WorktreeRecord {
+export function isWorktreeRecord(value: unknown): value is WorktreeRecord {
   return (
     isObjectRecord(value) &&
     isString(value.id) &&
