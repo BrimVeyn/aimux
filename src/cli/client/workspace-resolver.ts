@@ -30,18 +30,24 @@ export function resolveWorkspace(name: string | undefined): SessionRecord {
   const byId = sessions.find((session) => session.id === name)
   if (byId) return byId
 
-  const byName = sessions.find((session) => session.name === name)
-  if (byName) return byName
+  const exactNameMatches = sessions.filter((session) => session.name === name)
+  if (exactNameMatches.length > 1) {
+    throw new Error(
+      `workspace "${name}" matches multiple sessions: ${exactNameMatches.map((s) => s.id).join(', ')}`
+    )
+  }
+  const exactOnly = exactNameMatches[0]
+  if (exactOnly) return exactOnly
 
   const lower = name.toLowerCase()
   const ciMatches = sessions.filter((session) => session.name.toLowerCase() === lower)
-  const onlyMatch = ciMatches.length === 1 ? ciMatches[0] : undefined
-  if (onlyMatch) return onlyMatch
   if (ciMatches.length > 1) {
     throw new Error(
       `workspace "${name}" matches multiple sessions: ${ciMatches.map((s) => s.id).join(', ')}`
     )
   }
+  const ciOnly = ciMatches[0]
+  if (ciOnly) return ciOnly
 
   throw new Error(`workspace not found: ${name}`)
 }
