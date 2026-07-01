@@ -384,12 +384,10 @@ export async function createSessionBackend(opts?: {
       error: handshake.error ?? 'incompatible daemon handshake',
       socketPath,
     })
-    await opts?.onBreakingUpdateRequired?.()
-
     // Ring 3: prefer hot-reexec over the legacy stopTM+restart path when
     // the running daemon advertises `hotReexec` and the operator has opted
     // in via AIMUX_HOT_REEXEC=1. The terminal-manager and every PTY stay
-    // alive; the daemon binary swaps under them.
+    // alive; the daemon binary swaps under them — no session-loss prompt.
     const reexecEnabled = process.env.AIMUX_HOT_REEXEC === '1'
     const daemonSupportsReexec =
       handshake.capabilities?.includes(IPC_CAPABILITY_HOT_REEXEC) ?? false
@@ -421,6 +419,12 @@ export async function createSessionBackend(opts?: {
       }
       logDebug('backend.create.reexec.fallback', { reason: 'reexec attempt failed' })
     }
+
+    // We're about to kill the terminal-manager and every PTY — warn the UI
+    // now so the user isn't surprised. The hot-reexec branch above never
+    // reaches this point, so the callback fires only when sessions really
+    // do die.
+    await opts?.onBreakingUpdateRequired?.()
 
     // AIMUX_ALLOW_KILL_PTYS: legacy breaking-update fallback. Ring 3 of
     // docs/developer/hot-migration-plan.md replaces this with daemon
