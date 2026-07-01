@@ -96,4 +96,10 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
   disposeSession(tabId: string): void
   disposeAll(): void
   destroy(keepSessions?: boolean): Promise<void> | void
+  /**
+   * v12 — the UI calls this after `handleSwitchSessionEffect` finishes so the
+   * daemon can broadcast `workspaceSwitched` and any `aimux workspace switch
+   * --wait` CLI can exit. No-op on local backends (no daemon).
+   */
+  announceWorkspaceSwitched(sessionId: string): void
 }

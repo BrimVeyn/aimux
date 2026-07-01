@@ -515,6 +515,20 @@ export class RemoteSessionBackend
     this.dispatchCommand({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }, 'disposeAll')
   }
 
+  announceWorkspaceSwitched(sessionId: string): void {
+    // Fire-and-forget so `handleSwitchSessionEffect` doesn't block waiting on
+    // the daemon roundtrip. The daemon relays this as a `workspaceSwitched`
+    // broadcast that unblocks any `aimux workspace switch --wait` CLI.
+    this.dispatchCommand(
+      {
+        id: crypto.randomUUID(),
+        payload: { sessionId },
+        type: 'announceWorkspaceSwitched',
+      },
+      'announceWorkspaceSwitched'
+    )
+  }
+
   async destroy(keepSessions = true): Promise<void> {
     logDebug('backend.remote.destroy', { keepSessions })
     this.shouldReconnect = false
