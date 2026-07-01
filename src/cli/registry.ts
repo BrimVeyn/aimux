@@ -7,9 +7,16 @@ import { tabFocus } from './commands/tab/focus'
 import { tabList } from './commands/tab/list'
 import { tabSend } from './commands/tab/send'
 import { tabSnapshot } from './commands/tab/snapshot'
+import { tabTail } from './commands/tab/tail'
 import { tabWait } from './commands/tab/wait'
+import { workspaceClose } from './commands/workspace/close'
+import { workspaceCreate } from './commands/workspace/create'
 import { workspaceList } from './commands/workspace/list'
 import { workspaceShow } from './commands/workspace/show'
+import { workspaceSwitch } from './commands/workspace/switch'
+import { worktreeCreate } from './commands/worktree/create'
+import { worktreeList } from './commands/worktree/list'
+import { worktreeRemove } from './commands/worktree/remove'
 
 export interface CliCommand {
   group: string
@@ -27,9 +34,16 @@ export const COMMANDS: readonly CliCommand[] = [
   tabFocus,
   tabClose,
   tabSnapshot,
+  tabTail,
   tabWait,
   workspaceList,
   workspaceShow,
+  workspaceCreate,
+  workspaceSwitch,
+  workspaceClose,
+  worktreeList,
+  worktreeCreate,
+  worktreeRemove,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

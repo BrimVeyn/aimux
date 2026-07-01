@@ -10,6 +10,8 @@ import {
   encodeMessage,
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_THIN_ATTACH,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
+  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -219,6 +221,140 @@ describe('CLI DaemonClient', () => {
       await Bun.sleep(10)
     }
     expect(seen).toEqual([{ sessionId: 'session-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
+  })
+
+  test('createWorkspace request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('createWorkspace', { name: 'ws', projectPath: '/tmp/x', switch: true })
+    const req = mock.received.find((m) => m.type === 'createWorkspace')
+    expect(req?.payload).toEqual({ name: 'ws', projectPath: '/tmp/x', switch: true })
+  })
+
+  test('switchWorkspace request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('switchWorkspace', { targetSessionId: 'session-2' })
+    const req = mock.received.find((m) => m.type === 'switchWorkspace')
+    expect(req?.payload).toEqual({ targetSessionId: 'session-2' })
+  })
+
+  test('closeWorkspace request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('closeWorkspace', { targetSessionId: 'session-3' })
+    const req = mock.received.find((m) => m.type === 'closeWorkspace')
+    expect(req?.payload).toEqual({ targetSessionId: 'session-3' })
+  })
+
+  test('workspaceSwitched broadcast lands on the subscriber', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const seen: string[] = []
+    client.on('workspaceSwitched', (payload) => seen.push(payload.sessionId))
+
+    mock.emit({
+      payload: { sessionId: 'session-9' },
+      type: 'workspaceSwitched',
+    })
+
+    const deadline = Date.now() + 500
+    while (seen.length === 0 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(seen).toEqual(['session-9'])
+  })
+
+  test('addWorktreeRecord request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const worktree = {
+      createdAt: '2026-07-01T00:00:00.000Z',
+      createdByAimux: true,
+      id: 'wt-1',
+      name: 'feat/x',
+      path: '/tmp/wt/feat-x',
+      repoRoot: '/tmp/repo',
+      source: 'aimux-temp' as const,
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    }
+    await client.expectOk('addWorktreeRecord', { sessionId: 'session-1', worktree })
+    const req = mock.received.find((m) => m.type === 'addWorktreeRecord')
+    expect(req?.payload).toMatchObject({ sessionId: 'session-1', worktree: { id: 'wt-1' } })
+  })
+
+  test('tabRender + tabExit stream through to subscribers (tab tail)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const events: string[] = []
+    client.on('tabRender', (payload) => {
+      events.push(`render:${payload.tabId}:${payload.viewport.lines.length}`)
+    })
+    client.on('tabExit', (payload) => {
+      events.push(`exit:${payload.tabId}:${payload.exitCode}`)
+    })
+
+    await client.attach({ cols: 0, rows: 0, sessionId: 'session-1', thin: true })
+
+    mock.emit({
+      payload: {
+        tabId: 'tab-1',
+        terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
+          mouseTrackingMode: 'none',
+          sendFocusMode: false,
+        },
+        viewport: {
+          baseY: 0,
+          cursorVisible: true,
+          lines: [{ spans: [{ text: 'hi' }] }, { spans: [{ text: 'there' }] }],
+          viewportY: 0,
+        },
+      },
+      type: 'tabRender',
+    })
+    mock.emit({
+      payload: { exitCode: 0, tabId: 'tab-1' },
+      type: 'tabExit',
+    })
+
+    const deadline = Date.now() + 500
+    while (events.length < 2 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(events).toEqual(['render:tab-1:2', 'exit:tab-1:0'])
   })
 
   test('tabStatus events fan out to subscribers', async () => {

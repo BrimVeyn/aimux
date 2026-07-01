@@ -15,8 +15,8 @@ import {
 } from '../../src/ipc/protocol'
 
 describe('ipc protocol v11', () => {
-  test('MAX is 11, MIN stays at 10 (additive bump)', () => {
-    expect(IPC_PROTOCOL_VERSION).toBe(11)
+  test('MAX is at least 11, MIN stays at 10 (additive bump)', () => {
+    expect(IPC_PROTOCOL_VERSION).toBeGreaterThanOrEqual(11)
     expect(IPC_PROTOCOL_MIN_VERSION).toBe(10)
   })
 

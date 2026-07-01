@@ -231,4 +231,8 @@ export class LocalSessionBackend
     this.statusLoop.stop()
     this.currentSessionId = null
   }
+
+  announceWorkspaceSwitched(_sessionId: string): void {
+    // No daemon on the local backend, so there's no CLI to notify.
+  }
 }

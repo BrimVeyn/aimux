@@ -7,9 +7,10 @@ import type {
   TerminalModeState,
   TerminalSnapshot,
   WorkspaceSnapshotV1,
+  WorktreeRecord,
 } from '../state/types'
 
-import { isWorkspaceSnapshotV1 } from '../state/validation'
+import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 
 // v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
@@ -23,8 +24,13 @@ import { isWorkspaceSnapshotV1 } from '../state/validation'
 // to the session's last attached size. All three are gated behind
 // capabilities; MIN stays at 10 so a v10 UI keeps talking to a v11 daemon
 // (and vice-versa).
+//
+// v12: additive — workspace lifecycle requests (`createWorkspace`,
+// `switchWorkspace`, `closeWorkspace`, `announceWorkspaceSwitched`) and
+// worktree record requests (`addWorktreeRecord`, `removeWorktreeRecord`),
+// plus matching broadcast events. All capability-gated; MIN stays at 10.
 export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 11
+export const IPC_PROTOCOL_VERSION = 12
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -73,6 +79,32 @@ export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
 export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
 
 /**
+ * v12 — capability gating headless workspace lifecycle requests
+ * (`createWorkspace`, `switchWorkspace`, `closeWorkspace`,
+ * `announceWorkspaceSwitched`) and their `workspace*Requested` /
+ * `workspaceSwitched` broadcasts. When a UI is attached the daemon relays
+ * the request as an event so the UI's reducer stays authoritative for the
+ * live workspace snapshot; when no UI is attached the daemon mutates the
+ * catalog directly.
+ */
+export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE = 'workspaceLifecycle'
+
+/**
+ * v12 — capability gating `addWorktreeRecord` / `removeWorktreeRecord` and
+ * their `worktreeAdded` / `worktreeRemoved` broadcasts. Same UI-vs-headless
+ * fanout as workspaceLifecycle.
+ */
+export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents'
+
+/**
+ * v12 — capability marker for `aimux tab tail`. Functionally it's just a
+ * thin-attach + `tabRender` subscription, but declaring the capability lets
+ * older clients detect that the daemon is fresh enough to broadcast the
+ * events on which the streaming CLI depends.
+ */
+export const IPC_CAPABILITY_TAB_TAIL = 'tabTail'
+
+/**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
  * via a MIN bump. See `src/ipc/README.md` for the discipline.
@@ -89,6 +121,9 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
+  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_TAB_TAIL,
 ]
 
 export interface ProtocolHelloRequest {
@@ -220,6 +255,48 @@ export type ClientRequest =
   // tabs — does NOT attach. Lets a headless CLI inspect a session without
   // implicit `manager.resize` or `setBroadcastEnabled` side effects.
   | { id: string; type: 'listTabs'; payload: { sessionId: string } }
+  // v12 / capability `workspaceLifecycle`. Ask the daemon to create a new
+  // workspace in the catalog. When any UI socket is attached the daemon
+  // broadcasts `workspaceCreateRequested` so the UI's reducer performs the
+  // create (owning the live workspace snapshot); when no UI is attached the
+  // daemon writes the catalog directly.
+  | {
+      id: string
+      type: 'createWorkspace'
+      payload: { name: string; projectPath?: string; switch?: boolean }
+    }
+  // v12 / capability `workspaceLifecycle`. Ask the daemon to switch to
+  // another workspace. Broadcast → `workspaceSwitchRequested`; headless
+  // path bumps `lastOpenedAt` on the target so the next UI boot picks it.
+  | { id: string; type: 'switchWorkspace'; payload: { targetSessionId: string } }
+  // v12 / capability `workspaceLifecycle`. Ask the daemon to remove a
+  // workspace. Broadcast → `workspaceCloseRequested`; headless deletes the
+  // catalog entry directly.
+  | {
+      id: string
+      type: 'closeWorkspace'
+      payload: { targetSessionId: string }
+    }
+  // v12 / capability `workspaceLifecycle`. UI announces that its own
+  // `handleSwitchSessionEffect` has finished; the daemon relays as a
+  // `workspaceSwitched` broadcast so a `--wait`ing CLI can exit.
+  | { id: string; type: 'announceWorkspaceSwitched'; payload: { sessionId: string } }
+  // v12 / capability `worktreeLifecycleEvents`. Append a worktree record to
+  // a session in the catalog. UI-attached path relays as `worktreeAdded`;
+  // headless path writes the catalog directly.
+  | {
+      id: string
+      type: 'addWorktreeRecord'
+      payload: { sessionId: string; worktree: WorktreeRecord }
+    }
+  // v12 / capability `worktreeLifecycleEvents`. Remove a worktree record.
+  // UI-attached path relays as `worktreeRemoved`; headless path writes the
+  // catalog directly.
+  | {
+      id: string
+      type: 'removeWorktreeRecord'
+      payload: { sessionId: string; worktreeId: string }
+    }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
@@ -255,6 +332,49 @@ export type ServerEvent =
   | {
       type: 'tabAdded'
       payload: { sessionId: string; tab: TabSession }
+    }
+  // v12 / capability `workspaceLifecycle`. Broadcast to every socket when a
+  // CLI issues `createWorkspace` while a UI is attached — the UI runs its
+  // create-session handler so the live workspace snapshot is preserved.
+  // Broadcast is NOT session-scoped; the UI may be attached to a different
+  // session than the one being created.
+  | {
+      type: 'workspaceCreateRequested'
+      payload: { name: string; projectPath?: string; switch?: boolean }
+    }
+  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
+  // `switchWorkspace`; UI runs `handleSwitchSessionEffect` and then emits
+  // `announceWorkspaceSwitched` when done.
+  | {
+      type: 'workspaceSwitchRequested'
+      payload: { targetSessionId: string }
+    }
+  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
+  // `closeWorkspace`; UI runs `handleDeleteSessionEffect`.
+  | {
+      type: 'workspaceCloseRequested'
+      payload: { targetSessionId: string }
+    }
+  // v12 / capability `workspaceLifecycle`. Daemon relay of the UI's
+  // `announceWorkspaceSwitched` so a `--wait`ing CLI can exit.
+  | {
+      type: 'workspaceSwitched'
+      payload: { sessionId: string }
+    }
+  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
+  // `addWorktreeRecord` while a UI is attached; the UI reducer appends the
+  // record and persists the catalog.
+  | {
+      type: 'worktreeAdded'
+      payload: { sessionId: string; worktree: WorktreeRecord }
+    }
+  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
+  // `removeWorktreeRecord` while a UI is attached; the UI reducer removes
+  // the record (and closes any tabs pinned to it via the existing
+  // worktree-removal side-effect).
+  | {
+      type: 'worktreeRemoved'
+      payload: { sessionId: string; worktreeId: string }
     }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
@@ -563,6 +683,49 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'prepareReexec.reason must be a string when present'
       )
       return value as ClientRequest
+    case 'createWorkspace':
+      assert(
+        isString(value.payload.name) && value.payload.name.length > 0,
+        'createWorkspace.name must be a non-empty string'
+      )
+      assert(
+        value.payload.projectPath === undefined || isString(value.payload.projectPath),
+        'createWorkspace.projectPath must be a string when present'
+      )
+      assert(
+        value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
+        'createWorkspace.switch must be a boolean when present'
+      )
+      return value as ClientRequest
+    case 'switchWorkspace':
+      assert(
+        isString(value.payload.targetSessionId),
+        'switchWorkspace.targetSessionId must be a string'
+      )
+      return value as ClientRequest
+    case 'closeWorkspace':
+      assert(
+        isString(value.payload.targetSessionId),
+        'closeWorkspace.targetSessionId must be a string'
+      )
+      return value as ClientRequest
+    case 'announceWorkspaceSwitched':
+      assert(
+        isString(value.payload.sessionId),
+        'announceWorkspaceSwitched.sessionId must be a string'
+      )
+      return value as ClientRequest
+    case 'addWorktreeRecord':
+      assert(isString(value.payload.sessionId), 'addWorktreeRecord.sessionId must be a string')
+      assert(
+        isWorktreeRecord(value.payload.worktree),
+        'addWorktreeRecord.worktree must be a WorktreeRecord'
+      )
+      return value as ClientRequest
+    case 'removeWorktreeRecord':
+      assert(isString(value.payload.sessionId), 'removeWorktreeRecord.sessionId must be a string')
+      assert(isString(value.payload.worktreeId), 'removeWorktreeRecord.worktreeId must be a string')
+      return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -630,6 +793,46 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
       assert(isSessionStatus(value.payload.status), 'sessionStatus.status is invalid')
+      return value as ServerEvent
+    case 'workspaceCreateRequested':
+      assert(
+        isString(value.payload.name) && value.payload.name.length > 0,
+        'workspaceCreateRequested.name must be a non-empty string'
+      )
+      assert(
+        value.payload.projectPath === undefined || isString(value.payload.projectPath),
+        'workspaceCreateRequested.projectPath must be a string when present'
+      )
+      assert(
+        value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
+        'workspaceCreateRequested.switch must be a boolean when present'
+      )
+      return value as ServerEvent
+    case 'workspaceSwitchRequested':
+      assert(
+        isString(value.payload.targetSessionId),
+        'workspaceSwitchRequested.targetSessionId must be a string'
+      )
+      return value as ServerEvent
+    case 'workspaceCloseRequested':
+      assert(
+        isString(value.payload.targetSessionId),
+        'workspaceCloseRequested.targetSessionId must be a string'
+      )
+      return value as ServerEvent
+    case 'workspaceSwitched':
+      assert(isString(value.payload.sessionId), 'workspaceSwitched.sessionId must be a string')
+      return value as ServerEvent
+    case 'worktreeAdded':
+      assert(isString(value.payload.sessionId), 'worktreeAdded.sessionId must be a string')
+      assert(
+        isWorktreeRecord(value.payload.worktree),
+        'worktreeAdded.worktree must be a WorktreeRecord'
+      )
+      return value as ServerEvent
+    case 'worktreeRemoved':
+      assert(isString(value.payload.sessionId), 'worktreeRemoved.sessionId must be a string')
+      assert(isString(value.payload.worktreeId), 'worktreeRemoved.worktreeId must be a string')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

@@ -206,6 +206,29 @@ export class RemoteSessionBackend
         })
         this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
         break
+      case 'workspaceCreateRequested':
+        this.emit(
+          'workspaceCreateRequested',
+          message.payload.name,
+          message.payload.projectPath,
+          message.payload.switch === true
+        )
+        break
+      case 'workspaceSwitchRequested':
+        this.emit('workspaceSwitchRequested', message.payload.targetSessionId)
+        break
+      case 'workspaceCloseRequested':
+        this.emit('workspaceCloseRequested', message.payload.targetSessionId)
+        break
+      case 'workspaceSwitched':
+        this.emit('workspaceSwitched', message.payload.sessionId)
+        break
+      case 'worktreeAdded':
+        this.emit('worktreeAdded', message.payload.sessionId, message.payload.worktree)
+        break
+      case 'worktreeRemoved':
+        this.emit('worktreeRemoved', message.payload.sessionId, message.payload.worktreeId)
+        break
     }
   }
 
@@ -486,6 +509,20 @@ export class RemoteSessionBackend
       return
     }
     this.dispatchCommand({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }, 'disposeAll')
+  }
+
+  announceWorkspaceSwitched(sessionId: string): void {
+    // Fire-and-forget so `handleSwitchSessionEffect` doesn't block waiting on
+    // the daemon roundtrip. The daemon relays this as a `workspaceSwitched`
+    // broadcast that unblocks any `aimux workspace switch --wait` CLI.
+    this.dispatchCommand(
+      {
+        id: crypto.randomUUID(),
+        payload: { sessionId },
+        type: 'announceWorkspaceSwitched',
+      },
+      'announceWorkspaceSwitched'
+    )
   }
 
   async destroy(keepSessions = true): Promise<void> {

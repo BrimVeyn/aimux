@@ -24,6 +24,14 @@ import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-statu
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
+  addWorktreeToCatalog,
+  assertSessionInCatalog,
+  bumpLastOpenedInCatalog,
+  createWorkspaceInCatalog,
+  deleteFromCatalog,
+  removeWorktreeFromCatalog,
+} from './catalog-writer'
+import {
   consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
   getDaemonOldSocketPath,
@@ -200,6 +208,11 @@ export async function runDaemon(): Promise<void> {
   const sockets = new Set<Socket>()
   const attachedSessions = new Map<Socket, string>()
   const negotiatedVersions = new Map<Socket, number>()
+  // Sockets that attached with `thin: true` (headless CLIs). Used to
+  // distinguish "a UI is attached" from "only CLIs are talking to me" when
+  // deciding whether workspace/worktree mutations go via broadcast (UI does
+  // the write) or via catalog-writer (daemon does the write).
+  const thinAttachers = new Set<Socket>()
 
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
@@ -275,6 +288,32 @@ export async function runDaemon(): Promise<void> {
       if (version === undefined || version < minVersion) continue
       send(socket, event)
     }
+  }
+
+  // Workspace-scope broadcast: reaches every socket that negotiated at least
+  // `minVersion` regardless of which session it's attached to. Workspace
+  // lifecycle events (create/switch/close) target a session that the UI may
+  // not currently be attached to, so `broadcastForSessionVersioned` won't do.
+  const broadcastAllVersioned = (minVersion: number, event: ServerEvent): void => {
+    for (const socket of sockets) {
+      const version = negotiatedVersions.get(socket)
+      if (version === undefined || version < minVersion) continue
+      send(socket, event)
+    }
+  }
+
+  // Count UI attachers so workspace/worktree handlers can decide whether to
+  // relay via broadcast (UI attached → its reducer owns the write) or mutate
+  // the catalog directly. A "UI attacher" here is any non-thin attach — thin
+  // attachers are CLIs which don't run reducers.
+  const countUiAttachers = (): number => {
+    let count = 0
+    for (const socket of sockets) {
+      if (attachedSessions.get(socket) === undefined) continue
+      if (thinAttachers.has(socket)) continue
+      count++
+    }
+    return count
   }
 
   manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
@@ -483,6 +522,11 @@ export async function runDaemon(): Promise<void> {
                   }
 
                   attachedSessions.set(socket, message.payload.sessionId)
+                  if (message.payload.thin === true) {
+                    thinAttachers.add(socket)
+                  } else {
+                    thinAttachers.delete(socket)
+                  }
                   // A thin attacher (headless CLI) does not own a viewport, so
                   // it must not resize PTYs on a session a UI is driving. TM's
                   // attachSession always calls `sessionManager.resize` on the
@@ -786,6 +830,138 @@ export async function runDaemon(): Promise<void> {
                   await handleReexecRequest(socket, message.id, message.payload.reason)
                   break
                 }
+                case 'createWorkspace': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const { name, projectPath, switch: doSwitch } = message.payload
+                  if (countUiAttachers() > 0) {
+                    // Relay to the UI so it can preserve the live snapshot
+                    // of the currently-open workspace before appending the
+                    // new one. Fire-and-forget from the daemon's side.
+                    broadcastAllVersioned(12, {
+                      payload: { name, projectPath, switch: doSwitch },
+                      type: 'workspaceCreateRequested',
+                    })
+                    logDebug('daemon.request.createWorkspace.relay', { name, projectPath })
+                  } else {
+                    const created = createWorkspaceInCatalog(name, projectPath)
+                    if (doSwitch === true) {
+                      bumpLastOpenedInCatalog(created.id)
+                      // Mirror the UI-attached path: an ack event so a
+                      // `--wait` CLI can exit even in the headless flow.
+                      broadcastAllVersioned(12, {
+                        payload: { sessionId: created.id },
+                        type: 'workspaceSwitched',
+                      })
+                    }
+                    logDebug('daemon.request.createWorkspace.direct', {
+                      name,
+                      sessionId: created.id,
+                    })
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'switchWorkspace': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const { targetSessionId } = message.payload
+                  // Fail fast when the target is unknown — otherwise a UI-
+                  // attached `--wait` CLI would sit until timeout while the
+                  // UI silently drops the broadcast.
+                  assertSessionInCatalog(targetSessionId)
+                  if (countUiAttachers() > 0) {
+                    broadcastAllVersioned(12, {
+                      payload: { targetSessionId },
+                      type: 'workspaceSwitchRequested',
+                    })
+                    logDebug('daemon.request.switchWorkspace.relay', { targetSessionId })
+                  } else {
+                    bumpLastOpenedInCatalog(targetSessionId)
+                    // No UI to run the switch handler, so the switch is
+                    // effectively complete once the catalog reflects it.
+                    // Emit the switched event so a --wait CLI can exit.
+                    broadcastAllVersioned(12, {
+                      payload: { sessionId: targetSessionId },
+                      type: 'workspaceSwitched',
+                    })
+                    logDebug('daemon.request.switchWorkspace.direct', { targetSessionId })
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'closeWorkspace': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const { targetSessionId } = message.payload
+                  assertSessionInCatalog(targetSessionId)
+                  if (countUiAttachers() > 0) {
+                    broadcastAllVersioned(12, {
+                      payload: { targetSessionId },
+                      type: 'workspaceCloseRequested',
+                    })
+                    logDebug('daemon.request.closeWorkspace.relay', { targetSessionId })
+                  } else {
+                    deleteFromCatalog(targetSessionId)
+                    logDebug('daemon.request.closeWorkspace.direct', { targetSessionId })
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'announceWorkspaceSwitched': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  // UI-emitted acknowledgement. Relay so any --wait CLI can
+                  // exit. We don't validate that the announcement matches
+                  // an outstanding request — a UI can announce a switch that
+                  // happened via any means (menu, keybind, CLI).
+                  broadcastAllVersioned(12, {
+                    payload: { sessionId: message.payload.sessionId },
+                    type: 'workspaceSwitched',
+                  })
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'addWorktreeRecord': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const { sessionId: targetSessionId, worktree } = message.payload
+                  if (countUiAttachers() > 0) {
+                    broadcastAllVersioned(12, {
+                      payload: { sessionId: targetSessionId, worktree },
+                      type: 'worktreeAdded',
+                    })
+                    logDebug('daemon.request.addWorktreeRecord.relay', {
+                      sessionId: targetSessionId,
+                      worktreeId: worktree.id,
+                    })
+                  } else {
+                    addWorktreeToCatalog(targetSessionId, worktree)
+                    logDebug('daemon.request.addWorktreeRecord.direct', {
+                      sessionId: targetSessionId,
+                      worktreeId: worktree.id,
+                    })
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'removeWorktreeRecord': {
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  const { sessionId: targetSessionId, worktreeId } = message.payload
+                  if (countUiAttachers() > 0) {
+                    broadcastAllVersioned(12, {
+                      payload: { sessionId: targetSessionId, worktreeId },
+                      type: 'worktreeRemoved',
+                    })
+                    logDebug('daemon.request.removeWorktreeRecord.relay', {
+                      sessionId: targetSessionId,
+                      worktreeId,
+                    })
+                  } else {
+                    removeWorktreeFromCatalog(targetSessionId, worktreeId)
+                    logDebug('daemon.request.removeWorktreeRecord.direct', {
+                      sessionId: targetSessionId,
+                      worktreeId,
+                    })
+                  }
+                  sendOk(socket, message.id)
+                  break
+                }
               }
             } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error)
@@ -811,6 +987,7 @@ export async function runDaemon(): Promise<void> {
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
+      thinAttachers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
     socket.on('error', () => {
@@ -818,6 +995,7 @@ export async function runDaemon(): Promise<void> {
       sockets.delete(socket)
       attachedSessions.delete(socket)
       negotiatedVersions.delete(socket)
+      thinAttachers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
   })
