@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs'
 import { connect } from 'node:net'
 
 import type { SessionBackend } from './types'
 
+import { negotiateDaemonReexec, waitForSocketRemoval } from '../daemon/reexec-client'
 import {
   getIpcDaemonSocketPath,
   getSocketSecurityIssue,
@@ -245,102 +245,13 @@ async function restartDaemon(socketPath: string): Promise<void> {
  * the `hotReexec` capability — older daemons predate the wire and would
  * respond with an unknown-request error.
  */
-async function attemptHotReexec(socketPath: string): Promise<boolean> {
-  return new Promise<boolean>((resolve) => {
-    const socket = connect(socketPath)
-    const decoder = new MessageDecoder(parseServerMessage)
-    const helloId = crypto.randomUUID()
-    const reexecId = crypto.randomUUID()
-    let settled = false
-
-    const finish = (success: boolean, reason: string) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      socket.removeAllListeners()
-      socket.destroy()
-      logDebug('backend.reexec.finish', { reason, success })
-      resolve(success)
-    }
-
-    const timer = setTimeout(() => finish(false, 'timeout'), 5_000)
-
-    socket.once('error', (error: NodeJS.ErrnoException) => {
-      // ECONNRESET / EPIPE during drain is expected if the daemon already
-      // closed the socket after the ack flushed. Treat the prior reexecAck
-      // as authoritative; that observation is captured below.
-      finish(settled, error.message)
-    })
-    socket.once('connect', () => {
-      socket.write(
-        encodeMessage({
-          id: helloId,
-          payload: {
-            maxVersion: IPC_PROTOCOL_VERSION,
-            minVersion: IPC_PROTOCOL_MIN_VERSION,
-          },
-          type: 'hello',
-        })
-      )
-    })
-    socket.on('data', (chunk) => {
-      try {
-        for (const message of decoder.push(chunk)) {
-          if (!('id' in message)) continue
-          if (message.id === helloId) {
-            if (message.type !== 'helloResult') {
-              finish(false, `hello: ${message.type}`)
-              return
-            }
-            if (!message.payload.capabilities.includes(IPC_CAPABILITY_HOT_REEXEC)) {
-              finish(false, 'daemon does not advertise hotReexec')
-              return
-            }
-            socket.write(
-              encodeMessage({
-                id: reexecId,
-                payload: { reason: 'protocol-mismatch' },
-                type: 'prepareReexec',
-              })
-            )
-            continue
-          }
-          if (message.id === reexecId) {
-            if (message.type === 'reexecAck') {
-              logDebug('backend.reexec.ack', {
-                handoffPath: message.payload.handoffPath,
-                renamedSocketPath: message.payload.renamedSocketPath,
-              })
-              // The daemon has renamed its socket away and is about to exit.
-              // We can't keep using this socket — close it cleanly and let
-              // the caller spawn the successor.
-              finish(true, 'ack received')
-              return
-            }
-            finish(false, `prepareReexec: ${message.type}`)
-            return
-          }
-        }
-      } catch (error) {
-        finish(false, error instanceof Error ? error.message : String(error))
-      }
-    })
-  })
-}
-
-async function waitForSocketRemoval(socketPath: string, deadlineMs = 2_000): Promise<boolean> {
-  const stop = Date.now() + deadlineMs
-  while (Date.now() < stop) {
-    if (!existsSync(socketPath)) return true
-    await new Promise((r) => setTimeout(r, 25))
-  }
-  return false
-}
-
 async function hotReexecAndRespawn(socketPath: string): Promise<boolean> {
-  if (!(await attemptHotReexec(socketPath))) {
-    return false
-  }
+  const negotiation = await negotiateDaemonReexec(socketPath, { reason: 'protocol-mismatch' })
+  logDebug('backend.reexec.finish', {
+    ok: negotiation.ok,
+    reason: negotiation.ok ? 'ack received' : negotiation.reason,
+  })
+  if (!negotiation.ok) return false
   // Old daemon renamed the canonical path away; wait for the dirent to be
   // unbound (it should already be — rename is atomic) before spawning.
   await waitForSocketRemoval(socketPath, 1_000)
