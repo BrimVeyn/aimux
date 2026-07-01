@@ -8,6 +8,7 @@ import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
   MANAGER_CAPABILITY_SET_BROADCAST_ENABLED,
+  MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
   type ManagerAttachResult,
@@ -364,11 +365,16 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
   /**
    * Tell the TM whether to bother snapshotting and broadcasting renders.
    * Gated on the TM advertising `setBroadcastEnabled` in its hello
-   * capabilities; older TMs that don't keep broadcasting unconditionally,
-   * which matches the pre-capability behaviour.
+   * capabilities; TMs built before the capabilities field existed still get
+   * the call when they speak protocol v≥4 (which is where the request
+   * shipped). Below that, keep the pre-existing broadcast-always behaviour.
    */
   async setBroadcastEnabled(enabled: boolean): Promise<void> {
-    if (!this.serverCapabilities.has(MANAGER_CAPABILITY_SET_BROADCAST_ENABLED)) {
+    const advertised = this.serverCapabilities.has(MANAGER_CAPABILITY_SET_BROADCAST_ENABLED)
+    const versionImplies =
+      this.selectedProtocolVersion !== null &&
+      this.selectedProtocolVersion >= MANAGER_PROTOCOL_BROADCAST_GATE_VERSION
+    if (!advertised && !versionImplies) {
       logDebug('managerClient.setBroadcastEnabled.skipped', {
         enabled,
         reason: 'capability-not-advertised',

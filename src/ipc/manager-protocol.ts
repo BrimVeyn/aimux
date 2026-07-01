@@ -48,16 +48,20 @@ export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
 
 /**
  * Capability name a daemon must observe on the TM's helloResult before
- * sending `setBroadcastEnabled`. Older TMs that don't advertise it silently
- * always broadcast — same fallback as before, just gated on a capability
- * string instead of a version number.
- *
- * Historical note: this used to be a version gate
- * (`MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4`). The capability mechanism
- * supersedes that; the version constant was removed in the additive-contract
- * migration.
+ * sending `setBroadcastEnabled`.
  */
 export const MANAGER_CAPABILITY_SET_BROADCAST_ENABLED = 'setBroadcastEnabled'
+
+/**
+ * Version-based fallback for `setBroadcastEnabled`. TM binaries that predate
+ * the capability field (built before the additive-contract migration) don't
+ * advertise capabilities, but any TM at v4+ speaks the request. Callers gate
+ * on `capabilities.has('setBroadcastEnabled') || selectedVersion >= this`.
+ *
+ * Rolling-upgrade window: new daemon + old TM (still v4+) would otherwise
+ * silently regress to always-broadcasting, spiking CPU and IPC traffic.
+ */
+export const MANAGER_PROTOCOL_BROADCAST_GATE_VERSION = 4
 
 export interface ManagerHelloRequest {
   minVersion: number
