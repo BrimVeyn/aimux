@@ -127,7 +127,9 @@ aimux tab send <tabId> --stdin             # read from stdin
 Chord syntax mirrors `@brimveyn/aimux-config`'s keymap builder:
 `<C-x>`, `<Esc>`, `<CR>`, `<Tab>`, `<Up>`, chained (`<Up><Up>`), etc.
 Multi-line text is auto-wrapped in bracketed-paste so the receiver doesn't
-misread newlines as submit.
+misread newlines as submit. With `--enter`, the submitting `\r` is sent as a
+separate, settled write after the paste — a paste-aware TUI (e.g. Claude Code)
+would otherwise fold a same-burst `\r` into the paste buffer and never submit.
 
 #### `aimux tab focus`
 
