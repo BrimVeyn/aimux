@@ -1,8 +1,15 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
 
 import type { SessionRecord } from '../../src/state/types'
 
-import { isInsideAimuxWorktreeRoot, makeWorktreePath } from '../../src/platform/worktree-paths'
+import {
+  assertSafeAimuxWorktreePath,
+  isInsideAimuxWorktreeRoot,
+  makeWorktreePath,
+} from '../../src/platform/worktree-paths'
 import {
   ensureSessionWorktrees,
   getSessionProjectPath,
@@ -109,5 +116,27 @@ describe('session worktrees', () => {
 
   test('/private/tmp aliases are treated as inside the Aimux worktree root', () => {
     expect(isInsideAimuxWorktreeRoot('/private/tmp/aimux-wt/r-test/wt-test')).toBe(true)
+  })
+
+  test('accepts the first worktree of a repo before its repo-scoped parent exists', async () => {
+    const previousRoot = process.env.AIMUX_WORKTREE_ROOT
+    const root = await mkdtemp(join(tmpdir(), 'aimux-wt-test-'))
+    process.env.AIMUX_WORKTREE_ROOT = root
+    try {
+      const targetPath = makeWorktreePath({
+        repoRoot: '/Users/me/first-worktree-repo',
+        worktreeId: 'worktree-1',
+        worktreeName: 'feature',
+      })
+      // The repo-scoped parent (<root>/r-<hash>) does not exist yet — this is
+      // the first worktree for the repo. It must not throw ENOENT.
+      await assertSafeAimuxWorktreePath(targetPath)
+      // and the parent must now exist so git worktree add can populate it.
+      expect((await stat(dirname(targetPath))).isDirectory()).toBe(true)
+    } finally {
+      if (previousRoot === undefined) delete process.env.AIMUX_WORKTREE_ROOT
+      else process.env.AIMUX_WORKTREE_ROOT = previousRoot
+      await rm(root, { force: true, recursive: true })
+    }
   })
 })
