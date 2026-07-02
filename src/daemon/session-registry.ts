@@ -111,7 +111,21 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     const orderedSnapshotTabs = snapshot.tabs
       .map((persistedTab) => this.tabs.get(persistedTab.id))
       .filter((tab): tab is TabSession => tab !== undefined)
-    const normalizedTabs = normalizeGroupedTabOrder(orderedSnapshotTabs, layoutTrees, tabGroupMap)
+    // The registry — not the snapshot — is the source of truth for *which*
+    // tabs exist. A tab spawned by a sibling CLI after this workspace's
+    // snapshot was last persisted lives in `this.tabs` but is absent from
+    // `snapshot.tabs`; ordering by the snapshot alone would silently drop it
+    // from the attach result, so the UI would render an empty/stale workspace
+    // on switch. Append any live tab the snapshot doesn't mention (in
+    // registry order) so membership stays authoritative while the snapshot
+    // still supplies ordering + layout for the tabs it captured.
+    const snapshotIds = new Set(snapshot.tabs.map((persistedTab) => persistedTab.id))
+    const extraLiveTabs = tabs.filter((tab) => !snapshotIds.has(tab.id))
+    const normalizedTabs = normalizeGroupedTabOrder(
+      [...orderedSnapshotTabs, ...extraLiveTabs],
+      layoutTrees,
+      tabGroupMap
+    )
 
     return { activeTabId: this.activeTabId, tabs: normalizedTabs }
   }

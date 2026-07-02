@@ -97,4 +97,25 @@ describe('SessionRegistry', () => {
 
     expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-c', 'tab-a', 'tab-b'])
   })
+
+  test('reattach keeps live tabs the snapshot no longer knows about', () => {
+    const registry = new SessionRegistry()
+
+    // Seed two live tabs (as if the workspace was populated).
+    registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Alpha'), createSnapshotTab('tab-b', 'Beta', 'codex')],
+      })
+    )
+
+    // A sibling CLI spawned tab-b *after* the UI last persisted this
+    // workspace's snapshot, so the reattach snapshot only mentions tab-a. The
+    // registry is authoritative for membership, so tab-b must survive —
+    // otherwise switching to this workspace renders it as empty/stale.
+    const reattached = registry.attachFromSnapshot(
+      createSnapshot({ activeTabId: 'tab-a', tabs: [createSnapshotTab('tab-a', 'Alpha')] })
+    )
+
+    expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-a', 'tab-b'])
+  })
 })
