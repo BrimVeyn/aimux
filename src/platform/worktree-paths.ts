@@ -60,8 +60,15 @@ export async function assertSafeAimuxWorktreePath(path: string): Promise<void> {
   if (!isInsideAimuxWorktreeRoot(path)) {
     throw new Error(`refusing worktree path outside Aimux temp root: ${path}`)
   }
+  // Create the repo-scoped parent (<root>/r-<hash>) before resolving it: git
+  // worktree add does not create intermediate dirs, and realpath() would throw
+  // ENOENT on the first worktree for a repo. mkdir(recursive) leaves an
+  // existing symlink in place, so the realpath check below still catches an
+  // escape out of the temp root.
+  const parent = resolve(path, '..')
+  await mkdir(parent, { recursive: true })
   const realRoot = await realpath(root)
-  const realParent = await realpath(resolve(path, '..'))
+  const realParent = await realpath(parent)
   if (`${realParent}/`.startsWith(`${realRoot}/`)) return
   throw new Error(`unsafe Aimux worktree parent: ${realParent}`)
 }
