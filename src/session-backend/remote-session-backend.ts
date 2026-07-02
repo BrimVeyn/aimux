@@ -192,6 +192,11 @@ export class RemoteSessionBackend
         })
         this.emit('tabActivity', message.payload.tabId, message.payload.status)
         break
+      case 'tabTurnComplete':
+      case 'tabQuestion':
+        // v13 orchestration signals — consumed by the headless CLI, not the UI
+        // backend. Enumerated so the switch stays exhaustive; no UI wiring yet.
+        break
       case 'sessionStatus':
         logDebug('backend.remote.sessionStatus', {
           sessionId: message.payload.sessionId,

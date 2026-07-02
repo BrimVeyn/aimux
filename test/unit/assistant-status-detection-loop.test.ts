@@ -133,6 +133,153 @@ describe('runStatusDetectionLoop', () => {
     }
   })
 
+  test('turn-complete: emits once after idle holds for the settle window, then re-arms after a working blip', async () => {
+    let clock = 0
+    const turnEvents: { tabId: string; sessionId: string; idleMs: number }[] = []
+    const idleViewport = snapshot('❯ ', '')
+    const workingViewport = snapshot('✱ Thinking…', '  esc to interrupt')
+    const tabState = {
+      assistant: 'claude' as AssistantId,
+      command: 'claude',
+      viewport: idleViewport,
+    }
+    const loop = runStatusDetectionLoop({
+      listSessions: () => ['sess-A'],
+      listTabs: (): LoopTabView[] => [
+        {
+          assistant: tabState.assistant,
+          command: tabState.command,
+          id: 'tab-1',
+          viewport: tabState.viewport,
+        },
+      ],
+      nowFn: () => clock,
+      onSessionStatus: () => {},
+      onTabStatus: () => {},
+      onTurnComplete: (tabId, sessionId, idleMs) => {
+        turnEvents.push({ idleMs, sessionId, tabId })
+      },
+      tickMs: 5,
+      turnSettleMs: 100,
+    })
+    const waitFor = async (predicate: () => boolean): Promise<void> => {
+      const deadline = Date.now() + 1000
+      while (!predicate() && Date.now() < deadline) await Bun.sleep(5)
+    }
+    try {
+      // First ticks observe idle and record idleSince=0. Not yet past settle.
+      await waitFor(() => loop.getTabStatus('tab-1') === 'idle')
+      expect(turnEvents.length).toBe(0)
+      // Advance logical time past the settle window; a tick must now fire once.
+      clock = 250
+      await waitFor(() => turnEvents.length > 0)
+      expect(turnEvents.length).toBe(1)
+      expect(turnEvents[0]?.tabId).toBe('tab-1')
+      expect(turnEvents[0]?.idleMs).toBeGreaterThanOrEqual(100)
+      // Holding idle longer must NOT re-emit within the same episode.
+      clock = 900
+      await Bun.sleep(40)
+      expect(turnEvents.length).toBe(1)
+      // A working blip re-arms; the next settled idle emits a second turn.
+      tabState.viewport = workingViewport
+      await waitFor(() => loop.getTabStatus('tab-1') === 'working')
+      tabState.viewport = idleViewport
+      await waitFor(() => loop.getTabStatus('tab-1') === 'idle')
+      clock = 1200
+      await waitFor(() => turnEvents.length > 1)
+      expect(turnEvents.length).toBe(2)
+    } finally {
+      loop.stop()
+    }
+  })
+
+  test('turn-complete: a working blip before the settle window elapses prevents any emit', async () => {
+    let clock = 0
+    const turnEvents: unknown[] = []
+    const idleViewport = snapshot('❯ ', '')
+    const workingViewport = snapshot('✱ Thinking…', '  esc to interrupt')
+    const tabState = { viewport: idleViewport }
+    const loop = runStatusDetectionLoop({
+      listSessions: () => ['sess-A'],
+      listTabs: (): LoopTabView[] => [
+        { assistant: 'claude', command: 'claude', id: 'tab-1', viewport: tabState.viewport },
+      ],
+      nowFn: () => clock,
+      onSessionStatus: () => {},
+      onTabStatus: () => {},
+      onTurnComplete: () => {
+        turnEvents.push(1)
+      },
+      tickMs: 5,
+      turnSettleMs: 1000,
+    })
+    const waitFor = async (predicate: () => boolean): Promise<void> => {
+      const deadline = Date.now() + 1000
+      while (!predicate() && Date.now() < deadline) await Bun.sleep(5)
+    }
+    try {
+      await waitFor(() => loop.getTabStatus('tab-1') === 'idle')
+      // Flip to working while still short of the settle window.
+      clock = 500
+      tabState.viewport = workingViewport
+      await waitFor(() => loop.getTabStatus('tab-1') === 'working')
+      // Advance well past the original settle deadline; the interrupted idle
+      // episode must not fire.
+      clock = 3000
+      await Bun.sleep(40)
+      expect(turnEvents.length).toBe(0)
+    } finally {
+      loop.stop()
+    }
+  })
+
+  test('onTabQuestion fires once per waiting-input edge and re-arms after leaving', () => {
+    const questions: { tabId: string; kind: string; prompt: string; options?: string[] }[] = []
+    const idle = snapshot('❯ ', '')
+    const waiting = snapshot('Do you want to proceed?', '❯ 1. Yes', '  2. No')
+    const tabState = { viewport: idle }
+    const loop = runStatusDetectionLoop({
+      listSessions: () => ['sess-A'],
+      listTabs: (): LoopTabView[] => [
+        { assistant: 'claude', command: 'claude', id: 'tab-1', viewport: tabState.viewport },
+      ],
+      onSessionStatus: () => {},
+      onTabQuestion: (tabId, _sessionId, detail) => {
+        questions.push({ ...detail, tabId })
+      },
+      onTabStatus: () => {},
+      tickMs: 10_000,
+    })
+    const view = (): LoopTabView => ({
+      assistant: 'claude',
+      command: 'claude',
+      id: 'tab-1',
+      viewport: tabState.viewport,
+    })
+    try {
+      // idle → no question
+      loop.classifyNow('sess-A', [view()])
+      expect(questions.length).toBe(0)
+      // idle → waiting-input edge fires once
+      tabState.viewport = waiting
+      loop.classifyNow('sess-A', [view()])
+      expect(questions.length).toBe(1)
+      expect(questions[0]?.kind).toBe('permission')
+      expect(questions[0]?.options).toEqual(['Yes', 'No'])
+      // still waiting → no refire
+      loop.classifyNow('sess-A', [view()])
+      expect(questions.length).toBe(1)
+      // back to idle, then waiting again → second edge fires
+      tabState.viewport = idle
+      loop.classifyNow('sess-A', [view()])
+      tabState.viewport = waiting
+      loop.classifyNow('sess-A', [view()])
+      expect(questions.length).toBe(2)
+    } finally {
+      loop.stop()
+    }
+  })
+
   test('snapshotTabs only returns known tabs; forgotten tabs disappear on tick cleanup', () => {
     const tabs = new Map<string, FakeTab[]>([
       [

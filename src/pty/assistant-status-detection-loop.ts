@@ -17,6 +17,7 @@ import type { AssistantId, SessionStatus, TabActivity, TerminalSnapshot } from '
 
 import { logDebug } from '../debug/input-log'
 import { getLineText } from '../input/terminal-text-extraction'
+import { extractQuestion } from './assistant-question-extractor'
 import { AssistantStatusArbiter, type RecordHookEventInput } from './assistant-status-arbiter'
 import { AssistantStatusDetector } from './assistant-status-detector'
 
@@ -35,6 +36,15 @@ function tailPreview(viewport: TerminalSnapshot | undefined): string {
 /** Default polling interval. Cheap — detector is a handful of substring checks. */
 const DEFAULT_TICK_MS = 500
 
+/**
+ * How long a tab's `idle` activity must hold continuously before we call the
+ * turn complete. `idle` can flash for a fraction of a second between two tool
+ * calls, so an end-of-turn signal that fired on the first idle tick would catch
+ * the worker mid-turn. Requiring idle to *hold* this long is the authoritative
+ * replacement for a driver's settle-poll loop.
+ */
+const DEFAULT_TURN_SETTLE_MS = 1500
+
 export interface LoopTabView {
   id: string
   assistant: AssistantId
@@ -49,7 +59,30 @@ export interface StatusDetectionLoopOptions {
   onTabStatus: (tabId: string, status: TabActivity, sessionId: string) => void
   /** Emitted when either flag on a session changes. */
   onSessionStatus: (sessionId: string, status: SessionStatus) => void
+  /**
+   * Emitted once per turn, when a tab's `idle` activity has held continuously
+   * for `turnSettleMs`. Edge-triggered: re-armed only after the tab leaves
+   * `idle`, so a driver receives exactly one signal per turn. `idleMs` is how
+   * long idle had held when the signal fired.
+   */
+  onTurnComplete?: (tabId: string, sessionId: string, idleMs: number) => void
+  /**
+   * Emitted when a tab transitions into `waiting-input`. Edge-triggered: fires
+   * once per transition, carrying the captured prompt text and any parsed
+   * options. Fires on both tick and attach replay so a client that attaches to
+   * an already-blocked tab still learns the question.
+   */
+  onTabQuestion?: (
+    tabId: string,
+    sessionId: string,
+    detail: { kind: 'question' | 'permission'; prompt: string; options?: string[] }
+  ) => void
   tickMs?: number
+  /** Override the turn-complete settle window (default 1500ms). */
+  turnSettleMs?: number
+  /** Override the clock. Defaults to Date.now. Tests inject a logical clock so
+   *  the wall-clock-driven turn-complete settle is deterministic. */
+  nowFn?: () => number
 }
 
 export interface StatusDetectionLoopHandle {
@@ -80,10 +113,18 @@ export function runStatusDetectionLoop(
   options: StatusDetectionLoopOptions
 ): StatusDetectionLoopHandle {
   const tickMs = options.tickMs ?? DEFAULT_TICK_MS
+  const turnSettleMs = options.turnSettleMs ?? DEFAULT_TURN_SETTLE_MS
+  const now = options.nowFn ?? Date.now
   const detector = new AssistantStatusDetector()
   const arbiter = new AssistantStatusArbiter()
   const lastTabStatus = new Map<string, { status: TabActivity; sessionId: string }>()
   const lastSessionStatus = new Map<string, SessionStatus>()
+  // Timestamp when a tab most recently entered `idle`. Cleared when it leaves
+  // idle. `turnEmitted` guards against re-firing `onTurnComplete` within the
+  // same idle episode; it's cleared alongside `idleSince` so the next turn
+  // re-arms.
+  const idleSince = new Map<string, number>()
+  const turnEmitted = new Set<string>()
 
   const timer = setInterval(() => {
     try {
@@ -134,6 +175,38 @@ export function runStatusDetectionLoop(
         lastTabStatus.set(tab.id, { sessionId, status })
         options.onTabStatus(tab.id, status, sessionId)
       }
+
+      // Turn-complete bookkeeping. The emission itself is gated to `tick` so a
+      // synchronous attach replay (`classifyNow`) never fabricates an
+      // end-of-turn — only the wall-clock-driven poll does. The idleSince /
+      // turnEmitted maps are maintained on every call so state stays coherent
+      // regardless of source.
+      if (status === 'idle') {
+        let since = idleSince.get(tab.id)
+        if (since === undefined) {
+          since = now
+          idleSince.set(tab.id, since)
+        }
+        if (source === 'tick' && !turnEmitted.has(tab.id) && now - since >= turnSettleMs) {
+          turnEmitted.add(tab.id)
+          options.onTurnComplete?.(tab.id, sessionId, now - since)
+        }
+      } else {
+        idleSince.delete(tab.id)
+        turnEmitted.delete(tab.id)
+      }
+
+      // Question extraction on the idle/working → waiting-input edge. `prev`
+      // still holds the pre-update status, so this fires exactly once per
+      // transition even though the loop broadcasts to every client.
+      if (
+        status === 'waiting-input' &&
+        (!prev || prev.status !== 'waiting-input') &&
+        options.onTabQuestion
+      ) {
+        const detail = extractQuestion(tab.assistant, tab.viewport)
+        if (detail) options.onTabQuestion(tab.id, sessionId, detail)
+      }
     }
     const next: SessionStatus = { waiting, working }
     const prevSession = lastSessionStatus.get(sessionId)
@@ -154,14 +227,14 @@ export function runStatusDetectionLoop(
   }
 
   function tick(): void {
-    const now = Date.now()
+    const ts = now()
     const sessionIds = options.listSessions()
     const seenSessions = new Set<string>()
     const seenTabs = new Set<string>()
 
     for (const sessionId of sessionIds) {
       seenSessions.add(sessionId)
-      classifySession(sessionId, options.listTabs(sessionId), now, 'tick', seenTabs)
+      classifySession(sessionId, options.listTabs(sessionId), ts, 'tick', seenTabs)
     }
 
     for (const tabId of lastTabStatus.keys()) {
@@ -169,6 +242,8 @@ export function runStatusDetectionLoop(
         detector.forget(tabId)
         arbiter.forget(tabId)
         lastTabStatus.delete(tabId)
+        idleSince.delete(tabId)
+        turnEmitted.delete(tabId)
       }
     }
     for (const sessionId of lastSessionStatus.keys()) {
@@ -180,7 +255,7 @@ export function runStatusDetectionLoop(
 
   return {
     classifyNow: (sessionId, tabs) => {
-      classifySession(sessionId, tabs, Date.now(), 'classifyNow')
+      classifySession(sessionId, tabs, now(), 'classifyNow')
     },
     getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
@@ -206,6 +281,8 @@ export function runStatusDetectionLoop(
       arbiter.clear()
       lastTabStatus.clear()
       lastSessionStatus.clear()
+      idleSince.clear()
+      turnEmitted.clear()
     },
   }
 }

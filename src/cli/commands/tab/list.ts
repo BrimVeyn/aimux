@@ -1,20 +1,51 @@
 import type { CliCommand } from '../../registry'
 
-import { IPC_CAPABILITY_LIST_TABS, IPC_CAPABILITY_THIN_ATTACH } from '../../../ipc/protocol'
+import {
+  IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_LIST_TABS_LAST_LINE,
+  IPC_CAPABILITY_THIN_ATTACH,
+  type TabSessionSummary,
+} from '../../../ipc/protocol'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
+/**
+ * The daemon always populates `lastLine` on `listTabs` summaries (it's cheap),
+ * but the field bloats the common poll, so we strip it unless `--verbose` was
+ * asked for. Keeping the default output byte-identical to pre-v13 avoids
+ * churning downstream consumers.
+ */
+function stripLastLine(tab: TabSessionSummary): TabSessionSummary {
+  const { lastLine: _lastLine, ...rest } = tab
+  return rest
+}
+
 export const tabList: CliCommand = {
   args: [],
-  flags: SHARED_FLAGS,
+  flags: [
+    ...SHARED_FLAGS,
+    {
+      description: "include each tab's last non-blank rendered line",
+      kind: 'boolean',
+      name: 'verbose',
+    },
+  ],
   group: 'tab',
   run: async (ctx) => {
     const workspace = ctx.getWorkspace()
     const daemon = await ctx.getDaemon()
+    const verbose = ctx.args.flags.verbose === true
+
+    if (verbose && !daemon.hasCapability(IPC_CAPABILITY_LIST_TABS_LAST_LINE)) {
+      throw new Error(
+        'daemon predates tab list --verbose (listTabsLastLine) — restart aimux to pick up the new daemon'
+      )
+    }
 
     if (daemon.hasCapability(IPC_CAPABILITY_LIST_TABS)) {
       const result = await daemon.listTabs(workspace.id)
-      writeJson({ activeTabId: result.activeTabId, tabs: result.tabs })
+      const tabs = verbose ? result.tabs : result.tabs.map(stripLastLine)
+      writeJson({ activeTabId: result.activeTabId, tabs })
       return EXIT_OK
     }
 

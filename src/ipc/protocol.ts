@@ -1,5 +1,6 @@
 import type {
   AssistantId,
+  QuestionKind,
   SessionStatus,
   TabActivity,
   TabSession,
@@ -29,8 +30,15 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // `switchWorkspace`, `closeWorkspace`, `announceWorkspaceSwitched`) and
 // worktree record requests (`addWorktreeRecord`, `removeWorktreeRecord`),
 // plus matching broadcast events. All capability-gated; MIN stays at 10.
+//
+// v13: additive — agent-orchestration signals. Two new broadcast events,
+// `tabTurnComplete` (a tab's `idle` held long enough to call the turn done)
+// and `tabQuestion` (a tab entered `waiting-input`; carries the prompt text
+// plus best-effort parsed options), and an additive `lastLine` field on
+// `TabSessionSummary`. Gated behind `turnLifecycle`, `questionEvents`, and
+// `listTabsLastLine` respectively; MIN stays at 10.
 export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 12
+export const IPC_PROTOCOL_VERSION = 13
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -105,6 +113,31 @@ export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents
 export const IPC_CAPABILITY_TAB_TAIL = 'tabTail'
 
 /**
+ * v13 — capability gating the `tabTurnComplete` event. When advertised, the
+ * daemon broadcasts an authoritative end-of-turn signal once a tab's `idle`
+ * activity has held continuously for the settle window, so a driver need not
+ * poll `tabStatus` and re-confirm that idle held. Pre-cap peers never see the
+ * event and fall back to settle-polling `tabStatus`.
+ */
+export const IPC_CAPABILITY_TURN_LIFECYCLE = 'turnLifecycle'
+
+/**
+ * v13 — capability gating the `tabQuestion` event. When advertised, the daemon
+ * broadcasts the captured prompt text (plus best-effort parsed options) when a
+ * tab transitions into `waiting-input`, so a driver need not re-`snapshot` the
+ * screen and substring-match to learn what the worker is asking.
+ */
+export const IPC_CAPABILITY_QUESTION_EVENTS = 'questionEvents'
+
+/**
+ * v13 — capability gating the additive `lastLine` field on `listTabs`
+ * summaries. When advertised, each summary carries the tab's last non-blank
+ * rendered line so a fleet poll can read "what each worker is doing" without a
+ * `snapshot` round-trip per tab. Pre-cap daemons omit the field.
+ */
+export const IPC_CAPABILITY_LIST_TABS_LAST_LINE = 'listTabsLastLine'
+
+/**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
  * via a MIN bump. See `src/ipc/README.md` for the discipline.
@@ -124,6 +157,9 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_TAB_TAIL,
+  IPC_CAPABILITY_TURN_LIFECYCLE,
+  IPC_CAPABILITY_QUESTION_EVENTS,
+  IPC_CAPABILITY_LIST_TABS_LAST_LINE,
 ]
 
 export interface ProtocolHelloRequest {
@@ -184,6 +220,12 @@ export interface TabSessionSummary {
   activity?: TabActivity
   command: string
   worktreeId?: string
+  /**
+   * v13 / capability `listTabsLastLine`. The tab's last non-blank rendered
+   * line, trimmed. Present only when the daemon advertises the capability;
+   * omitted when the tab has produced no viewport yet.
+   */
+  lastLine?: string
 }
 
 export interface ListTabsResult {
@@ -324,6 +366,26 @@ export type ServerEvent =
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
   | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
+  // v13 / capability `turnLifecycle`. Authoritative end-of-turn: broadcast
+  // once a tab's `idle` activity has held continuously for the settle window.
+  // Edge-triggered — re-armed only after the tab leaves `idle` again — so a
+  // driver gets exactly one per turn. `idleMs` is how long idle had held when
+  // the event fired.
+  | { type: 'tabTurnComplete'; payload: { sessionId: string; tabId: string; idleMs: number } }
+  // v13 / capability `questionEvents`. Broadcast when a tab transitions into
+  // `waiting-input`. `prompt` is the captured tail text (authoritative);
+  // `options` is a best-effort per-CLI parse of the choice list and may be
+  // absent even when the prompt clearly offers choices.
+  | {
+      type: 'tabQuestion'
+      payload: {
+        sessionId: string
+        tabId: string
+        kind: QuestionKind
+        prompt: string
+        options?: string[]
+      }
+    }
   | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
   // Capability-gated on `tabLifecycleEvents`. Broadcast after a successful
   // `createTab` so every UI/CLI client attached to the same session learns
@@ -510,8 +572,13 @@ function isTabSessionSummary(value: unknown): value is TabSessionSummary {
       value.activity === 'waiting-input' ||
       value.activity === 'idle') &&
     isString(value.command) &&
-    (value.worktreeId === undefined || isString(value.worktreeId))
+    (value.worktreeId === undefined || isString(value.worktreeId)) &&
+    (value.lastLine === undefined || isString(value.lastLine))
   )
+}
+
+function isQuestionKind(value: unknown): value is QuestionKind {
+  return value === 'question' || value === 'permission'
 }
 
 function isListTabsResult(value: unknown): value is ListTabsResult {
@@ -785,6 +852,21 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.sessionId), 'tabStatus.sessionId must be a string')
       assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
       assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
+      return value as ServerEvent
+    case 'tabTurnComplete':
+      assert(isString(value.payload.sessionId), 'tabTurnComplete.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'tabTurnComplete.tabId must be a string')
+      assert(isFiniteNumber(value.payload.idleMs), 'tabTurnComplete.idleMs must be a number')
+      return value as ServerEvent
+    case 'tabQuestion':
+      assert(isString(value.payload.sessionId), 'tabQuestion.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'tabQuestion.tabId must be a string')
+      assert(isQuestionKind(value.payload.kind), 'tabQuestion.kind is invalid')
+      assert(isString(value.payload.prompt), 'tabQuestion.prompt must be a string')
+      assert(
+        value.payload.options === undefined || isStringArray(value.payload.options),
+        'tabQuestion.options must be a string array when present'
+      )
       return value as ServerEvent
     case 'tabAdded':
       assert(isString(value.payload.sessionId), 'tabAdded.sessionId must be a string')

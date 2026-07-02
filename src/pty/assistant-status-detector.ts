@@ -85,7 +85,14 @@ export class AssistantStatusDetector {
   }
 }
 
-function extractTailText(viewport: TerminalSnapshot, lineCount: number): string {
+/**
+ * Last `lineCount` non-blank rendered lines, trailing-trimmed, oldest-first.
+ * Shared by the status detector (10-line tail for classification) and the
+ * question extractor (larger tail for prompt capture) so both read the screen
+ * the same way. Prefers `tailLines` when the user has scrolled the viewport
+ * off the active screen.
+ */
+export function extractTailLines(viewport: TerminalSnapshot, lineCount: number): string[] {
   const isScrolledToBottom = viewport.viewportY === viewport.baseY
   const lines = isScrolledToBottom ? viewport.lines : (viewport.tailLines ?? viewport.lines)
   // Full-screen TUIs (claude, opencode) paint in the alternate buffer and
@@ -112,7 +119,11 @@ function extractTailText(viewport: TerminalSnapshot, lineCount: number): string 
     if (!line) continue
     parts.push(getLineText(line).replace(/\s+$/u, ''))
   }
-  return parts.join('\n')
+  return parts
+}
+
+function extractTailText(viewport: TerminalSnapshot, lineCount: number): string {
+  return extractTailLines(viewport, lineCount).join('\n')
 }
 
 function classifyBuiltin(

@@ -26,6 +26,7 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 | `2`   | Usage error (bad flags, missing required argument)               |
 | `3`   | Runtime error (tab crashed, git refused a worktree operation, …) |
 | `4`   | Daemon unreachable — socket missing, spawn failed, no handshake  |
+| `10`  | `tab run`: the worker is blocked on a question/permission        |
 | `124` | `--timeout` expired before the awaited event arrived             |
 
 ## Shared Flags
@@ -94,10 +95,14 @@ it errors out with a message telling you to restart `aimux`.
 Lists tabs in the target workspace.
 
 ```
-aimux tab list [--workspace W]
+aimux tab list [--verbose] [--workspace W]
 -> { tabs: [{ id, assistant, title, status, activity, command, worktreeId? }],
      activeTabId }
 ```
+
+`--verbose` adds `lastLine` — the tab's last non-blank rendered line — to each
+entry, so a fleet poll can read "what each worker is doing" without a
+`snapshot` per tab. Requires a daemon advertising `listTabsLastLine` (v13).
 
 #### `aimux tab create`
 
@@ -121,7 +126,10 @@ aimux tab send <tabId> <text>
 aimux tab send <tabId> --enter <text>      # appends \r so the CLI submits
 aimux tab send <tabId> --keys "<C-c>"      # chord parser -> raw bytes
 aimux tab send <tabId> --stdin             # read from stdin
+aimux tab send <tabId> --enter --await-submit <text>   # + confirm uptake
 -> { ok: true, bytesWritten: N }
+-> { ok: true, bytesWritten: N, submitted: true,       # with --await-submit
+     uptake: { confirmed: true, ms } | { confirmed: false } }
 ```
 
 Chord syntax mirrors `@brimveyn/aimux-config`'s keymap builder:
@@ -130,6 +138,36 @@ Multi-line text is auto-wrapped in bracketed-paste so the receiver doesn't
 misread newlines as submit. With `--enter`, the submitting `\r` is sent as a
 separate, settled write after the paste — a paste-aware TUI (e.g. Claude Code)
 would otherwise fold a same-burst `\r` into the paste buffer and never submit.
+
+`--await-submit` (requires `--enter`) blocks after the write until the tab
+transitions to `working` — i.e. the receiving CLI accepted the prompt — or
+`--await-timeout` ms elapse (default 15000). Uptake is advisory: a missed
+transition still exits 0 with `uptake.confirmed: false`. For a full
+submit→turn-end round-trip, prefer `tab run` below.
+
+#### `aimux tab run`
+
+The high-leverage orchestration verb: submit a prompt, then block until the
+worker's turn completes **or** it asks a question, and return a structured
+outcome. Collapses spawn→send→uptake→await→snapshot into one event-driven call
+that reports facts, not screen-scraped heuristics.
+
+```
+aimux tab run <tabId> [--prompt-file F | --stdin | <text>] [--timeout 900000] [--no-enter]
+-> { outcome: 'completed', durationMs }                          exit 0
+-> { outcome: 'question', kind, question, options?, durationMs } exit 10
+-> { outcome: 'timeout', durationMs }                            exit 124
+-> { outcome: 'error', error, durationMs }                       exit 3
+```
+
+Exactly one of `--prompt-file`, `--stdin`, or `<text>` supplies the prompt.
+After submitting, `run` waits for the `tabTurnComplete` signal (an authoritative
+end-of-turn: `idle` held for the settle window) or a `tabQuestion` event
+(`kind` ∈ `question | permission`, `question` = the captured prompt text,
+`options` = a best-effort parse of the choices). It is uptake-guarded — it
+ignores `tabTurnComplete` until it has first seen the tab go `working`, so a
+lingering pre-submit `idle` is never misread as "completed". Requires a daemon
+advertising `turnLifecycle` + `questionEvents` (v13).
 
 #### `aimux tab focus`
 

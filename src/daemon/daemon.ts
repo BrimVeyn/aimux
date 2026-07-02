@@ -21,6 +21,7 @@ import {
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
+import { lastNonBlankLine } from '../pty/last-line'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
@@ -106,6 +107,18 @@ export function mergeTabRegistryEntry(
   }
   registry.set(tabId, entry)
   return entry
+}
+
+/**
+ * Turn-complete settle window for the status loop, overridable via
+ * `AIMUX_TURN_SETTLE_MS` for slow/loaded machines. Falls back to the loop's
+ * own default when unset or non-numeric.
+ */
+function turnCompleteSettleMs(): number | undefined {
+  const raw = process.env.AIMUX_TURN_SETTLE_MS
+  if (raw == null || raw === '') return undefined
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
 }
 
 function send(socket: Socket, message: ServerResponse | ServerEvent): void {
@@ -376,6 +389,20 @@ export async function runDaemon(): Promise<void> {
       logDebug('daemon.status.session', { sessionId, status })
       broadcastAll({ payload: { sessionId, status }, type: 'sessionStatus' })
     },
+    onTabQuestion: (tabId, sessionId, detail) => {
+      logDebug('daemon.status.question', { kind: detail.kind, sessionId, tabId })
+      // v13 / capability `questionEvents`. Same v13 send-time gate as below.
+      broadcastAllVersioned(13, {
+        payload: {
+          kind: detail.kind,
+          options: detail.options,
+          prompt: detail.prompt,
+          sessionId,
+          tabId,
+        },
+        type: 'tabQuestion',
+      })
+    },
     onTabStatus: (tabId, status, sessionId) => {
       logDebug('daemon.status.tab', { sessionId, status, tabId })
       // Broadcast to every client. Clients silently ignore events for tabIds
@@ -385,6 +412,14 @@ export async function runDaemon(): Promise<void> {
       // client tears down its socket to switch sessions.
       broadcastAll({ payload: { sessionId, status, tabId }, type: 'tabStatus' })
     },
+    onTurnComplete: (tabId, sessionId, idleMs) => {
+      logDebug('daemon.status.turnComplete', { idleMs, sessionId, tabId })
+      // v13 / capability `turnLifecycle`. Gate at send time — pre-v13 parsers
+      // throw on unknown event types and would drop the connection. MIN stays
+      // at 10, so we fan this only to peers that negotiated at least v13.
+      broadcastAllVersioned(13, { payload: { idleMs, sessionId, tabId }, type: 'tabTurnComplete' })
+    },
+    turnSettleMs: turnCompleteSettleMs(),
   })
 
   // Local HTTP server that receives Claude Code hook callbacks for every PTY
@@ -789,6 +824,12 @@ export async function runDaemon(): Promise<void> {
                       assistant: entry.assistant,
                       command: entry.command,
                       id: tabId,
+                      // Additive v13 field (capability `listTabsLastLine`): the
+                      // tab's last non-blank rendered line, so a fleet poll can
+                      // read "what each worker is doing" without a per-tab
+                      // snapshot. Undefined when the tab has no viewport yet, in
+                      // which case the field is omitted from the JSON wire.
+                      lastLine: lastNonBlankLine(entry.viewport),
                       status: entry.status ?? 'running',
                       title: entry.title ?? '',
                       worktreeId: entry.worktreeId,

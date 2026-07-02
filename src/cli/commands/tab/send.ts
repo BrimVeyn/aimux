@@ -1,33 +1,12 @@
 import type { CliCommand } from '../../registry'
 
 import { IPC_CAPABILITY_THIN_ATTACH } from '../../../ipc/protocol'
-import { bracketedPaste, notationToBytes } from '../../chord'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
+import { buildPromptPayload, writePromptPayload } from './prompt-io'
 
-/**
- * Gap between the bracketed-paste write and the trailing carriage return when
- * `--enter` submits a pasted block. Claude Code (and other paste-aware TUIs)
- * buffer every byte between the paste-start/paste-end markers; a `\r` that
- * arrives in the same burst as the paste-end marker is folded into the paste
- * buffer as literal content instead of being read as a submit keystroke. A
- * short settle lets the receiver exit paste mode before the Enter lands.
- */
-const PASTE_SUBMIT_SETTLE_MS = 50
-
-/**
- * Lower a chord/paste buffer of bytes into the string the protocol expects.
- * Every byte we emit is < 0x80 (control chars or printable ASCII), so a
- * Latin-1 decode is faithful — the receiving PTY's UTF-8 path treats each
- * single byte as itself.
- */
-function bytesToString(bytes: Buffer): string {
-  let out = ''
-  for (const byte of bytes) {
-    out += String.fromCharCode(byte)
-  }
-  return out
-}
+/** Default ceiling for the submit→working transition under --await-submit. */
+const DEFAULT_AWAIT_TIMEOUT_MS = 15_000
 
 export const tabSend: CliCommand = {
   args: [{ name: 'tabId', required: true }, { name: 'text' }],
@@ -44,6 +23,18 @@ export const tabSend: CliCommand = {
       kind: 'boolean',
       name: 'stdin',
     },
+    {
+      description:
+        'after submitting, block until the tab transitions to working (uptake confirmed)',
+      kind: 'boolean',
+      name: 'await-submit',
+    },
+    {
+      description:
+        'milliseconds to wait for the working transition with --await-submit (default 15000)',
+      kind: 'number',
+      name: 'await-timeout',
+    },
   ],
   group: 'tab',
   run: async (ctx) => {
@@ -55,30 +46,25 @@ export const tabSend: CliCommand = {
     const fromStdin = ctx.args.flags.stdin === true
     const asKeys = ctx.args.flags.keys === true
     const appendEnter = ctx.args.flags.enter === true
+    const awaitSubmit = ctx.args.flags['await-submit'] === true
+    const awaitTimeoutMs =
+      typeof ctx.args.flags['await-timeout'] === 'number'
+        ? ctx.args.flags['await-timeout']
+        : DEFAULT_AWAIT_TIMEOUT_MS
 
-    let data: string
-    // Whether `data` is a bracketed-paste block (multi-line text that
-    // `bracketedPaste` wrapped in start/end markers). A trailing `\r` must be
-    // sent as a *separate*, settled write for these — see PASTE_SUBMIT_SETTLE_MS.
-    let bracketed = false
-    if (fromStdin) {
-      const stdinText = await Bun.stdin.text()
-      if (asKeys) {
-        data = bytesToString(notationToBytes(stdinText))
-      } else {
-        data = bracketedPaste(stdinText)
-        bracketed = data !== stdinText
-      }
-    } else {
-      const text = ctx.args.positionals[1] ?? ''
-      if (asKeys) {
-        if (text === '') throw new Error('--keys requires the chord notation as <text>')
-        data = bytesToString(notationToBytes(text))
-      } else {
-        data = bracketedPaste(text)
-        bracketed = data !== text
-      }
+    // Uptake only means something once we actually submit the prompt: the
+    // working transition is the receiving CLI accepting the Enter. Without
+    // --enter there is nothing to confirm, so fail loudly rather than block
+    // forever on a transition that can't come.
+    if (awaitSubmit && !appendEnter) {
+      throw new Error('--await-submit requires --enter')
     }
+
+    const text = fromStdin ? await Bun.stdin.text() : (ctx.args.positionals[1] ?? '')
+    if (asKeys && text === '') {
+      throw new Error('--keys requires the chord notation as <text>')
+    }
+    const payload = buildPromptPayload(text, asKeys)
 
     const workspace = ctx.getWorkspace()
     const daemon = await ctx.getDaemon()
@@ -89,22 +75,40 @@ export const tabSend: CliCommand = {
     }
 
     await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
-    await daemon.expectOk('write', { data, tabId })
 
-    let bytesWritten = Buffer.byteLength(data, 'utf8')
-    if (appendEnter) {
-      // A bracketed paste swallows a same-burst `\r`, so settle first, then
-      // submit as an independent write. Plain text / key chords carry no paste
-      // markers, so the Enter can follow immediately — but still as its own
-      // write so the two paths stay uniform.
-      if (bracketed) {
-        await Bun.sleep(PASTE_SUBMIT_SETTLE_MS)
-      }
-      await daemon.expectOk('write', { data: '\r', tabId })
-      bytesWritten += 1
+    if (!awaitSubmit) {
+      const bytesWritten = await writePromptPayload(daemon, tabId, payload, appendEnter)
+      writeJson({ bytesWritten, ok: true })
+      return EXIT_OK
     }
 
-    writeJson({ bytesWritten, ok: true })
+    // The daemon only emits tabStatus on TRANSITIONS, so we must be subscribed
+    // before the submit write lands — otherwise the working transition can fire
+    // between the write and our subscription and be lost forever. Arm the
+    // listener + a one-shot promise here, then start the clock right before the
+    // Enter so `ms` reflects submit→uptake latency, not setup overhead.
+    const uptake = new Promise<{ confirmed: true; ms: number } | { confirmed: false }>(
+      (resolve) => {
+        const off = daemon.on('tabStatus', (event) => {
+          if (event.tabId !== tabId || event.status !== 'working') return
+          off()
+          clearTimeout(timer)
+          resolve({ confirmed: true, ms: Date.now() - start })
+        })
+        const timer = setTimeout(() => {
+          off()
+          resolve({ confirmed: false })
+        }, awaitTimeoutMs)
+      }
+    )
+
+    const start = Date.now()
+    const bytesWritten = await writePromptPayload(daemon, tabId, payload, appendEnter)
+    const result = await uptake
+
+    // The bytes WERE written regardless of uptake — the working transition is
+    // advisory, so a missed transition is still EXIT_OK.
+    writeJson({ bytesWritten, ok: true, submitted: true, uptake: result })
     return EXIT_OK
   },
   summary: 'Write text or a key chord to a tab',

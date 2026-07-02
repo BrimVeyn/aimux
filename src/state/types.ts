@@ -19,6 +19,14 @@ export type LegacyPersistedTabStatus = TabStatus | 'exited'
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 
 /**
+ * Classifies why a tab is blocked on user input. `permission` is a tool /
+ * command approval prompt; `question` is any other prompt the assistant is
+ * waiting on. Carried by the `tabQuestion` server event so an orchestrator can
+ * branch without re-scraping the screen.
+ */
+export type QuestionKind = 'question' | 'permission'
+
+/**
  * Per-session status flags. Both can be true at once (e.g. one tab working,
  * another waiting for user input) so we keep them as independent booleans
  * rather than a single priority enum.

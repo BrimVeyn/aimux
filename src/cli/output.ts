@@ -22,9 +22,11 @@ export function writeError(message: string): void {
 //   2   usage error (bad flags, unknown command, missing argument)
 //   3   runtime error (server replied with `error`, command failed)
 //   4   daemon unreachable (socket missing and autostart failed)
+//   10  question (`tab run`: worker is blocked on a question/permission)
 //   124 timeout (`tab wait`, `tab tail --timeout`, `workspace switch --wait`)
 export const EXIT_OK = 0
 export const EXIT_USAGE = 2
 export const EXIT_RUNTIME = 3
 export const EXIT_DAEMON_UNREACHABLE = 4
+export const EXIT_QUESTION = 10
 export const EXIT_TIMEOUT = 124

@@ -5,6 +5,7 @@ import { tabClose } from './commands/tab/close'
 import { tabCreate } from './commands/tab/create'
 import { tabFocus } from './commands/tab/focus'
 import { tabList } from './commands/tab/list'
+import { tabRun } from './commands/tab/run'
 import { tabSend } from './commands/tab/send'
 import { tabSnapshot } from './commands/tab/snapshot'
 import { tabTail } from './commands/tab/tail'
@@ -31,6 +32,7 @@ export const COMMANDS: readonly CliCommand[] = [
   tabList,
   tabCreate,
   tabSend,
+  tabRun,
   tabFocus,
   tabClose,
   tabSnapshot,
