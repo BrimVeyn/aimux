@@ -11,7 +11,7 @@ import { useAIUsageStore } from '../../../state/ai-usage-store'
 import { useAppStore } from '../../../state/app-store'
 import { useKeymap } from '../../keymap-context'
 import { getStatusBarModel, type IdentitySegment } from '../../status-bar-model'
-import { useTheme } from '../../theme'
+import { useBaseTheme, useTheme } from '../../theme'
 import { AIUsageIndicator } from '../overlays/ai-usage/ai-usage-indicator'
 
 // Powerline-style separator glyph pairs.
@@ -110,6 +110,10 @@ function Separator({ bg, fg, glyph }: { bg: string; fg: string; glyph: string })
 
 export function StatusBar() {
   const t = useTheme()
+  // Badge foregrounds (mode label, version) sit on colored tiles and would
+  // render invisible with a transparent chrome color — always use the base
+  // (opaque) background token for contrast against those tiles.
+  const base = useBaseTheme()
   const state = useAppStore((s) => s)
   const config = useKeymap()
   const model = getStatusBarModel(state, config)
@@ -139,7 +143,7 @@ export function StatusBar() {
       <box height={1} flexShrink={0} flexDirection="row" overflow="hidden">
         {/* A: mode */}
         <box backgroundColor={modeColor} paddingLeft={1} paddingRight={1}>
-          <text fg={t.background} selectable={false}>
+          <text fg={base.background} selectable={false}>
             {getModeBadge(state.focusMode)}
           </text>
         </box>
@@ -186,7 +190,7 @@ export function StatusBar() {
 
         {/* Y: version */}
         <box backgroundColor={tileY} paddingLeft={1} paddingRight={1} flexShrink={0}>
-          <text fg={t.background} selectable={false}>
+          <text fg={base.background} selectable={false}>
             v{APP_VERSION}
           </text>
         </box>

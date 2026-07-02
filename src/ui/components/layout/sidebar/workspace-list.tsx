@@ -15,7 +15,7 @@ import { formatDivergence } from '../../../../state/session-worktrees'
 import { IDLE_SESSION_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
-import { useTheme } from '../../../theme'
+import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
@@ -298,14 +298,17 @@ const WorkspaceRow = memo(function WorkspaceRow({
   status,
 }: WorkspaceRowProps) {
   const t = useTheme()
+  // Selection highlight must stay opaque in transparent mode — otherwise the
+  // cursor row visually disappears against the see-through chrome.
+  const base = useBaseTheme()
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
   let bgColor: string | undefined
   if (dragging || isActiveItem) {
-    bgColor = t.backgroundElement
+    bgColor = base.backgroundElement
   } else if (inCurrentGroup) {
-    bgColor = t.backgroundPanel
+    bgColor = base.backgroundPanel
   }
   const workingColor = t.primary
   const waitingColor = t.warning
