@@ -7,7 +7,7 @@ import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/session-worktrees'
-import { useTheme } from '../../../theme'
+import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -33,6 +33,8 @@ export const WorktreeRow = memo(function WorktreeRow({
   worktree,
 }: WorktreeRowProps) {
   const t = useTheme()
+  // Selection highlight must stay opaque in transparent mode.
+  const base = useBaseTheme()
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const isCurrentSession = session.id === currentSessionId
   const divergence = useAppStore((s) => s.worktreeDivergence[worktree.id])
@@ -102,9 +104,9 @@ export const WorktreeRow = memo(function WorktreeRow({
 
   let bgColor: string | undefined
   if (isActiveItem) {
-    bgColor = t.backgroundElement
+    bgColor = base.backgroundElement
   } else if (inCurrentGroup) {
-    bgColor = t.backgroundPanel
+    bgColor = base.backgroundPanel
   }
 
   const connector = isLast ? '└─' : '├─'
