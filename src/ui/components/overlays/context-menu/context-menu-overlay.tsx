@@ -9,7 +9,8 @@ import {
   type ContextMenuState,
   subscribeContextMenu,
 } from '../../../context-menu/controller'
-import { useTheme } from '../../../theme'
+import { useTheme, useTransparent } from '../../../theme'
+import { fillBorderedBoxInterior } from '../../../transparent-fill'
 
 const MenuItem = memo(function MenuItem({
   active,
@@ -59,6 +60,7 @@ export function ContextMenuOverlay() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [selected, setSelected] = useState(0)
   const t = useTheme()
+  const transparent = useTransparent()
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
   const terminalRows = useAppStore((s) => s.layout.terminalRows)
 
@@ -131,7 +133,8 @@ export function ContextMenuOverlay() {
         flexDirection="column"
         border
         borderColor={t.border}
-        backgroundColor={t.backgroundPanel}
+        backgroundColor={transparent ? 'transparent' : t.backgroundPanel}
+        renderAfter={transparent ? fillBorderedBoxInterior : undefined}
         onMouseDown={handleMenuMouseDown}
       >
         {menu.items.map(([label, onSelect], index) => (
