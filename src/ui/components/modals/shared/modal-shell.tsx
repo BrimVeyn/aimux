@@ -1,9 +1,8 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 import type { ReactNode } from 'react'
 
-import { type BoxRenderable, type OptimizedBuffer, RGBA } from '@opentui/core'
-
 import { useTheme, useTransparent } from '../../../theme'
+import { fillBorderedBoxInterior } from '../../../transparent-fill'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 
 interface ModalShellProps {
@@ -14,38 +13,6 @@ interface ModalShellProps {
   keybindsModeId?: ModeId
   title: string
   width: number | `${number}%`
-}
-
-const TRANSPARENT_RGBA = RGBA.fromValues(0, 0, 0, 0)
-
-// opentui's BoxRenderable only paints a fill when `backgroundColor.a > 0`, so
-// a fully transparent modal bg leaks the chrome characters underneath. The
-// `renderAfter` hook runs after the box paints itself but before its children
-// render, so we manually overwrite every interior cell with a blank space.
-//
-// Two gotchas we hit by reading the zig source (packages/core/src/zig/buffer.zig):
-//  1. `setCellWithAlphaBlending` early-returns via `isFullyTransparent` when
-//     both fg and bg alpha are 0 — nothing gets written.
-//  2. Its `blendCells` deliberately preserves the destination char when the
-//     overlay char is `DEFAULT_SPACE_CHAR` (codepoint 32) so that drawing a
-//     space on top of existing text does not erase it.
-//
-// `setCell` (→ `bufferSetCell` → zig `buffer.set`) bypasses both: it writes
-// the cell unconditionally, no alpha check, no blending, no char preservation.
-function fillModalInteriorWithSpaces(this: BoxRenderable, buffer: OptimizedBuffer): void {
-  const x0 = this.screenX
-  const y0 = this.screenY
-  const w = this.width
-  const h = this.height
-  const startX = x0 + 1
-  const startY = y0 + 1
-  const endX = x0 + w - 1
-  const endY = y0 + h - 1
-  for (let y = startY; y < endY; y++) {
-    for (let x = startX; x < endX; x++) {
-      buffer.setCell(x, y, ' ', TRANSPARENT_RGBA, TRANSPARENT_RGBA)
-    }
-  }
 }
 
 export function ModalShell({
@@ -76,7 +43,7 @@ export function ModalShell({
         backgroundColor={bg}
         padding={1}
         width={width}
-        renderAfter={transparent ? fillModalInteriorWithSpaces : undefined}
+        renderAfter={transparent ? fillBorderedBoxInterior : undefined}
       >
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">
