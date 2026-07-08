@@ -1,10 +1,27 @@
 import type { AssistantId } from '../state/types'
 
+/**
+ * How an assistant renders a vendor-neutral model / reasoning-effort selection
+ * into its own CLI args. Vendor flag syntax lives here on the assistant
+ * definition — the source of truth — rather than in a separate resolver, so
+ * there's exactly one place that knows `claude` takes `--effort` while `codex`
+ * takes `-c model_reasoning_effort=…`. An absent builder means the CLI has no
+ * control for that dimension, and passing `--model` / `--effort` for it is an
+ * error (see `buildAssistantModelArgs`). Values themselves are passed through
+ * unvalidated: the worker CLI is the source of truth for its own vocabulary and
+ * rejects a bad value with its own clear startup error.
+ */
+export interface AssistantModelSpec {
+  buildModelArgs?: (model: string) => string[]
+  buildEffortArgs?: (effort: string) => string[]
+}
+
 export interface AssistantOption {
   id: AssistantId
   label: string
   command: string
   description: string
+  model?: AssistantModelSpec
 }
 
 const DEFAULT_SHELL =
@@ -17,18 +34,30 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     description: 'Anthropic Claude CLI',
     id: 'claude',
     label: 'Claude',
+    model: {
+      buildEffortArgs: (effort) => ['--effort', effort],
+      buildModelArgs: (model) => ['--model', model],
+    },
   },
   {
     command: 'codex',
     description: 'OpenAI Codex CLI',
     id: 'codex',
     label: 'Codex',
+    model: {
+      buildEffortArgs: (effort) => ['-c', `model_reasoning_effort=${effort}`],
+      buildModelArgs: (model) => ['--model', model],
+    },
   },
   {
     command: 'opencode',
     description: 'OpenCode CLI',
     id: 'opencode',
     label: 'OpenCode',
+    // OpenCode takes a `provider/model` selector but has no reasoning-effort flag.
+    model: {
+      buildModelArgs: (model) => ['--model', model],
+    },
   },
   {
     command: 'agy',
@@ -73,4 +102,35 @@ export function isCommandAvailable(command: string): boolean {
 export function parseCommand(commandString: string): { executable: string; args: string[] } {
   const parts = commandString.trim().split(/\s+/).filter(Boolean)
   return { args: parts.slice(1), executable: parts[0] ?? '' }
+}
+
+/**
+ * Translate a vendor-neutral `{ model, effort }` selection into the extra CLI
+ * args to append to an assistant's default command. Throws if the assistant has
+ * no control for a requested dimension (e.g. `--effort` on OpenCode, anything on
+ * `terminal`) — that combination is unrepresentable, so we fail at the CLI
+ * boundary rather than spawn a worker that silently ignores the request.
+ */
+export function buildAssistantModelArgs(
+  option: AssistantOption,
+  selection: { model?: string; effort?: string }
+): string[] {
+  const args: string[] = []
+  const { effort, model } = selection
+
+  if (model !== undefined && model !== '') {
+    if (!option.model?.buildModelArgs) {
+      throw new Error(`assistant '${option.id}' does not support --model`)
+    }
+    args.push(...option.model.buildModelArgs(model))
+  }
+
+  if (effort !== undefined && effort !== '') {
+    if (!option.model?.buildEffortArgs) {
+      throw new Error(`assistant '${option.id}' does not support --effort`)
+    }
+    args.push(...option.model.buildEffortArgs(effort))
+  }
+
+  return args
 }

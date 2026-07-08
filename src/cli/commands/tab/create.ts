@@ -7,7 +7,11 @@ import {
   IPC_CAPABILITY_THIN_ATTACH,
 } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
-import { getAllAssistantOptions, parseCommand } from '../../../pty/command-registry'
+import {
+  buildAssistantModelArgs,
+  getAllAssistantOptions,
+  parseCommand,
+} from '../../../pty/command-registry'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
@@ -31,6 +35,16 @@ export const tabCreate: CliCommand = {
       name: 'command',
     },
     {
+      description: 'model for the worker (maps to the assistant’s model flag)',
+      kind: 'string',
+      name: 'model',
+    },
+    {
+      description: 'reasoning-effort level (maps to the assistant’s effort flag)',
+      kind: 'string',
+      name: 'effort',
+    },
+    {
       description: 'worktree id the tab belongs to (defaults to the workspace’s active worktree)',
       kind: 'string',
       name: 'worktree',
@@ -49,8 +63,21 @@ export const tabCreate: CliCommand = {
         `unknown assistant: ${assistantId} (known: ${options.map((o) => o.id).join(', ')})`
       )
     }
-    const command =
-      typeof ctx.args.flags.command === 'string' ? ctx.args.flags.command : option.command
+    const commandOverride =
+      typeof ctx.args.flags.command === 'string' ? ctx.args.flags.command : undefined
+    const model = typeof ctx.args.flags.model === 'string' ? ctx.args.flags.model : undefined
+    const effort = typeof ctx.args.flags.effort === 'string' ? ctx.args.flags.effort : undefined
+
+    // A full `--command` override owns the whole invocation, so `--model` /
+    // `--effort` (which only make sense as additions to the assistant default)
+    // would be ambiguous alongside it — reject rather than silently drop them.
+    if (commandOverride !== undefined && (model !== undefined || effort !== undefined)) {
+      throw new Error(
+        '--model / --effort cannot be combined with --command (bake them into --command)'
+      )
+    }
+
+    const command = commandOverride ?? option.command
     const title = typeof ctx.args.flags.title === 'string' ? ctx.args.flags.title : option.label
     const cwdRaw = typeof ctx.args.flags.cwd === 'string' ? ctx.args.flags.cwd : undefined
     const cwd = cwdRaw === undefined ? undefined : resolvePath(cwdRaw)
@@ -81,7 +108,11 @@ export const tabCreate: CliCommand = {
     // Thin-attach so we don't clobber the UI's dimensions on the same session.
     await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
 
-    const { args, executable } = parseCommand(command)
+    const { args: baseArgs, executable } = parseCommand(command)
+    // Append the model/effort flags to the assistant default. Throws if the
+    // assistant has no control for a requested dimension.
+    const modelArgs = buildAssistantModelArgs(option, { effort, model })
+    const args = [...baseArgs, ...modelArgs]
     const tabId = createPrefixedId('tab')
 
     // cols/rows = 0 means "fall back to the session's last attached size" on
@@ -101,7 +132,16 @@ export const tabCreate: CliCommand = {
       worktreeId,
     })
 
-    writeJson({ assistant: assistantId, command, tabId, title, worktreeId })
+    const resolvedCommand = [executable, ...args].join(' ')
+    writeJson({
+      assistant: assistantId,
+      command: resolvedCommand,
+      effort: effort ?? null,
+      model: model ?? null,
+      tabId,
+      title,
+      worktreeId,
+    })
     return EXIT_OK
   },
   summary: 'Create a new tab in the active workspace',
