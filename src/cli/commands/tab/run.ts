@@ -17,31 +17,7 @@ import {
 import { SHARED_FLAGS } from '../../flags'
 import { writeJson } from '../../output'
 import { awaitTurn, DEFAULT_TIMEOUT_MS, turnOutcomeExitCode } from './await-turn'
-import { buildPromptPayload, writePromptPayload } from './prompt-io'
-
-/**
- * Resolve the prompt text from exactly one source. We require exactly one of
- * `--prompt-file`, `--stdin`, or the positional `[text]` so an orchestrator
- * never silently sends the wrong buffer when two sources are set (e.g. a stale
- * positional plus a fresh `--prompt-file`).
- */
-async function resolvePromptText(
-  promptFile: string | undefined,
-  fromStdin: boolean,
-  positionalText: string | undefined
-): Promise<string> {
-  const sources = [promptFile !== undefined, fromStdin, positionalText !== undefined].filter(
-    (present) => present
-  ).length
-  if (sources !== 1) {
-    throw new Error(
-      'provide exactly one prompt source: --prompt-file <f>, --stdin, or a [text] positional'
-    )
-  }
-  if (promptFile !== undefined) return Bun.file(promptFile).text()
-  if (fromStdin) return Bun.stdin.text()
-  return positionalText ?? ''
-}
+import { buildPromptPayload, resolvePromptText, writePromptPayload } from './prompt-io'
 
 export const tabRun: CliCommand = {
   args: [{ name: 'tabId', required: true }, { name: 'text' }],

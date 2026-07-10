@@ -1,4 +1,7 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import type { DaemonClient } from '../../src/cli/client/daemon-client'
 import type { CliContext } from '../../src/cli/context'
@@ -137,5 +140,30 @@ describe('tab send --await-submit', () => {
     expect(out.ok).toBe(true)
     expect('submitted' in out).toBe(false)
     expect('uptake' in out).toBe(false)
+  })
+})
+
+describe('tab send --prompt-file', () => {
+  test('reads the file content as the payload', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'aimux-send-'))
+    const file = join(dir, 'p.md')
+    writeFileSync(file, 'hello from file')
+    const { daemon, writes } = makeFakeDaemon({})
+    const ctx = makeContext({ 'prompt-file': file }, ['tab-1'], daemon)
+    const { code } = await captureJson(async () => await tabSend.run(ctx))
+    expect(code).toBe(0)
+    expect(writes.join('')).toContain('hello from file')
+  })
+
+  test('rejects --prompt-file combined with --stdin', async () => {
+    const { daemon } = makeFakeDaemon({})
+    const ctx = makeContext({ 'prompt-file': '/x', 'stdin': true }, ['tab-1'], daemon)
+    let message = ''
+    try {
+      await tabSend.run(ctx)
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error)
+    }
+    expect(message).toContain('cannot be combined with --stdin')
   })
 })

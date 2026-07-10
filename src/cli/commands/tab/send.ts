@@ -24,6 +24,11 @@ export const tabSend: CliCommand = {
       name: 'stdin',
     },
     {
+      description: 'read the payload from this file instead of <text>',
+      kind: 'string',
+      name: 'prompt-file',
+    },
+    {
       description:
         'after submitting, block until the tab transitions to working (uptake confirmed)',
       kind: 'boolean',
@@ -44,6 +49,8 @@ export const tabSend: CliCommand = {
     }
 
     const fromStdin = ctx.args.flags.stdin === true
+    const promptFile =
+      typeof ctx.args.flags['prompt-file'] === 'string' ? ctx.args.flags['prompt-file'] : undefined
     const asKeys = ctx.args.flags.keys === true
     const appendEnter = ctx.args.flags.enter === true
     const awaitSubmit = ctx.args.flags['await-submit'] === true
@@ -60,7 +67,26 @@ export const tabSend: CliCommand = {
       throw new Error('--await-submit requires --enter')
     }
 
-    const text = fromStdin ? await Bun.stdin.text() : (ctx.args.positionals[1] ?? '')
+    // At most one payload source. Unlike `tab run`, zero sources is valid here
+    // (`tab send <tab> --enter` submits an empty line), so we only reject
+    // conflicting combinations rather than requiring exactly one.
+    if (promptFile !== undefined) {
+      if (fromStdin) throw new Error('--prompt-file cannot be combined with --stdin')
+      if (asKeys)
+        throw new Error('--prompt-file cannot be combined with --keys (chords go in <text>)')
+      if (ctx.args.positionals[1] !== undefined) {
+        throw new Error('--prompt-file cannot be combined with a <text> positional')
+      }
+    }
+
+    let text: string
+    if (promptFile !== undefined) {
+      text = await Bun.file(promptFile).text()
+    } else if (fromStdin) {
+      text = await Bun.stdin.text()
+    } else {
+      text = ctx.args.positionals[1] ?? ''
+    }
     if (asKeys && text === '') {
       throw new Error('--keys requires the chord notation as <text>')
     }
