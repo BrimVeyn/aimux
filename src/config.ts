@@ -13,7 +13,14 @@ function migrateThemeId(value: unknown): ThemeId | undefined {
   return resolveLegacyThemeId(value)
 }
 
-export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
+/**
+ * Path to the active profile's config file, resolved at CALL time. It must not
+ * be a module-level constant: `runCli` applies `--profile` (via `AIMUX_PROFILE`)
+ * after this module is imported, so a frozen path would read the wrong profile.
+ */
+export function getConfigPath(): string {
+  return `${getProfileConfigDir()}/aimux.json`
+}
 
 export interface PersistedGitPane {
   diffModeRatio?: number
@@ -238,12 +245,13 @@ function isCustomCommandsRecord(value: unknown): value is Record<string, string>
 }
 
 export function loadConfigResult(): ConfigLoadResult {
+  const configPath = getConfigPath()
   try {
-    if (!existsSync(CONFIG_PATH)) {
+    if (!existsSync(configPath)) {
       return { config: DEFAULT_CONFIG, issues: [], source: 'defaults' }
     }
 
-    const raw = readFileSync(CONFIG_PATH, 'utf8')
+    const raw = readFileSync(configPath, 'utf8')
     const parsed = JSON.parse(raw) as {
       version?: number
       customCommands?: unknown
@@ -346,7 +354,7 @@ export function loadConfigResult(): ConfigLoadResult {
     const validWorktreeTemplates = parseWorktreeTemplates(parsed.worktreeTemplates, issues)
 
     if (issues.length > 0) {
-      logDebug('config.load.validationIssue', { issues, path: CONFIG_PATH })
+      logDebug('config.load.validationIssue', { issues, path: configPath })
     }
 
     return {
@@ -371,7 +379,7 @@ export function loadConfigResult(): ConfigLoadResult {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logDebug('config.load.error', { error: message, path: CONFIG_PATH })
+    logDebug('config.load.error', { error: message, path: configPath })
     return {
       config: DEFAULT_CONFIG,
       issues: [`failed to load config: ${message}`],
@@ -385,14 +393,15 @@ export function loadConfig(): AimuxConfig {
 }
 
 export function saveConfig(config: AimuxConfig): boolean {
+  const configPath = getConfigPath()
   try {
     mkdirSync(getProfileConfigDir(), { recursive: true })
-    writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`)
     return true
   } catch (error) {
     logDebug('config.save.error', {
       error: error instanceof Error ? error.message : String(error),
-      path: CONFIG_PATH,
+      path: configPath,
     })
     return false
   }

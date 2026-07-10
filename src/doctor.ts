@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 
-import { CONFIG_PATH, loadConfigResult } from './config'
+import { getConfigPath, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
 
 export interface DoctorCheck {
@@ -22,11 +22,12 @@ function getConfigDetails(configResult: ReturnType<typeof loadConfigResult>): st
     return configResult.issues.join('; ')
   }
 
-  if (existsSync(CONFIG_PATH)) {
-    return `loaded ${CONFIG_PATH}`
+  const configPath = getConfigPath()
+  if (existsSync(configPath)) {
+    return `loaded ${configPath}`
   }
 
-  return `using defaults (${CONFIG_PATH} not found)`
+  return `using defaults (${configPath} not found)`
 }
 
 function getAssistantDetails(

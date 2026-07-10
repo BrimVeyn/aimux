@@ -52,6 +52,7 @@ function formatArgs(args: readonly ArgSpec[]): string {
 function flagValueHint(flag: FlagSpec): string {
   if (flag.kind === 'boolean') return ''
   if (flag.kind === 'number') return ' <n>'
+  if (flag.kind === 'optional-string') return `[=<${flag.name}>]`
   return ` <${flag.name}>`
 }
 

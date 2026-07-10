@@ -6,7 +6,7 @@
 
 export interface FlagSpec {
   name: string
-  kind: 'string' | 'number' | 'boolean'
+  kind: 'string' | 'number' | 'boolean' | 'optional-string'
   description?: string
 }
 
@@ -57,6 +57,13 @@ export function parseArgs(
           throw new CliUsageError(`flag --${name} does not take a value`)
         }
         flags[name] = true
+        continue
+      }
+      if (spec.kind === 'optional-string') {
+        // Value binds ONLY in the `=` form (`--flag=value`). A bare `--flag`
+        // must not swallow the next token (it may be a positional), so it
+        // parses as boolean `true`.
+        flags[name] = eq === -1 ? true : token.slice(eq + 1)
         continue
       }
       const raw = eq === -1 ? argv[++i] : token.slice(eq + 1)

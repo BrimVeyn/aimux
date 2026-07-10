@@ -2,12 +2,14 @@ import { resolve as resolvePath } from 'node:path'
 
 import type { CliCommand } from '../../registry'
 
+import { loadConfig } from '../../../config'
 import {
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_THIN_ATTACH,
 } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
+  type AssistantOption,
   buildAssistantModelArgs,
   getAllAssistantOptions,
   parseCommand,
@@ -17,6 +19,35 @@ import { EXIT_OK, writeJson } from '../../output'
 
 const FALLBACK_COLS = 200
 const FALLBACK_ROWS = 60
+
+/**
+ * Resolve the cwd a spawned tab should run in. Precedence: explicit `--cwd`
+ * (resolved to absolute) > the resolved worktree's path > undefined (the
+ * daemon's default). Worktree record paths are already absolute.
+ */
+export function resolveTabCwd(
+  cwdFlag: string | undefined,
+  worktreeRecord: { path: string } | undefined
+): string | undefined {
+  if (cwdFlag !== undefined) return resolvePath(cwdFlag)
+  return worktreeRecord?.path
+}
+
+/**
+ * Resolve the base command a tab launches. Mirrors the UI's precedence
+ * (`src/app-runtime/side-effects.ts`): an explicit `--command` override wins,
+ * else the workspace's persisted `customCommands[assistantId]` (so CLI workers
+ * inherit e.g. `claude --dangerously-skip-permissions`), else the builtin
+ * default. `getAllAssistantOptions` deliberately does NOT apply builtin
+ * overrides, so this lookup must be explicit.
+ */
+export function resolveAssistantCommand(
+  commandOverride: string | undefined,
+  customCommands: Record<string, string>,
+  option: AssistantOption
+): string {
+  return commandOverride ?? customCommands[option.id] ?? option.command
+}
 
 export const tabCreate: CliCommand = {
   args: [],
@@ -56,7 +87,12 @@ export const tabCreate: CliCommand = {
     if (typeof assistantId !== 'string' || assistantId.length === 0) {
       throw new Error('--assistant is required')
     }
-    const options = getAllAssistantOptions({})
+    // Load the workspace's persisted customCommands so CLI-spawned tabs honor
+    // the same assistant commands the UI uses (e.g. skip-permissions flags), and
+    // so purely-custom assistant ids resolve. loadConfig degrades to {} on a
+    // missing/invalid config — no new failure mode.
+    const { customCommands } = loadConfig()
+    const options = getAllAssistantOptions(customCommands)
     const option = options.find((o) => o.id === assistantId)
     if (!option) {
       throw new Error(
@@ -77,10 +113,9 @@ export const tabCreate: CliCommand = {
       )
     }
 
-    const command = commandOverride ?? option.command
+    const command = resolveAssistantCommand(commandOverride, customCommands, option)
     const title = typeof ctx.args.flags.title === 'string' ? ctx.args.flags.title : option.label
     const cwdRaw = typeof ctx.args.flags.cwd === 'string' ? ctx.args.flags.cwd : undefined
-    const cwd = cwdRaw === undefined ? undefined : resolvePath(cwdRaw)
 
     const workspace = ctx.getWorkspace()
     const daemon = await ctx.getDaemon()
@@ -104,6 +139,14 @@ export const tabCreate: CliCommand = {
       }
       worktreeId = worktreeFlag
     }
+
+    // Default the PTY cwd to the resolved worktree's path so a worker spawned
+    // into a worktree actually runs inside it. An explicit --cwd always wins;
+    // an unknown worktreeId (stale activeWorktreeId) falls through to the
+    // daemon's default rather than guessing.
+    const worktreeRecord =
+      worktreeId !== undefined ? workspace.worktrees?.find((w) => w.id === worktreeId) : undefined
+    const cwd = resolveTabCwd(cwdRaw, worktreeRecord)
 
     // Thin-attach so we don't clobber the UI's dimensions on the same session.
     await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
@@ -136,6 +179,7 @@ export const tabCreate: CliCommand = {
     writeJson({
       assistant: assistantId,
       command: resolvedCommand,
+      cwd: cwd ?? null,
       effort: effort ?? null,
       model: model ?? null,
       tabId,
