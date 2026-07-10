@@ -26,7 +26,7 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 | `2`   | Usage error (bad flags, missing required argument)               |
 | `3`   | Runtime error (tab crashed, git refused a worktree operation, …) |
 | `4`   | Daemon unreachable — socket missing, spawn failed, no handshake  |
-| `10`  | `tab run`: the worker is blocked on a question/permission        |
+| `10`  | `tab run` / `tab await`: worker is blocked on a question/permission |
 | `124` | `--timeout` expired before the awaited event arrived             |
 
 ## Shared Flags
@@ -106,15 +106,37 @@ entry, so a fleet poll can read "what each worker is doing" without a
 
 #### `aimux tab create`
 
-Creates a new tab. `--command` overrides the assistant's default binary.
-`--worktree` pins the tab to a specific worktree id; without it the
-workspace's active worktree is used.
+Creates a new tab.
 
 ```
-aimux tab create --assistant <id> [--title T] [--cwd .]
-                 [--command CMD] [--worktree WT] [--workspace W]
--> { tabId, assistant, title, command, worktreeId? }
+aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
+                 [--model M] [--effort E]
+                 [--worktree WT | --new-worktree[=<name>] [--base R] [--branch B]]
+                 [--workspace W]
+-> { tabId, assistant, title, command, cwd, model, effort,
+     worktreeId, path, branch, name }   # worktree fields null when none
 ```
+
+- **cwd** defaults to the resolved worktree's path (so a worker spawned into a
+  worktree actually runs inside it); an explicit `--cwd` overrides.
+- **`--command`** overrides the assistant's default binary entirely.
+- **`--model` / `--effort`** map to the assistant's own flags (claude
+  `--model`/`--effort`; codex `--model` + `-c model_reasoning_effort=…`; opencode
+  `--model` only). They append to the resolved base command and **cannot** be
+  combined with `--command`. Values aren't validated by aimux — a bad one makes
+  the worker CLI fail at startup.
+- **customCommands**: the base command is resolved as
+  `--command` > the workspace's persisted `customCommands[assistant]` > the
+  builtin default, so CLI-spawned tabs inherit e.g. `claude
+  --dangerously-skip-permissions` exactly like the UI. `--command claude` is the
+  bypass.
+- **`--worktree WT`** pins the tab to an existing worktree id (co-locate several
+  tabs in one tree); without it the workspace's active worktree is used.
+- **`--new-worktree[=<name>]`** creates a fresh worktree (branch `aimux/<name>`
+  off `--base`, default HEAD) and runs the tab in it, emitting the worktree's
+  `path`/`branch`/`name`. A bare flag derives the name; the `=` form names it.
+  Mutually exclusive with `--worktree` and `--cwd`; `--base`/`--branch` require
+  it.
 
 #### `aimux tab send`
 
@@ -126,6 +148,7 @@ aimux tab send <tabId> <text>
 aimux tab send <tabId> --enter <text>      # appends \r so the CLI submits
 aimux tab send <tabId> --keys "<C-c>"      # chord parser -> raw bytes
 aimux tab send <tabId> --stdin             # read from stdin
+aimux tab send <tabId> --prompt-file F     # read from a file (no shell redirect)
 aimux tab send <tabId> --enter --await-submit <text>   # + confirm uptake
 -> { ok: true, bytesWritten: N }
 -> { ok: true, bytesWritten: N, submitted: true,       # with --await-submit
@@ -168,6 +191,31 @@ end-of-turn: `idle` held for the settle window) or a `tabQuestion` event
 ignores `tabTurnComplete` until it has first seen the tab go `working`, so a
 lingering pre-submit `idle` is never misread as "completed". Requires a daemon
 advertising `turnLifecycle` + `questionEvents` (v13).
+
+#### `aimux tab await`
+
+The standalone half of `tab run`: block until a tab's **in-flight** turn ends or
+the worker asks — without submitting anything. Use it for a turn you started by
+hand (a `tab send --enter`, or a worker you nudged). Same outcome JSON and exit
+codes as `tab run`.
+
+```
+aimux tab await <tabId> [--timeout 900000]
+-> { outcome: 'completed', durationMs }                          exit 0
+-> { outcome: 'question', kind, question, durationMs }           exit 10
+-> { outcome: 'timeout', durationMs }                            exit 124
+-> { outcome: 'error', error, durationMs }                       exit 3
+```
+
+Seeded from the attach replay so it never hangs or lies: a tab already `working`
+is awaited to completion; an already `waiting-input` tab returns `question`
+immediately (with a best-effort snapshot tail as the text — `kind` is
+`question`, real options aren't recoverable from a replay); an `idle` tab is
+awaited for a **fresh** working→idle cycle, so a stale already-finished turn is
+never re-reported as "completed" (it times out instead). A missing tab is exit
+`3` (`tab not found`) — the re-spawn signal — not `4`, which stays
+daemon-unreachable. Requires `turnLifecycle` + `questionEvents` (v13); no new
+capability.
 
 #### `aimux tab focus`
 
