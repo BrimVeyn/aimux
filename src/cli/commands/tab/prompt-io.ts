@@ -18,6 +18,31 @@ import { bracketedPaste, notationToBytes } from '../../chord'
 export const PASTE_SUBMIT_SETTLE_MS = 50
 
 /**
+ * Resolve prompt text from exactly one source — `--prompt-file`, `--stdin`, or
+ * a positional `[text]`. Requiring exactly one prevents an orchestrator from
+ * silently sending the wrong buffer when two are set (e.g. a stale positional
+ * plus a fresh `--prompt-file`). Used by `tab run`; `tab send` keeps its own
+ * looser guard (zero sources is valid there).
+ */
+export async function resolvePromptText(
+  promptFile: string | undefined,
+  fromStdin: boolean,
+  positionalText: string | undefined
+): Promise<string> {
+  const sources = [promptFile !== undefined, fromStdin, positionalText !== undefined].filter(
+    (present) => present
+  ).length
+  if (sources !== 1) {
+    throw new Error(
+      'provide exactly one prompt source: --prompt-file <f>, --stdin, or a [text] positional'
+    )
+  }
+  if (promptFile !== undefined) return Bun.file(promptFile).text()
+  if (fromStdin) return Bun.stdin.text()
+  return positionalText ?? ''
+}
+
+/**
  * Lower a chord/paste buffer of bytes into the string the protocol expects.
  * Every byte we emit is < 0x80 (control chars or printable ASCII), so a
  * Latin-1 decode is faithful — the receiving PTY's UTF-8 path treats each

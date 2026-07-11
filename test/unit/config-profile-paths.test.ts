@@ -43,10 +43,25 @@ describe('config profile paths', () => {
     const config = await import(`../../src/config.ts?profile=dev-${Date.now()}`)
     const sessions = await import(`../../src/state/session-catalog.ts?profile=dev-${Date.now()}`)
 
-    expect(config.CONFIG_PATH).toBe(join(tempHome, '.config', 'aimux', 'dev', 'aimux.json'))
+    expect(config.getConfigPath()).toBe(join(tempHome, '.config', 'aimux', 'dev', 'aimux.json'))
     expect(sessions.getSessionCatalogPath()).toBe(
       join(tempHome, '.config', 'aimux', 'dev', 'aimux-sessions.json')
     )
+  })
+
+  test('getConfigPath() reflects a profile change made AFTER import (call-time resolution)', async () => {
+    tempHome = mkdtempSync(join(tmpdir(), 'aimux-config-late-'))
+    process.env.HOME = tempHome
+    delete process.env.AIMUX_RUNTIME_PROFILE
+
+    // Import once under one profile, then switch — a module-const path would be
+    // frozen to the first profile; getConfigPath() must track the change.
+    process.env.AIMUX_PROFILE = 'alpha'
+    const config = await import(`../../src/config.ts?late=${Date.now()}`)
+    expect(config.getConfigPath()).toBe(join(tempHome, '.config', 'aimux', 'alpha', 'aimux.json'))
+
+    process.env.AIMUX_PROFILE = 'beta'
+    expect(config.getConfigPath()).toBe(join(tempHome, '.config', 'aimux', 'beta', 'aimux.json'))
   })
 
   test('persists skippedUpdateVersion through saveConfig/loadConfig', async () => {

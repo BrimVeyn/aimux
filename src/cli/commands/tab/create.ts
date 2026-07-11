@@ -2,21 +2,53 @@ import { resolve as resolvePath } from 'node:path'
 
 import type { CliCommand } from '../../registry'
 
+import { loadConfig } from '../../../config'
 import {
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_THIN_ATTACH,
 } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
+  type AssistantOption,
   buildAssistantModelArgs,
   getAllAssistantOptions,
   parseCommand,
 } from '../../../pty/command-registry'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
+import { createWorkspaceWorktree } from '../worktree/create-core'
 
 const FALLBACK_COLS = 200
 const FALLBACK_ROWS = 60
+
+/**
+ * Resolve the cwd a spawned tab should run in. Precedence: explicit `--cwd`
+ * (resolved to absolute) > the resolved worktree's path > undefined (the
+ * daemon's default). Worktree record paths are already absolute.
+ */
+export function resolveTabCwd(
+  cwdFlag: string | undefined,
+  worktreeRecord: { path: string } | undefined
+): string | undefined {
+  if (cwdFlag !== undefined) return resolvePath(cwdFlag)
+  return worktreeRecord?.path
+}
+
+/**
+ * Resolve the base command a tab launches. Mirrors the UI's precedence
+ * (`src/app-runtime/side-effects.ts`): an explicit `--command` override wins,
+ * else the workspace's persisted `customCommands[assistantId]` (so CLI workers
+ * inherit e.g. `claude --dangerously-skip-permissions`), else the builtin
+ * default. `getAllAssistantOptions` deliberately does NOT apply builtin
+ * overrides, so this lookup must be explicit.
+ */
+export function resolveAssistantCommand(
+  commandOverride: string | undefined,
+  customCommands: Record<string, string>,
+  option: AssistantOption
+): string {
+  return commandOverride ?? customCommands[option.id] ?? option.command
+}
 
 export const tabCreate: CliCommand = {
   args: [],
@@ -49,6 +81,17 @@ export const tabCreate: CliCommand = {
       kind: 'string',
       name: 'worktree',
     },
+    {
+      description: 'create a fresh worktree for this tab (optionally named: --new-worktree=<name>)',
+      kind: 'optional-string',
+      name: 'new-worktree',
+    },
+    { description: 'base ref for --new-worktree (default HEAD)', kind: 'string', name: 'base' },
+    {
+      description: 'branch for --new-worktree (default aimux/<name>)',
+      kind: 'string',
+      name: 'branch',
+    },
   ],
   group: 'tab',
   run: async (ctx) => {
@@ -56,7 +99,12 @@ export const tabCreate: CliCommand = {
     if (typeof assistantId !== 'string' || assistantId.length === 0) {
       throw new Error('--assistant is required')
     }
-    const options = getAllAssistantOptions({})
+    // Load the workspace's persisted customCommands so CLI-spawned tabs honor
+    // the same assistant commands the UI uses (e.g. skip-permissions flags), and
+    // so purely-custom assistant ids resolve. loadConfig degrades to {} on a
+    // missing/invalid config — no new failure mode.
+    const { customCommands } = loadConfig()
+    const options = getAllAssistantOptions(customCommands)
     const option = options.find((o) => o.id === assistantId)
     if (!option) {
       throw new Error(
@@ -77,10 +125,28 @@ export const tabCreate: CliCommand = {
       )
     }
 
-    const command = commandOverride ?? option.command
+    const command = resolveAssistantCommand(commandOverride, customCommands, option)
     const title = typeof ctx.args.flags.title === 'string' ? ctx.args.flags.title : option.label
     const cwdRaw = typeof ctx.args.flags.cwd === 'string' ? ctx.args.flags.cwd : undefined
-    const cwd = cwdRaw === undefined ? undefined : resolvePath(cwdRaw)
+    const tabId = createPrefixedId('tab')
+
+    // `--new-worktree[=<name>]`: create a fresh worktree and run the tab in it.
+    // A bare flag parses as `true` (name derived below); the `=` form names it.
+    const newWorktreeFlag = ctx.args.flags['new-worktree']
+    const newWorktree = newWorktreeFlag !== undefined
+    const worktreeFlag =
+      typeof ctx.args.flags.worktree === 'string' ? ctx.args.flags.worktree : undefined
+    const baseFlag = typeof ctx.args.flags.base === 'string' ? ctx.args.flags.base : undefined
+    const branchFlag = typeof ctx.args.flags.branch === 'string' ? ctx.args.flags.branch : undefined
+    if (newWorktree && worktreeFlag !== undefined) {
+      throw new Error('--new-worktree creates its own; use --worktree <id> to co-locate instead')
+    }
+    if (newWorktree && cwdRaw !== undefined) {
+      throw new Error('--new-worktree sets the cwd to the new worktree; drop --cwd')
+    }
+    if (!newWorktree && (baseFlag !== undefined || branchFlag !== undefined)) {
+      throw new Error('--base / --branch require --new-worktree (use `worktree create` otherwise)')
+    }
 
     const workspace = ctx.getWorkspace()
     const daemon = await ctx.getDaemon()
@@ -91,19 +157,41 @@ export const tabCreate: CliCommand = {
       )
     }
 
-    // Resolve worktreeId: explicit flag wins, otherwise the workspace's
-    // currently-active worktree, otherwise undefined (= no grouping).
-    const worktreeFlag =
-      typeof ctx.args.flags.worktree === 'string' ? ctx.args.flags.worktree : undefined
-    let worktreeId: string | undefined = worktreeFlag ?? workspace.activeWorktreeId
-    if (worktreeFlag !== undefined) {
-      const known = workspace.worktrees?.some((w) => w.id === worktreeFlag) ?? false
-      if (!known) {
-        const ids = workspace.worktrees?.map((w) => w.id).join(', ') ?? '(none)'
-        throw new Error(`unknown worktree id: ${worktreeFlag} (known: ${ids})`)
+    // Resolve the worktree the tab belongs to + its record (for the cwd default
+    // and the output). Three modes: create a fresh one, use an explicit id, or
+    // fall back to the workspace's active worktree.
+    let worktreeId: string | undefined
+    let worktreeRecord: { branch?: string; name?: string; path: string } | undefined
+    if (newWorktree) {
+      const worktreeName =
+        typeof newWorktreeFlag === 'string' && newWorktreeFlag !== ''
+          ? newWorktreeFlag
+          : `${assistantId}-${tabId.slice(-6)}`
+      const record = await createWorkspaceWorktree({
+        base: baseFlag ?? 'HEAD',
+        branch: branchFlag ?? `aimux/${worktreeName}`,
+        daemon,
+        name: worktreeName,
+        workspace,
+      })
+      worktreeId = record.id
+      worktreeRecord = record
+    } else {
+      worktreeId = worktreeFlag ?? workspace.activeWorktreeId
+      if (worktreeFlag !== undefined) {
+        const known = workspace.worktrees?.some((w) => w.id === worktreeFlag) ?? false
+        if (!known) {
+          const ids = workspace.worktrees?.map((w) => w.id).join(', ') ?? '(none)'
+          throw new Error(`unknown worktree id: ${worktreeFlag} (known: ${ids})`)
+        }
       }
-      worktreeId = worktreeFlag
+      worktreeRecord =
+        worktreeId !== undefined ? workspace.worktrees?.find((w) => w.id === worktreeId) : undefined
     }
+
+    // Default the PTY cwd to the resolved worktree's path so a worker spawned
+    // into a worktree actually runs inside it. An explicit --cwd always wins.
+    const cwd = resolveTabCwd(cwdRaw, worktreeRecord)
 
     // Thin-attach so we don't clobber the UI's dimensions on the same session.
     await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
@@ -113,7 +201,6 @@ export const tabCreate: CliCommand = {
     // assistant has no control for a requested dimension.
     const modelArgs = buildAssistantModelArgs(option, { effort, model })
     const args = [...baseArgs, ...modelArgs]
-    const tabId = createPrefixedId('tab')
 
     // cols/rows = 0 means "fall back to the session's last attached size" on
     // v11 daemons. Without that capability we have nothing reasonable to put
@@ -135,12 +222,16 @@ export const tabCreate: CliCommand = {
     const resolvedCommand = [executable, ...args].join(' ')
     writeJson({
       assistant: assistantId,
+      branch: worktreeRecord?.branch ?? null,
       command: resolvedCommand,
+      cwd: cwd ?? null,
       effort: effort ?? null,
       model: model ?? null,
+      name: worktreeRecord?.name ?? null,
+      path: worktreeRecord?.path ?? null,
       tabId,
       title,
-      worktreeId,
+      worktreeId: worktreeId ?? null,
     })
     return EXIT_OK
   },

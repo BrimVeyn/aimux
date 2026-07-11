@@ -1,6 +1,7 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { tabAwait } from './commands/tab/await'
 import { tabClose } from './commands/tab/close'
 import { tabCreate } from './commands/tab/create'
 import { tabFocus } from './commands/tab/focus'
@@ -33,6 +34,7 @@ export const COMMANDS: readonly CliCommand[] = [
   tabCreate,
   tabSend,
   tabRun,
+  tabAwait,
   tabFocus,
   tabClose,
   tabSnapshot,

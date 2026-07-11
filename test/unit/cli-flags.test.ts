@@ -41,4 +41,28 @@ describe('cli flag parser', () => {
     expect(parseArgs(['--tail', '12'], spec, []).flags.tail).toBe(12)
     expect(() => parseArgs(['--tail', 'lots'], spec, [])).toThrow(/must be a number/)
   })
+
+  describe('optional-string kind', () => {
+    const spec = [{ kind: 'optional-string', name: 'new-worktree' } as const]
+
+    test('bare flag parses as boolean true', () => {
+      expect(parseArgs(['--new-worktree'], spec, []).flags['new-worktree']).toBe(true)
+    })
+
+    test('=form binds the value', () => {
+      expect(parseArgs(['--new-worktree=fix-auth'], spec, []).flags['new-worktree']).toBe(
+        'fix-auth'
+      )
+    })
+
+    test('=form binds an empty value', () => {
+      expect(parseArgs(['--new-worktree='], spec, []).flags['new-worktree']).toBe('')
+    })
+
+    test('bare flag does NOT swallow the following positional', () => {
+      const parsed = parseArgs(['--new-worktree', 'tab-123'], spec, [{ name: 'tabId' }])
+      expect(parsed.flags['new-worktree']).toBe(true)
+      expect(parsed.positionals).toEqual(['tab-123'])
+    })
+  })
 })

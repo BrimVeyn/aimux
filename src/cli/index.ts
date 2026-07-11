@@ -20,8 +20,8 @@ const EXIT_CODES_BLOCK = [
   '  2    usage error (bad flags, unknown command, missing argument)',
   '  3    runtime error (server replied with error, command failed)',
   '  4    daemon unreachable (socket missing and autostart failed)',
-  '  10   question (tab run: worker is blocked on a question/permission)',
-  '  124  timeout (tab wait, tab tail --timeout, workspace switch --wait)',
+  '  10   question (tab run / tab await: worker is blocked on a question/permission)',
+  '  124  timeout (tab run, tab await, tab wait, tab tail --timeout, workspace switch --wait)',
 ].join('\n')
 
 const OUTPUT_CONTRACT_BLOCK = [
@@ -52,6 +52,7 @@ function formatArgs(args: readonly ArgSpec[]): string {
 function flagValueHint(flag: FlagSpec): string {
   if (flag.kind === 'boolean') return ''
   if (flag.kind === 'number') return ' <n>'
+  if (flag.kind === 'optional-string') return `[=<${flag.name}>]`
   return ` <${flag.name}>`
 }
 
