@@ -116,6 +116,66 @@ describe('AssistantStatusDetector', () => {
     expect(s).toBe('waiting-input')
   })
 
+  test('grok: detects working from Thought for trace + interrupt', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't1',
+        viewport: snapshot(['Thought for 3.4s', '  esc to interrupt']),
+      })
+    ).toBe('working')
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't2',
+        viewport: snapshot(['Thinking… some reasoning']),
+      })
+    ).toBe('working')
+  })
+
+  test('grok: plan approval prompt is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'grok',
+      tabId: 't',
+      viewport: snapshot(['[ a ] pprove [ c ] omment [ q ] uit plan']),
+    })
+    expect(s).toBe('waiting-input')
+  })
+
+  test('grok: waiting on answers Q&A + enter select is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't',
+        viewport: snapshot(['Waiting on answers for 3 questions', 'Enter :select']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('grok: do you want / permission style prompt is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't',
+        viewport: snapshot(['Do you want to proceed with this change?']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('grok: idle when tail has no sentinels (plain prompt screen)', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'grok',
+      tabId: 't',
+      viewport: snapshot(['grok-4.5 · ask', '❯ type your prompt here']),
+    })
+    expect(s).toBe('idle')
+  })
+
   test('custom CLI: shell command is always idle regardless of activity', () => {
     const d = new AssistantStatusDetector()
     const now = 1000
@@ -227,6 +287,7 @@ describe('isShellCommand', () => {
     expect(isShellCommand('claude')).toBe(false)
     expect(isShellCommand('codex')).toBe(false)
     expect(isShellCommand('opencode')).toBe(false)
+    expect(isShellCommand('grok')).toBe(false)
     expect(isShellCommand('my-agent')).toBe(false)
     expect(isShellCommand(undefined)).toBe(false)
     expect(isShellCommand('')).toBe(false)

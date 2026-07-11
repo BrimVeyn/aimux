@@ -6,7 +6,7 @@
  * `src/detect.rs` in that repo.
  *
  * The detector classifies a terminal session as `working`, `waiting-input`,
- * or `idle`. Built-in CLIs (claude, codex, opencode) use per-CLI substring
+ * or `idle`. Built-in CLIs (claude, codex, opencode, grok) have dedicated classify* functions.
  * tables. Custom CLIs fall back to a generic heuristic that (a) recognises
  * common shells as always-idle and (b) uses pane-tail change velocity plus
  * generic y/n / confirm prompt patterns.
@@ -95,7 +95,7 @@ export class AssistantStatusDetector {
 export function extractTailLines(viewport: TerminalSnapshot, lineCount: number): string[] {
   const isScrolledToBottom = viewport.viewportY === viewport.baseY
   const lines = isScrolledToBottom ? viewport.lines : (viewport.tailLines ?? viewport.lines)
-  // Full-screen TUIs (claude, opencode) paint in the alternate buffer and
+  // Full-screen TUIs (claude, opencode, grok) paint in the alternate buffer and
   // often leave the last rows blank, putting their status bar higher up.
   // Skip trailing blank rows before taking the last `lineCount`.
   let end = lines.length
@@ -138,6 +138,8 @@ function classifyBuiltin(
       return classifyCodex(haystack)
     case 'opencode':
       return classifyOpencode(haystack)
+    case 'grok':
+      return classifyGrok(haystack, rawTail)
     default:
       return null
   }
@@ -209,6 +211,47 @@ function classifyOpencode(haystack: string): TabActivity {
   ) {
     return 'working'
   }
+  return 'idle'
+}
+
+function classifyGrok(haystack: string, _rawTail: string): TabActivity {
+  // Waiting for user decision / input (plan approval, Q&A, permissions, confirms).
+  // These are the distinctive Grok Build TUI states that must produce 'waiting-input'
+  // so the rest of the system (turn lifecycle, question events, UI chips, orchestrators)
+  // treats grok the same as claude/codex/opencode.
+  if (
+    haystack.includes('waiting on answers') ||
+    haystack.includes('pprove') || // stylized "[ a ] pprove [ c ] omment [ q ] uit plan"
+    haystack.includes('omment') ||
+    haystack.includes('uit plan') ||
+    (haystack.includes('approve') &&
+      (haystack.includes('comment') || haystack.includes('quit') || haystack.includes('plan'))) ||
+    haystack.includes('enter :select') ||
+    haystack.includes('enter to select') ||
+    haystack.includes('enter submit') ||
+    haystack.includes('do you want') ||
+    haystack.includes('would you like') ||
+    haystack.includes('permission required') ||
+    haystack.includes('permission to') ||
+    haystack.includes('approve?') ||
+    haystack.includes('allow?')
+  ) {
+    return 'waiting-input'
+  }
+
+  // Agent actively reasoning or executing (mirrors claude spinner + interrupt logic).
+  // "Thought for Xs" is the primary visible trace while Grok thinks/plans.
+  if (
+    haystack.includes('thought for') || // "Thought for 3.4s", etc.
+    haystack.includes('thinking…') ||
+    haystack.includes('thinking ...') ||
+    haystack.includes('esc to interrupt') ||
+    haystack.includes('esc interrupt') ||
+    haystack.includes('esc: interrupt')
+  ) {
+    return 'working'
+  }
+
   return 'idle'
 }
 

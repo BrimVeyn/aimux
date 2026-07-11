@@ -209,6 +209,7 @@ function MouseHarness({
         antigravity: 'antigravity',
         claude: command,
         codex: 'codex',
+        grok: 'grok',
         opencode: 'opencode',
         terminal: 'zsh',
       },

@@ -7,7 +7,7 @@ import { SessionRegistry } from '../../src/daemon/session-registry'
 function createSnapshotTab(
   id: string,
   title: string,
-  assistant: 'claude' | 'codex' | 'terminal' = 'claude',
+  assistant: 'claude' | 'codex' | 'grok' | 'terminal' = 'claude',
   command = assistant === 'terminal' ? 'zsh' : assistant
 ) {
   return {

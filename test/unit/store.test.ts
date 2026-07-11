@@ -34,7 +34,7 @@ describe('initial state', () => {
 function createTab(
   overrides: Partial<ReturnType<typeof createInitialState>['tabs'][number]> & {
     id: string
-    assistant: 'claude' | 'codex' | 'opencode' | 'terminal'
+    assistant: 'claude' | 'codex' | 'opencode' | 'grok' | 'antigravity' | 'terminal'
     title: string
     status: 'starting' | 'running' | 'exited' | 'error'
     command: string

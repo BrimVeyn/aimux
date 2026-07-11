@@ -41,6 +41,7 @@ const PERMISSION_SIGNALS: readonly string[] = [
   '△ permission',
   'allow this',
   'approve',
+  'pprove', // Grok stylized plan approval "[ a ] pprove ..."
   'grant',
   'press enter to confirm',
 ]

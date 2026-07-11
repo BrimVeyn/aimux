@@ -18,6 +18,7 @@ describe('command registry', () => {
       'claude',
       'codex',
       'opencode',
+      'grok',
       'antigravity',
       'terminal',
     ])
@@ -56,6 +57,16 @@ describe('buildAssistantModelArgs', () => {
     expect(() => buildAssistantModelArgs(option('opencode'), { effort: 'high' })).toThrow(
       'does not support --effort'
     )
+  })
+
+  test('grok maps model to -m and effort to --effort', () => {
+    expect(buildAssistantModelArgs(option('grok'), { effort: 'high', model: 'grok-4.5' })).toEqual([
+      '-m',
+      'grok-4.5',
+      '--effort',
+      'high',
+    ])
+    expect(buildAssistantModelArgs(option('grok'), { model: 'custom' })).toEqual(['-m', 'custom'])
   })
 
   test('terminal rejects both model and effort', () => {

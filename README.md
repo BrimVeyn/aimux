@@ -13,7 +13,7 @@ snippets, themes, and fully configurable keymaps.
 ## Features
 
 - multi-workspace workflow with a dedicated workspace picker
-- tabs for `claude`, `codex`, `opencode`, and `terminal`
+- tabs for `claude`, `codex`, `opencode`, `grok`, and `terminal`
 - split panes with pane focus and resize shortcuts
 - persistent workspaces with saved layout and tab state
 - profile-isolated config, catalogs, daemon sockets, and runtime state

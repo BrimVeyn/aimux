@@ -83,7 +83,7 @@ if (command === '--help' || command === '-h' || command === 'help') {
       '',
       'Common CLI verbs at a glance',
       '  aimux tab list                                     Enumerate tabs (+ activeTabId)',
-      '  aimux tab create --assistant <id> [--title …]      Spawn claude / codex / opencode / terminal / …',
+      '  aimux tab create --assistant <id> [--title …]      Spawn claude / codex / opencode / grok / terminal / …',
       '  aimux tab send <tabId> [text] [--enter|--keys|--stdin]  Type, chord, or paste into a tab',
       '  aimux tab focus <tabId>                            Bring a tab to the foreground',
       '  aimux tab close <tabId>                            Terminate a tab',

@@ -109,14 +109,14 @@ Each tab is just `{ panes: WorktreeTemplatePane[] }` with ≥ 1 pane. The
 first pane of a tab is its root (the visible pane); subsequent panes are
 splits of a previous pane in the same tab.
 
-| Pane field  | Required        | Notes                                                                                       |
-| ----------- | --------------- | ------------------------------------------------------------------------------------------- |
-| `id`        | yes             | unique within its tab; referenced by `splitFrom`                                            |
-| `assistant` | yes             | `claude`, `codex`, `opencode`, `antigravity`, `terminal`, `shell`, or any custom command id |
-| `splitFrom` | only after root | id of an earlier pane in the **same** tab                                                   |
-| `direction` | only after root | `horizontal` (side-by-side) or `vertical` (top/bottom)                                      |
-| `ratio`     | no              | fraction of space taken by the **new** pane, between 0.15 and 0.85                          |
-| `send`      | no              | initial input typed into the pane shortly after spawn; newline appended automatically       |
+| Pane field  | Required        | Notes                                                                                               |
+| ----------- | --------------- | --------------------------------------------------------------------------------------------------- |
+| `id`        | yes             | unique within its tab; referenced by `splitFrom`                                                    |
+| `assistant` | yes             | `claude`, `codex`, `opencode`, `grok`, `antigravity`, `terminal`, `shell`, or any custom command id |
+| `splitFrom` | only after root | id of an earlier pane in the **same** tab                                                           |
+| `direction` | only after root | `horizontal` (side-by-side) or `vertical` (top/bottom)                                              |
+| `ratio`     | no              | fraction of space taken by the **new** pane, between 0.15 and 0.85                                  |
+| `send`      | no              | initial input typed into the pane shortly after spawn; newline appended automatically               |
 
 `'shell'` is accepted as an alias for the built-in `'terminal'` assistant
 (which spawns `$SHELL`).
