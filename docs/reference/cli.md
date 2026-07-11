@@ -20,14 +20,14 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 
 ## Exit Codes
 
-| Code  | Meaning                                                          |
-| ----- | ---------------------------------------------------------------- |
-| `0`   | Success                                                          |
-| `2`   | Usage error (bad flags, missing required argument)               |
-| `3`   | Runtime error (tab crashed, git refused a worktree operation, …) |
-| `4`   | Daemon unreachable — socket missing, spawn failed, no handshake  |
+| Code  | Meaning                                                             |
+| ----- | ------------------------------------------------------------------- |
+| `0`   | Success                                                             |
+| `2`   | Usage error (bad flags, missing required argument)                  |
+| `3`   | Runtime error (tab crashed, git refused a worktree operation, …)    |
+| `4`   | Daemon unreachable — socket missing, spawn failed, no handshake     |
 | `10`  | `tab run` / `tab await`: worker is blocked on a question/permission |
-| `124` | `--timeout` expired before the awaited event arrived             |
+| `124` | `--timeout` expired before the awaited event arrived                |
 
 ## Shared Flags
 
@@ -122,13 +122,13 @@ aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
 - **`--command`** overrides the assistant's default binary entirely.
 - **`--model` / `--effort`** map to the assistant's own flags (claude
   `--model`/`--effort`; codex `--model` + `-c model_reasoning_effort=…`; opencode
-  `--model` only). They append to the resolved base command and **cannot** be
+  `--model` only; grok `-m` / `--effort`). They append to the resolved base command and **cannot** be
   combined with `--command`. Values aren't validated by aimux — a bad one makes
   the worker CLI fail at startup.
 - **customCommands**: the base command is resolved as
   `--command` > the workspace's persisted `customCommands[assistant]` > the
   builtin default, so CLI-spawned tabs inherit e.g. `claude
-  --dangerously-skip-permissions` exactly like the UI. `--command claude` is the
+--dangerously-skip-permissions` exactly like the UI. `--command claude` is the
   bypass.
 - **`--worktree WT`** pins the tab to an existing worktree id (co-locate several
   tabs in one tree); without it the workspace's active worktree is used.

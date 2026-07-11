@@ -105,7 +105,7 @@ Typical first-run flow:
 1. Open `aimux`
 2. Create a workspace from the picker
 3. Optionally attach a project directory
-4. Open a tab for `claude`, `codex`, `opencode`, or `terminal`
+4. Open a tab for `claude`, `codex`, `opencode`, `grok`, or `terminal`
 5. Use `i` to focus the terminal and `Ctrl+Z` to return to navigation mode
 
 See `guide/sessions.md` for the full workspace model.

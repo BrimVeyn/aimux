@@ -37,7 +37,13 @@ export type ModeId =
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
-export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
+export type BuiltinAssistantId =
+  | 'claude'
+  | 'codex'
+  | 'opencode'
+  | 'grok'
+  | 'terminal'
+  | 'antigravity'
 export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
 

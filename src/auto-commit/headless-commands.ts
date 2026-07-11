@@ -3,9 +3,14 @@ export interface HeadlessInvocation {
   args: string[]
 }
 
-export type SupportedProvider = 'claude' | 'codex' | 'opencode'
+export type SupportedProvider = 'claude' | 'codex' | 'opencode' | 'grok'
 
-const SUPPORTED: ReadonlySet<string> = new Set<SupportedProvider>(['claude', 'codex', 'opencode'])
+const SUPPORTED: ReadonlySet<string> = new Set<SupportedProvider>([
+  'claude',
+  'codex',
+  'opencode',
+  'grok',
+])
 
 export function isSupportedProvider(id: string): id is SupportedProvider {
   return SUPPORTED.has(id)
@@ -31,6 +36,13 @@ export function buildHeadlessInvocation(
     }
     case 'opencode': {
       return { args: ['run', prompt], executable: 'opencode' }
+    }
+    case 'grok': {
+      // Headless: grok -p "<prompt>" [-m <model>]. Model appended after prompt value to
+      // match documented example shape `grok -p "..." -m my-model`. No output-format flag.
+      const args: string[] = ['-p', prompt]
+      if (model != null && model !== '') args.push('-m', model)
+      return { args, executable: 'grok' }
     }
     default:
       return null

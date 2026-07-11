@@ -55,7 +55,7 @@ export const tabCreate: CliCommand = {
   flags: [
     ...SHARED_FLAGS,
     {
-      description: 'assistant id (claude, codex, opencode, terminal, ...)',
+      description: 'assistant id (claude, codex, opencode, grok, terminal, ...)',
       kind: 'string',
       name: 'assistant',
     },

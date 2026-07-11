@@ -60,6 +60,17 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    command: 'grok',
+    description: 'xAI Grok Build CLI',
+    id: 'grok',
+    label: 'Grok',
+    model: {
+      // Grok supports -m (and likely --model) plus --effort (alias --reasoning-effort).
+      buildEffortArgs: (effort) => ['--effort', effort],
+      buildModelArgs: (model) => ['-m', model],
+    },
+  },
+  {
     command: 'agy',
     description: 'Antigravity CLI',
     id: 'antigravity',

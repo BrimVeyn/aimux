@@ -36,14 +36,25 @@ test('opencode ignores model (backend decides)', () => {
   expect(out).toEqual({ args: ['run', 'go!'], executable: 'opencode' })
 })
 
+test('grok with model uses -p + -m after prompt value', () => {
+  const out = buildHeadlessInvocation('grok', 'do the thing', 'grok-4.5')
+  expect(out).toEqual({ args: ['-p', 'do the thing', '-m', 'grok-4.5'], executable: 'grok' })
+})
+
+test('grok without model', () => {
+  const out = buildHeadlessInvocation('grok', 'do the thing', undefined)
+  expect(out).toEqual({ args: ['-p', 'do the thing'], executable: 'grok' })
+})
+
 test('terminal is not supported', () => {
   expect(buildHeadlessInvocation('terminal', 'go!', undefined)).toBeNull()
 })
 
-test('isSupportedProvider identifies the three CLIs', () => {
+test('isSupportedProvider identifies supported CLIs (incl. grok)', () => {
   expect(isSupportedProvider('claude')).toBe(true)
   expect(isSupportedProvider('codex')).toBe(true)
   expect(isSupportedProvider('opencode')).toBe(true)
+  expect(isSupportedProvider('grok')).toBe(true)
   expect(isSupportedProvider('terminal')).toBe(false)
   expect(isSupportedProvider('some-custom')).toBe(false)
 })

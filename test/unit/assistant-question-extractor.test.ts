@@ -65,6 +65,20 @@ describe('extractQuestion', () => {
     expect(detail?.prompt).toBe('What database should the migration target?')
   })
 
+  test('grok plan approval prompt → permission kind (via shared signals) + prompt captured', () => {
+    const detail = extractQuestion(
+      'grok',
+      snapshot(
+        'Bottom Line',
+        'Swap legacy sessions for JWT + rotation',
+        '[ a ] pprove [ c ] omment [ q ] uit plan'
+      )
+    )
+    expect(detail?.kind).toBe('permission') // "approve" triggers it
+    expect(detail?.prompt).toContain('[ a ] pprove')
+    expect(detail?.options).toBeUndefined() // not a numbered/marked list in this snapshot
+  })
+
   test('prompt is trailing-trimmed and joins the non-blank tail', () => {
     const detail = extractQuestion('custom', snapshot('line one   ', 'line two [y/n]  ', '', ''))
     expect(detail?.prompt).toBe('line one\nline two [y/n]')

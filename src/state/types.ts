@@ -4,7 +4,13 @@ import type { ThemedToken } from 'shiki'
 import type { WorktreeTemplate } from '../config'
 import type { LayoutNode, SplitDirection } from './layout-tree'
 
-export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
+export type BuiltinAssistantId =
+  | 'claude'
+  | 'codex'
+  | 'opencode'
+  | 'grok'
+  | 'terminal'
+  | 'antigravity'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
 
