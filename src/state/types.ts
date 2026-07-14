@@ -262,7 +262,14 @@ export interface GitPanelState {
   error: GitPanelError | null
 }
 
-export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed' | 'image'
+export type DiffFileStatus =
+  | 'modified'
+  | 'new'
+  | 'deleted'
+  | 'binary'
+  | 'renamed'
+  | 'image'
+  | 'too-large'
 
 export interface DiffData {
   path: string

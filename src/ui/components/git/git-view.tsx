@@ -7,6 +7,7 @@ import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
+import { MAX_DIFF_BYTES } from '../../../git/diff-limits'
 import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
@@ -21,6 +22,7 @@ import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
+import { formatBytes } from './image-diff/dimensions'
 import { GitPaneHeader } from './pane/git-pane-header'
 
 interface DiffStageProps {
@@ -33,6 +35,12 @@ interface DiffStageProps {
 }
 
 function placeholderText(diff: DiffData): string | null {
+  if (diff.status === 'too-large') {
+    const before = diff.binarySizeBefore ?? 0
+    const after = diff.binarySizeAfter ?? 0
+    const largest = Math.max(before, after)
+    return `(file too large to diff — ${formatBytes(largest)}, limit ${formatBytes(MAX_DIFF_BYTES)})`
+  }
   if (diff.status === 'binary') {
     const before = diff.binarySizeBefore ?? 0
     const after = diff.binarySizeAfter ?? 0
