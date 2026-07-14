@@ -9,7 +9,6 @@
     "for-each-ref",
     "push",
     "diff",
-    "show",
     "status",
     "printf",
     "branch",
@@ -19,7 +18,9 @@
     "merge",
     "reset",
     "add",
-    "stash"
+    "stash",
+    "init",
+    "config"
   ],
   "ignoreDependencies": ["bun-types"],
   "rules": {
