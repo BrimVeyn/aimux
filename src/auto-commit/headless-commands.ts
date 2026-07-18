@@ -3,13 +3,14 @@ export interface HeadlessInvocation {
   args: string[]
 }
 
-export type SupportedProvider = 'claude' | 'codex' | 'opencode' | 'grok'
+export type SupportedProvider = 'claude' | 'codex' | 'opencode' | 'grok' | 'kimi'
 
 const SUPPORTED: ReadonlySet<string> = new Set<SupportedProvider>([
   'claude',
   'codex',
   'opencode',
   'grok',
+  'kimi',
 ])
 
 export function isSupportedProvider(id: string): id is SupportedProvider {
@@ -43,6 +44,13 @@ export function buildHeadlessInvocation(
       const args: string[] = ['-p', prompt]
       if (model != null && model !== '') args.push('-m', model)
       return { args, executable: 'grok' }
+    }
+    case 'kimi': {
+      // Headless: kimi -p "<prompt>" [--model <model>]. Non-interactive mode uses
+      // auto permission by default; --output-format text is the default.
+      const args: string[] = ['-p', prompt]
+      if (model != null && model !== '') args.push('--model', model)
+      return { args, executable: 'kimi' }
     }
     default:
       return null

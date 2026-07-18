@@ -21,3 +21,14 @@ export function codexBackend(opts?: { args?: string[] }): BackendConfig {
     command: 'codex',
   }
 }
+
+/**
+ * Create a Kimi Code CLI backend configuration.
+ * Stub — runtime wiring deferred to follow-up work.
+ */
+export function kimiBackend(opts?: { model?: string }): BackendConfig {
+  return {
+    args: opts?.model != null && opts.model !== '' ? ['--model', opts.model] : [],
+    command: 'kimi',
+  }
+}

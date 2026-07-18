@@ -42,6 +42,7 @@ export type BuiltinAssistantId =
   | 'codex'
   | 'opencode'
   | 'grok'
+  | 'kimi'
   | 'terminal'
   | 'antigravity'
 export type AssistantId = BuiltinAssistantId | (string & {})

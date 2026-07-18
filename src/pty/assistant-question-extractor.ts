@@ -44,6 +44,13 @@ const PERMISSION_SIGNALS: readonly string[] = [
   'pprove', // Grok stylized plan approval "[ a ] pprove ..."
   'grant',
   'press enter to confirm',
+  // Kimi Code CLI approval panel titles
+  'run this command?',
+  'write this file?',
+  'apply these edits?',
+  'ready to build with this plan?',
+  'approve for session',
+  'stop this task?',
 ]
 
 /**

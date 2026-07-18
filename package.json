@@ -1,7 +1,7 @@
 {
   "name": "@brimveyn/aimux",
   "version": "1.19.5",
-  "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode side-by-side with tabbed navigation, split panes, and persistent sessions.",
+  "description": "A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode, Kimi side-by-side with tabbed navigation, split panes, and persistent sessions.",
   "keywords": [
     "ai",
     "aimux",
@@ -9,6 +9,7 @@
     "claude",
     "cli",
     "codex",
+    "kimi",
     "multiplexer",
     "opencode",
     "pty",

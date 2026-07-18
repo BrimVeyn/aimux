@@ -299,7 +299,7 @@ interface BackendConfig {
 Notes:
 
 - the config package resolves this field
-- helper functions such as `claudeBackend()` and `codexBackend()` are exported
+- helper functions such as `claudeBackend()`, `codexBackend()`, and `kimiBackend()` are exported
 - the helper module explicitly documents runtime wiring as deferred
 
 Do not present this as a fully working runtime backend override surface today.
@@ -411,7 +411,7 @@ background request is ever made. When `enabled: true`:
   message (and the actual commit) only cover the staged set; with nothing
   staged, `git add -A` is run before committing.
 
-Supported providers: `claude`, `codex`, `opencode`, `grok`. The active tab's
+Supported providers: `claude`, `codex`, `opencode`, `grok`, `kimi`. The active tab's
 assistant determines which CLI is invoked.
 
 Example:

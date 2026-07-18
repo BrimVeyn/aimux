@@ -122,7 +122,7 @@ aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
 - **`--command`** overrides the assistant's default binary entirely.
 - **`--model` / `--effort`** map to the assistant's own flags (claude
   `--model`/`--effort`; codex `--model` + `-c model_reasoning_effort=…`; opencode
-  `--model` only; grok `-m` / `--effort`). They append to the resolved base command and **cannot** be
+  `--model` only; grok `-m` / `--effort`; kimi `--model` only). They append to the resolved base command and **cannot** be
   combined with `--command`. Values aren't validated by aimux — a bad one makes
   the worker CLI fail at startup.
 - **customCommands**: the base command is resolved as

@@ -6,10 +6,10 @@
  * `src/detect.rs` in that repo.
  *
  * The detector classifies a terminal session as `working`, `waiting-input`,
- * or `idle`. Built-in CLIs (claude, codex, opencode, grok) have dedicated classify* functions.
- * tables. Custom CLIs fall back to a generic heuristic that (a) recognises
- * common shells as always-idle and (b) uses pane-tail change velocity plus
- * generic y/n / confirm prompt patterns.
+ * or `idle`. Built-in CLIs (claude, codex, opencode, grok, kimi) have dedicated
+ * classify* functions. Custom CLIs fall back to a generic heuristic that
+ * (a) recognises common shells as always-idle and (b) uses pane-tail change
+ * velocity plus generic y/n / confirm prompt patterns.
  */
 import type { AssistantId, TabActivity, TerminalSnapshot } from '../state/types'
 
@@ -140,6 +140,8 @@ function classifyBuiltin(
       return classifyOpencode(haystack)
     case 'grok':
       return classifyGrok(haystack, rawTail)
+    case 'kimi':
+      return classifyKimi(haystack, rawTail)
     default:
       return null
   }
@@ -253,6 +255,68 @@ function classifyGrok(haystack: string, _rawTail: string): TabActivity {
   }
 
   return 'idle'
+}
+
+/** Braille spinner frames used by Kimi Code CLI (`BRAILLE_SPINNER_FRAMES`). */
+const KIMI_BRAILLE_SPINNER = '⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+/** Moon-phase spinner frames used by Kimi Code CLI (`MOON_SPINNER_FRAMES`). */
+const KIMI_MOON_SPINNER = '🌑🌒🌓🌔🌕🌖🌗🌘'
+
+/**
+ * Kimi Code CLI status heuristics from the official TUI:
+ * - Approval panel titles/footers → waiting-input
+ * - Braille/moon spinners, `working...`, rotating tips → working
+ */
+function classifyKimi(haystack: string, rawTail: string): TabActivity {
+  // Tool / plan approval panel (apps/kimi-code approval-panel.ts headers + footer).
+  if (
+    haystack.includes('run this command?') ||
+    haystack.includes('write this file?') ||
+    haystack.includes('apply these edits?') ||
+    haystack.includes('stop this task?') ||
+    haystack.includes('ready to build with this plan?') ||
+    haystack.includes('approve for session') ||
+    haystack.includes('approve for this session') ||
+    haystack.includes('type feedback') ||
+    haystack.includes('waiting for authorization') ||
+    haystack.includes('sign in to kimi') ||
+    haystack.includes('do you want') ||
+    haystack.includes('would you like') ||
+    haystack.includes('permission required') ||
+    haystack.includes('permission to') ||
+    haystack.includes('approve?') ||
+    haystack.includes('allow?') ||
+    // Generic "Approve <Tool>?" header, e.g. "▶ Approve Bash?"
+    (haystack.includes('approve ') && haystack.includes('?')) ||
+    // Distinctive panel chrome: "↑/↓ select · 1/2 choose · ↵ confirm"
+    haystack.includes('↑/↓ select') ||
+    haystack.includes('↵ confirm')
+  ) {
+    return 'waiting-input'
+  }
+
+  // Agent actively streaming / calling tools.
+  // Anchor thinking on ellipsis so the footer model suffix "thinking" alone
+  // (e.g. "kimi-k2 thinking") does not mark an idle session as working.
+  if (
+    haystack.includes('working...') ||
+    haystack.includes('working…') ||
+    haystack.includes(' · tip:') ||
+    haystack.includes('thinking…') ||
+    haystack.includes('thinking...') ||
+    hasKimiSpinner(rawTail)
+  ) {
+    return 'working'
+  }
+
+  return 'idle'
+}
+
+function hasKimiSpinner(rawTail: string): boolean {
+  for (const ch of rawTail) {
+    if (KIMI_BRAILLE_SPINNER.includes(ch) || KIMI_MOON_SPINNER.includes(ch)) return true
+  }
+  return false
 }
 
 const GENERIC_WAITING_PATTERNS: string[] = [

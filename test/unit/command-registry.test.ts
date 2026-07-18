@@ -19,6 +19,7 @@ describe('command registry', () => {
       'codex',
       'opencode',
       'grok',
+      'kimi',
       'antigravity',
       'terminal',
     ])
@@ -67,6 +68,15 @@ describe('buildAssistantModelArgs', () => {
       'high',
     ])
     expect(buildAssistantModelArgs(option('grok'), { model: 'custom' })).toEqual(['-m', 'custom'])
+  })
+
+  test('kimi supports --model but rejects --effort', () => {
+    expect(buildAssistantModelArgs(option('kimi'), { model: 'kimi-code/kimi-for-coding' })).toEqual(
+      ['--model', 'kimi-code/kimi-for-coding']
+    )
+    expect(() => buildAssistantModelArgs(option('kimi'), { effort: 'high' })).toThrow(
+      'does not support --effort'
+    )
   })
 
   test('terminal rejects both model and effort', () => {

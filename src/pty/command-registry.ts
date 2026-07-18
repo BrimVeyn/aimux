@@ -71,6 +71,16 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    command: 'kimi',
+    description: 'Moonshot Kimi Code CLI',
+    id: 'kimi',
+    label: 'Kimi',
+    // Kimi supports --model / -m; no reasoning-effort flag.
+    model: {
+      buildModelArgs: (model) => ['--model', model],
+    },
+  },
+  {
     command: 'agy',
     description: 'Antigravity CLI',
     id: 'antigravity',

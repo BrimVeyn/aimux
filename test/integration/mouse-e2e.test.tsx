@@ -210,6 +210,7 @@ function MouseHarness({
         claude: command,
         codex: 'codex',
         grok: 'grok',
+        kimi: 'kimi',
         opencode: 'opencode',
         terminal: 'zsh',
       },

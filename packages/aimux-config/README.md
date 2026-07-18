@@ -204,6 +204,7 @@ Current helpers:
 
 - `claudeBackend()`
 - `codexBackend()`
+- `kimiBackend()`
 
 These helpers are documented as stubs. Do not treat them as a fully supported
 runtime backend override system yet.

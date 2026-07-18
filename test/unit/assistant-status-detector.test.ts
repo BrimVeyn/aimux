@@ -176,6 +176,62 @@ describe('AssistantStatusDetector', () => {
     expect(s).toBe('idle')
   })
 
+  test('kimi: approval panel title is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't1',
+        viewport: snapshot(['▶ Run this command?', '1. Approve', '2. Reject']),
+      })
+    ).toBe('waiting-input')
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't2',
+        viewport: snapshot(['Ready to build with this plan?', '1. Approve plan']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('kimi: approval panel footer chrome is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'kimi',
+      tabId: 't',
+      viewport: snapshot(['↑/↓ select · 1/2/3 choose · ↵ confirm']),
+    })
+    expect(s).toBe('waiting-input')
+  })
+
+  test('kimi: detects working from working... label and braille spinner', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't1',
+        viewport: snapshot(['⠋ working...']),
+      })
+    ).toBe('working')
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't2',
+        viewport: snapshot(['🌑  · Tip: press Esc to interrupt']),
+      })
+    ).toBe('working')
+  })
+
+  test('kimi: idle welcome / prompt screen is not working', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'kimi',
+      tabId: 't',
+      viewport: snapshot(['Welcome to Kimi Code CLI!', 'Model: K2.7 Code', '> type your prompt']),
+    })
+    expect(s).toBe('idle')
+  })
+
   test('custom CLI: shell command is always idle regardless of activity', () => {
     const d = new AssistantStatusDetector()
     const now = 1000
@@ -288,6 +344,7 @@ describe('isShellCommand', () => {
     expect(isShellCommand('codex')).toBe(false)
     expect(isShellCommand('opencode')).toBe(false)
     expect(isShellCommand('grok')).toBe(false)
+    expect(isShellCommand('kimi')).toBe(false)
     expect(isShellCommand('my-agent')).toBe(false)
     expect(isShellCommand(undefined)).toBe(false)
     expect(isShellCommand('')).toBe(false)

@@ -46,15 +46,29 @@ test('grok without model', () => {
   expect(out).toEqual({ args: ['-p', 'do the thing'], executable: 'grok' })
 })
 
+test('kimi with model uses -p + --model after prompt value', () => {
+  const out = buildHeadlessInvocation('kimi', 'do the thing', 'kimi-code/kimi-for-coding')
+  expect(out).toEqual({
+    args: ['-p', 'do the thing', '--model', 'kimi-code/kimi-for-coding'],
+    executable: 'kimi',
+  })
+})
+
+test('kimi without model', () => {
+  const out = buildHeadlessInvocation('kimi', 'do the thing', undefined)
+  expect(out).toEqual({ args: ['-p', 'do the thing'], executable: 'kimi' })
+})
+
 test('terminal is not supported', () => {
   expect(buildHeadlessInvocation('terminal', 'go!', undefined)).toBeNull()
 })
 
-test('isSupportedProvider identifies supported CLIs (incl. grok)', () => {
+test('isSupportedProvider identifies supported CLIs (incl. grok and kimi)', () => {
   expect(isSupportedProvider('claude')).toBe(true)
   expect(isSupportedProvider('codex')).toBe(true)
   expect(isSupportedProvider('opencode')).toBe(true)
   expect(isSupportedProvider('grok')).toBe(true)
+  expect(isSupportedProvider('kimi')).toBe(true)
   expect(isSupportedProvider('terminal')).toBe(false)
   expect(isSupportedProvider('some-custom')).toBe(false)
 })
