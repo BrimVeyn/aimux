@@ -49,6 +49,7 @@ export type {
   AppAction,
   AppState,
   AutoCommitConfig,
+  AutoRenameConfig,
   BackendConfig,
   BindingDef,
   DiscoveredRepo,

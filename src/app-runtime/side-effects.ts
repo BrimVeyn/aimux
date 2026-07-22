@@ -329,7 +329,8 @@ export function startTabSession(
   tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'worktreeId'>,
   cols: number,
   rows: number,
-  cwd?: string
+  cwd?: string,
+  autoRenameCandidate = true
 ): void {
   logInputDebug('app.tab.start.request', {
     cols,
@@ -357,6 +358,7 @@ export function startTabSession(
   backend.createSession({
     args,
     assistant: tab.assistant,
+    autoRenameCandidate,
     cols,
     command: executable,
     cwd,
@@ -613,7 +615,8 @@ function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
     tab,
     state.layout.terminalCols,
     state.layout.terminalRows,
-    getTabProjectPath(ctx, tab)
+    getTabProjectPath(ctx, tab),
+    false
   )
 }
 
@@ -872,6 +875,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'rename-session': {
       handleRenameSessionEffect(state.sessions, dispatch, effect.sessionId, effect.name)
+      return
+    }
+    case 'rename-tab': {
+      dispatch({
+        autoRenameStatus: 'attempted',
+        tabId: effect.tabId,
+        title: effect.title,
+        type: 'rename-tab',
+      })
+      backend.renameTab(effect.tabId, effect.title)
       return
     }
     case 'split-pane': {

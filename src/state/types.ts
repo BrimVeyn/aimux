@@ -133,6 +133,7 @@ export interface PersistedTabSnapshot {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
 export interface WorkspaceSnapshotV1 {
@@ -203,6 +204,7 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
 export interface SidebarState {
@@ -747,7 +749,18 @@ export type TabAction =
   | { type: 'reorder-active-tab'; delta: number }
   | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-session'; tabId: string }
-  | { type: 'rename-tab'; tabId: string; title: string }
+  | {
+      type: 'rename-tab'
+      tabId: string
+      title: string
+      autoRenameStatus?: 'eligible' | 'attempted'
+    }
+  | {
+      type: 'update-tab-metadata'
+      tabId: string
+      title?: string
+      autoRenameStatus?: 'eligible' | 'attempted'
+    }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }
   | {
       type: 'replace-tab-viewport'

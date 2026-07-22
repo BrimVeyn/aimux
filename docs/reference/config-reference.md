@@ -49,6 +49,7 @@ defineConfig({
   snippets?: SnippetDef[]
   snippetTriggerChar?: string
   autoCommit?: Partial<AutoCommitConfig>
+  autoRename?: Partial<AutoRenameConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
   worktreeTemplates?: WorktreeTemplate[]
@@ -69,6 +70,7 @@ defineConfig({
 | `snippets`           | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
 | `snippetTriggerChar` | Supported          | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                           |
 | `autoCommit`         | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                                 |
+| `autoRename`         | Supported          | Renames new assistant tabs from their first prompt. Enabled by default; see `../guide/sessions.md#automatic-tab-names`  |
 | `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces`    |
 | `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
 | `worktreeTemplates`  | Supported          | Multi-tab / multi-pane layouts spawned at worktree creation. See `../guide/worktrees.md#templates`                      |
@@ -431,6 +433,44 @@ export default defineConfig({
 
 See [`../guide/git-mode.md#auto-commit`](../guide/git-mode.md#auto-commit)
 for the full user-facing walkthrough.
+
+## `autoRename`
+
+Status: `Supported`
+
+```ts
+autoRename?: {
+  enabled?: boolean                          // default: true
+  timeoutMs?: number                         // default: 15_000
+  models?: Partial<Record<string, string>>   // per-provider model override
+}
+```
+
+After the first non-empty prompt in a newly created assistant tab, aimux runs
+that same assistant's headless CLI in the background and replaces the default
+tab label with a concise title. Explicit `--title` values and manual renames
+are never overwritten. A failed generation keeps the existing title and is
+not retried on later prompts.
+
+The first prompt is sent to the configured provider as an additional model
+request. Disable this feature if prompts must not leave the interactive
+assistant process. Supported providers are `claude`, `codex`, `opencode`,
+`grok`, and `kimi`; plain terminals and custom providers are ignored.
+
+```ts
+export default defineConfig({
+  autoRename: {
+    enabled: true,
+    models: {
+      claude: 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+    },
+  },
+})
+```
+
+The daemon reads this setting at startup. Run `aimux restart-daemon` after
+changing it; live PTYs remain owned by the terminal-manager.
 
 ## `multiRepo`
 

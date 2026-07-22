@@ -67,6 +67,14 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     this.getOrCreateRegistry(sessionId).write(tabId, data)
   }
 
+  updateTabMetadata(
+    sessionId: string,
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ): void {
+    this.getOrCreateRegistry(sessionId).updateTabMetadata(tabId, patch)
+  }
+
   resize(sessionId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
     this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, options)
   }

@@ -8,10 +8,12 @@ function createSnapshotTab(
   id: string,
   title: string,
   assistant: 'claude' | 'codex' | 'grok' | 'terminal' = 'claude',
-  command = assistant === 'terminal' ? 'zsh' : assistant
+  command = assistant === 'terminal' ? 'zsh' : assistant,
+  autoRenameStatus?: 'eligible' | 'attempted'
 ) {
   return {
     assistant,
+    autoRenameStatus,
     buffer: title.toLowerCase(),
     command,
     id,
@@ -117,5 +119,24 @@ describe('SessionRegistry', () => {
     )
 
     expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-a', 'tab-b'])
+  })
+
+  test('does not regress completed auto-rename metadata from a stale snapshot', () => {
+    const registry = new SessionRegistry()
+
+    registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Generated title', 'claude', 'claude', 'attempted')],
+      })
+    )
+
+    const reattached = registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Claude', 'claude', 'claude', 'eligible')],
+      })
+    )
+
+    expect(reattached.tabs[0]?.autoRenameStatus).toBe('attempted')
+    expect(reattached.tabs[0]?.title).toBe('Generated title')
   })
 })

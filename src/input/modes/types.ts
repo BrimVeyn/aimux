@@ -52,6 +52,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
   | { type: 'rename-session'; sessionId: string; name: string }
+  | { type: 'rename-tab'; tabId: string; title: string }
   | {
       type: 'split-pane'
       direction: SplitDirection

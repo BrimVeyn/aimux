@@ -210,6 +210,7 @@ export const tabCreate: CliCommand = {
     await daemon.expectOk('createTab', {
       args,
       assistant: assistantId,
+      autoRenameCandidate: ctx.args.flags.title === undefined,
       cols: useFallback ? 0 : FALLBACK_COLS,
       command: executable,
       cwd,

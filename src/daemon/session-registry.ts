@@ -89,7 +89,10 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       for (const persisted of snapshot.tabs) {
         const existing = this.tabs.get(persisted.id)
         if (existing) {
-          existing.title = persisted.title
+          if (existing.autoRenameStatus !== 'attempted') {
+            existing.title = persisted.title
+            existing.autoRenameStatus = persisted.autoRenameStatus
+          }
           existing.worktreeId = persisted.worktreeId
         }
       }
@@ -145,6 +148,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cwd?: string
     /** Extra env injected into the spawned shell. Passed through to the PTY. */
     env?: Record<string, string>
+    autoRenameStatus?: 'eligible' | 'attempted'
     /**
      * Worktree this tab belongs to (for UI grouping). Stored on the
      * TabSession so an attach-time replay surfaces it inside the right
@@ -164,6 +168,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       this.tabs.set(options.tabId, {
         activity: 'idle',
         assistant: options.assistant,
+        autoRenameStatus: options.autoRenameStatus,
         buffer: '',
         command: [options.command, ...(options.args ?? [])].join(' '),
         id: options.tabId,
@@ -182,11 +187,22 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.assistant = options.assistant
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
+      existing.autoRenameStatus = options.autoRenameStatus
       if (options.worktreeId !== undefined) existing.worktreeId = options.worktreeId
     }
 
     this.activeTabId = options.tabId
     this.ptyManager.createSession(options)
+  }
+
+  updateTabMetadata(
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ): void {
+    const tab = this.tabs.get(tabId)
+    if (!tab) return
+    if (patch.title !== undefined) tab.title = patch.title
+    if (patch.autoRenameStatus !== undefined) tab.autoRenameStatus = patch.autoRenameStatus
   }
 
   /**

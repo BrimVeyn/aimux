@@ -9,6 +9,30 @@ import {
 import { createInitialState } from '../../src/state/store'
 
 describe('session persistence', () => {
+  test('round-trips auto-rename status in workspace snapshots', () => {
+    const state = createInitialState({ claude: 'claude' })
+    state.tabs = [
+      {
+        assistant: 'claude',
+        autoRenameStatus: 'attempted',
+        buffer: '',
+        command: 'claude',
+        id: 'tab-1',
+        status: 'running',
+        terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
+          mouseTrackingMode: 'none',
+          sendFocusMode: false,
+        },
+        title: 'Cache fix',
+      },
+    ]
+    const snapshot = serializeWorkspace(state)
+    expect(snapshot.tabs[0]?.autoRenameStatus).toBe('attempted')
+    expect(restoreTabsFromWorkspace(snapshot)[0]?.autoRenameStatus).toBe('attempted')
+  })
   test('serializes workspace snapshot', () => {
     const state = {
       ...createInitialState({ claude: 'claude' }),

@@ -1,5 +1,6 @@
 import { connect } from 'node:net'
 
+import type { AutoRenameConfigSnapshot } from '../auto-rename/coordinator'
 import type { SessionBackend } from './types'
 
 import { negotiateDaemonReexec, waitForSocketRemoval } from '../daemon/reexec-client'
@@ -273,10 +274,11 @@ async function stopTerminalManager(): Promise<void> {
 
 export async function createSessionBackend(opts?: {
   onBreakingUpdateRequired?: () => Promise<void>
+  autoRenameConfig?: AutoRenameConfigSnapshot
 }): Promise<SessionBackend> {
   if (process.env.AIMUX_LOCAL_BACKEND === '1') {
     logDebug('backend.create.localExplicit')
-    return new LocalSessionBackend()
+    return new LocalSessionBackend(opts?.autoRenameConfig)
   }
 
   const socketPath = getIpcDaemonSocketPath()

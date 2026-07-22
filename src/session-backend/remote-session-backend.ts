@@ -10,6 +10,7 @@ import {
   type AttachResult,
   type ClientRequest,
   encodeMessage,
+  IPC_CAPABILITY_TAB_METADATA,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -211,6 +212,12 @@ export class RemoteSessionBackend
         })
         this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
         break
+      case 'tabMetadataUpdated':
+        this.emit('tabMetadataUpdated', message.payload.sessionId, message.payload.tabId, {
+          autoRenameStatus: message.payload.autoRenameStatus,
+          title: message.payload.title,
+        })
+        break
       case 'workspaceCreateRequested':
         this.emit(
           'workspaceCreateRequested',
@@ -411,6 +418,7 @@ export class RemoteSessionBackend
     rows: number
     cwd?: string
     worktreeId?: string
+    autoRenameCandidate?: boolean
   }): void {
     if (!this.attached) {
       logDebug('backend.remote.skipCreateBeforeAttach', { tabId: options.tabId })
@@ -432,6 +440,15 @@ export class RemoteSessionBackend
     this.dispatchCommand(
       { id: crypto.randomUUID(), payload: { data: input, tabId }, type: 'write' },
       'write',
+      tabId
+    )
+  }
+
+  renameTab(tabId: string, title: string): void {
+    if (!this.attached || !this.daemonAdvertises(IPC_CAPABILITY_TAB_METADATA)) return
+    this.dispatchCommand(
+      { id: crypto.randomUUID(), payload: { tabId, title }, type: 'renameTab' },
+      'renameTab',
       tabId
     )
   }

@@ -32,8 +32,11 @@ import {
 // either way (pre-v7 TM → new client never sees the indices; new TM →
 // pre-v7 client ignores them and falls back to the theme default), so Min
 // is raised in lockstep to force matching binaries.
+//
+// v9: additive — `tabMetadata` updates titles and auto-rename state without
+// restarting PTYs. Capability-gated; MIN remains at 8.
 export const MANAGER_PROTOCOL_MIN_VERSION = 8
-export const MANAGER_PROTOCOL_VERSION = 8
+export const MANAGER_PROTOCOL_VERSION = 9
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New
@@ -44,7 +47,10 @@ export const MANAGER_PROTOCOL_VERSION = 8
 export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
   'setBroadcastEnabled',
   'createTabWorktreeId',
+  'tabMetadata',
 ]
+
+export const MANAGER_CAPABILITY_TAB_METADATA = 'tabMetadata'
 
 /**
  * Capability name a daemon must observe on the TM's helloResult before
@@ -119,9 +125,20 @@ export type ManagerRequest =
          * `worktreeId = undefined`.
          */
         worktreeId?: string
+        autoRenameStatus?: 'eligible' | 'attempted'
       }
     }
   | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
+  | {
+      id: string
+      type: 'updateTabMetadata'
+      payload: {
+        sessionId: string
+        tabId: string
+        title?: string
+        autoRenameStatus?: 'eligible' | 'attempted'
+      }
+    }
   | {
       id: string
       type: 'resizeClient'
@@ -364,11 +381,31 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
         value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
         'createTab.worktreeId must be a string when present'
       )
+      assert(
+        value.payload.autoRenameStatus === undefined ||
+          value.payload.autoRenameStatus === 'eligible' ||
+          value.payload.autoRenameStatus === 'attempted',
+        'createTab.autoRenameStatus is invalid'
+      )
       return value as ManagerRequest
     case 'write':
       assert(isString(value.payload.sessionId), 'write.sessionId must be a string')
       assert(isString(value.payload.tabId), 'write.tabId must be a string')
       assert(isString(value.payload.data), 'write.data must be a string')
+      return value as ManagerRequest
+    case 'updateTabMetadata':
+      assert(isString(value.payload.sessionId), 'updateTabMetadata.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'updateTabMetadata.tabId must be a string')
+      assert(
+        value.payload.title === undefined || isString(value.payload.title),
+        'updateTabMetadata.title must be a string when present'
+      )
+      assert(
+        value.payload.autoRenameStatus === undefined ||
+          value.payload.autoRenameStatus === 'eligible' ||
+          value.payload.autoRenameStatus === 'attempted',
+        'updateTabMetadata.autoRenameStatus is invalid'
+      )
       return value as ManagerRequest
     case 'resizeClient':
       assert(isString(value.payload.sessionId), 'resizeClient.sessionId must be a string')

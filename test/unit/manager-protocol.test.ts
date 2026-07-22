@@ -110,3 +110,17 @@ describe('manager protocol', () => {
     })
   })
 })
+
+test('parses additive tab metadata updates', () => {
+  const request = parseManagerRequest({
+    id: 'metadata-1',
+    payload: {
+      autoRenameStatus: 'attempted',
+      sessionId: 'session-1',
+      tabId: 'tab-1',
+      title: 'Cache fix',
+    },
+    type: 'updateTabMetadata',
+  })
+  expect(request.type).toBe('updateTabMetadata')
+})

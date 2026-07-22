@@ -239,6 +239,11 @@ export function bindBackendRuntimeEvents({
     const current = appStore.getState()
     if (current.tabs.some((t) => t.id === tab.id)) {
       logInputDebug('app.backend.event.tabAdded.skipDuplicate', { sessionId, tabId: tab.id })
+      dispatch({
+        autoRenameStatus: tab.autoRenameStatus,
+        tabId: tab.id,
+        type: 'update-tab-metadata',
+      })
       return
     }
     if (current.currentSessionId !== sessionId) {
@@ -253,12 +258,22 @@ export function bindBackendRuntimeEvents({
     dispatch({ tab, type: 'add-tab' })
   }
 
+  const handleTabMetadataUpdated = (
+    sessionId: string,
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ) => {
+    if (appStore.getState().currentSessionId !== sessionId) return
+    dispatch({ ...patch, tabId, type: 'update-tab-metadata' })
+  }
+
   backend.on('render', handleRender)
   backend.on('exit', handleExit)
   backend.on('error', handleError)
   backend.on('sessionActivity', handleSessionActivity)
   backend.on('tabActivity', handleTabActivity)
   backend.on('tabAdded', handleTabAdded)
+  backend.on('tabMetadataUpdated', handleTabMetadataUpdated)
   backend.on('workspaceCreateRequested', handleWorkspaceCreateRequested)
   backend.on('workspaceSwitchRequested', handleWorkspaceSwitchRequested)
   backend.on('workspaceCloseRequested', handleWorkspaceCloseRequested)
@@ -274,6 +289,7 @@ export function bindBackendRuntimeEvents({
     backend.off('sessionActivity', handleSessionActivity)
     backend.off('tabActivity', handleTabActivity)
     backend.off('tabAdded', handleTabAdded)
+    backend.off('tabMetadataUpdated', handleTabMetadataUpdated)
     backend.off('workspaceCreateRequested', handleWorkspaceCreateRequested)
     backend.off('workspaceSwitchRequested', handleWorkspaceSwitchRequested)
     backend.off('workspaceCloseRequested', handleWorkspaceCloseRequested)

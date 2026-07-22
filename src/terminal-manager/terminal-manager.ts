@@ -209,6 +209,15 @@ export async function runTerminalManager(): Promise<void> {
                 )
                 sendOk(socket, message.id)
                 break
+              case 'updateTabMetadata':
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                sessionManager.updateTabMetadata(
+                  message.payload.sessionId,
+                  message.payload.tabId,
+                  message.payload
+                )
+                sendOk(socket, message.id)
+                break
               case 'resizeClient': {
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.resize(

@@ -152,7 +152,10 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
         (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode)) &&
-        (tab.worktreeId === undefined || isString(tab.worktreeId))
+        (tab.worktreeId === undefined || isString(tab.worktreeId)) &&
+        (tab.autoRenameStatus === undefined ||
+          tab.autoRenameStatus === 'eligible' ||
+          tab.autoRenameStatus === 'attempted')
     ) &&
     (value.layoutTree === undefined || isLayoutNode(value.layoutTree)) &&
     (value.layoutTrees === undefined || isLayoutTreesMap(value.layoutTrees)) &&

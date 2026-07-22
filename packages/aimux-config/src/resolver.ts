@@ -1,6 +1,7 @@
 import type {
   AimuxUserConfig,
   AutoCommitConfig,
+  AutoRenameConfig,
   ModeId,
   ModeKeymapDef,
   MultiRepoConfig,
@@ -10,6 +11,7 @@ import type {
 
 import {
   DEFAULT_AUTO_COMMIT_CONFIG,
+  DEFAULT_AUTO_RENAME_CONFIG,
   DEFAULT_MULTI_REPO_CONFIG,
   getDefaultKeymapConfig,
 } from './defaults'
@@ -28,6 +30,12 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     timeoutMs: userConfig.autoCommit?.timeoutMs ?? DEFAULT_AUTO_COMMIT_CONFIG.timeoutMs,
   }
 
+  const autoRename: AutoRenameConfig = {
+    enabled: userConfig.autoRename?.enabled ?? DEFAULT_AUTO_RENAME_CONFIG.enabled,
+    models: { ...DEFAULT_AUTO_RENAME_CONFIG.models, ...userConfig.autoRename?.models },
+    timeoutMs: userConfig.autoRename?.timeoutMs ?? DEFAULT_AUTO_RENAME_CONFIG.timeoutMs,
+  }
+
   const multiRepo: MultiRepoConfig = {
     enabled: userConfig.multiRepo?.enabled ?? DEFAULT_MULTI_REPO_CONFIG.enabled,
     maxDepth: Math.max(1, userConfig.multiRepo?.maxDepth ?? DEFAULT_MULTI_REPO_CONFIG.maxDepth),
@@ -35,6 +43,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 
   return {
     autoCommit,
+    autoRename,
     backends: userConfig.backends ?? {},
     externalEditor: userConfig.externalEditor ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),

@@ -49,6 +49,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
     tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
     tabs: state.tabs.map((tab) => ({
       assistant: tab.assistant,
+      autoRenameStatus: tab.autoRenameStatus,
       buffer: tab.buffer,
       command: tab.command,
       errorMessage: tab.errorMessage,
@@ -113,6 +114,7 @@ export function restoreTabsFromWorkspace(
     .map((tab) => ({
       activity: 'idle',
       assistant: tab.assistant,
+      autoRenameStatus: tab.autoRenameStatus,
       buffer: tab.buffer,
       command: tab.command,
       errorMessage: tab.errorMessage,

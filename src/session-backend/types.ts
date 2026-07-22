@@ -23,6 +23,11 @@ export interface SessionBackendEvents {
    * `tabRender` event lands.
    */
   tabAdded: [sessionId: string, tab: TabSession]
+  tabMetadataUpdated: [
+    sessionId: string,
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' },
+  ]
   /**
    * v12 workspace-lifecycle events. Fired when a CLI issued
    * `createWorkspace` / `switchWorkspace` / `closeWorkspace` and the daemon
@@ -86,8 +91,10 @@ export interface SessionBackend extends EventEmitter<SessionBackendEvents> {
      *  registry surfaces the right grouping in `listTabs` for headless
      *  consumers (CLI control plane). */
     worktreeId?: string
+    autoRenameCandidate?: boolean
   }): void
   write(tabId: string, input: string): void
+  renameTab(tabId: string, title: string): void
   scrollViewport(tabId: string, deltaLines: number): void
   scrollViewportToBottom(tabId: string): void
   setActiveTab(tabId: string | null): void

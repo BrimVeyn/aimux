@@ -1,4 +1,9 @@
-import type { AutoCommitConfig, MultiRepoConfig, ResolvedKeymapConfig } from './types'
+import type {
+  AutoCommitConfig,
+  AutoRenameConfig,
+  MultiRepoConfig,
+  ResolvedKeymapConfig,
+} from './types'
 
 import * as actions from './actions'
 import { KeymapBuilder } from './keymap-builder'
@@ -10,6 +15,15 @@ export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
     codex: 'gpt-5-mini',
   },
   timeoutMs: 60_000,
+}
+
+export const DEFAULT_AUTO_RENAME_CONFIG: AutoRenameConfig = {
+  enabled: true,
+  models: {
+    claude: 'claude-haiku-4-5',
+    codex: 'gpt-5-mini',
+  },
+  timeoutMs: 15_000,
 }
 
 export const DEFAULT_MULTI_REPO_CONFIG: MultiRepoConfig = {

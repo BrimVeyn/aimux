@@ -3,6 +3,8 @@ import { connect, createServer, type Socket } from 'node:net'
 
 import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
 
+import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
+import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
 import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
 import {
@@ -70,6 +72,7 @@ export interface DaemonTabEntry {
   title?: string
   status?: TabStatus
   worktreeId?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
 /**
@@ -91,16 +94,25 @@ export function mergeTabRegistryEntry(
   command: string,
   initialViewport: TerminalSnapshot | undefined,
   allocateSeq: () => number,
-  metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
+  metadata?: {
+    title?: string
+    status?: TabStatus
+    worktreeId?: string
+    autoRenameStatus?: 'eligible' | 'attempted'
+  }
 ): DaemonTabEntry {
   const existing = registry.get(tabId)
   const viewport = existing?.viewport ?? initialViewport
+  const preserveAttemptedMetadata = existing?.autoRenameStatus === 'attempted'
   const entry: DaemonTabEntry = {
     assistant,
+    autoRenameStatus: preserveAttemptedMetadata
+      ? 'attempted'
+      : (metadata?.autoRenameStatus ?? existing?.autoRenameStatus),
     command,
     sessionId,
     status: metadata?.status ?? existing?.status,
-    title: metadata?.title ?? existing?.title,
+    title: preserveAttemptedMetadata ? existing.title : (metadata?.title ?? existing?.title),
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
     worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
@@ -193,6 +205,7 @@ async function ensureTerminalManagerReady(manager: TerminalManagerClient): Promi
 }
 
 export async function runDaemon(): Promise<void> {
+  const resolvedConfig = await loadUserConfig()
   const socketPath = getIpcDaemonSocketPath()
   // A handoff file means we were spawned to take over from a predecessor
   // daemon that already drained and renamed its socket away. Consume the
@@ -247,8 +260,13 @@ export async function runDaemon(): Promise<void> {
     assistant: AssistantId,
     command: string,
     initialViewport?: TerminalSnapshot,
-    metadata?: { title?: string; status?: TabStatus; worktreeId?: string }
-  ): void => {
+    metadata?: {
+      title?: string
+      status?: TabStatus
+      worktreeId?: string
+      autoRenameStatus?: 'eligible' | 'attempted'
+    }
+  ): DaemonTabEntry => {
     const before = tabRegistry.get(tabId)
     const entry = mergeTabRegistryEntry(
       tabRegistry,
@@ -270,6 +288,7 @@ export async function runDaemon(): Promise<void> {
       sessionId,
       tabId,
     })
+    return entry
   }
 
   const broadcastAll = (event: ServerEvent): void => {
@@ -315,6 +334,45 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
+  const applyTabMetadata = (
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ): void => {
+    const entry = tabRegistry.get(tabId)
+    if (!entry) return
+    if (patch.title !== undefined) entry.title = patch.title
+    if (patch.autoRenameStatus !== undefined) entry.autoRenameStatus = patch.autoRenameStatus
+    void (async () => {
+      try {
+        await manager.updateTabMetadata(entry.sessionId, tabId, patch)
+      } catch (error) {
+        logDebug('daemon.tabMetadata.managerFailed', {
+          error: error instanceof Error ? error.message : String(error),
+          tabId,
+        })
+      }
+    })()
+    broadcastForSessionVersioned(entry.sessionId, 14, {
+      payload: { ...patch, sessionId: entry.sessionId, tabId },
+      type: 'tabMetadataUpdated',
+    })
+  }
+
+  const autoRename = new AutoRenameCoordinator({
+    config: resolvedConfig.autoRename,
+    getTab: (tabId) => {
+      const entry = tabRegistry.get(tabId)
+      if (!entry) return
+      return {
+        assistant: entry.assistant,
+        autoRenameStatus: entry.autoRenameStatus,
+        id: tabId,
+        title: entry.title ?? '',
+      }
+    },
+    updateTab: applyTabMetadata,
+  })
+
   // Count UI attachers so workspace/worktree handlers can decide whether to
   // relay via broadcast (UI attached → its reducer owns the write) or mutate
   // the catalog directly. A "UI attacher" here is any non-thin attach — thin
@@ -352,6 +410,7 @@ export async function runDaemon(): Promise<void> {
   manager.on('exit', (sessionId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
     tabRegistry.delete(tabId)
+    autoRename.unregister(tabId)
     if (sessionActiveTabIds.get(sessionId) === tabId) {
       sessionActiveTabIds.set(sessionId, null)
     }
@@ -611,14 +670,25 @@ export async function runDaemon(): Promise<void> {
                   })
                   sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
-                    rememberTab(
+                    const remembered = rememberTab(
                       message.payload.sessionId,
                       tab.id,
                       tab.assistant,
                       tab.command,
                       tab.viewport,
-                      { status: tab.status, title: tab.title, worktreeId: tab.worktreeId }
+                      {
+                        autoRenameStatus: tab.autoRenameStatus,
+                        status: tab.status,
+                        title: tab.title,
+                        worktreeId: tab.worktreeId,
+                      }
                     )
+                    autoRename.register({
+                      assistant: remembered.assistant,
+                      autoRenameStatus: remembered.autoRenameStatus,
+                      id: tab.id,
+                      title: remembered.title ?? tab.title,
+                    })
                   }
                   // Classify synchronously BEFORE sending attachResult so
                   // each tab's activity and the full session-status snapshot
@@ -637,10 +707,15 @@ export async function runDaemon(): Promise<void> {
                     })),
                   })
                   statusLoop.classifyNow(message.payload.sessionId, tabsForLoop)
-                  const tabsWithActivity = attachResult.tabs.map((tab) => ({
-                    ...tab,
-                    activity: statusLoop.getTabStatus(tab.id) ?? tab.activity,
-                  }))
+                  const tabsWithActivity = attachResult.tabs.map((tab) => {
+                    const metadata = tabRegistry.get(tab.id)
+                    return {
+                      ...tab,
+                      activity: statusLoop.getTabStatus(tab.id) ?? tab.activity,
+                      autoRenameStatus: metadata?.autoRenameStatus ?? tab.autoRenameStatus,
+                      title: metadata?.title ?? tab.title,
+                    }
+                  })
                   const initialSessionStatuses = statusLoop.snapshotSessions()
                   logDebug('daemon.attach.replay', {
                     sessionId: message.payload.sessionId,
@@ -699,6 +774,11 @@ export async function runDaemon(): Promise<void> {
                     message.payload.command,
                     ...(message.payload.args ?? []),
                   ].join(' ')
+                  const autoRenameStatus = initialAutoRenameStatus(
+                    resolvedConfig.autoRename,
+                    message.payload.assistant,
+                    message.payload.autoRenameCandidate === true
+                  )
                   rememberTab(
                     sessionId,
                     message.payload.tabId,
@@ -706,6 +786,7 @@ export async function runDaemon(): Promise<void> {
                     fullCommand,
                     undefined,
                     {
+                      autoRenameStatus,
                       status: 'starting',
                       title: message.payload.title,
                       worktreeId: message.payload.worktreeId,
@@ -719,7 +800,16 @@ export async function runDaemon(): Promise<void> {
                   // even on PTYs that outlive this daemon process.
                   const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
-                  await manager.createTab({ ...message.payload, cols, env, rows, sessionId })
+                  const { autoRenameCandidate: _autoRenameCandidate, ...managerTabPayload } =
+                    message.payload
+                  await manager.createTab({
+                    ...managerTabPayload,
+                    autoRenameStatus,
+                    cols,
+                    env,
+                    rows,
+                    sessionId,
+                  })
                   sendOk(socket, message.id)
                   // Fan a `tabAdded` event only to peers that negotiated at
                   // least v11 — older parsers throw on unknown message types
@@ -728,6 +818,7 @@ export async function runDaemon(): Promise<void> {
                   const synthesizedTab: TabSession = {
                     activity: 'idle',
                     assistant: message.payload.assistant,
+                    autoRenameStatus,
                     buffer: '',
                     command: fullCommand,
                     id: message.payload.tabId,
@@ -740,6 +831,7 @@ export async function runDaemon(): Promise<void> {
                     payload: { sessionId, tab: synthesizedTab },
                     type: 'tabAdded',
                   })
+                  autoRename.register(synthesizedTab)
                   logDebug('daemon.request.createTab.success', {
                     sessionId,
                     tabId: message.payload.tabId,
@@ -750,6 +842,21 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   await manager.write(sessionId, message.payload.tabId, message.payload.data)
+                  autoRename.observeWrite(message.payload.tabId, message.payload.data)
+                  sendOk(socket, message.id)
+                  break
+                }
+                case 'renameTab': {
+                  const sessionId = requireSession(socket, attachedSessions)
+                  requireNegotiatedVersion(socket, negotiatedVersions)
+                  if (tabRegistry.get(message.payload.tabId)?.sessionId !== sessionId) {
+                    throw new Error(`Tab not found in attached session: ${message.payload.tabId}`)
+                  }
+                  autoRename.manualRename(message.payload.tabId)
+                  applyTabMetadata(message.payload.tabId, {
+                    autoRenameStatus: 'attempted',
+                    title: message.payload.title.trim(),
+                  })
                   sendOk(socket, message.id)
                   break
                 }
@@ -806,6 +913,7 @@ export async function runDaemon(): Promise<void> {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   tabRegistry.delete(message.payload.tabId)
+                  autoRename.unregister(message.payload.tabId)
                   if (sessionActiveTabIds.get(sessionId) === message.payload.tabId) {
                     sessionActiveTabIds.set(sessionId, null)
                   }
@@ -851,7 +959,10 @@ export async function runDaemon(): Promise<void> {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   if (sessionId != null && sessionId !== '') {
                     for (const [tabId, entry] of tabRegistry) {
-                      if (entry.sessionId === sessionId) tabRegistry.delete(tabId)
+                      if (entry.sessionId === sessionId) {
+                        autoRename.unregister(tabId)
+                        tabRegistry.delete(tabId)
+                      }
                     }
                     sessionActiveTabIds.delete(sessionId)
                     sessionDimensions.delete(sessionId)

@@ -524,11 +524,12 @@ export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   const trimmed = (ctx.state.modal.editBuffer ?? '').trim()
   const tabId = ctx.state.modal.sessionTargetId
   const actions: KeyResult['actions'] = []
+  const effects: KeyResult['effects'] = []
   if (trimmed && tabId != null && tabId !== '') {
-    actions.push({ tabId, title: trimmed, type: 'rename-tab' })
+    effects.push({ tabId, title: trimmed, type: 'rename-tab' })
   }
   actions.push({ type: 'close-modal' })
-  return r(actions, [], 'navigation')
+  return r(actions, effects, 'navigation')
 }
 
 // Rename worktree modal

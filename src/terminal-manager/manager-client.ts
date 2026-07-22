@@ -8,6 +8,7 @@ import { logDebug } from '../debug/input-log'
 import {
   encodeManagerMessage,
   MANAGER_CAPABILITY_SET_BROADCAST_ENABLED,
+  MANAGER_CAPABILITY_TAB_METADATA,
   MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
@@ -295,7 +296,10 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       tabId: options.tabId,
       title: options.title,
     })
-    return this.sendExpectOk({ id: crypto.randomUUID(), payload: options, type: 'createTab' })
+    const payload = this.serverCapabilities.has(MANAGER_CAPABILITY_TAB_METADATA)
+      ? options
+      : (({ autoRenameStatus: _autoRenameStatus, ...legacy }) => legacy)(options)
+    return this.sendExpectOk({ id: crypto.randomUUID(), payload, type: 'createTab' })
   }
 
   async write(sessionId: string, tabId: string, data: string): Promise<void> {
@@ -303,6 +307,19 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       id: crypto.randomUUID(),
       payload: { data, sessionId, tabId },
       type: 'write',
+    })
+  }
+
+  async updateTabMetadata(
+    sessionId: string,
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ): Promise<void> {
+    if (!this.serverCapabilities.has(MANAGER_CAPABILITY_TAB_METADATA)) return
+    return this.sendExpectOk({
+      id: crypto.randomUUID(),
+      payload: { ...patch, sessionId, tabId },
+      type: 'updateTabMetadata',
     })
   }
 

@@ -74,6 +74,33 @@ describe('mergeTabRegistryEntry', () => {
     expect(entry?.command).toBe('new-cmd')
   })
 
+  test('does not regress completed auto-rename metadata from a stale attach', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    registry.set('t1', {
+      assistant: 'claude',
+      autoRenameStatus: 'attempted',
+      command: 'claude',
+      sessionId: 'S',
+      title: 'Generated title',
+      viewport: undefined,
+      viewportSeq: 0,
+    })
+
+    const entry = mergeTabRegistryEntry(
+      registry,
+      'S',
+      't1',
+      'claude',
+      'claude',
+      undefined,
+      makeAllocator(),
+      { autoRenameStatus: 'eligible', title: 'Claude' }
+    )
+
+    expect(entry.autoRenameStatus).toBe('attempted')
+    expect(entry.title).toBe('Generated title')
+  })
+
   test('no viewport anywhere yields seq=0 placeholder (never bumps the allocator)', () => {
     const registry = new Map<string, DaemonTabEntry>()
     let allocCalls = 0

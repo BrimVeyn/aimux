@@ -122,6 +122,7 @@ export interface PersistedTabSnapshot {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
 export interface WorkspaceSnapshotV1 {
@@ -188,6 +189,7 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
 export interface SnippetRecord {
@@ -847,6 +849,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
   | { type: 'rename-session'; sessionId: string; name: string }
+  | { type: 'rename-tab'; tabId: string; title: string }
   | { type: 'split-pane'; direction: SplitDirection; sourceTabId?: string }
   | { type: 'confirm-split' }
   | { type: 'scroll-git-diff'; delta: number }
@@ -1089,6 +1092,12 @@ export interface AutoCommitConfig {
   models: Partial<Record<string, string>>
 }
 
+export interface AutoRenameConfig {
+  enabled: boolean
+  timeoutMs: number
+  models: Partial<Record<string, string>>
+}
+
 export interface MultiRepoConfig {
   /** When true, scan projectPath for nested git repos and aggregate their status into the git panel. */
   enabled: boolean
@@ -1200,6 +1209,7 @@ export interface AimuxUserConfig {
    */
   snippetTriggerChar?: string
   autoCommit?: Partial<AutoCommitConfig>
+  autoRename?: Partial<AutoRenameConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
   externalEditor?: ExternalEditorConfig
@@ -1279,6 +1289,7 @@ export interface ResolvedConfig {
   snippets: SnippetDef[]
   snippetTriggerChar: string
   autoCommit: AutoCommitConfig
+  autoRename: AutoRenameConfig
   multiRepo: MultiRepoConfig
   statusBar: StatusBarConfig
   externalEditor: ExternalEditorConfig

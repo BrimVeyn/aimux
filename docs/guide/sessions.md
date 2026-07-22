@@ -131,6 +131,19 @@ unconditionally following the bottom of the terminal.
 This is intentional: a persisted workspace is not assumed to still have a live
 terminal attachment until the backend reattaches it.
 
+## Automatic Tab Names
+
+New Claude, Codex, OpenCode, Grok, and Kimi tabs are renamed in the background
+from their first non-empty prompt. The title uses the same provider as the tab,
+stays within six words and 48 characters, and follows the prompt's language.
+
+Aimux never replaces a title supplied with `aimux tab create --title`, a manual
+rename, or a historical tab restored from an older snapshot. Generation is
+attempted once; failures leave the assistant label unchanged. Configure or
+disable the feature through `autoRename` in `aimux.config.ts`. Because the
+prompt is submitted as an additional model request, review the privacy and
+model settings in the [config reference](../reference/config-reference.md#autorename).
+
 ## Legacy Workspace Migration
 
 If the new workspace catalog does not exist but `aimux.json` still contains a

@@ -543,7 +543,20 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
     case 'rename-tab':
       return {
         ...state,
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, title: action.title })),
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          autoRenameStatus: action.autoRenameStatus ?? tab.autoRenameStatus,
+          title: action.title,
+        })),
+      }
+    case 'update-tab-metadata':
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          autoRenameStatus: action.autoRenameStatus ?? tab.autoRenameStatus,
+          title: action.title ?? tab.title,
+        })),
       }
     case 'split-pane': {
       if (!(state.activeTabId != null && state.activeTabId !== '')) {

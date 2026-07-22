@@ -136,6 +136,8 @@ if (command === '--help' || command === '-h' || command === 'help') {
   process.exit(0)
 }
 
+const resolvedConfig = await loadUserConfig()
+
 const renderer = await createCliRenderer({
   autoFocus: true,
   // Transparent clear color so cells untouched by BoxRenderable paints (e.g.
@@ -164,7 +166,6 @@ try {
 
 const root = createRoot(renderer)
 
-const resolvedConfig = await loadUserConfig()
 logDebug('index.userConfigLoaded', {
   leader: resolvedConfig.keymaps.leader,
   modeCount: resolvedConfig.keymaps.modes.size,
@@ -179,6 +180,7 @@ if (resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true) {
 }
 
 const backend = await createSessionBackend({
+  autoRenameConfig: resolvedConfig.autoRename,
   onBreakingUpdateRequired: () =>
     new Promise<void>((resolve) => {
       root.render(<BreakingUpdateScreen onConfirm={resolve} />)

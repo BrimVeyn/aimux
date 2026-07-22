@@ -37,8 +37,11 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // plus best-effort parsed options), and an additive `lastLine` field on
 // `TabSessionSummary`. Gated behind `turnLifecycle`, `questionEvents`, and
 // `listTabsLastLine` respectively; MIN stays at 10.
+//
+// v14: additive — tab metadata synchronization for manual and automatic
+// renames. The new request/event are capability-gated; MIN stays at 10.
 export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 13
+export const IPC_PROTOCOL_VERSION = 14
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -137,6 +140,9 @@ export const IPC_CAPABILITY_QUESTION_EVENTS = 'questionEvents'
  */
 export const IPC_CAPABILITY_LIST_TABS_LAST_LINE = 'listTabsLastLine'
 
+/** Additive tab-title and auto-rename metadata synchronization. */
+export const IPC_CAPABILITY_TAB_METADATA = 'tabMetadata'
+
 /**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
@@ -160,6 +166,7 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_CAPABILITY_QUESTION_EVENTS,
   IPC_CAPABILITY_LIST_TABS_LAST_LINE,
+  IPC_CAPABILITY_TAB_METADATA,
 ]
 
 export interface ProtocolHelloRequest {
@@ -269,9 +276,12 @@ export type ClientRequest =
          * only forwards it to the TM when its own capability is in play.
          */
         worktreeId?: string
+        /** True only when the creator did not provide an explicit title. */
+        autoRenameCandidate?: boolean
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
+  | { id: string; type: 'renameTab'; payload: { tabId: string; title: string } }
   | {
       id: string
       type: 'resizeClient'
@@ -394,6 +404,15 @@ export type ServerEvent =
   | {
       type: 'tabAdded'
       payload: { sessionId: string; tab: TabSession }
+    }
+  | {
+      type: 'tabMetadataUpdated'
+      payload: {
+        sessionId: string
+        tabId: string
+        title?: string
+        autoRenameStatus?: 'eligible' | 'attempted'
+      }
     }
   // v12 / capability `workspaceLifecycle`. Broadcast to every socket when a
   // CLI issues `createWorkspace` while a UI is attached — the UI runs its
@@ -608,6 +627,9 @@ function isTabSession(value: unknown): value is TabSession {
     isString(value.buffer) &&
     isTerminalModeState(value.terminalModes) &&
     isString(value.command) &&
+    (value.autoRenameStatus === undefined ||
+      value.autoRenameStatus === 'eligible' ||
+      value.autoRenameStatus === 'attempted') &&
     (value.viewport === undefined || isTerminalSnapshot(value.viewport)) &&
     (value.errorMessage === undefined || isString(value.errorMessage)) &&
     (value.exitCode === undefined || isFiniteNumber(value.exitCode)) &&
@@ -714,10 +736,22 @@ export function parseClientRequest(value: unknown): ClientRequest {
         value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
         'createTab.worktreeId must be a string when present'
       )
+      assert(
+        value.payload.autoRenameCandidate === undefined ||
+          typeof value.payload.autoRenameCandidate === 'boolean',
+        'createTab.autoRenameCandidate must be a boolean when present'
+      )
       return value as ClientRequest
     case 'write':
       assert(isString(value.payload.tabId), 'write.tabId must be a string')
       assert(isString(value.payload.data), 'write.data must be a string')
+      return value as ClientRequest
+    case 'renameTab':
+      assert(isString(value.payload.tabId), 'renameTab.tabId must be a string')
+      assert(
+        isString(value.payload.title) && value.payload.title.trim().length > 0,
+        'renameTab.title must be a non-empty string'
+      )
       return value as ClientRequest
     case 'resizeClient':
       assert(isFiniteNumber(value.payload.cols), 'resizeClient.cols must be a number')
@@ -871,6 +905,20 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'tabAdded':
       assert(isString(value.payload.sessionId), 'tabAdded.sessionId must be a string')
       assert(isTabSession(value.payload.tab), 'tabAdded.tab is invalid')
+      return value as ServerEvent
+    case 'tabMetadataUpdated':
+      assert(isString(value.payload.sessionId), 'tabMetadataUpdated.sessionId must be a string')
+      assert(isString(value.payload.tabId), 'tabMetadataUpdated.tabId must be a string')
+      assert(
+        value.payload.title === undefined || isString(value.payload.title),
+        'tabMetadataUpdated.title must be a string when present'
+      )
+      assert(
+        value.payload.autoRenameStatus === undefined ||
+          value.payload.autoRenameStatus === 'eligible' ||
+          value.payload.autoRenameStatus === 'attempted',
+        'tabMetadataUpdated.autoRenameStatus is invalid'
+      )
       return value as ServerEvent
     case 'sessionStatus':
       assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
