@@ -31,9 +31,10 @@ own worktree, all submitted, ran, and merged green (8 tests pass).
 ## Suggestions — all shipped in protocol v13 ✅
 
 These let an orchestrator drop its last screen-scraping heuristics. Every one is
-now implemented as an **additive, capability-gated** wire change (protocol v13,
-`MIN` still 10 — old peers keep working). The `aimux-orchestrator` skill has been
-rewired onto them; the pre-v13 workarounds survive only as documented fallbacks.
+implemented as an **additive, capability-gated** wire change (protocol v13,
+`MIN` still 10 — old peers keep working). The repository-owned
+`aimux-orchestrator` skill now uses the native `aimux worker` facade exclusively;
+the pre-v13 shell wrappers and duplicated CLI reference have been removed.
 
 | #   | Suggestion                                        | Shipped as                                                                                                                                                                                                                                                                                                                                    | Capability                         |
 | --- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |

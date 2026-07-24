@@ -12,6 +12,11 @@ import {
 } from '../../src/ipc/manager-protocol'
 
 describe('manager protocol', () => {
+  test('requires the v11 breaking-release boundary', () => {
+    expect(MANAGER_PROTOCOL_MIN_VERSION).toBe(11)
+    expect(MANAGER_PROTOCOL_VERSION).toBe(11)
+  })
+
   test('selects highest mutually supported version', () => {
     expect(
       selectManagerProtocolVersion({

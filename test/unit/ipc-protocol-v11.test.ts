@@ -8,16 +8,14 @@ import {
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_PROTOCOL_CAPABILITIES,
-  IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   parseClientRequest,
   parseServerMessage,
 } from '../../src/ipc/protocol'
 
 describe('ipc protocol v11', () => {
-  test('MAX is at least 11, MIN stays at 10 (additive bump)', () => {
+  test('MAX still includes the historical v11 feature level', () => {
     expect(IPC_PROTOCOL_VERSION).toBeGreaterThanOrEqual(11)
-    expect(IPC_PROTOCOL_MIN_VERSION).toBe(10)
   })
 
   test('advertises every v11 capability', () => {
@@ -150,6 +148,45 @@ describe('ipc protocol v11', () => {
         type: 'createTab',
       })
     ).toThrow('createTab.worktreeId must be a string when present')
+  })
+
+  test('workerName metadata round-trips on createTab and listTabsResult', () => {
+    expect(
+      parseClientRequest({
+        id: 'req-worker',
+        payload: {
+          args: [],
+          assistant: 'claude',
+          cols: 120,
+          command: 'claude',
+          rows: 40,
+          tabId: 'tab-worker',
+          title: 'auth',
+          workerName: 'auth',
+        },
+        type: 'createTab',
+      })
+    ).toMatchObject({ payload: { workerName: 'auth' } })
+
+    expect(
+      parseServerMessage({
+        id: 'res-worker',
+        payload: {
+          activeTabId: 'tab-worker',
+          tabs: [
+            {
+              assistant: 'claude',
+              command: 'claude',
+              id: 'tab-worker',
+              status: 'running',
+              title: 'auth',
+              workerName: 'auth',
+            },
+          ],
+        },
+        type: 'listTabsResult',
+      })
+    ).toMatchObject({ payload: { tabs: [{ workerName: 'auth' }] } })
   })
 
   test('tabAdded event round-trips with a full TabSession', () => {

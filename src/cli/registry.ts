@@ -11,6 +11,12 @@ import { tabSend } from './commands/tab/send'
 import { tabSnapshot } from './commands/tab/snapshot'
 import { tabTail } from './commands/tab/tail'
 import { tabWait } from './commands/tab/wait'
+import { workerAwait } from './commands/worker/await'
+import { workerDoctor } from './commands/worker/doctor'
+import { workerList } from './commands/worker/list'
+import { workerPrompt } from './commands/worker/prompt'
+import { workerRun } from './commands/worker/run'
+import { workerStop } from './commands/worker/stop'
 import { workspaceClose } from './commands/workspace/close'
 import { workspaceCreate } from './commands/workspace/create'
 import { workspaceList } from './commands/workspace/list'
@@ -48,6 +54,12 @@ export const COMMANDS: readonly CliCommand[] = [
   worktreeList,
   worktreeCreate,
   worktreeRemove,
+  workerRun,
+  workerPrompt,
+  workerAwait,
+  workerList,
+  workerStop,
+  workerDoctor,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

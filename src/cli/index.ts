@@ -64,9 +64,10 @@ function formatFlagLine(flag: FlagSpec): string {
 function printHelp(): void {
   process.stdout.write(
     [
-      'aimux CLI control plane — drive workspaces, worktrees, and tabs from scripts.',
+      'aimux — terminal multiplexer and agent-friendly control plane.',
       '',
       'Usage:',
+      '  aimux                                      Start the interactive TUI',
       '  aimux <group> <verb> [flags] [args]',
       '  aimux <group> --help                        List verbs in a group',
       '  aimux <group> <verb> --help                 Show flags/args for a verb',
@@ -99,15 +100,12 @@ function printHelp(): void {
       'Env:',
       '  AIMUX_PROFILE                  Runtime profile (state dir, socket paths); --profile overrides.',
       '',
-      'Agent recipes:',
-      '  # spawn Claude in a new tab, wait until it idles, snapshot the screen',
-      '  TAB=$(aimux tab create --assistant claude --title fixup | jq -r .tabId)',
-      '  aimux tab send "$TAB" "explain this repo" --enter',
-      '  aimux tab wait "$TAB" --status idle --timeout 60000',
-      '  aimux tab snapshot "$TAB" --tail 40 --format text',
+      'Agent recipe:',
+      '  # create an isolated named worker, dispatch, and await one structured outcome',
+      '  aimux worker run --name fixup --assistant claude "explain this repo"',
       '',
-      '  # stream renders as NDJSON (one event per line)',
-      '  aimux tab tail "$TAB" --rate-limit-ms 100 --follow-status',
+      'Maintenance:',
+      '  aimux doctor | update | restart-daemon | restart-terminal-manager | version',
       '',
     ].join('\n')
   )
@@ -201,6 +199,11 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     if (error instanceof CliUsageError) {
       writeError(error.message)
       writeError(`usage: aimux ${command.group} ${command.verb}`)
+      writeJson({
+        command: `${command.group} ${command.verb}`,
+        error: error.message,
+        kind: 'usage-error',
+      })
       return EXIT_USAGE
     }
     throw error
@@ -241,6 +244,15 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     return code
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
+    if (error instanceof CliUsageError) {
+      writeError(message)
+      writeJson({
+        command: `${command.group} ${command.verb}`,
+        error: message,
+        kind: 'usage-error',
+      })
+      return EXIT_USAGE
+    }
     // Classify by error type, not by string-sniffing the message: a runtime
     // error whose message happens to include "socket" (e.g. daemon reply
     // "socket write failed for tab X") must not masquerade as

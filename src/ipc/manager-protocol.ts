@@ -35,8 +35,14 @@ import {
 //
 // v9: additive — `tabMetadata` updates titles and auto-rename state without
 // restarting PTYs. Capability-gated; MIN remains at 8.
-export const MANAGER_PROTOCOL_MIN_VERSION = 8
-export const MANAGER_PROTOCOL_VERSION = 9
+//
+// v10: additive — `workerName` persists a workspace-scoped orchestration
+// handle on tabs created through the headless worker facade.
+//
+// v11: breaking release boundary — force a fresh terminal-manager so named
+// worker metadata is guaranteed to survive daemon reattach and process swaps.
+export const MANAGER_PROTOCOL_MIN_VERSION = 11
+export const MANAGER_PROTOCOL_VERSION = 11
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New
@@ -48,9 +54,11 @@ export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
   'setBroadcastEnabled',
   'createTabWorktreeId',
   'tabMetadata',
+  'workerMetadata',
 ]
 
 export const MANAGER_CAPABILITY_TAB_METADATA = 'tabMetadata'
+export const MANAGER_CAPABILITY_WORKER_METADATA = 'workerMetadata'
 
 /**
  * Capability name a daemon must observe on the TM's helloResult before
@@ -125,6 +133,7 @@ export type ManagerRequest =
          * `worktreeId = undefined`.
          */
         worktreeId?: string
+        workerName?: string
         autoRenameStatus?: 'eligible' | 'attempted'
       }
     }
@@ -380,6 +389,10 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(
         value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
         'createTab.worktreeId must be a string when present'
+      )
+      assert(
+        value.payload.workerName === undefined || isString(value.payload.workerName),
+        'createTab.workerName must be a string when present'
       )
       assert(
         value.payload.autoRenameStatus === undefined ||

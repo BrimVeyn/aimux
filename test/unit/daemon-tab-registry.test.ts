@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test'
 
 import type { TerminalLine, TerminalSnapshot } from '../../src/state/types'
 
-import { type DaemonTabEntry, mergeTabRegistryEntry } from '../../src/daemon/daemon'
+import {
+  type DaemonTabEntry,
+  findWorkerNameConflict,
+  mergeTabRegistryEntry,
+} from '../../src/daemon/daemon'
 
 function snapshot(tag: string): TerminalSnapshot {
   const line: TerminalLine = { spans: [{ text: tag }] }
@@ -112,5 +116,38 @@ describe('mergeTabRegistryEntry', () => {
     expect(registry.get('t1')?.viewport).toBeUndefined()
     expect(registry.get('t1')?.viewportSeq).toBe(0)
     expect(allocCalls).toBe(0)
+  })
+})
+
+describe('findWorkerNameConflict', () => {
+  test('scopes worker names to a workspace session', () => {
+    const registry = new Map<string, DaemonTabEntry>([
+      [
+        'tab-a',
+        {
+          assistant: 'claude',
+          command: 'claude',
+          sessionId: 'workspace-a',
+          viewport: undefined,
+          viewportSeq: 0,
+          workerName: 'api',
+        },
+      ],
+      [
+        'tab-b',
+        {
+          assistant: 'codex',
+          command: 'codex',
+          sessionId: 'workspace-b',
+          viewport: undefined,
+          viewportSeq: 0,
+          workerName: 'api',
+        },
+      ],
+    ])
+
+    expect(findWorkerNameConflict(registry, 'workspace-a', 'api')).toBe('tab-a')
+    expect(findWorkerNameConflict(registry, 'workspace-b', 'api')).toBe('tab-b')
+    expect(findWorkerNameConflict(registry, 'workspace-a', 'web')).toBeUndefined()
   })
 })

@@ -157,6 +157,8 @@ The help modal reflects the resolved keymap, so it includes your overrides.
 
 ```bash
 aimux
+aimux worker doctor
+aimux worker run --name investigate --assistant claude "inspect this repository"
 aimux version
 aimux doctor
 aimux update
@@ -165,6 +167,10 @@ aimux restart-terminal-manager
 ```
 
 See [`docs/reference/cli.md`](docs/reference/cli.md) for behavior details.
+
+For agent orchestration, prefer the named `aimux worker` commands. They combine
+isolated worktree creation, prompt dispatch, authoritative turn waiting, fleet
+inspection, and guarded cleanup without shell wrappers or `jq`.
 
 ## Runtime Model
 

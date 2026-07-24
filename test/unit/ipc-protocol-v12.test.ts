@@ -5,7 +5,6 @@ import {
   IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_CAPABILITIES,
-  IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   parseClientRequest,
   parseServerMessage,
@@ -23,9 +22,8 @@ const WORKTREE_FIXTURE = {
 }
 
 describe('ipc protocol v12', () => {
-  test('MAX is at least 12, MIN stays at 10 (additive bump)', () => {
+  test('MAX still includes the historical v12 feature level', () => {
     expect(IPC_PROTOCOL_VERSION).toBeGreaterThanOrEqual(12)
-    expect(IPC_PROTOCOL_MIN_VERSION).toBe(10)
   })
 
   test('advertises every v12 capability', () => {

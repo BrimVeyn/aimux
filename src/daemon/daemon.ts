@@ -3,10 +3,12 @@ import { connect, createServer, type Socket } from 'node:net'
 
 import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
 
+import { version as APP_VERSION } from '../../package.json'
 import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
 import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
+import { MANAGER_CAPABILITY_WORKER_METADATA } from '../ipc/manager-protocol'
 import {
   type ClientRequest,
   encodeMessage,
@@ -72,6 +74,7 @@ export interface DaemonTabEntry {
   title?: string
   status?: TabStatus
   worktreeId?: string
+  workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 
@@ -98,6 +101,7 @@ export function mergeTabRegistryEntry(
     title?: string
     status?: TabStatus
     worktreeId?: string
+    workerName?: string
     autoRenameStatus?: 'eligible' | 'attempted'
   }
 ): DaemonTabEntry {
@@ -115,10 +119,22 @@ export function mergeTabRegistryEntry(
     title: preserveAttemptedMetadata ? existing.title : (metadata?.title ?? existing?.title),
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
+    workerName: metadata?.workerName ?? existing?.workerName,
     worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
   }
   registry.set(tabId, entry)
   return entry
+}
+
+export function findWorkerNameConflict(
+  registry: ReadonlyMap<string, DaemonTabEntry>,
+  sessionId: string,
+  workerName: string
+): string | undefined {
+  for (const [tabId, entry] of registry) {
+    if (entry.sessionId === sessionId && entry.workerName === workerName) return tabId
+  }
+  return undefined
 }
 
 /**
@@ -264,6 +280,7 @@ export async function runDaemon(): Promise<void> {
       title?: string
       status?: TabStatus
       worktreeId?: string
+      workerName?: string
       autoRenameStatus?: 'eligible' | 'attempted'
     }
   ): DaemonTabEntry => {
@@ -589,7 +606,9 @@ export async function runDaemon(): Promise<void> {
                   send(socket, {
                     id: message.id,
                     payload: {
+                      appVersion: APP_VERSION,
                       capabilities: [...IPC_PROTOCOL_CAPABILITIES],
+                      managerCapabilities: [...manager.getCapabilities()],
                       ...(managerSelectedVersion !== null && { managerSelectedVersion }),
                       maxVersion: IPC_PROTOCOL_VERSION,
                       minVersion: IPC_PROTOCOL_MIN_VERSION,
@@ -680,6 +699,7 @@ export async function runDaemon(): Promise<void> {
                         autoRenameStatus: tab.autoRenameStatus,
                         status: tab.status,
                         title: tab.title,
+                        workerName: tab.workerName,
                         worktreeId: tab.worktreeId,
                       }
                     )
@@ -714,6 +734,7 @@ export async function runDaemon(): Promise<void> {
                       activity: statusLoop.getTabStatus(tab.id) ?? tab.activity,
                       autoRenameStatus: metadata?.autoRenameStatus ?? tab.autoRenameStatus,
                       title: metadata?.title ?? tab.title,
+                      workerName: metadata?.workerName ?? tab.workerName,
                     }
                   })
                   const initialSessionStatuses = statusLoop.snapshotSessions()
@@ -742,6 +763,23 @@ export async function runDaemon(): Promise<void> {
                 case 'createTab': {
                   const sessionId = requireSession(socket, attachedSessions)
                   requireNegotiatedVersion(socket, negotiatedVersions)
+                  if (message.payload.workerName !== undefined) {
+                    if (!manager.hasCapability(MANAGER_CAPABILITY_WORKER_METADATA)) {
+                      throw new Error(
+                        'the running terminal manager does not support worker metadata; restart aimux before creating named workers'
+                      )
+                    }
+                    const conflictTabId = findWorkerNameConflict(
+                      tabRegistry,
+                      sessionId,
+                      message.payload.workerName
+                    )
+                    if (conflictTabId !== undefined) {
+                      throw new Error(
+                        `worker name already exists in this workspace: ${message.payload.workerName} (${conflictTabId})`
+                      )
+                    }
+                  }
                   // Capability `createTabSizeFallback`: cols/rows = 0 means
                   // "use the session's last attached dimensions". Headless
                   // CLIs don't have a viewport of their own, so this lets
@@ -789,6 +827,7 @@ export async function runDaemon(): Promise<void> {
                       autoRenameStatus,
                       status: 'starting',
                       title: message.payload.title,
+                      workerName: message.payload.workerName,
                       worktreeId: message.payload.worktreeId,
                     }
                   )
@@ -802,14 +841,23 @@ export async function runDaemon(): Promise<void> {
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
                   const { autoRenameCandidate: _autoRenameCandidate, ...managerTabPayload } =
                     message.payload
-                  await manager.createTab({
-                    ...managerTabPayload,
-                    autoRenameStatus,
-                    cols,
-                    env,
-                    rows,
-                    sessionId,
-                  })
+                  try {
+                    await manager.createTab({
+                      ...managerTabPayload,
+                      autoRenameStatus,
+                      cols,
+                      env,
+                      rows,
+                      sessionId,
+                    })
+                  } catch (error) {
+                    // `rememberTab` must happen before the manager call so
+                    // early render events have metadata to merge into. Undo
+                    // that optimistic entry when creation fails, otherwise a
+                    // ghost worker name would block a clean retry.
+                    tabRegistry.delete(message.payload.tabId)
+                    throw error
+                  }
                   sendOk(socket, message.id)
                   // Fan a `tabAdded` event only to peers that negotiated at
                   // least v11 — older parsers throw on unknown message types
@@ -825,6 +873,7 @@ export async function runDaemon(): Promise<void> {
                     status: 'starting',
                     terminalModes: createDefaultTerminalModes(),
                     title: message.payload.title,
+                    workerName: message.payload.workerName,
                     worktreeId: message.payload.worktreeId,
                   }
                   broadcastForSessionVersioned(sessionId, 11, {
@@ -940,6 +989,7 @@ export async function runDaemon(): Promise<void> {
                       lastLine: lastNonBlankLine(entry.viewport),
                       status: entry.status ?? 'running',
                       title: entry.title ?? '',
+                      workerName: entry.workerName,
                       worktreeId: entry.worktreeId,
                     })
                   }

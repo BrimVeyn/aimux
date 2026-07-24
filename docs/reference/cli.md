@@ -9,8 +9,8 @@ The `aimux` CLI has two personas:
 
 - **Interactive** — `aimux` launches the TUI. `aimux doctor`, `aimux update`,
   and the restart commands manage the local install.
-- **Headless control plane** — `aimux tab …`, `aimux workspace …`, and
-  `aimux worktree …` drive the running daemon over its IPC socket without
+- **Headless control plane** — `aimux worker …`, `aimux tab …`,
+  `aimux workspace …`, and `aimux worktree …` drive the running daemon without
   the TUI. Every command writes one JSON object on stdout (or an NDJSON
   stream for `tab wait` / `tab tail`), so an outer script or agent can pipe
   the output through `jq`.
@@ -87,6 +87,35 @@ Used by the runtime itself, not typical user entrypoints:
 Every control-plane command routes to the daemon (auto-spawning it if the
 socket is missing). If the daemon predates a capability the command needs,
 it errors out with a message telling you to restart `aimux`.
+
+### Worker commands
+
+The `worker` group is the preferred interface for an agent orchestrating other
+agents. It composes the lower-level tab and worktree primitives, gives each
+worker a stable workspace-scoped name, and returns `schemaVersion: 1` envelopes.
+
+```
+aimux worker run --name auth --assistant claude --prompt-file /tmp/auth.md
+aimux worker run --name api --assistant codex --stdin --detach
+aimux worker prompt auth --prompt-file /tmp/correction.md
+aimux worker await api
+aimux worker list [name|tab-id]
+aimux worker stop auth [--cleanup-worktree] [--force]
+aimux worker doctor
+```
+
+`worker run` creates a fresh worktree by default. Use `--worktree <id>` to
+co-locate intentionally or `--no-worktree` to use the active worktree. Without
+`--detach`, it waits for a completed/question/timeout/error outcome. With
+`--detach`, it returns after prompt uptake is confirmed.
+
+`worker stop --cleanup-worktree` removes only aimux-created, unshared
+worktrees. Dirty worktrees require `--force`; primary and external worktrees are
+never removed by this command.
+
+`worker doctor` reports the client version, negotiated daemon protocol and
+capabilities, available assistants, model/effort controls, workspace, and the
+packaged orchestrator skill path.
 
 ### Tab commands
 

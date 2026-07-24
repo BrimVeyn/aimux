@@ -133,6 +133,8 @@ export interface PersistedTabSnapshot {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  /** Stable workspace-scoped name assigned by the headless worker facade. */
+  workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 
@@ -204,6 +206,8 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
+  /** Stable workspace-scoped name assigned by the headless worker facade. */
+  workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 

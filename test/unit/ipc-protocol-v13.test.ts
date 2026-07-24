@@ -5,15 +5,13 @@ import {
   IPC_CAPABILITY_QUESTION_EVENTS,
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_PROTOCOL_CAPABILITIES,
-  IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   parseServerMessage,
 } from '../../src/ipc/protocol'
 
 describe('ipc protocol v13', () => {
-  test('MAX is at least 13, MIN stays at 10 (additive bump)', () => {
+  test('MAX still includes the historical v13 feature level', () => {
     expect(IPC_PROTOCOL_VERSION).toBeGreaterThanOrEqual(13)
-    expect(IPC_PROTOCOL_MIN_VERSION).toBe(10)
   })
 
   test('advertises every v13 capability', () => {

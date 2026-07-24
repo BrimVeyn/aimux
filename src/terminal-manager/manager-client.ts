@@ -9,6 +9,7 @@ import {
   encodeManagerMessage,
   MANAGER_CAPABILITY_SET_BROADCAST_ENABLED,
   MANAGER_CAPABILITY_TAB_METADATA,
+  MANAGER_CAPABILITY_WORKER_METADATA,
   MANAGER_PROTOCOL_BROADCAST_GATE_VERSION,
   MANAGER_PROTOCOL_MIN_VERSION,
   MANAGER_PROTOCOL_VERSION,
@@ -296,9 +297,15 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       tabId: options.tabId,
       title: options.title,
     })
-    const payload = this.serverCapabilities.has(MANAGER_CAPABILITY_TAB_METADATA)
-      ? options
-      : (({ autoRenameStatus: _autoRenameStatus, ...legacy }) => legacy)(options)
+    let payload = options
+    if (!this.serverCapabilities.has(MANAGER_CAPABILITY_TAB_METADATA)) {
+      const { autoRenameStatus: _autoRenameStatus, ...legacy } = payload
+      payload = legacy
+    }
+    if (!this.serverCapabilities.has(MANAGER_CAPABILITY_WORKER_METADATA)) {
+      const { workerName: _workerName, ...legacy } = payload
+      payload = legacy
+    }
     return this.sendExpectOk({ id: crypto.randomUUID(), payload, type: 'createTab' })
   }
 
@@ -413,6 +420,14 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
    */
   getSelectedProtocolVersion(): number | null {
     return this.selectedProtocolVersion
+  }
+
+  getCapabilities(): readonly string[] {
+    return [...this.serverCapabilities]
+  }
+
+  hasCapability(name: string): boolean {
+    return this.serverCapabilities.has(name)
   }
 
   destroy(): void {

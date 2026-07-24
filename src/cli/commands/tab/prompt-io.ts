@@ -6,6 +6,7 @@
 import type { DaemonClient } from '../../client/daemon-client'
 
 import { bracketedPaste, notationToBytes } from '../../chord'
+import { CliUsageError } from '../../flags'
 
 /**
  * Gap between the bracketed-paste write and the trailing carriage return when
@@ -33,7 +34,7 @@ export async function resolvePromptText(
     (present) => present
   ).length
   if (sources !== 1) {
-    throw new Error(
+    throw new CliUsageError(
       'provide exactly one prompt source: --prompt-file <f>, --stdin, or a [text] positional'
     )
   }

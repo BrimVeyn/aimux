@@ -89,6 +89,7 @@ describe('ipc protocol framing', () => {
         id: '6',
         payload: {
           capabilities: ['thinAttach'],
+          managerCapabilities: ['workerMetadata'],
           maxVersion: IPC_PROTOCOL_VERSION,
           minVersion: 2,
           processVersion: '1.2.3',
@@ -97,7 +98,10 @@ describe('ipc protocol framing', () => {
         type: 'helloResult',
       })
     ).toMatchObject({
-      payload: { capabilities: ['thinAttach'] },
+      payload: {
+        capabilities: ['thinAttach'],
+        managerCapabilities: ['workerMetadata'],
+      },
       type: 'helloResult',
     })
   })

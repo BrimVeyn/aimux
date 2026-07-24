@@ -40,8 +40,14 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 //
 // v14: additive — tab metadata synchronization for manual and automatic
 // renames. The new request/event are capability-gated; MIN stays at 10.
-export const IPC_PROTOCOL_MIN_VERSION = 10
-export const IPC_PROTOCOL_VERSION = 14
+//
+// v15: additive — workspace-scoped `workerName` metadata on create, attach,
+// and list results. This powers stable name-or-id orchestration selectors.
+//
+// v16: breaking release boundary — the agent-first worker control plane and
+// its metadata guarantees are now required. Old app/daemon pairs must not mix.
+export const IPC_PROTOCOL_MIN_VERSION = 16
+export const IPC_PROTOCOL_VERSION = 16
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -106,6 +112,7 @@ export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE = 'workspaceLifecycle'
  * fanout as workspaceLifecycle.
  */
 export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents'
+export const IPC_CAPABILITY_WORKER_METADATA = 'workerMetadata'
 
 /**
  * v12 — capability marker for `aimux tab tail`. Functionally it's just a
@@ -167,6 +174,7 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_QUESTION_EVENTS,
   IPC_CAPABILITY_LIST_TABS_LAST_LINE,
   IPC_CAPABILITY_TAB_METADATA,
+  IPC_CAPABILITY_WORKER_METADATA,
 ]
 
 export interface ProtocolHelloRequest {
@@ -175,6 +183,8 @@ export interface ProtocolHelloRequest {
 }
 
 export interface ProtocolHelloResult {
+  /** aimux package version; absent on older daemons. */
+  appVersion?: string
   minVersion: number
   maxVersion: number
   processVersion: string
@@ -184,6 +194,8 @@ export interface ProtocolHelloResult {
    * not yet advertise capabilities are normalised to `[]` at parse time.
    */
   capabilities: string[]
+  /** Capabilities negotiated with the terminal-manager; absent on older daemons. */
+  managerCapabilities?: string[]
   /**
    * Manager-protocol version currently negotiated between the daemon and
    * its terminal-manager. `undefined` when the daemon has not yet connected
@@ -227,6 +239,7 @@ export interface TabSessionSummary {
   activity?: TabActivity
   command: string
   worktreeId?: string
+  workerName?: string
   /**
    * v13 / capability `listTabsLastLine`. The tab's last non-blank rendered
    * line, trimmed. Present only when the daemon advertises the capability;
@@ -276,6 +289,8 @@ export type ClientRequest =
          * only forwards it to the TM when its own capability is in play.
          */
         worktreeId?: string
+        /** v15 / capability `workerMetadata`: stable workspace-scoped handle. */
+        workerName?: string
         /** True only when the creator did not provide an explicit title. */
         autoRenameCandidate?: boolean
       }
@@ -566,12 +581,14 @@ function isProtocolHelloResult(value: unknown): value is ProtocolHelloResult {
     isFiniteNumber(value.maxVersion) &&
     isFiniteNumber(value.selectedVersion) &&
     isString(value.processVersion) &&
+    (value.appVersion === undefined || isString(value.appVersion)) &&
     // Wire-back-compat: peers that predate the capabilities field omit it
     // entirely. parseServerMessage normalises that to `[]` before the cast
     // so the typed shape stays non-optional.
     (value.capabilities === undefined || isStringArray(value.capabilities)) &&
     // Additive: peers that predate managerSelectedVersion omit it.
-    (value.managerSelectedVersion === undefined || isFiniteNumber(value.managerSelectedVersion))
+    (value.managerSelectedVersion === undefined || isFiniteNumber(value.managerSelectedVersion)) &&
+    (value.managerCapabilities === undefined || isStringArray(value.managerCapabilities))
   )
 }
 
@@ -592,6 +609,7 @@ function isTabSessionSummary(value: unknown): value is TabSessionSummary {
       value.activity === 'idle') &&
     isString(value.command) &&
     (value.worktreeId === undefined || isString(value.worktreeId)) &&
+    (value.workerName === undefined || isString(value.workerName)) &&
     (value.lastLine === undefined || isString(value.lastLine))
   )
 }
@@ -627,6 +645,7 @@ function isTabSession(value: unknown): value is TabSession {
     isString(value.buffer) &&
     isTerminalModeState(value.terminalModes) &&
     isString(value.command) &&
+    (value.workerName === undefined || isString(value.workerName)) &&
     (value.autoRenameStatus === undefined ||
       value.autoRenameStatus === 'eligible' ||
       value.autoRenameStatus === 'attempted') &&
@@ -735,6 +754,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(
         value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
         'createTab.worktreeId must be a string when present'
+      )
+      assert(
+        value.payload.workerName === undefined || isString(value.payload.workerName),
+        'createTab.workerName must be a string when present'
       )
       assert(
         value.payload.autoRenameCandidate === undefined ||

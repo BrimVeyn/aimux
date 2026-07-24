@@ -59,6 +59,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      workerName: tab.workerName,
       worktreeId: tab.worktreeId,
     })),
     version: 1,
@@ -124,6 +125,7 @@ export function restoreTabsFromWorkspace(
       terminalModes: tab.terminalModes,
       title: tab.title,
       viewport: tab.viewport,
+      workerName: tab.workerName,
       worktreeId: tab.worktreeId,
     }))
   return pruneOrphanedTabs(restored, options.validWorktreeIds)

@@ -94,6 +94,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
             existing.autoRenameStatus = persisted.autoRenameStatus
           }
           existing.worktreeId = persisted.worktreeId
+          existing.workerName = persisted.workerName
         }
       }
       if (
@@ -155,6 +156,8 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
      * worktree column. Optional — tabs not bound to a worktree are valid.
      */
     worktreeId?: string
+    /** Workspace-scoped orchestration handle; does not affect PTY behavior. */
+    workerName?: string
   }): void {
     logDebug('daemon.registry.createSession', {
       args: options.args ?? [],
@@ -175,6 +178,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         status: 'starting',
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
+        workerName: options.workerName,
         worktreeId: options.worktreeId,
       })
     } else {
@@ -189,6 +193,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
       existing.autoRenameStatus = options.autoRenameStatus
       if (options.worktreeId !== undefined) existing.worktreeId = options.worktreeId
+      if (options.workerName !== undefined) existing.workerName = options.workerName
     }
 
     this.activeTabId = options.tabId

@@ -135,8 +135,24 @@ export class DaemonClient {
     return this.hello.capabilities
   }
 
+  getAppVersion(): string | null {
+    return this.hello.appVersion ?? null
+  }
+
   getSelectedVersion(): number {
     return this.hello.selectedVersion
+  }
+
+  getProcessVersion(): string {
+    return this.hello.processVersion
+  }
+
+  getManagerCapabilities(): readonly string[] {
+    return this.hello.managerCapabilities ?? []
+  }
+
+  getManagerSelectedVersion(): number | null {
+    return this.hello.managerSelectedVersion ?? null
   }
 
   private async send(request: ClientRequest): Promise<ServerResponse> {

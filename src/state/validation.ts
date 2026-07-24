@@ -153,6 +153,7 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode)) &&
         (tab.worktreeId === undefined || isString(tab.worktreeId)) &&
+        (tab.workerName === undefined || isString(tab.workerName)) &&
         (tab.autoRenameStatus === undefined ||
           tab.autoRenameStatus === 'eligible' ||
           tab.autoRenameStatus === 'attempted')

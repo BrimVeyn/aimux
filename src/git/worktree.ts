@@ -33,6 +33,14 @@ export async function getHeadSha(cwd: string): Promise<string | undefined> {
   return result.text().trim() || undefined
 }
 
+export async function isGitWorktreeDirty(cwd: string): Promise<boolean> {
+  const result = await $`git -C ${cwd} status --porcelain`.quiet().nothrow()
+  if (result.exitCode !== 0) {
+    throw new Error(result.stderr.toString().trim() || `failed to inspect worktree: ${cwd}`)
+  }
+  return result.text().trim().length > 0
+}
+
 // Local branch names, ordered most-recently-committed first so the likely base
 // surfaces near the top of the picker.
 export async function listLocalBranches(cwd: string): Promise<string[]> {
