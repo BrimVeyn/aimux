@@ -7,7 +7,7 @@ import { EXIT_OK, writeJson } from '../../output'
 import { resolveWorkerTab, WORKER_SCHEMA_VERSION, workerView } from './shared'
 
 export const workerStop: CliCommand = {
-  args: [{ name: 'worker', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'worker' }, name: 'worker', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {

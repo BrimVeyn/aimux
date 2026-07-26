@@ -9,10 +9,11 @@ import { EXIT_OK, EXIT_TIMEOUT, writeJson } from '../../output'
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000
 
 export const workspaceCreate: CliCommand = {
-  args: [{ name: 'name', required: true }],
+  args: [{ complete: { kind: 'none' }, name: 'name', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {
+      complete: { kind: 'file' },
       description: 'project path to associate with the workspace',
       kind: 'string',
       name: 'project',

@@ -1,16 +1,20 @@
 #!/usr/bin/env bun
-import { runDaemon } from './daemon/daemon'
-import { getRuntimeProfile } from './daemon/runtime-paths'
-import { logDebug } from './debug/input-log'
-import { runDoctor } from './doctor'
-import { runRestartDaemon } from './restart-daemon'
-import { runRestartTerminalManager } from './restart-terminal-manager'
-import { createSessionBackend } from './session-backend/bootstrap'
-import { runTerminalManager } from './terminal-manager/terminal-manager'
-import { runUpdate } from './update'
-
+// Every branch below imports dynamically ON PURPOSE. Static imports here would
+// be paid by every invocation — including `aimux __complete`, which runs on
+// each TAB press and must stay well under a keystroke's worth of latency.
 const command = process.argv[2]
-const runtimeProfile = getRuntimeProfile()
+
+// Shell completion. First branch and cheapest: it loads the CLI registry and
+// nothing else — no daemon client, no session backend, no renderer.
+if (command === '__complete') {
+  const { runComplete } = await import('./cli/completion/entry')
+  process.exit(await runComplete(process.argv.slice(3)))
+}
+
+if (command === 'completion') {
+  const { runCompletion } = await import('./cli/completion/entry')
+  process.exit(runCompletion(process.argv.slice(3)))
+}
 
 // CLI control plane (docs/reference/cli.md). Branch BEFORE the UI bootstrap so
 // `aimux tab list` from a non-TTY shell never spins up the React renderer.
@@ -28,28 +32,38 @@ if (command === '--version' || command === '-v' || command === 'version') {
 }
 
 if (command === 'doctor' || command === '--doctor') {
+  const { runDoctor } = await import('./doctor')
   process.exit(runDoctor())
 }
 
 if (command === 'restart-daemon') {
+  const { runRestartDaemon } = await import('./restart-daemon')
   process.exit(await runRestartDaemon())
 }
 
 if (command === 'restart-terminal-manager') {
+  const { runRestartTerminalManager } = await import('./restart-terminal-manager')
   process.exit(await runRestartTerminalManager())
 }
 
 if (command === 'update') {
+  const { runUpdate } = await import('./update')
   process.exit(await runUpdate())
 }
 
+const { logDebug } = await import('./debug/input-log')
+const { getRuntimeProfile } = await import('./daemon/runtime-paths')
+const runtimeProfile = getRuntimeProfile()
+
 if (command === 'daemon') {
   logDebug('index.daemonMode', { runtimeProfile })
+  const { runDaemon } = await import('./daemon/daemon')
   await runDaemon()
 }
 
 if (command === 'terminal-manager') {
   logDebug('index.terminalManagerMode', { runtimeProfile })
+  const { runTerminalManager } = await import('./terminal-manager/terminal-manager')
   await runTerminalManager()
 }
 
@@ -65,6 +79,8 @@ const [
   { loadUserConfig },
   { BreakingUpdateScreen },
   { setHostPalette },
+  { createSessionBackend },
+  { maybeAutoInstallCompletion },
 ] = await Promise.all([
   import('@opentui/core'),
   import('@opentui/react'),
@@ -72,8 +88,16 @@ const [
   import('./config/loader'),
   import('./ui/breaking-update-screen'),
   import('./ui/host-palette'),
+  import('./session-backend/bootstrap'),
+  import('./cli/completion/install'),
 ])
 const resolvedConfig = await loadUserConfig()
+
+// First launch (and after every upgrade): drop the shell completion script in
+// the conventional location for $SHELL. Silent and best-effort — it writes one
+// file, never a dotfile, and never blocks the TUI. Opt out with
+// AIMUX_NO_COMPLETION_INSTALL=1; `aimux doctor` reports what landed where.
+maybeAutoInstallCompletion()
 
 const renderer = await createCliRenderer({
   autoFocus: true,

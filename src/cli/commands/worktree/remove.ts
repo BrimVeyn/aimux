@@ -9,7 +9,7 @@ import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
 export const worktreeRemove: CliCommand = {
-  args: [{ name: 'worktree', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'worktree' }, name: 'worktree', required: true }],
   flags: [
     ...SHARED_FLAGS,
     { description: 'pass --force to git worktree remove', kind: 'boolean', name: 'force' },

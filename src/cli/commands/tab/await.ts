@@ -27,7 +27,7 @@ import { awaitTurn, DEFAULT_TIMEOUT_MS, type TurnOutcome, turnOutcomeExitCode } 
 const QUESTION_TAIL_LINES = 25
 
 export const tabAwait: CliCommand = {
-  args: [{ name: 'tabId', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {

@@ -12,10 +12,11 @@ function isTabActivity(value: string): value is TabActivity {
 }
 
 export const tabWait: CliCommand = {
-  args: [{ name: 'tabId', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {
+      complete: { kind: 'values', values: ['idle', 'waiting-input', 'working'] },
       description: 'target activity (idle | working | waiting-input)',
       kind: 'string',
       name: 'status',

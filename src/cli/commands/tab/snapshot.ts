@@ -9,11 +9,12 @@ import { snapshotTailLines, snapshotToLines } from '../../snapshot-render'
 const RENDER_WAIT_MS = 500
 
 export const tabSnapshot: CliCommand = {
-  args: [{ name: 'tabId', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true }],
   flags: [
     ...SHARED_FLAGS,
     { description: 'return only the last N non-blank lines', kind: 'number', name: 'tail' },
     {
+      complete: { kind: 'values', values: ['json', 'text'] },
       description: 'output format: json (default) or text (raw screen dump)',
       kind: 'string',
       name: 'format',

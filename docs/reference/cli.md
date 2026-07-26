@@ -75,12 +75,52 @@ when refreshing the app-facing runtime — PTYs survive.
 
 Restarts the long-lived terminal manager. Destructive: every live PTY dies.
 
+### `aimux completion`
+
+Shell tab completion for bash, zsh, and fish.
+
+```
+aimux completion install            # write the script for the detected shell
+aimux completion install --shell zsh
+aimux completion zsh > ~/.zfunc/_aimux   # or print it and place it yourself
+```
+
+**You normally never run this.** The first time the TUI starts (and again
+after every upgrade) aimux writes the script for `$SHELL` into the
+conventional location:
+
+| Shell | Path                                                                                         |
+| ----- | -------------------------------------------------------------------------------------------- |
+| bash  | `$XDG_DATA_HOME/bash-completion/completions/aimux`                                           |
+| zsh   | first writable `$fpath` entry under `$HOME`, else `$XDG_DATA_HOME/zsh/site-functions/_aimux` |
+| fish  | `$XDG_CONFIG_HOME/fish/completions/aimux.fish`                                               |
+
+Auto-install writes exactly one file and never edits a dotfile. If the zsh
+directory it picked isn't on your `$fpath`, `aimux doctor` prints the single
+line to add to `~/.zshrc`. Set `AIMUX_NO_COMPLETION_INSTALL=1` to opt out
+entirely.
+
+Completion covers groups, verbs, flag names (minus the ones already on the
+line), fixed value vocabularies (`--status`, `--format`), assistant ids, and
+workspaces. Path-taking flags (`--prompt-file`, `--cwd`, `--project`) hand off
+to the shell's own filename completion.
+
+Flags:
+
+| Flag                        | Meaning                                                                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `--shell <bash\|zsh\|fish>` | Override `$SHELL` detection when installing.                                                                                   |
+| `--command <invocation>`    | What the script should invoke. Point it at a checkout to test a dev build: `--command "bun run /path/to/aimux/src/index.tsx"`. |
+
 ### Hidden internal commands
 
 Used by the runtime itself, not typical user entrypoints:
 
 - `aimux daemon`
 - `aimux terminal-manager`
+- `aimux __complete --cword <n> -- <words…>` — resolves one TAB press. Prints
+  `value<TAB>description` lines plus a trailing `:list` / `:files` / `:none`
+  directive, and always exits `0`: a shell is listening, not a human.
 
 ## Headless Control Plane
 

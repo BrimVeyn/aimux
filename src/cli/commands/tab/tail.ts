@@ -21,7 +21,7 @@ function toCursor(snapshot: TerminalSnapshot): Cursor {
 }
 
 export const tabTail: CliCommand = {
-  args: [{ name: 'tabId', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {

@@ -20,10 +20,18 @@ import { awaitTurn, DEFAULT_TIMEOUT_MS, turnOutcomeExitCode } from './await-turn
 import { buildPromptPayload, resolvePromptText, writePromptPayload } from './prompt-io'
 
 export const tabRun: CliCommand = {
-  args: [{ name: 'tabId', required: true }, { name: 'text' }],
+  args: [
+    { complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true },
+    { complete: { kind: 'none' }, name: 'text' },
+  ],
   flags: [
     ...SHARED_FLAGS,
-    { description: 'read the prompt from this file', kind: 'string', name: 'prompt-file' },
+    {
+      complete: { kind: 'file' },
+      description: 'read the prompt from this file',
+      kind: 'string',
+      name: 'prompt-file',
+    },
     { description: 'read the prompt from stdin', kind: 'boolean', name: 'stdin' },
     {
       description: 'overall turn cap in milliseconds (default 900000 = 15 min)',

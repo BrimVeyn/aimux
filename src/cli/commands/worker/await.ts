@@ -12,7 +12,7 @@ import {
 } from './shared'
 
 export const workerAwait: CliCommand = {
-  args: [{ name: 'worker', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'worker' }, name: 'worker', required: true }],
   flags: [
     ...SHARED_FLAGS,
     { description: 'overall turn cap in milliseconds', kind: 'number', name: 'timeout' },

@@ -5,7 +5,7 @@ import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
 export const tabClose: CliCommand = {
-  args: [{ name: 'tabId', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true }],
   flags: SHARED_FLAGS,
   group: 'tab',
   run: async (ctx) => {

@@ -6,7 +6,7 @@ import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
 export const workspaceClose: CliCommand = {
-  args: [{ name: 'workspace', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'workspace' }, name: 'workspace', required: true }],
   flags: SHARED_FLAGS,
   group: 'workspace',
   run: async (ctx) => {

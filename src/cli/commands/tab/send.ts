@@ -9,7 +9,10 @@ import { buildPromptPayload, writePromptPayload } from './prompt-io'
 const DEFAULT_AWAIT_TIMEOUT_MS = 15_000
 
 export const tabSend: CliCommand = {
-  args: [{ name: 'tabId', required: true }, { name: 'text' }],
+  args: [
+    { complete: { kind: 'dynamic', source: 'tab' }, name: 'tabId', required: true },
+    { complete: { kind: 'none' }, name: 'text' },
+  ],
   flags: [
     ...SHARED_FLAGS,
     { description: 'append \\r so the receiving CLI submits', kind: 'boolean', name: 'enter' },
@@ -24,6 +27,7 @@ export const tabSend: CliCommand = {
       name: 'stdin',
     },
     {
+      complete: { kind: 'file' },
       description: 'read the payload from this file instead of <text>',
       kind: 'string',
       name: 'prompt-file',

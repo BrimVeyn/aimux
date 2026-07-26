@@ -36,6 +36,12 @@ bun install -g @brimveyn/aimux
 
 Requires [Bun](https://bun.sh).
 
+Shell completion (bash, zsh, fish) installs itself the first time you launch
+the TUI — one file in your shell's completions directory, no dotfile edits.
+Run `aimux doctor` to see where it landed, or
+`aimux completion install --shell zsh` to place it yourself. Opt out with
+`AIMUX_NO_COMPLETION_INSTALL=1`. See [docs/reference/cli.md](docs/reference/cli.md#aimux-completion).
+
 ## Quick Start
 
 Create the default profile and install the typed config package into it:

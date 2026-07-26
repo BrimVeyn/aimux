@@ -107,6 +107,10 @@ function printHelp(): void {
       'Maintenance:',
       '  aimux doctor | update | restart-daemon | restart-terminal-manager | version',
       '',
+      'Shell completion:',
+      '  Installed automatically on first launch (AIMUX_NO_COMPLETION_INSTALL=1 opts out).',
+      '  aimux completion install | aimux completion <bash|zsh|fish>',
+      '',
     ].join('\n')
   )
 }

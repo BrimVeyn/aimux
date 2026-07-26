@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 
+import { completionStatus } from './cli/completion/install'
 import { getConfigPath, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
 
@@ -72,6 +73,9 @@ export function buildDoctorReport(): DoctorReport {
     name: 'config',
     ok: configResult.issues.length === 0,
   })
+
+  const completion = completionStatus()
+  checks.push({ details: completion.detail, name: 'completion', ok: completion.ok })
 
   for (const option of ASSISTANT_OPTIONS) {
     const configuredCommand = config.customCommands[option.id] ?? option.command

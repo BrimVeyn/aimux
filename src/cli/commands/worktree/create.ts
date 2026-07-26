@@ -8,9 +8,24 @@ export const worktreeCreate: CliCommand = {
   args: [],
   flags: [
     ...SHARED_FLAGS,
-    { description: 'display name for the new worktree', kind: 'string', name: 'name' },
-    { description: 'branch name (defaults to aimux/<name>)', kind: 'string', name: 'branch' },
-    { description: 'base ref for the branch (defaults to HEAD)', kind: 'string', name: 'base' },
+    {
+      complete: { kind: 'none' },
+      description: 'display name for the new worktree',
+      kind: 'string',
+      name: 'name',
+    },
+    {
+      complete: { kind: 'none' },
+      description: 'branch name (defaults to aimux/<name>)',
+      kind: 'string',
+      name: 'branch',
+    },
+    {
+      complete: { kind: 'dynamic', source: 'git-ref' },
+      description: 'base ref for the branch (defaults to HEAD)',
+      kind: 'string',
+      name: 'base',
+    },
   ],
   group: 'worktree',
   run: async (ctx) => {

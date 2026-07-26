@@ -14,22 +14,39 @@ import {
 } from './shared'
 
 export const workerRun: CliCommand = {
-  args: [{ name: 'text' }],
+  args: [{ complete: { kind: 'none' }, name: 'text' }],
   flags: [
     ...SHARED_FLAGS,
-    { description: 'unique workspace-scoped worker name', kind: 'string', name: 'name' },
     {
+      complete: { kind: 'none' },
+      description: 'unique workspace-scoped worker name',
+      kind: 'string',
+      name: 'name',
+    },
+    {
+      complete: { kind: 'dynamic', source: 'assistant' },
       description: 'assistant id (claude, codex, opencode, ...)',
       kind: 'string',
       name: 'assistant',
     },
-    { description: 'model passed through to the assistant', kind: 'string', name: 'model' },
     {
+      complete: { kind: 'none' },
+      description: 'model passed through to the assistant',
+      kind: 'string',
+      name: 'model',
+    },
+    {
+      complete: { kind: 'none' },
       description: 'reasoning effort passed through to the assistant',
       kind: 'string',
       name: 'effort',
     },
-    { description: 'read the prompt from this file', kind: 'string', name: 'prompt-file' },
+    {
+      complete: { kind: 'file' },
+      description: 'read the prompt from this file',
+      kind: 'string',
+      name: 'prompt-file',
+    },
     { description: 'read the prompt from stdin', kind: 'boolean', name: 'stdin' },
     {
       description: 'return after prompt uptake instead of turn completion',
@@ -37,14 +54,25 @@ export const workerRun: CliCommand = {
       name: 'detach',
     },
     { description: 'overall turn cap in milliseconds', kind: 'number', name: 'timeout' },
-    { description: 'co-locate in an existing worktree id', kind: 'string', name: 'worktree' },
+    {
+      complete: { kind: 'dynamic', source: 'worktree' },
+      description: 'co-locate in an existing worktree id',
+      kind: 'string',
+      name: 'worktree',
+    },
     {
       description: 'run in the workspace active worktree instead of creating one',
       kind: 'boolean',
       name: 'no-worktree',
     },
-    { description: 'base ref for the fresh worktree (default HEAD)', kind: 'string', name: 'base' },
     {
+      complete: { kind: 'dynamic', source: 'git-ref' },
+      description: 'base ref for the fresh worktree (default HEAD)',
+      kind: 'string',
+      name: 'base',
+    },
+    {
+      complete: { kind: 'none' },
       description: 'branch for the fresh worktree (default aimux/<name>)',
       kind: 'string',
       name: 'branch',

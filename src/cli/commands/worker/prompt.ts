@@ -13,10 +13,18 @@ import {
 } from './shared'
 
 export const workerPrompt: CliCommand = {
-  args: [{ name: 'worker', required: true }, { name: 'text' }],
+  args: [
+    { complete: { kind: 'dynamic', source: 'worker' }, name: 'worker', required: true },
+    { complete: { kind: 'none' }, name: 'text' },
+  ],
   flags: [
     ...SHARED_FLAGS,
-    { description: 'read the prompt from this file', kind: 'string', name: 'prompt-file' },
+    {
+      complete: { kind: 'file' },
+      description: 'read the prompt from this file',
+      kind: 'string',
+      name: 'prompt-file',
+    },
     { description: 'read the prompt from stdin', kind: 'boolean', name: 'stdin' },
     {
       description: 'return after prompt uptake instead of turn completion',

@@ -5,7 +5,7 @@ import { EXIT_OK, writeJson } from '../../output'
 import { listNamedWorkerTabs, resolveWorkerTab, WORKER_SCHEMA_VERSION, workerView } from './shared'
 
 export const workerList: CliCommand = {
-  args: [{ name: 'worker' }],
+  args: [{ complete: { kind: 'dynamic', source: 'worker' }, name: 'worker' }],
   flags: SHARED_FLAGS,
   group: 'worker',
   run: async (ctx) => {

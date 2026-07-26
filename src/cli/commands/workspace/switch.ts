@@ -8,7 +8,7 @@ import { EXIT_OK, EXIT_TIMEOUT, writeJson } from '../../output'
 const DEFAULT_WAIT_TIMEOUT_MS = 30_000
 
 export const workspaceSwitch: CliCommand = {
-  args: [{ name: 'workspace', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'workspace' }, name: 'workspace', required: true }],
   flags: [
     ...SHARED_FLAGS,
     {
