@@ -176,7 +176,9 @@ See [`docs/reference/cli.md`](docs/reference/cli.md) for behavior details.
 
 For agent orchestration, prefer the named `aimux worker` commands. They combine
 isolated worktree creation, prompt dispatch, authoritative turn waiting, fleet
-inspection, and guarded cleanup without shell wrappers or `jq`.
+inspection, and guarded cleanup without shell wrappers or `jq`. Pin the target
+with `--workspace` (or `AIMUX_WORKSPACE`) for anything long-running: the default
+follows whichever workspace the UI opened last.
 
 ## Runtime Model
 

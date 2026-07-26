@@ -1,13 +1,14 @@
 import type { SessionRecord, WorktreeRecord } from '../../../state/types'
 import type { DaemonClient } from '../../client/daemon-client'
 
-import { createGitWorktree, removeGitWorktree } from '../../../git/worktree'
+import { createGitWorktree, removeGitWorktree, resolveGitRef } from '../../../git/worktree'
 import { IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
   assertSafeAimuxWorktreePath,
   ensureAimuxWorktreeRoot,
   makeWorktreePath,
+  pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
 
 export interface CreateWorktreeParams {
@@ -47,6 +48,17 @@ export async function createWorkspaceWorktree(
     )
   }
 
+  // Verify the base ref in the REPO WE ARE ABOUT TO USE, before touching disk.
+  // The workspace decides the repo, so a caller who believes it is orchestrating
+  // project A while the resolved workspace points at project B would otherwise
+  // get either a confusing bare git error or — when the ref exists in both repos
+  // — a silent success in the wrong project.
+  if ((await resolveGitRef(primary.repoRoot, base)) === undefined) {
+    throw new Error(
+      `base ref "${base}" does not exist in ${primary.repoRoot} (workspace "${workspace.name}") — check that this is the repository you meant`
+    )
+  }
+
   const worktreeId = createPrefixedId('worktree')
   const targetPath = makeWorktreePath({
     repoRoot: primary.repoRoot,
@@ -56,12 +68,19 @@ export async function createWorkspaceWorktree(
   await ensureAimuxWorktreeRoot()
   await assertSafeAimuxWorktreePath(targetPath)
 
-  await createGitWorktree({
-    baseRef: base,
-    branchName: branch,
-    repoPath: primary.repoRoot,
-    targetPath,
-  })
+  try {
+    await createGitWorktree({
+      baseRef: base,
+      branchName: branch,
+      repoPath: primary.repoRoot,
+      targetPath,
+    })
+  } catch (error) {
+    // `assertSafeAimuxWorktreePath` had to mkdir the repo-scoped parent for git;
+    // a failed creation must not leave that directory behind.
+    await pruneEmptyWorktreeParent(targetPath)
+    throw error
+  }
 
   const now = new Date().toISOString()
   const record: WorktreeRecord = {
@@ -85,6 +104,7 @@ export async function createWorkspaceWorktree(
     // errors: report the original failure, the real problem to surface.
     try {
       await removeGitWorktree({ force: true, repoPath: primary.repoRoot, targetPath })
+      await pruneEmptyWorktreeParent(targetPath)
     } catch {
       // Best-effort rollback; leave the git-side worktree if it can't be removed
       // cleanly. `worktree list` will flag it as gitTracked with no catalog.

@@ -12,13 +12,21 @@ Own the plan and quality gate. Let aimux own worker transport and lifecycle.
 Run once:
 
 ```bash
-aimux worker doctor
+aimux worker doctor --workspace <target>
 aimux worker --help
 ```
 
 Stop if the doctor reports missing worker capabilities, the wrong workspace, or
 an unavailable assistant. Restart/update aimux as instructed; do not fall back
 to screen scraping or the legacy shell wrappers.
+
+**Pin the workspace and verify the repo before dispatching anything.** Without
+`--workspace` (or `AIMUX_WORKSPACE`) aimux targets whichever workspace the UI
+opened last, and that can change under you mid-run — including to a different
+project. Check `checks.workspace.repoRoot` in the doctor output against the
+repository you mean, then pass `--workspace <id|name>` on **every** call (all
+examples below do). Every worker response echoes `workspace.repoRoot`; read it on
+the first dispatch instead of assuming.
 
 ## Orchestration loop
 
@@ -29,19 +37,20 @@ to screen scraping or the legacy shell wrappers.
 
 ```bash
 aimux worker run \
+  --workspace <target> \
   --name feat-auth \
   --assistant claude \
   --prompt-file /tmp/feat-auth.md \
   --detach
 ```
 
-5. Inspect the fleet with `aimux worker list`.
-6. Await a detached worker with `aimux worker await feat-auth`.
+5. Inspect the fleet with `aimux worker list --workspace <target>`.
+6. Await a detached worker with `aimux worker await feat-auth --workspace <target>`.
 7. If a worker asks a question, answer only when the plan already determines the
    answer:
 
 ```bash
-aimux worker prompt feat-auth --prompt-file /tmp/answer.md
+aimux worker prompt feat-auth --workspace <target> --replace --prompt-file /tmp/answer.md
 ```
 
 Escalate design choices, irreversible operations, deployments, pushes,
@@ -54,8 +63,31 @@ migrations, spending, and external communication to the human.
 10. After integration, close and clean up:
 
 ```bash
-aimux worker stop feat-auth --cleanup-worktree
+aimux worker stop feat-auth --workspace <target> --cleanup-worktree
 ```
+
+## Dispatch failure modes
+
+Read these before the first dispatch; each one otherwise reads as a lost fleet.
+
+- **`status: "pending-submit"` (exit 11)** — the prompt is sitting unsubmitted in
+  the worker's composer. The worker is alive and healthy. Recover with
+  `aimux worker submit <name> --workspace <target>`; never re-dispatch, which
+  would double the fleet onto the same branches. Widen the confirmation window
+  with `--uptake-timeout <ms>` for slow-booting assistants.
+- **An empty `worker list`** — read the `workspace` field in the response. An
+  empty fleet in the wrong workspace is not a dead fleet. Add
+  `--all-workspaces` to answer "are they really gone?" in one call;
+  `git worktree list` in the target repo is the on-disk cross-check.
+- **Composer contamination** — a human typing in a worker's tab leaves text that
+  `worker prompt` would append to, merging both into one incoherent instruction.
+  Use `--replace` (clears with `<C-u>`) for every correction, and
+  `aimux tab snapshot <tabId>` when a worker's behaviour doesn't match the
+  prompt you believe you sent.
+- **Fresh worktrees are not provisioned** — a new worktree has no installed
+  dependencies and no generated files. Every dispatch prompt must tell the worker
+  to bootstrap before running any gate (see `references/prompts.md`), or it will
+  report environment failures as its own.
 
 ## Isolation
 
@@ -78,6 +110,8 @@ may overlap or scope is uncertain.
 - Prefer `--prompt-file` for multiline prompts; it avoids shell quoting hazards.
 - Use `--detach` for parallel launch. Without it, `worker run` waits and returns
   a completed/question/timeout/error outcome.
+- Pass `--workspace` on every call, and confirm the `repoRoot` the first response
+  reports is the repository you intend to change.
 
 ## Quality and safety
 

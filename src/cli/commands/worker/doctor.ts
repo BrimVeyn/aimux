@@ -18,6 +18,11 @@ import {
   isCommandAvailable,
   parseCommand,
 } from '../../../pty/command-registry'
+import {
+  findPrimaryWorktree,
+  WORKSPACE_ENV_VAR,
+  workspaceRepoRoot,
+} from '../../client/workspace-resolver'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeJson } from '../../output'
 import { WORKER_SCHEMA_VERSION } from './shared'
@@ -56,7 +61,8 @@ export const workerDoctor: CliCommand = {
     const missingManagerCapabilities = [MANAGER_CAPABILITY_WORKER_METADATA].filter(
       (capability) => !managerCapabilities.includes(capability)
     )
-    const primaryWorktree = workspace.worktrees?.find((worktree) => worktree.source === 'primary')
+    const primaryWorktree = findPrimaryWorktree(workspace)
+    const workspaceOrigin = ctx.getWorkspaceOrigin?.() ?? 'active'
     const availableAssistants = assistants.filter((assistant) => assistant.available)
     const skillPath = fileURLToPath(
       new URL('../../../../skills/aimux-orchestrator/', import.meta.url)
@@ -81,6 +87,16 @@ export const workerDoctor: CliCommand = {
     if (!existsSync(skillPath)) {
       issues.push(`packaged orchestrator skill is missing: ${skillPath}`)
     }
+    // Not an issue — an inferred workspace is the normal interactive case — but
+    // it IS the one resolution mode that can follow the UI to another project
+    // between two calls. An orchestrator dispatching a multi-hour fleet wants to
+    // see this before it starts, not after it reviews diffs from the wrong repo.
+    const warnings: string[] = []
+    if (workspaceOrigin === 'active') {
+      warnings.push(
+        `workspace "${workspace.name}" was inferred from the most recently opened session and follows the UI; pin it with --workspace or ${WORKSPACE_ENV_VAR}`
+      )
+    }
     const ready = issues.length === 0
     writeJson({
       assistants,
@@ -100,7 +116,12 @@ export const workerDoctor: CliCommand = {
         skill: { ok: existsSync(skillPath), path: skillPath },
         workspace: {
           hasPrimaryWorktree: primaryWorktree !== undefined,
+          name: workspace.name,
           ok: primaryWorktree !== undefined,
+          /** Repo every fresh worker worktree is cut from — confirm before dispatching. */
+          repoRoot: workspaceRepoRoot(workspace),
+          /** 'flag' | 'env' | 'active'; only 'active' can follow the UI. */
+          source: workspaceOrigin,
         },
       },
       cliVersion: version,
@@ -116,10 +137,13 @@ export const workerDoctor: CliCommand = {
       ready,
       schemaVersion: WORKER_SCHEMA_VERSION,
       skillPath,
+      warnings,
       workspace: {
         id: workspace.id,
         name: workspace.name,
         projectPath: workspace.projectPath ?? null,
+        repoRoot: workspaceRepoRoot(workspace),
+        source: workspaceOrigin,
       },
     })
     return ready ? EXIT_OK : EXIT_RUNTIME

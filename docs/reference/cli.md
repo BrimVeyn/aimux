@@ -20,23 +20,33 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 
 ## Exit Codes
 
-| Code  | Meaning                                                             |
-| ----- | ------------------------------------------------------------------- |
-| `0`   | Success                                                             |
-| `2`   | Usage error (bad flags, missing required argument)                  |
-| `3`   | Runtime error (tab crashed, git refused a worktree operation, …)    |
-| `4`   | Daemon unreachable — socket missing, spawn failed, no handshake     |
-| `10`  | `tab run` / `tab await`: worker is blocked on a question/permission |
-| `124` | `--timeout` expired before the awaited event arrived                |
+| Code  | Meaning                                                                                                    |
+| ----- | ---------------------------------------------------------------------------------------------------------- |
+| `0`   | Success                                                                                                    |
+| `2`   | Usage error (bad flags, missing required argument)                                                         |
+| `3`   | Runtime error (tab crashed, git refused a worktree operation, …)                                           |
+| `4`   | Daemon unreachable — socket missing, spawn failed, no handshake                                            |
+| `10`  | `tab run` / `tab await`: worker is blocked on a question/permission                                        |
+| `11`  | `worker run/prompt --detach`: prompt is in the composer but no turn started (recover with `worker submit`) |
+| `124` | `--timeout` expired before the awaited event arrived                                                       |
 
 ## Shared Flags
 
 Every headless command accepts:
 
-| Flag                     | Meaning                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------- |
-| `--workspace <name\|id>` | Target workspace. Defaults to the catalog entry with the newest `lastOpenedAt`. |
-| `--profile <name>`       | Override `AIMUX_PROFILE` for this invocation.                                   |
+| Flag                     | Meaning                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `--workspace <name\|id>` | Target workspace. Falls back to `AIMUX_WORKSPACE`, then to the catalog entry with the newest `lastOpenedAt`. |
+| `--profile <name>`       | Override `AIMUX_PROFILE` for this invocation.                                                                |
+
+**Pin the workspace for anything long-running.** The default ("newest
+`lastOpenedAt`") follows the UI: switching workspaces in the TUI changes what a
+later CLI call resolves to, so a fleet dispatched without a pin can end up
+cutting worktrees in a different repository. Pass `--workspace` per call or
+export `AIMUX_WORKSPACE=<name|id>` once. Every `worker` command echoes the
+resolved `workspace: { id, name, repoRoot }` so the target is verifiable from
+the output, and `worker doctor` reports `workspace.source`
+(`flag` | `env` | `active`).
 
 ## TUI + Local Install
 
@@ -135,27 +145,72 @@ agents. It composes the lower-level tab and worktree primitives, gives each
 worker a stable workspace-scoped name, and returns `schemaVersion: 1` envelopes.
 
 ```
-aimux worker run --name auth --assistant claude --prompt-file /tmp/auth.md
-aimux worker run --name api --assistant codex --stdin --detach
-aimux worker prompt auth --prompt-file /tmp/correction.md
+aimux worker run --workspace repo --name auth --assistant claude --prompt-file /tmp/auth.md
+aimux worker run --workspace repo --name api --assistant codex --stdin --detach
+aimux worker prompt auth --prompt-file /tmp/correction.md [--replace]
+aimux worker submit auth
 aimux worker await api
-aimux worker list [name|tab-id]
+aimux worker list [name|tab-id] [--all-workspaces]
 aimux worker stop auth [--cleanup-worktree] [--force]
 aimux worker doctor
 ```
 
+Every envelope carries `workspace: { id, name, repoRoot }` alongside the worker,
+and each worker view carries its own `repoRoot` — the repository the worktree was
+cut from.
+
 `worker run` creates a fresh worktree by default. Use `--worktree <id>` to
 co-locate intentionally or `--no-worktree` to use the active worktree. Without
 `--detach`, it waits for a completed/question/timeout/error outcome. With
-`--detach`, it returns after prompt uptake is confirmed.
+`--detach`, it returns after prompt uptake is confirmed. The base ref is verified
+in the resolved repository first, so a ref that does not exist there fails with
+the repo path named rather than a bare `not a valid object name`.
+
+#### Detached uptake
+
+With `--detach`, dispatch waits for the tab's first paint before writing (a
+still-booting TUI buffers the payload but drops the submitting `\r`), then waits
+for the `working` transition. If none arrives it re-checks the live activity,
+sends one more `\r`, and waits again. Outcomes:
+
+- `status: "dispatched"` — uptake confirmed. `uptake.resubmits` says whether the
+  retry was needed.
+- `status: "pending-submit"` (exit `11`) — the prompt is sitting in the composer
+  unsubmitted. The worker is healthy; recover with `aimux worker submit <name>`,
+  do **not** re-dispatch.
+
+`--uptake-timeout <ms>` widens the confirmation window (default 15000). It is
+independent of `--timeout`, which caps the turn itself.
+
+`worker submit <name>` submits whatever is already in a worker's composer and
+blocks until the turn starts — the awaitable form of
+`tab send <tab> "<CR>" --keys`.
+
+`worker prompt --replace` clears the composer (`<C-u>`) before writing. Use it
+whenever a human may have typed into the worker's tab: without it the write is
+appended to whatever is already there, concatenating both into one instruction.
+
+`worker list` always reports the `workspace` it queried, so an empty `workers`
+array reads as "none here" rather than "the fleet died".
+`worker list --all-workspaces` answers "are my workers really gone?" in one call
+and labels each worker with its owning workspace.
+
+Addressing a worker by name keeps working when the active workspace moves: if the
+name isn't in the resolved workspace, aimux searches the catalog and binds to the
+workspace that actually owns it. With an explicit `--workspace` /
+`AIMUX_WORKSPACE` the pin is respected, but the error names the workspace that
+does hold the worker.
 
 `worker stop --cleanup-worktree` removes only aimux-created, unshared
 worktrees. Dirty worktrees require `--force`; primary and external worktrees are
-never removed by this command.
+never removed by this command. It works headlessly (no attached UI required);
+tab-close and worktree-removal are reported independently (`closed`,
+`closeError`, `worktreeRemoved`) so a failure in one never strands the other.
 
 `worker doctor` reports the client version, negotiated daemon protocol and
-capabilities, available assistants, model/effort controls, workspace, and the
-packaged orchestrator skill path.
+capabilities, available assistants, model/effort controls, workspace (including
+`source` and `repoRoot`), non-fatal `warnings`, and the packaged orchestrator
+skill path.
 
 ### Tab commands
 
@@ -218,7 +273,9 @@ aimux tab send <tabId> --enter <text>      # appends \r so the CLI submits
 aimux tab send <tabId> --keys "<C-c>"      # chord parser -> raw bytes
 aimux tab send <tabId> --stdin             # read from stdin
 aimux tab send <tabId> --prompt-file F     # read from a file (no shell redirect)
+aimux tab send <tabId> --enter                         # submit only (empty payload)
 aimux tab send <tabId> --enter --await-submit <text>   # + confirm uptake
+aimux tab send <tabId> --keys "<CR>" --await-submit    # submit a pending prompt, awaited
 -> { ok: true, bytesWritten: N }
 -> { ok: true, bytesWritten: N, submitted: true,       # with --await-submit
      uptake: { confirmed: true, ms } | { confirmed: false } }
@@ -231,11 +288,19 @@ misread newlines as submit. With `--enter`, the submitting `\r` is sent as a
 separate, settled write after the paste — a paste-aware TUI (e.g. Claude Code)
 would otherwise fold a same-burst `\r` into the paste buffer and never submit.
 
-`--await-submit` (requires `--enter`) blocks after the write until the tab
-transitions to `working` — i.e. the receiving CLI accepted the prompt — or
-`--await-timeout` ms elapse (default 15000). Uptake is advisory: a missed
-transition still exits 0 with `uptake.confirmed: false`. For a full
-submit→turn-end round-trip, prefer `tab run` below.
+An empty payload with `--enter` is a valid submit-only operation ("press Enter"):
+the zero-length write is skipped and only the `\r` is sent.
+
+`--await-submit` blocks after the write until the tab transitions to `working` —
+i.e. the receiving CLI accepted the prompt — or `--await-timeout` ms elapse
+(default 15000). It requires something that submits: either `--enter` or `--keys`
+(where the chord itself carries the submit, e.g. `"<CR>"`). Uptake is advisory: a
+missed transition still exits 0 with `uptake.confirmed: false`. For a full
+submit→turn-end round-trip, prefer `tab run` below; for a named worker, prefer
+`worker submit`.
+
+`<C-u>` clears the composer line. Send it before a prompt (or use
+`worker prompt --replace`) when the tab may contain text you did not write.
 
 #### `aimux tab run`
 

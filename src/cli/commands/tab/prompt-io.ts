@@ -92,7 +92,12 @@ export async function writePromptPayload(
   payload: PromptPayload,
   appendEnter: boolean
 ): Promise<number> {
-  await daemon.expectOk('write', { data: payload.data, tabId })
+  // Skip a zero-length write: "submit only" (empty payload + --enter) is a
+  // legitimate operation, but a 0-byte write reaches the pty as an empty
+  // ArrayBufferView and surfaces a raw Bun ERR_INVALID_ARG_TYPE to the user.
+  if (payload.data !== '') {
+    await daemon.expectOk('write', { data: payload.data, tabId })
+  }
   let bytesWritten = Buffer.byteLength(payload.data, 'utf8')
   if (appendEnter) {
     // A bracketed paste swallows a same-burst `\r`, so settle first, then

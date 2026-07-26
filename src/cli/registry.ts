@@ -17,6 +17,7 @@ import { workerList } from './commands/worker/list'
 import { workerPrompt } from './commands/worker/prompt'
 import { workerRun } from './commands/worker/run'
 import { workerStop } from './commands/worker/stop'
+import { workerSubmit } from './commands/worker/submit'
 import { workspaceClose } from './commands/workspace/close'
 import { workspaceCreate } from './commands/workspace/create'
 import { workspaceList } from './commands/workspace/list'
@@ -56,6 +57,7 @@ export const COMMANDS: readonly CliCommand[] = [
   worktreeRemove,
   workerRun,
   workerPrompt,
+  workerSubmit,
   workerAwait,
   workerList,
   workerStop,

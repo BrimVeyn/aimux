@@ -55,6 +55,12 @@ export const workerRun: CliCommand = {
     },
     { description: 'overall turn cap in milliseconds', kind: 'number', name: 'timeout' },
     {
+      description:
+        'milliseconds to wait for the detached submit→working confirmation (default 15000)',
+      kind: 'number',
+      name: 'uptake-timeout',
+    },
+    {
       complete: { kind: 'dynamic', source: 'worktree' },
       description: 'co-locate in an existing worktree id',
       kind: 'string',
@@ -97,6 +103,11 @@ export const workerRun: CliCommand = {
       ctx.args.flags.stdin === true,
       ctx.args.positionals[0]
     )
+    // Resolve the target workspace ONCE, up front, and use that record for
+    // every later step. The repo a worktree is cut from comes from this record,
+    // so an orchestrator that omits --workspace at least gets the resolved
+    // identity echoed back in the response instead of having to infer it.
+    const workspace = ctx.getWorkspace()
     const result = await createCliTab(ctx, {
       assistantId: assistant,
       base: typeof ctx.args.flags.base === 'string' ? ctx.args.flags.base : undefined,
@@ -108,16 +119,23 @@ export const workerRun: CliCommand = {
       workerName: name,
       worktreeId: worktree,
     })
-    const tabs = await (await ctx.getDaemon()).listTabs(ctx.getWorkspace().id)
+    const tabs = await (await ctx.getDaemon()).listTabs(workspace.id)
     const tab = tabs.tabs.find((entry) => entry.id === result.tabId)
     if (!tab) throw new Error(`created worker disappeared: ${result.tabId}`)
-    const worker = workerView(ctx, tab)
-    const outcome = await dispatchWorkerPrompt(ctx, result.tabId, text, {
+    const worker = workerView(workspace, tab)
+    const outcome = await dispatchWorkerPrompt(ctx, workspace, result.tabId, text, {
+      // The tab was spawned microseconds ago: its assistant is still booting, so
+      // the prompt must not be written until the TUI is reading keystrokes.
+      awaitFirstPaint: true,
       detach: ctx.args.flags.detach === true,
       timeoutMs:
         typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS,
+      uptakeTimeoutMs:
+        typeof ctx.args.flags['uptake-timeout'] === 'number'
+          ? ctx.args.flags['uptake-timeout']
+          : undefined,
     })
-    writeJson(workerEnvelope(worker, outcome))
+    writeJson(workerEnvelope(workspace, worker, outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: 'Create a named worker, dispatch a prompt, and await its outcome',

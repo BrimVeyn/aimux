@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { lstat, mkdir, realpath } from 'node:fs/promises'
+import { lstat, mkdir, realpath, rmdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
 const DEFAULT_WORKTREE_ROOT = '/tmp/aimux-wt'
@@ -53,6 +53,26 @@ export async function ensureAimuxWorktreeRoot(): Promise<string> {
     throw new Error(`unsafe Aimux worktree root: ${root}`)
   }
   return root
+}
+
+/**
+ * Drop the repo-scoped `<root>/r-<hash>` parent of a removed worktree when it is
+ * empty. `assertSafeAimuxWorktreePath` creates that directory before git runs,
+ * so a failed or rolled-back creation used to leave one behind forever. Silent
+ * on ENOTEMPTY (another worktree for the same repo is still live) and on any
+ * other error — this is housekeeping, never the point of the operation.
+ */
+export async function pruneEmptyWorktreeParent(worktreePath: string): Promise<void> {
+  if (!isInsideAimuxWorktreeRoot(worktreePath)) return
+  const parent = resolve(worktreePath, '..')
+  // Never touch the root itself — only the per-repo directory below it.
+  if (parent === resolve(getAimuxWorktreeRoot())) return
+  if (!isInsideAimuxWorktreeRoot(parent)) return
+  try {
+    await rmdir(parent)
+  } catch {
+    // Non-empty (a sibling worktree is live) or already gone. Either is fine.
+  }
 }
 
 export async function assertSafeAimuxWorktreePath(path: string): Promise<void> {

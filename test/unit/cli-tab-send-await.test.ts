@@ -131,6 +131,27 @@ describe('tab send --await-submit', () => {
     expect(out.uptake.confirmed).toBe(false)
   })
 
+  test('accepts --await-submit with --keys, where the chord carries the submit', async () => {
+    const { daemon, writes } = makeFakeDaemon({ emitWorkingOnEnter: 'tab-1' })
+    const ctx = makeContext({ 'await-submit': true, 'keys': true }, ['tab-1', '<CR>'], daemon)
+    const { code, json } = await captureJson(async () => await tabSend.run(ctx))
+    expect(code).toBe(0)
+    const out = json as { uptake: { confirmed: boolean } }
+    expect(out.uptake.confirmed).toBe(true)
+    expect(writes).toEqual(['\r'])
+  })
+
+  test('submit-only (empty payload + --enter) writes just the carriage return', async () => {
+    // A zero-length write reaches the pty as an empty ArrayBufferView and used to
+    // surface a raw Bun ERR_INVALID_ARG_TYPE; "just press Enter" must be valid.
+    const { daemon, writes } = makeFakeDaemon({})
+    const ctx = makeContext({ enter: true }, ['tab-1'], daemon)
+    const { code, json } = await captureJson(async () => await tabSend.run(ctx))
+    expect(code).toBe(0)
+    expect((json as { ok: boolean }).ok).toBe(true)
+    expect(writes).toEqual(['\r'])
+  })
+
   test('non-await path output is unchanged', async () => {
     const { daemon } = makeFakeDaemon({})
     const ctx = makeContext({ enter: true }, ['tab-1', 'hello'], daemon)

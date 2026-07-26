@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
@@ -9,6 +10,7 @@ import {
   assertSafeAimuxWorktreePath,
   isInsideAimuxWorktreeRoot,
   makeWorktreePath,
+  pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
 import {
   ensureSessionWorktrees,
@@ -133,6 +135,42 @@ describe('session worktrees', () => {
       await assertSafeAimuxWorktreePath(targetPath)
       // and the parent must now exist so git worktree add can populate it.
       expect((await stat(dirname(targetPath))).isDirectory()).toBe(true)
+    } finally {
+      if (previousRoot === undefined) delete process.env.AIMUX_WORKTREE_ROOT
+      else process.env.AIMUX_WORKTREE_ROOT = previousRoot
+      await rm(root, { force: true, recursive: true })
+    }
+  })
+
+  test('prunes the repo-scoped parent only once it is empty, and never the root', async () => {
+    const previousRoot = process.env.AIMUX_WORKTREE_ROOT
+    const root = await mkdtemp(join(tmpdir(), 'aimux-wt-test-'))
+    process.env.AIMUX_WORKTREE_ROOT = root
+    try {
+      const first = makeWorktreePath({
+        repoRoot: '/Users/me/prune-repo',
+        worktreeId: 'worktree-1',
+        worktreeName: 'one',
+      })
+      const second = makeWorktreePath({
+        repoRoot: '/Users/me/prune-repo',
+        worktreeId: 'worktree-2',
+        worktreeName: 'two',
+      })
+      await assertSafeAimuxWorktreePath(first)
+      await mkdir(second, { recursive: true })
+
+      // A sibling worktree is still live — the shared parent must survive.
+      await pruneEmptyWorktreeParent(first)
+      expect((await stat(dirname(first))).isDirectory()).toBe(true)
+
+      await rm(second, { force: true, recursive: true })
+      await pruneEmptyWorktreeParent(first)
+      expect(existsSync(dirname(first))).toBe(false)
+
+      // The root itself is shared by every repo; pruning must never reach it.
+      await pruneEmptyWorktreeParent(join(root, 'r-abc'))
+      expect((await stat(root)).isDirectory()).toBe(true)
     } finally {
       if (previousRoot === undefined) delete process.env.AIMUX_WORKTREE_ROOT
       else process.env.AIMUX_WORKTREE_ROOT = previousRoot

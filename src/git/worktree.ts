@@ -59,6 +59,16 @@ export async function listLocalBranches(cwd: string): Promise<string[]> {
     .filter((line) => line !== '')
 }
 
+// Resolve a ref to its SHA in a specific repository, or undefined when it does
+// not exist there. The repo argument matters more than it looks: the same ref
+// name ("main", "HEAD") resolves in almost every repo, so a caller that picked
+// the wrong repository gets a *successful* resolution and no signal at all.
+export async function resolveGitRef(repoPath: string, ref: string): Promise<string | undefined> {
+  const result = await $`git -C ${repoPath} rev-parse --verify --quiet ${ref}`.quiet().nothrow()
+  if (result.exitCode !== 0) return undefined
+  return result.text().trim() || undefined
+}
+
 export async function createGitWorktree({
   baseRef,
   branchName,
@@ -74,7 +84,11 @@ export async function createGitWorktree({
     .quiet()
     .nothrow()
   if (result.exitCode !== 0) {
-    throw new Error(result.stderr.toString().trim() || 'failed to create git worktree')
+    // Always name the repository. A bare "fatal: not a valid object name: 'X'"
+    // reads as a ref-resolution bug when the real cause is that git ran in a
+    // repository the caller did not mean to target.
+    const stderr = result.stderr.toString().trim()
+    throw new Error(`${stderr || 'failed to create git worktree'} (in ${repoPath})`)
   }
 }
 

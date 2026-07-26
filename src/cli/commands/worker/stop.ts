@@ -1,10 +1,15 @@
 import type { CliCommand } from '../../registry'
 
 import { isGitWorktreeDirty, removeGitWorktree } from '../../../git/worktree'
-import { IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
+import {
+  IPC_CAPABILITY_THIN_ATTACH,
+  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+} from '../../../ipc/protocol'
+import { pruneEmptyWorktreeParent } from '../../../platform/worktree-paths'
+import { workspaceIdentity } from '../../client/workspace-resolver'
 import { SHARED_FLAGS } from '../../flags'
-import { EXIT_OK, writeJson } from '../../output'
-import { resolveWorkerTab, WORKER_SCHEMA_VERSION, workerView } from './shared'
+import { EXIT_OK, EXIT_RUNTIME, writeJson } from '../../output'
+import { resolveWorkerTarget, WORKER_SCHEMA_VERSION, workerView } from './shared'
 
 export const workerStop: CliCommand = {
   args: [{ complete: { kind: 'dynamic', source: 'worker' }, name: 'worker', required: true }],
@@ -19,10 +24,9 @@ export const workerStop: CliCommand = {
   ],
   group: 'worker',
   run: async (ctx) => {
-    const tab = await resolveWorkerTab(ctx, ctx.args.positionals[0] ?? '')
-    const worker = workerView(ctx, tab)
+    const { tab, workspace } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
+    const worker = workerView(workspace, tab)
     const daemon = await ctx.getDaemon()
-    const workspace = ctx.getWorkspace()
     const cleanup = ctx.args.flags['cleanup-worktree'] === true
     const record =
       tab.worktreeId === undefined
@@ -50,7 +54,29 @@ export const workerStop: CliCommand = {
       }
     }
 
-    await daemon.expectOk('closeTab', { tabId: tab.id })
+    // `closeTab` is session-scoped on the daemon, so it fails with "No session
+    // attached" unless this connection has attached first. Every other worker
+    // verb thin-attaches; this one did not, which made teardown the one step of
+    // the documented lifecycle a headless orchestrator could not complete.
+    if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
+      throw new Error(
+        'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
+      )
+    }
+    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+
+    // Teardown is two independent effects. Report them independently: a failed
+    // tab close must not strand a merged worktree on disk with no way to remove
+    // it through aimux (the alternative — a bare `git worktree remove` — desyncs
+    // the catalog from disk).
+    let closeError: string | undefined
+    try {
+      await daemon.expectOk('closeTab', { tabId: tab.id })
+    } catch (error) {
+      closeError = error instanceof Error ? error.message : String(error)
+      if (!cleanup) throw error
+    }
+
     let worktreeRemoved = false
     if (cleanup && record !== undefined) {
       await removeGitWorktree({
@@ -58,6 +84,7 @@ export const workerStop: CliCommand = {
         repoPath: record.repoRoot,
         targetPath: record.path,
       })
+      await pruneEmptyWorktreeParent(record.path)
       try {
         await daemon.expectOk('removeWorktreeRecord', {
           sessionId: workspace.id,
@@ -72,12 +99,14 @@ export const workerStop: CliCommand = {
       worktreeRemoved = true
     }
     writeJson({
-      closed: true,
+      closed: closeError === undefined,
+      ...(closeError === undefined ? {} : { closeError }),
       schemaVersion: WORKER_SCHEMA_VERSION,
       worker,
+      workspace: workspaceIdentity(workspace),
       worktreeRemoved,
     })
-    return EXIT_OK
+    return closeError === undefined ? EXIT_OK : EXIT_RUNTIME
   },
   summary: 'Stop a named worker and optionally clean up its worktree',
   verb: 'stop',

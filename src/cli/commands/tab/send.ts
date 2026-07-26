@@ -63,12 +63,13 @@ export const tabSend: CliCommand = {
         ? ctx.args.flags['await-timeout']
         : DEFAULT_AWAIT_TIMEOUT_MS
 
-    // Uptake only means something once we actually submit the prompt: the
-    // working transition is the receiving CLI accepting the Enter. Without
-    // --enter there is nothing to confirm, so fail loudly rather than block
-    // forever on a transition that can't come.
-    if (awaitSubmit && !appendEnter) {
-      throw new Error('--await-submit requires --enter')
+    // Uptake only means something once something submits: either the appended
+    // `\r` (--enter) or a chord that carries its own submit (--keys "<CR>",
+    // which is the recovery path for a prompt already sitting in a composer).
+    // Without one of those there is nothing to confirm, so fail loudly rather
+    // than block forever on a transition that can't come.
+    if (awaitSubmit && !appendEnter && !asKeys) {
+      throw new Error('--await-submit requires --enter or --keys (the chord carries the submit)')
     }
 
     // At most one payload source. Unlike `tab run`, zero sources is valid here

@@ -2,33 +2,39 @@ import type { CliCommand } from '../../registry'
 
 import { SHARED_FLAGS } from '../../flags'
 import { writeJson } from '../../output'
-import { DEFAULT_TIMEOUT_MS } from '../tab/await-turn'
 import {
-  awaitExistingWorker,
+  DETACH_UPTAKE_TIMEOUT_MS,
   resolveWorkerTarget,
+  submitWorkerPrompt,
   workerEnvelope,
   workerOutcomeExitCode,
   workerView,
 } from './shared'
 
-export const workerAwait: CliCommand = {
+export const workerSubmit: CliCommand = {
   args: [{ complete: { kind: 'dynamic', source: 'worker' }, name: 'worker', required: true }],
   flags: [
     ...SHARED_FLAGS,
-    { description: 'overall turn cap in milliseconds', kind: 'number', name: 'timeout' },
+    {
+      description: 'milliseconds to wait for the submit→working confirmation (default 15000)',
+      kind: 'number',
+      name: 'uptake-timeout',
+    },
   ],
   group: 'worker',
   run: async (ctx) => {
     const { tab, workspace } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
-    const outcome = await awaitExistingWorker(
+    const outcome = await submitWorkerPrompt(
       ctx,
       workspace,
       tab.id,
-      typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS
+      typeof ctx.args.flags['uptake-timeout'] === 'number'
+        ? ctx.args.flags['uptake-timeout']
+        : DETACH_UPTAKE_TIMEOUT_MS
     )
     writeJson(workerEnvelope(workspace, workerView(workspace, tab), outcome))
     return workerOutcomeExitCode(outcome)
   },
-  summary: "Await an existing worker's in-flight turn",
-  verb: 'await',
+  summary: 'Submit a prompt already sitting in a worker composer and confirm uptake',
+  verb: 'submit',
 }

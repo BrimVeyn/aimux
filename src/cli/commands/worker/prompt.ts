@@ -6,7 +6,7 @@ import { DEFAULT_TIMEOUT_MS } from '../tab/await-turn'
 import { resolvePromptText } from '../tab/prompt-io'
 import {
   dispatchWorkerPrompt,
-  resolveWorkerTab,
+  resolveWorkerTarget,
   workerEnvelope,
   workerOutcomeExitCode,
   workerView,
@@ -32,11 +32,23 @@ export const workerPrompt: CliCommand = {
       name: 'detach',
     },
     { description: 'overall turn cap in milliseconds', kind: 'number', name: 'timeout' },
+    {
+      description:
+        'milliseconds to wait for the detached submit→working confirmation (default 15000)',
+      kind: 'number',
+      name: 'uptake-timeout',
+    },
+    {
+      description:
+        'clear the composer (<C-u>) before writing, so text typed by a human in the UI cannot be concatenated onto this prompt',
+      kind: 'boolean',
+      name: 'replace',
+    },
   ],
   group: 'worker',
   run: async (ctx) => {
     const selector = ctx.args.positionals[0] ?? ''
-    const tab = await resolveWorkerTab(ctx, selector)
+    const { tab, workspace } = await resolveWorkerTarget(ctx, selector)
     const promptFile =
       typeof ctx.args.flags['prompt-file'] === 'string' ? ctx.args.flags['prompt-file'] : undefined
     const text = await resolvePromptText(
@@ -44,12 +56,17 @@ export const workerPrompt: CliCommand = {
       ctx.args.flags.stdin === true,
       ctx.args.positionals[1]
     )
-    const outcome = await dispatchWorkerPrompt(ctx, tab.id, text, {
+    const outcome = await dispatchWorkerPrompt(ctx, workspace, tab.id, text, {
       detach: ctx.args.flags.detach === true,
+      replace: ctx.args.flags.replace === true,
       timeoutMs:
         typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS,
+      uptakeTimeoutMs:
+        typeof ctx.args.flags['uptake-timeout'] === 'number'
+          ? ctx.args.flags['uptake-timeout']
+          : undefined,
     })
-    writeJson(workerEnvelope(workerView(ctx, tab), outcome))
+    writeJson(workerEnvelope(workspace, workerView(workspace, tab), outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: 'Prompt an existing named worker and await its outcome',

@@ -13,6 +13,7 @@ import {
   IPC_CAPABILITY_WORKER_METADATA,
 } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
+import { pruneEmptyWorktreeParent } from '../../../platform/worktree-paths'
 import {
   type AssistantOption,
   buildAssistantModelArgs,
@@ -98,6 +99,7 @@ async function rollbackCreatedWorktree(
       repoPath: record.repoRoot,
       targetPath: record.path,
     })
+    await pruneEmptyWorktreeParent(record.path)
     await daemon.expectOk('removeWorktreeRecord', {
       sessionId: workspace.id,
       worktreeId: record.id,

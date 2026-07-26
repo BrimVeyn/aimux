@@ -5,6 +5,7 @@ import {
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
 } from '../../../ipc/protocol'
+import { pruneEmptyWorktreeParent } from '../../../platform/worktree-paths'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
@@ -59,6 +60,7 @@ export const worktreeRemove: CliCommand = {
     // All capability and liveness checks happen before touching git. If git
     // refuses a dirty worktree the catalog remains unchanged.
     await removeGitWorktree({ force, repoPath: primary.repoRoot, targetPath: worktree.path })
+    await pruneEmptyWorktreeParent(worktree.path)
     try {
       await daemon.expectOk('removeWorktreeRecord', {
         sessionId: workspace.id,
