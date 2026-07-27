@@ -514,6 +514,17 @@ export async function runDaemon(): Promise<void> {
           payload: event.payload,
           receivedAt: event.receivedAt,
         })
+        // `UserPromptSubmit` carries the exact prompt at the exact moment it is
+        // submitted, so auto-rename prefers it over reconstructing keystrokes:
+        // trust dialogs, menus and completions never produce one.
+        if (event.hookEventName === 'UserPromptSubmit') {
+          const prompt = event.payload.prompt
+          const parentToolUseId = event.payload.parent_tool_use_id
+          const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
+          if (typeof prompt === 'string' && !fromSubagent) {
+            autoRename.observePrompt(event.paneId, prompt)
+          }
+        }
       },
     })
     try {

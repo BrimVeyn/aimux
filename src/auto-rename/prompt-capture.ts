@@ -121,6 +121,14 @@ export class PromptCapture {
     this.escapeBuffer += char
     const sequence = this.escapeBuffer
 
+    // Alt/Shift+Enter — a newline inside the prompt, not a submission and not a
+    // reason to distrust what we captured.
+    if (sequence.length === 2 && (char === '\r' || char === '\n')) {
+      this.escapeBuffer = ''
+      this.insert('\n')
+      return
+    }
+
     if (
       sequence.length === 2 &&
       sequence !== '\x1b[' &&
@@ -169,6 +177,17 @@ export class PromptCapture {
 
     const final = sequence.at(-1) ?? ''
     const parameters = sequence.slice(2, -1)
+    // Modified Enter under the kitty keyboard protocol (`CSI 13;2 u`) or
+    // xterm's modifyOtherKeys (`CSI 27;2;13 ~`): another way to type a newline
+    // inside the prompt.
+    const fields = parameters.split(';')
+    if (
+      (final === 'u' && fields[0] === '13') ||
+      (final === '~' && fields[0] === '27' && fields[2] === '13')
+    ) {
+      this.insert('\n')
+      return
+    }
     if ((final === 'C' || final === 'D') && parameters.includes(';')) {
       this.invalidateCurrentSubmission()
       return

@@ -134,12 +134,27 @@ terminal attachment until the backend reattaches it.
 ## Automatic Tab Names
 
 New Claude, Codex, OpenCode, Grok, and Kimi tabs are renamed in the background
-from their first non-empty prompt. The title uses the same provider as the tab,
-stays within six words and 48 characters, and follows the prompt's language.
+from their opening prompt. The title uses the same provider as the tab, stays
+within six words and 48 characters, and follows the prompt's language.
+
+Only prompts that describe work are used. Slash commands, `!` shell escapes,
+confirmations (`y`, `1`, `continue`) and answers to startup dialogs such as the
+trust-folder prompt are ignored, and ignoring one costs nothing — the tab stays
+armed for the next prompt. Once a usable prompt arrives, aimux waits out a short
+settle window (`autoRename.settleMs`, 2.5s by default) so a burst of opening
+messages produces a single title covering all of them.
+
+For Claude tabs the prompt comes from Claude Code's `UserPromptSubmit` hook, so
+what gets titled is exactly what was submitted. Other providers fall back to
+reconstructing the prompt from what you typed.
+
+A failed generation is not the end: the tab stays armed and retries on the next
+prompt, up to `autoRename.maxAttempts`. After that — or immediately if the
+provider CLI is not installed — aimux derives a title from the prompt text
+itself, so a tab does not stay on its assistant label.
 
 Aimux never replaces a title supplied with `aimux tab create --title`, a manual
-rename, or a historical tab restored from an older snapshot. Generation is
-attempted once; failures leave the assistant label unchanged. Configure or
+rename, or a historical tab restored from an older snapshot. Configure or
 disable the feature through `autoRename` in `aimux.config.ts`. Because the
 prompt is submitted as an additional model request, review the privacy and
 model settings in the [config reference](../reference/config-reference.md#autorename).

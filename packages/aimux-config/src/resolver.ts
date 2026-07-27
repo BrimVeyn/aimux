@@ -32,7 +32,16 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 
   const autoRename: AutoRenameConfig = {
     enabled: userConfig.autoRename?.enabled ?? DEFAULT_AUTO_RENAME_CONFIG.enabled,
+    maxAttempts: Math.max(
+      1,
+      userConfig.autoRename?.maxAttempts ?? DEFAULT_AUTO_RENAME_CONFIG.maxAttempts
+    ),
+    minPromptWords: Math.max(
+      1,
+      userConfig.autoRename?.minPromptWords ?? DEFAULT_AUTO_RENAME_CONFIG.minPromptWords
+    ),
     models: { ...DEFAULT_AUTO_RENAME_CONFIG.models, ...userConfig.autoRename?.models },
+    settleMs: Math.max(0, userConfig.autoRename?.settleMs ?? DEFAULT_AUTO_RENAME_CONFIG.settleMs),
     timeoutMs: userConfig.autoRename?.timeoutMs ?? DEFAULT_AUTO_RENAME_CONFIG.timeoutMs,
   }
 

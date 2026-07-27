@@ -443,14 +443,28 @@ autoRename?: {
   enabled?: boolean                          // default: true
   timeoutMs?: number                         // default: 15_000
   models?: Partial<Record<string, string>>   // per-provider model override
+  settleMs?: number                          // default: 2_500
+  maxAttempts?: number                       // default: 3
+  minPromptWords?: number                    // default: 3
 }
 ```
 
-After the first non-empty prompt in a newly created assistant tab, aimux runs
-that same assistant's headless CLI in the background and replaces the default
-tab label with a concise title. Explicit `--title` values and manual renames
-are never overwritten. A failed generation keeps the existing title and is
-not retried on later prompts.
+After the first prompt that actually describes work, aimux runs that same
+assistant's headless CLI in the background and replaces the default tab label
+with a concise title. Explicit `--title` values and manual renames are never
+overwritten.
+
+- `settleMs` — quiet period before generating. Prompts submitted inside the
+  window are folded into the same request, so a rapid "read X" / "now do Y"
+  opening produces one title covering both. `0` generates on the first prompt.
+- `minPromptWords` — prompts below this length are treated as dialog answers
+  and ignored, as are slash commands, `!` shell escapes and confirmations like
+  `y` or `1`. Ignoring a prompt costs nothing: the tab stays armed.
+- `maxAttempts` — how many generations may fail before aimux gives up on the
+  CLI and derives a title from the prompt text locally. Failures in between
+  (non-zero exit, timeout, unusable output) leave the tab armed, so the next
+  prompt tries again. A provider whose CLI is not installed skips straight to
+  the local title.
 
 The first prompt is sent to the configured provider as an additional model
 request. Disable this feature if prompts must not leave the interactive

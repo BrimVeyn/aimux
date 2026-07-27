@@ -1,9 +1,20 @@
 import { buildHeadlessInvocation, type HeadlessInvocation } from '../auto-commit/headless-commands'
+import { clampTitle } from './title-format'
 
 export type TitleSpawnFn = (
   invocation: HeadlessInvocation,
   signal: AbortSignal
 ) => Promise<{ stdout: string; exitCode: number } | null>
+
+/**
+ * `failed` is retryable — a later prompt may well produce a usable title.
+ * `unavailable` is not: the provider has no headless mode or its binary is not
+ * installed, so the coordinator should stop burning attempts and fall back.
+ */
+export type TitleResult =
+  | { status: 'ok'; title: string }
+  | { status: 'failed' }
+  | { status: 'unavailable' }
 
 export function buildTitlePrompt(firstPrompt: string): string {
   return [
@@ -23,24 +34,16 @@ export function sanitizeGeneratedTitle(raw: string): string | null {
   if (first == null || first === '') return null
 
   const unlabelled = first.replace(/^TITLE\s*:\s*/iu, '').replaceAll(/^["'“”‘’]+|["'“”‘’]+$/gu, '')
-  const clean = unlabelled
-    .replaceAll(/\s+/gu, ' ')
-    .replace(/[.!?,;:…]+$/u, '')
-    .trim()
-  const words = clean.split(' ').filter(Boolean)
-  const usesUnspacedScript = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(clean)
-  if (words.length < 2 && !usesUnspacedScript) return null
+  return clampTitle(unlabelled)
+}
 
-  let title = words.slice(0, 6).join(' ')
-  if (title.length > 48) {
-    title = title
-      .slice(0, 48)
-      .replace(/\s+\S*$/u, '')
-      .trim()
+function executableOnPath(executable: string): boolean {
+  try {
+    return typeof Bun !== 'undefined' && Bun.which(executable) != null
+  } catch {
+    // Never let a lookup failure mask a provider that would have worked.
+    return true
   }
-  return title === '' || (title.split(' ').filter(Boolean).length < 2 && !usesUnspacedScript)
-    ? null
-    : title
 }
 
 export async function generateTabTitle(options: {
@@ -50,21 +53,29 @@ export async function generateTabTitle(options: {
   timeoutMs: number
   signal: AbortSignal
   spawn?: TitleSpawnFn
-}): Promise<string | null> {
+  isExecutableAvailable?: (executable: string) => boolean
+}): Promise<TitleResult> {
   const invocation = buildHeadlessInvocation(
     options.provider,
     buildTitlePrompt(options.firstPrompt),
     options.model
   )
-  if (!invocation) return null
+  if (!invocation) return { status: 'unavailable' }
+
+  // A caller-supplied spawn does not go through PATH, so only probe it for the
+  // real one. Probing lets a missing CLI fail instantly instead of after the
+  // full timeout, once per tab instead of once per attempt.
+  const available = options.isExecutableAvailable ?? (options.spawn ? null : executableOnPath)
+  if (available && !available(invocation.executable)) return { status: 'unavailable' }
 
   const signal = AbortSignal.any([options.signal, AbortSignal.timeout(options.timeoutMs)])
   try {
     const result = await (options.spawn ?? defaultSpawn)(invocation, signal)
-    if (!result || result.exitCode !== 0 || signal.aborted) return null
-    return sanitizeGeneratedTitle(result.stdout)
+    if (!result || result.exitCode !== 0 || signal.aborted) return { status: 'failed' }
+    const title = sanitizeGeneratedTitle(result.stdout)
+    return title == null ? { status: 'failed' } : { status: 'ok', title }
   } catch {
-    return null
+    return { status: 'failed' }
   }
 }
 

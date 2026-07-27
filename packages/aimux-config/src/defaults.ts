@@ -19,10 +19,13 @@ export const DEFAULT_AUTO_COMMIT_CONFIG: AutoCommitConfig = {
 
 export const DEFAULT_AUTO_RENAME_CONFIG: AutoRenameConfig = {
   enabled: true,
+  maxAttempts: 3,
+  minPromptWords: 3,
   models: {
     claude: 'claude-haiku-4-5',
     codex: 'gpt-5-mini',
   },
+  settleMs: 2_500,
   timeoutMs: 15_000,
 }
 

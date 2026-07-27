@@ -1096,6 +1096,19 @@ export interface AutoRenameConfig {
   enabled: boolean
   timeoutMs: number
   models: Partial<Record<string, string>>
+  /**
+   * Quiet period after a title-worthy prompt before a title is generated.
+   * Prompts submitted inside the window are appended to the same request, so a
+   * "read X" / "now do Y" opening yields one title instead of two.
+   */
+  settleMs: number
+  /** Generation attempts before falling back to a title derived locally from the prompt. */
+  maxAttempts: number
+  /**
+   * Prompts with fewer words than this are treated as menu answers or
+   * confirmations and ignored (they do not consume an attempt).
+   */
+  minPromptWords: number
 }
 
 export interface MultiRepoConfig {
