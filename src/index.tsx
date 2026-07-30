@@ -72,8 +72,14 @@ if (command === '--help' || command === '-h' || command === 'help') {
   process.exit(await runCli([]))
 }
 
+// Sequential ON PURPOSE: @opentui/react evaluates @opentui/core as part of its
+// own module graph. Loading both concurrently races the two evaluations and
+// react's chunk can hit `class X extends TextNodeRenderable` while core is
+// still initializing (ReferenceError: cannot access before initialization).
+// react has to wait on core either way, so this costs nothing.
+const { createCliRenderer } = await import('@opentui/core')
+
 const [
-  { createCliRenderer },
   { createRoot },
   { App },
   { loadUserConfig },
@@ -82,7 +88,6 @@ const [
   { createSessionBackend },
   { maybeAutoInstallCompletion },
 ] = await Promise.all([
-  import('@opentui/core'),
   import('@opentui/react'),
   import('./app'),
   import('./config/loader'),
