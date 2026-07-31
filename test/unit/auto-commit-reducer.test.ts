@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, AutoCommitState } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { AutoCommitState } from '../../src/state/types'
 
 import { reduceAutoCommitState } from '../../src/state/reducers/auto-commit-state'
 

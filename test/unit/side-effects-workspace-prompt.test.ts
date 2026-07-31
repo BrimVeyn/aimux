@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, AppState } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { AppState } from '../../src/state/types'
 
 import { executeSideEffect } from '../../src/app-runtime/side-effects'
 import { appReducer, createInitialState } from '../../src/state/store'

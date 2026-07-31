@@ -4,7 +4,8 @@ import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { KeyChord } from '../input/keymap/key-chord'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, FocusMode, SnippetRecord, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { FocusMode, SnippetRecord, TabSession } from '../state/types'
 
 import { INPUT_DEBUG_LOG_PATH, logInputDebug } from '../debug/input-log'
 import { createRawInputHandler } from '../input/raw-input-handler'

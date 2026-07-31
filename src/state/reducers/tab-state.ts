@@ -1,4 +1,5 @@
-import type { AppAction, AppState, TabSession } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState, TabSession } from '../types'
 
 import {
   allLeafIds,

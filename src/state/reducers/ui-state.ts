@@ -1,4 +1,5 @@
-import type { AppAction, AppState, BarSide, BarState, BarWidget } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState, BarSide, BarState, BarWidget } from '../types'
 
 import {
   boundaryDeltaFromRatio,

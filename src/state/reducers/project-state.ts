@@ -1,4 +1,5 @@
-import type { AppAction, AppState } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
 import { restoreProjectState } from '../project-persistence'

@@ -1,7 +1,8 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState, ProjectSnapshotV1, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { LayoutState, ProjectSnapshotV1, TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import {

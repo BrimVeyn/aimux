@@ -1,7 +1,8 @@
 import type { CliRenderer } from '@opentui/core'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, TabSession } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
 /**

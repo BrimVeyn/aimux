@@ -1,4 +1,5 @@
-import type { AppAction, AppState, AutoCommitState } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState, AutoCommitState } from '../types'
 
 function setByProject(
   state: AutoCommitState,

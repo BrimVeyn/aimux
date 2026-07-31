@@ -1,6 +1,7 @@
 import type { WorkspaceTemplate, WorkspaceTemplatePane } from '../config'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AssistantId, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AssistantId, TabSession } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
 import { logInputDebug } from '../debug/input-log'

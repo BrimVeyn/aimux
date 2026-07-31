@@ -1,8 +1,8 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
+import type { AppAction } from '../state/actions'
 import type {
-  AppAction,
   ProjectStatus,
   TabActivity,
   TabSession,

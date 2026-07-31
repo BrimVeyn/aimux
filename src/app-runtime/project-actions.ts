@@ -1,5 +1,6 @@
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, ProjectRecord, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, ProjectRecord, TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'

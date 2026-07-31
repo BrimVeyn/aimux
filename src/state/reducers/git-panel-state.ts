@@ -1,5 +1,5 @@
+import type { AppAction } from '../actions'
 import type {
-  AppAction,
   AppState,
   BranchDivergence,
   GitFileEntry,

@@ -1,7 +1,8 @@
 import type { KeyEvent } from '@opentui/core'
 
+import type { AppAction } from '../../state/actions'
 import type { SplitDirection } from '../../state/layout-tree'
-import type { AppAction, AppState, GitFileListMode, TabSession } from '../../state/types'
+import type { AppState, GitFileListMode, TabSession } from '../../state/types'
 
 export type ModeId =
   | 'navigation'

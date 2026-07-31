@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, BarsState } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { BarsState } from '../../src/state/types'
 
 import { setActiveDispatch } from '../../src/state/dispatch-ref'
 import {

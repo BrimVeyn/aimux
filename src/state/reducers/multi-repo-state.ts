@@ -1,9 +1,6 @@
-import {
-  type AppAction,
-  type AppState,
-  type DiscoveredRepo,
-  EMPTY_MULTI_REPO_STATE,
-} from '../types'
+import type { AppAction } from '../actions'
+
+import { type AppState, type DiscoveredRepo, EMPTY_MULTI_REPO_STATE } from '../types'
 
 /**
  * Compute the shortest distinguishing prefix for each non-root repo name.

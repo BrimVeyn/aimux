@@ -1,7 +1,8 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { LayoutState } from '../state/types'
 
 import { attachCurrentSession } from './backend-attach-runtime'
 import { bindBackendRuntimeEvents } from './backend-runtime-events'

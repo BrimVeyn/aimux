@@ -1,12 +1,7 @@
 import { $ } from 'bun'
 
-import type {
-  AppAction,
-  AppState,
-  AssistantId,
-  AutoCommitState,
-  GitRefreshPayload,
-} from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, AssistantId, AutoCommitState, GitRefreshPayload } from '../state/types'
 
 import { buildHeadlessInvocation, isSupportedProvider } from '../auto-commit/headless-commands'
 import { composePromptFromTemplate, loadBriefingTemplate } from '../auto-commit/prompt-loader'

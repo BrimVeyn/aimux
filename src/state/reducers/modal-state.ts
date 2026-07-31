@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 
-import type { AppAction, AppState } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState } from '../types'
 
 import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'

@@ -1,5 +1,5 @@
 import type { SideEffect } from '../input/modes/types'
-import type { AppAction } from './types'
+import type { AppAction } from './actions'
 
 type DispatchFn = (action: AppAction) => void
 type SideEffectFn = (effect: SideEffect) => void

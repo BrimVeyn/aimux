@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, AppState, AutoCommitState } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { AppState, AutoCommitState } from '../../src/state/types'
 
 import { reduceModalState } from '../../src/state/reducers/modal-state'
 import { createInitialState } from '../../src/state/store'

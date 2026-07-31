@@ -1,6 +1,7 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
-import type { AppAction, AppState, GitRefreshPayload, TabActivity } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, GitRefreshPayload, TabActivity } from '../state/types'
 
 import {
   type AutoCommitConfigSnapshot,

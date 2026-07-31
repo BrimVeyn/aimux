@@ -1,4 +1,5 @@
 import type { WorkspaceTemplate } from '../config'
+import type { AppAction } from './actions'
 
 import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
 import { reduceAutoCommit } from './reducers/auto-commit-state'
@@ -11,7 +12,6 @@ import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
 import {
-  type AppAction,
   type AppState,
   type BarsState,
   EMPTY_AUTO_COMMIT_STATE,

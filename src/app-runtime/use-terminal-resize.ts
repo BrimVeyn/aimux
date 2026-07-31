@@ -10,7 +10,8 @@ import {
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
 import { getBarWidth } from '../state/bars'
