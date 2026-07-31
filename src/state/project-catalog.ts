@@ -10,32 +10,118 @@ import { ensureProjectWorkspaces } from './project-workspaces'
 import { toast } from './toast-store'
 import { isProjectRecord } from './validation'
 
+const CATALOG_VERSION = 2
+
 interface ProjectCatalogFile {
-  version: 1
+  version: typeof CATALOG_VERSION
   projects: ProjectRecord[]
 }
 
-const PROJECTS_PATH = join(getProfileConfigDir(), 'aimux-sessions.json')
+// Resolved per call, never module-cached: $HOME is read at call time so tests
+// that redirect it cannot clobber the real catalog.
+function projectsPath(): string {
+  return join(getProfileConfigDir(), 'aimux-projects.json')
+}
+
+// ponytail: the v1 file is left on disk so a downgrade still works. Drop this
+// helper, migrateV1 and the fallback branch a release or two out.
+function legacySessionsPath(): string {
+  return join(getProfileConfigDir(), 'aimux-sessions.json')
+}
+
+/** The v1 shape, before project/workspace naming. Only what migrateV1 reads. */
+interface LegacyProjectRecordV1 {
+  projectPath?: string
+  workspaceSnapshot?: {
+    tabs?: { worktreeId?: string }[]
+    lastActiveTabByWorktree?: Record<string, string>
+  }
+  worktrees?: { source?: string; repoRoot?: string }[]
+  activeWorktreeId?: string
+}
+
+/**
+ * v1 -> v2: `worktrees` became `workspaces`, `workspaceSnapshot` became
+ * `projectSnapshot`, and each tab's `worktreeId` became `workspaceId`. Record
+ * ids are deliberately left alone — they are opaque and may be scripted.
+ *
+ * `projectPath` is also healed here: v1 rewrote it with the *active worktree's*
+ * path, so it usually pointed inside the worktree root rather than at the repo.
+ */
+function migrateV1(records: LegacyProjectRecordV1[]): unknown[] {
+  return records.map((record) => {
+    const { activeWorktreeId, workspaceSnapshot, worktrees, ...rest } = record
+    const primaryRepoRoot = worktrees?.find((w) => w.source === 'primary')?.repoRoot
+    return {
+      ...rest,
+      ...(primaryRepoRoot != null && primaryRepoRoot !== ''
+        ? { projectPath: primaryRepoRoot }
+        : null),
+      ...(worktrees ? { workspaces: worktrees } : null),
+      ...(activeWorktreeId != null ? { activeWorkspaceId: activeWorktreeId } : null),
+      ...(workspaceSnapshot
+        ? {
+            projectSnapshot: (() => {
+              const { lastActiveTabByWorktree, tabs, ...snapshot } = workspaceSnapshot
+              return {
+                ...snapshot,
+                ...(lastActiveTabByWorktree
+                  ? { lastActiveTabByWorkspace: lastActiveTabByWorktree }
+                  : null),
+                ...(tabs
+                  ? {
+                      tabs: tabs.map(({ worktreeId, ...tab }) => ({
+                        ...tab,
+                        ...(worktreeId != null ? { workspaceId: worktreeId } : null),
+                      })),
+                    }
+                  : null),
+              }
+            })(),
+          }
+        : null),
+    }
+  })
+}
+
+function parseCatalog(path: string, version: number): { projects: unknown[] } | { issue: string } {
+  const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
+    version?: unknown
+    projects?: unknown
+    sessions?: unknown
+  }
+  if (parsed.version !== version) {
+    return { issue: `invalid project catalog header in ${path}` }
+  }
+  // v1 called the array `sessions`.
+  const records = parsed.projects ?? parsed.sessions
+  if (!Array.isArray(records)) {
+    return { issue: `invalid project catalog header in ${path}` }
+  }
+  return { projects: records }
+}
 
 function readCatalogFile(): { file: ProjectCatalogFile | null; issue?: string } {
   try {
-    if (!existsSync(PROJECTS_PATH)) {
+    let records: unknown[]
+    if (existsSync(projectsPath())) {
+      const parsed = parseCatalog(projectsPath(), CATALOG_VERSION)
+      if ('issue' in parsed) return { file: null, issue: parsed.issue }
+      records = parsed.projects
+    } else if (existsSync(legacySessionsPath())) {
+      const parsed = parseCatalog(legacySessionsPath(), 1)
+      if ('issue' in parsed) return { file: null, issue: parsed.issue }
+      records = migrateV1(parsed.projects as LegacyProjectRecordV1[])
+      logDebug('projects.catalog.migrateV1', { projectCount: records.length })
+    } else {
       return { file: null }
     }
 
-    const parsed = JSON.parse(readFileSync(PROJECTS_PATH, 'utf8')) as {
-      version?: unknown
-      projects?: unknown
-    }
-    if (parsed.version !== 1 || !Array.isArray(parsed.projects)) {
-      return { file: null, issue: 'invalid project catalog header' }
-    }
-
-    if (!parsed.projects.every(isProjectRecord)) {
+    if (!records.every(isProjectRecord)) {
       return { file: null, issue: 'invalid project catalog entries' }
     }
 
-    return { file: { projects: parsed.projects, version: 1 } }
+    return { file: { projects: records, version: CATALOG_VERSION } }
   } catch (error) {
     return {
       file: null,
@@ -49,14 +135,19 @@ export function loadProjectCatalog(): ProjectRecord[] {
   if (file) {
     logDebug('projects.catalog.load', { projectCount: file.projects.length })
     const normalized = normalizeProjects(file.projects)
-    if (JSON.stringify(normalized) !== JSON.stringify(file.projects)) {
+    // A fresh migration has no v2 file yet, so write even when normalizing
+    // changed nothing.
+    if (
+      !existsSync(projectsPath()) ||
+      JSON.stringify(normalized) !== JSON.stringify(file.projects)
+    ) {
       saveProjectCatalog(normalized)
     }
     return normalized
   }
 
   if (issue != null && issue !== '') {
-    logDebug('projects.catalog.loadIssue', { issue, path: PROJECTS_PATH })
+    logDebug('projects.catalog.loadIssue', { issue, path: projectsPath() })
   }
 
   const config = loadConfig()
@@ -88,13 +179,16 @@ export function loadProjectCatalog(): ProjectRecord[] {
 export function saveProjectCatalog(projects: ProjectRecord[]): void {
   try {
     mkdirSync(getProfileConfigDir(), { recursive: true })
-    writeFileSync(PROJECTS_PATH, `${JSON.stringify({ projects, version: 1 }, null, 2)}\n`)
+    writeFileSync(
+      projectsPath(),
+      `${JSON.stringify({ projects, version: CATALOG_VERSION }, null, 2)}\n`
+    )
     logDebug('projects.catalog.save', { projectCount: projects.length })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     logDebug('projects.catalog.saveError', {
       error: message,
-      path: PROJECTS_PATH,
+      path: projectsPath(),
       projectCount: projects.length,
     })
     // Persisting the catalog underpins project/workspace state — a silent
@@ -104,7 +198,7 @@ export function saveProjectCatalog(projects: ProjectRecord[]): void {
 }
 
 export function getProjectCatalogPath(): string {
-  return PROJECTS_PATH
+  return projectsPath()
 }
 
 export function findMostRecentProject(projects: ProjectRecord[]): ProjectRecord | undefined {

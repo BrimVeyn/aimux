@@ -45,7 +45,7 @@ describe('config profile paths', () => {
 
     expect(config.getConfigPath()).toBe(join(tempHome, '.config', 'aimux', 'dev', 'aimux.json'))
     expect(projects.getProjectCatalogPath()).toBe(
-      join(tempHome, '.config', 'aimux', 'dev', 'aimux-sessions.json')
+      join(tempHome, '.config', 'aimux', 'dev', 'aimux-projects.json')
     )
   })
 

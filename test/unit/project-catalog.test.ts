@@ -6,6 +6,6 @@ import { getProjectCatalogPath } from '../../src/state/project-catalog'
 
 describe('project catalog', () => {
   test('stores projects in a separate ~/.config file', () => {
-    expect(getProjectCatalogPath()).toBe(`${dirname(getConfigPath())}/aimux-sessions.json`)
+    expect(getProjectCatalogPath()).toBe(`${dirname(getConfigPath())}/aimux-projects.json`)
   })
 })
