@@ -12,6 +12,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The protocol-discipline check reads the branch's commit messages
+          # looking for a BREAKING: marker. The default shallow checkout has
+          # none of them, so a MIN bump would always look unexplained.
+          fetch-depth: 0
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -29,9 +34,8 @@ jobs:
         run: bun run check
 
       - name: Protocol discipline check
-        # Needs access to origin/main so the MIN-bump comparison can run.
-        # `actions/checkout@v4` only fetches the merge commit by default; fetch
-        # the main ref explicitly so the script can diff against it.
+        # `fetch-depth: 0` above gives us the history; this still names the ref
+        # explicitly because a PR checkout has no local `origin/main` branch.
         run: |
-          git fetch --no-tags --depth=50 origin main:refs/remotes/origin/main || true
+          git fetch --no-tags origin main:refs/remotes/origin/main || true
           bun run lint:protocol

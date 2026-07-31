@@ -115,7 +115,20 @@ function checkMinBumps(): void {
 
     // MIN was raised. Demand a BREAKING marker in the commit range or the
     // env-var escape hatch (useful when running this check on main itself).
+    //
+    // A shallow checkout truncates that range to the tip, so the marker is
+    // simply not present to be found — "no marker written" and "no history to
+    // read" are different answers and only the first is the author's fault.
+    // Skip rather than accuse, the same way a missing base ref is handled. CI
+    // checks out full history (`fetch-depth: 0`) so it still enforces this.
+    if (git('rev-parse --is-shallow-repository')?.trim() === 'true') {
+      console.warn(
+        `[discipline] skipping MIN-bump check for ${spec.label}: shallow checkout, commit range unreadable`
+      )
+      continue
+    }
     const commitMessages = git(`log --format=%B ${base}..HEAD`) ?? ''
+
     const envReason = process.env.AIMUX_PROTOCOL_BREAKING_REASON ?? ''
     if (BREAKING_MARKER.test(commitMessages) || BREAKING_MARKER.test(envReason)) {
       console.log(
