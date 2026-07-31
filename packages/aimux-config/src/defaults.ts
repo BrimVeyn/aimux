@@ -345,6 +345,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.createWorkspaceEscape, 'Back/Cancel')
         .map('<Tab>', actions.switchCreateWorkspaceField, 'Next field')
         .map('<CR>', actions.confirmCreateWorkspace, 'Create')
+        .map('<C-CR>', actions.createWorkspaceNewline, 'Newline')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

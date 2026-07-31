@@ -10,11 +10,13 @@ import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
 
+/** The box is this tall from the start: a one-line slot asks for a one-line task. */
+const PROMPT_LINES = 5
+
 interface CreateWorkspaceModalProps {
-  activeField: 'name' | 'branch' | 'base'
+  activeField: 'prompt' | 'base'
   step: 'form' | 'template'
-  workspaceName: string
-  branchName: string
+  prompt: string
   branchError: string | null
   baseQuery: string
   baseRef: string
@@ -31,11 +33,10 @@ export function CreateWorkspaceModal({
   baseQuery,
   baseRef,
   branchError,
-  branchName,
   cursorPos,
+  prompt,
   selectedIndex,
   step,
-  workspaceName,
   workspaces,
   workspaceTemplates,
 }: CreateWorkspaceModalProps) {
@@ -116,20 +117,15 @@ export function CreateWorkspaceModal({
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column" gap={1}>
-        <TextField
-          active={activeField === 'name'}
-          label="Workspace name"
-          value={workspaceName}
-          cursorPos={activeField === 'name' ? cursorPos : undefined}
-          placeholder="my-feature"
-        />
         <box flexDirection="column">
           <TextField
-            active={activeField === 'branch'}
-            label="Branch name"
-            value={branchName}
-            cursorPos={activeField === 'branch' ? cursorPos : undefined}
-            placeholder="aimux/my-feature"
+            active={activeField === 'prompt'}
+            label="What do you want to work on?"
+            description="Sent to the assistant, and names the workspace and its branch."
+            value={prompt}
+            cursorPos={activeField === 'prompt' ? cursorPos : undefined}
+            placeholder="Describe the task..."
+            minLines={PROMPT_LINES}
           />
           {branchError != null && branchError !== '' ? (
             <text fg={t.error}>{branchError}</text>
@@ -148,7 +144,7 @@ export function CreateWorkspaceModal({
           onHover={handleHover}
           emptyState={<text fg={t.textMuted}>No branches found</text>}
         />
-        <text fg={t.textMuted}>Tab switches fields · Enter creates</text>
+        <text fg={t.textMuted}>Ctrl+Enter newline · Tab picks a base · Enter creates</text>
       </box>
     </Form>
   )

@@ -7,13 +7,12 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
-import { getActiveWorkspace } from '../project-workspaces'
 import {
   type BaseRefOption,
   buildBaseRefOptions,
-  filterAssistants,
   filterProjects,
   filterSnippets,
+  getNewTabAssistantOptions,
 } from '../selectors'
 import { reduceAutoCommitState } from './auto-commit-state'
 
@@ -51,18 +50,16 @@ function getCreateWorkspaceBaseOptions(state: AppState, queryOverride?: string):
   )
 }
 
-const CREATE_WORKSPACE_FIELDS = ['name', 'branch', 'base'] as const
+const CREATE_WORKSPACE_FIELDS = ['prompt', 'base'] as const
 
 type CreateWorkspaceField = (typeof CREATE_WORKSPACE_FIELDS)[number]
 
 /** The buffer a create-workspace field edits, so cursor math has one source. */
 function getCreateWorkspaceFieldValue(
-  modal: { workspaceName: string; branchName: string; baseQuery: string },
+  modal: { prompt: string; baseQuery: string },
   field: CreateWorkspaceField
 ): string {
-  if (field === 'name') return modal.workspaceName
-  if (field === 'branch') return modal.branchName
-  return modal.baseQuery
+  return field === 'prompt' ? modal.prompt : modal.baseQuery
 }
 
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
@@ -75,6 +72,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
+          pendingWorkspace: action.pendingWorkspace,
           projectTargetId: null,
           selectedIndex: 0,
           type: 'new-tab',
@@ -294,23 +292,21 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         focusMode: 'command-edit',
         modal: {
-          activeField: 'name',
+          activeField: 'prompt',
           baseBranches: [],
           baseQuery: '',
-          // Default to the active workspace's branch, preserving the previous
-          // always-fork-from-source behaviour until the user picks another base.
-          baseRef:
-            getActiveWorkspace(state.projects.find((entry) => entry.id === state.currentProjectId))
-              ?.branch ?? '',
+          // Left empty on purpose: `load-create-workspace-base-branches`
+          // resolves the repo's default branch and backfills it below. Seeding
+          // the active workspace's branch here would win over that.
+          baseRef: '',
           branchError: null,
-          branchName: '',
           cursorPos: 0,
           editBuffer: '',
           projectTargetId: null,
+          prompt: '',
           selectedIndex: 0,
           step: 'form',
           type: 'create-workspace',
-          workspaceName: '',
         },
       }
     case 'switch-create-workspace-field': {
@@ -319,7 +315,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         CREATE_WORKSPACE_FIELDS[
           (CREATE_WORKSPACE_FIELDS.indexOf(state.modal.activeField) + 1) %
             CREATE_WORKSPACE_FIELDS.length
-        ] ?? 'name'
+        ] ?? 'prompt'
       const buffer = getCreateWorkspaceFieldValue(state.modal, next)
       // Entering the base field highlights the row matching the resolved ref,
       // so the picker opens on what the form already says it will fork from.
@@ -346,12 +342,18 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type !== 'create-workspace') return state
       const modalWithBranches = { ...state.modal, baseBranches: action.branches }
       const withBranches: AppState = { ...state, modal: modalWithBranches }
-      // Backfill a default base if none resolved yet (e.g. detached source).
+      // The user may already have typed a base while this was in flight.
       if (state.modal.baseRef !== '') return withBranches
-      const firstOption = getCreateWorkspaceBaseOptions(withBranches)[0]
+      // Fork from the repo's default branch, falling back to the most recently
+      // committed one when the repo has neither an origin/HEAD nor a main.
+      const fallback = getCreateWorkspaceBaseOptions(withBranches)[0]?.ref ?? ''
+      const defaultBranch =
+        action.defaultBranch != null && action.branches.includes(action.defaultBranch)
+          ? action.defaultBranch
+          : fallback
       return {
         ...withBranches,
-        modal: { ...modalWithBranches, baseRef: firstOption?.ref ?? '' },
+        modal: { ...modalWithBranches, baseRef: defaultBranch },
       }
     }
     case 'set-create-workspace-branch-error': {
@@ -360,9 +362,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         modal: {
           ...state.modal,
-          activeField: 'branch',
+          // The branch is generated now, so there is no branch field to focus:
+          // send the user back to the prompt, which is what produced the name.
+          activeField: 'prompt',
           branchError: action.message,
-          cursorPos: state.modal.branchName.length,
+          cursorPos: state.modal.prompt.length,
         },
       }
     }
@@ -373,10 +377,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ...state,
         modal: {
           ...state.modal,
-          cursorPos: action.step === 'form' ? state.modal.workspaceName.length : 0,
-          // Returning to the form always lands on the name field, so the
+          cursorPos: action.step === 'form' ? state.modal.prompt.length : 0,
+          // Returning to the form always lands on the prompt field, so the
           // cursor above matches whatever the user sees.
-          ...(action.step === 'form' ? { activeField: 'name' as const } : null),
+          ...(action.step === 'form' ? { activeField: 'prompt' as const } : null),
           selectedIndex: 0,
           step: action.step,
         },
@@ -657,9 +661,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       let optionCount: number
       if (state.modal.type === 'new-tab') {
-        optionCount = filterAssistants(
-          getAllAssistantOptions(state.customCommands),
-          state.modal.editBuffer
+        optionCount = getNewTabAssistantOptions(
+          state.customCommands,
+          state.modal.editBuffer,
+          state.modal.pendingWorkspace != null
         ).length
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
@@ -730,9 +735,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (state.modal.type === 'help') {
         optionCount = state.modal.entryCount
       } else if (state.modal.type === 'new-tab') {
-        optionCount = filterAssistants(
-          getAllAssistantOptions(state.customCommands),
-          state.modal.editBuffer
+        optionCount = getNewTabAssistantOptions(
+          state.customCommands,
+          state.modal.editBuffer,
+          state.modal.pendingWorkspace != null
         ).length
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
@@ -819,13 +825,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           text = current.slice(0, at) + action.char + current.slice(at)
           pos = at + action.char.length
         }
-        if (field === 'name') {
-          return { ...state, modal: { ...state.modal, cursorPos: pos, workspaceName: text } }
-        }
-        if (field === 'branch') {
+        if (field === 'prompt') {
           return {
             ...state,
-            modal: { ...state.modal, branchError: null, branchName: text, cursorPos: pos },
+            modal: { ...state.modal, branchError: null, cursorPos: pos, prompt: text },
           }
         }
         // Re-filter and snap the base to the top match as the query changes.

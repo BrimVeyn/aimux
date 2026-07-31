@@ -69,6 +69,35 @@ export async function resolveGitRef(repoPath: string, ref: string): Promise<stri
   return result.text().trim() || undefined
 }
 
+// The branch a new workspace forks from unless the user picks another base.
+// `origin/HEAD` is the only authoritative answer; it is missing on repos cloned
+// with --no-checkout or created locally, hence the name probes behind it.
+export async function getDefaultBranch(repoPath: string): Promise<string | undefined> {
+  const head = await $`git -C ${repoPath} symbolic-ref --short refs/remotes/origin/HEAD`
+    .quiet()
+    .nothrow()
+  if (head.exitCode === 0) {
+    const ref = head.text().trim()
+    const short = ref.startsWith('origin/') ? ref.slice('origin/'.length) : ref
+    if (short !== '') return short
+  }
+  const locals = await listLocalBranches(repoPath)
+  return ['main', 'master'].find((name) => locals.includes(name))
+}
+
+// Rename a local branch. Returns false (without throwing) when git refuses —
+// the target name already exists, most likely — so a failed rename leaves the
+// workspace on the branch it was created with instead of losing it.
+export async function renameGitBranch(
+  repoPath: string,
+  from: string,
+  to: string
+): Promise<boolean> {
+  if (from === '' || to === '' || from === to) return false
+  const result = await $`git -C ${repoPath} branch -m ${from} ${to}`.quiet().nothrow()
+  return result.exitCode === 0
+}
+
 export async function createGitWorktree({
   baseRef,
   branchName,

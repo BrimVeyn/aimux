@@ -1,5 +1,6 @@
-import type { AssistantOption } from '../pty/command-registry'
 import type { ProjectRecord, SnippetRecord, WorkspaceRecord } from './types'
+
+import { type AssistantOption, getAllAssistantOptions } from '../pty/command-registry'
 
 export interface BaseRefOption {
   /** Git ref the new workspace is forked from. */
@@ -53,6 +54,27 @@ export function filterAssistants(
   const lower = filter.toLowerCase()
   return options.filter(
     (o) => o.label.toLowerCase().includes(lower) || o.description.toLowerCase().includes(lower)
+  )
+}
+
+/**
+ * Assistants offered by the new-tab picker. One source of truth on purpose: the
+ * modal renders this list while `launch-selected-assistant` indexes into it, so
+ * a divergence launches the row above or below the one the user highlighted.
+ *
+ * Chained from `<C-p>`, the prompt is pasted into the assistant and drives the
+ * workspace's name — neither of which a plain shell can do — so Terminal is not
+ * offered there. A bare `<C-n>` still lists it.
+ */
+export function getNewTabAssistantOptions(
+  customCommands: Record<string, string>,
+  filter: string | null,
+  excludeTerminal: boolean
+): AssistantOption[] {
+  const all = getAllAssistantOptions(customCommands)
+  return filterAssistants(
+    excludeTerminal ? all.filter((option) => option.id !== 'terminal') : all,
+    filter
   )
 }
 

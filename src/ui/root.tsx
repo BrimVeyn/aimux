@@ -107,6 +107,7 @@ function renderModal(
           cursorPos={modal.cursorPos}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
+          excludeTerminal={modal.type === 'new-tab' && modal.pendingWorkspace != null}
         />
       )
     case 'create-workspace':
@@ -114,8 +115,7 @@ function renderModal(
         <CreateWorkspaceModal
           activeField={modal.activeField}
           step={modal.step}
-          workspaceName={modal.workspaceName}
-          branchName={modal.branchName}
+          prompt={modal.prompt}
           branchError={modal.branchError}
           baseQuery={modal.baseQuery}
           baseRef={modal.baseRef}

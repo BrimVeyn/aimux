@@ -13,7 +13,14 @@ import { dirname, join as joinPath, resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, AssistantId, TabSession, WorkspaceRecord } from '../state/types'
+import type {
+  AppAction,
+  AppState,
+  AssistantId,
+  PendingWorkspaceLaunch,
+  TabSession,
+  WorkspaceRecord,
+} from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
 import {
@@ -29,6 +36,7 @@ import {
   createGitWorktree,
   deleteGitBranch,
   getCurrentBranch,
+  getDefaultBranch,
   getHeadSha,
   getMainWorktreeRoot,
   listGitWorktrees,
@@ -71,7 +79,7 @@ import {
   getActiveWorkspacePath,
   withActiveWorkspace,
 } from '../state/project-workspaces'
-import { filterAssistants, filterProjects, filterSnippets } from '../state/selectors'
+import { filterProjects, filterSnippets, getNewTabAssistantOptions } from '../state/selectors'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { appReducer } from '../state/store'
 import { buildTabEntries } from '../state/tab-entries'
@@ -89,12 +97,14 @@ import {
   restartTabSession,
   switchProjectRecords,
 } from './project-actions'
+import { injectPromptWhenReady } from './prompt-injection'
 import { writeToTab } from './pty-write'
 import {
   handleDeleteSnippetEffect,
   handleSaveSnippetEditorEffect,
   pasteSnippetToTab,
 } from './snippet-actions'
+import { placeholderWorkspaceName, renameWorkspaceFromPrompt } from './workspace-naming'
 
 const STARTUP_GRACE_MS = 5_000
 /**
@@ -123,9 +133,12 @@ export interface SideEffectContext {
 }
 
 function getSelectedAssistantOption(state: AppState) {
-  const all = getAllAssistantOptions(state.customCommands)
-  const filter = state.modal.type === 'new-tab' ? state.modal.editBuffer : null
-  const list = filterAssistants(all, filter)
+  const newTab = state.modal.type === 'new-tab' ? state.modal : null
+  const list = getNewTabAssistantOptions(
+    state.customCommands,
+    newTab?.editBuffer ?? null,
+    newTab?.pendingWorkspace != null
+  )
   return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
 }
 
@@ -365,11 +378,12 @@ export function startTabSession(
   })
 }
 
+/** Returns the id of the tab it created, so a caller can write into it. */
 function launchAssistant(
   ctx: SideEffectContext,
   assistant: AssistantId,
   workspaceId?: string
-): void {
+): string {
   const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const customCommand = state.customCommands[assistant]
   const tab = createTabSession(
@@ -400,6 +414,40 @@ function launchAssistant(
     state.layout.terminalRows,
     getTabProjectPath(ctx, tab)
   )
+  return tab.id
+}
+
+/**
+ * Second half of the `<C-p>` flow, once the assistant is known: hand it the
+ * prompt and rename the workspace after what the prompt describes. Both are
+ * background work that must never block or fail the launch itself.
+ */
+function startPendingWorkspaceLaunch(
+  ctx: SideEffectContext,
+  pending: PendingWorkspaceLaunch,
+  assistant: AssistantId,
+  tabId: string
+): void {
+  void injectPromptWhenReady({
+    backend: ctx.backend,
+    getState: ctx.getState,
+    prompt: pending.prompt,
+    tabId,
+  })
+
+  const workspace = ctx
+    .getState()
+    .projects.find((entry) => entry.id === pending.projectId)
+    ?.workspaces?.find((entry) => entry.id === pending.workspaceId)
+  if (!workspace) return
+
+  void renameWorkspaceFromPrompt(
+    { projectId: pending.projectId, prompt: pending.prompt, provider: assistant, workspace },
+    {
+      applyName: (projectId, workspaceId, patch) =>
+        ctx.dispatch({ patch, projectId, type: 'update-workspace-record', workspaceId }),
+    }
+  )
 }
 
 /**
@@ -411,17 +459,21 @@ async function createWorkspaceFromModal(
   ctx: SideEffectContext,
   projectId: string,
   params: {
-    workspaceName: string
-    branchName: string
+    prompt: string
     baseRef?: string
     templateId?: string
   }
 ): Promise<void> {
+  // A name derived locally from the prompt, so the sidebar reads right from the
+  // first frame. The model-generated one replaces it a few seconds later.
+  // The branch is left to `createAimuxTempWorkspace`, which suffixes it with a
+  // timestamp: two workspaces started from the same prompt must not collide on
+  // the branch name before the model has had a chance to distinguish them.
   const workspace = await createAimuxTempWorkspace(
     ctx,
     projectId,
-    params.workspaceName,
-    params.branchName,
+    placeholderWorkspaceName(params.prompt),
+    undefined,
     params.baseRef
   )
   // Undefined means the create was rejected (e.g. branch already checked out);
@@ -436,12 +488,17 @@ async function createWorkspaceFromModal(
   ctx.dispatch({ type: 'close-modal' })
 
   if (template) {
+    // A template picks its own assistants, so there is nobody to hand the
+    // prompt to and no provider to name with: the local name is the final one.
     applyWorkspaceTemplate(ctx, template, workspace.id, workspace.path)
     ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
     return
   }
 
-  ctx.dispatch({ type: 'open-new-tab-modal' })
+  ctx.dispatch({
+    pendingWorkspace: { projectId, prompt: params.prompt, workspaceId: workspace.id },
+    type: 'open-new-tab-modal',
+  })
 }
 
 function applyWorkspaceTemplate(
@@ -636,9 +693,19 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'launch-selected-assistant': {
-      // The tab lands in the project's active workspace — launchAssistant
-      // resolves that itself. Creating a workspace is `create-workspace`'s job.
-      launchAssistant(ctx, getSelectedAssistantOption(state).id)
+      const assistant = getSelectedAssistantOption(state).id
+      // Chained from `<C-p>`: pin the tab to the workspace just created, hand it
+      // the prompt, and name the workspace with the assistant the user picked.
+      // Otherwise the tab lands in the project's active workspace, which
+      // launchAssistant resolves itself.
+      const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
+      logInputDebug('app.launchSelectedAssistant', {
+        assistant,
+        chained: pending != null,
+        modal: state.modal.type,
+      })
+      const tabId = launchAssistant(ctx, assistant, pending?.workspaceId)
+      if (pending) startPendingWorkspaceLaunch(ctx, pending, assistant, tabId)
       return
     }
     case 'edit-selected-assistant': {
@@ -651,9 +718,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const project = state.projects.find((entry) => entry.id === state.currentProjectId)
         const sourcePath = getActiveWorkspace(project)?.path ?? getActiveWorkspacePath(project)
         if (!(sourcePath != null && sourcePath !== '')) return
-        const branches = await listLocalBranches(sourcePath)
+        const [branches, defaultBranch] = await Promise.all([
+          listLocalBranches(sourcePath),
+          getDefaultBranch(sourcePath),
+        ])
         if (ctx.getState().modal.type !== 'create-workspace') return
-        ctx.dispatch({ branches, type: 'set-create-workspace-base-branches' })
+        ctx.dispatch({ branches, defaultBranch, type: 'set-create-workspace-base-branches' })
       })()
       return
     }
@@ -667,7 +737,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       }
       const projectId = state.currentProjectId
       if (!(projectId != null && projectId !== '')) return
-      const { baseRef, branchName, workspaceName } = state.modal
+      const { baseRef, prompt } = state.modal
       const templateId =
         state.modal.step === 'template'
           ? state.workspaceTemplates[state.modal.selectedIndex]?.id
@@ -677,9 +747,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           await enqueueGitOp(async () =>
             createWorkspaceFromModal(ctx, projectId, {
               baseRef: baseRef !== '' ? baseRef : undefined,
-              branchName,
+              prompt,
               templateId,
-              workspaceName,
             })
           )
         } catch (error) {

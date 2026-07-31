@@ -27,16 +27,36 @@ Each project tracks three kinds of workspace:
 
 ## Creating a workspace
 
-Press `Ctrl+P` to open the **New workspace** modal:
+Press `Ctrl+P` to open the **New workspace** modal. It asks one question —
+_What do you want to work on?_ — and derives the rest from your answer:
 
-1. Give it a name. The branch defaults to `aimux/<name>-<id>`, and the base
-   defaults to the active workspace's branch — `Tab` cycles the three fields.
+1. Describe the work. The base defaults to the repository's default branch
+   (`origin/HEAD`, falling back to `main` or `master`); `Tab` switches to it if
+   you want to fork from somewhere else.
 2. Press `Enter`. If the project declares [templates](#templates) you pick one
    first; otherwise the workspace is created straight away.
-3. Without a template, the new-tab modal opens on the new workspace so you can
-   pick an assistant. With a template, its tabs start instead.
+3. Without a template, the assistant picker opens on the new workspace.
+   `Terminal` is not offered there — a shell cannot take your prompt. With a
+   template, its tabs start instead.
+4. Your prompt is pasted into the assistant and submitted as soon as it is
+   ready, so the workspace starts working on its own.
 
 aimux confirms with a **Created workspace** toast.
+
+### Naming
+
+The workspace and its branch are both named after your prompt.
+
+A name derived locally from the prompt appears immediately, so the sidebar
+never reads `wt-myrepo`. In the background the assistant you picked generates a
+better one; when it lands, the workspace is renamed on screen **and** its branch
+is renamed with `git branch -m`. The directory under `AIMUX_WORKTREE_ROOT` keeps
+its original slug — git registers worktrees by absolute path, so renaming the
+directory would orphan them.
+
+If no headless CLI is available, or the model call fails or times out, the local
+name simply stays. Nothing is retried and nothing is reported: it is already a
+name derived from what you asked for.
 
 `Ctrl+N` never creates a workspace — it only opens a tab in the workspace you
 are already in.

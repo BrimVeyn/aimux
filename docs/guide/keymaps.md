@@ -171,7 +171,7 @@ Document your own configs accordingly.
 - `r` - rename tab
 - `dd` - close tab
 - `Ctrl+N` - new tab (in the active workspace)
-- `Ctrl+P` - create workspace
+- `Ctrl+P` - create workspace (asks what you want to work on, then names it)
 - `Ctrl+R` - restart tab
 - `Ctrl+G` - project picker
 - `Ctrl+B` - toggle left bar

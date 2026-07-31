@@ -376,6 +376,20 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
+  /**
+   * Set when `create-workspace` chained into this picker. The prompt the user
+   * typed there is sent to the assistant and drives the workspace's real name,
+   * and the tab is pinned to the freshly created workspace rather than the
+   * project's active one. Living on the modal means `close-modal` clears it, so
+   * escaping the picker cannot leak a stale prompt into a later tab.
+   */
+  pendingWorkspace?: PendingWorkspaceLaunch
+}
+
+export interface PendingWorkspaceLaunch {
+  projectId: string
+  workspaceId: string
+  prompt: string
 }
 
 export interface ModalProjectPicker extends ModalBase {
@@ -444,10 +458,13 @@ export interface ModalCreateProject extends ModalBase {
  */
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
-  activeField: 'name' | 'branch' | 'base'
+  activeField: 'prompt' | 'base'
   step: 'form' | 'template'
-  workspaceName: string
-  branchName: string
+  /**
+   * "What do you want to work on?" — the only thing the user types. It is sent
+   * to the assistant, and it names both the workspace and its branch.
+   */
+  prompt: string
   branchError: string | null
   /** Filter text typed into the "Base" picker. */
   baseQuery: string
@@ -657,7 +674,7 @@ export interface AppState {
 // -- Modal actions --
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
-  | { type: 'open-new-tab-modal' }
+  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
@@ -674,7 +691,7 @@ export type ModalAction =
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-project-modal'; returnToProjectPicker: boolean }
   | { type: 'open-create-workspace-modal' }
-  | { type: 'set-create-workspace-base-branches'; branches: string[] }
+  | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
   | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }

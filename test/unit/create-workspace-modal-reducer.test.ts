@@ -48,75 +48,92 @@ function type(state: AppState, text: string): AppState {
   return next
 }
 
-test('open-create-workspace-modal defaults the base to the active workspace branch', () => {
+test('open-create-workspace-modal opens on an empty prompt with no base resolved yet', () => {
   const s = open()
   if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s.focusMode).toBe('command-edit')
   expect(s.modal.step).toBe('form')
-  expect(s.modal.activeField).toBe('name')
-  expect(s.modal.baseRef).toBe('feat/a')
-  expect(s.modal.workspaceName).toBe('')
+  expect(s.modal.activeField).toBe('prompt')
+  expect(s.modal.prompt).toBe('')
+  // Left for the async default-branch lookup to fill; seeding the active
+  // workspace's branch here would beat it to the field.
+  expect(s.modal.baseRef).toBe('')
 })
 
-test('Tab cycles name -> branch -> base -> name and moves the cursor to the field end', () => {
-  const s1 = type(open(), 'my-feature')
+test('Tab cycles prompt -> base -> prompt and moves the cursor to the field end', () => {
+  const s1 = type(open(), 'fix the scroll drift')
   if (s1.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s1.modal.workspaceName).toBe('my-feature')
+  expect(s1.modal.prompt).toBe('fix the scroll drift')
 
   const s2 = appReducer(s1, { type: 'switch-create-workspace-field' })
   if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s2.modal.activeField).toBe('branch')
+  expect(s2.modal.activeField).toBe('base')
   expect(s2.modal.cursorPos).toBe(0)
 
-  const s3 = appReducer(type(s2, 'aimux/x'), { type: 'switch-create-workspace-field' })
+  const s3 = appReducer(s2, { type: 'switch-create-workspace-field' })
   if (s3.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s3.modal.activeField).toBe('base')
-
-  const s4 = appReducer(s3, { type: 'switch-create-workspace-field' })
-  if (s4.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s4.modal.activeField).toBe('name')
-  // Back on the name field the cursor sits after the text already typed.
-  expect(s4.modal.cursorPos).toBe('my-feature'.length)
-  expect(s4.modal.branchName).toBe('aimux/x')
+  expect(s3.modal.activeField).toBe('prompt')
+  // Back on the prompt the cursor sits after the text already typed.
+  expect(s3.modal.cursorPos).toBe('fix the scroll drift'.length)
 })
 
-test('typing in the branch field clears a previous branch error', () => {
+test('a branch error focuses the prompt, and typing there clears it', () => {
   const s1 = appReducer(open(), { message: 'taken', type: 'set-create-workspace-branch-error' })
   if (s1.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s1.modal.activeField).toBe('branch')
+  // There is no branch field any more, so the error has to land on the field
+  // that produced the branch name.
+  expect(s1.modal.activeField).toBe('prompt')
   expect(s1.modal.branchError).toBe('taken')
 
   const s2 = type(s1, 'z')
   if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s2.modal.branchError).toBeNull()
-  expect(s2.modal.branchName).toBe('z')
+  expect(s2.modal.prompt).toBe('z')
 })
 
-test('set-create-workspace-base-branches backfills the base only when unresolved', () => {
-  const kept = appReducer(open(), {
+test('set-create-workspace-base-branches forks from the repo default branch', () => {
+  const s = appReducer(open(), {
     branches: ['develop', 'main'],
+    defaultBranch: 'main',
     type: 'set-create-workspace-base-branches',
   })
-  if (kept.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(kept.modal.baseRef).toBe('feat/a')
+  if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
+  expect(s.modal.baseRef).toBe('main')
+})
 
-  // A project whose active workspace has no branch (detached) starts unresolved.
-  const detached = seed()
-  const project = detached.projects[0]
+test('set-create-workspace-base-branches falls back when there is no default branch', () => {
+  // No origin/HEAD and no main/master: the first option (most recently
+  // committed) is still a better answer than an empty base.
+  const base = seed()
+  const project = base.projects[0]
   if (!project) throw new Error('expected a seeded project')
-  const noBranch: AppState = {
-    ...detached,
+  const noMain: AppState = {
+    ...base,
     projects: [{ ...project, workspaces: [workspace('wt-a', { branch: undefined })] }],
   }
-  const filled = appReducer(open(noBranch), {
+  const s = appReducer(open(noMain), {
     branches: ['develop'],
     type: 'set-create-workspace-base-branches',
   })
-  if (filled.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(filled.modal.baseRef).toBe('develop')
+  if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
+  expect(s.modal.baseRef).toBe('develop')
 })
 
-test('set-create-workspace-step round-trips form <-> template and lands back on the name field', () => {
+test('set-create-workspace-base-branches leaves a base the user already chose', () => {
+  const chosen = appReducer(open(), { index: 0, type: 'set-modal-selection-index' })
+  const typed = appReducer(chosen, { type: 'switch-create-workspace-field' })
+  if (typed.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
+  const withBase: AppState = { ...typed, modal: { ...typed.modal, baseRef: 'develop' } }
+  const s = appReducer(withBase, {
+    branches: ['develop', 'main'],
+    defaultBranch: 'main',
+    type: 'set-create-workspace-base-branches',
+  })
+  if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
+  expect(s.modal.baseRef).toBe('develop')
+})
+
+test('set-create-workspace-step round-trips form <-> template and lands back on the prompt', () => {
   const s1 = appReducer(type(open(), 'wt'), { step: 'template', type: 'set-create-workspace-step' })
   if (s1.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s1.modal.step).toBe('template')
@@ -125,10 +142,10 @@ test('set-create-workspace-step round-trips form <-> template and lands back on 
   const s2 = appReducer(s1, { step: 'form', type: 'set-create-workspace-step' })
   if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s2.modal.step).toBe('form')
-  expect(s2.modal.activeField).toBe('name')
-  // The typed name survives the round trip — Esc from the template step must
+  expect(s2.modal.activeField).toBe('prompt')
+  // The typed prompt survives the round trip — Esc from the template step must
   // not discard the form.
-  expect(s2.modal.workspaceName).toBe('wt')
+  expect(s2.modal.prompt).toBe('wt')
   expect(s2.modal.cursorPos).toBe(2)
 })
 
@@ -136,5 +153,5 @@ test('the template step swallows typed characters instead of editing a field', (
   const s1 = appReducer(type(open(), 'wt'), { step: 'template', type: 'set-create-workspace-step' })
   const s2 = type(s1, 'xyz')
   if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s2.modal.workspaceName).toBe('wt')
+  expect(s2.modal.prompt).toBe('wt')
 })

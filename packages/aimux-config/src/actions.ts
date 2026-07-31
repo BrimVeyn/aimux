@@ -238,7 +238,27 @@ export const createWorkspaceModal: KeyResult = r(
 
 export const switchCreateWorkspaceField: KeyResult = r([{ type: 'switch-create-workspace-field' }])
 
-export const confirmCreateWorkspace: KeyResult = r([], [{ type: 'create-workspace' }])
+/**
+ * An empty prompt is not a workspace: it names nothing, branches nothing and
+ * gives the assistant nothing to do, so Enter is simply inert until it is typed.
+ */
+export const confirmCreateWorkspace: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  if (modal.type === 'create-workspace' && modal.prompt.trim() === '') return r([])
+  return r([], [{ type: 'create-workspace' }])
+}
+
+/**
+ * `Enter` creates, so the prompt needs another way to break a line. Inverted
+ * from the commit modal on purpose: there the body is the whole point, here
+ * most prompts are one line and creating must stay the cheapest keystroke.
+ */
+export const createWorkspaceNewline: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  if (modal.type !== 'create-workspace' || modal.step !== 'form') return r([])
+  if (modal.activeField !== 'prompt') return r([])
+  return r([{ char: '\n', type: 'update-command-edit' }])
+}
 
 /** Esc backs out of the template step to the form; from the form it closes. */
 export const createWorkspaceEscape: ActionFn = (ctx: ModeContext) => {

@@ -322,6 +322,13 @@ export interface ModalClosed extends ModalBase {
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
+  /** Set when `create-workspace` chained into this picker. */
+  pendingWorkspace?: PendingWorkspaceLaunch
+}
+export interface PendingWorkspaceLaunch {
+  projectId: string
+  workspaceId: string
+  prompt: string
 }
 export interface ModalProjectPicker extends ModalBase {
   type: 'project-picker'
@@ -364,10 +371,10 @@ export interface ModalCreateProject extends ModalBase {
 }
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
-  activeField: 'name' | 'branch' | 'base'
+  activeField: 'prompt' | 'base'
   step: 'form' | 'template'
-  workspaceName: string
-  branchName: string
+  /** "What do you want to work on?" — names the workspace and its branch. */
+  prompt: string
   branchError: string | null
   baseQuery: string
   baseRef: string
@@ -556,7 +563,7 @@ export interface AppState {
 // ─── AppAction union ──────────────────────────────────────────────────────────
 
 export type ModalAction =
-  | { type: 'open-new-tab-modal' }
+  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-project-picker' }
@@ -572,7 +579,7 @@ export type ModalAction =
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-project-modal'; returnToProjectPicker: boolean }
   | { type: 'open-create-workspace-modal' }
-  | { type: 'set-create-workspace-base-branches'; branches: string[] }
+  | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
   | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }

@@ -4,7 +4,7 @@ import type { AssistantId } from '../../../../state/types'
 
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { filterAssistants } from '../../../../state/selectors'
+import { getNewTabAssistantOptions } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
@@ -17,6 +17,8 @@ interface NewTabModalProps {
   cursorPos?: number
   editingCommand: AssistantId | null
   editBuffer: string
+  /** Chained from `<C-p>`: a shell cannot take the prompt, so Terminal is hidden. */
+  excludeTerminal: boolean
 }
 
 export function NewTabModal({
@@ -24,12 +26,16 @@ export function NewTabModal({
   customCommands,
   editBuffer,
   editingCommand,
+  excludeTerminal,
   filter,
   selectedIndex,
 }: NewTabModalProps) {
   const t = useTheme()
   const options = useMemo(() => getAllAssistantOptions(customCommands), [customCommands])
-  const filtered = useMemo(() => filterAssistants(options, filter), [filter, options])
+  const filtered = useMemo(
+    () => getNewTabAssistantOptions(customCommands, filter, excludeTerminal),
+    [customCommands, excludeTerminal, filter]
+  )
 
   const handleHover = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
@@ -94,7 +100,13 @@ export function NewTabModal({
       selectedIndex={selectedIndex}
       emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
       onHover={handleHover}
-      footer={<text fg={t.textMuted}>Enter launches in the active workspace</text>}
+      footer={
+        <text fg={t.textMuted}>
+          {excludeTerminal
+            ? 'Enter launches in the new workspace and sends your prompt'
+            : 'Enter launches in the active workspace'}
+        </text>
+      }
     />
   )
 }

@@ -27,6 +27,7 @@ interface TextFieldProps {
   cursorPos?: number
   description?: ReactNode
   label?: ReactNode
+  minLines?: number
   placeholder?: string
   value: string
 }
@@ -94,6 +95,7 @@ export function TextField({
   cursorPos,
   description,
   label,
+  minLines,
   placeholder,
   value,
 }: TextFieldProps) {
@@ -104,7 +106,13 @@ export function TextField({
           {label}
         </FieldLabel>
       ) : null}
-      <InputField active={active} value={value} cursorPos={cursorPos} placeholder={placeholder} />
+      <InputField
+        active={active}
+        value={value}
+        cursorPos={cursorPos}
+        placeholder={placeholder}
+        minLines={minLines}
+      />
     </box>
   )
 }
@@ -138,27 +146,31 @@ export function AutoComplete({
         cursorPos={cursorPos}
         placeholder={placeholder}
       />
-      <box flexDirection="column" height={maxVisibleRows}>
-        {items.length === 0
-          ? (emptyState ?? null)
-          : visibleItems.map((item, index) => {
-              const optionIndex = scrollOffset + index
-              const optionActive = active && optionIndex === selectedIndex
-              return (
-                <ListItem
-                  key={item.key}
-                  index={optionIndex}
-                  active={optionActive}
-                  leading={resolveItemContent(item.leading, optionActive)}
-                  title={resolveItemContent(item.title, optionActive)}
-                  subtitle={resolveItemContent(item.subtitle, optionActive)}
-                  trailing={resolveItemContent(item.trailing, optionActive)}
-                  onHoverIndex={onHover}
-                  onClick={item.onClick}
-                />
-              )
-            })}
-      </box>
+      {/* Collapsed unless focused: a dropdown nobody is driving is noise, and
+          it pushes the rest of the form off the modal. */}
+      {active ? (
+        <box flexDirection="column" height={maxVisibleRows}>
+          {items.length === 0
+            ? (emptyState ?? null)
+            : visibleItems.map((item, index) => {
+                const optionIndex = scrollOffset + index
+                const optionActive = active && optionIndex === selectedIndex
+                return (
+                  <ListItem
+                    key={item.key}
+                    index={optionIndex}
+                    active={optionActive}
+                    leading={resolveItemContent(item.leading, optionActive)}
+                    title={resolveItemContent(item.title, optionActive)}
+                    subtitle={resolveItemContent(item.subtitle, optionActive)}
+                    trailing={resolveItemContent(item.trailing, optionActive)}
+                    onHoverIndex={onHover}
+                    onClick={item.onClick}
+                  />
+                )
+              })}
+        </box>
+      ) : null}
     </box>
   )
 }
