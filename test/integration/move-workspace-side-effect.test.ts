@@ -4,9 +4,10 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { SideEffectContext } from '../../src/app-runtime/side-effect-context'
 import type { AppState, ProjectRecord, TabSession, WorkspaceRecord } from '../../src/state/types'
 
-import { executeSideEffect, type SideEffectContext } from '../../src/app-runtime/side-effects'
+import { executeSideEffect } from '../../src/app-runtime/side-effects'
 import { enqueueGitOp } from '../../src/git/command-queue'
 import { appReducer, createInitialState } from '../../src/state/store'
 

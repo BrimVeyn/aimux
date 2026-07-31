@@ -8,13 +8,14 @@ import {
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import type { SideEffectContext } from './app-runtime/side-effect-context'
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { TerminalContentOrigin } from './input/raw-input-handler'
 import type { SessionBackend } from './session-backend/types'
 
-import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
+import { executeSideEffect } from './app-runtime/side-effects'
 import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
