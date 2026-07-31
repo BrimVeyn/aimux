@@ -8,8 +8,17 @@ import { appReducer, createInitialState } from '../../src/state/store'
 
 const NOW = '2026-07-31T00:00:00.000Z'
 
+/**
+ * Point the assistant at a binary every machine has. `startTabSession` marks a
+ * tab as errored when its executable is not on PATH, and the injector rightly
+ * abandons an errored tab — so without this the test silently passes only where
+ * `claude` happens to be installed, and reports "the prompt was never sent" on
+ * a machine that simply lacks it.
+ */
+const AVAILABLE_COMMANDS = { claude: '/bin/cat' }
+
 function seed(): AppState {
-  const base = createInitialState({}, [
+  const base = createInitialState(AVAILABLE_COMMANDS, [
     {
       activeWorkspaceId: 'workspace-new',
       createdAt: NOW,
@@ -43,6 +52,15 @@ function seed(): AppState {
       type: 'open-new-tab-modal',
     }
   )
+}
+
+/** Poll until `done()` holds, so the assertion waits on the app, not the clock. */
+async function until(done: () => boolean, timeoutMs = 10_000): Promise<void> {
+  const deadline = performance.now() + timeoutMs
+  while (!done()) {
+    if (performance.now() > deadline) throw new Error('timed out waiting for the prompt to submit')
+    await Bun.sleep(20)
+  }
 }
 
 /** A store that actually applies dispatches, like the real one. */
@@ -100,7 +118,10 @@ test('the chained launch pins the tab to the new workspace and sends the prompt'
     },
   })
 
-  await Bun.sleep(1200)
+  // Wait for the submit, not for a duration: the injector polls at 100ms and
+  // waits out an echo window, so any fixed sleep is a bet on how loaded the
+  // machine is. This one lost that bet on a CI-class box.
+  await until(() => writes.at(-1)?.input === '\r')
 
   const sent = writes.map((entry) => entry.input).join('')
   expect(sent).toContain('fix the scroll drift')
@@ -109,7 +130,7 @@ test('the chained launch pins the tab to the new workspace and sends the prompt'
 })
 
 test('a plain new tab sends nothing', async () => {
-  const base = createInitialState({}, [])
+  const base = createInitialState(AVAILABLE_COMMANDS, [])
   const { ctx, writes } = harness(appReducer(base, { type: 'open-new-tab-modal' }))
 
   executeSideEffect({ type: 'launch-selected-assistant' }, ctx)

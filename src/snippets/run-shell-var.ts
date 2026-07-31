@@ -47,27 +47,55 @@ export async function runShellVar(name: string, v: SnippetShellVar): Promise<str
     return ''
   }
 
+  // Racing the timeout rather than checking a flag after the reads: `proc.kill()`
+  // signals the shell, but a command it forked instead of exec'ing outlives it
+  // still holding the stdout pipe, so reading to EOF blocks past the deadline —
+  // on Linux `sleep 5` behind an 80ms timeout waited the full five seconds.
+  // ponytail: the orphan is left running. Kill the process group if a snippet
+  // ever spawns something expensive enough to care about.
   let timeoutFired = false
-  const timeoutHandle = setTimeout(() => {
-    timeoutFired = true
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+  const expired = new Promise<'timeout'>((resolve) => {
+    timeoutHandle = setTimeout(() => {
+      timeoutFired = true
+      try {
+        proc.kill()
+      } catch {
+        // process already gone
+      }
+      resolve('timeout')
+    }, timeoutMs)
+  })
+
+  // Swallow inside, not with a trailing `.catch`: the loser of the race below
+  // is still a live promise, and a late failure would otherwise surface as an
+  // unhandled rejection long after we returned.
+  const collected = (async (): Promise<[string, string, number] | 'failed'> => {
     try {
-      proc.kill()
-    } catch {
-      // process already gone
+      return await Promise.all([
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+        proc.exited,
+      ])
+    } catch (error) {
+      logDebug('snippets.shellVar.error', {
+        cmd: v.sh,
+        error: error instanceof Error ? error.message : String(error),
+        name,
+      })
+      return 'failed'
     }
-  }, timeoutMs)
+  })()
 
   try {
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ])
+    const outcome = await Promise.race([collected, expired])
 
-    if (timeoutFired) {
+    if (outcome === 'timeout' || timeoutFired) {
       logDebug('snippets.shellVar.timeout', { cmd: v.sh, name, timeoutMs })
       return ''
     }
+    if (outcome === 'failed') return ''
+    const [stdout, stderr, exitCode] = outcome
 
     if (exitCode !== 0) {
       logDebug('snippets.shellVar.nonZeroExit', {
