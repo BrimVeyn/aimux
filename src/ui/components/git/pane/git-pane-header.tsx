@@ -4,7 +4,9 @@ import type { GitPanelState } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { useTheme } from '../../../theme'
+import { selectPrRowVisible, usePrStatusStore } from '../../../../state/pr-status-store'
+import { useTheme, useTransparent } from '../../../theme'
+import { PrStateRow } from './pr-state-row'
 
 export type GitPaneTab = 'files' | 'checks'
 
@@ -27,6 +29,11 @@ export const GitPaneHeader = memo(function GitPaneHeader({
   tab,
 }: GitPaneHeaderProps) {
   const t = useTheme()
+  // Transparent mode drops every painted background, so the active tab falls
+  // back to colour alone rather than punching a hole in the terminal image.
+  const transparent = useTransparent()
+  const activeTabBg = transparent ? undefined : t.backgroundElement
+  const prRowVisible = usePrStatusStore(selectPrRowVisible)
   const fileListMode = useAppStore((s) => s.gitPane.fileListMode)
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
   const toggleListMode = useCallback(() => {
@@ -53,40 +60,95 @@ export const GitPaneHeader = memo(function GitPaneHeader({
   const showBehind = behind > 0
   const showTracking = showAhead || showBehind
 
-  // On the checks tab the PR summary already names the branch, and the
-  // working-tree counters are irrelevant — drop the whole git row.
-  const showGitRow = tab !== 'checks' && gitPanel.error === null
-  const showToggle = showGitRow && gitPanel.files.length > 0
+  // The PR row already carries the branch identity (and the checks tab spells
+  // out `base ← head`), so the branch row is only worth a line without a PR.
+  const showPrRow = hasTabs && prRowVisible
+  const showBranchRow = !showPrRow && gitPanel.error === null
+  const showToggle = tab !== 'checks' && gitPanel.files.length > 0
   const showHistorical = headOffset > 0
   const showReviewBase = baseLabel != null && baseLabel !== ''
   const showScope = showHistorical || showReviewBase
-
-  return (
-    <box flexDirection="column" flexShrink={0} paddingBottom={1}>
-      {hasTabs ? (
-        <box flexDirection="row" gap={1} onMouseDown={tab === 'files' ? showChecks : showFiles}>
+  const trackingAndToggle = (
+    <box flexDirection="row" flexShrink={0} gap={2}>
+      {showTracking && tab !== 'checks' ? (
+        <box flexDirection="row" gap={1}>
+          {showAhead ? (
+            <text selectable={false} fg={t.textMuted} wrapMode="none">
+              {`↑${ahead}`}
+            </text>
+          ) : null}
+          {showBehind ? (
+            <text selectable={false} fg={t.textMuted} wrapMode="none">
+              {`↓${behind}`}
+            </text>
+          ) : null}
+        </box>
+      ) : null}
+      {showToggle ? (
+        <box flexDirection="row" gap={1} paddingLeft={1} onMouseDown={toggleListMode}>
           <text
             selectable={false}
-            fg={tab === 'files' ? t.primary : t.textMuted}
+            fg={fileListMode === 'tree' ? t.primary : t.textMuted}
             wrapMode="none"
-            onMouseDown={showFiles}
           >
-            files
+            tree
           </text>
           <text selectable={false} fg={t.textMuted} wrapMode="none">
             |
           </text>
           <text
             selectable={false}
-            fg={tab === 'checks' ? t.primary : t.textMuted}
+            fg={fileListMode === 'flat' ? t.primary : t.textMuted}
             wrapMode="none"
-            onMouseDown={showChecks}
           >
-            checks
+            flat
           </text>
         </box>
       ) : null}
-      {showGitRow ? (
+    </box>
+  )
+
+  return (
+    <box flexDirection="column" flexShrink={0} paddingBottom={1}>
+      {showPrRow && hasProject ? <PrStateRow projectPath={projectPath} /> : null}
+      {hasTabs ? (
+        <box flexDirection="row" justifyContent="space-between">
+          <box flexDirection="row" flexShrink={0} gap={1}>
+            <box
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={tab === 'files' ? activeTabBg : undefined}
+              onMouseDown={showFiles}
+            >
+              <text
+                selectable={false}
+                fg={tab === 'files' ? t.text : t.textMuted}
+                bg={tab === 'files' ? activeTabBg : undefined}
+                wrapMode="none"
+              >
+                files
+              </text>
+            </box>
+            <box
+              paddingLeft={1}
+              paddingRight={1}
+              backgroundColor={tab === 'checks' ? activeTabBg : undefined}
+              onMouseDown={showChecks}
+            >
+              <text
+                selectable={false}
+                fg={tab === 'checks' ? t.text : t.textMuted}
+                bg={tab === 'checks' ? activeTabBg : undefined}
+                wrapMode="none"
+              >
+                checks
+              </text>
+            </box>
+          </box>
+          {trackingAndToggle}
+        </box>
+      ) : null}
+      {showBranchRow ? (
         <box flexDirection="row" justifyContent="space-between">
           <box flexDirection="row" flexShrink={1} overflow="hidden">
             <text selectable={false} fg={t.textMuted} wrapMode="none">
@@ -99,43 +161,7 @@ export const GitPaneHeader = memo(function GitPaneHeader({
               {branchIsResolved ? <strong>{branchLabel}</strong> : branchLabel}
             </text>
           </box>
-          <box flexDirection="row" flexShrink={0} gap={2}>
-            {showTracking ? (
-              <box flexDirection="row" gap={1}>
-                {showAhead ? (
-                  <text selectable={false} fg={t.textMuted} wrapMode="none">
-                    {`↑${ahead}`}
-                  </text>
-                ) : null}
-                {showBehind ? (
-                  <text selectable={false} fg={t.textMuted} wrapMode="none">
-                    {`↓${behind}`}
-                  </text>
-                ) : null}
-              </box>
-            ) : null}
-            {showToggle ? (
-              <box flexDirection="row" gap={1} paddingLeft={1} onMouseDown={toggleListMode}>
-                <text
-                  selectable={false}
-                  fg={fileListMode === 'tree' ? t.primary : t.textMuted}
-                  wrapMode="none"
-                >
-                  tree
-                </text>
-                <text selectable={false} fg={t.textMuted} wrapMode="none">
-                  |
-                </text>
-                <text
-                  selectable={false}
-                  fg={fileListMode === 'flat' ? t.primary : t.textMuted}
-                  wrapMode="none"
-                >
-                  flat
-                </text>
-              </box>
-            ) : null}
-          </box>
+          {hasTabs ? null : trackingAndToggle}
         </box>
       ) : null}
       {showScope ? (
