@@ -41,8 +41,8 @@ import {
 //
 // v11: breaking release boundary — force a fresh terminal-manager so named
 // worker metadata is guaranteed to survive daemon reattach and process swaps.
-export const MANAGER_PROTOCOL_MIN_VERSION = 11
-export const MANAGER_PROTOCOL_VERSION = 11
+export const MANAGER_PROTOCOL_MIN_VERSION = 12
+export const MANAGER_PROTOCOL_VERSION = 12
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New

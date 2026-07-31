@@ -5,6 +5,67 @@ Typed configuration package for [`@brimveyn/aimux`](https://github.com/BrimVeyn/
 Use this package to author `aimux.config.ts` or `aimux.config.js` inside an
 `aimux` profile directory.
 
+## BREAKING in 0.9.0 — project / workspace / tab
+
+aimux now has one word per level, and each level has its own creation action:
+
+| Level         | What it is                               | Action                         |
+| ------------- | ---------------------------------------- | ------------------------------ |
+| **project**   | a repository you add by picking a folder | `<C-g>` → "Create new project" |
+| **workspace** | a git worktree inside a project          | `<C-p>`                        |
+| **tab**       | an assistant in a workspace              | `<C-n>`                        |
+
+What used to be called a workspace is now a **project**; what used to be called
+a worktree is now a **workspace**.
+
+**`<C-n>` no longer creates worktrees.** It is an assistant picker; the tab
+opens in the active workspace. Use `<C-p>` to create a workspace.
+
+### Renamed actions
+
+The old names still work in 0.9.0 as `@deprecated` aliases and will be removed
+in a later release:
+
+| 0.8.x                        | 0.9.0                         |
+| ---------------------------- | ----------------------------- |
+| `sessionPicker`              | `projectPicker`               |
+| `openCreateSessionModal`     | `openCreateProjectModal`      |
+| `createSessionEscape`        | `createProjectEscape`         |
+| `confirmCreateSession`       | `confirmCreateProject`        |
+| `reorderSession`             | `reorderProject`              |
+| `switchSessionByIndex`       | `switchProjectByIndex`        |
+| `toggleSessionBar`           | `toggleProjectBar`            |
+| `openWorktreeMove`           | `openWorkspaceMove`           |
+| `toggleWorktreeMoveDelete`   | `toggleWorkspaceMoveDelete`   |
+| `confirmWorktreeMove`        | `confirmWorkspaceMove`        |
+| `confirmWorktreeDeleteModal` | `confirmWorkspaceDeleteModal` |
+
+### Removed actions
+
+These have no replacement — `<C-n>` cannot create or delete a workspace any
+more. A config referencing them fails to compile, on purpose:
+`toggleNewTabWorktree`, `deleteSelectedWorktree`, `confirmDeleteWorktree`.
+
+### Renamed mode ids
+
+Mode ids are not aliased; `.mode('modal.create-session', …)` throws.
+
+| 0.8.x                                   | 0.9.0                            |
+| --------------------------------------- | -------------------------------- |
+| `modal.session-picker.filtering`        | `modal.project-picker.filtering` |
+| `modal.session-name`                    | `modal.project-name`             |
+| `modal.create-session`                  | `modal.create-project`           |
+| `modal.worktree-move`                   | `modal.workspace-move`           |
+| `modal.worktree-move-confirm`           | `modal.workspace-move-confirm`   |
+| `modal.worktree-delete-confirm`         | `modal.workspace-delete-confirm` |
+| `modal.new-tab.worktree-delete-confirm` | _(removed)_                      |
+| _(new)_                                 | `modal.create-workspace`         |
+
+### Renamed config key
+
+`worktreeTemplates` is now `workspaceTemplates`. The old key is still read in
+0.9.0 and reports a config issue; rename it.
+
 ## What This Package Does
 
 `@brimveyn/aimux-config` provides:

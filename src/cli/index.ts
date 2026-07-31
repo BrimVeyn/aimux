@@ -172,6 +172,17 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   const group = argv[0] ?? ''
   const verb = argv[1] ?? ''
 
+  // `aimux worktree` was renamed to `aimux workspace`, and the old
+  // `aimux workspace` became `aimux project`. Aliasing the groups would
+  // silently change what `aimux workspace create` does, so refuse loudly for
+  // a release instead.
+  if (group === 'worktree') {
+    writeError(
+      '`aimux worktree` was renamed to `aimux workspace`, and the old `aimux workspace` is now `aimux project`. See docs/reference/cli.md'
+    )
+    return EXIT_USAGE
+  }
+
   // `aimux <group> --help` (or bare `aimux <group>`) — group-scoped help. Print
   // the verb list without erroring on the missing verb, so agents can drill
   // down step by step.

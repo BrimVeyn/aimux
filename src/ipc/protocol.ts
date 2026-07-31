@@ -46,8 +46,8 @@ import { isProjectSnapshotV1, isWorkspaceRecord } from '../state/validation'
 //
 // v16: breaking release boundary — the agent-first worker control plane and
 // its metadata guarantees are now required. Old app/daemon pairs must not mix.
-export const IPC_PROTOCOL_MIN_VERSION = 16
-export const IPC_PROTOCOL_VERSION = 16
+export const IPC_PROTOCOL_MIN_VERSION = 17
+export const IPC_PROTOCOL_VERSION = 17
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its

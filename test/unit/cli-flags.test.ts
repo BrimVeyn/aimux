@@ -66,3 +66,27 @@ describe('cli flag parser', () => {
     })
   })
 })
+
+describe('deprecated flag aliases from the project/workspace rename', () => {
+  test('--workspace still resolves a project, keyed under the new name', () => {
+    const parsed = parseArgs(['--workspace', 'main'], SHARED_FLAGS, [])
+    expect(parsed.flags.project).toBe('main')
+    // The old spelling must not leak into the result.
+    expect(parsed.flags.workspace).toBeUndefined()
+  })
+
+  test('the alias works in the --flag=value form too', () => {
+    expect(parseArgs(['--workspace=main'], SHARED_FLAGS, []).flags.project).toBe('main')
+  })
+
+  test('--worktree resolves to the workspace flag when a command declares one', () => {
+    const spec = [{ description: 'target workspace', kind: 'string', name: 'workspace' }] as const
+    const parsed = parseArgs(['--worktree', 'wt-1'], spec, [])
+    expect(parsed.flags.workspace).toBe('wt-1')
+    expect(parsed.flags.worktree).toBeUndefined()
+  })
+
+  test('an alias is ignored when the command has no such current flag', () => {
+    expect(() => parseArgs(['--worktree', 'x'], SHARED_FLAGS, [])).toThrow(CliUsageError)
+  })
+})

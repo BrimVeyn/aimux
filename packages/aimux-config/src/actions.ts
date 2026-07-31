@@ -928,3 +928,38 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   }
   return r([{ type: 'switch-create-project-field' }])
 }
+
+// ---------------------------------------------------------------------------
+// Deprecated aliases — 0.8.x names kept working for one release.
+//
+// The project/workspace/worktree rename moved every one of these. Aliases only
+// exist where the old name still has a target: `toggleNewTabWorktree`,
+// `deleteSelectedWorktree` and `confirmDeleteWorktree` were deleted outright
+// when <C-n> stopped creating worktrees, so a config referencing them is a
+// compile error on purpose.
+//
+// ponytail: drop these with the other rename shims.
+// ---------------------------------------------------------------------------
+
+/** @deprecated renamed to `projectPicker`. */
+export const sessionPicker = projectPicker
+/** @deprecated renamed to `openCreateProjectModal`. */
+export const openCreateSessionModal = openCreateProjectModal
+/** @deprecated renamed to `createProjectEscape`. */
+export const createSessionEscape = createProjectEscape
+/** @deprecated renamed to `confirmCreateProject`. */
+export const confirmCreateSession = confirmCreateProject
+/** @deprecated renamed to `reorderProject`. */
+export const reorderSession = reorderProject
+/** @deprecated renamed to `switchProjectByIndex`. */
+export const switchSessionByIndex = switchProjectByIndex
+/** @deprecated renamed to `toggleProjectBar`. */
+export const toggleSessionBar = toggleProjectBar
+/** @deprecated renamed to `openWorkspaceMove`. */
+export const openWorktreeMove = openWorkspaceMove
+/** @deprecated renamed to `toggleWorkspaceMoveDelete`. */
+export const toggleWorktreeMoveDelete = toggleWorkspaceMoveDelete
+/** @deprecated renamed to `confirmWorkspaceMove`. */
+export const confirmWorktreeMove = confirmWorkspaceMove
+/** @deprecated renamed to `confirmWorkspaceDeleteModal`. */
+export const confirmWorktreeDeleteModal = confirmWorkspaceDeleteModal

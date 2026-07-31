@@ -351,6 +351,8 @@ export function loadConfigResult(): ConfigLoadResult {
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
       workspaceTemplates?: unknown
+      /** ponytail: pre-rename spelling, honoured for one release. */
+      worktreeTemplates?: unknown
     }
 
     const issues: string[] = []
@@ -437,7 +439,16 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid skippedUpdateVersion')
     }
 
-    const validWorkspaceTemplates = parseWorkspaceTemplates(parsed.workspaceTemplates, issues)
+    // `worktreeTemplates` was the pre-rename key. Accepting it for one release
+    // matters more than usual: an unknown key parses fine and the templates
+    // just silently vanish, with no error for the user to act on.
+    if (parsed.workspaceTemplates === undefined && parsed.worktreeTemplates !== undefined) {
+      issues.push('worktreeTemplates is deprecated — rename it to workspaceTemplates')
+    }
+    const validWorkspaceTemplates = parseWorkspaceTemplates(
+      parsed.workspaceTemplates ?? parsed.worktreeTemplates,
+      issues
+    )
 
     if (issues.length > 0) {
       logDebug('config.load.validationIssue', { issues, path: configPath })

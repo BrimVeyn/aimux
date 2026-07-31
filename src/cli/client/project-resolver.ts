@@ -16,6 +16,8 @@ export interface ResolvedProject {
 
 /** Env pin for headless orchestrators — `--project` still wins over it. */
 export const PROJECT_ENV_VAR = 'AIMUX_PROJECT'
+/** ponytail: pre-rename spelling, honoured for one release. Drop with --workspace. */
+const LEGACY_PROJECT_ENV_VAR = 'AIMUX_WORKSPACE'
 
 /** The project's primary (root) workspace, i.e. the repository it is about. */
 export function findPrimaryWorkspace(project: ProjectRecord): WorkspaceRecord | undefined {
@@ -58,7 +60,7 @@ export function resolveProjectWithOrigin(name: string | undefined): ResolvedProj
   }
 
   const flag = name !== undefined && name !== '' ? name : undefined
-  const env = process.env[PROJECT_ENV_VAR]
+  const env = process.env[PROJECT_ENV_VAR] ?? process.env[LEGACY_PROJECT_ENV_VAR]
   const fromEnv = env != null && env !== '' ? env : undefined
   const selector = flag ?? fromEnv
   if (selector === undefined) {
