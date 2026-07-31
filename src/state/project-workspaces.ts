@@ -17,6 +17,22 @@ export function formatDivergence(divergence: BranchDivergence | undefined): stri
 }
 
 /**
+ * The workspace standing for the repo checkout itself.
+ *
+ * Falls back to the first record because a project loaded from an older
+ * catalog can have workspaces with no `primary` among them, and every caller
+ * wants *something* to anchor the project row on. Callers that need the real
+ * primary or nothing — the CLI, catalog repair — should keep asking for
+ * `source === 'primary'` directly and get `undefined` when it is absent.
+ */
+export function getPrimaryWorkspace(
+  workspaces: WorkspaceRecord[] | undefined
+): WorkspaceRecord | undefined {
+  if (!workspaces) return undefined
+  return workspaces.find((workspace) => workspace.source === 'primary') ?? workspaces[0]
+}
+
+/**
  * Whether tabs can be opened where the project currently sits. aimux works in
  * worktrees, so the repo checkout — and a project that has nothing else — is
  * not somewhere a tab can live. One predicate so the `<C-n>` guard and the

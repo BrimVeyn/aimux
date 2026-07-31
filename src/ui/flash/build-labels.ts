@@ -1,6 +1,6 @@
 import type { AppState, FlashJumpTarget, FlashLabel } from '../../state/types'
 
-import { filterTabsForActiveWorkspace } from '../../state/project-workspaces'
+import { filterTabsForActiveWorkspace, getPrimaryWorkspace } from '../../state/project-workspaces'
 import { orderProjectsForDisplay } from '../project-ordering'
 import { assignFlashLabels, type FlashTarget } from './assign-labels'
 
@@ -22,7 +22,7 @@ function collectTargets(state: AppState): PendingTarget[] {
   for (const [index, project] of ordered.entries()) {
     const projectIndex = index + 1
     const workspaces = project.workspaces ?? []
-    const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+    const primary = getPrimaryWorkspace(workspaces)
     out.push({
       key: `ws:${project.id}`,
       name: project.name,

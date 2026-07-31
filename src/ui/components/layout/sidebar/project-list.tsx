@@ -10,6 +10,7 @@ import type { ProjectRecord, ProjectStatus } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
+import { getPrimaryWorkspace } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_PROJECT_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
@@ -65,8 +66,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
   // otherwise the cursor visually "disappears" off-screen when crossing
   // a project boundary on a key press.
   const currentWorkspaces = currentProject?.workspaces ?? []
-  const currentPrimary =
-    currentWorkspaces.find((w) => w.source === 'primary') ?? currentWorkspaces[0]
+  const currentPrimary = getPrimaryWorkspace(currentWorkspaces)
   const rawActiveWorkspaceId = currentProject?.activeWorkspaceId
   const activeOnNonPrimary =
     rawActiveWorkspaceId != null &&
@@ -147,9 +147,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
       // same semantics as j/k cycling onto a project item.
       const sourceProject = ordered.find((s) => s.id === source)
       const sourceWorkspaces = sourceProject?.workspaces ?? []
-      const sourcePrimaryId = (
-        sourceWorkspaces.find((w) => w.source === 'primary') ?? sourceWorkspaces[0]
-      )?.id
+      const sourcePrimaryId = getPrimaryWorkspace(sourceWorkspaces)?.id
       runSideEffectGlobal({
         index: idx + 1,
         type: 'switch-project-by-index',
@@ -211,7 +209,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
             const projectIndex = baselineOrder.indexOf(project.id) + 1
             const isCurrentProject = project.id === currentProjectId
             const workspaces = project.workspaces ?? []
-            const primaryWorkspace = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+            const primaryWorkspace = getPrimaryWorkspace(workspaces)
             const extraWorkspaces = workspaces.filter((w) => w.id !== primaryWorkspace?.id)
             const projectIsActiveItem =
               isCurrentProject &&

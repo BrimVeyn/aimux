@@ -78,6 +78,7 @@ import {
   filterTabsForActiveWorkspace,
   getActiveWorkspace,
   getActiveWorkspacePath,
+  getPrimaryWorkspace,
   withActiveWorkspace,
 } from '../state/project-workspaces'
 import { filterProjects, filterSnippets, getNewTabAssistantOptions } from '../state/selectors'
@@ -1373,7 +1374,7 @@ function buildSidebarItems(state: AppState): SidebarItem[] {
   for (const project of ordered) {
     items.push({ projectId: project.id, workspaceId: null })
     const workspaces = project.workspaces ?? []
-    const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+    const primary = getPrimaryWorkspace(workspaces)
     for (const wt of workspaces) {
       if (wt.id === primary?.id) continue
       items.push({ projectId: project.id, workspaceId: wt.id })
@@ -1387,7 +1388,7 @@ function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
   if (projectId == null || projectId === '') return -1
   const project = state.projects.find((s) => s.id === projectId)
   const workspaces = project?.workspaces ?? []
-  const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+  const primary = getPrimaryWorkspace(workspaces)
   const activeWtId = project?.activeWorkspaceId ?? null
   // The project row IS the primary workspace (no separate row), so an active
   // primary or undefined active maps to the project-item.
@@ -1423,7 +1424,7 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   // Determine the workspace to activate. For project-items, that's the
   // primary; for workspace-items, the specific workspace.
   const workspaces = project.workspaces ?? []
-  const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+  const primary = getPrimaryWorkspace(workspaces)
   const targetWorkspaceId = target.workspaceId ?? primary?.id
 
   const isCrossProject = project.id !== state.currentProjectId
@@ -1491,12 +1492,23 @@ function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
   dispatch({ tabId: targetTabId, type: 'set-active-tab' })
 }
 
+/**
+ * Rewrite one project and hand back the whole list, ready for `set-projects`.
+ *
+ * Reads the *live* store rather than `ctx.state`: callers reach here after
+ * seconds of git work, and `ctx.state` is the render snapshot from before it.
+ * Since `set-projects` replaces the array wholesale, a stale read does not just
+ * miss an update — it reverts it. Workspace naming lands asynchronously, so
+ * that window is wide open.
+ */
 function replaceProject(
-  state: AppState,
+  ctx: SideEffectContext,
   projectId: string,
   next: (project: AppState['projects'][number]) => AppState['projects'][number]
 ): AppState['projects'] {
-  return state.projects.map((project) => (project.id === projectId ? next(project) : project))
+  return ctx
+    .getState()
+    .projects.map((project) => (project.id === projectId ? next(project) : project))
 }
 
 function handleSwitchWorkspace(
@@ -1507,7 +1519,7 @@ function handleSwitchWorkspace(
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
   const workspace = project?.workspaces?.find((entry) => entry.id === workspaceId)
   if (!project || !workspace) return
-  const projects = replaceProject(ctx.state, projectId, (entry) => ({
+  const projects = replaceProject(ctx, projectId, (entry) => ({
     ...entry,
     activeWorkspaceId: workspaceId,
     updatedAt: new Date().toISOString(),
@@ -1584,7 +1596,7 @@ async function createAimuxTempWorkspace(
     source: 'aimux-temp',
     updatedAt: now,
   }
-  const projects = replaceProject(ctx.state, projectId, (entry) => ({
+  const projects = replaceProject(ctx, projectId, (entry) => ({
     ...entry,
     activeWorkspaceId: workspace.id,
     updatedAt: now,
@@ -1783,16 +1795,22 @@ function removeWorkspaceRecordFromProject(
   project: NonNullable<SideEffectContext['state']['projects'][number]>,
   workspaceId: string
 ): void {
-  const remaining = (project.workspaces ?? []).filter((entry) => entry.id !== workspaceId)
-  const nextActive =
-    project.activeWorkspaceId === workspaceId ? remaining[0] : getActiveWorkspace(project)
-  const projects = replaceProject(ctx.state, projectId, (entry) => ({
-    ...entry,
-    activeWorkspaceId: nextActive?.id,
-    projectSnapshot: pruneSnapshotOfWorkspace(entry.projectSnapshot, workspaceId),
-    updatedAt: new Date().toISOString(),
-    workspaces: remaining,
-  }))
+  const projects = replaceProject(ctx, projectId, (entry) => {
+    // Filtered from `entry`, not from the `project` this was called with: a
+    // workspace created while the delete's git work ran is in one and not the
+    // other, and rebuilding from the stale copy would delete it too.
+    const remaining = (entry.workspaces ?? []).filter((w) => w.id !== workspaceId)
+    return {
+      ...entry,
+      activeWorkspaceId: (entry.activeWorkspaceId === workspaceId
+        ? remaining[0]
+        : getActiveWorkspace(entry)
+      )?.id,
+      projectSnapshot: pruneSnapshotOfWorkspace(entry.projectSnapshot, workspaceId),
+      updatedAt: new Date().toISOString(),
+      workspaces: remaining,
+    }
+  })
   saveProjectCatalog(projects)
   ctx.dispatch({ projects, type: 'set-projects' })
 }
