@@ -26,6 +26,9 @@ interface ProjectListProps {
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
+const RULE = '─'
+const HEADER_TITLE = 'Projects'
+
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false
   for (let i = 0; i < a.length; i++) {
@@ -145,11 +148,9 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      // The project row visually anchors the project's primary workspace
-      // (its branch line shows the primary's branch). Clicking it should
-      // land on the primary — same semantics as j/k cycling onto a project
-      // item — instead of preserving whatever non-primary workspace happened
-      // to be active last time we left this project.
+      // The project row stands for the project itself, not for whichever
+      // workspace was last active in it. Clicking it lands on the primary —
+      // same semantics as j/k cycling onto a project item.
       const sourceProject = ordered.find((s) => s.id === source)
       const sourceWorkspaces = sourceProject?.workspaces ?? []
       const sourcePrimaryId = (
@@ -182,8 +183,24 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           .filter((s): s is ProjectRecord => !!s)
       : ordered
 
+  const rule = RULE.repeat(Math.max(1, contentWidth))
+
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+      <box flexShrink={0}>
+        <text fg={t.border} selectable={false} wrapMode="none">
+          {rule}
+        </text>
+      </box>
+      <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
+        <text fg={t.text} selectable={false} wrapMode="none">
+          {HEADER_TITLE}
+        </text>
+        <box flexGrow={1} flexShrink={1} />
+        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleNewProject}>
+          +
+        </text>
+      </box>
       <scrollbox
         ref={scrollRef}
         scrollY
@@ -196,7 +213,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           // with their non-primary workspaces. One map, one React keypath per
           // visible row; transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
-          for (const [visibleIdx, project] of visibleProjects.entries()) {
+          for (const project of visibleProjects) {
             const projectIndex = baselineOrder.indexOf(project.id) + 1
             const isCurrentProject = project.id === currentProjectId
             const workspaces = project.workspaces ?? []
@@ -217,7 +234,10 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
-                marginTop={visibleIdx > 0 ? 1 : 0}
+                // Every project gets a blank line above it, which doubles as
+                // the gap under the header — one rule instead of a spacer row
+                // that would shift the list every time the header changes.
+                marginTop={1}
                 setRowRef={setRowRef}
                 onDragStart={handleRowDragStart}
                 onDrag={handleRowDrag}
@@ -242,18 +262,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           return rows
         })()}
       </scrollbox>
-      <box
-        flexDirection="row"
-        flexShrink={0}
-        marginTop={1}
-        backgroundColor={t.backgroundPanel}
-        justifyContent="center"
-        onMouseDown={handleNewProject}
-      >
-        <text fg={t.text} selectable={false}>
-          + New project
-        </text>
-      </box>
     </box>
   )
 }
