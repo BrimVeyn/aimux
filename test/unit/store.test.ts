@@ -185,7 +185,8 @@ describe('appReducer', () => {
     const session = next.sessions.find((entry) => entry.id === 'session-1')
 
     expect(session?.activeWorktreeId).toBe('wt-2')
-    expect(session?.projectPath).toBe('/repo/feature')
+    // Only the active worktree moves — projectPath keeps naming the repo.
+    expect(session?.projectPath).toBe('/repo/main')
   })
 
   test('activating a legacy tab leaves active worktree unchanged', () => {

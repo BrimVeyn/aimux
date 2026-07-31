@@ -14,7 +14,7 @@ import {
 } from '../../src/platform/worktree-paths'
 import {
   ensureSessionWorktrees,
-  getSessionProjectPath,
+  getActiveWorktreePath,
   withActiveWorktree,
 } from '../../src/state/session-worktrees'
 
@@ -40,7 +40,7 @@ describe('session worktrees', () => {
     expect(session.activeWorktreeId).toBe(session.worktrees?.[0]?.id)
   })
 
-  test('active worktree updates legacy projectPath mirror', () => {
+  test('switching the active worktree leaves projectPath pinned to the repo', () => {
     const session = ensureSessionWorktrees(makeSession())
     const first = session.worktrees?.[0]
     if (!first) throw new Error('expected primary worktree')
@@ -54,8 +54,9 @@ describe('session worktrees', () => {
     const switched = withActiveWorktree({ ...session, worktrees: [first, second] }, second.id)
 
     expect(switched.activeWorktreeId).toBe(second.id)
-    expect(getSessionProjectPath(switched)).toBe('/repo/feature')
-    expect(switched.projectPath).toBe('/repo/feature')
+    // The cwd follows the worktree; the project keeps naming the repo.
+    expect(getActiveWorktreePath(switched)).toBe('/repo/feature')
+    expect(switched.projectPath).toBe('/repo/main')
   })
 
   test('generated temp worktree paths stay inside the Aimux root', () => {

@@ -187,7 +187,6 @@ export function reduceSessionState(state: AppState, action: AppAction): AppState
             ...session,
             activeWorktreeId:
               action.activate === true ? action.worktree.id : session.activeWorktreeId,
-            projectPath: action.activate === true ? action.worktree.path : session.projectPath,
             updatedAt: new Date().toISOString(),
             worktrees: [...(session.worktrees ?? []), action.worktree],
           }

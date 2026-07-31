@@ -46,11 +46,12 @@ export function ensureSessionWorktrees(
     const activeWorktreeId = worktrees.some((w) => w.id === session.activeWorktreeId)
       ? session.activeWorktreeId
       : worktrees[0]?.id
-    const active = worktrees.find((w) => w.id === activeWorktreeId)
     return {
       ...session,
       activeWorktreeId,
-      projectPath: active?.path ?? session.projectPath,
+      // projectPath stays pinned to the repo. The active worktree's path is a
+      // separate thing — read it with getActiveWorktreePath.
+      projectPath: worktrees.find((w) => w.source === 'primary')?.repoRoot ?? session.projectPath,
       worktrees,
     }
   }
@@ -197,7 +198,11 @@ export function getActiveWorktree(session: SessionRecord | undefined): WorktreeR
   )
 }
 
-export function getSessionProjectPath(session: SessionRecord | undefined): string | undefined {
+/**
+ * The cwd to work in: the active worktree's path, falling back to the project
+ * root. Not the same as `session.projectPath`, which names the repo itself.
+ */
+export function getActiveWorktreePath(session: SessionRecord | undefined): string | undefined {
   return getActiveWorktree(session)?.path ?? session?.projectPath
 }
 
@@ -207,7 +212,6 @@ export function withActiveWorktree(session: SessionRecord, worktreeId: string): 
   return {
     ...session,
     activeWorktreeId: worktreeId,
-    projectPath: worktree.path,
     updatedAt: new Date().toISOString(),
   }
 }

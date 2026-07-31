@@ -3,7 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
-import { getSessionProjectPath } from '../state/session-worktrees'
+import { getActiveWorktreePath } from '../state/session-worktrees'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
@@ -62,7 +62,7 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
       ? state.sessions.find((session) => session.id === state.currentSessionId)
       : undefined
   const sessionName = currentSession?.name ?? 'no workspace'
-  const sessionPath = getSessionProjectPath(currentSession)
+  const sessionPath = getActiveWorktreePath(currentSession)
   const sessionSegs = sessionSegments(sessionName, sessionPath)
 
   switch (state.focusMode) {

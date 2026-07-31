@@ -38,7 +38,7 @@ import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
-import { getSessionProjectPath } from './state/session-worktrees'
+import { getActiveWorktreePath } from './state/session-worktrees'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
@@ -418,7 +418,7 @@ export function App({
     dispatch,
     getCurrentSessionProjectPath: () => {
       if (!(state.currentSessionId != null && state.currentSessionId !== '')) return
-      return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
+      return getActiveWorktreePath(state.sessions.find((s) => s.id === state.currentSessionId))
     },
     // Read straight from the store, not stateRef. stateRef is only refreshed
     // on render, so within a single JS turn (a click handler that dispatches

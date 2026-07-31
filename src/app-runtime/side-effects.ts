@@ -63,7 +63,7 @@ import { pruneSnapshotOfWorktree } from '../state/session-persistence'
 import {
   filterTabsForActiveWorktree,
   getActiveWorktree,
-  getSessionProjectPath,
+  getActiveWorktreePath,
   withActiveWorktree,
 } from '../state/session-worktrees'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
@@ -644,7 +644,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     case 'load-create-worktree-base-branches': {
       void (async () => {
         const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-        const sourcePath = getActiveWorktree(session)?.path ?? getSessionProjectPath(session)
+        const sourcePath = getActiveWorktree(session)?.path ?? getActiveWorktreePath(session)
         if (!(sourcePath != null && sourcePath !== '')) return
         const branches = await listLocalBranches(sourcePath)
         if (ctx.getState().modal.type !== 'create-worktree') return
@@ -1413,7 +1413,6 @@ function handleSwitchWorktree(ctx: SideEffectContext, sessionId: string, worktre
   const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
     ...entry,
     activeWorktreeId: worktreeId,
-    projectPath: worktree.path,
     updatedAt: new Date().toISOString(),
   }))
   saveSessionCatalog(sessions)
@@ -1435,7 +1434,7 @@ async function createAimuxTempWorktree(
   const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
   const source =
     session?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(session)
-  const sourcePath = source?.path ?? getSessionProjectPath(session)
+  const sourcePath = source?.path ?? getActiveWorktreePath(session)
   if (!session || !(sourcePath != null && sourcePath !== '')) return undefined
 
   // Resolve the *main* repo checkout, never the active linked worktree, so the
@@ -1490,7 +1489,6 @@ async function createAimuxTempWorktree(
   const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
     ...entry,
     activeWorktreeId: worktree.id,
-    projectPath: worktree.path,
     updatedAt: now,
     worktrees: [...(entry.worktrees ?? []), worktree],
   }))
@@ -1688,7 +1686,6 @@ function removeWorktreeRecordFromSession(
   const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
     ...entry,
     activeWorktreeId: nextActive?.id,
-    projectPath: nextActive?.path ?? entry.projectPath,
     updatedAt: new Date().toISOString(),
     workspaceSnapshot: pruneSnapshotOfWorktree(entry.workspaceSnapshot, worktreeId),
     worktrees: remaining,

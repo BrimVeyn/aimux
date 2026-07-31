@@ -6,7 +6,7 @@ import { useGitPanelPolling } from '../../../../git/git-poller'
 import { usePrStatusPolling } from '../../../../git/pr-status-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
-import { getSessionProjectPath } from '../../../../state/session-worktrees'
+import { getActiveWorktreePath } from '../../../../state/session-worktrees'
 import { GitPanel } from '../git-panel'
 import { GitPaneHeader, type GitPaneTab } from './git-pane-header'
 import { PrChecksPanel } from './pr-checks-panel'
@@ -32,7 +32,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({
     currentSessionId != null && currentSessionId !== ''
       ? sessions.find((s) => s.id === currentSessionId)
       : undefined
-  const projectPath = getSessionProjectPath(currentSession)
+  const projectPath = getActiveWorktreePath(currentSession)
 
   const [tab, setTab] = useState<GitPaneTab>('files')
 
