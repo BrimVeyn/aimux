@@ -9,6 +9,7 @@ const NOW = '2024-01-01T00:00:00.000Z'
 
 let home: string
 let originalHome: string | undefined
+let originalProfile: string | undefined
 
 /**
  * A v1 record, using the pre-rename key names exactly as they were on disk.
@@ -100,13 +101,22 @@ function writeLegacy(): void {
 
 beforeEach(() => {
   originalHome = process.env.HOME
+  originalProfile = process.env.AIMUX_PROFILE
   home = mkdtempSync(join(tmpdir(), 'aimux-migrate-'))
   process.env.HOME = home
+  // Pin the profile as well as HOME. The catalog path is
+  // `$HOME/.config/aimux/<profile>/`, so a profile inherited from the ambient
+  // environment sends `writeLegacy` and the loader to different directories:
+  // the load finds nothing, reports no error, and every assertion here fails
+  // with "0 projects" for a reason that has nothing to do with migration.
+  process.env.AIMUX_PROFILE = 'default'
 })
 
 afterEach(() => {
   if (originalHome === undefined) delete process.env.HOME
   else process.env.HOME = originalHome
+  if (originalProfile === undefined) delete process.env.AIMUX_PROFILE
+  else process.env.AIMUX_PROFILE = originalProfile
   rmSync(home, { force: true, recursive: true })
 })
 
