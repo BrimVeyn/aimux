@@ -1,5 +1,6 @@
 import type { WorktreeTemplate } from '../config'
 
+import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
 import { reduceAutoCommit } from './reducers/auto-commit-state'
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
@@ -12,26 +13,22 @@ import { filterSnippets } from './selectors'
 import {
   type AppAction,
   type AppState,
+  type BarsState,
   EMPTY_AUTO_COMMIT_STATE,
   EMPTY_MULTI_REPO_STATE,
   type GitModeState,
-  type GitPaneMode,
-  type GitPanePosition,
   type GitPaneState,
   type SessionRecord,
   type SnippetRecord,
 } from './types'
 
-const DEFAULT_SIDEBAR_WIDTH = 28
-const DEFAULT_SIDEBAR_MIN_WIDTH = 18
-const DEFAULT_SIDEBAR_MAX_WIDTH = 42
 const DEFAULT_TERMINAL_COLS = 80
 const DEFAULT_TERMINAL_ROWS = 24
 
 export interface InitialStateOverrides {
   gitMode?: Partial<GitModeState>
   gitPane?: Partial<GitPaneState>
-  sidebar?: Pick<AppState['sidebar'], 'visible' | 'width'>
+  bars?: BarsState
   sessionBarVisible?: boolean
   worktreeTemplates?: WorktreeTemplate[]
 }
@@ -39,26 +36,37 @@ export interface InitialStateOverrides {
 const DEFAULT_GIT_PANE: GitPaneState = {
   diffCount: { enabled: true },
   diffModeRatio: 0.35,
-  embeddedRatio: 0.5,
   fileListMode: 'tree',
-  mode: 'embedded',
-  paneRatio: 0.5,
   path: { enabled: true },
-  position: 'bottom',
   prefetchRadius: 5,
   treeCompaction: true,
-  visible: true,
 }
 
-function resolveGitPanePosition(mode: GitPaneMode, position: GitPanePosition): GitPanePosition {
-  if (mode === 'embedded') {
-    return position === 'top' || position === 'bottom' ? position : 'bottom'
-  }
-  return position === 'left' || position === 'right' ? position : 'left'
+export const DEFAULT_BARS: BarsState = {
+  left: {
+    visible: true,
+    widgets: [
+      { grow: 50, id: 'workspaces', visible: true },
+      { grow: 50, id: 'git', visible: true },
+    ],
+    width: 28,
+  },
+  right: { visible: false, widgets: [], width: 40 },
 }
 
-function clampSidebarWidth(width: number): number {
-  return Math.min(DEFAULT_SIDEBAR_MAX_WIDTH, Math.max(DEFAULT_SIDEBAR_MIN_WIDTH, width))
+/**
+ * Drop widget ids this build cannot render (config written by a newer or
+ * patched version) and normalise widths — the only place unknown ids can enter.
+ */
+function sanitizeBars(bars: BarsState): BarsState {
+  const sanitizeBar = (bar: BarsState[keyof BarsState]): BarsState[keyof BarsState] => ({
+    ...bar,
+    widgets: bar.widgets
+      .filter((widget) => (KNOWN_WIDGET_IDS as readonly string[]).includes(widget.id))
+      .map((widget) => ({ ...widget, grow: Math.max(1, Math.round(widget.grow)) })),
+    width: clampBarWidth(bar.width),
+  })
+  return { left: sanitizeBar(bars.left), right: sanitizeBar(bars.right) }
 }
 
 export function createInitialState(
@@ -68,24 +76,15 @@ export function createInitialState(
   showSessionPicker = false,
   overrides: InitialStateOverrides = {}
 ): AppState {
-  const gitPaneMode = overrides.gitPane?.mode ?? DEFAULT_GIT_PANE.mode
-  const gitPanePosition = resolveGitPanePosition(
-    gitPaneMode,
-    overrides.gitPane?.position ?? DEFAULT_GIT_PANE.position
-  )
   return {
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,
+    bars: sanitizeBars(overrides.bars ?? DEFAULT_BARS),
     currentSessionId: null,
     customCommands,
     focusMode: showSessionPicker ? 'command-edit' : 'navigation',
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
-    gitPane: {
-      ...DEFAULT_GIT_PANE,
-      ...overrides.gitPane,
-      mode: gitPaneMode,
-      position: gitPanePosition,
-    },
+    gitPane: { ...DEFAULT_GIT_PANE, ...overrides.gitPane },
     gitPanel: emptyGitPanel(),
     lastActiveTabByWorktree: {},
     layout: {
@@ -109,12 +108,6 @@ export function createInitialState(
     },
     sessions,
     sessionStatuses: {},
-    sidebar: {
-      maxWidth: DEFAULT_SIDEBAR_MAX_WIDTH,
-      minWidth: DEFAULT_SIDEBAR_MIN_WIDTH,
-      visible: overrides.sidebar?.visible ?? true,
-      width: clampSidebarWidth(overrides.sidebar?.width ?? DEFAULT_SIDEBAR_WIDTH),
-    },
     snippets,
     tabGroupMap: {},
     tabs: [],

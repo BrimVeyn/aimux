@@ -13,7 +13,7 @@ import type { SessionBackend } from '../session-backend/types'
 import type { AppAction, AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
-import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
+import { getBarWidth } from '../state/bars'
 import {
   createTerminalBounds,
   forEachSplitPaneRect,
@@ -223,9 +223,12 @@ export function useTerminalResize({
     [backend, contentOriginRef]
   )
 
-  const gitPaneInPaneMode = state.gitPane.mode === 'pane' && state.gitPane.visible
+  // `getBarWidth` is the single authority on bar width — the Bar component
+  // renders from the same function. A mismatch silently corrupts PTY columns
+  // and mouse hit-testing.
+  const leftBarWidth = getBarWidth(state.bars.left)
+  const rightBarWidth = getBarWidth(state.bars.right)
   const terminalSize = useMemo(() => {
-    const sidebarWidth = state.sidebar.visible ? state.sidebar.width : 0
     const sessionBarRows = state.sessionBar.visible ? 1 : 0
     const sessionBarTopOffset = sessionBarRows
     const reservedRows =
@@ -233,18 +236,16 @@ export function useTerminalResize({
       STATUS_BAR_HEIGHT +
       TERMINAL_PANE_VERTICAL_CHROME +
       sessionBarRows
-    const gitPaneWidth = gitPaneInPaneMode ? getGitPaneWidthFromRatio(state.gitPane.paneRatio) : 0
-    const gitOnLeft = gitPaneInPaneMode && state.gitPane.position === 'left'
     const cols = Math.max(
       MIN_TERMINAL_COLS,
-      Math.floor(dimensions.width - sidebarWidth - gitPaneWidth - MAIN_AREA_HORIZONTAL_CHROME)
+      Math.floor(dimensions.width - leftBarWidth - rightBarWidth - MAIN_AREA_HORIZONTAL_CHROME)
     )
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows))
 
     contentOriginRef.current = {
       cols,
       rows,
-      x: sidebarWidth + (gitOnLeft ? gitPaneWidth : 0) + 1,
+      x: leftBarWidth + 1,
       y: 1 + sessionBarTopOffset,
     }
 
@@ -253,12 +254,9 @@ export function useTerminalResize({
     contentOriginRef,
     dimensions.height,
     dimensions.width,
-    state.sidebar.visible,
-    state.sidebar.width,
+    leftBarWidth,
+    rightBarWidth,
     state.sessionBar.visible,
-    gitPaneInPaneMode,
-    state.gitPane.position,
-    state.gitPane.paneRatio,
   ])
 
   useLayoutEffect(() => {
@@ -280,14 +278,7 @@ export function useTerminalResize({
     })
     handledBySyncRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.sidebar.visible,
-    state.sidebar.width,
-    state.sessionBar.visible,
-    gitPaneInPaneMode,
-    state.gitPane.position,
-    state.gitPane.paneRatio,
-  ])
+  }, [leftBarWidth, rightBarWidth, state.sessionBar.visible])
 
   useEffect(() => {
     if (handledBySyncRef.current) {

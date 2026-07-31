@@ -10,6 +10,7 @@ import type { FocusMode, TabSession } from '../../../state/types'
 
 import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-poller'
 import { useAppStore } from '../../../state/app-store'
+import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
@@ -197,7 +198,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const bar = useAppStore((s) => s.sessionBar)
-  const sidebar = useAppStore((s) => s.sidebar)
+  const leftBarVisible = useAppStore((s) => getBarWidth(s.bars.left) > 0)
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const sessions = useAppStore((s) => s.sessions)
   const focusMode: FocusMode = useAppStore((s) => s.focusMode)
@@ -206,7 +207,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
 
   // Sidebar now also shows worktree chips with divergence — poll whenever
   // either surface is visible.
-  useWorktreeDivergencePolling(bar.visible || sidebar.visible || forceVisible)
+  useWorktreeDivergencePolling(bar.visible || leftBarVisible || forceVisible)
 
   const currentSession = useMemo(
     () =>

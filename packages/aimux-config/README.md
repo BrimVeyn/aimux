@@ -188,7 +188,7 @@ palette guidance, and precedence details.
 | `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins |
 | `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting                 |
 | `backends`   | Typed surface only | Runtime wiring deferred                                                              |
-| `sidebar`    | Typed surface only | Type exists, runtime not currently driven by this field                              |
+| `sidebar`    | Ignored            | Superseded by the app-managed `bars` state in `aimux.json`                           |
 | `hooks`      | Typed surface only | Type exists, runtime use not currently wired                                         |
 | `snippets`   | Typed surface only | Runtime currently uses `aimux-snippets.json`                                         |
 

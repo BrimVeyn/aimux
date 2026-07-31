@@ -78,18 +78,24 @@ describe('mode handlers', () => {
     expect(armed.actions).toEqual([])
   })
 
-  test('navigation: Ctrl+Z opens sidebar when hidden, no-op when visible', () => {
+  test('navigation: Ctrl+Z opens the workspaces bar when hidden, no-op when visible', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const hiddenCtx = ctx()
-    hiddenCtx.state.sidebar = { ...hiddenCtx.state.sidebar, visible: false }
+    hiddenCtx.state.bars = {
+      ...hiddenCtx.state.bars,
+      left: { ...hiddenCtx.state.bars.left, visible: false },
+    }
     const openResult = requireValue(
       handler.handleKey(key('z', { ctrl: true }), hiddenCtx),
       'Expected Ctrl+Z result'
     )
-    expect(openResult.actions).toEqual([{ type: 'toggle-sidebar' }])
+    expect(openResult.actions).toEqual([{ side: 'left', type: 'toggle-bar' }])
 
     const visibleCtx = ctx()
-    visibleCtx.state.sidebar = { ...visibleCtx.state.sidebar, visible: true }
+    visibleCtx.state.bars = {
+      ...visibleCtx.state.bars,
+      left: { ...visibleCtx.state.bars.left, visible: true },
+    }
     const noopResult = requireValue(
       handler.handleKey(key('z', { ctrl: true }), visibleCtx),
       'Expected Ctrl+Z noop result'
@@ -204,13 +210,13 @@ describe('mode handlers', () => {
     expect(result?.transition).toBeUndefined()
   })
 
-  test('terminal-input: Ctrl+B resolves to toggle-sidebar', () => {
+  test('terminal-input: Ctrl+B resolves to toggle-bar left', () => {
     const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
     const result = requireValue(
       handler.handleKey(key('b', { ctrl: true }), ctx()),
       'Expected Ctrl+B result'
     )
-    expect(result.actions).toContainEqual({ type: 'toggle-sidebar' })
+    expect(result.actions).toContainEqual({ side: 'left', type: 'toggle-bar' })
   })
 
   test('terminal-input: unbound keys (Ctrl+L) return null', () => {

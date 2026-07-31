@@ -197,10 +197,9 @@ describe('session persistence', () => {
     const initialState = createInitialState()
     const baseState = {
       ...initialState,
-      sidebar: {
-        ...initialState.sidebar,
-        visible: true,
-        width: 31,
+      bars: {
+        ...initialState.bars,
+        left: { ...initialState.bars.left, visible: true, width: 31 },
       },
     }
     const restored = restoreWorkspaceState(baseState, {
@@ -229,8 +228,6 @@ describe('session persistence', () => {
 
     expect(restored.tabs).toHaveLength(0)
     expect(restored.activeTabId).toBeNull()
-    expect(restored.sidebar.visible).toBe(true)
-    expect(restored.sidebar.width).toBe(31)
     expect(restored.focusMode).toBe('navigation')
   })
 

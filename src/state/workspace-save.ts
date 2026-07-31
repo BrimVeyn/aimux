@@ -23,20 +23,18 @@ export function buildSessionsWithCurrentSnapshot(
 export function saveCurrentWorkspace(state: AppState): void {
   saveConfig({
     ...loadConfig(),
+    bars: state.bars,
     customCommands: state.customCommands,
     gitPane: {
       diffModeRatio: state.gitPane.diffModeRatio,
-      embeddedRatio: state.gitPane.embeddedRatio,
       fileListMode: state.gitPane.fileListMode,
-      mode: state.gitPane.mode,
-      paneRatio: state.gitPane.paneRatio,
-      position: state.gitPane.position,
-      visible: state.gitPane.visible,
     },
     sessionBarVisible: state.sessionBar.visible,
+    // Legacy mirror of the left bar: lets an older build (and the workspace
+    // snapshot schema) still find a sidebar after a downgrade.
     sidebar: {
-      visible: state.sidebar.visible,
-      width: state.sidebar.width,
+      visible: state.bars.left.visible,
+      width: state.bars.left.width,
     },
   })
   saveSessionCatalog(

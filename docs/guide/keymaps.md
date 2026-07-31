@@ -171,7 +171,7 @@ Document your own configs accordingly.
 - `Ctrl+N` - new tab
 - `Ctrl+R` - restart tab
 - `Ctrl+G` - workspace picker
-- `Ctrl+B` - toggle sidebar
+- `Ctrl+B` - toggle left bar
 - `Ctrl+S` - snippet picker
 - `Ctrl+T` - theme picker
 - `G` - toggle git panel
@@ -182,7 +182,7 @@ Document your own configs accordingly.
 ### `terminal-input`
 
 - `Ctrl+Z` - leave terminal-input mode
-- `Ctrl+B` - toggle sidebar
+- `Ctrl+B` - toggle left bar
 - `Leader+h/j/k/l` - focus panes
 - `Leader+H/J/K/L` - resize panes
 - `Leader+|` - split vertical
@@ -192,6 +192,7 @@ Document your own configs accordingly.
 ### Shared between `navigation` and `terminal-input`
 
 - `Leader+b` - toggle workspace bar
+- `Leader+B` - toggle right bar
 - `Leader+1` through `Leader+9` - switch workspaces by index
 
 ### `git-mode`

@@ -106,40 +106,14 @@ export function App({
     const json = loadConfig()
     const sessionBarVisible =
       resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
-    const sidebarOverrides = json.sidebar
-
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
     const userGitPane = resolvedConfig.gitPane
-    const fileListMode = userGitPane?.initialFileListMode ?? json.gitPane?.fileListMode ?? 'tree'
-    const diffModeRatio = userGitPane?.initialDiffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
-    const treeCompaction =
-      userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true
-    const prefetchRadius = userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5
-    const persistedPaneRatio = json.gitPane?.paneRatio ?? json.gitPane?.ratio ?? 0.5
-    const persistedEmbeddedRatio = json.gitPane?.embeddedRatio ?? json.gitPane?.ratio ?? 0.5
     const gitPaneOverrides = {
-      ...json.gitPane,
-      diffModeRatio,
-      embeddedRatio:
-        userGitPane?.initialMode === 'embedded' && userGitPane?.initialRatio !== undefined
-          ? userGitPane.initialRatio
-          : persistedEmbeddedRatio,
-      fileListMode,
-      paneRatio:
-        userGitPane?.initialMode === 'pane' && userGitPane?.initialRatio !== undefined
-          ? userGitPane.initialRatio
-          : persistedPaneRatio,
-      prefetchRadius,
-      treeCompaction,
-      ...(userGitPane?.initialVisible !== undefined ? { visible: userGitPane.initialVisible } : {}),
-      ...(userGitPane?.initialMode !== undefined ? { mode: userGitPane.initialMode } : {}),
-      ...(userGitPane?.initialPosition !== undefined
-        ? { position: userGitPane.initialPosition }
-        : {}),
-      ...(userGitPane?.initialDiffModeRatio !== undefined
-        ? { diffModeRatio: userGitPane.initialDiffModeRatio }
-        : {}),
+      diffModeRatio: userGitPane?.initialDiffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35,
+      fileListMode: userGitPane?.initialFileListMode ?? json.gitPane?.fileListMode ?? 'tree',
+      prefetchRadius: userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5,
+      treeCompaction: userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true,
       ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }
@@ -152,9 +126,9 @@ export function App({
       mergedSnippets,
       sessionCatalog.length === 0,
       {
+        bars: json.bars,
         gitPane: gitPaneOverrides,
         sessionBarVisible,
-        sidebar: sidebarOverrides,
         worktreeTemplates:
           resolvedConfig.worktreeTemplates.length > 0
             ? resolvedConfig.worktreeTemplates
@@ -382,13 +356,12 @@ export function App({
   })
 
   const {
-    handleEmbeddedGitResizeStart,
-    handleGitPaneResizeStart,
+    handleBarBoundaryResizeStart,
+    handleBarResizeStart,
     handlePaneActivate,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
     handleSeparatorDragStart,
-    handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
     handleTerminalDrag,
@@ -563,12 +536,11 @@ export function App({
         onTerminalMouseUp={handleTerminalMouseUp}
         onPaneActivate={handlePaneActivate}
         onSplitResize={handleSplitResize}
-        onEmbeddedGitResizeStart={handleEmbeddedGitResizeStart}
-        onGitPaneResizeStart={handleGitPaneResizeStart}
+        onBarBoundaryResizeStart={handleBarBoundaryResizeStart}
+        onBarResizeStart={handleBarResizeStart}
         onSeparatorDragStart={handleSeparatorDragStart}
         onSeparatorDrag={handleSeparatorDrag}
         onSeparatorDragEnd={handleSeparatorDragEnd}
-        onSidebarResizeStart={handleSidebarResizeStart}
         onMeasure={terminalSize.onMeasure}
         terminalCols={terminalSize.cols}
         terminalRows={terminalSize.rows}

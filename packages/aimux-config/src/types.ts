@@ -207,21 +207,26 @@ export interface DirectoryResult {
   type: DirectoryResultType
 }
 
-// ─── Sidebar / git panel / modal state (for ModeContext) ──────────────────────
+// ─── Bars / git panel / modal state (for ModeContext) ─────────────────────────
 
-export interface SidebarState {
+export type BarSide = 'left' | 'right'
+
+export interface BarWidget {
+  id: string
+  grow: number
   visible: boolean
-  width: number
-  minWidth: number
-  maxWidth: number
 }
 
-export interface GitPaneState {
+export interface BarState {
   visible: boolean
-  mode: 'embedded' | 'pane'
-  position: 'top' | 'bottom' | 'left' | 'right'
-  paneRatio: number
-  embeddedRatio: number
+  width: number
+  /** Ordered top → bottom. */
+  widgets: BarWidget[]
+}
+
+export type BarsState = Record<BarSide, BarState>
+
+export interface GitPaneState {
   diffModeRatio: number
   fileListMode: GitFileListMode
   treeCompaction: boolean
@@ -536,7 +541,7 @@ export interface AppState {
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
-  sidebar: SidebarState
+  bars: BarsState
   gitPane: GitPaneState
   modal: ModalState
   layout: LayoutState
@@ -695,17 +700,16 @@ export type LayoutAction =
     }
 
 export type UIAction =
-  | { type: 'toggle-sidebar' }
-  | { type: 'resize-sidebar'; delta: number }
-  | { type: 'set-sidebar-width'; width: number }
+  | { type: 'toggle-bar'; side: BarSide }
+  | { type: 'resize-bar'; side: BarSide; delta: number }
+  | { type: 'set-bar-width'; side: BarSide; width: number }
+  | { type: 'toggle-widget'; widgetId: string }
+  | { type: 'move-widget'; widgetId: string; side: BarSide; index: number }
+  | { type: 'set-bar-boundary'; side: BarSide; index: number; ratio: number }
+  | { type: 'resize-widget'; widgetId: string; delta: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
-  | { type: 'toggle-git-pane' }
-  | { type: 'resize-git-pane'; delta: number }
-  | { type: 'set-git-pane-ratio'; target: 'pane' | 'embedded'; ratio: number }
   | { type: 'resize-git-diff-pane'; delta: number }
-  | { type: 'set-git-pane-mode'; mode: 'embedded' | 'pane' }
-  | { type: 'set-git-pane-position'; position: 'top' | 'bottom' | 'left' | 'right' }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
 
@@ -1273,31 +1277,19 @@ export interface ResolvedConfig {
   sessionBar: {
     initialVisible?: boolean
   }
-  gitPane:
-    | {
-        initialMode?: 'embedded'
-        initialPosition?: 'top' | 'bottom'
-        initialVisible?: boolean
-        initialRatio?: number
-        initialDiffModeRatio?: number
-        initialFileListMode?: GitFileListMode
-        initialTreeCompaction?: boolean
-        path?: GitPanePathConfig
-        diffCount?: GitPaneDiffCountConfig
-        prefetchRadius?: number
-      }
-    | {
-        initialMode: 'pane'
-        initialPosition?: 'left' | 'right'
-        initialVisible?: boolean
-        initialRatio?: number
-        initialDiffModeRatio?: number
-        initialFileListMode?: GitFileListMode
-        initialTreeCompaction?: boolean
-        path?: GitPanePathConfig
-        diffCount?: GitPaneDiffCountConfig
-        prefetchRadius?: number
-      }
+  /**
+   * Placement (`initialMode`/`initialPosition`/`initialRatio`/`initialVisible`)
+   * moved to the bars layout in `aimux.json`; those fields are still accepted
+   * in user config but ignored.
+   */
+  gitPane: {
+    initialDiffModeRatio?: number
+    initialFileListMode?: GitFileListMode
+    initialTreeCompaction?: boolean
+    path?: GitPanePathConfig
+    diffCount?: GitPaneDiffCountConfig
+    prefetchRadius?: number
+  }
   hooks: HooksConfig
   snippets: SnippetDef[]
   snippetTriggerChar: string

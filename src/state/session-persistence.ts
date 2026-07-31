@@ -42,9 +42,11 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
     layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
     layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
     savedAt: new Date().toISOString(),
+    // Mirror of the left bar. `isWorkspaceSnapshotV1` requires this key —
+    // dropping it invalidates every entry in the session catalog.
     sidebar: {
-      visible: state.sidebar.visible,
-      width: state.sidebar.width,
+      visible: state.bars.left.visible,
+      width: state.bars.left.width,
     },
     tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
     tabs: state.tabs.map((tab) => ({
@@ -277,10 +279,7 @@ export function restoreWorkspaceState(
   state: AppState,
   workspaceSnapshot: WorkspaceSnapshotV1 | undefined,
   options: RestoreOptions = {}
-): Pick<
-  AppState,
-  'tabs' | 'activeTabId' | 'focusMode' | 'sidebar' | 'layoutTrees' | 'tabGroupMap'
-> &
+): Pick<AppState, 'tabs' | 'activeTabId' | 'focusMode' | 'layoutTrees' | 'tabGroupMap'> &
   Partial<Pick<AppState, 'lastActiveTabByWorktree'>> {
   const tabs = restoreTabsFromWorkspace(workspaceSnapshot, options)
   const activeTabId =
@@ -305,7 +304,6 @@ export function restoreWorkspaceState(
     activeTabId,
     focusMode: 'navigation',
     layoutTrees,
-    sidebar: state.sidebar,
     tabGroupMap,
     tabs: orderedTabs,
     ...(persistedLastActiveTab ? { lastActiveTabByWorktree: persistedLastActiveTab } : {}),

@@ -62,10 +62,10 @@ defineConfig({
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `keymaps`            | Supported          | Fully resolved and registered by the app                                                                                |
 | `sessionBar`         | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                   |
-| `gitPane`            | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately                                   |
+| `gitPane`            | Supported          | Content prefs only; placement moved to the app-managed `bars` state                                                     |
 | `theme`              | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins                                    |
 | `backends`           | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                                  |
-| `sidebar`            | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                               |
+| `sidebar`            | Ignored            | Superseded by the app-managed `bars` state; kept so old config files still typecheck                                    |
 | `hooks`              | Typed surface only | Type exists; runtime use is not currently wired                                                                         |
 | `snippets`           | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
 | `snippetTriggerChar` | Supported          | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                           |
@@ -154,34 +154,17 @@ export default defineConfig({
 
 Status: `Supported`
 
-Type (discriminated union on `mode`):
+Type:
 
 ```ts
-type GitPaneConfig =
-  | {
-      initialMode?: 'embedded'
-      initialPosition?: 'top' | 'bottom'
-      initialVisible?: boolean
-      initialRatio?: number // 0..1, clamped to [0.2, 0.8]
-      initialDiffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
-      initialFileListMode?: 'tree' | 'flat'
-      initialTreeCompaction?: boolean
-      path?: GitPanePathConfig
-      diffCount?: GitPaneDiffCountConfig
-      prefetchRadius?: number
-    }
-  | {
-      initialMode: 'pane'
-      initialPosition?: 'left' | 'right'
-      initialVisible?: boolean
-      initialRatio?: number
-      initialDiffModeRatio?: number
-      initialFileListMode?: 'tree' | 'flat'
-      initialTreeCompaction?: boolean
-      path?: GitPanePathConfig
-      diffCount?: GitPaneDiffCountConfig
-      prefetchRadius?: number
-    }
+interface GitPaneConfig {
+  initialDiffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
+  initialFileListMode?: 'tree' | 'flat'
+  initialTreeCompaction?: boolean
+  path?: GitPanePathConfig
+  diffCount?: GitPaneDiffCountConfig
+  prefetchRadius?: number
+}
 
 type GitPanePathConfig = { enabled: false } | { enabled: true; pathFn?: (path: string) => string }
 
@@ -190,16 +173,9 @@ type GitPaneDiffCountConfig = { enabled: boolean }
 
 Runtime behavior:
 
-- `mode: 'embedded'` renders the git file list inside the sidebar, above or
-- `initialMode: 'embedded'` renders the git file list inside the sidebar,
-  above or below the tab list depending on `initialPosition`.
-- `initialMode: 'pane'` renders the git file list as a standalone pane next to
-  the sidebar (`left`) or on the far right of the main area (`right`).
-- `initialPosition` allowed values are constrained per `initialMode` at the
-  type level.
-- `initialRatio` controls startup size: in `embedded` mode it's the vertical
-  split ratio against the tab list; in `pane` mode it maps to a column count in
-  `[20, 80]`.
+- Placement (`initialMode`, `initialPosition`, `initialRatio`, `initialVisible`)
+  moved to the bars layout — see [`bars`](#bars). Those fields are still
+  accepted so existing config files typecheck, but they are ignored.
 - `initialDiffModeRatio` controls the file-list width while you are in
   full-screen git diff mode.
 - `initialFileListMode` controls whether the git file list renders as a folder
@@ -220,11 +196,8 @@ Example:
 ```ts
 export default defineConfig({
   gitPane: {
-    initialMode: 'pane',
-    initialPosition: 'right',
     initialDiffModeRatio: 0.3,
     initialFileListMode: 'tree',
-    initialRatio: 0.35,
     initialTreeCompaction: true,
     path: {
       enabled: true,
@@ -237,8 +210,8 @@ export default defineConfig({
 
 Legacy migration: config files written before `gitPane` existed stored
 `gitPanelVisible` / `gitPanelRatio` at the root of `aimux.json`. Those keys
-are read once on load and converted to `{ mode: 'embedded', position: 'bottom',
-ratio, visible }`, then persisted under `gitPane` on the next save.
+are read once on load and folded into the derived bars layout on the next
+save.
 
 ## `theme`
 
@@ -306,21 +279,33 @@ Notes:
 
 Do not present this as a fully working runtime backend override surface today.
 
-## `sidebar`
+## `bars`
 
-Status: `Typed surface only`
+Status: `Runtime state, not typed config`
 
-Type:
+The left and right bars — and which widgets sit in each — are app-managed state
+persisted in `aimux.json` under `bars`, not something you declare in
+`aimux.config.ts`:
 
 ```ts
-interface SidebarConfig {
-  widgets?: string[]
-  width?: number
+interface PersistedBars {
+  left: PersistedBar
+  right: PersistedBar
+}
+
+interface PersistedBar {
+  visible: boolean
+  width: number // cells, clamped to [18, 80]
+  widgets: { id: string; grow: number; visible: boolean }[] // ordered top → bottom
 }
 ```
 
-Current runtime behavior is driven by app state and persisted workspace data,
-not by this top-level typed config field.
+Widget ids: `workspaces`, `git`. Move a widget between bars, reorder it, or
+hide it with the right-click menu on the widget. `<C-b>` toggles the left bar,
+`<Leader>B` the right one.
+
+Config files written before bars existed are upgraded automatically from the
+old `sidebar` + `gitPane.mode`/`position` fields on first load.
 
 ## `hooks`
 
