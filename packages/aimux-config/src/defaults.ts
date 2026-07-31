@@ -102,6 +102,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     .mode(['navigation', 'terminal-input'], (m) =>
       m
         .map('<Leader>b', actions.toggleSessionBar, 'Toggle session bar')
+        .map('<Leader>B', actions.toggleBar('right'), 'Toggle right bar')
         .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
         .map('<Leader>1', actions.switchTabByIndex(1), 'Tab 1')
         .map('<Leader>2', actions.switchTabByIndex(2), 'Tab 2')

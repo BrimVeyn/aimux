@@ -51,15 +51,13 @@ describe('resolveConfig startup override aliases', () => {
     expect(config.sessionBar).toEqual({
       initialVisible: true,
     })
+    // Placement fields (initialMode/initialPosition/initialRatio/initialVisible)
+    // are accepted in user config but dropped — the bars layout owns placement.
     expect(config.gitPane).toEqual({
       diffCount: undefined,
       initialDiffModeRatio: 0.3,
       initialFileListMode: 'tree',
-      initialMode: 'pane',
-      initialPosition: 'right',
-      initialRatio: 0.4,
       initialTreeCompaction: true,
-      initialVisible: false,
       path: undefined,
       prefetchRadius: undefined,
     })
@@ -79,6 +77,6 @@ describe('resolveConfig startup override aliases', () => {
       path: { enabled: true, pathFn: expect.any(Function) },
       prefetchRadius: 3,
     })
-    expect('initialMode' in config.gitPane && config.gitPane.initialMode !== undefined).toBe(false)
+    expect('initialMode' in config.gitPane).toBe(false)
   })
 })

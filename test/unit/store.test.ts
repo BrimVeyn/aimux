@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
+import { BAR_MAX_WIDTH, BAR_MIN_WIDTH } from '../../src/state/bars'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 describe('initial state', () => {
@@ -9,25 +10,30 @@ describe('initial state', () => {
     expect(state.modal.type).toBeNull()
   })
 
-  test('applies persisted sidebar overrides', () => {
+  test('applies persisted bar overrides', () => {
     const state = createInitialState({}, [], [], false, {
-      sidebar: { visible: false, width: 33 },
+      bars: {
+        left: { visible: false, widgets: [{ grow: 100, id: 'git', visible: true }], width: 33 },
+        right: { visible: false, widgets: [], width: 40 },
+      },
     })
 
-    expect(state.sidebar.visible).toBe(false)
-    expect(state.sidebar.width).toBe(33)
+    expect(state.bars.left.visible).toBe(false)
+    expect(state.bars.left.width).toBe(33)
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git'])
   })
 
-  test('clamps persisted sidebar width to valid bounds', () => {
-    const tooSmall = createInitialState({}, [], [], false, {
-      sidebar: { visible: true, width: 2 },
-    })
-    const tooLarge = createInitialState({}, [], [], false, {
-      sidebar: { visible: true, width: 200 },
+  test('clamps persisted bar width and drops unknown widget ids', () => {
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: { visible: true, widgets: [{ grow: 100, id: 'nope', visible: true }], width: 2 },
+        right: { visible: true, widgets: [], width: 200 },
+      },
     })
 
-    expect(tooSmall.sidebar.width).toBe(18)
-    expect(tooLarge.sidebar.width).toBe(42)
+    expect(state.bars.left.width).toBe(18)
+    expect(state.bars.left.widgets).toEqual([])
+    expect(state.bars.right.width).toBe(80)
   })
 })
 
@@ -923,13 +929,13 @@ describe('appReducer', () => {
     expect(next.tabs.map((tab) => tab.id)).toEqual(['1', '2'])
   })
 
-  test('clamps sidebar resize', () => {
+  test('clamps bar resize', () => {
     const initial = createInitialState()
-    const smaller = appReducer(initial, { delta: -50, type: 'resize-sidebar' })
-    const larger = appReducer(initial, { delta: 99, type: 'resize-sidebar' })
+    const smaller = appReducer(initial, { delta: -50, side: 'left', type: 'resize-bar' })
+    const larger = appReducer(initial, { delta: 99, side: 'left', type: 'resize-bar' })
 
-    expect(smaller.sidebar.width).toBe(initial.sidebar.minWidth)
-    expect(larger.sidebar.width).toBe(initial.sidebar.maxWidth)
+    expect(smaller.bars.left.width).toBe(BAR_MIN_WIDTH)
+    expect(larger.bars.left.width).toBe(BAR_MAX_WIDTH)
   })
 
   test('reset-tab-session keeps tab but clears runtime state', () => {

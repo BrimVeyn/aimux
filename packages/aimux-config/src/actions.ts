@@ -51,8 +51,14 @@ export const openFlashJump: KeyResult = r(
   'modal.flash-jump'
 )
 
-export const toggleSidebar: KeyResult = r([{ type: 'toggle-sidebar' }])
-export const toggleGitPane: KeyResult = r([{ type: 'toggle-git-pane' }])
+export function toggleBar(side: 'left' | 'right'): KeyResult {
+  return r([{ side, type: 'toggle-bar' }])
+}
+export const toggleSidebar: KeyResult = toggleBar('left')
+export function toggleWidget(widgetId: string): KeyResult {
+  return r([{ type: 'toggle-widget', widgetId }])
+}
+export const toggleGitPane: KeyResult = toggleWidget('git')
 export const toggleSessionBar: KeyResult = r([{ type: 'toggle-session-bar' }])
 export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.modal.type === 'ai-usage') {
@@ -61,13 +67,6 @@ export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
   return r([{ type: 'open-ai-usage-modal' }], [], 'modal.ai-usage')
 }
 
-export function setGitPaneMode(mode: 'embedded' | 'pane'): KeyResult {
-  return r([{ mode, type: 'set-git-pane-mode' }])
-}
-
-export function setGitPanePosition(position: 'top' | 'bottom' | 'left' | 'right'): KeyResult {
-  return r([{ position, type: 'set-git-pane-position' }])
-}
 export const enterGitMode: KeyResult = r([{ type: 'enter-git-mode' }], [], 'git-mode')
 
 export function switchSessionByIndex(index: number): KeyResult {
@@ -139,12 +138,20 @@ export function reorderSession(delta: number): KeyResult {
   return r([{ delta, type: 'reorder-active-session' }])
 }
 
+export function resizeBar(side: 'left' | 'right', delta: number): KeyResult {
+  return r([{ delta, side, type: 'resize-bar' }])
+}
+
 export function resizeSidebar(delta: number): KeyResult {
-  return r([{ delta, type: 'resize-sidebar' }])
+  return resizeBar('left', delta)
+}
+
+export function resizeWidget(widgetId: string, delta: number): KeyResult {
+  return r([{ delta, type: 'resize-widget', widgetId }])
 }
 
 export function resizeGitPane(delta: number): KeyResult {
-  return r([{ delta, type: 'resize-git-pane' }])
+  return resizeWidget('git', delta)
 }
 
 export function resizeGitDiffPane(delta: number): ActionFn {
@@ -480,9 +487,11 @@ export const closePane: ActionFn = (ctx: ModeContext) => {
 }
 
 // Navigation-specific dynamic actions
+// Reveals whichever bar hosts the workspace list — it is not pinned to the left.
 export const ctrlZSidebar: ActionFn = (ctx: ModeContext) => {
-  if (!ctx.state.sidebar.visible) {
-    return r([{ type: 'toggle-sidebar' }])
+  const side = ctx.state.bars.left.widgets.some((w) => w.id === 'workspaces') ? 'left' : 'right'
+  if (!ctx.state.bars[side].visible) {
+    return r([{ side, type: 'toggle-bar' }])
   }
   return r([])
 }
@@ -498,7 +507,7 @@ export const leaveTerminalInput: KeyResult = r(
   'navigation'
 )
 
-export const toggleSidebarFromInput: KeyResult = r([{ type: 'toggle-sidebar' }])
+export const toggleSidebarFromInput: KeyResult = toggleBar('left')
 
 // Session name modal
 export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {

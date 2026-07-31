@@ -7,6 +7,7 @@ import type { FoldState } from '../../../../state/types'
 import type { ThemeId } from '../../../themes'
 
 import { useAppStore } from '../../../../state/app-store'
+import { getBarWidth } from '../../../../state/bars'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
 import { buildDiffSegments, firstChangeSegmentOffset, gutterWidth } from './build-rows'
@@ -51,7 +52,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   const highlights: DiffHighlights = preparation.highlights
 
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
-  const sidebarWidth = useAppStore((s) => s.sidebar.width)
+  const sidebarWidth = useAppStore((s) => getBarWidth(s.bars.left))
   const contentWidth = useMemo(() => {
     if (!file) return 0
     const gw = gutterWidth(file)

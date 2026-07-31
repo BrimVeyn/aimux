@@ -18,14 +18,18 @@ import {
 
 import type { TerminalContentOrigin } from '../../src/input/raw-input-handler'
 import type { SessionBackend } from '../../src/session-backend/types'
-import type { TabSession, TerminalModeState, TerminalSnapshot } from '../../src/state/types'
+import type {
+  BarsState,
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+} from '../../src/state/types'
 
 import { useMouseHandlers } from '../../src/app-runtime/use-mouse-handlers'
 import { encodeMouseEventForPty } from '../../src/input/mouse-forwarding'
 import { parseCommand } from '../../src/pty/command-registry'
 import { PtyManager } from '../../src/pty/pty-manager'
 import { appStore } from '../../src/state/app-store'
-import { getGitPaneWidthFromRatio } from '../../src/state/git-pane-sizing'
 import { appReducer, createInitialState } from '../../src/state/store'
 import { RootView } from '../../src/ui/root'
 
@@ -218,15 +222,10 @@ function MouseHarness({
       gitPane: {
         diffCount: { enabled: true },
         diffModeRatio: 0.35,
-        embeddedRatio: 0.5,
         fileListMode: 'tree' as const,
-        mode: 'embedded' as const,
-        paneRatio: 0.5,
         path: { enabled: true },
-        position: 'bottom' as const,
         prefetchRadius: 0,
         treeCompaction: false,
-        visible: true,
       },
       layout: {
         terminalCols: terminalSize.cols,
@@ -357,28 +356,14 @@ const RESIZE_RENDERER = {
   updateSelection() {},
 }
 
-function ResizeHarness({
-  embeddedRatio = 0.5,
-  gitPaneMode,
-  gitPanePosition,
-}: {
-  gitPaneMode: 'embedded' | 'pane'
-  gitPanePosition: 'top' | 'bottom' | 'left' | 'right'
-  embeddedRatio?: number
-}) {
+function ResizeHarness({ bars }: { bars: BarsState }) {
   const [state, dispatch] = useReducer(appReducer, undefined, () => {
     const base = createInitialState()
     return {
       ...base,
       activeTabId: TEST_TAB_ID,
+      bars,
       focusMode: 'navigation' as const,
-      gitPane: {
-        ...base.gitPane,
-        embeddedRatio,
-        mode: gitPaneMode,
-        position: gitPanePosition,
-        visible: true,
-      },
       sessionBar: { ...base.sessionBar, visible: false },
       tabs: [
         {
@@ -419,9 +404,8 @@ function ResizeHarness({
       onTerminalClick={handlers.handleTerminalClick}
       onPaneActivate={handlers.handlePaneActivate}
       onSplitResize={handlers.handleSplitResize}
-      onSidebarResizeStart={handlers.handleSidebarResizeStart}
-      onGitPaneResizeStart={handlers.handleGitPaneResizeStart}
-      onEmbeddedGitResizeStart={handlers.handleEmbeddedGitResizeStart}
+      onBarResizeStart={handlers.handleBarResizeStart}
+      onBarBoundaryResizeStart={handlers.handleBarBoundaryResizeStart}
       onSeparatorDragStart={handlers.handleSeparatorDragStart}
       onSeparatorDrag={handlers.handleSeparatorDrag}
       onSeparatorDragEnd={handlers.handleSeparatorDragEnd}
@@ -431,11 +415,7 @@ function ResizeHarness({
   )
 }
 
-async function mountResizeHarness(options: {
-  embeddedRatio?: number
-  gitPaneMode: 'embedded' | 'pane'
-  gitPanePosition: 'top' | 'bottom' | 'left' | 'right'
-}) {
+async function mountResizeHarness(options: { bars: BarsState }) {
   const { mockMouse, renderer, renderOnce } = await createTestRenderer({
     height: TEST_HEIGHT,
     useMouse: true,
@@ -456,11 +436,8 @@ async function mountResizeHarness(options: {
   await renderOnce()
   await waitFor(
     renderOnce,
-    () => {
-      const gitPane = appStore.getState().gitPane
-      return gitPane.mode === options.gitPaneMode && gitPane.position === options.gitPanePosition
-    },
-    () => JSON.stringify(appStore.getState().gitPane),
+    () => JSON.stringify(appStore.getState().bars) === JSON.stringify(options.bars),
+    () => JSON.stringify(appStore.getState().bars),
     1_000
   )
 
@@ -528,17 +505,34 @@ describe('mouse passthrough integration', () => {
   }, 15_000)
 })
 
+const LEFT_ONLY_BARS: BarsState = {
+  left: {
+    visible: true,
+    widgets: [
+      { grow: 50, id: 'workspaces', visible: true },
+      { grow: 50, id: 'git', visible: true },
+    ],
+    width: 28,
+  },
+  right: { visible: false, widgets: [], width: 40 },
+}
+
+const BOTH_BARS: BarsState = {
+  left: { visible: true, widgets: [{ grow: 100, id: 'workspaces', visible: true }], width: 28 },
+  right: { visible: true, widgets: [{ grow: 100, id: 'git', visible: true }], width: 30 },
+}
+
 describe('mouse resize integration', () => {
-  test('drags the sidebar edge to resize width', async () => {
-    const app = await mountResizeHarness({ gitPaneMode: 'embedded', gitPanePosition: 'bottom' })
-    const initialWidth = appStore.getState().sidebar.width
+  test('drags the left bar edge to resize width', async () => {
+    const app = await mountResizeHarness({ bars: LEFT_ONLY_BARS })
+    const initialWidth = appStore.getState().bars.left.width
 
     let changed = false
     for (let x = initialWidth - 1; x <= initialWidth + 2 && !changed; x += 1) {
       for (let y = 4; y <= 20; y += 2) {
         await app.mockMouse.drag(x, y, x + 6, y)
         await app.renderOnce()
-        if (appStore.getState().sidebar.width > initialWidth) {
+        if (appStore.getState().bars.left.width > initialWidth) {
           changed = true
           break
         }
@@ -546,51 +540,47 @@ describe('mouse resize integration', () => {
     }
 
     expect(changed).toBe(true)
-    expect(appStore.getState().sidebar.width).toBeGreaterThan(initialWidth)
+    expect(appStore.getState().bars.left.width).toBeGreaterThan(initialWidth)
   })
 
-  test('drags the side git pane edge to resize pane width', async () => {
-    const app = await mountResizeHarness({ gitPaneMode: 'pane', gitPanePosition: 'left' })
-    const initialRatio = appStore.getState().gitPane.paneRatio
-    const paneWidth = getGitPaneWidthFromRatio(initialRatio)
-    const startX = appStore.getState().sidebar.width + paneWidth
+  test('drags the right bar edge leftwards to widen it', async () => {
+    const app = await mountResizeHarness({ bars: BOTH_BARS })
+    const initialWidth = appStore.getState().bars.right.width
+    const edgeX = TEST_WIDTH - initialWidth
 
+    // The exact edge column shifts a little with the surrounding layout, so
+    // sweep a few columns around it rather than pinning one coordinate.
     let changed = false
-    for (let x = startX - 1; x <= startX + 2; x += 1) {
-      await app.mockMouse.drag(x, 8, x + 6, 8)
+    for (let x = edgeX - 1; x <= edgeX + 6 && !changed; x += 1) {
+      await app.mockMouse.drag(x, 8, x - 6, 8)
       await app.renderOnce()
-      if (appStore.getState().gitPane.paneRatio > initialRatio) {
-        changed = true
-        break
-      }
+      changed = appStore.getState().bars.right.width > initialWidth
     }
 
     expect(changed).toBe(true)
-    expect(appStore.getState().gitPane.paneRatio).toBeGreaterThan(initialRatio)
-    expect(appStore.getState().gitPane.embeddedRatio).toBe(0.5)
+    expect(appStore.getState().bars.right.width).toBeGreaterThan(initialWidth)
+    expect(appStore.getState().bars.left.width).toBe(BOTH_BARS.left.width)
   })
 
-  test('drags the embedded git divider to resize height without changing sidebar width', async () => {
-    const app = await mountResizeHarness({
-      embeddedRatio: 0.5,
-      gitPaneMode: 'embedded',
-      gitPanePosition: 'bottom',
-    })
-    const initialRatio = appStore.getState().gitPane.embeddedRatio
-    const initialSidebarWidth = appStore.getState().sidebar.width
+  test('drags the widget boundary to redistribute grow without changing bar width', async () => {
+    const app = await mountResizeHarness({ bars: LEFT_ONLY_BARS })
+    const initialGrows = appStore.getState().bars.left.widgets.map((w) => w.grow)
+    const initialWidth = appStore.getState().bars.left.width
 
     let changed = false
     for (let y = 8; y <= 28; y += 1) {
       await app.mockMouse.drag(8, y, 8, y + 4)
       await app.renderOnce()
-      if (appStore.getState().gitPane.embeddedRatio !== initialRatio) {
+      const grows = appStore.getState().bars.left.widgets.map((w) => w.grow)
+      if (grows.join() !== initialGrows.join()) {
         changed = true
         break
       }
     }
 
     expect(changed).toBe(true)
-    expect(appStore.getState().gitPane.embeddedRatio).not.toBe(initialRatio)
-    expect(appStore.getState().sidebar.width).toBe(initialSidebarWidth)
+    const grows = appStore.getState().bars.left.widgets.map((w) => w.grow)
+    expect(grows.reduce((a, b) => a + b, 0)).toBe(initialGrows.reduce((a, b) => a + b, 0))
+    expect(appStore.getState().bars.left.width).toBe(initialWidth)
   })
 })

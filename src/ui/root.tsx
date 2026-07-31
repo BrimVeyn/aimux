@@ -6,6 +6,7 @@ import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
 import type { WorktreeTemplate } from '../config'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type {
+  BarSide,
   FocusMode,
   ModalState,
   SessionRecord,
@@ -16,13 +17,10 @@ import type { ThemeId } from './themes'
 
 import { useWorktreeBranchPolling } from '../git/worktree-branch-poller'
 import { useAppStore } from '../state/app-store'
-import { dispatchGlobal } from '../state/dispatch-ref'
-import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
+import { getBarWidth } from '../state/bars'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
 import { GitView } from './components/git/git-view'
-import { buildGitPaneContextMenu } from './components/git/pane/git-pane-context-menu'
-import { GitPaneWidget } from './components/git/pane/git-pane-widget'
-import { Sidebar } from './components/layout/sidebar/sidebar'
+import { Bar, type BarBoundaryResizeInfo } from './components/layout/bar'
 import { SplitLayout } from './components/layout/split-layout'
 import { StatusBar } from './components/layout/status-bar'
 import { TerminalPane } from './components/layout/terminal-pane'
@@ -41,7 +39,6 @@ import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
 import { WorktreeMoveConfirmModal } from './components/modals/worktree/worktree-move-confirm-modal'
 import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
-import { ContextMenuBox } from './components/overlays/context-menu/context-menu-box'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
@@ -289,17 +286,8 @@ interface RootViewProps {
   onTerminalMouseUp?: (event: MouseEvent) => boolean
   onPaneActivate?: (tabId: string) => void
   onSplitResize?: (tabId: string, ratio: number, axis: SplitDirection) => void
-  onSidebarResizeStart?: (info: { initialWidth: number; screenStart: number }) => void
-  onGitPaneResizeStart?: (info: {
-    initialWidth: number
-    screenStart: number
-    side: 'left' | 'right'
-  }) => void
-  onEmbeddedGitResizeStart?: (info: {
-    containerStart: number
-    position: 'top' | 'bottom'
-    totalSize: number
-  }) => void
+  onBarResizeStart?: (info: { initialWidth: number; screenStart: number; side: BarSide }) => void
+  onBarBoundaryResizeStart?: (info: BarBoundaryResizeInfo) => void
   onSeparatorDragStart?: (info: {
     tabId: string
     direction: SplitDirection
@@ -317,14 +305,13 @@ export function RootView({
   contentOrigin,
   localScrollbackEnabled,
   mouseForwardingEnabled,
-  onEmbeddedGitResizeStart,
-  onGitPaneResizeStart,
+  onBarBoundaryResizeStart,
+  onBarResizeStart,
   onMeasure,
   onPaneActivate,
   onSeparatorDrag,
   onSeparatorDragEnd,
   onSeparatorDragStart,
-  onSidebarResizeStart,
   onSplitResize,
   onTerminalClick,
   onTerminalDrag,
@@ -349,31 +336,25 @@ export function RootView({
   const currentSessionId = useAppStore((s) => s.currentSessionId)
   const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const worktreeTemplates = useAppStore((s) => s.worktreeTemplates)
-  const gitPaneMode = useAppStore((s) => s.gitPane.mode)
-  const gitPaneVisible = useAppStore((s) => s.gitPane.visible)
-  const gitPanePosition = useAppStore((s) => s.gitPane.position)
-  const gitPaneRatio = useAppStore((s) => s.gitPane.paneRatio)
-  const sidebarWidth = useAppStore((s) => s.sidebar.width)
-  const sidebarVisible = useAppStore((s) => s.sidebar.visible)
+  const leftBarWidth = useAppStore((s) => getBarWidth(s.bars.left))
 
-  const gitPaneInPaneOnLeft = gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left'
   const splitChrome = PANE_BORDER * 2
 
   // Keep every worktree's `branch` in state synchronized with the on-disk
   // HEAD so the sidebar (and divergence calc) never reads a stale value.
   useWorktreeBranchPolling(true)
 
-  const handleSidebarEdgeResize = useCallback(
+  // The terminal's own left edge stays a drag target for the left bar, so the
+  // resize gesture works from either side of the seam.
+  const handleLeftBarEdgeResize = useCallback(
     (event: MouseEvent): boolean => {
-      onSidebarResizeStart?.({ initialWidth: sidebarWidth, screenStart: event.x })
+      onBarResizeStart?.({ initialWidth: leftBarWidth, screenStart: event.x, side: 'left' })
       return true
     },
-    [onSidebarResizeStart, sidebarWidth]
+    [leftBarWidth, onBarResizeStart]
   )
   const handleTerminalLeftEdgeMouseDown =
-    sidebarVisible && !gitPaneInPaneOnLeft && onSidebarResizeStart
-      ? handleSidebarEdgeResize
-      : undefined
+    leftBarWidth > 0 && onBarResizeStart ? handleLeftBarEdgeResize : undefined
 
   const handleRootMouseDrag = useCallback(
     (event: MouseEvent) => {
@@ -460,21 +441,16 @@ export function RootView({
       onMouseUp={handleRootMouseUp}
     >
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
-        <Sidebar
-          onEmbeddedGitResizeStart={onEmbeddedGitResizeStart}
+        <Bar
+          side="left"
+          onBoundaryResizeStart={onBarBoundaryResizeStart}
+          onEdgeResizeStart={onBarResizeStart}
           onResizeDrag={onSeparatorDrag}
           onResizeDragEnd={onSeparatorDragEnd}
         />
         <box flexDirection="column" flexGrow={1}>
           <TopTabBar />
           <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
-            {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'left' ? (
-              <GitPaneInPaneMode
-                position="left"
-                ratio={gitPaneRatio}
-                onGitPaneResizeStart={onGitPaneResizeStart}
-              />
-            ) : null}
             {activeTree && activeTree.type === 'split' ? (
               <SplitLayout
                 node={activeTree}
@@ -517,15 +493,15 @@ export function RootView({
                 onMeasure={onMeasure}
               />
             )}
-            {gitPaneMode === 'pane' && gitPaneVisible && gitPanePosition === 'right' ? (
-              <GitPaneInPaneMode
-                position="right"
-                ratio={gitPaneRatio}
-                onGitPaneResizeStart={onGitPaneResizeStart}
-              />
-            ) : null}
           </box>
         </box>
+        <Bar
+          side="right"
+          onBoundaryResizeStart={onBarBoundaryResizeStart}
+          onEdgeResizeStart={onBarResizeStart}
+          onResizeDrag={onSeparatorDrag}
+          onResizeDragEnd={onSeparatorDragEnd}
+        />
       </box>
       <StatusBar />
       <PendingChordOverlay />
@@ -544,66 +520,6 @@ export function RootView({
         worktreeTemplates,
       })}
       <ToastViewport />
-    </box>
-  )
-}
-
-function GitPaneInPaneMode({
-  onGitPaneResizeStart,
-  position,
-  ratio,
-}: {
-  ratio: number
-  position: 'left' | 'right'
-  onGitPaneResizeStart?: (info: {
-    initialWidth: number
-    screenStart: number
-    side: 'left' | 'right'
-  }) => void
-}) {
-  const tokens = useTheme()
-  const bg = tokens.backgroundPanel
-  const gitPane = useAppStore((s) => s.gitPane)
-  const width = getGitPaneWidthFromRatio(ratio)
-  const contentWidth = Math.max(1, width - 1)
-  const gitPaneMenu = buildGitPaneContextMenu(
-    gitPane,
-    () => dispatchGlobal({ type: 'toggle-git-pane' }),
-    (mode, nextPosition) => {
-      dispatchGlobal({ mode, type: 'set-git-pane-mode' })
-      dispatchGlobal({ position: nextPosition, type: 'set-git-pane-position' })
-    }
-  )
-  const handleResizeMouseDown = useCallback(
-    (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
-      onGitPaneResizeStart?.({ initialWidth: width, screenStart: event.x, side: position })
-    },
-    [onGitPaneResizeStart, position, width]
-  )
-  const handle = (
-    <box
-      width={1}
-      flexShrink={0}
-      backgroundColor={tokens.border}
-      onMouseDown={handleResizeMouseDown}
-    />
-  )
-  return (
-    <box flexDirection="column" width={width} flexShrink={0} backgroundColor={bg} overflow="hidden">
-      <box flexDirection="row" flexGrow={1} overflow="hidden">
-        {position === 'right' ? handle : null}
-        <ContextMenuBox
-          width={contentWidth}
-          flexGrow={1}
-          overflow="hidden"
-          rightClickMenu={gitPaneMenu}
-        >
-          <GitPaneWidget pollingEnabled />
-        </ContextMenuBox>
-        {position === 'left' ? handle : null}
-      </box>
     </box>
   )
 }

@@ -105,57 +105,10 @@ function sameFiles(a: GitFileEntry[], b: GitFileEntry[]): boolean {
 
 export function reduceGitPanelState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
-    case 'toggle-git-pane': {
-      const nextVisible = !state.gitPane.visible
-      const sidebarMustShow = state.gitPane.mode === 'embedded' && nextVisible
-      return {
-        ...state,
-        gitPane: { ...state.gitPane, visible: nextVisible },
-        sidebar: sidebarMustShow ? { ...state.sidebar, visible: true } : state.sidebar,
-      }
-    }
-    case 'resize-git-pane': {
-      const target = state.gitPane.mode === 'pane' ? 'paneRatio' : 'embeddedRatio'
-      const nextRatio = clampRatio(state.gitPane[target] + action.delta)
-      if (nextRatio === state.gitPane[target]) return state
-      return { ...state, gitPane: { ...state.gitPane, [target]: nextRatio } }
-    }
-    case 'set-git-pane-ratio': {
-      const key = action.target === 'pane' ? 'paneRatio' : 'embeddedRatio'
-      const nextRatio = clampRatio(action.ratio)
-      if (nextRatio === state.gitPane[key]) return state
-      return { ...state, gitPane: { ...state.gitPane, [key]: nextRatio } }
-    }
     case 'resize-git-diff-pane': {
       const nextRatio = clampRatio(state.gitPane.diffModeRatio + action.delta)
       if (nextRatio === state.gitPane.diffModeRatio) return state
       return { ...state, gitPane: { ...state.gitPane, diffModeRatio: nextRatio } }
-    }
-    case 'set-git-pane-mode': {
-      if (state.gitPane.mode === action.mode) return state
-      const isEmbedded = action.mode === 'embedded'
-      const isValidEmbedded =
-        state.gitPane.position === 'top' || state.gitPane.position === 'bottom'
-      const isValidPane = state.gitPane.position === 'left' || state.gitPane.position === 'right'
-      let nextPosition: typeof state.gitPane.position
-      if (isEmbedded) {
-        nextPosition = isValidEmbedded ? state.gitPane.position : 'bottom'
-      } else {
-        nextPosition = isValidPane ? state.gitPane.position : 'left'
-      }
-      return {
-        ...state,
-        gitPane: { ...state.gitPane, mode: action.mode, position: nextPosition },
-      }
-    }
-    case 'set-git-pane-position': {
-      const validForMode =
-        state.gitPane.mode === 'embedded'
-          ? action.position === 'top' || action.position === 'bottom'
-          : action.position === 'left' || action.position === 'right'
-      if (!validForMode) return state
-      if (state.gitPane.position === action.position) return state
-      return { ...state, gitPane: { ...state.gitPane, position: action.position } }
     }
     case 'git-refresh-success': {
       const prev = state.gitPanel

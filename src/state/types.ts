@@ -211,15 +211,26 @@ export interface TabSession {
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 
-export interface SidebarState {
+export type BarSide = 'left' | 'right'
+
+/**
+ * One widget slot in a bar. `grow` is the flex weight opentui consumes
+ * directly; hidden widgets keep their weight but are excluded from the layout.
+ */
+export interface BarWidget {
+  id: string
+  grow: number
   visible: boolean
-  width: number
-  minWidth: number
-  maxWidth: number
 }
 
-export type GitPaneMode = 'embedded' | 'pane'
-export type GitPanePosition = 'top' | 'bottom' | 'left' | 'right'
+export interface BarState {
+  visible: boolean
+  width: number
+  /** Ordered top → bottom. */
+  widgets: BarWidget[]
+}
+
+export type BarsState = Record<BarSide, BarState>
 
 export type GitPanePathConfig =
   | { enabled: false }
@@ -230,11 +241,6 @@ export interface GitPaneDiffCountConfig {
 }
 
 export interface GitPaneState {
-  visible: boolean
-  mode: GitPaneMode
-  position: GitPanePosition
-  paneRatio: number
-  embeddedRatio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
   treeCompaction: boolean
@@ -611,7 +617,7 @@ export interface AppState {
   sessionBar: SessionBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
-  sidebar: SidebarState
+  bars: BarsState
   gitPane: GitPaneState
   modal: ModalState
   layout: LayoutState
@@ -803,17 +809,16 @@ export type LayoutAction =
 
 // -- UI actions --
 export type UIAction =
-  | { type: 'toggle-sidebar' }
-  | { type: 'resize-sidebar'; delta: number }
-  | { type: 'set-sidebar-width'; width: number }
+  | { type: 'toggle-bar'; side: BarSide }
+  | { type: 'resize-bar'; side: BarSide; delta: number }
+  | { type: 'set-bar-width'; side: BarSide; width: number }
+  | { type: 'toggle-widget'; widgetId: string }
+  | { type: 'move-widget'; widgetId: string; side: BarSide; index: number }
+  | { type: 'set-bar-boundary'; side: BarSide; index: number; ratio: number }
+  | { type: 'resize-widget'; widgetId: string; delta: number }
   | { type: 'set-focus-mode'; focusMode: FocusMode }
   | { type: 'set-terminal-size'; cols: number; rows: number }
-  | { type: 'toggle-git-pane' }
-  | { type: 'resize-git-pane'; delta: number }
-  | { type: 'set-git-pane-ratio'; target: 'pane' | 'embedded'; ratio: number }
   | { type: 'resize-git-diff-pane'; delta: number }
-  | { type: 'set-git-pane-mode'; mode: GitPaneMode }
-  | { type: 'set-git-pane-position'; position: GitPanePosition }
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-session-bar' }
 

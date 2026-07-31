@@ -22,22 +22,46 @@ export function getConfigPath(): string {
   return `${getProfileConfigDir()}/aimux.json`
 }
 
+/**
+ * `visible` / `mode` / `position` / `*Ratio` are legacy placement fields, read
+ * once by `deriveBarsFromLegacy` and no longer written. They must stay
+ * optional: rejecting the whole block would silently drop the git *content*
+ * preferences (`fileListMode`, `diffModeRatio`, `treeCompaction`).
+ */
 export interface PersistedGitPane {
   diffModeRatio?: number
   fileListMode?: GitFileListMode
   treeCompaction?: boolean
   prefetchRadius?: number
-  visible: boolean
-  mode: 'embedded' | 'pane'
-  position: 'top' | 'bottom' | 'left' | 'right'
+  visible?: boolean
+  mode?: 'embedded' | 'pane'
+  position?: 'top' | 'bottom' | 'left' | 'right'
   paneRatio?: number
   embeddedRatio?: number
   ratio?: number
 }
 
+/** Legacy; still written for downgrade safety, read only as a bars fallback. */
 export interface PersistedSidebar {
   visible: boolean
   width: number
+}
+
+export interface PersistedBarWidget {
+  id: string
+  grow: number
+  visible: boolean
+}
+
+export interface PersistedBar {
+  visible: boolean
+  width: number
+  widgets: PersistedBarWidget[]
+}
+
+export interface PersistedBars {
+  left: PersistedBar
+  right: PersistedBar
 }
 
 export interface WorktreeTemplatePane {
@@ -67,6 +91,7 @@ export interface AimuxConfig {
   themeTransparent?: boolean
   themeMode?: ThemeMode
   gitPane?: PersistedGitPane
+  bars?: PersistedBars
   sidebar?: PersistedSidebar
   sessionBarVisible?: boolean
   workspaceSnapshot?: WorkspaceSnapshotV1
@@ -79,8 +104,9 @@ export interface AimuxConfig {
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  const modeOk = v.mode === 'embedded' || v.mode === 'pane'
+  const modeOk = v.mode === undefined || v.mode === 'embedded' || v.mode === 'pane'
   const positionOk =
+    v.position === undefined ||
     v.position === 'top' ||
     v.position === 'bottom' ||
     v.position === 'left' ||
@@ -106,7 +132,7 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
       Number.isFinite(v.diffModeRatio) &&
       v.diffModeRatio > 0 &&
       v.diffModeRatio < 1)
-  const visibleOk = typeof v.visible === 'boolean'
+  const visibleOk = v.visible === undefined || typeof v.visible === 'boolean'
   const fileListModeOk =
     v.fileListMode === undefined || v.fileListMode === 'tree' || v.fileListMode === 'flat'
   const treeCompactionOk = v.treeCompaction === undefined || typeof v.treeCompaction === 'boolean'
@@ -130,10 +156,67 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   ) {
     return false
   }
-  // cross-field coherence: embedded => top|bottom; pane => left|right
-  if (v.mode === 'embedded' && v.position !== 'top' && v.position !== 'bottom') return false
-  if (v.mode === 'pane' && v.position !== 'left' && v.position !== 'right') return false
   return true
+}
+
+function isPersistedBar(value: unknown): value is PersistedBar {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (typeof v.visible !== 'boolean') return false
+  if (typeof v.width !== 'number' || !Number.isFinite(v.width) || v.width <= 0) return false
+  if (!Array.isArray(v.widgets)) return false
+  return v.widgets.every((raw) => {
+    if (typeof raw !== 'object' || raw === null) return false
+    const widget = raw as Record<string, unknown>
+    return (
+      typeof widget.id === 'string' &&
+      widget.id.length > 0 &&
+      typeof widget.grow === 'number' &&
+      Number.isFinite(widget.grow) &&
+      widget.grow > 0 &&
+      typeof widget.visible === 'boolean'
+    )
+  })
+}
+
+export function isPersistedBars(value: unknown): value is PersistedBars {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return isPersistedBar(v.left) && isPersistedBar(v.right)
+}
+
+/**
+ * One-time upgrade from the pre-bars layout (a left sidebar plus a git pane
+ * with its own mode/position). Runs whenever `bars` is absent so an existing
+ * install keeps the layout it had.
+ */
+export function deriveBarsFromLegacy(
+  sidebar: PersistedSidebar | undefined,
+  gitPane: PersistedGitPane | undefined
+): PersistedBars {
+  const gitVisible = gitPane?.visible ?? true
+  const embeddedRatio = gitPane?.embeddedRatio ?? gitPane?.ratio ?? 0.5
+  const gitGrow = Math.max(1, Math.round(embeddedRatio * 100))
+  const git = { grow: gitGrow, id: 'git', visible: gitVisible }
+  const workspaces = { grow: Math.max(1, 100 - gitGrow), id: 'workspaces', visible: true }
+
+  const left: PersistedBar = {
+    visible: sidebar?.visible ?? true,
+    widgets: gitPane?.position === 'top' ? [git, workspaces] : [workspaces, git],
+    width: sidebar?.width ?? 28,
+  }
+  const right: PersistedBar = { visible: false, widgets: [], width: 40 }
+
+  // A legacy `pane` git panel on the right was already its own right-hand
+  // column — it maps straight onto the right bar. On the left it shared the
+  // edge with the sidebar, which the single-bar model expresses as a stack.
+  if (gitPane?.mode === 'pane' && gitPane.position === 'right') {
+    left.widgets = [{ ...workspaces, grow: 100 }]
+    right.visible = true
+    right.widgets = [{ ...git, grow: 100 }]
+    right.width = Math.round((gitPane.paneRatio ?? gitPane.ratio ?? 0.5) * 80)
+  }
+  return { left, right }
 }
 
 function isRatioValid(value: unknown): boolean {
@@ -259,6 +342,7 @@ export function loadConfigResult(): ConfigLoadResult {
       themeTransparent?: unknown
       themeMode?: unknown
       gitPane?: unknown
+      bars?: unknown
       sidebar?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
@@ -303,6 +387,11 @@ export function loadConfigResult(): ConfigLoadResult {
     const validSidebar = isPersistedSidebar(parsed.sidebar) ? parsed.sidebar : undefined
     if (parsed.sidebar !== undefined && validSidebar === undefined) {
       issues.push('ignored invalid sidebar')
+    }
+
+    const validBars = isPersistedBars(parsed.bars) ? parsed.bars : undefined
+    if (parsed.bars !== undefined && validBars === undefined) {
+      issues.push('ignored invalid bars')
     }
 
     // Legacy migration: previous schema stored gitPanelVisible/gitPanelRatio at
@@ -359,6 +448,7 @@ export function loadConfigResult(): ConfigLoadResult {
 
     return {
       config: {
+        bars: validBars ?? deriveBarsFromLegacy(validSidebar, validGitPane),
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
         prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,

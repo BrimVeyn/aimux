@@ -43,7 +43,7 @@ If neither file exists, `aimux` falls back to the package defaults.
 This file is meant for:
 
 - keymap customization
-- startup overrides such as `sessionBar.initialVisible` or `gitPane.initialMode`
+- startup overrides such as `sessionBar.initialVisible` or `gitPane.initialFileListMode`
 - other exported config fields from `@brimveyn/aimux-config`
 
 Important: not every typed field exported by `@brimveyn/aimux-config` is fully
@@ -58,14 +58,18 @@ Today it is used for values such as:
 
 - `customCommands`
 - `themeId`
-- `gitPane` (`{ visible, mode, position, ratio, diffModeRatio, fileListMode }`)
+- `bars` (`{ left, right }`, each `{ visible, width, widgets }`) — the left/right
+  widget bars
+- `gitPane` (`{ diffModeRatio, fileListMode, treeCompaction }`) — git content prefs
 - `sessionBarVisible`
 - `workspaceSnapshot` for legacy migration
 - `skippedUpdateVersion`
 - `worktreeTemplates` (fallback when `aimux.config.ts` does not declare them)
 
 Legacy top-level keys `gitPanelVisible` / `gitPanelRatio` are still read on
-load for backward compatibility and migrated into `gitPane` on the next save.
+load for backward compatibility. A file with no `bars` key is upgraded from the
+old `sidebar` + `gitPane.mode`/`position` placement fields on load, and `bars`
+is written on the next save.
 
 This file is created and updated by the app.
 
@@ -136,12 +140,14 @@ persists the current UI state separately.
 
 1. `resolvedConfig.gitPane.initial*` (typed config)
 2. `aimux.json.gitPane` (persisted state)
-3. built-in defaults (`{ mode: 'embedded', position: 'bottom', ratio: 0.5, diffModeRatio: 0.35, fileListMode: 'tree', ... }`)
+3. built-in defaults (`{ diffModeRatio: 0.35, fileListMode: 'tree', treeCompaction: true, ... }`)
 
 Fields you do not set in typed config fall through to the persisted or default
-values. Fields you do set are reapplied on every launch, so runtime toggles,
-mode changes, and resizes for those fields will not stick while the config
-entry remains present.
+values. Fields you do set are reapplied on every launch, so runtime toggles for
+those fields will not stick while the config entry remains present.
+
+Where the git pane _sits_ is no longer part of this: placement lives in `bars`
+and is always app-managed.
 
 ### Theme
 

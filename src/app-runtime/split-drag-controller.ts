@@ -16,8 +16,7 @@ export interface AxisDragState {
   screenStart: number
 }
 
-export interface AnchoredRatioDragState {
-  anchor: 'start' | 'end'
+export interface RatioDragState {
   axis: ScreenAxis
   screenStart: number
   totalSize: number
@@ -38,10 +37,7 @@ export function getAxisDeltaFromDrag(event: OtuiMouseEvent, drag: AxisDragState)
   return getScreenPosition(event, drag.axis) - drag.screenStart
 }
 
-export function getAnchoredRatioFromDrag(
-  event: OtuiMouseEvent,
-  drag: AnchoredRatioDragState
-): number {
-  const offset = getScreenPosition(event, drag.axis) - drag.screenStart
-  return drag.anchor === 'start' ? offset / drag.totalSize : 1 - offset / drag.totalSize
+/** Cursor position as a 0..1 fraction of the dragged container. */
+export function getRatioFromDrag(event: OtuiMouseEvent, drag: RatioDragState): number {
+  return (getScreenPosition(event, drag.axis) - drag.screenStart) / drag.totalSize
 }
