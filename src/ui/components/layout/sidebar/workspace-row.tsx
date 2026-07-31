@@ -109,20 +109,24 @@ export const WorkspaceRow = memo(function WorkspaceRow({
     bgColor = base.backgroundPanel
   }
 
-  // The branch is not shown: it is derived from this name, so printing both
-  // says the same thing twice and costs the row the width the churn needs.
   const { added, removed } = formatDiffStat(divergence)
   const statWidth = added.length + removed.length + (added !== '' && removed !== '' ? 1 : 0)
   const nameLabel = truncate(
     workspace.name,
     Math.max(0, contentWidth - 5 - (statWidth > 0 ? statWidth + 1 : 0))
   )
+  // Second line, aligned under the name (2 padding + the 4-cell glyph run).
+  // Only workspaces that own a branch get one — an external checkout without
+  // one would otherwise be a row of a different height for no information.
+  const branchLabel =
+    workspace.branch == null || workspace.branch === ''
+      ? null
+      : truncate(workspace.branch, Math.max(0, contentWidth - 6))
 
   return (
     <ContextMenuBox
       id={`sidebar-wt-${workspace.id}`}
-      flexDirection="row"
-      alignItems="center"
+      flexDirection="column"
       flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
@@ -130,30 +134,38 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
-      <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {'  '}
-        {'\u{e702}'}{' '}
-      </text>
-      <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
-      <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
-        {nameLabel}
-      </text>
-      <box flexGrow={1} flexShrink={1} />
-      {added !== '' ? (
-        <text fg={t.success} selectable={false} wrapMode="none">
-          {added}
-        </text>
-      ) : null}
-      {added !== '' && removed !== '' ? (
+      <box flexDirection="row" alignItems="center">
         <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {' '}
+          {'  '}
+          {'\u{e702}'}{' '}
         </text>
-      ) : null}
-      {removed !== '' ? (
-        <text fg={t.error} selectable={false} wrapMode="none">
-          {removed}
+        <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
+        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+          {nameLabel}
         </text>
-      ) : null}
+        <box flexGrow={1} flexShrink={1} />
+        {added !== '' ? (
+          <text fg={t.success} selectable={false} wrapMode="none">
+            {added}
+          </text>
+        ) : null}
+        {added !== '' && removed !== '' ? (
+          <text fg={t.textMuted} selectable={false} wrapMode="none">
+            {' '}
+          </text>
+        ) : null}
+        {removed !== '' ? (
+          <text fg={t.error} selectable={false} wrapMode="none">
+            {removed}
+          </text>
+        ) : null}
+      </box>
+      {branchLabel == null ? null : (
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {'    '}
+          {branchLabel}
+        </text>
+      )}
     </ContextMenuBox>
   )
 })
