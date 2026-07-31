@@ -8,7 +8,7 @@ import { WorkspaceList } from '../components/layout/sidebar/workspace-list'
  * `KNOWN_WIDGET_IDS` (src/state/bars.ts) and in the default layout.
  */
 export const WIDGET_RENDERERS: Record<string, (contentWidth: number) => ReactNode> = {
-  git: () => <GitPaneWidget pollingEnabled />,
+  git: (contentWidth) => <GitPaneWidget contentWidth={contentWidth} pollingEnabled />,
   workspaces: (contentWidth) => <WorkspaceList contentWidth={contentWidth} />,
 }
 
