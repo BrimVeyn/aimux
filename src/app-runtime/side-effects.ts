@@ -57,15 +57,15 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
-import { saveSessionCatalog } from '../state/session-catalog'
-import { pruneSnapshotOfWorktree } from '../state/session-persistence'
+import { saveProjectCatalog } from '../state/project-catalog'
+import { pruneSnapshotOfWorktree } from '../state/project-persistence'
 import {
   filterTabsForActiveWorktree,
   getActiveWorktree,
   getActiveWorktreePath,
   withActiveWorktree,
-} from '../state/session-worktrees'
+} from '../state/project-worktrees'
+import { filterAssistants, filterProjects, filterSnippets } from '../state/selectors'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { appReducer } from '../state/store'
 import { buildTabEntries } from '../state/tab-entries'
@@ -76,15 +76,15 @@ import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
 import { triggerAutoCommitNow } from './auto-commit-ref'
-import { writeToTab } from './pty-write'
 import {
-  handleCreateSessionEffect,
-  handleDeleteSessionEffect,
-  handleRenameSessionEffect,
-  handleSwitchSessionEffect,
+  handleCreateProjectEffect,
+  handleDeleteProjectEffect,
+  handleRenameProjectEffect,
+  handleSwitchProjectEffect,
   restartTabSession,
-  switchSessionRecords,
-} from './session-actions'
+  switchProjectRecords,
+} from './project-actions'
+import { writeToTab } from './pty-write'
 import {
   handleDeleteSnippetEffect,
   handleSaveSnippetEditorEffect,
@@ -114,7 +114,7 @@ export interface SideEffectContext {
   clearStartupGrace: (tabId: string) => void
   startStartupGrace: (tabId: string, timeoutMs: number) => void
   getState: () => AppState
-  getCurrentSessionProjectPath: () => string | undefined
+  getCurrentProjectProjectPath: () => string | undefined
 }
 
 function getSelectedAssistantOption(state: AppState) {
@@ -124,53 +124,53 @@ function getSelectedAssistantOption(state: AppState) {
   return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
 }
 
-function handleSessionSelection(ctx: SideEffectContext): void {
+function handleProjectSelection(ctx: SideEffectContext): void {
   const { backend, dispatch, state } = ctx
-  const selectedSession = getSelectedSession(state)
-  logInputDebug('app.sessionPicker.confirm', {
-    creatingNew: !selectedSession,
+  const selectedProject = getSelectedProject(state)
+  logInputDebug('app.projectPicker.confirm', {
+    creatingNew: !selectedProject,
     selectedIndex: state.modal.selectedIndex,
-    selectedSessionId: selectedSession?.id ?? null,
+    selectedProjectId: selectedProject?.id ?? null,
   })
 
-  if (selectedSession) {
-    handleSwitchSessionEffect(state, backend, dispatch, selectedSession)
+  if (selectedProject) {
+    handleSwitchProjectEffect(state, backend, dispatch, selectedProject)
     return
   }
 
-  dispatch({ returnToSessionPicker: true, type: 'open-create-session-modal' })
+  dispatch({ returnToProjectPicker: true, type: 'open-create-project-modal' })
 }
 
-function handleSelectedSessionDelete(ctx: SideEffectContext): void {
+function handleSelectedProjectDelete(ctx: SideEffectContext): void {
   const { backend, dispatch, state } = ctx
-  const selectedSession = getSelectedSession(state)
-  logInputDebug('app.sessionPicker.deleteSelected', {
+  const selectedProject = getSelectedProject(state)
+  logInputDebug('app.projectPicker.deleteSelected', {
     selectedIndex: state.modal.selectedIndex,
-    selectedSessionId: selectedSession?.id ?? null,
+    selectedProjectId: selectedProject?.id ?? null,
   })
 
-  if (selectedSession) {
-    handleDeleteSessionEffect(state, backend, dispatch, selectedSession.id, {
-      openSessionPicker: true,
+  if (selectedProject) {
+    handleDeleteProjectEffect(state, backend, dispatch, selectedProject.id, {
+      openProjectPicker: true,
     })
   }
 }
 
-function openSelectedSessionRename(ctx: SideEffectContext): void {
+function openSelectedProjectRename(ctx: SideEffectContext): void {
   const { dispatch, state } = ctx
-  const selectedSession = getSelectedSession(state)
-  if (!selectedSession) {
+  const selectedProject = getSelectedProject(state)
+  if (!selectedProject) {
     return
   }
 
-  logInputDebug('app.sessionPicker.openRenameModal', {
+  logInputDebug('app.projectPicker.openRenameModal', {
     selectedIndex: state.modal.selectedIndex,
-    selectedSessionId: selectedSession.id,
+    selectedProjectId: selectedProject.id,
   })
   dispatch({
-    initialName: selectedSession.name,
-    sessionTargetId: selectedSession.id,
-    type: 'open-session-name-modal',
+    initialName: selectedProject.name,
+    projectTargetId: selectedProject.id,
+    type: 'open-project-name-modal',
   })
 }
 
@@ -266,8 +266,8 @@ function confirmSplitSelection(ctx: SideEffectContext): void {
     customCommand,
     state.customCommands,
     getActiveWorktree(
-      state.currentSessionId != null && state.currentSessionId !== ''
-        ? state.sessions.find((s) => s.id === state.currentSessionId)
+      state.currentProjectId != null && state.currentProjectId !== ''
+        ? state.projects.find((s) => s.id === state.currentProjectId)
         : undefined
     )?.id
   )
@@ -280,9 +280,9 @@ function createTabId(): string {
   return createPrefixedId('tab')
 }
 
-function getSelectedSession(state: AppState) {
-  const filter = state.modal.type === 'session-picker' ? state.modal.editBuffer : null
-  return filterSessions(state.sessions, filter)[state.modal.selectedIndex]
+function getSelectedProject(state: AppState) {
+  const filter = state.modal.type === 'project-picker' ? state.modal.editBuffer : null
+  return filterProjects(state.projects, filter)[state.modal.selectedIndex]
 }
 
 function getSelectedSnippet(state: AppState) {
@@ -373,8 +373,8 @@ function launchAssistant(
     state.customCommands,
     worktreeId ??
       getActiveWorktree(
-        state.currentSessionId != null && state.currentSessionId !== ''
-          ? state.sessions.find((s) => s.id === state.currentSessionId)
+        state.currentProjectId != null && state.currentProjectId !== ''
+          ? state.projects.find((s) => s.id === state.currentProjectId)
           : undefined
       )?.id
   )
@@ -398,13 +398,13 @@ function launchAssistant(
 }
 
 /**
- * The `<C-p>` flow: create a worktree in the current session, then hand off.
+ * The `<C-p>` flow: create a worktree in the current project, then hand off.
  * A template already produces tabs, so it wins; otherwise we chain into the
  * new-tab modal rather than leaving the user in an empty worktree.
  */
 async function createWorktreeFromModal(
   ctx: SideEffectContext,
-  sessionId: string,
+  projectId: string,
   params: {
     worktreeName: string
     branchName: string
@@ -414,7 +414,7 @@ async function createWorktreeFromModal(
 ): Promise<void> {
   const worktree = await createAimuxTempWorktree(
     ctx,
-    sessionId,
+    projectId,
     params.worktreeName,
     params.branchName,
     params.baseRef
@@ -563,15 +563,15 @@ function getTabProjectPath(
   ctx: SideEffectContext,
   tab: Pick<TabSession, 'worktreeId'>
 ): string | undefined {
-  const session =
-    ctx.state.currentSessionId != null && ctx.state.currentSessionId !== ''
-      ? ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
+  const project =
+    ctx.state.currentProjectId != null && ctx.state.currentProjectId !== ''
+      ? ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
       : undefined
   if (tab.worktreeId != null && tab.worktreeId !== '') {
-    const worktree = session?.worktrees?.find((entry) => entry.id === tab.worktreeId)
+    const worktree = project?.worktrees?.find((entry) => entry.id === tab.worktreeId)
     if (worktree) return worktree.path
   }
-  return ctx.getCurrentSessionProjectPath()
+  return ctx.getCurrentProjectProjectPath()
 }
 
 function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
@@ -631,7 +631,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'launch-selected-assistant': {
-      // The tab lands in the session's active worktree — launchAssistant
+      // The tab lands in the project's active worktree — launchAssistant
       // resolves that itself. Creating a worktree is `create-worktree`'s job.
       launchAssistant(ctx, getSelectedAssistantOption(state).id)
       return
@@ -643,8 +643,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'load-create-worktree-base-branches': {
       void (async () => {
-        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-        const sourcePath = getActiveWorktree(session)?.path ?? getActiveWorktreePath(session)
+        const project = state.projects.find((entry) => entry.id === state.currentProjectId)
+        const sourcePath = getActiveWorktree(project)?.path ?? getActiveWorktreePath(project)
         if (!(sourcePath != null && sourcePath !== '')) return
         const branches = await listLocalBranches(sourcePath)
         if (ctx.getState().modal.type !== 'create-worktree') return
@@ -660,8 +660,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         dispatch({ step: 'template', type: 'set-create-worktree-step' })
         return
       }
-      const sessionId = state.currentSessionId
-      if (!(sessionId != null && sessionId !== '')) return
+      const projectId = state.currentProjectId
+      if (!(projectId != null && projectId !== '')) return
       const { baseRef, branchName, worktreeName } = state.modal
       const templateId =
         state.modal.step === 'template'
@@ -670,7 +670,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void (async () => {
         try {
           await enqueueGitOp(async () =>
-            createWorktreeFromModal(ctx, sessionId, {
+            createWorktreeFromModal(ctx, projectId, {
               baseRef: baseRef !== '' ? baseRef : undefined,
               branchName,
               templateId,
@@ -683,16 +683,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       })()
       return
     }
-    case 'confirm-selected-session': {
-      handleSessionSelection(ctx)
+    case 'confirm-selected-project': {
+      handleProjectSelection(ctx)
       return
     }
-    case 'delete-selected-session': {
-      handleSelectedSessionDelete(ctx)
+    case 'delete-selected-project': {
+      handleSelectedProjectDelete(ctx)
       return
     }
-    case 'delete-session': {
-      handleDeleteSessionEffect(state, backend, dispatch, effect.sessionId)
+    case 'delete-project': {
+      handleDeleteProjectEffect(state, backend, dispatch, effect.projectId)
       return
     }
     case 'delete-worktree': {
@@ -701,7 +701,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           await enqueueGitOp(async () =>
             runDeleteWorktree(
               { ...ctx, state: ctx.getState() },
-              effect.sessionId,
+              effect.projectId,
               effect.worktreeId,
               !!(effect.force === true),
               !!(effect.closeTabs === true)
@@ -717,13 +717,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
             return
           }
           const latest = ctx.getState()
-          const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
-          const worktree = session?.worktrees?.find((entry) => entry.id === effect.worktreeId)
+          const project = latest.projects.find((entry) => entry.id === effect.projectId)
+          const worktree = project?.worktrees?.find((entry) => entry.id === effect.worktreeId)
           ctx.dispatch({
             closeTabs: effect.closeTabs === true,
             force: true,
+            projectId: effect.projectId,
             reason: message,
-            sessionId: effect.sessionId,
             type: 'open-worktree-delete-confirm',
             worktreeId: effect.worktreeId,
             worktreeLabel: worktree?.branch ?? worktree?.name ?? 'this worktree',
@@ -738,7 +738,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           await enqueueGitOp(async () =>
             runMoveWorktree(
               { ...ctx, state: ctx.getState() },
-              effect.sessionId,
+              effect.projectId,
               effect.sourceWorktreeId,
               effect.targetWorktreeId,
               effect.deleteSource === true,
@@ -754,8 +754,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'load-worktree-move-stats': {
       void (async () => {
-        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-        const worktrees = session?.worktrees ?? []
+        const project = state.projects.find((entry) => entry.id === state.currentProjectId)
+        const worktrees = project?.worktrees ?? []
         if (worktrees.length === 0) return
         const counts = await Promise.all(
           worktrees.map(async (worktree) => [worktree.id, await countDirtyFiles(worktree.path)])
@@ -768,12 +768,12 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       })()
       return
     }
-    case 'open-rename-selected-session': {
-      openSelectedSessionRename(ctx)
+    case 'open-rename-selected-project': {
+      openSelectedProjectRename(ctx)
       return
     }
-    case 'create-session':
-      handleCreateSessionEffect(state, dispatch, effect.name, effect.projectPath)
+    case 'create-project':
+      handleCreateProjectEffect(state, dispatch, effect.name, effect.projectPath)
       return
     case 'close-tab': {
       ctx.clearIdleTimer(effect.tabId)
@@ -825,8 +825,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       applyThemeEffect(effect, ctx)
       return
     }
-    case 'rename-session': {
-      handleRenameSessionEffect(state.sessions, dispatch, effect.sessionId, effect.name)
+    case 'rename-project': {
+      handleRenameProjectEffect(state.projects, dispatch, effect.projectId, effect.name)
       return
     }
     case 'rename-tab': {
@@ -919,7 +919,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'generate-auto-commit-now': {
       if (!isAutoCommitEnabled()) return
-      void runGenerateAutoCommitNow(ctx, effect.sessionId)
+      void runGenerateAutoCommitNow(ctx, effect.projectId)
       return
     }
     case 'git-push': {
@@ -930,8 +930,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleConfirmUpdateSelection(ctx)
       return
     }
-    case 'switch-session-by-index': {
-      handleSwitchSessionByIndex(ctx, effect.index, effect.worktreeId)
+    case 'switch-project-by-index': {
+      handleSwitchProjectByIndex(ctx, effect.index, effect.worktreeId)
       return
     }
     case 'cycle-sidebar-item': {
@@ -998,7 +998,7 @@ function openSelectedSnippetSourceInEditor(ctx: SideEffectContext): void {
 
 function openFileInEditor(ctx: SideEffectContext, relPath: string): void {
   const fileEntry = ctx.state.gitPanel.files.find((f) => f.path === relPath)
-  const cwd = fileEntry?.repoPath ?? ctx.getCurrentSessionProjectPath()
+  const cwd = fileEntry?.repoPath ?? ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) {
     ctx.dispatch({ message: 'no working directory', type: 'git-mode-set-message' })
     return
@@ -1194,7 +1194,7 @@ async function openEditorInline(
   }
 }
 
-function handleSwitchSessionByIndex(
+function handleSwitchProjectByIndex(
   ctx: SideEffectContext,
   index: number,
   worktreeId?: string
@@ -1203,18 +1203,18 @@ function handleSwitchSessionByIndex(
   // Read fresh state. ctx.state is the snapshot from the previous render and
   // lags behind dispatches that happened in the same JS turn.
   const state = ctx.getState()
-  const ordered = [...state.sessions].sort(
+  const ordered = [...state.projects].sort(
     (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
   )
   const target = ordered[index - 1]
   if (!target) {
-    logInputDebug('app.sessionBar.switchOutOfRange', { index, total: ordered.length })
+    logInputDebug('app.projectBar.switchOutOfRange', { index, total: ordered.length })
     return
   }
 
   // Resolve which worktree to land on. If the caller passed an explicit
   // `worktreeId` (workspace-row tap → its primary, worktree-row tap → that
-  // worktree), honor it; otherwise let the target session keep its persisted
+  // worktree), honor it; otherwise let the target project keep its persisted
   // activeWorktreeId.
   const resolvedWorktreeId =
     worktreeId != null &&
@@ -1225,10 +1225,10 @@ function handleSwitchSessionByIndex(
   const needsWorktreeChange =
     resolvedWorktreeId != null && resolvedWorktreeId !== target.activeWorktreeId
 
-  if (target.id === state.currentSessionId) {
+  if (target.id === state.currentProjectId) {
     if (needsWorktreeChange) {
       dispatch({
-        sessionId: target.id,
+        projectId: target.id,
         type: 'set-active-worktree',
         worktreeId: resolvedWorktreeId,
       })
@@ -1239,68 +1239,68 @@ function handleSwitchSessionByIndex(
     return
   }
 
-  // Cross-workspace: bundle the worktree change into the session record AND
-  // fold set-sessions + load-session into a SINGLE setState call. Otherwise
+  // Cross-workspace: bundle the worktree change into the project record AND
+  // fold set-projects + load-project into a SINGLE setState call. Otherwise
   // any subscriber notification (re-render, useEffect, backend re-attach)
-  // between dispatches can re-assert the session's previously-persisted
+  // between dispatches can re-assert the project's previously-persisted
   // activeWorktreeId, dropping the user back on the last-visited worktree.
-  const patchedSession = needsWorktreeChange
+  const patchedProject = needsWorktreeChange
     ? withActiveWorktree(target, resolvedWorktreeId)
     : target
   const patchedState: AppState = needsWorktreeChange
     ? {
         ...state,
-        sessions: state.sessions.map((s) => (s.id === patchedSession.id ? patchedSession : s)),
+        projects: state.projects.map((s) => (s.id === patchedProject.id ? patchedProject : s)),
       }
     : state
-  const sessions = switchSessionRecords(patchedState, patchedSession)
-  saveSessionCatalog(sessions)
+  const projects = switchProjectRecords(patchedState, patchedProject)
+  saveProjectCatalog(projects)
   void backend.destroy(true)
   appStore.setState((current) => {
-    const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
+    const afterSet = appReducer(current, { projects, type: 'set-projects' })
     return appReducer(afterSet, {
       forceDisconnected: false,
-      sessionId: patchedSession.id,
-      type: 'load-session',
-      workspaceSnapshot: patchedSession.workspaceSnapshot,
+      projectId: patchedProject.id,
+      type: 'load-project',
+      workspaceSnapshot: patchedProject.workspaceSnapshot,
     })
   })
 }
 
 interface SidebarItem {
-  sessionId: string
+  projectId: string
   worktreeId: string | null
 }
 
 function buildSidebarItems(state: AppState): SidebarItem[] {
-  const ordered = [...state.sessions].sort(
+  const ordered = [...state.projects].sort(
     (a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
   )
   const items: SidebarItem[] = []
-  for (const session of ordered) {
-    items.push({ sessionId: session.id, worktreeId: null })
-    const worktrees = session.worktrees ?? []
+  for (const project of ordered) {
+    items.push({ projectId: project.id, worktreeId: null })
+    const worktrees = project.worktrees ?? []
     const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
     for (const wt of worktrees) {
       if (wt.id === primary?.id) continue
-      items.push({ sessionId: session.id, worktreeId: wt.id })
+      items.push({ projectId: project.id, worktreeId: wt.id })
     }
   }
   return items
 }
 
 function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
-  const sessionId = state.currentSessionId
-  if (sessionId == null || sessionId === '') return -1
-  const session = state.sessions.find((s) => s.id === sessionId)
-  const worktrees = session?.worktrees ?? []
+  const projectId = state.currentProjectId
+  if (projectId == null || projectId === '') return -1
+  const project = state.projects.find((s) => s.id === projectId)
+  const worktrees = project?.worktrees ?? []
   const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-  const activeWtId = session?.activeWorktreeId ?? null
+  const activeWtId = project?.activeWorktreeId ?? null
   // The workspace row IS the primary worktree (no separate row), so an active
   // primary or undefined active maps to the workspace-item.
   const targetWorktreeId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
   return items.findIndex(
-    (item) => item.sessionId === sessionId && item.worktreeId === targetWorktreeId
+    (item) => item.projectId === projectId && item.worktreeId === targetWorktreeId
   )
 }
 
@@ -1324,48 +1324,48 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   const target = items[(((startIdx + direction) % len) + len) % len]
   if (!target) return
 
-  const session = state.sessions.find((s) => s.id === target.sessionId)
-  if (!session) return
+  const project = state.projects.find((s) => s.id === target.projectId)
+  if (!project) return
 
   // Determine the worktree to activate. For workspace-items, that's the
   // primary; for worktree-items, the specific worktree.
-  const worktrees = session.worktrees ?? []
+  const worktrees = project.worktrees ?? []
   const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
   const targetWorktreeId = target.worktreeId ?? primary?.id
 
-  const isCrossWorkspace = session.id !== state.currentSessionId
+  const isCrossWorkspace = project.id !== state.currentProjectId
   const needsWorktreeChange =
-    targetWorktreeId != null && targetWorktreeId !== session.activeWorktreeId
+    targetWorktreeId != null && targetWorktreeId !== project.activeWorktreeId
 
   if (isCrossWorkspace) {
-    // Bundle the worktree change into the session record AND fold the
-    // session switch's two dispatches (set-sessions + load-session) into a
+    // Bundle the worktree change into the project record AND fold the
+    // project switch's two dispatches (set-projects + load-project) into a
     // SINGLE Zustand setState call — otherwise each dispatch fires a
     // separate subscription notification and the @opentui/react reconciler
-    // paints an intermediate frame where the new session is current but
+    // paints an intermediate frame where the new project is current but
     // the old activeWorktreeId still holds, producing the visible flicker.
-    const patchedSession = needsWorktreeChange
-      ? withActiveWorktree(session, targetWorktreeId)
-      : session
+    const patchedProject = needsWorktreeChange
+      ? withActiveWorktree(project, targetWorktreeId)
+      : project
     const patchedState: AppState = needsWorktreeChange
       ? {
           ...state,
-          sessions: state.sessions.map((s) => (s.id === patchedSession.id ? patchedSession : s)),
+          projects: state.projects.map((s) => (s.id === patchedProject.id ? patchedProject : s)),
         }
       : state
-    const sessions = switchSessionRecords(patchedState, patchedSession)
-    saveSessionCatalog(sessions)
+    const projects = switchProjectRecords(patchedState, patchedProject)
+    saveProjectCatalog(projects)
     void backend.destroy(true)
     appStore.setState((current) => {
-      const afterSet = appReducer(current, { sessions, type: 'set-sessions' })
+      const afterSet = appReducer(current, { projects, type: 'set-projects' })
       return appReducer(afterSet, {
         // Daemon is alive and attach() will hydrate real statuses within a
         // frame, so skip the snapshot's running→disconnected downgrade —
         // otherwise the "Restored snapshot" hint flashes on every j/k cycle.
         forceDisconnected: false,
-        sessionId: patchedSession.id,
-        type: 'load-session',
-        workspaceSnapshot: patchedSession.workspaceSnapshot,
+        projectId: patchedProject.id,
+        type: 'load-project',
+        workspaceSnapshot: patchedProject.workspaceSnapshot,
       })
     })
     return
@@ -1373,7 +1373,7 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
 
   if (needsWorktreeChange) {
     dispatch({
-      sessionId: session.id,
+      projectId: project.id,
       type: 'set-active-worktree',
       worktreeId: targetWorktreeId,
     })
@@ -1382,11 +1382,11 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
 
 function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
   const { dispatch, state } = ctx
-  const currentSession =
-    state.currentSessionId != null && state.currentSessionId !== ''
-      ? state.sessions.find((s) => s.id === state.currentSessionId)
+  const currentProject =
+    state.currentProjectId != null && state.currentProjectId !== ''
+      ? state.projects.find((s) => s.id === state.currentProjectId)
       : undefined
-  const visible = filterTabsForActiveWorktree(state.tabs, currentSession)
+  const visible = filterTabsForActiveWorktree(state.tabs, currentProject)
   const entries = buildTabEntries(visible, state.layoutTrees, state.tabGroupMap, state.activeTabId)
   const target = entries[index - 1]
   if (!target) {
@@ -1398,25 +1398,25 @@ function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
   dispatch({ tabId: targetTabId, type: 'set-active-tab' })
 }
 
-function replaceSession(
+function replaceProject(
   state: AppState,
-  sessionId: string,
-  next: (session: AppState['sessions'][number]) => AppState['sessions'][number]
-): AppState['sessions'] {
-  return state.sessions.map((session) => (session.id === sessionId ? next(session) : session))
+  projectId: string,
+  next: (project: AppState['projects'][number]) => AppState['projects'][number]
+): AppState['projects'] {
+  return state.projects.map((project) => (project.id === projectId ? next(project) : project))
 }
 
-function handleSwitchWorktree(ctx: SideEffectContext, sessionId: string, worktreeId: string): void {
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
-  const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
-  if (!session || !worktree) return
-  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+function handleSwitchWorktree(ctx: SideEffectContext, projectId: string, worktreeId: string): void {
+  const project = ctx.state.projects.find((entry) => entry.id === projectId)
+  const worktree = project?.worktrees?.find((entry) => entry.id === worktreeId)
+  if (!project || !worktree) return
+  const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
     activeWorktreeId: worktreeId,
     updatedAt: new Date().toISOString(),
   }))
-  saveSessionCatalog(sessions)
-  ctx.dispatch({ sessions, type: 'set-sessions' })
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
 }
 
 function normalizeBranchName(branch: string | undefined): string | undefined {
@@ -1425,17 +1425,17 @@ function normalizeBranchName(branch: string | undefined): string | undefined {
 
 async function createAimuxTempWorktree(
   ctx: SideEffectContext,
-  sessionId: string,
+  projectId: string,
   requestedName?: string,
   requestedBranchName?: string,
   requestedBaseRef?: string,
   sourceWorktreeId?: string
 ): Promise<WorktreeRecord | undefined> {
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
+  const project = ctx.state.projects.find((entry) => entry.id === projectId)
   const source =
-    session?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(session)
-  const sourcePath = source?.path ?? getActiveWorktreePath(session)
-  if (!session || !(sourcePath != null && sourcePath !== '')) return undefined
+    project?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(project)
+  const sourcePath = source?.path ?? getActiveWorktreePath(project)
+  if (!project || !(sourcePath != null && sourcePath !== '')) return undefined
 
   // Resolve the *main* repo checkout, never the active linked worktree, so the
   // record's repoRoot stays valid after sibling worktrees are deleted.
@@ -1447,7 +1447,7 @@ async function createAimuxTempWorktree(
   const worktreeName =
     trimmedName != null && trimmedName !== ''
       ? trimmedName
-      : `wt-${sanitizePathSegment(session.name, 12)}`
+      : `wt-${sanitizePathSegment(project.name, 12)}`
   const trimmedBranch = requestedBranchName?.trim()
   const branchName =
     trimmedBranch != null && trimmedBranch !== ''
@@ -1486,19 +1486,19 @@ async function createAimuxTempWorktree(
     source: 'aimux-temp',
     updatedAt: now,
   }
-  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+  const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
     activeWorktreeId: worktree.id,
     updatedAt: now,
     worktrees: [...(entry.worktrees ?? []), worktree],
   }))
-  saveSessionCatalog(sessions)
-  ctx.dispatch({ sessions, type: 'set-sessions' })
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
   toast.success(`Created worktree ${branchName}`)
   return worktree
 }
 
-// Dispose and close every tab pinned to a worktree (timers, pty session, state).
+// Dispose and close every tab pinned to a worktree (timers, pty project, state).
 function disposeWorktreeTabs(ctx: SideEffectContext, worktreeId: string): void {
   for (const tab of ctx.state.tabs.filter((entry) => entry.worktreeId === worktreeId)) {
     ctx.clearIdleTimer(tab.id)
@@ -1510,16 +1510,16 @@ function disposeWorktreeTabs(ctx: SideEffectContext, worktreeId: string): void {
 
 async function runDeleteWorktree(
   ctx: SideEffectContext,
-  sessionId: string,
+  projectId: string,
   worktreeId: string,
   force: boolean,
   closeTabs = false
 ): Promise<void> {
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
-  const worktree = session?.worktrees?.find((entry) => entry.id === worktreeId)
-  if (!session) throw new Error('session not found')
+  const project = ctx.state.projects.find((entry) => entry.id === projectId)
+  const worktree = project?.worktrees?.find((entry) => entry.id === worktreeId)
+  if (!project) throw new Error('project not found')
   if (!worktree) throw new Error('worktree not found')
-  if ((session.worktrees?.length ?? 0) <= 1) throw new Error('at least one worktree must remain')
+  if ((project.worktrees?.length ?? 0) <= 1) throw new Error('at least one worktree must remain')
   if (worktree.source === 'primary') throw new Error('root worktree cannot be deleted')
 
   const tabsInWorktree = ctx.state.tabs.filter((tab) => tab.worktreeId === worktreeId)
@@ -1531,7 +1531,7 @@ async function runDeleteWorktree(
     throw new ActiveWorktreeTabsError(tabsInWorktree.length)
   }
 
-  const repoPath = resolveWorktreeGitDir(session, worktree)
+  const repoPath = resolveWorktreeGitDir(project, worktree)
   const isAimuxTemp = worktree.source === 'aimux-temp' && worktree.createdByAimux
   // Drop the throwaway aimux branch alongside the worktree so deleted temp
   // worktrees don't accumulate in the repo or haunt the base picker. Scoped to
@@ -1563,9 +1563,9 @@ async function runDeleteWorktree(
   // we don't operate on the snapshot captured before the awaits above.
   disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, worktreeId)
   const latest = ctx.getState()
-  const latestSession = latest.sessions.find((entry) => entry.id === sessionId)
-  if (latestSession) {
-    removeWorktreeRecordFromSession({ ...ctx, state: latest }, sessionId, latestSession, worktreeId)
+  const latestProject = latest.projects.find((entry) => entry.id === projectId)
+  if (latestProject) {
+    removeWorktreeRecordFromProject({ ...ctx, state: latest }, projectId, latestProject, worktreeId)
   }
 }
 
@@ -1574,13 +1574,13 @@ async function runDeleteWorktree(
 // share the common git dir), so fall back to the main checkout or any live
 // worktree path rather than letting `git -C` fail on a vanished directory.
 function resolveWorktreeGitDir(
-  session: NonNullable<SideEffectContext['state']['sessions'][number]>,
+  project: NonNullable<SideEffectContext['state']['projects'][number]>,
   worktree: WorktreeRecord
 ): string {
   const candidates = [
-    session.worktrees?.find((entry) => entry.source === 'primary')?.path,
+    project.worktrees?.find((entry) => entry.source === 'primary')?.path,
     worktree.repoRoot,
-    ...(session.worktrees ?? [])
+    ...(project.worktrees ?? [])
       .filter((entry) => entry.id !== worktree.id)
       .map((entry) => entry.path),
   ]
@@ -1589,17 +1589,17 @@ function resolveWorktreeGitDir(
 
 async function runMoveWorktree(
   ctx: SideEffectContext,
-  sessionId: string,
+  projectId: string,
   sourceWorktreeId: string,
   targetWorktreeId: string,
   deleteSource: boolean,
   stashTarget: boolean,
   keepConflicts: boolean
 ): Promise<void> {
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
-  const source = session?.worktrees?.find((entry) => entry.id === sourceWorktreeId)
-  const target = session?.worktrees?.find((entry) => entry.id === targetWorktreeId)
-  if (!session) throw new Error('session not found')
+  const project = ctx.state.projects.find((entry) => entry.id === projectId)
+  const source = project?.worktrees?.find((entry) => entry.id === sourceWorktreeId)
+  const target = project?.worktrees?.find((entry) => entry.id === targetWorktreeId)
+  if (!project) throw new Error('project not found')
   if (!source || !target) throw new Error('worktree not found')
   if (source.id === target.id) throw new Error('source and target are the same worktree')
   if (source.branch == null || source.branch === '') {
@@ -1626,7 +1626,7 @@ async function runMoveWorktree(
     ctx.dispatch({
       deleteSource,
       files: result.files,
-      sessionId,
+      projectId,
       sourceLabel,
       sourceWorktreeId,
       targetLabel,
@@ -1641,7 +1641,7 @@ async function runMoveWorktree(
     // auto-commit driver is safe against this state: git refuses to commit
     // with unmerged index entries, so it fails loudly instead of committing
     // conflict markers.
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
     toast.warning(
       `Left conflict markers in ${targetLabel} (${result.files.length} file(s)) — resolve & commit there; ${sourceLabel} kept`
     )
@@ -1661,10 +1661,10 @@ async function runMoveWorktree(
   // default worktree. Re-read state each step so we never resurrect the source.
   if (deleteSource) {
     disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, sourceWorktreeId)
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
-    await runDeleteWorktree({ ...ctx, state: ctx.getState() }, sessionId, sourceWorktreeId, true)
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
+    await runDeleteWorktree({ ...ctx, state: ctx.getState() }, projectId, sourceWorktreeId, true)
   } else {
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, sessionId, targetWorktreeId)
+    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
   }
   const stashNote = result.stashedTarget
     ? ` · target's previous changes stashed (recover with git stash pop)`
@@ -1674,24 +1674,24 @@ async function runMoveWorktree(
   )
 }
 
-function removeWorktreeRecordFromSession(
+function removeWorktreeRecordFromProject(
   ctx: SideEffectContext,
-  sessionId: string,
-  session: NonNullable<SideEffectContext['state']['sessions'][number]>,
+  projectId: string,
+  project: NonNullable<SideEffectContext['state']['projects'][number]>,
   worktreeId: string
 ): void {
-  const remaining = (session.worktrees ?? []).filter((entry) => entry.id !== worktreeId)
+  const remaining = (project.worktrees ?? []).filter((entry) => entry.id !== worktreeId)
   const nextActive =
-    session.activeWorktreeId === worktreeId ? remaining[0] : getActiveWorktree(session)
-  const sessions = replaceSession(ctx.state, sessionId, (entry) => ({
+    project.activeWorktreeId === worktreeId ? remaining[0] : getActiveWorktree(project)
+  const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
     activeWorktreeId: nextActive?.id,
     updatedAt: new Date().toISOString(),
     workspaceSnapshot: pruneSnapshotOfWorktree(entry.workspaceSnapshot, worktreeId),
     worktrees: remaining,
   }))
-  saveSessionCatalog(sessions)
-  ctx.dispatch({ sessions, type: 'set-sessions' })
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
 }
 
 function isForceableWorktreeDeleteError(message: string): boolean {
@@ -1747,7 +1747,7 @@ async function runGitAction(
   args: string[],
   pathToInvalidate?: string
 ): Promise<void> {
-  const fallback = ctx.getCurrentSessionProjectPath()
+  const fallback = ctx.getCurrentProjectProjectPath()
   const repoPath =
     pathToInvalidate != null && pathToInvalidate !== ''
       ? ctx.state.gitPanel.files.find((f) => f.path === pathToInvalidate)?.repoPath
@@ -1771,7 +1771,7 @@ async function runGitActionAll(
   args: string[],
   pathsToInvalidate: string[]
 ): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const cwd = ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) return
   const result = await $`git -C ${cwd} ${args}`.quiet().nothrow()
   if (result.exitCode !== 0) {
@@ -1787,7 +1787,7 @@ async function runGitActionAll(
 
 async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
   const repoPath = ctx.state.gitPanel.files.find((f) => f.path === path)?.repoPath
-  const cwd = repoPath ?? ctx.getCurrentSessionProjectPath()
+  const cwd = repoPath ?? ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) return
   const absolute = `${cwd}/${path}`
   try {
@@ -1805,7 +1805,7 @@ async function runGitRm(ctx: SideEffectContext, path: string): Promise<void> {
 }
 
 async function runGitCommit(ctx: SideEffectContext, title: string, body: string): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const cwd = ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) return
   if (!title) {
     ctx.dispatch({ message: 'empty commit title', type: 'git-mode-set-message' })
@@ -1820,7 +1820,7 @@ async function runGitCommit(ctx: SideEffectContext, title: string, body: string)
     toast.error(stderr || 'Commit failed')
     return
   }
-  clearAutoCommitForCurrentSession(ctx)
+  clearAutoCommitForCurrentProject(ctx)
   // Match the push flow: clear any inline git-pane message and surface the
   // result as a toast so it's seen even after leaving git mode.
   ctx.dispatch({ message: null, type: 'git-mode-set-message' })
@@ -1836,7 +1836,7 @@ async function runGitCommitAuto(
     ctx.dispatch({ message: 'empty commit title', type: 'git-mode-set-message' })
     return
   }
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const cwd = ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) return
 
   // If the user has manually staged files, respect that intent and commit
@@ -1864,28 +1864,28 @@ async function runGitCommitAuto(
     return
   }
 
-  clearAutoCommitForCurrentSession(ctx)
+  clearAutoCommitForCurrentProject(ctx)
   ctx.dispatch({ message: `committed: ${title}`, type: 'git-mode-set-message' })
 }
 
-function clearAutoCommitForCurrentSession(ctx: SideEffectContext): void {
-  const sessionId = ctx.state.currentSessionId
-  if (!(sessionId != null && sessionId !== '')) return
-  ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+function clearAutoCommitForCurrentProject(ctx: SideEffectContext): void {
+  const projectId = ctx.state.currentProjectId
+  if (!(projectId != null && projectId !== '')) return
+  ctx.dispatch({ projectId, type: 'auto-commit-clear' })
 }
 
-async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: string): Promise<void> {
-  const session = ctx.state.sessions.find((s) => s.id === sessionId)
+async function runGenerateAutoCommitNow(ctx: SideEffectContext, projectId: string): Promise<void> {
+  const project = ctx.state.projects.find((s) => s.id === projectId)
   const panel = ctx.state.gitPanel
   if (panel.error !== null) {
     toast.warning('Auto-commit: git panel unavailable')
-    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    ctx.dispatch({ projectId, type: 'auto-commit-clear' })
     return
   }
   const tab = ctx.activeTab
   if (!tab) {
-    toast.warning('Auto-commit: no active assistant tab — open a claude/codex session first')
-    ctx.dispatch({ sessionId, type: 'auto-commit-clear' })
+    toast.warning('Auto-commit: no active assistant tab — open a claude/codex project first')
+    ctx.dispatch({ projectId, type: 'auto-commit-clear' })
     return
   }
   await triggerAutoCommitNow({
@@ -1896,14 +1896,14 @@ async function runGenerateAutoCommitNow(ctx: SideEffectContext, sessionId: strin
       branch: panel.branch,
       files: panel.files,
     },
-    projectPath: session?.projectPath,
-    sessionId,
+    projectId,
+    projectPath: project?.projectPath,
     tabId: tab.id,
   })
 }
 
 async function runGitPush(ctx: SideEffectContext): Promise<void> {
-  const cwd = ctx.getCurrentSessionProjectPath()
+  const cwd = ctx.getCurrentProjectProjectPath()
   if (!(cwd != null && cwd !== '')) return
   ctx.dispatch({ message: 'pushing…', type: 'git-mode-set-message' })
 

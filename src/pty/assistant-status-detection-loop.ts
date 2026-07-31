@@ -3,17 +3,17 @@
  *
  * Backends drive this loop to monitor every known terminal at a fixed cadence:
  * every tick we pull each tab's current viewport, run the detector on the last
- * ~10 non-blank lines, and report per-tab + per-session statuses to the
+ * ~10 non-blank lines, and report per-tab + per-project statuses to the
  * backend's transport. The loop is the single source of truth so that idle
  * tabs can't erase a sibling's waiting-input, and so that clients receive
- * status for every session the backend owns, not just the attached one.
+ * status for every project the backend owns, not just the attached one.
  *
- * Per-session status is a pair of independent booleans:
+ * Per-project status is a pair of independent booleans:
  *   - `working`: at least one tab is working.
  *   - `waiting`: at least one tab is waiting for user input.
  * Both can be true at the same time — the chip renders one glyph per flag.
  */
-import type { AssistantId, SessionStatus, TabActivity, TerminalSnapshot } from '../state/types'
+import type { AssistantId, ProjectStatus, TabActivity, TerminalSnapshot } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { getLineText } from '../input/terminal-text-extraction'
@@ -53,19 +53,19 @@ export interface LoopTabView {
 }
 
 export interface StatusDetectionLoopOptions {
-  listSessions: () => string[]
-  listTabs: (sessionId: string) => LoopTabView[]
+  listProjects: () => string[]
+  listTabs: (projectId: string) => LoopTabView[]
   /** Emitted when a tab's status changes. */
-  onTabStatus: (tabId: string, status: TabActivity, sessionId: string) => void
-  /** Emitted when either flag on a session changes. */
-  onSessionStatus: (sessionId: string, status: SessionStatus) => void
+  onTabStatus: (tabId: string, status: TabActivity, projectId: string) => void
+  /** Emitted when either flag on a project changes. */
+  onProjectStatus: (projectId: string, status: ProjectStatus) => void
   /**
    * Emitted once per turn, when a tab's `idle` activity has held continuously
    * for `turnSettleMs`. Edge-triggered: re-armed only after the tab leaves
    * `idle`, so a driver receives exactly one signal per turn. `idleMs` is how
    * long idle had held when the signal fired.
    */
-  onTurnComplete?: (tabId: string, sessionId: string, idleMs: number) => void
+  onTurnComplete?: (tabId: string, projectId: string, idleMs: number) => void
   /**
    * Emitted when a tab transitions into `waiting-input`. Edge-triggered: fires
    * once per transition, carrying the captured prompt text and any parsed
@@ -74,7 +74,7 @@ export interface StatusDetectionLoopOptions {
    */
   onTabQuestion?: (
     tabId: string,
-    sessionId: string,
+    projectId: string,
     detail: { kind: 'question' | 'permission'; prompt: string; options?: string[] }
   ) => void
   tickMs?: number
@@ -89,18 +89,18 @@ export interface StatusDetectionLoopHandle {
   stop: () => void
   /** Last classified status for a tab, for on-attach replay. */
   getTabStatus: (tabId: string) => TabActivity | undefined
-  /** Last session flags, for on-attach replay. */
-  getSessionStatus: (sessionId: string) => SessionStatus | undefined
-  /** Snapshot of every known session's flags. */
-  snapshotSessions: () => { sessionId: string; status: SessionStatus }[]
-  /** Snapshot of every known tab's status plus its session. */
-  snapshotTabs: () => { tabId: string; sessionId: string; status: TabActivity }[]
+  /** Last project flags, for on-attach replay. */
+  getProjectStatus: (projectId: string) => ProjectStatus | undefined
+  /** Snapshot of every known project's flags. */
+  snapshotProjects: () => { projectId: string; status: ProjectStatus }[]
+  /** Snapshot of every known tab's status plus its project. */
+  snapshotTabs: () => { tabId: string; projectId: string; status: TabActivity }[]
   /**
-   * Synchronously run classification for a single session. Used on client
+   * Synchronously run classification for a single project. Used on client
    * attach so the replay snapshot is populated *before* the client reads it,
    * rather than relying on the next scheduled tick.
    */
-  classifyNow: (sessionId: string, tabs: LoopTabView[]) => void
+  classifyNow: (projectId: string, tabs: LoopTabView[]) => void
   /**
    * Feed a Claude Code hook event into the arbiter. The next tick will
    * combine it with the visual detector's verdict. Called by the daemon's
@@ -117,8 +117,8 @@ export function runStatusDetectionLoop(
   const now = options.nowFn ?? Date.now
   const detector = new AssistantStatusDetector()
   const arbiter = new AssistantStatusArbiter()
-  const lastTabStatus = new Map<string, { status: TabActivity; sessionId: string }>()
-  const lastSessionStatus = new Map<string, SessionStatus>()
+  const lastTabStatus = new Map<string, { status: TabActivity; projectId: string }>()
+  const lastProjectStatus = new Map<string, ProjectStatus>()
   // Timestamp when a tab most recently entered `idle`. Cleared when it leaves
   // idle. `turnEmitted` guards against re-firing `onTurnComplete` within the
   // same idle episode; it's cleared alongside `idleSince` so the next turn
@@ -138,7 +138,7 @@ export function runStatusDetectionLoop(
   timer.unref?.()
 
   function classifySession(
-    sessionId: string,
+    projectId: string,
     tabs: LoopTabView[],
     now: number,
     source: 'tick' | 'classifyNow',
@@ -159,21 +159,21 @@ export function runStatusDetectionLoop(
       if (status === 'working') working = true
       if (status === 'waiting-input') waiting = true
       const prev = lastTabStatus.get(tab.id)
-      const changed = !prev || prev.status !== status || prev.sessionId !== sessionId
+      const changed = !prev || prev.status !== status || prev.projectId !== projectId
       logDebug('statusLoop.classify', {
         assistant: tab.assistant,
         changed,
-        prevSessionId: prev?.sessionId,
+        prevProjectId: prev?.projectId,
         prevStatus: prev?.status,
-        sessionId,
+        projectId,
         source,
         status,
         tabId: tab.id,
         tailPreview: tailPreview(tab.viewport),
       })
       if (changed) {
-        lastTabStatus.set(tab.id, { sessionId, status })
-        options.onTabStatus(tab.id, status, sessionId)
+        lastTabStatus.set(tab.id, { projectId, status })
+        options.onTabStatus(tab.id, status, projectId)
       }
 
       // Turn-complete bookkeeping. The emission itself is gated to `tick` so a
@@ -189,7 +189,7 @@ export function runStatusDetectionLoop(
         }
         if (source === 'tick' && !turnEmitted.has(tab.id) && now - since >= turnSettleMs) {
           turnEmitted.add(tab.id)
-          options.onTurnComplete?.(tab.id, sessionId, now - since)
+          options.onTurnComplete?.(tab.id, projectId, now - since)
         }
       } else {
         idleSince.delete(tab.id)
@@ -205,36 +205,36 @@ export function runStatusDetectionLoop(
         options.onTabQuestion
       ) {
         const detail = extractQuestion(tab.assistant, tab.viewport)
-        if (detail) options.onTabQuestion(tab.id, sessionId, detail)
+        if (detail) options.onTabQuestion(tab.id, projectId, detail)
       }
     }
-    const next: SessionStatus = { waiting, working }
-    const prevSession = lastSessionStatus.get(sessionId)
-    const sessionChanged =
-      !prevSession || prevSession.working !== working || prevSession.waiting !== waiting
+    const next: ProjectStatus = { waiting, working }
+    const prevProject = lastProjectStatus.get(projectId)
+    const projectChanged =
+      !prevProject || prevProject.working !== working || prevProject.waiting !== waiting
     logDebug('statusLoop.classifySession', {
-      prev: prevSession,
-      sessionChanged,
-      sessionId,
+      prev: prevProject,
+      projectChanged,
+      projectId,
       source,
       status: next,
       tabCount: tabs.length,
     })
-    if (sessionChanged) {
-      lastSessionStatus.set(sessionId, next)
-      options.onSessionStatus(sessionId, next)
+    if (projectChanged) {
+      lastProjectStatus.set(projectId, next)
+      options.onProjectStatus(projectId, next)
     }
   }
 
   function tick(): void {
     const ts = now()
-    const sessionIds = options.listSessions()
-    const seenSessions = new Set<string>()
+    const projectIds = options.listProjects()
+    const seenProjects = new Set<string>()
     const seenTabs = new Set<string>()
 
-    for (const sessionId of sessionIds) {
-      seenSessions.add(sessionId)
-      classifySession(sessionId, options.listTabs(sessionId), ts, 'tick', seenTabs)
+    for (const projectId of projectIds) {
+      seenProjects.add(projectId)
+      classifySession(projectId, options.listTabs(projectId), ts, 'tick', seenTabs)
     }
 
     for (const tabId of lastTabStatus.keys()) {
@@ -246,18 +246,18 @@ export function runStatusDetectionLoop(
         turnEmitted.delete(tabId)
       }
     }
-    for (const sessionId of lastSessionStatus.keys()) {
-      if (!seenSessions.has(sessionId)) {
-        lastSessionStatus.delete(sessionId)
+    for (const projectId of lastProjectStatus.keys()) {
+      if (!seenProjects.has(projectId)) {
+        lastProjectStatus.delete(projectId)
       }
     }
   }
 
   return {
-    classifyNow: (sessionId, tabs) => {
-      classifySession(sessionId, tabs, now(), 'classifyNow')
+    classifyNow: (projectId, tabs) => {
+      classifySession(projectId, tabs, now(), 'classifyNow')
     },
-    getSessionStatus: (sessionId) => lastSessionStatus.get(sessionId),
+    getProjectStatus: (projectId) => lastProjectStatus.get(projectId),
     getTabStatus: (tabId) => lastTabStatus.get(tabId)?.status,
     recordHookEvent: (input) => {
       const mapped = arbiter.recordHookEvent(input)
@@ -267,11 +267,11 @@ export function runStatusDetectionLoop(
         paneId: input.paneId,
       })
     },
-    snapshotSessions: () =>
-      [...lastSessionStatus.entries()].map(([sessionId, status]) => ({ sessionId, status })),
+    snapshotProjects: () =>
+      [...lastProjectStatus.entries()].map(([projectId, status]) => ({ projectId, status })),
     snapshotTabs: () =>
       [...lastTabStatus.entries()].map(([tabId, entry]) => ({
-        sessionId: entry.sessionId,
+        projectId: entry.projectId,
         status: entry.status,
         tabId,
       })),
@@ -280,7 +280,7 @@ export function runStatusDetectionLoop(
       detector.clear()
       arbiter.clear()
       lastTabStatus.clear()
-      lastSessionStatus.clear()
+      lastProjectStatus.clear()
       idleSince.clear()
       turnEmitted.clear()
     },

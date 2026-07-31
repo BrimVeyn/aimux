@@ -7,7 +7,7 @@ import { getStatusBarModel, type StatusBarModel } from '../../src/ui/status-bar-
 const CONFIG = getDefaultKeymapConfig()
 
 function identityText(model: StatusBarModel): string {
-  return model.sessionSegments.map((seg) => seg.text).join('')
+  return model.projectSegments.map((seg) => seg.text).join('')
 }
 
 describe('getStatusBarModel', () => {
@@ -31,16 +31,16 @@ describe('getStatusBarModel', () => {
     expect(model.right).toContain('Leave insert')
   })
 
-  test('shows modal-specific hints for session picker', () => {
+  test('shows modal-specific hints for project picker', () => {
     const state = {
       ...createInitialState(),
       focusMode: 'modal' as const,
       modal: {
         cursorPos: 0,
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
-        type: 'session-picker' as const,
+        type: 'project-picker' as const,
       },
     }
     const model = getStatusBarModel(state, CONFIG)
@@ -49,22 +49,22 @@ describe('getStatusBarModel', () => {
     expect(model.right).toContain('Open')
   })
 
-  test('shows current session name when active', () => {
+  test('shows current project name when active', () => {
     const state = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
-          name: 'Main Session',
+          name: 'Main Project',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
     }
 
     const model = getStatusBarModel(state, CONFIG)
-    expect(identityText(model)).toContain('Main Session')
+    expect(identityText(model)).toContain('Main Project')
   })
 
   test('shows git-mode hints when in git focus', () => {

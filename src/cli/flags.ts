@@ -130,7 +130,7 @@ export function parseArgs(
 
 /**
  * Shared flag set — every command takes these. `--workspace` selects the
- * target session (by id or name); `--profile` overrides `AIMUX_PROFILE`
+ * target project (by id or name); `--profile` overrides `AIMUX_PROFILE`
  * before any runtime path is resolved; `--json` is a no-op kept for
  * consistency with future formats.
  */

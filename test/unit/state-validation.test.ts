@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isSessionRecord, isSnippetRecord, isWorkspaceSnapshotV1 } from '../../src/state/validation'
+import { isProjectRecord, isSnippetRecord, isWorkspaceSnapshotV1 } from '../../src/state/validation'
 
 describe('state validation', () => {
   test('accepts a valid workspace snapshot', () => {
@@ -59,11 +59,11 @@ describe('state validation', () => {
     ).toBe(false)
   })
 
-  test('rejects malformed session records', () => {
+  test('rejects malformed project records', () => {
     expect(
-      isSessionRecord({
+      isProjectRecord({
         createdAt: new Date().toISOString(),
-        id: 'session-1',
+        id: 'project-1',
         lastOpenedAt: 123,
         name: 'Main workspace',
         updatedAt: new Date().toISOString(),

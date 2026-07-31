@@ -208,7 +208,7 @@ function MouseHarness({
   const storeState = useMemo(
     () => ({
       activeTabId: TEST_TAB_ID,
-      currentSessionId: null,
+      currentProjectId: null,
       customCommands: {
         antigravity: 'antigravity',
         claude: command,
@@ -234,11 +234,11 @@ function MouseHarness({
       layoutTrees: {},
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
         type: null,
       },
-      sessions: [],
+      projects: [],
       sidebar: {
         maxWidth: SIDEBAR_MAX_WIDTH,
         minWidth: SIDEBAR_MIN_WIDTH,
@@ -364,7 +364,7 @@ function ResizeHarness({ bars }: { bars: BarsState }) {
       activeTabId: TEST_TAB_ID,
       bars,
       focusMode: 'navigation' as const,
-      sessionBar: { ...base.sessionBar, visible: false },
+      projectBar: { ...base.projectBar, visible: false },
       tabs: [
         {
           activity: 'idle',

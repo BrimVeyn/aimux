@@ -3,7 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
-import { getActiveWorktreePath } from '../state/session-worktrees'
+import { getActiveWorktreePath } from '../state/project-worktrees'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
@@ -16,21 +16,21 @@ export interface IdentitySegment {
 export interface StatusBarModel {
   help: string
   right: string
-  sessionSegments: IdentitySegment[]
+  projectSegments: IdentitySegment[]
 }
 
 const HINT_LIMIT = 6
 const HELP_DESCRIPTION = 'Help'
 const SEP = '  ·  '
 
-function sessionSegments(
-  sessionName: string,
-  sessionPath: string | null | undefined
+function projectSegments(
+  projectName: string,
+  projectPath: string | null | undefined
 ): IdentitySegment[] {
-  const segs: IdentitySegment[] = [{ id: 'session', text: sessionName, tone: 'primary' }]
-  if (sessionPath != null && sessionPath !== '') {
-    segs.push({ id: 'sep-session-path', text: SEP, tone: 'muted' })
-    segs.push({ id: 'path', text: abbreviatePath(sessionPath), tone: 'muted' })
+  const segs: IdentitySegment[] = [{ id: 'project', text: projectName, tone: 'primary' }]
+  if (projectPath != null && projectPath !== '') {
+    segs.push({ id: 'sep-project-path', text: SEP, tone: 'muted' })
+    segs.push({ id: 'path', text: abbreviatePath(projectPath), tone: 'muted' })
   }
   return segs
 }
@@ -57,27 +57,27 @@ function helpHintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
 }
 
 export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig): StatusBarModel {
-  const currentSession =
-    state.currentSessionId != null && state.currentSessionId !== ''
-      ? state.sessions.find((session) => session.id === state.currentSessionId)
+  const currentProject =
+    state.currentProjectId != null && state.currentProjectId !== ''
+      ? state.projects.find((project) => project.id === state.currentProjectId)
       : undefined
-  const sessionName = currentSession?.name ?? 'no workspace'
-  const sessionPath = getActiveWorktreePath(currentSession)
-  const sessionSegs = sessionSegments(sessionName, sessionPath)
+  const projectName = currentProject?.name ?? 'no workspace'
+  const projectPath = getActiveWorktreePath(currentProject)
+  const projectSegs = projectSegments(projectName, projectPath)
 
   switch (state.focusMode) {
     case 'terminal-input':
       return {
         help: '',
+        projectSegments: projectSegs,
         right: hintForMode(config, 'terminal-input'),
-        sessionSegments: sessionSegs,
       }
     case 'modal': {
       const modalMode = deriveModalModeId(state.modal.type)
       return {
         help: '',
+        projectSegments: projectSegs,
         right: modalMode ? hintForMode(config, modalMode) : '',
-        sessionSegments: sessionSegs,
       }
     }
     case 'git': {
@@ -93,24 +93,24 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
       }
       return {
         help: helpHintForMode(config, 'git-mode'),
+        projectSegments: [...projectSegs, ...extras],
         right: hintForGitMode(config, headOffset),
-        sessionSegments: [...sessionSegs, ...extras],
       }
     }
     case 'command-edit': {
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {
         help: '',
+        projectSegments: projectSegs,
         right: commandEditMode ? hintForMode(config, commandEditMode) : '',
-        sessionSegments: sessionSegs,
       }
     }
     case 'navigation':
     default:
       return {
         help: helpHintForMode(config, 'navigation'),
+        projectSegments: projectSegs,
         right: hintForMode(config, 'navigation'),
-        sessionSegments: sessionSegs,
       }
   }
 }
@@ -121,8 +121,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.help.filtering'
     case 'new-tab':
       return 'modal.new-tab.command-edit'
-    case 'session-picker':
-      return 'modal.session-picker.filtering'
+    case 'project-picker':
+      return 'modal.project-picker.filtering'
     case 'snippet-picker':
       return 'modal.snippet-picker.filtering'
     case 'split-picker':
@@ -142,8 +142,8 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
 
 function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId | null {
   switch (modalType) {
-    case 'create-session':
-      return 'modal.create-session'
+    case 'create-project':
+      return 'modal.create-project'
     case 'git-commit':
       return 'modal.git-commit'
     case 'new-tab':
@@ -152,10 +152,10 @@ function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId |
       return 'modal.rename-tab'
     case 'rename-worktree':
       return 'modal.rename-worktree'
-    case 'session-name':
-      return 'modal.session-name'
-    case 'session-picker':
-      return 'modal.session-picker.filtering'
+    case 'project-name':
+      return 'modal.project-name'
+    case 'project-picker':
+      return 'modal.project-picker.filtering'
     case 'snippet-editor':
       return 'modal.snippet-editor'
     case 'snippet-picker':

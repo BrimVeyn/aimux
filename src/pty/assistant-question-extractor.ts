@@ -49,7 +49,7 @@ const PERMISSION_SIGNALS: readonly string[] = [
   'write this file?',
   'apply these edits?',
   'ready to build with this plan?',
-  'approve for session',
+  'approve for project',
   'stop this task?',
 ]
 

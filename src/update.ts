@@ -60,7 +60,7 @@ export async function runUpdate(): Promise<number> {
   }
 
   // The terminal-manager is intentionally NOT restarted here: doing so kills
-  // live AI sessions. The flip side: the running TM keeps executing the
+  // live AI projects. The flip side: the running TM keeps executing the
   // previous version's code path, so any TM-side fix (perf, lifecycle) only
   // takes effect after a manual restart. Surface that explicitly so users
   // aren't silently stuck on stale behaviour.
@@ -73,7 +73,7 @@ export async function runUpdate(): Promise<number> {
         'TM-side fixes in this update apply to new TMs only — the running one',
         'keeps its old behaviour until restarted.',
         'Run `aimux restart-terminal-manager` when you can afford to lose your',
-        'current PTY sessions to upgrade it.',
+        'current PTY projects to upgrade it.',
         '',
       ].join('\n')
     )

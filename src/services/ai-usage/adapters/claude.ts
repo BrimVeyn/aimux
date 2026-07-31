@@ -186,8 +186,8 @@ export async function fetchClaudeUsage(_config: AIUsageToolConfig): Promise<Usag
     const now = Date.now()
 
     const windows: UsageWindow[] = []
-    const session = buildWindow('session', 'Session', parsed.five_hour, FIVE_HOUR_SECONDS, now)
-    if (session) windows.push(session)
+    const project = buildWindow('project', 'Project', parsed.five_hour, FIVE_HOUR_SECONDS, now)
+    if (project) windows.push(project)
     const weekly = buildWindow('weekly', 'Weekly', parsed.seven_day, SEVEN_DAY_SECONDS, now)
     if (weekly) windows.push(weekly)
     const opus = buildWindow('opus', 'Opus', parsed.seven_day_opus, SEVEN_DAY_SECONDS, now)
@@ -195,7 +195,7 @@ export async function fetchClaudeUsage(_config: AIUsageToolConfig): Promise<Usag
     const sonnet = buildWindow('sonnet', 'Sonnet', parsed.seven_day_sonnet, SEVEN_DAY_SECONDS, now)
     if (sonnet) windows.push(sonnet)
 
-    const summary = session ?? weekly
+    const summary = project ?? weekly
 
     return {
       ...base,

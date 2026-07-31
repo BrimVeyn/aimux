@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import {
   assertSafeAimuxWorktreePath,
@@ -13,15 +13,15 @@ import {
   pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
 import {
-  ensureSessionWorktrees,
+  ensureProjectWorktrees,
   getActiveWorktreePath,
   withActiveWorktree,
-} from '../../src/state/session-worktrees'
+} from '../../src/state/project-worktrees'
 
-function makeSession(projectPath = '/repo/main'): SessionRecord {
+function makeProject(projectPath = '/repo/main'): ProjectRecord {
   return {
     createdAt: '2024-01-01T00:00:00.000Z',
-    id: 'session-1',
+    id: 'project-1',
     lastOpenedAt: '2024-01-01T00:00:00.000Z',
     name: 'repo',
     projectPath,
@@ -29,20 +29,20 @@ function makeSession(projectPath = '/repo/main'): SessionRecord {
   }
 }
 
-describe('session worktrees', () => {
+describe('project worktrees', () => {
   test('normalizes a legacy projectPath into a primary worktree', () => {
-    const session = ensureSessionWorktrees(makeSession(), '2024-01-02T00:00:00.000Z')
+    const project = ensureProjectWorktrees(makeProject(), '2024-01-02T00:00:00.000Z')
 
-    expect(session.worktrees).toHaveLength(1)
-    expect(session.worktrees?.[0]?.path).toBe('/repo/main')
-    expect(session.worktrees?.[0]?.source).toBe('primary')
-    expect(session.worktrees?.[0]?.createdByAimux).toBe(false)
-    expect(session.activeWorktreeId).toBe(session.worktrees?.[0]?.id)
+    expect(project.worktrees).toHaveLength(1)
+    expect(project.worktrees?.[0]?.path).toBe('/repo/main')
+    expect(project.worktrees?.[0]?.source).toBe('primary')
+    expect(project.worktrees?.[0]?.createdByAimux).toBe(false)
+    expect(project.activeWorktreeId).toBe(project.worktrees?.[0]?.id)
   })
 
   test('switching the active worktree leaves projectPath pinned to the repo', () => {
-    const session = ensureSessionWorktrees(makeSession())
-    const first = session.worktrees?.[0]
+    const project = ensureProjectWorktrees(makeProject())
+    const first = project.worktrees?.[0]
     if (!first) throw new Error('expected primary worktree')
     const second = {
       ...first,
@@ -51,7 +51,7 @@ describe('session worktrees', () => {
       path: '/repo/feature',
     }
 
-    const switched = withActiveWorktree({ ...session, worktrees: [first, second] }, second.id)
+    const switched = withActiveWorktree({ ...project, worktrees: [first, second] }, second.id)
 
     expect(switched.activeWorktreeId).toBe(second.id)
     // The cwd follows the worktree; the project keeps naming the repo.
@@ -89,8 +89,8 @@ describe('session worktrees', () => {
   })
 
   test('prunes missing Aimux temp worktrees on normalization', () => {
-    const session = ensureSessionWorktrees(makeSession('/repo/main'))
-    const primary = session.worktrees?.[0]
+    const project = ensureProjectWorktrees(makeProject('/repo/main'))
+    const primary = project.worktrees?.[0]
     if (!primary) throw new Error('expected primary worktree')
     const missingTemp = {
       ...primary,
@@ -105,8 +105,8 @@ describe('session worktrees', () => {
       source: 'aimux-temp' as const,
     }
 
-    const normalized = ensureSessionWorktrees({
-      ...session,
+    const normalized = ensureProjectWorktrees({
+      ...project,
       activeWorktreeId: missingTemp.id,
       projectPath: missingTemp.path,
       worktrees: [primary, missingTemp],

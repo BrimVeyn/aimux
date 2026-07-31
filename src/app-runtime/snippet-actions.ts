@@ -40,7 +40,7 @@ export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null 
     return null
   }
 
-  const snippetId = state.modal.sessionTargetId
+  const snippetId = state.modal.projectTargetId
   // Config-pinned snippets are sticky and read-only in the UI.
   if (snippetId != null && snippetId !== '' && isConfigSnippetId(snippetId)) {
     return null

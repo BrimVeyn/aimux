@@ -12,9 +12,9 @@ import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-p
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
+import { filterTabsForActiveWorktree } from '../../../state/project-worktrees'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
-import { moveIdToIdPosition } from '../../session-ordering'
+import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
 import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
@@ -197,10 +197,10 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const headerBg = t.backgroundPanel
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
-  const bar = useAppStore((s) => s.sessionBar)
+  const bar = useAppStore((s) => s.projectBar)
   const leftBarVisible = useAppStore((s) => getBarWidth(s.bars.left) > 0)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
   const focusMode: FocusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const tabGroupMap = useAppStore((s) => s.tabGroupMap)
@@ -209,17 +209,17 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   // either surface is visible.
   useWorktreeDivergencePolling(bar.visible || leftBarVisible || forceVisible)
 
-  const currentSession = useMemo(
+  const currentProject = useMemo(
     () =>
-      currentSessionId != null && currentSessionId !== ''
-        ? sessions.find((s) => s.id === currentSessionId)
+      currentProjectId != null && currentProjectId !== ''
+        ? projects.find((s) => s.id === currentProjectId)
         : undefined,
-    [currentSessionId, sessions]
+    [currentProjectId, projects]
   )
 
   const visibleTabs = useMemo(
-    () => filterTabsForActiveWorktree(tabs, currentSession),
-    [tabs, currentSession]
+    () => filterTabsForActiveWorktree(tabs, currentProject),
+    [tabs, currentProject]
   )
 
   const entries = useMemo(

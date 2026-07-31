@@ -56,12 +56,12 @@ export const tabList: CliCommand = {
     }
 
     // Fallback: thin-attach to read the same information without resizing the
-    // session. Pre-listTabs daemons that advertise thinAttach would in
+    // project. Pre-listTabs daemons that advertise thinAttach would in
     // principle land here, but that combination shouldn't ship.
     const attach = await daemon.attach({
       cols: 0,
+      projectId: workspace.id,
       rows: 0,
-      sessionId: workspace.id,
       thin: true,
     })
     writeJson({

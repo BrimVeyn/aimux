@@ -9,7 +9,7 @@ import type {
   BarSide,
   FocusMode,
   ModalState,
-  SessionRecord,
+  ProjectRecord,
   SnippetRecord,
   WorktreeRecord,
 } from '../state/types'
@@ -29,9 +29,9 @@ import { AIUsageModal } from './components/modals/app/ai-usage-modal'
 import { HelpModal } from './components/modals/app/help-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
 import { GitCommitModal } from './components/modals/git/git-commit-modal'
-import { CreateSessionModal } from './components/modals/sessions/create-session-modal'
-import { SessionNameModal } from './components/modals/sessions/session-name-modal'
-import { SessionPickerModal } from './components/modals/sessions/session-picker-modal'
+import { CreateProjectModal } from './components/modals/projects/create-project-modal'
+import { ProjectNameModal } from './components/modals/projects/project-name-modal'
+import { ProjectPickerModal } from './components/modals/projects/project-picker-modal'
 import { WorktreeDeleteConfirm } from './components/modals/shared/worktree-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
@@ -47,21 +47,21 @@ import { useTheme } from './theme'
 
 const EMPTY_WORKTREES: WorktreeRecord[] = []
 
-function getCreateSessionFields(modal: ModalState) {
-  if (modal.type !== 'create-session') {
-    return { directoryQuery: '', sessionName: '' }
+function getCreateProjectFields(modal: ModalState) {
+  if (modal.type !== 'create-project') {
+    return { directoryQuery: '', projectName: '' }
   }
 
   if (modal.activeField === 'directory') {
     return {
       directoryQuery: modal.editBuffer ?? '',
-      sessionName: modal.nameBuffer,
+      projectName: modal.nameBuffer,
     }
   }
 
   return {
     directoryQuery: modal.nameBuffer,
-    sessionName: modal.editBuffer ?? '',
+    projectName: modal.editBuffer ?? '',
   }
 }
 
@@ -82,12 +82,12 @@ function renderModal(
   modal: ModalState,
   options: {
     customCommands: Record<string, string>
-    sessions: SessionRecord[]
-    currentSessionId: string | null
+    projects: ProjectRecord[]
+    currentProjectId: string | null
     currentTabCount: number
     snippets: SnippetRecord[]
     themeId: ThemeId
-    createSessionFields: { directoryQuery: string; sessionName: string }
+    createProjectFields: { directoryQuery: string; projectName: string }
     snippetEditorFields: { snippetName: string; snippetTrigger: string; snippetContent: string }
     focusMode: FocusMode
     activeAssistant?: string
@@ -123,30 +123,30 @@ function renderModal(
           cursorPos={modal.cursorPos}
           selectedIndex={modal.selectedIndex}
           worktrees={
-            options.currentSessionId != null && options.currentSessionId !== ''
-              ? (options.sessions.find((session) => session.id === options.currentSessionId)
+            options.currentProjectId != null && options.currentProjectId !== ''
+              ? (options.projects.find((project) => project.id === options.currentProjectId)
                   ?.worktrees ?? EMPTY_WORKTREES)
               : EMPTY_WORKTREES
           }
           worktreeTemplates={options.worktreeTemplates}
         />
       )
-    case 'session-picker':
+    case 'project-picker':
       return (
-        <SessionPickerModal
-          sessions={options.sessions}
+        <ProjectPickerModal
+          projects={options.projects}
           selectedIndex={modal.selectedIndex}
-          currentSessionId={options.currentSessionId}
+          currentProjectId={options.currentProjectId}
           currentTabCount={options.currentTabCount}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
         />
       )
-    case 'session-name':
+    case 'project-name':
       return (
-        <SessionNameModal
+        <ProjectNameModal
           title={
-            modal.sessionTargetId != null && modal.sessionTargetId !== ''
+            modal.projectTargetId != null && modal.projectTargetId !== ''
               ? 'Rename workspace'
               : 'Create workspace'
           }
@@ -154,15 +154,15 @@ function renderModal(
         />
       )
     case 'rename-tab':
-      return <SessionNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
+      return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
     case 'rename-worktree':
-      return <SessionNameModal title="Rename worktree" value={modal.editBuffer ?? ''} />
-    case 'create-session':
+      return <ProjectNameModal title="Rename worktree" value={modal.editBuffer ?? ''} />
+    case 'create-project':
       return (
-        <CreateSessionModal
+        <CreateProjectModal
           activeField={modal.activeField}
-          directoryQuery={options.createSessionFields.directoryQuery}
-          sessionName={options.createSessionFields.sessionName}
+          directoryQuery={options.createProjectFields.directoryQuery}
+          projectName={options.createProjectFields.projectName}
           results={modal.directoryResults}
           selectedIndex={modal.selectedIndex}
           pendingProjectPath={modal.pendingProjectPath}
@@ -185,7 +185,7 @@ function renderModal(
           snippetName={options.snippetEditorFields.snippetName}
           snippetTrigger={options.snippetEditorFields.snippetTrigger}
           snippetContent={options.snippetEditorFields.snippetContent}
-          isEditing={modal.sessionTargetId !== null}
+          isEditing={modal.projectTargetId !== null}
         />
       )
     case 'theme-picker':
@@ -206,9 +206,9 @@ function renderModal(
         />
       )
     case 'worktree-move': {
-      const session =
-        options.currentSessionId != null && options.currentSessionId !== ''
-          ? options.sessions.find((entry) => entry.id === options.currentSessionId)
+      const project =
+        options.currentProjectId != null && options.currentProjectId !== ''
+          ? options.projects.find((entry) => entry.id === options.currentProjectId)
           : undefined
       return (
         <WorktreeMoveModal
@@ -217,7 +217,7 @@ function renderModal(
           selectedIndex={modal.selectedIndex}
           sourceWorktreeId={modal.sourceWorktreeId}
           stats={modal.stats}
-          worktrees={session?.worktrees ?? EMPTY_WORKTREES}
+          worktrees={project?.worktrees ?? EMPTY_WORKTREES}
         />
       )
     }
@@ -334,8 +334,8 @@ export function RootView({
   const modal = useAppStore((s) => s.modal)
   const snippets = useAppStore((s) => s.snippets)
   const customCommands = useAppStore((s) => s.customCommands)
-  const sessions = useAppStore((s) => s.sessions)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const projects = useAppStore((s) => s.projects)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
   const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
   const worktreeTemplates = useAppStore((s) => s.worktreeTemplates)
   const leftBarWidth = useAppStore((s) => getBarWidth(s.bars.left))
@@ -402,7 +402,7 @@ export function RootView({
     activeTabId != null && activeTabId !== ''
       ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
       : null
-  const createSessionFields = getCreateSessionFields(modal)
+  const createProjectFields = getCreateProjectFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
 
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
@@ -416,12 +416,12 @@ export function RootView({
         <ContextMenuOverlay />
         {renderModal(modal, {
           activeAssistant: activeTab?.assistant,
-          createSessionFields,
-          currentSessionId,
+          createProjectFields,
+          currentProjectId,
           currentTabCount: tabs.length,
           customCommands,
           focusMode,
-          sessions,
+          projects,
           snippetEditorFields,
           snippets,
           themeId,
@@ -509,12 +509,12 @@ export function RootView({
       <PendingChordOverlay />
       <ContextMenuOverlay />
       {renderModal(modal, {
-        createSessionFields,
-        currentSessionId,
+        createProjectFields,
+        currentProjectId,
         currentTabCount: tabs.length,
         customCommands,
         focusMode,
-        sessions,
+        projects,
         snippetEditorFields,
         snippets,
         themeId,

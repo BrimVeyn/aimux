@@ -68,14 +68,14 @@ export const workspaceCreate: CliCommand = {
     }
 
     // Subscribe BEFORE sending the request. The UI's create+switch path
-    // relays as `workspaceSwitched` once handleCreateSessionEffect has
-    // dispatched load-session. Match on name+projectPath since the CLI
-    // doesn't know the id the UI will assign to the new session.
+    // relays as `workspaceSwitched` once handleCreateProjectEffect has
+    // dispatched load-project. Match on name+projectPath since the CLI
+    // doesn't know the id the UI will assign to the new project.
     const settled = new Promise<number>((resolve) => {
       const off = daemon.on('workspaceSwitched', (payload) => {
         off()
         clearTimeout(timer)
-        writeJson({ name, projectPath, sessionId: payload.sessionId, switch: doSwitch })
+        writeJson({ name, projectId: payload.projectId, projectPath, switch: doSwitch })
         resolve(EXIT_OK)
       })
       const timer = setTimeout(() => {

@@ -38,7 +38,7 @@ describe('mergeTabRegistryEntry', () => {
     registry.set('t1', {
       assistant: 'claude',
       command: 'claude',
-      sessionId: 'S',
+      projectId: 'S',
       viewport: fresh,
       viewportSeq: 42,
     })
@@ -59,7 +59,7 @@ describe('mergeTabRegistryEntry', () => {
     registry.set('t1', {
       assistant: 'claude',
       command: 'old-cmd',
-      sessionId: 'S-old',
+      projectId: 'S-old',
       viewport: snapshot('preserved'),
       viewportSeq: 7,
     })
@@ -73,7 +73,7 @@ describe('mergeTabRegistryEntry', () => {
       makeAllocator()
     )
     const entry = registry.get('t1')
-    expect(entry?.sessionId).toBe('S-new')
+    expect(entry?.projectId).toBe('S-new')
     expect(entry?.assistant).toBe('codex')
     expect(entry?.command).toBe('new-cmd')
   })
@@ -84,7 +84,7 @@ describe('mergeTabRegistryEntry', () => {
       assistant: 'claude',
       autoRenameStatus: 'attempted',
       command: 'claude',
-      sessionId: 'S',
+      projectId: 'S',
       title: 'Generated title',
       viewport: undefined,
       viewportSeq: 0,
@@ -120,14 +120,14 @@ describe('mergeTabRegistryEntry', () => {
 })
 
 describe('findWorkerNameConflict', () => {
-  test('scopes worker names to a workspace session', () => {
+  test('scopes worker names to a workspace project', () => {
     const registry = new Map<string, DaemonTabEntry>([
       [
         'tab-a',
         {
           assistant: 'claude',
           command: 'claude',
-          sessionId: 'workspace-a',
+          projectId: 'workspace-a',
           viewport: undefined,
           viewportSeq: 0,
           workerName: 'api',
@@ -138,7 +138,7 @@ describe('findWorkerNameConflict', () => {
         {
           assistant: 'codex',
           command: 'codex',
-          sessionId: 'workspace-b',
+          projectId: 'workspace-b',
           viewport: undefined,
           viewportSeq: 0,
           workerName: 'api',

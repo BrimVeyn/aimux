@@ -6,7 +6,7 @@ import { useGitPanelPolling } from '../../../../git/git-poller'
 import { usePrStatusPolling } from '../../../../git/pr-status-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
-import { getActiveWorktreePath } from '../../../../state/session-worktrees'
+import { getActiveWorktreePath } from '../../../../state/project-worktrees'
 import { GitPanel } from '../git-panel'
 import { GitPaneHeader, type GitPaneTab } from './git-pane-header'
 import { PrChecksPanel } from './pr-checks-panel'
@@ -26,13 +26,13 @@ export const GitPaneWidget = memo(function GitPaneWidget({
   const treeCompaction = useAppStore((s) => s.gitPane.treeCompaction)
   const pathConfig = useAppStore((s) => s.gitPane.path)
   const diffCountConfig = useAppStore((s) => s.gitPane.diffCount)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
-  const currentSession =
-    currentSessionId != null && currentSessionId !== ''
-      ? sessions.find((s) => s.id === currentSessionId)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
+  const currentProject =
+    currentProjectId != null && currentProjectId !== ''
+      ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getActiveWorktreePath(currentSession)
+  const projectPath = getActiveWorktreePath(currentProject)
 
   const [tab, setTab] = useState<GitPaneTab>('files')
 

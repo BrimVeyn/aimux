@@ -23,13 +23,13 @@ import {
 
 interface ManagerClientEvents {
   render: [
-    sessionId: string,
+    projectId: string,
     tabId: string,
     viewport: TerminalSnapshot,
     terminalModes: TerminalModeState,
   ]
-  exit: [sessionId: string, tabId: string, exitCode: number]
-  error: [sessionId: string, tabId: string, message: string]
+  exit: [projectId: string, tabId: string, exitCode: number]
+  error: [projectId: string, tabId: string, message: string]
 }
 
 const REQUEST_TIMEOUT_MS = 10_000
@@ -126,7 +126,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
 
   private handleManagerEvent(message: ManagerEvent): void {
     logDebug('managerClient.event', {
-      sessionId: message.payload.sessionId,
+      projectId: message.payload.projectId,
       tabId: message.payload.tabId,
       type: message.type,
     })
@@ -134,7 +134,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       case 'tabRender':
         this.emit(
           'render',
-          message.payload.sessionId,
+          message.payload.projectId,
           message.payload.tabId,
           message.payload.viewport,
           message.payload.terminalModes
@@ -143,7 +143,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       case 'tabExit':
         this.emit(
           'exit',
-          message.payload.sessionId,
+          message.payload.projectId,
           message.payload.tabId,
           message.payload.exitCode
         )
@@ -151,7 +151,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
       case 'tabError':
         this.emit(
           'error',
-          message.payload.sessionId,
+          message.payload.projectId,
           message.payload.tabId,
           message.payload.message
         )
@@ -253,15 +253,15 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
   }
 
   async attachSession(options: {
-    sessionId: string
+    projectId: string
     cols: number
     rows: number
     workspaceSnapshot?: WorkspaceSnapshotV1
   }): Promise<ManagerAttachResult> {
     logDebug('managerClient.attach.start', {
       cols: options.cols,
+      projectId: options.projectId,
       rows: options.rows,
-      sessionId: options.sessionId,
       snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
     })
     await this.connect()
@@ -282,7 +282,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
 
     logDebug('managerClient.attach.success', {
       activeTabId: response.payload.activeTabId,
-      sessionId: options.sessionId,
+      projectId: options.projectId,
       tabs: response.payload.tabs.length,
     })
     return response.payload
@@ -293,7 +293,7 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
   ): Promise<void> {
     logDebug('managerClient.createTab', {
       command: options.command,
-      sessionId: options.sessionId,
+      projectId: options.projectId,
       tabId: options.tabId,
       title: options.title,
     })
@@ -309,79 +309,79 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     return this.sendExpectOk({ id: crypto.randomUUID(), payload, type: 'createTab' })
   }
 
-  async write(sessionId: string, tabId: string, data: string): Promise<void> {
+  async write(projectId: string, tabId: string, data: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { data, sessionId, tabId },
+      payload: { data, projectId, tabId },
       type: 'write',
     })
   }
 
   async updateTabMetadata(
-    sessionId: string,
+    projectId: string,
     tabId: string,
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
   ): Promise<void> {
     if (!this.serverCapabilities.has(MANAGER_CAPABILITY_TAB_METADATA)) return
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { ...patch, sessionId, tabId },
+      payload: { ...patch, projectId, tabId },
       type: 'updateTabMetadata',
     })
   }
 
-  async resize(sessionId: string, cols: number, rows: number): Promise<void> {
+  async resize(projectId: string, cols: number, rows: number): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows, sessionId },
+      payload: { cols, projectId, rows },
       type: 'resizeClient',
     })
   }
 
-  async resizeTab(sessionId: string, tabId: string, cols: number, rows: number): Promise<void> {
+  async resizeTab(projectId: string, tabId: string, cols: number, rows: number): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { cols, rows, sessionId, tabId },
+      payload: { cols, projectId, rows, tabId },
       type: 'resizeTab',
     })
   }
 
-  async scroll(sessionId: string, tabId: string, deltaLines: number): Promise<void> {
+  async scroll(projectId: string, tabId: string, deltaLines: number): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { deltaLines, sessionId, tabId },
+      payload: { deltaLines, projectId, tabId },
       type: 'scroll',
     })
   }
 
-  async scrollToBottom(sessionId: string, tabId: string): Promise<void> {
+  async scrollToBottom(projectId: string, tabId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { sessionId, tabId },
+      payload: { projectId, tabId },
       type: 'scrollToBottom',
     })
   }
 
-  async setActiveTab(sessionId: string, tabId: string | null): Promise<void> {
+  async setActiveTab(projectId: string, tabId: string | null): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { sessionId, tabId },
+      payload: { projectId, tabId },
       type: 'setActiveTab',
     })
   }
 
-  async closeTab(sessionId: string, tabId: string): Promise<void> {
+  async closeTab(projectId: string, tabId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { sessionId, tabId },
+      payload: { projectId, tabId },
       type: 'closeTab',
     })
   }
 
-  async disposeSession(sessionId: string): Promise<void> {
+  async disposeSession(projectId: string): Promise<void> {
     return this.sendExpectOk({
       id: crypto.randomUUID(),
-      payload: { sessionId },
+      payload: { projectId },
       type: 'disposeSession',
     })
   }

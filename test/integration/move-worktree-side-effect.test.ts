@@ -4,7 +4,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { AppState, SessionRecord, TabSession, WorktreeRecord } from '../../src/state/types'
+import type { AppState, ProjectRecord, TabSession, WorktreeRecord } from '../../src/state/types'
 
 import { executeSideEffect, type SideEffectContext } from '../../src/app-runtime/side-effects'
 import { enqueueGitOp } from '../../src/git/command-queue'
@@ -99,7 +99,7 @@ test('move + delete leaves the target active (not snapped back to a default work
     tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
     tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
   ]
-  const session: SessionRecord = {
+  const project: ProjectRecord = {
     activeWorktreeId: 'wt-src',
     createdAt: NOW,
     id: 's1',
@@ -111,9 +111,9 @@ test('move + delete leaves the target active (not snapped back to a default work
   // A tab in the primary worktree is what the source tab would reselect to on
   // close — the bug snapped the active worktree there instead of the target.
   let state: AppState = {
-    ...createInitialState({}, [session]),
+    ...createInitialState({}, [project]),
     activeTabId: 't-src',
-    currentSessionId: 's1',
+    currentProjectId: 's1',
     tabs: [tab('t-main', 'wt-main'), tab('t-src', 'wt-src')],
   }
   const disposed: string[] = []
@@ -129,7 +129,7 @@ test('move + delete leaves the target active (not snapped back to a default work
     dispatch: (action) => {
       state = appReducer(state, action)
     },
-    getCurrentSessionProjectPath: () => {},
+    getCurrentProjectProjectPath: () => {},
     getState: () => state,
     renderer: { destroy() {} } as never,
     setThemeId: () => {},
@@ -141,7 +141,7 @@ test('move + delete leaves the target active (not snapped back to a default work
   executeSideEffect(
     {
       deleteSource: true,
-      sessionId: 's1',
+      projectId: 's1',
       sourceWorktreeId: 'wt-src',
       targetWorktreeId: 'wt-tgt',
       type: 'move-worktree',
@@ -150,7 +150,7 @@ test('move + delete leaves the target active (not snapped back to a default work
   )
   await enqueueGitOp(async () => {})
 
-  const after = state.sessions[0]
+  const after = state.projects[0]
   // The target is the active worktree — not the primary the closed tab pointed at.
   expect(after?.activeWorktreeId).toBe('wt-tgt')
   expect(after?.worktrees?.map((w) => w.id)).toEqual(['wt-main', 'wt-tgt'])
@@ -173,7 +173,7 @@ function harness() {
     tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
     tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
   ]
-  const session: SessionRecord = {
+  const project: ProjectRecord = {
     activeWorktreeId: 'wt-src',
     createdAt: NOW,
     id: 's1',
@@ -183,9 +183,9 @@ function harness() {
     worktrees,
   }
   let state: AppState = {
-    ...createInitialState({}, [session]),
+    ...createInitialState({}, [project]),
     activeTabId: 't-src',
-    currentSessionId: 's1',
+    currentProjectId: 's1',
     tabs: [tab('t-main', 'wt-main'), tab('t-src', 'wt-src')],
   }
   const ctx: SideEffectContext = {
@@ -196,7 +196,7 @@ function harness() {
     dispatch: (action) => {
       state = appReducer(state, action)
     },
-    getCurrentSessionProjectPath: () => {},
+    getCurrentProjectProjectPath: () => {},
     getState: () => state,
     renderer: { destroy() {} } as never,
     setThemeId: () => {},
@@ -214,7 +214,7 @@ test('overlapping dirty target opens the stash dialog; retry with stashTarget co
 
   executeSideEffect(
     {
-      sessionId: 's1',
+      projectId: 's1',
       sourceWorktreeId: 'wt-src',
       targetWorktreeId: 'wt-tgt',
       type: 'move-worktree',
@@ -235,7 +235,7 @@ test('overlapping dirty target opens the stash dialog; retry with stashTarget co
 
   executeSideEffect(
     {
-      sessionId: 's1',
+      projectId: 's1',
       sourceWorktreeId: 'wt-src',
       stashTarget: true,
       targetWorktreeId: 'wt-tgt',
@@ -247,7 +247,7 @@ test('overlapping dirty target opens the stash dialog; retry with stashTarget co
 
   expect(git(tgt, 'stash', 'list')).toContain('aimux: backup before move from feature')
   expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
-  expect(getState().sessions[0]?.activeWorktreeId).toBe('wt-tgt')
+  expect(getState().projects[0]?.activeWorktreeId).toBe('wt-tgt')
 })
 
 test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps the source', async () => {
@@ -260,7 +260,7 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
 
   executeSideEffect(
     {
-      sessionId: 's1',
+      projectId: 's1',
       sourceWorktreeId: 'wt-src',
       targetWorktreeId: 'wt-tgt',
       type: 'move-worktree',
@@ -281,7 +281,7 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
     {
       deleteSource: true,
       keepConflicts: true,
-      sessionId: 's1',
+      projectId: 's1',
       sourceWorktreeId: 'wt-src',
       targetWorktreeId: 'wt-tgt',
       type: 'move-worktree',
@@ -292,7 +292,7 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
 
   // Conflict markers left in the target for manual resolution.
   expect(git(tgt, 'diff', '--name-only', '--diff-filter=U')).toContain('file.txt')
-  const after = getState().sessions[0]
+  const after = getState().projects[0]
   expect(after?.activeWorktreeId).toBe('wt-tgt')
   // deleteSource is deliberately ignored: the source's work only landed half-resolved.
   expect(after?.worktrees?.map((w) => w.id)).toContain('wt-src')

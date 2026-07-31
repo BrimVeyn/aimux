@@ -53,7 +53,7 @@ const COMPLETION_SUBCOMMANDS: readonly CompletionCandidate[] = [
 const GROUP_DESCRIPTIONS: Record<string, string> = {
   tab: 'Drive individual tabs (create, send, snapshot, await)',
   worker: 'Named agent workers — the preferred orchestration surface',
-  workspace: 'Workspaces (sessions) in the profile catalog',
+  workspace: 'Workspaces (projects) in the profile catalog',
   worktree: 'Git worktrees attached to the active workspace',
 }
 

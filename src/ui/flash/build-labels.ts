@@ -1,7 +1,7 @@
 import type { AppState, FlashJumpTarget, FlashLabel } from '../../state/types'
 
-import { filterTabsForActiveWorktree } from '../../state/session-worktrees'
-import { orderSessionsForDisplay } from '../session-ordering'
+import { filterTabsForActiveWorktree } from '../../state/project-worktrees'
+import { orderProjectsForDisplay } from '../project-ordering'
 import { assignFlashLabels, type FlashTarget } from './assign-labels'
 
 interface PendingTarget {
@@ -18,18 +18,18 @@ interface PendingTarget {
  */
 function collectTargets(state: AppState): PendingTarget[] {
   const out: PendingTarget[] = []
-  const ordered = orderSessionsForDisplay(state.sessions)
-  for (const [index, session] of ordered.entries()) {
-    const sessionIndex = index + 1
-    const worktrees = session.worktrees ?? []
+  const ordered = orderProjectsForDisplay(state.projects)
+  for (const [index, project] of ordered.entries()) {
+    const projectIndex = index + 1
+    const worktrees = project.worktrees ?? []
     const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
     out.push({
-      key: `ws:${session.id}`,
-      name: session.name,
+      key: `ws:${project.id}`,
+      name: project.name,
       target: {
         kind: 'workspace',
-        sessionId: session.id,
-        sessionIndex,
+        projectId: project.id,
+        projectIndex,
         worktreeId: primary?.id,
       },
     })
@@ -40,22 +40,22 @@ function collectTargets(state: AppState): PendingTarget[] {
         name: worktree.name,
         target: {
           kind: 'worktree',
-          sessionId: session.id,
-          sessionIndex,
+          projectId: project.id,
+          projectIndex,
           worktreeId: worktree.id,
         },
       })
     }
   }
 
-  const currentSession = state.sessions.find((s) => s.id === state.currentSessionId)
-  if (currentSession) {
-    const tabs = filterTabsForActiveWorktree(state.tabs, currentSession)
+  const currentProject = state.projects.find((s) => s.id === state.currentProjectId)
+  if (currentProject) {
+    const tabs = filterTabsForActiveWorktree(state.tabs, currentProject)
     for (const tab of tabs) {
       out.push({
         key: `tab:${tab.id}`,
         name: tab.title,
-        target: { kind: 'tab', sessionId: currentSession.id, sessionIndex: 0, tabId: tab.id },
+        target: { kind: 'tab', projectId: currentProject.id, projectIndex: 0, tabId: tab.id },
       })
     }
   }

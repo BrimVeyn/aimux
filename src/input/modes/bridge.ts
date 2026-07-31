@@ -10,15 +10,15 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 }
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
-  'create-session': 'modal.create-session',
+  'create-project': 'modal.create-project',
   'create-worktree': 'modal.create-worktree',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
+  'project-name': 'modal.project-name',
+  'project-picker': 'modal.project-picker.filtering',
   'rename-tab': 'modal.rename-tab',
   'rename-worktree': 'modal.rename-worktree',
-  'session-name': 'modal.session-name',
-  'session-picker': 'modal.session-picker.filtering',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
   'split-picker': 'modal.split-picker',

@@ -69,7 +69,7 @@ export const tabTail: CliCommand = {
     // Attach before wiring subscribers so replay renders arrive after we
     // print the "attached" marker; that keeps NDJSON output deterministic
     // for downstream consumers.
-    const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
 
     // Fail fast on a bad tabId — otherwise tail would sit silent until
     // --timeout, since no matching tabRender/tabExit would ever fire.

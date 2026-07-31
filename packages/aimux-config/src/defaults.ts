@@ -50,7 +50,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
         .map('<C-p>', actions.createWorktreeModal, 'Create workspace')
-        .map('<C-g>', actions.sessionPicker, 'Session picker')
+        .map('<C-g>', actions.projectPicker, 'Project picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')
         .map('<C-b>', actions.toggleSidebar, 'Toggle sidebar')
@@ -69,8 +69,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('h', actions.prevTab, 'Prev tab')
         .map('L', actions.reorderTab(1), 'Move tab right')
         .map('H', actions.reorderTab(-1), 'Move tab left')
-        .map('J', actions.reorderSession(1), 'Move workspace down')
-        .map('K', actions.reorderSession(-1), 'Move workspace up')
+        .map('J', actions.reorderProject(1), 'Move workspace down')
+        .map('K', actions.reorderProject(-1), 'Move workspace up')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
         .map('S', actions.openFlashJump, 'Flash jump')
@@ -98,11 +98,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Session bar: same chords from nav and while typing in the terminal
+    // Project bar: same chords from nav and while typing in the terminal
     // -----------------------------------------------------------------------
     .mode(['navigation', 'terminal-input'], (m) =>
       m
-        .map('<Leader>b', actions.toggleSessionBar, 'Toggle session bar')
+        .map('<Leader>b', actions.toggleProjectBar, 'Toggle project bar')
         .map('<Leader>B', actions.toggleBar('right'), 'Toggle right bar')
         .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
         .map('<Leader>1', actions.switchTabByIndex(1), 'Tab 1')
@@ -299,12 +299,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: session-picker (always in filter mode via Picker)
+    // Modal: project-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------
-    .mode('modal.session-picker.filtering', (m) =>
+    .mode('modal.project-picker.filtering', (m) =>
       m
-        .map('<Esc>', actions.sessionPickerEscape, 'Cancel')
-        .map('<CR>', actions.confirmSelectedSession, 'Open')
+        .map('<Esc>', actions.projectPickerEscape, 'Cancel')
+        .map('<CR>', actions.confirmSelectedProject, 'Open')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -313,23 +313,23 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: session-name
+    // Modal: project-name
     // -----------------------------------------------------------------------
-    .mode('modal.session-name', (m) =>
+    .mode('modal.project-name', (m) =>
       m
-        .map('<Esc>', actions.backToSessionPicker, 'Cancel')
-        .map('<CR>', actions.confirmSessionRename, 'Confirm')
+        .map('<Esc>', actions.backToProjectPicker, 'Cancel')
+        .map('<CR>', actions.confirmProjectRename, 'Confirm')
         .passthrough()
     )
 
     // -----------------------------------------------------------------------
-    // Modal: create-session
+    // Modal: create-project
     // -----------------------------------------------------------------------
-    .mode('modal.create-session', (m) =>
+    .mode('modal.create-project', (m) =>
       m
-        .map('<Esc>', actions.createSessionEscape, 'Cancel')
+        .map('<Esc>', actions.createProjectEscape, 'Cancel')
         .map('<Tab>', actions.switchField, 'Next field')
-        .map('<CR>', actions.confirmCreateSession, 'Confirm')
+        .map('<CR>', actions.confirmCreateProject, 'Confirm')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

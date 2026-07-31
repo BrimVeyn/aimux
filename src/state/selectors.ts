@@ -1,5 +1,5 @@
 import type { AssistantOption } from '../pty/command-registry'
-import type { SessionRecord, SnippetRecord, WorktreeRecord } from './types'
+import type { ProjectRecord, SnippetRecord, WorktreeRecord } from './types'
 
 export interface BaseRefOption {
   /** Git ref the new worktree is forked from. */
@@ -12,7 +12,7 @@ export interface BaseRefOption {
 
 /**
  * Ordered, filtered base-ref candidates for the worktree-create "Base" picker:
- * branches checked out in the session's worktrees first (labelled with the
+ * branches checked out in the project's worktrees first (labelled with the
  * worktree name), then the remaining local branches. A branch already surfaced
  * via a worktree is not repeated. Throwaway `aimux/` branches are skipped unless
  * a live worktree is on them — `git worktree remove` leaves the branch behind,
@@ -56,18 +56,18 @@ export function filterAssistants(
   )
 }
 
-export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
+export function filterProjects(projects: ProjectRecord[], filter: string | null): ProjectRecord[] {
   if (!(filter != null && filter !== '')) {
-    return sessions
+    return projects
   }
 
   const lower = filter.toLowerCase()
-  return sessions.filter(
-    (session) =>
-      session.name.toLowerCase().includes(lower) ||
-      (session.projectPath != null &&
-        session.projectPath !== '' &&
-        session.projectPath.toLowerCase().includes(lower))
+  return projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(lower) ||
+      (project.projectPath != null &&
+        project.projectPath !== '' &&
+        project.projectPath.toLowerCase().includes(lower))
   )
 }
 

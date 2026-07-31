@@ -94,7 +94,7 @@ export const workerDoctor: CliCommand = {
     const warnings: string[] = []
     if (workspaceOrigin === 'active') {
       warnings.push(
-        `workspace "${workspace.name}" was inferred from the most recently opened session and follows the UI; pin it with --workspace or ${WORKSPACE_ENV_VAR}`
+        `workspace "${workspace.name}" was inferred from the most recently opened project and follows the UI; pin it with --workspace or ${WORKSPACE_ENV_VAR}`
       )
     }
     const ready = issues.length === 0

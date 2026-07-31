@@ -11,8 +11,8 @@ const INTERVAL_MS = 4000
 // when the live branch differs from the stored one. Components read
 // `worktree.branch` from state — no per-component polling, no flickers.
 //
-// Runs once when enabled; reads sessions from the store on each tick so
-// session updates do NOT re-create the effect (which would otherwise feedback
+// Runs once when enabled; reads projects from the store on each tick so
+// project updates do NOT re-create the effect (which would otherwise feedback
 // off our own dispatches).
 export function useWorktreeBranchPolling(enabled: boolean): void {
   useEffect(() => {
@@ -22,17 +22,17 @@ export function useWorktreeBranchPolling(enabled: boolean): void {
     let timer: ReturnType<typeof setTimeout> | null = null
 
     const tick = async () => {
-      const sessions = appStore.getState().sessions
+      const projects = appStore.getState().projects
       await Promise.all(
-        sessions.flatMap((session) =>
-          (session.worktrees ?? []).map(async (worktree) => {
+        projects.flatMap((project) =>
+          (project.worktrees ?? []).map(async (worktree) => {
             if (worktree.path == null || worktree.path === '') return
             const branch = await getCurrentBranch(worktree.path)
             if (cancelled) return
             if (branch != null && branch !== worktree.branch) {
               dispatchGlobal({
                 patch: { branch },
-                sessionId: session.id,
+                projectId: project.id,
                 type: 'update-worktree-record',
                 worktreeId: worktree.id,
               })

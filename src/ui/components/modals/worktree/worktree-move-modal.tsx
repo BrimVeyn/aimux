@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react'
 import type { ModalWorktreeMove, WorktreeRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/session-worktrees'
+import { formatDivergence } from '../../../../state/project-worktrees'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'

@@ -71,8 +71,8 @@ export const tabSnapshot: CliCommand = {
 
     const attach = await daemon.attach({
       cols: 0,
+      projectId: workspace.id,
       rows: 0,
-      sessionId: workspace.id,
       thin: true,
     })
     const tab = attach.tabs.find((t) => t.id === tabId)

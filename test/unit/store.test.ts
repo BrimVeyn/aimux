@@ -60,20 +60,20 @@ function createTab(
 }
 
 describe('appReducer', () => {
-  test('opens session picker from navigation', () => {
+  test('opens project picker from navigation', () => {
     const initial = createInitialState()
-    const next = appReducer(initial, { type: 'open-session-picker' })
+    const next = appReducer(initial, { type: 'open-project-picker' })
 
-    expect(next.modal.type).toBe('session-picker')
+    expect(next.modal.type).toBe('project-picker')
     expect(next.focusMode).toBe('command-edit')
   })
 
-  test('loads selected session and marks it current', () => {
+  test('loads selected project and marks it current', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
@@ -105,20 +105,20 @@ describe('appReducer', () => {
       focusMode: 'modal' as const,
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
-        type: 'session-picker' as const,
+        type: 'project-picker' as const,
       },
     }
 
-    const next = appReducer(initial, { sessionId: 'session-1', type: 'load-session' })
-    expect(next.currentSessionId).toBe('session-1')
+    const next = appReducer(initial, { projectId: 'project-1', type: 'load-project' })
+    expect(next.currentProjectId).toBe('project-1')
     expect(next.activeTabId).toBe('tab-1')
     expect(next.tabs[0]?.status).toBe('disconnected')
     expect(next.focusMode).toBe('navigation')
   })
 
-  test('activating a tab switches active session worktree', () => {
+  test('activating a tab switches active project worktree', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
@@ -127,7 +127,7 @@ describe('appReducer', () => {
           {
             activeWorktreeId: 'wt-1',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
@@ -160,7 +160,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -182,11 +182,11 @@ describe('appReducer', () => {
     }
 
     const next = appReducer(initial, { tabId: 'tab-2', type: 'set-active-tab' })
-    const session = next.sessions.find((entry) => entry.id === 'session-1')
+    const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(session?.activeWorktreeId).toBe('wt-2')
+    expect(project?.activeWorktreeId).toBe('wt-2')
     // Only the active worktree moves — projectPath keeps naming the repo.
-    expect(session?.projectPath).toBe('/repo/main')
+    expect(project?.projectPath).toBe('/repo/main')
   })
 
   test('activating a legacy tab leaves active worktree unchanged', () => {
@@ -198,7 +198,7 @@ describe('appReducer', () => {
           {
             activeWorktreeId: 'wt-1',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
@@ -221,7 +221,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -234,10 +234,10 @@ describe('appReducer', () => {
     }
 
     const next = appReducer(initial, { tabId: 'tab-1', type: 'set-active-tab' })
-    const session = next.sessions.find((entry) => entry.id === 'session-1')
+    const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(session?.activeWorktreeId).toBe('wt-1')
-    expect(session?.projectPath).toBe('/repo/main')
+    expect(project?.activeWorktreeId).toBe('wt-1')
+    expect(project?.projectPath).toBe('/repo/main')
   })
 
   test('the new-tab modal is an assistant picker and nothing else', () => {
@@ -248,7 +248,7 @@ describe('appReducer', () => {
         {
           activeWorktreeId: 'wt-feature',
           createdAt: now,
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: now,
           name: 'Main',
           projectPath: '/repo/feature',
@@ -281,7 +281,7 @@ describe('appReducer', () => {
       false
     )
     const opened = appReducer(
-      { ...initial, currentSessionId: 'session-1' },
+      { ...initial, currentProjectId: 'project-1' },
       { type: 'open-new-tab-modal' }
     )
     if (opened.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
@@ -296,30 +296,30 @@ describe('appReducer', () => {
     expect(moved.modal.type).toBe('new-tab')
   })
 
-  test('deleting a non-current session keeps the current workspace and modal state', () => {
+  test('deleting a non-current project keeps the current workspace and modal state', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-2',
+          id: 'project-2',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Other',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       focusMode: 'navigation' as const,
-      sessionStatuses: {
-        'session-1': { waiting: false, working: false },
-        'session-2': { waiting: true, working: false },
+      projectStatuses: {
+        'project-1': { waiting: false, working: false },
+        'project-2': { waiting: true, working: false },
       },
       tabs: [
         createTab({
@@ -332,29 +332,29 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { sessionId: 'session-2', type: 'delete-session-record' })
-    expect(next.sessions.map((session) => session.id)).toEqual(['session-1'])
-    expect(next.currentSessionId).toBe('session-1')
+    const next = appReducer(initial, { projectId: 'project-2', type: 'delete-project-record' })
+    expect(next.projects.map((project) => project.id)).toEqual(['project-1'])
+    expect(next.currentProjectId).toBe('project-1')
     expect(next.activeTabId).toBe('tab-1')
     expect(next.tabs).toHaveLength(1)
     expect(next.focusMode).toBe('navigation')
     expect(next.modal.type).toBeNull()
-    expect(next.sessionStatuses['session-2']).toBeUndefined()
+    expect(next.projectStatuses['project-2']).toBeUndefined()
   })
 
-  test('deleting active session from the session bar does not open the picker', () => {
+  test('deleting active project from the project bar does not open the picker', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -366,34 +366,34 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { sessionId: 'session-1', type: 'delete-session-record' })
-    expect(next.sessions).toHaveLength(0)
-    expect(next.currentSessionId).toBeNull()
+    const next = appReducer(initial, { projectId: 'project-1', type: 'delete-project-record' })
+    expect(next.projects).toHaveLength(0)
+    expect(next.currentProjectId).toBeNull()
     expect(next.activeTabId).toBeNull()
     expect(next.tabs).toHaveLength(0)
     expect(next.focusMode).toBe('navigation')
     expect(next.modal.type).toBeNull()
   })
 
-  test('deleting active session from the picker keeps the picker open', () => {
+  test('deleting active project from the picker keeps the picker open', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       focusMode: 'modal' as const,
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
-        type: 'session-picker' as const,
+        type: 'project-picker' as const,
       },
       tabs: [
         createTab({
@@ -407,14 +407,14 @@ describe('appReducer', () => {
     }
 
     const next = appReducer(initial, {
-      openSessionPicker: true,
-      sessionId: 'session-1',
-      type: 'delete-session-record',
+      openProjectPicker: true,
+      projectId: 'project-1',
+      type: 'delete-project-record',
     })
-    expect(next.sessions).toHaveLength(0)
-    expect(next.currentSessionId).toBeNull()
+    expect(next.projects).toHaveLength(0)
+    expect(next.currentProjectId).toBeNull()
     expect(next.tabs).toHaveLength(0)
-    expect(next.modal.type).toBe('session-picker')
+    expect(next.modal.type).toBe('project-picker')
     expect(next.focusMode).toBe('modal')
   })
 
@@ -483,7 +483,7 @@ describe('appReducer', () => {
           {
             activeWorktreeId: 'wt-main',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
@@ -516,7 +516,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'main-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -551,10 +551,10 @@ describe('appReducer', () => {
 
   test('cycles only within the active worktree (does not cross worktrees)', () => {
     const now = '2024-01-01T00:00:00.000Z'
-    const sessionWithTwoWorktrees = {
+    const projectWithTwoWorktrees = {
       activeWorktreeId: 'wt-main',
       createdAt: now,
-      id: 'session-1',
+      id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
       projectPath: '/repo/main',
@@ -620,9 +620,9 @@ describe('appReducer', () => {
     // From last tab of active worktree, +1 wraps to FIRST of same worktree
     // (must not cross to feature-1).
     const fromLastOfActive = {
-      ...createInitialState({}, [sessionWithTwoWorktrees], [], false),
+      ...createInitialState({}, [projectWithTwoWorktrees], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
     const wrapped = appReducer(fromLastOfActive, { delta: 1, type: 'move-active-tab' })
@@ -632,12 +632,12 @@ describe('appReducer', () => {
     const onFeature = {
       ...createInitialState(
         {},
-        [{ ...sessionWithTwoWorktrees, activeWorktreeId: 'wt-feature' }],
+        [{ ...projectWithTwoWorktrees, activeWorktreeId: 'wt-feature' }],
         [],
         false
       ),
       activeTabId: 'feature-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
     const nextOnFeature = appReducer(onFeature, { delta: 1, type: 'move-active-tab' })
@@ -931,7 +931,7 @@ describe('appReducer', () => {
     expect(larger.bars.left.width).toBe(BAR_MAX_WIDTH)
   })
 
-  test('reset-tab-session keeps tab but clears runtime state', () => {
+  test('reset-tab-project keeps tab but clears runtime state', () => {
     const initial = {
       ...createInitialState(),
       activeTabId: '1',
@@ -959,7 +959,7 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { tabId: '1', type: 'reset-tab-session' })
+    const next = appReducer(initial, { tabId: '1', type: 'reset-tab-project' })
     expect(next.activeTabId).toBe('1')
     expect(next.focusMode).toBe('navigation')
     expect(next.tabs[0]).toMatchObject({
@@ -983,11 +983,11 @@ describe('appReducer', () => {
 describe('set-active-worktree remembers the last viewed tab per worktree', () => {
   const now = '2024-01-01T00:00:00.000Z'
 
-  function twoWorktreeSession(activeWorktreeId: 'wt-main' | 'wt-feature') {
+  function twoWorktreeProject(activeWorktreeId: 'wt-main' | 'wt-feature') {
     return {
       activeWorktreeId,
       createdAt: now,
-      id: 'session-1',
+      id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
       projectPath: activeWorktreeId === 'wt-main' ? '/repo/main' : '/repo/feature',
@@ -1047,15 +1047,15 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
   test('restores the last viewed tab when switching back to a worktree', () => {
     // On wt-main viewing main-2 (the second tab, not the first).
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
 
     // Switch to wt-feature → lands on its first tab and remembers main-2.
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
+      projectId: 'project-1',
       type: 'set-active-worktree',
       worktreeId: 'wt-feature',
     })
@@ -1064,7 +1064,7 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
 
     // Switch back to wt-main → restores main-2 instead of snapping to main-1.
     const backOnMain = appReducer(onFeature, {
-      sessionId: 'session-1',
+      projectId: 'project-1',
       type: 'set-active-worktree',
       worktreeId: 'wt-main',
     })
@@ -1073,14 +1073,14 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
 
   test('falls back to the first visible tab when no tab is remembered', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
       activeTabId: 'main-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
 
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
+      projectId: 'project-1',
       type: 'set-active-worktree',
       worktreeId: 'wt-feature',
     })
@@ -1089,15 +1089,15 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
 
   test('falls back to the first visible tab when the remembered tab is gone', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       lastActiveTabByWorktree: { 'wt-feature': 'feature-removed' },
       tabs,
     }
 
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
+      projectId: 'project-1',
       type: 'set-active-worktree',
       worktreeId: 'wt-feature',
     })

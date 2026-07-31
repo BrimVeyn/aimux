@@ -6,15 +6,15 @@ import type {
 
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { SessionRecord, SessionStatus, WorktreeRecord } from '../../../../state/types'
+import type { ProjectRecord, ProjectStatus, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/session-worktrees'
+import { formatDivergence } from '../../../../state/project-worktrees'
 // eslint-disable-next-line no-duplicate-imports
-import { IDLE_SESSION_STATUS } from '../../../../state/types'
+import { IDLE_PROJECT_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
-import { moveIdToIdPosition, orderSessionsForDisplay } from '../../../session-ordering'
+import { moveIdToIdPosition, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
@@ -44,9 +44,9 @@ function truncate(label: string, max: number): string {
 
 export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
   const t = useTheme()
-  const sessions = useAppStore((s) => s.sessions)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const statusMap = useAppStore((s) => s.sessionStatuses)
+  const projects = useAppStore((s) => s.projects)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const statusMap = useAppStore((s) => s.projectStatuses)
 
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
@@ -54,23 +54,23 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
   const rowRefs = useRef(new Map<string, BoxRenderable>())
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 
-  const ordered = useMemo(() => orderSessionsForDisplay(sessions), [sessions])
+  const ordered = useMemo(() => orderProjectsForDisplay(projects), [projects])
   const baselineOrder = useMemo(() => ordered.map((s) => s.id), [ordered])
 
-  const currentSession = useMemo(
+  const currentProject = useMemo(
     () =>
-      currentSessionId != null && currentSessionId !== ''
-        ? sessions.find((s) => s.id === currentSessionId)
+      currentProjectId != null && currentProjectId !== ''
+        ? projects.find((s) => s.id === currentProjectId)
         : undefined,
-    [currentSessionId, sessions]
+    [currentProjectId, projects]
   )
   // The active row can be either a worktree row OR the workspace row
   // (when the primary worktree is active). Both must scroll into view —
   // otherwise the cursor visually "disappears" off-screen when crossing
   // a workspace boundary on a key press.
-  const currentWorktrees = currentSession?.worktrees ?? []
+  const currentWorktrees = currentProject?.worktrees ?? []
   const currentPrimary = currentWorktrees.find((w) => w.source === 'primary') ?? currentWorktrees[0]
-  const rawActiveWorktreeId = currentSession?.activeWorktreeId
+  const rawActiveWorktreeId = currentProject?.activeWorktreeId
   const activeOnNonPrimary =
     rawActiveWorktreeId != null &&
     rawActiveWorktreeId !== '' &&
@@ -78,8 +78,8 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
   let activeRowId: string | null = null
   if (activeOnNonPrimary) {
     activeRowId = `sidebar-wt-${rawActiveWorktreeId}`
-  } else if (currentSessionId != null && currentSessionId !== '') {
-    activeRowId = `sidebar-ws-${currentSessionId}`
+  } else if (currentProjectId != null && currentProjectId !== '') {
+    activeRowId = `sidebar-ws-${currentProjectId}`
   }
 
   useSidebarAutoScroll({
@@ -139,25 +139,25 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
     const changed = !arraysEqual(finalOrder, baselineOrder)
     if (changed) {
-      dispatchGlobal({ orderedIds: finalOrder, type: 'reorder-sessions' })
+      dispatchGlobal({ orderedIds: finalOrder, type: 'reorder-projects' })
       return
     }
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      // The workspace row visually anchors the session's primary worktree
+      // The workspace row visually anchors the project's primary worktree
       // (its branch line shows the primary's branch). Clicking it should
       // land on the primary — same semantics as j/k cycling onto a workspace
       // item — instead of preserving whatever non-primary worktree happened
-      // to be active last time we left this session.
-      const sourceSession = ordered.find((s) => s.id === source)
-      const sourceWorktrees = sourceSession?.worktrees ?? []
+      // to be active last time we left this project.
+      const sourceProject = ordered.find((s) => s.id === source)
+      const sourceWorktrees = sourceProject?.worktrees ?? []
       const sourcePrimaryId = (
         sourceWorktrees.find((w) => w.source === 'primary') ?? sourceWorktrees[0]
       )?.id
       runSideEffectGlobal({
         index: idx + 1,
-        type: 'switch-session-by-index',
+        type: 'switch-project-by-index',
         worktreeId: sourcePrimaryId,
       })
     }
@@ -169,17 +169,17 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
     lastSwapWithRef.current = null
   }, [])
 
-  const handleNewSession = useCallback((e: OtuiMouseEvent) => {
+  const handleNewProject = useCallback((e: OtuiMouseEvent) => {
     e.stopPropagation()
     e.preventDefault()
-    dispatchGlobal({ returnToSessionPicker: false, type: 'open-create-session-modal' })
+    dispatchGlobal({ returnToProjectPicker: false, type: 'open-create-project-modal' })
   }, [])
 
-  const visibleSessions =
+  const visibleProjects =
     dragOrder !== null
       ? dragOrder
           .map((id) => ordered.find((s) => s.id === id))
-          .filter((s): s is SessionRecord => !!s)
+          .filter((s): s is ProjectRecord => !!s)
       : ordered
 
   return (
@@ -196,27 +196,27 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
           // with their non-primary worktrees. One map, one React keypath per
           // visible row; transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
-          for (const [visibleIdx, session] of visibleSessions.entries()) {
-            const sessionIndex = baselineOrder.indexOf(session.id) + 1
-            const isCurrentSession = session.id === currentSessionId
-            const worktrees = session.worktrees ?? []
+          for (const [visibleIdx, project] of visibleProjects.entries()) {
+            const projectIndex = baselineOrder.indexOf(project.id) + 1
+            const isCurrentProject = project.id === currentProjectId
+            const worktrees = project.worktrees ?? []
             const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
             const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
             const workspaceIsActiveItem =
-              isCurrentSession &&
-              (session.activeWorktreeId == null ||
-                session.activeWorktreeId === '' ||
-                session.activeWorktreeId === primaryWorktree?.id)
+              isCurrentProject &&
+              (project.activeWorktreeId == null ||
+                project.activeWorktreeId === '' ||
+                project.activeWorktreeId === primaryWorktree?.id)
             rows.push(
               <WorkspaceRow
-                key={`ws:${session.id}`}
-                session={session}
+                key={`ws:${project.id}`}
+                project={project}
                 isActiveItem={workspaceIsActiveItem}
-                inCurrentGroup={isCurrentSession}
+                inCurrentGroup={isCurrentProject}
                 primaryWorktree={primaryWorktree}
                 hasExtraWorktrees={extraWorktrees.length > 0}
-                status={statusMap[session.id] ?? IDLE_SESSION_STATUS}
-                dragging={draggingId === session.id}
+                status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
+                dragging={draggingId === project.id}
                 contentWidth={contentWidth}
                 marginTop={visibleIdx > 0 ? 1 : 0}
                 setRowRef={setRowRef}
@@ -230,11 +230,11 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
               rows.push(
                 <WorktreeRow
                   key={`wt:${worktree.id}`}
-                  session={session}
+                  project={project}
                   worktree={worktree}
-                  sessionIndex={sessionIndex}
-                  isActiveItem={isCurrentSession && worktree.id === session.activeWorktreeId}
-                  inCurrentGroup={isCurrentSession}
+                  projectIndex={projectIndex}
+                  isActiveItem={isCurrentProject && worktree.id === project.activeWorktreeId}
+                  inCurrentGroup={isCurrentProject}
                   isLast={wtIdx === extraWorktrees.length - 1}
                 />
               )
@@ -249,7 +249,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         marginTop={1}
         backgroundColor={t.backgroundPanel}
         justifyContent="center"
-        onMouseDown={handleNewSession}
+        onMouseDown={handleNewProject}
       >
         <text fg={t.text} selectable={false}>
           + New workspace
@@ -260,16 +260,16 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 }
 
 interface WorkspaceRowProps {
-  session: SessionRecord
+  project: ProjectRecord
   /** True when this row is the active cursor item (workspace's primary active). */
   isActiveItem: boolean
   /** True when this row belongs to the current workspace (selection scope). */
   inCurrentGroup: boolean
-  /** The session's primary worktree — its git branch is shown as the workspace's anchor identity. */
+  /** The project's primary worktree — its git branch is shown as the workspace's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
   /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
   hasExtraWorktrees: boolean
-  status: SessionStatus
+  status: ProjectStatus
   dragging: boolean
   contentWidth: number
   /** Vertical spacing above this row — used to separate workspace blocks. */
@@ -293,7 +293,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   onDragStart,
   onDrop,
   primaryWorktree,
-  session,
+  project,
   setRowRef,
   status,
 }: WorkspaceRowProps) {
@@ -317,16 +317,16 @@ const WorkspaceRow = memo(function WorkspaceRow({
   )
 
   const handleRef = useCallback(
-    (r: BoxRenderable | null) => setRowRef(session.id, r),
-    [setRowRef, session.id]
+    (r: BoxRenderable | null) => setRowRef(project.id, r),
+    [setRowRef, project.id]
   )
   const handleMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
-      onDragStart(session.id)
+      onDragStart(project.id)
     },
-    [onDragStart, session.id]
+    [onDragStart, project.id]
   )
   const handleMouseUp = useCallback(
     (e: OtuiMouseEvent) => {
@@ -341,18 +341,18 @@ const WorkspaceRow = memo(function WorkspaceRow({
         'Rename workspace',
         () =>
           dispatchGlobal({
-            initialName: session.name,
-            returnToSessionPicker: false,
-            sessionTargetId: session.id,
-            type: 'open-session-name-modal',
+            initialName: project.name,
+            projectTargetId: project.id,
+            returnToProjectPicker: false,
+            type: 'open-project-name-modal',
           }),
       ],
       [
         'Delete workspace',
-        () => runSideEffectGlobal({ sessionId: session.id, type: 'delete-session' }),
+        () => runSideEffectGlobal({ projectId: project.id, type: 'delete-project' }),
       ],
     ],
-    [session.id, session.name]
+    [project.id, project.name]
   )
 
   // Neutral muted marker; working/waiting overrides it. Keeping a glyph
@@ -370,7 +370,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const branchText = primaryWorktree?.branch ?? ''
   const divergenceText = formatDivergence(divergence)
   const showBranch = branchText !== ''
-  const nameLabel = truncate(session.name, Math.max(0, contentWidth - 4))
+  const nameLabel = truncate(project.name, Math.max(0, contentWidth - 4))
   const branchLabel = truncate(
     branchText,
     Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
@@ -379,7 +379,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   return (
     <ContextMenuBox
       ref={handleRef}
-      id={`sidebar-ws-${session.id}`}
+      id={`sidebar-ws-${project.id}`}
       flexDirection="column"
       flexShrink={0}
       marginTop={marginTop}
@@ -399,7 +399,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
         <text fg={t.text} selectable={false} wrapMode="none">
           {' '}
         </text>
-        <FlashLabelBadge rowKey={`ws:${session.id}`} />
+        <FlashLabelBadge rowKey={`ws:${project.id}`} />
         <text fg={t.text} selectable={false} wrapMode="none">
           {nameLabel}
         </text>

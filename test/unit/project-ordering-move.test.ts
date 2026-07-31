@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { moveIdToIdPosition } from '../../src/ui/session-ordering'
+import { moveIdToIdPosition } from '../../src/ui/project-ordering'
 
 describe('moveIdToIdPosition', () => {
   test('moves earlier id to a later slot, shifting the displaced id left', () => {

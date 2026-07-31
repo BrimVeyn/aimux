@@ -121,7 +121,7 @@ test('parses additive tab metadata updates', () => {
     id: 'metadata-1',
     payload: {
       autoRenameStatus: 'attempted',
-      sessionId: 'session-1',
+      projectId: 'project-1',
       tabId: 'tab-1',
       title: 'Cache fix',
     },

@@ -7,7 +7,7 @@ import { searchProjectDirectories, warmDirectoryCache } from '../platform/projec
 const DEFAULT_DIRECTORY_SEARCH_DEBOUNCE_MS = 200
 
 function getDirectoryQuery(modal: ModalState): string {
-  if (modal.type !== 'create-session') {
+  if (modal.type !== 'create-project') {
     return ''
   }
 
@@ -26,12 +26,12 @@ export function useDirectorySearch(
   const directoryQuery = getDirectoryQuery(modal)
 
   useEffect(() => {
-    if (modal.type !== 'create-session') return
+    if (modal.type !== 'create-project') return
     void warmDirectoryCache()
   }, [modal.type])
 
   useEffect(() => {
-    if (modal.type !== 'create-session') {
+    if (modal.type !== 'create-project') {
       return
     }
 

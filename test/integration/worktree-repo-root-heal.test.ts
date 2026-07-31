@@ -4,9 +4,9 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { SessionRecord, WorktreeRecord } from '../../src/state/types'
+import type { ProjectRecord, WorktreeRecord } from '../../src/state/types'
 
-import { ensureSessionWorktrees } from '../../src/state/session-worktrees'
+import { ensureProjectWorktrees } from '../../src/state/project-worktrees'
 
 const NOW = '2024-01-02T00:00:00.000Z'
 
@@ -49,10 +49,10 @@ describe('worktree repoRoot healing', () => {
 
   test('repairs a record whose repoRoot points at a since-deleted sibling worktree', () => {
     const deletedSibling = join(base, 'deleted-sibling')
-    const session: SessionRecord = {
+    const project: ProjectRecord = {
       activeWorktreeId: 'wt-linked',
       createdAt: NOW,
-      id: 'session-heal',
+      id: 'project-heal',
       lastOpenedAt: NOW,
       name: 'main',
       projectPath: linkedWorktree,
@@ -79,7 +79,7 @@ describe('worktree repoRoot healing', () => {
 
     expect(existsSync(deletedSibling)).toBe(false)
 
-    const healed = ensureSessionWorktrees(session, NOW)
+    const healed = ensureProjectWorktrees(project, NOW)
     const linked = healed.worktrees?.find((entry) => entry.id === 'wt-linked')
 
     expect(linked).toBeDefined()
@@ -92,10 +92,10 @@ describe('worktree repoRoot healing', () => {
     // while git still tracks it — git marks such worktrees "prunable".
     rmSync(linkedWorktree, { force: true, recursive: true })
 
-    const session: SessionRecord = {
+    const project: ProjectRecord = {
       activeWorktreeId: 'wt-primary',
       createdAt: NOW,
-      id: 'session-prune',
+      id: 'project-prune',
       lastOpenedAt: NOW,
       name: 'main',
       projectPath: mainRepo,
@@ -118,7 +118,7 @@ describe('worktree repoRoot healing', () => {
       ],
     }
 
-    const reconciled = ensureSessionWorktrees(session, NOW)
+    const reconciled = ensureProjectWorktrees(project, NOW)
 
     expect(reconciled.worktrees?.map((entry) => entry.id)).toEqual(['wt-primary'])
     expect(reconciled.worktrees?.some((entry) => entry.path === linkedWorktree)).toBe(false)

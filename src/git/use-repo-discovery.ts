@@ -5,7 +5,7 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 import { discoverRepos } from './repo-discovery'
 
 /**
- * Discover nested git repos inside `projectPath` once per session and push
+ * Discover nested git repos inside `projectPath` once per project and push
  * the result into state. No-op when the multi-repo config flag is off.
  */
 export function useRepoDiscovery(projectPath: string | undefined): void {

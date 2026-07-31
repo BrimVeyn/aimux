@@ -52,31 +52,31 @@ describe('ipc protocol v12', () => {
     ).toThrow('createWorkspace.name must be a non-empty string')
   })
 
-  test('switchWorkspace round-trips with a targetSessionId', () => {
+  test('switchWorkspace round-trips with a targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
-        payload: { targetSessionId: 'session-2' },
+        payload: { targetProjectId: 'project-2' },
         type: 'switchWorkspace',
       })
     ).not.toThrow()
   })
 
-  test('switchWorkspace rejects a missing targetSessionId', () => {
+  test('switchWorkspace rejects a missing targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
         payload: {},
         type: 'switchWorkspace',
       })
-    ).toThrow('switchWorkspace.targetSessionId must be a string')
+    ).toThrow('switchWorkspace.targetProjectId must be a string')
   })
 
-  test('closeWorkspace round-trips with targetSessionId', () => {
+  test('closeWorkspace round-trips with targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r3',
-        payload: { targetSessionId: 'session-3' },
+        payload: { targetProjectId: 'project-3' },
         type: 'closeWorkspace',
       })
     ).not.toThrow()
@@ -86,7 +86,7 @@ describe('ipc protocol v12', () => {
     expect(() =>
       parseClientRequest({
         id: 'r4',
-        payload: { sessionId: 'session-4' },
+        payload: { projectId: 'project-4' },
         type: 'announceWorkspaceSwitched',
       })
     ).not.toThrow()
@@ -96,7 +96,7 @@ describe('ipc protocol v12', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { sessionId: 'session-5', worktree: WORKTREE_FIXTURE },
+        payload: { projectId: 'project-5', worktree: WORKTREE_FIXTURE },
         type: 'addWorktreeRecord',
       })
     ).not.toThrow()
@@ -106,7 +106,7 @@ describe('ipc protocol v12', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { sessionId: 'session-5', worktree: { id: 'wt-1' } },
+        payload: { projectId: 'project-5', worktree: { id: 'wt-1' } },
         type: 'addWorktreeRecord',
       })
     ).toThrow('addWorktreeRecord.worktree must be a WorktreeRecord')
@@ -116,7 +116,7 @@ describe('ipc protocol v12', () => {
     expect(() =>
       parseClientRequest({
         id: 'r6',
-        payload: { sessionId: 'session-6', worktreeId: 'wt-1' },
+        payload: { projectId: 'project-6', worktreeId: 'wt-1' },
         type: 'removeWorktreeRecord',
       })
     ).not.toThrow()
@@ -125,7 +125,7 @@ describe('ipc protocol v12', () => {
   test('workspaceSwitchRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { targetSessionId: 'session-1' },
+        payload: { targetProjectId: 'project-1' },
         type: 'workspaceSwitchRequested',
       })
     ).not.toThrow()
@@ -143,7 +143,7 @@ describe('ipc protocol v12', () => {
   test('workspaceCloseRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { targetSessionId: 'session-1' },
+        payload: { targetProjectId: 'project-1' },
         type: 'workspaceCloseRequested',
       })
     ).not.toThrow()
@@ -152,7 +152,7 @@ describe('ipc protocol v12', () => {
   test('workspaceSwitched event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1' },
+        payload: { projectId: 'project-1' },
         type: 'workspaceSwitched',
       })
     ).not.toThrow()
@@ -161,7 +161,7 @@ describe('ipc protocol v12', () => {
   test('worktreeAdded event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktree: WORKTREE_FIXTURE },
+        payload: { projectId: 'project-1', worktree: WORKTREE_FIXTURE },
         type: 'worktreeAdded',
       })
     ).not.toThrow()
@@ -170,7 +170,7 @@ describe('ipc protocol v12', () => {
   test('worktreeAdded rejects a malformed worktree', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktree: { id: 'wt-1' } },
+        payload: { projectId: 'project-1', worktree: { id: 'wt-1' } },
         type: 'worktreeAdded',
       })
     ).toThrow('worktreeAdded.worktree must be a WorktreeRecord')
@@ -179,7 +179,7 @@ describe('ipc protocol v12', () => {
   test('worktreeRemoved event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktreeId: 'wt-1' },
+        payload: { projectId: 'project-1', worktreeId: 'wt-1' },
         type: 'worktreeRemoved',
       })
     ).not.toThrow()

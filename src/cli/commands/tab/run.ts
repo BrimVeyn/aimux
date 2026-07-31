@@ -72,7 +72,7 @@ export const tabRun: CliCommand = {
       )
     }
 
-    const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
     if (!attach.tabs.some((t) => t.id === tabId)) {
       throw new Error(`tab not found: ${tabId}`)
     }

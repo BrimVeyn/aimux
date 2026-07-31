@@ -15,7 +15,7 @@ import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
-import { getActiveWorktree, getActiveWorktreePath } from '../../../state/session-worktrees'
+import { getActiveWorktree, getActiveWorktreePath } from '../../../state/project-worktrees'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
@@ -131,20 +131,20 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
   const gitMode = useAppStore((s) => s.gitMode)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
   const focusMode = useAppStore((s) => s.focusMode)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
-  const currentSession =
-    currentSessionId != null && currentSessionId !== ''
-      ? sessions.find((s) => s.id === currentSessionId)
+  const currentProject =
+    currentProjectId != null && currentProjectId !== ''
+      ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getActiveWorktreePath(currentSession)
+  const projectPath = getActiveWorktreePath(currentProject)
 
   // Review-vs-base: when toggled on for a worktree that records a baseRef,
   // resolve the fork point and diff the working tree against it.
-  const activeWorktree = getActiveWorktree(currentSession)
+  const activeWorktree = getActiveWorktree(currentProject)
   const reviewBaseRef =
     gitMode.reviewBase && activeWorktree?.baseRef != null && activeWorktree.baseRef !== ''
       ? activeWorktree.baseRef

@@ -3,7 +3,7 @@ import type { MutableRefObject } from 'react'
 import type { SessionBackend } from '../session-backend/types'
 import type {
   AppAction,
-  SessionStatus,
+  ProjectStatus,
   TabActivity,
   TabSession,
   TerminalModeState,
@@ -14,12 +14,12 @@ import type { TabRuntimeTimeouts } from './tab-runtime-timeouts'
 import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { appStore } from '../state/app-store'
-import { loadSessionCatalog, saveSessionCatalog } from '../state/session-catalog'
+import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
 import {
-  handleCreateSessionEffect,
-  handleDeleteSessionEffect,
-  handleSwitchSessionEffect,
-} from './session-actions'
+  handleCreateProjectEffect,
+  handleDeleteProjectEffect,
+  handleSwitchProjectEffect,
+} from './project-actions'
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend
@@ -86,9 +86,9 @@ export function bindBackendRuntimeEvents({
     dispatch({ message, tabId, type: 'set-tab-error' })
   }
 
-  const handleSessionActivity = (sessionId: string, status: SessionStatus) => {
-    logInputDebug('app.backend.event.sessionActivity', { sessionId, status })
-    dispatch({ sessionId, status, type: 'set-session-status' })
+  const handleProjectActivity = (projectId: string, status: ProjectStatus) => {
+    logInputDebug('app.backend.event.projectActivity', { projectId, status })
+    dispatch({ projectId, status, type: 'set-project-status' })
   }
 
   const handleTabActivity = (tabId: string, activity: TabActivity) => {
@@ -98,7 +98,7 @@ export function bindBackendRuntimeEvents({
 
   // Serialise workspace lifecycle handlers behind a small FIFO so back-to-back
   // switch/create/close broadcasts from multiple CLIs don't race the
-  // in-flight `handleSwitchSessionEffect`. Every lifecycle handler awaits the
+  // in-flight `handleSwitchProjectEffect`. Every lifecycle handler awaits the
   // previous chain link before running.
   let lifecycleChain: Promise<void> = Promise.resolve()
   const enqueueLifecycle = (fn: () => void | Promise<void>): void => {
@@ -123,102 +123,102 @@ export function bindBackendRuntimeEvents({
     enqueueLifecycle(() => {
       logInputDebug('app.backend.event.workspaceCreateRequested', { doSwitch, name, projectPath })
       const state = appStore.getState()
-      handleCreateSessionEffect(state, dispatch, name, projectPath)
+      handleCreateProjectEffect(state, dispatch, name, projectPath)
       if (doSwitch) {
-        // The create dispatched `set-sessions`+`load-session`; the new session
+        // The create dispatched `set-projects`+`load-project`; the new project
         // is now in the catalog + current. Loading already ran, so the switch
         // is effectively done — just tell the daemon so any --wait CLI exits.
         const created = appStore
           .getState()
-          .sessions.find((s) => s.name === name && s.projectPath === projectPath)
+          .projects.find((s) => s.name === name && s.projectPath === projectPath)
         if (created) backend.announceWorkspaceSwitched(created.id)
       }
     })
   }
 
-  const handleWorkspaceSwitchRequested = (targetSessionId: string) => {
+  const handleWorkspaceSwitchRequested = (targetProjectId: string) => {
     enqueueLifecycle(async () => {
-      logInputDebug('app.backend.event.workspaceSwitchRequested', { targetSessionId })
+      logInputDebug('app.backend.event.workspaceSwitchRequested', { targetProjectId })
       let state = appStore.getState()
-      let target = state.sessions.find((s) => s.id === targetSessionId)
+      let target = state.projects.find((s) => s.id === targetProjectId)
       if (!target) {
-        // In-memory list is stale (e.g. daemon just added a session via the
+        // In-memory list is stale (e.g. daemon just added a project via the
         // headless path). Reload from disk and try once more before giving
         // up — the daemon already validated the catalog, so this should hit.
-        const fresh = loadSessionCatalog()
-        target = fresh.find((s) => s.id === targetSessionId)
+        const fresh = loadProjectCatalog()
+        target = fresh.find((s) => s.id === targetProjectId)
         if (target) {
-          dispatch({ sessions: fresh, type: 'set-sessions' })
+          dispatch({ projects: fresh, type: 'set-projects' })
           state = appStore.getState()
         }
       }
       if (!target) {
         // Announce anyway so any `--wait` CLI unblocks — better a spurious
         // exit than a 30s hang while the caller retries.
-        logInputDebug('app.backend.event.workspaceSwitchRequested.notFound', { targetSessionId })
-        backend.announceWorkspaceSwitched(targetSessionId)
+        logInputDebug('app.backend.event.workspaceSwitchRequested.notFound', { targetProjectId })
+        backend.announceWorkspaceSwitched(targetProjectId)
         return
       }
-      handleSwitchSessionEffect(state, backend, dispatch, target)
+      handleSwitchProjectEffect(state, backend, dispatch, target)
       // Give the reducer a tick to settle before announcing — the switch
-      // fires `set-sessions`+`load-session` synchronously but the backend
+      // fires `set-projects`+`load-project` synchronously but the backend
       // re-attach happens async.
       await Promise.resolve()
-      backend.announceWorkspaceSwitched(targetSessionId)
+      backend.announceWorkspaceSwitched(targetProjectId)
     })
   }
 
-  const handleWorkspaceCloseRequested = (targetSessionId: string) => {
+  const handleWorkspaceCloseRequested = (targetProjectId: string) => {
     enqueueLifecycle(() => {
-      logInputDebug('app.backend.event.workspaceCloseRequested', { targetSessionId })
+      logInputDebug('app.backend.event.workspaceCloseRequested', { targetProjectId })
       const state = appStore.getState()
-      handleDeleteSessionEffect(state, backend, dispatch, targetSessionId)
+      handleDeleteProjectEffect(state, backend, dispatch, targetProjectId)
     })
   }
 
-  const handleWorkspaceSwitched = (sessionId: string) => {
+  const handleWorkspaceSwitched = (projectId: string) => {
     // The daemon's own relay for --wait CLIs. UI side has no work to do —
     // logging is enough.
-    logInputDebug('app.backend.event.workspaceSwitched', { sessionId })
+    logInputDebug('app.backend.event.workspaceSwitched', { projectId })
   }
 
-  const handleWorktreeAdded = (sessionId: string, worktree: WorktreeRecord) => {
-    // Idempotent: skip if a duplicate id is already in the session (the CLI
+  const handleWorktreeAdded = (projectId: string, worktree: WorktreeRecord) => {
+    // Idempotent: skip if a duplicate id is already in the project (the CLI
     // may have raced the UI's own worktree-add path).
     const current = appStore.getState()
-    const session = current.sessions.find((s) => s.id === sessionId)
-    const already = session?.worktrees?.some((w) => w.id === worktree.id) === true
+    const project = current.projects.find((s) => s.id === projectId)
+    const already = project?.worktrees?.some((w) => w.id === worktree.id) === true
     if (already) {
       logInputDebug('app.backend.event.worktreeAdded.skipDuplicate', {
-        sessionId,
+        projectId,
         worktreeId: worktree.id,
       })
       return
     }
     logInputDebug('app.backend.event.worktreeAdded', {
-      sessionId,
+      projectId,
       worktreeId: worktree.id,
     })
-    dispatch({ sessionId, type: 'add-worktree-record', worktree })
+    dispatch({ projectId, type: 'add-worktree-record', worktree })
     // Persist the catalog so the change survives restart even if no other
     // side-effect saves shortly after.
-    saveSessionCatalog(appStore.getState().sessions)
+    saveProjectCatalog(appStore.getState().projects)
   }
 
-  const handleWorktreeRemoved = (sessionId: string, worktreeId: string) => {
+  const handleWorktreeRemoved = (projectId: string, worktreeId: string) => {
     const current = appStore.getState()
-    const session = current.sessions.find((s) => s.id === sessionId)
-    const present = session?.worktrees?.some((w) => w.id === worktreeId) === true
+    const project = current.projects.find((s) => s.id === projectId)
+    const present = project?.worktrees?.some((w) => w.id === worktreeId) === true
     if (!present) {
-      logInputDebug('app.backend.event.worktreeRemoved.skipMissing', { sessionId, worktreeId })
+      logInputDebug('app.backend.event.worktreeRemoved.skipMissing', { projectId, worktreeId })
       return
     }
-    logInputDebug('app.backend.event.worktreeRemoved', { sessionId, worktreeId })
-    // Build the updated sessions list and dispatch via `set-sessions` — this
+    logInputDebug('app.backend.event.worktreeRemoved', { projectId, worktreeId })
+    // Build the updated projects list and dispatch via `set-projects` — this
     // matches the pattern used by the existing worktree-delete side-effect
     // and centralises the write in one action rather than adding a new one.
-    const sessions = current.sessions.map((s) => {
-      if (s.id !== sessionId) return s
+    const projects = current.projects.map((s) => {
+      if (s.id !== projectId) return s
       const remaining = (s.worktrees ?? []).filter((w) => w.id !== worktreeId)
       return {
         ...s,
@@ -227,18 +227,18 @@ export function bindBackendRuntimeEvents({
         worktrees: remaining,
       }
     })
-    saveSessionCatalog(sessions)
-    dispatch({ sessions, type: 'set-sessions' })
+    saveProjectCatalog(projects)
+    dispatch({ projects, type: 'set-projects' })
   }
 
-  const handleTabAdded = (sessionId: string, tab: TabSession) => {
+  const handleTabAdded = (projectId: string, tab: TabSession) => {
     // Idempotent: the daemon broadcasts `tabAdded` for every createTab,
     // including the ones this UI process initiated (which already dispatched
     // `add-tab` locally). Skip the duplicate so we don't get two entries for
     // the same tab id.
     const current = appStore.getState()
     if (current.tabs.some((t) => t.id === tab.id)) {
-      logInputDebug('app.backend.event.tabAdded.skipDuplicate', { sessionId, tabId: tab.id })
+      logInputDebug('app.backend.event.tabAdded.skipDuplicate', { projectId, tabId: tab.id })
       dispatch({
         autoRenameStatus: tab.autoRenameStatus,
         tabId: tab.id,
@@ -246,31 +246,31 @@ export function bindBackendRuntimeEvents({
       })
       return
     }
-    if (current.currentSessionId !== sessionId) {
-      logInputDebug('app.backend.event.tabAdded.skipForeignSession', {
-        currentSessionId: current.currentSessionId,
-        sessionId,
+    if (current.currentProjectId !== projectId) {
+      logInputDebug('app.backend.event.tabAdded.skipForeignProject', {
+        currentProjectId: current.currentProjectId,
+        projectId,
         tabId: tab.id,
       })
       return
     }
-    logInputDebug('app.backend.event.tabAdded', { sessionId, tabId: tab.id })
+    logInputDebug('app.backend.event.tabAdded', { projectId, tabId: tab.id })
     dispatch({ tab, type: 'add-tab' })
   }
 
   const handleTabMetadataUpdated = (
-    sessionId: string,
+    projectId: string,
     tabId: string,
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
   ) => {
-    if (appStore.getState().currentSessionId !== sessionId) return
+    if (appStore.getState().currentProjectId !== projectId) return
     dispatch({ ...patch, tabId, type: 'update-tab-metadata' })
   }
 
   backend.on('render', handleRender)
   backend.on('exit', handleExit)
   backend.on('error', handleError)
-  backend.on('sessionActivity', handleSessionActivity)
+  backend.on('projectActivity', handleProjectActivity)
   backend.on('tabActivity', handleTabActivity)
   backend.on('tabAdded', handleTabAdded)
   backend.on('tabMetadataUpdated', handleTabMetadataUpdated)
@@ -286,7 +286,7 @@ export function bindBackendRuntimeEvents({
     backend.off('render', handleRender)
     backend.off('exit', handleExit)
     backend.off('error', handleError)
-    backend.off('sessionActivity', handleSessionActivity)
+    backend.off('projectActivity', handleProjectActivity)
     backend.off('tabActivity', handleTabActivity)
     backend.off('tabAdded', handleTabAdded)
     backend.off('tabMetadataUpdated', handleTabMetadataUpdated)

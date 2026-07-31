@@ -14,12 +14,12 @@ import {
   setSplitRatio,
   splitNode,
 } from '../layout-tree'
-import { normalizeGroupedTabOrder } from '../session-persistence'
+import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
   filterTabsForActiveWorktree,
   orderTabsByWorktree,
   withActiveWorktree,
-} from '../session-worktrees'
+} from '../project-worktrees'
 import { createDefaultTerminalModes } from '../terminal-modes'
 
 const MAX_BUFFER_LENGTH = 50_000
@@ -197,9 +197,9 @@ function getActiveIndex(state: AppState): number {
   return state.tabs.findIndex((tab) => tab.id === state.activeTabId)
 }
 
-function getCurrentSession(state: AppState) {
-  return state.currentSessionId != null && state.currentSessionId !== ''
-    ? state.sessions.find((session) => session.id === state.currentSessionId)
+function getCurrentProject(state: AppState) {
+  return state.currentProjectId != null && state.currentProjectId !== ''
+    ? state.projects.find((project) => project.id === state.currentProjectId)
     : undefined
 }
 
@@ -211,29 +211,29 @@ function withActiveTabWorktree(
   if (
     tabId == null ||
     tabId === '' ||
-    !(state.currentSessionId != null && state.currentSessionId !== '')
+    !(state.currentProjectId != null && state.currentProjectId !== '')
   )
     return state
   const tab = state.tabs.find((entry) => entry.id === tabId)
   if (!(tab?.worktreeId != null && tab?.worktreeId !== '')) return state
   const worktreeId = tab.worktreeId
-  // When `onlyIfMissing` is set, we leave the session's worktree alone if it
+  // When `onlyIfMissing` is set, we leave the project's worktree alone if it
   // already points at a known worktree. Used by `hydrate-workspace` so that
   // a backend re-attach after a user-initiated worktree switch (j/k cycling)
   // doesn't clobber the freshly chosen worktree by re-syncing from the
   // restored active tab.
   if (opts?.onlyIfMissing === true) {
-    const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+    const project = state.projects.find((entry) => entry.id === state.currentProjectId)
     const hasValidWorktree =
-      session?.activeWorktreeId != null &&
-      session.activeWorktreeId !== '' &&
-      (session.worktrees?.some((w) => w.id === session.activeWorktreeId) ?? false)
+      project?.activeWorktreeId != null &&
+      project.activeWorktreeId !== '' &&
+      (project.worktrees?.some((w) => w.id === project.activeWorktreeId) ?? false)
     if (hasValidWorktree) return state
   }
   return {
     ...state,
-    sessions: state.sessions.map((session) =>
-      session.id === state.currentSessionId ? withActiveWorktree(session, worktreeId) : session
+    projects: state.projects.map((project) =>
+      project.id === state.currentProjectId ? withActiveWorktree(project, worktreeId) : project
     ),
   }
 }
@@ -314,23 +314,23 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           ...state,
           activeTabId: newTab.id,
           focusMode: 'navigation',
-          modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: null },
+          modal: { editBuffer: null, projectTargetId: null, selectedIndex: 0, type: null },
           tabs: [...state.tabs, newTab],
         },
         newTab.id
       )
     }
     case 'hydrate-workspace': {
-      // The session's activeWorktreeId may have just been switched by the
+      // The project's activeWorktreeId may have just been switched by the
       // user (j/k cycle, sidebar click) before the backend attached. Honor
       // that choice by only considering tabs visible in that worktree —
       // otherwise we'd land the active tab on whatever the backend picked
       // (typically the worktree we *last* persisted, not the current one).
-      const currentSession =
-        state.currentSessionId != null && state.currentSessionId !== ''
-          ? state.sessions.find((s) => s.id === state.currentSessionId)
+      const currentProject =
+        state.currentProjectId != null && state.currentProjectId !== ''
+          ? state.projects.find((s) => s.id === state.currentProjectId)
           : undefined
-      const visibleForWorktree = filterTabsForActiveWorktree(action.tabs, currentSession)
+      const visibleForWorktree = filterTabsForActiveWorktree(action.tabs, currentProject)
       const visibleIds = new Set(visibleForWorktree.map((t) => t.id))
       const hydratedActiveTabId =
         action.activeTabId != null &&
@@ -394,12 +394,12 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       if (state.tabs.length === 0) {
         return state
       }
-      const session = getCurrentSession(state)
-      const visibleTabs = filterTabsForActiveWorktree(state.tabs, session)
+      const project = getCurrentProject(state)
+      const visibleTabs = filterTabsForActiveWorktree(state.tabs, project)
       if (visibleTabs.length === 0) {
         return state
       }
-      const orderedTabs = orderTabsByWorktree(visibleTabs, session)
+      const orderedTabs = orderTabsByWorktree(visibleTabs, project)
       const currentIndex = orderedTabs.findIndex((tab) => tab.id === state.activeTabId)
       const safeIndex = currentIndex === -1 ? 0 : currentIndex
       const nextIndex = (safeIndex + action.delta + orderedTabs.length) % orderedTabs.length
@@ -486,7 +486,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       })
       return { ...state, tabs }
     }
-    case 'reset-tab-session':
+    case 'reset-tab-project':
       return withActiveTabWorktree(
         {
           ...state,

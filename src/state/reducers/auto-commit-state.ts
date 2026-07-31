@@ -1,11 +1,11 @@
 import type { AppAction, AppState, AutoCommitState } from '../types'
 
-function setBySession(
+function setByProject(
   state: AutoCommitState,
-  sessionId: string,
-  next: AutoCommitState['bySession'][string]
+  projectId: string,
+  next: AutoCommitState['byProject'][string]
 ): AutoCommitState {
-  return { bySession: { ...state.bySession, [sessionId]: next } }
+  return { byProject: { ...state.byProject, [projectId]: next } }
 }
 
 export function reduceAutoCommitState(
@@ -14,7 +14,7 @@ export function reduceAutoCommitState(
 ): AutoCommitState | null {
   switch (action.type) {
     case 'auto-commit-generation-started': {
-      return setBySession(state, action.sessionId, {
+      return setByProject(state, action.projectId, {
         abortController: action.abortController,
         kind: 'generating',
         startedAt: action.startedAt,
@@ -23,10 +23,10 @@ export function reduceAutoCommitState(
       })
     }
     case 'auto-commit-generation-ready': {
-      const current = state.bySession[action.sessionId]
+      const current = state.byProject[action.projectId]
       if (!current || current.kind !== 'generating') return null
       if (current.workingTreeHash !== action.workingTreeHash) return null
-      return setBySession(state, action.sessionId, {
+      return setByProject(state, action.projectId, {
         body: action.body,
         generatedAt: action.generatedAt,
         kind: 'ready',
@@ -36,7 +36,7 @@ export function reduceAutoCommitState(
       })
     }
     case 'auto-commit-clear': {
-      const current = state.bySession[action.sessionId]
+      const current = state.byProject[action.projectId]
       if (!current || current.kind === 'idle') return null
       if (current.kind === 'generating') {
         try {
@@ -45,7 +45,7 @@ export function reduceAutoCommitState(
           // ignore
         }
       }
-      return setBySession(state, action.sessionId, { kind: 'idle' })
+      return setByProject(state, action.projectId, { kind: 'idle' })
     }
     default:
       return null

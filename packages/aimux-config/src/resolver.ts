@@ -60,7 +60,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
-    sessionBar: resolveSessionBar(userConfig.sessionBar),
+    projectBar: resolveProjectBar(userConfig.projectBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
@@ -96,9 +96,9 @@ function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['the
   }
 }
 
-function resolveSessionBar(
-  userConfig: AimuxUserConfig['sessionBar']
-): ResolvedConfig['sessionBar'] {
+function resolveProjectBar(
+  userConfig: AimuxUserConfig['projectBar']
+): ResolvedConfig['projectBar'] {
   if (!userConfig) return {}
   return {
     initialVisible: userConfig.initialVisible ?? userConfig.visible,

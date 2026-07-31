@@ -1,5 +1,5 @@
 import type {
-  SessionRecord,
+  ProjectRecord,
   SnippetRecord,
   TerminalLine,
   TerminalModeState,
@@ -164,7 +164,7 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
   )
 }
 
-export function isSessionRecord(value: unknown): value is SessionRecord {
+export function isProjectRecord(value: unknown): value is ProjectRecord {
   return (
     isObjectRecord(value) &&
     isString(value.id) &&

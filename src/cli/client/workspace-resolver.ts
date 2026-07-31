@@ -1,6 +1,6 @@
-import type { SessionRecord, WorktreeRecord } from '../../state/types'
+import type { ProjectRecord, WorktreeRecord } from '../../state/types'
 
-import { findMostRecentSession, loadSessionCatalog } from '../../state/session-catalog'
+import { findMostRecentProject, loadProjectCatalog } from '../../state/project-catalog'
 
 /**
  * Where a command's target workspace came from. An orchestrator needs this to
@@ -11,15 +11,15 @@ export type WorkspaceOrigin = 'flag' | 'env' | 'active'
 
 export interface ResolvedWorkspace {
   origin: WorkspaceOrigin
-  record: SessionRecord
+  record: ProjectRecord
 }
 
 /** Env pin for headless orchestrators — `--workspace` still wins over it. */
 export const WORKSPACE_ENV_VAR = 'AIMUX_WORKSPACE'
 
 /** The workspace's primary (root) worktree, i.e. the repository it is about. */
-export function findPrimaryWorktree(session: SessionRecord): WorktreeRecord | undefined {
-  return session.worktrees?.find((worktree) => worktree.source === 'primary')
+export function findPrimaryWorktree(project: ProjectRecord): WorktreeRecord | undefined {
+  return project.worktrees?.find((worktree) => worktree.source === 'primary')
 }
 
 /**
@@ -27,33 +27,33 @@ export function findPrimaryWorktree(session: SessionRecord): WorktreeRecord | un
  * every worker envelope so an agent can see *which project* it just acted on
  * instead of inferring it from a worktree path hash.
  */
-export function workspaceRepoRoot(session: SessionRecord): string | null {
-  return findPrimaryWorktree(session)?.repoRoot ?? session.projectPath ?? null
+export function workspaceRepoRoot(project: ProjectRecord): string | null {
+  return findPrimaryWorktree(project)?.repoRoot ?? project.projectPath ?? null
 }
 
 /** Stable workspace identity block embedded in command output. */
-export function workspaceIdentity(session: SessionRecord): {
+export function workspaceIdentity(project: ProjectRecord): {
   id: string
   name: string
   repoRoot: string | null
 } {
-  return { id: session.id, name: session.name, repoRoot: workspaceRepoRoot(session) }
+  return { id: project.id, name: project.name, repoRoot: workspaceRepoRoot(project) }
 }
 
 /**
- * Resolve `--workspace W` to a session record from the catalog, reporting where
+ * Resolve `--workspace W` to a project record from the catalog, reporting where
  * the choice came from. Precedence: the explicit flag, then `AIMUX_WORKSPACE`,
- * then the most recently opened session. Throws when the catalog is empty (no
- * session has ever been created) or when the explicit name/id doesn't match.
+ * then the most recently opened project. Throws when the catalog is empty (no
+ * project has ever been created) or when the explicit name/id doesn't match.
  *
  * Matching: exact id wins; otherwise exact name (case-sensitive); otherwise
  * unique case-insensitive name match.
  */
 export function resolveWorkspaceWithOrigin(name: string | undefined): ResolvedWorkspace {
-  const sessions = loadSessionCatalog()
-  if (sessions.length === 0) {
+  const projects = loadProjectCatalog()
+  if (projects.length === 0) {
     throw new Error(
-      'no sessions found — create one from the aimux UI first (or pass --workspace once created)'
+      'no projects found — create one from the aimux UI first (or pass --workspace once created)'
     )
   }
 
@@ -62,7 +62,7 @@ export function resolveWorkspaceWithOrigin(name: string | undefined): ResolvedWo
   const fromEnv = env != null && env !== '' ? env : undefined
   const selector = flag ?? fromEnv
   if (selector === undefined) {
-    const active = findMostRecentSession(sessions)
+    const active = findMostRecentProject(projects)
     if (!active) {
       throw new Error('no active workspace and the catalog is empty')
     }
@@ -71,32 +71,32 @@ export function resolveWorkspaceWithOrigin(name: string | undefined): ResolvedWo
 
   return {
     origin: flag !== undefined ? 'flag' : 'env',
-    record: matchWorkspace(sessions, selector),
+    record: matchWorkspace(projects, selector),
   }
 }
 
-export function resolveWorkspace(name: string | undefined): SessionRecord {
+export function resolveWorkspace(name: string | undefined): ProjectRecord {
   return resolveWorkspaceWithOrigin(name).record
 }
 
-function matchWorkspace(sessions: SessionRecord[], name: string): SessionRecord {
-  const byId = sessions.find((session) => session.id === name)
+function matchWorkspace(projects: ProjectRecord[], name: string): ProjectRecord {
+  const byId = projects.find((project) => project.id === name)
   if (byId) return byId
 
-  const exactNameMatches = sessions.filter((session) => session.name === name)
+  const exactNameMatches = projects.filter((project) => project.name === name)
   if (exactNameMatches.length > 1) {
     throw new Error(
-      `workspace "${name}" matches multiple sessions: ${exactNameMatches.map((s) => s.id).join(', ')}`
+      `workspace "${name}" matches multiple projects: ${exactNameMatches.map((s) => s.id).join(', ')}`
     )
   }
   const exactOnly = exactNameMatches[0]
   if (exactOnly) return exactOnly
 
   const lower = name.toLowerCase()
-  const ciMatches = sessions.filter((session) => session.name.toLowerCase() === lower)
+  const ciMatches = projects.filter((project) => project.name.toLowerCase() === lower)
   if (ciMatches.length > 1) {
     throw new Error(
-      `workspace "${name}" matches multiple sessions: ${ciMatches.map((s) => s.id).join(', ')}`
+      `workspace "${name}" matches multiple projects: ${ciMatches.map((s) => s.id).join(', ')}`
     )
   }
   const ciOnly = ciMatches[0]
@@ -105,6 +105,6 @@ function matchWorkspace(sessions: SessionRecord[], name: string): SessionRecord 
   throw new Error(`workspace not found: ${name}`)
 }
 
-export function listWorkspaces(): SessionRecord[] {
-  return loadSessionCatalog()
+export function listWorkspaces(): ProjectRecord[] {
+  return loadProjectCatalog()
 }

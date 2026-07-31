@@ -1,22 +1,22 @@
-import type { AppState, SessionRecord } from './types'
+import type { AppState, ProjectRecord } from './types'
 
 import { loadConfig, saveConfig } from '../config'
-import { saveSessionCatalog } from './session-catalog'
-import { serializeWorkspace } from './session-persistence'
+import { saveProjectCatalog } from './project-catalog'
+import { serializeWorkspace } from './project-persistence'
 
-export function buildSessionsWithCurrentSnapshot(
-  sessions: SessionRecord[],
-  currentSessionId: string | null,
+export function buildProjectsWithCurrentSnapshot(
+  projects: ProjectRecord[],
+  currentProjectId: string | null,
   state: AppState
-): SessionRecord[] {
-  return sessions.map((session) =>
-    session.id === currentSessionId
+): ProjectRecord[] {
+  return projects.map((project) =>
+    project.id === currentProjectId
       ? {
-          ...session,
+          ...project,
           updatedAt: new Date().toISOString(),
           workspaceSnapshot: serializeWorkspace(state),
         }
-      : session
+      : project
   )
 }
 
@@ -29,7 +29,7 @@ export function saveCurrentWorkspace(state: AppState): void {
       diffModeRatio: state.gitPane.diffModeRatio,
       fileListMode: state.gitPane.fileListMode,
     },
-    sessionBarVisible: state.sessionBar.visible,
+    projectBarVisible: state.projectBar.visible,
     // Legacy mirror of the left bar: lets an older build (and the workspace
     // snapshot schema) still find a sidebar after a downgrade.
     sidebar: {
@@ -37,7 +37,7 @@ export function saveCurrentWorkspace(state: AppState): void {
       width: state.bars.left.width,
     },
   })
-  saveSessionCatalog(
-    buildSessionsWithCurrentSnapshot(state.sessions, state.currentSessionId, state)
+  saveProjectCatalog(
+    buildProjectsWithCurrentSnapshot(state.projects, state.currentProjectId, state)
   )
 }

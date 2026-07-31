@@ -15,9 +15,9 @@ export type ModeId =
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
   | 'modal.worktree-delete-confirm'
-  | 'modal.session-picker.filtering'
-  | 'modal.session-name'
-  | 'modal.create-session'
+  | 'modal.project-picker.filtering'
+  | 'modal.project-name'
+  | 'modal.create-project'
   | 'modal.create-worktree'
   | 'modal.rename-tab'
   | 'modal.rename-worktree'
@@ -54,7 +54,7 @@ export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
  */
 export type LegacyPersistedTabStatus = TabStatus | 'exited'
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
-export interface SessionStatus {
+export interface ProjectStatus {
   working: boolean
   waiting: boolean
 }
@@ -163,7 +163,7 @@ export interface WorktreeRecord {
   updatedAt: string
 }
 
-export interface SessionRecord {
+export interface ProjectRecord {
   id: string
   name: string
   projectPath?: string
@@ -309,33 +309,33 @@ export interface GitModeState {
 interface ModalBase {
   selectedIndex: number
   editBuffer: string | null
-  sessionTargetId: string | null
+  projectTargetId: string | null
   cursorPos?: number
 }
 
 export interface ModalClosed extends ModalBase {
   type: null
   editBuffer: null
-  sessionTargetId: null
+  projectTargetId: null
 }
 
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
 }
-export interface ModalSessionPicker extends ModalBase {
-  type: 'session-picker'
+export interface ModalProjectPicker extends ModalBase {
+  type: 'project-picker'
 }
-export interface ModalSessionName extends ModalBase {
-  type: 'session-name'
-  returnToSessionPicker: boolean
+export interface ModalProjectName extends ModalBase {
+  type: 'project-name'
+  returnToProjectPicker: boolean
 }
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
 }
 export interface ModalRenameWorktree extends ModalBase {
   type: 'rename-worktree'
-  worktreeSessionId: string
+  worktreeProjectId: string
 }
 export interface ModalSnippetPicker extends ModalBase {
   type: 'snippet-picker'
@@ -354,13 +354,13 @@ export interface ModalSplitPicker extends ModalBase {
   type: 'split-picker'
   splitDirection: SplitDirection
 }
-export interface ModalCreateSession extends ModalBase {
-  type: 'create-session'
+export interface ModalCreateProject extends ModalBase {
+  type: 'create-project'
   directoryResults: DirectoryResult[]
   pendingProjectPath: string | null
   activeField: 'directory' | 'name'
   nameBuffer: string
-  returnToSessionPicker: boolean
+  returnToProjectPicker: boolean
 }
 export interface ModalCreateWorktree extends ModalBase {
   type: 'create-worktree'
@@ -416,7 +416,7 @@ export interface ModalWorktreeMoveConfirm extends ModalBase {
   type: 'worktree-move-confirm'
   variant: 'stash-target' | 'keep-conflicts'
   files: string[]
-  sessionId: string
+  projectId: string
   sourceWorktreeId: string
   targetWorktreeId: string
   deleteSource: boolean
@@ -431,7 +431,7 @@ export interface ModalWorktreeMoveConfirm extends ModalBase {
  */
 export interface ModalWorktreeDeleteConfirm extends ModalBase {
   type: 'worktree-delete-confirm'
-  sessionId: string
+  projectId: string
   worktreeId: string
   worktreeLabel: string
   reason: string
@@ -444,8 +444,8 @@ export type FlashJumpTargetKind = 'workspace' | 'worktree' | 'tab'
 
 export interface FlashJumpTarget {
   kind: FlashJumpTargetKind
-  sessionIndex: number
-  sessionId: string
+  projectIndex: number
+  projectId: string
   worktreeId?: string
   tabId?: string
 }
@@ -466,15 +466,15 @@ export interface ModalFlashJump extends ModalBase {
 export type ModalState =
   | ModalClosed
   | ModalNewTab
-  | ModalSessionPicker
-  | ModalSessionName
+  | ModalProjectPicker
+  | ModalProjectName
   | ModalRenameTab
   | ModalRenameWorktree
   | ModalSnippetPicker
   | ModalThemePicker
   | ModalHelp
   | ModalSplitPicker
-  | ModalCreateSession
+  | ModalCreateProject
   | ModalCreateWorktree
   | ModalSnippetEditor
   | ModalGitCommit
@@ -490,7 +490,7 @@ export interface LayoutState {
   terminalRows: number
 }
 
-export interface SessionBarState {
+export interface ProjectBarState {
   visible: boolean
 }
 
@@ -513,7 +513,7 @@ export type AutoCommitSuggestion =
     }
 
 export interface AutoCommitState {
-  bySession: Record<string, AutoCommitSuggestion>
+  byProject: Record<string, AutoCommitSuggestion>
 }
 
 export interface DiscoveredRepo {
@@ -532,10 +532,10 @@ export interface AppState {
   activeTabId: string | null
   layoutTrees: Record<string, LayoutNode>
   tabGroupMap: Record<string, string>
-  sessions: SessionRecord[]
-  currentSessionId: string | null
-  sessionStatuses: Record<string, SessionStatus>
-  sessionBar: SessionBarState
+  projects: ProjectRecord[]
+  currentProjectId: string | null
+  projectStatuses: Record<string, ProjectStatus>
+  projectBar: ProjectBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
   bars: BarsState
@@ -559,30 +559,30 @@ export type ModalAction =
   | { type: 'open-new-tab-modal' }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
-  | { type: 'open-session-picker' }
+  | { type: 'open-project-picker' }
   | {
-      type: 'open-session-name-modal'
-      sessionTargetId?: string
+      type: 'open-project-name-modal'
+      projectTargetId?: string
       initialName?: string
-      returnToSessionPicker?: boolean
+      returnToProjectPicker?: boolean
     }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
   | { type: 'update-command-edit'; char: string }
   | { type: 'cancel-command-edit' }
-  | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
+  | { type: 'open-create-project-modal'; returnToProjectPicker: boolean }
   | { type: 'open-create-worktree-modal' }
   | { type: 'set-create-worktree-base-branches'; branches: string[] }
   | { type: 'set-create-worktree-branch-error'; message: string | null }
   | { type: 'set-create-worktree-step'; step: 'form' | 'template' }
   | { type: 'switch-create-worktree-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
-  | { type: 'switch-create-session-field' }
+  | { type: 'switch-create-project-field' }
   | { type: 'select-directory' }
   | { type: 'open-rename-tab-modal' }
   | {
       type: 'open-rename-worktree-modal'
-      sessionId: string
+      projectId: string
       worktreeId: string
       initialName: string
     }
@@ -602,7 +602,7 @@ export type ModalAction =
       type: 'open-worktree-move-confirm'
       variant: 'stash-target' | 'keep-conflicts'
       files: string[]
-      sessionId: string
+      projectId: string
       sourceWorktreeId: string
       targetWorktreeId: string
       deleteSource: boolean
@@ -611,7 +611,7 @@ export type ModalAction =
     }
   | {
       type: 'open-worktree-delete-confirm'
-      sessionId: string
+      projectId: string
       worktreeId: string
       worktreeLabel: string
       reason: string
@@ -621,20 +621,20 @@ export type ModalAction =
   | { type: 'open-flash-jump-modal' }
   | { type: 'clear-flash-jump-pending' }
 
-export type SessionAction =
-  | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
-  | { type: 'set-sessions'; sessions: SessionRecord[] }
-  | { type: 'create-session-record'; session: SessionRecord }
-  | { type: 'rename-session-record'; sessionId: string; name: string }
-  | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
-  | { type: 'reorder-sessions'; orderedIds: string[] }
-  | { type: 'reorder-active-session'; delta: number }
-  | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
-  | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
-  | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
+export type ProjectAction =
+  | { type: 'load-project'; projectId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
+  | { type: 'set-projects'; projects: ProjectRecord[] }
+  | { type: 'create-project-record'; project: ProjectRecord }
+  | { type: 'rename-project-record'; projectId: string; name: string }
+  | { type: 'delete-project-record'; projectId: string; openProjectPicker?: boolean }
+  | { type: 'reorder-projects'; orderedIds: string[] }
+  | { type: 'reorder-active-project'; delta: number }
+  | { type: 'set-project-status'; projectId: string; status: ProjectStatus }
+  | { type: 'add-worktree-record'; projectId: string; worktree: WorktreeRecord; activate?: boolean }
+  | { type: 'set-active-worktree'; projectId: string; worktreeId: string }
   | {
       type: 'update-worktree-record'
-      sessionId: string
+      projectId: string
       worktreeId: string
       patch: Partial<WorktreeRecord>
     }
@@ -654,7 +654,7 @@ export type TabAction =
   | { type: 'set-active-tab'; tabId: string }
   | { type: 'move-active-tab'; delta: number }
   | { type: 'reorder-active-tab'; delta: number }
-  | { type: 'reset-tab-session'; tabId: string }
+  | { type: 'reset-tab-project'; tabId: string }
   | { type: 'rename-tab'; tabId: string; title: string }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }
   | {
@@ -702,7 +702,7 @@ export type UIAction =
   | { type: 'set-terminal-size'; cols: number; rows: number }
   | { type: 'resize-git-diff-pane'; delta: number }
   | { type: 'set-pending-chords'; chords: string[] | null }
-  | { type: 'toggle-session-bar' }
+  | { type: 'toggle-project-bar' }
 
 export interface GitRefreshPayload {
   branch: string | null
@@ -780,10 +780,10 @@ export type GitModeAction =
       fromSection: GitFileSection
       toSection: GitFileSection | null
     }
-  | { type: 'open-git-commit-modal'; sessionId?: string }
+  | { type: 'open-git-commit-modal'; projectId?: string }
   | { type: 'git-commit-enter-confirm' }
   | { type: 'git-commit-leave-confirm' }
-  | { type: 'git-commit-enter-generating'; sessionId: string }
+  | { type: 'git-commit-enter-generating'; projectId: string }
   | { type: 'git-commit-leave-generating' }
 
 export type DataAction =
@@ -793,7 +793,7 @@ export type DataAction =
 export type AutoCommitAction =
   | {
       type: 'auto-commit-generation-started'
-      sessionId: string
+      projectId: string
       tabId: string
       workingTreeHash: string
       abortController: AbortController
@@ -801,17 +801,17 @@ export type AutoCommitAction =
     }
   | {
       type: 'auto-commit-generation-ready'
-      sessionId: string
+      projectId: string
       workingTreeHash: string
       title: string
       body: string
       generatedAt: number
     }
-  | { type: 'auto-commit-clear'; sessionId: string }
+  | { type: 'auto-commit-clear'; projectId: string }
 
 export type AppAction =
   | ModalAction
-  | SessionAction
+  | ProjectAction
   | TabAction
   | LayoutAction
   | UIAction
@@ -826,10 +826,10 @@ export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'launch-selected-assistant' }
   | { type: 'edit-selected-assistant' }
-  | { type: 'confirm-selected-session' }
-  | { type: 'delete-selected-session' }
-  | { type: 'open-rename-selected-session' }
-  | { type: 'create-session'; name: string; projectPath?: string }
+  | { type: 'confirm-selected-project' }
+  | { type: 'delete-selected-project' }
+  | { type: 'open-rename-selected-project' }
+  | { type: 'create-project'; name: string; projectPath?: string }
   | { type: 'create-worktree' }
   | { type: 'load-create-worktree-base-branches' }
   | { type: 'close-tab'; tabId: string }
@@ -844,7 +844,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'restore' }
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
-  | { type: 'rename-session'; sessionId: string; name: string }
+  | { type: 'rename-project'; projectId: string; name: string }
   | { type: 'rename-tab'; tabId: string; title: string }
   | { type: 'split-pane'; direction: SplitDirection; sourceTabId?: string }
   | { type: 'confirm-split' }
@@ -860,16 +860,16 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-commit-auto'; title: string; body: string }
-  | { type: 'generate-auto-commit-now'; sessionId: string }
+  | { type: 'generate-auto-commit-now'; projectId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
-  | { type: 'switch-session-by-index'; index: number }
+  | { type: 'switch-project-by-index'; index: number }
   | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
   | { type: 'switch-tab-by-index'; index: number }
-  | { type: 'delete-session'; sessionId: string }
+  | { type: 'delete-project'; projectId: string }
   | {
       type: 'delete-worktree'
-      sessionId: string
+      projectId: string
       worktreeId: string
       // Force the git worktree removal (discards uncommitted changes in the
       // worktree). Also implies closing the worktree's tabs.
@@ -881,7 +881,7 @@ export type SideEffect =
     }
   | {
       type: 'move-worktree'
-      sessionId: string
+      projectId: string
       sourceWorktreeId: string
       targetWorktreeId: string
       deleteSource?: boolean
@@ -940,7 +940,7 @@ export interface SidebarConfig {
 // ─── Hooks config (stub) ──────────────────────────────────────────────────────
 
 export interface HooksConfig {
-  onSessionCreate?: (session: { name: string; projectPath?: string }) => void | Promise<void>
+  onProjectCreate?: (project: { name: string; projectPath?: string }) => void | Promise<void>
 }
 
 // ─── Snippet config (stub) ────────────────────────────────────────────────────
@@ -1018,8 +1018,8 @@ export interface KeymapBuilderApi {
 
 // ─── Top-level user config ────────────────────────────────────────────────────
 
-export interface SessionBarConfig {
-  /** Startup override for the session bar visibility. Reapplied on each launch. */
+export interface ProjectBarConfig {
+  /** Startup override for the project bar visibility. Reapplied on each launch. */
   initialVisible?: boolean
   /** @deprecated Use `initialVisible` instead. */
   visible?: boolean
@@ -1207,7 +1207,7 @@ export interface AimuxUserConfig {
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
-  sessionBar?: SessionBarConfig
+  projectBar?: ProjectBarConfig
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
@@ -1266,7 +1266,7 @@ export interface ResolvedConfig {
   keymaps: ResolvedKeymapConfig
   backends: Record<string, BackendConfig>
   sidebar: SidebarConfig
-  sessionBar: {
+  projectBar: {
     initialVisible?: boolean
   }
   /**

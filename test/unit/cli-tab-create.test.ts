@@ -3,7 +3,7 @@ import { resolve as resolvePath } from 'node:path'
 
 import type { DaemonClient } from '../../src/cli/client/daemon-client'
 import type { CliContext } from '../../src/cli/context'
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import {
   resolveAssistantCommand,
@@ -91,12 +91,12 @@ describe('resolveAssistantCommand', () => {
 function ctxFor(
   flags: Record<string, string | number | boolean>,
   daemon: DaemonClient,
-  workspace: Partial<SessionRecord> = {}
+  workspace: Partial<ProjectRecord> = {}
 ): CliContext {
   return {
     args: { flags, positionals: [] },
     getDaemon: async () => daemon,
-    getWorkspace: () => ({ id: 'ws', name: 'ws', ...workspace }) as unknown as SessionRecord,
+    getWorkspace: () => ({ id: 'ws', name: 'ws', ...workspace }) as unknown as ProjectRecord,
   }
 }
 
@@ -157,7 +157,7 @@ describe('tabCreate.run createTab payload', () => {
       activeWorktreeId: 'wt-1',
       worktrees: [
         { id: 'wt-1', name: 'x', path: '/repo/wt', source: 'aimux-temp' },
-      ] as unknown as SessionRecord['worktrees'],
+      ] as unknown as ProjectRecord['worktrees'],
     })
 
     try {

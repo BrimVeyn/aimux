@@ -282,21 +282,21 @@ export function TerminalPane({
   // top-level pane on a worktree with zero tabs). Selectors return plain
   // strings so re-renders are cheap and bounded to actual name changes.
   const emptyWorkspaceName = useAppStore((s) => {
-    const id = s.currentSessionId
+    const id = s.currentProjectId
     if (id == null || id === '') return ''
-    return s.sessions.find((sess) => sess.id === id)?.name ?? ''
+    return s.projects.find((sess) => sess.id === id)?.name ?? ''
   })
   const emptyWorktreeName = useAppStore((s) => {
-    const id = s.currentSessionId
+    const id = s.currentProjectId
     if (id == null || id === '') return ''
-    const session = s.sessions.find((sess) => sess.id === id)
-    if (!session) return ''
+    const project = s.projects.find((sess) => sess.id === id)
+    if (!project) return ''
     const activeId =
-      session.activeWorktreeId != null && session.activeWorktreeId !== ''
-        ? session.activeWorktreeId
-        : session.worktrees?.[0]?.id
+      project.activeWorktreeId != null && project.activeWorktreeId !== ''
+        ? project.activeWorktreeId
+        : project.worktrees?.[0]?.id
     if (activeId == null || activeId === '') return ''
-    return session.worktrees?.find((w) => w.id === activeId)?.name ?? ''
+    return project.worktrees?.find((w) => w.id === activeId)?.name ?? ''
   })
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled

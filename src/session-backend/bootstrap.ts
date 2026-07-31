@@ -106,7 +106,7 @@ export async function probeDaemonProtocolCompatibility(
     const helloRequestId = crypto.randomUUID()
     const attachRequestId = crypto.randomUUID()
     const disposeRequestId = crypto.randomUUID()
-    const probeSessionId = `probe-${crypto.randomUUID()}`
+    const probeProjectId = `probe-${crypto.randomUUID()}`
     let daemonProcessVersion: string | undefined
     let daemonCapabilities: readonly string[] = []
     let daemonManagerSelectedVersion: number | undefined
@@ -167,9 +167,9 @@ export async function probeDaemonProtocolCompatibility(
                 id: attachRequestId,
                 payload: {
                   cols: 80,
+                  projectId: probeProjectId,
                   protocolVersion: message.payload.selectedVersion,
                   rows: 24,
-                  sessionId: probeSessionId,
                 },
                 type: 'attach',
               })
@@ -311,7 +311,7 @@ export async function createSessionBackend(opts?: {
     // Ring 3: prefer hot-reexec over the legacy stopTM+restart path when
     // the running daemon advertises `hotReexec` and the operator has opted
     // in via AIMUX_HOT_REEXEC=1. The terminal-manager and every PTY stay
-    // alive; the daemon binary swaps under them — no session-loss prompt.
+    // alive; the daemon binary swaps under them — no project-loss prompt.
     const reexecEnabled = process.env.AIMUX_HOT_REEXEC === '1'
     const daemonSupportsReexec =
       handshake.capabilities?.includes(IPC_CAPABILITY_HOT_REEXEC) ?? false
@@ -363,7 +363,7 @@ export async function createSessionBackend(opts?: {
 
     // We're about to kill the terminal-manager and every PTY — warn the UI
     // now so the user isn't surprised. The hot-reexec branch above never
-    // reaches this point, so the callback fires only when sessions really
+    // reaches this point, so the callback fires only when projects really
     // do die.
     await opts?.onBreakingUpdateRequired?.()
 

@@ -1,10 +1,10 @@
-import type { SessionRecord, WorktreeRecord } from '../state/types'
+import type { ProjectRecord, WorktreeRecord } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
-import { loadSessionCatalog, saveSessionCatalog } from '../state/session-catalog'
-import { createEmptyWorkspaceSnapshot } from '../state/session-persistence'
-import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-worktrees'
+import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
+import { createEmptyWorkspaceSnapshot } from '../state/project-persistence'
+import { createPrimaryWorktree, ensureProjectWorktrees } from '../state/project-worktrees'
 
 /**
  * Catalog mutations invoked by the daemon when NO UI is attached. When a UI
@@ -15,13 +15,13 @@ import { createPrimaryWorktree, ensureSessionWorktrees } from '../state/session-
  * safe to call from the daemon process, no React / dispatcher involved.
  */
 
-export function createWorkspaceInCatalog(name: string, projectPath?: string): SessionRecord {
-  const sessions = loadSessionCatalog()
+export function createWorkspaceInCatalog(name: string, projectPath?: string): ProjectRecord {
+  const projects = loadProjectCatalog()
   const now = new Date().toISOString()
-  const session: SessionRecord = {
+  const project: ProjectRecord = {
     activeWorktreeId: undefined,
     createdAt: now,
-    id: createPrefixedId('session'),
+    id: createPrefixedId('project'),
     lastOpenedAt: now,
     name,
     projectPath,
@@ -31,85 +31,85 @@ export function createWorkspaceInCatalog(name: string, projectPath?: string): Se
   }
   if (projectPath != null && projectPath !== '') {
     const worktree = createPrimaryWorktree(projectPath, now)
-    session.activeWorktreeId = worktree.id
-    session.worktrees = [worktree]
+    project.activeWorktreeId = worktree.id
+    project.worktrees = [worktree]
   }
-  saveSessionCatalog([...sessions, ensureSessionWorktrees(session)])
-  logDebug('daemon.catalog.createWorkspace', { name, projectPath, sessionId: session.id })
-  return session
+  saveProjectCatalog([...projects, ensureProjectWorktrees(project)])
+  logDebug('daemon.catalog.createWorkspace', { name, projectId: project.id, projectPath })
+  return project
 }
 
 /**
- * Throws when the target session isn't in the catalog. Used by the daemon
+ * Throws when the target project isn't in the catalog. Used by the daemon
  * before broadcasting a workspace-lifecycle request so the CLI's `expectOk`
  * fails fast (with a meaningful message) instead of the `--wait` path
  * hanging out for its timeout while the UI silently ignores an unknown id.
  */
-export function assertSessionInCatalog(sessionId: string): void {
-  const sessions = loadSessionCatalog()
-  if (!sessions.some((s) => s.id === sessionId)) {
-    throw new Error(`workspace not found: ${sessionId}`)
+export function assertProjectInCatalog(projectId: string): void {
+  const projects = loadProjectCatalog()
+  if (!projects.some((s) => s.id === projectId)) {
+    throw new Error(`workspace not found: ${projectId}`)
   }
 }
 
-export function bumpLastOpenedInCatalog(sessionId: string): void {
-  const sessions = loadSessionCatalog()
+export function bumpLastOpenedInCatalog(projectId: string): void {
+  const projects = loadProjectCatalog()
   const now = new Date().toISOString()
-  const target = sessions.find((s) => s.id === sessionId)
+  const target = projects.find((s) => s.id === projectId)
   if (!target) {
-    throw new Error(`workspace not found: ${sessionId}`)
+    throw new Error(`workspace not found: ${projectId}`)
   }
-  const updated = sessions.map((s) => (s.id === sessionId ? { ...s, lastOpenedAt: now } : s))
-  saveSessionCatalog(updated)
-  logDebug('daemon.catalog.switchWorkspace', { sessionId })
+  const updated = projects.map((s) => (s.id === projectId ? { ...s, lastOpenedAt: now } : s))
+  saveProjectCatalog(updated)
+  logDebug('daemon.catalog.switchWorkspace', { projectId })
 }
 
-export function deleteFromCatalog(sessionId: string): void {
-  const sessions = loadSessionCatalog()
-  const remaining = sessions.filter((s) => s.id !== sessionId)
-  if (remaining.length === sessions.length) {
-    throw new Error(`workspace not found: ${sessionId}`)
+export function deleteFromCatalog(projectId: string): void {
+  const projects = loadProjectCatalog()
+  const remaining = projects.filter((s) => s.id !== projectId)
+  if (remaining.length === projects.length) {
+    throw new Error(`workspace not found: ${projectId}`)
   }
-  saveSessionCatalog(remaining)
-  logDebug('daemon.catalog.closeWorkspace', { sessionId })
+  saveProjectCatalog(remaining)
+  logDebug('daemon.catalog.closeWorkspace', { projectId })
 }
 
-export function addWorktreeToCatalog(sessionId: string, worktree: WorktreeRecord): void {
-  const sessions = loadSessionCatalog()
-  const target = sessions.find((s) => s.id === sessionId)
+export function addWorktreeToCatalog(projectId: string, worktree: WorktreeRecord): void {
+  const projects = loadProjectCatalog()
+  const target = projects.find((s) => s.id === projectId)
   if (!target) {
-    throw new Error(`workspace not found: ${sessionId}`)
+    throw new Error(`workspace not found: ${projectId}`)
   }
   const existing = target.worktrees ?? []
   if (existing.some((w) => w.id === worktree.id)) {
     throw new Error(`worktree already exists: ${worktree.id}`)
   }
-  const updated = sessions.map((s) =>
-    s.id === sessionId
+  const updated = projects.map((s) =>
+    s.id === projectId
       ? { ...s, updatedAt: new Date().toISOString(), worktrees: [...existing, worktree] }
       : s
   )
-  saveSessionCatalog(updated)
+  saveProjectCatalog(updated)
   logDebug('daemon.catalog.addWorktree', {
-    sessionId,
+    projectId,
     worktreeId: worktree.id,
     worktreeName: worktree.name,
   })
 }
 
-export function removeWorktreeFromCatalog(sessionId: string, worktreeId: string): void {
-  const sessions = loadSessionCatalog()
-  const target = sessions.find((s) => s.id === sessionId)
+export function removeWorktreeFromCatalog(projectId: string, worktreeId: string): void {
+  const projects = loadProjectCatalog()
+  const target = projects.find((s) => s.id === projectId)
   if (!target) {
-    throw new Error(`workspace not found: ${sessionId}`)
+    throw new Error(`workspace not found: ${projectId}`)
   }
   const existing = target.worktrees ?? []
   const nextWorktrees = existing.filter((w) => w.id !== worktreeId)
   if (nextWorktrees.length === existing.length) {
     throw new Error(`worktree not found: ${worktreeId}`)
   }
-  const updated = sessions.map((s) =>
-    s.id === sessionId
+  const updated = projects.map((s) =>
+    s.id === projectId
       ? {
           ...s,
           activeWorktreeId: s.activeWorktreeId === worktreeId ? undefined : s.activeWorktreeId,
@@ -118,6 +118,6 @@ export function removeWorktreeFromCatalog(sessionId: string, worktreeId: string)
         }
       : s
   )
-  saveSessionCatalog(updated)
-  logDebug('daemon.catalog.removeWorktree', { sessionId, worktreeId })
+  saveProjectCatalog(updated)
+  logDebug('daemon.catalog.removeWorktree', { projectId, worktreeId })
 }

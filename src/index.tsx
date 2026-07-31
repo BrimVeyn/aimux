@@ -5,7 +5,7 @@
 const command = process.argv[2]
 
 // Shell completion. First branch and cheapest: it loads the CLI registry and
-// nothing else — no daemon client, no session backend, no renderer.
+// nothing else — no daemon client, no project backend, no renderer.
 if (command === '__complete') {
   const { runComplete } = await import('./cli/completion/entry')
   process.exit(await runComplete(process.argv.slice(3)))

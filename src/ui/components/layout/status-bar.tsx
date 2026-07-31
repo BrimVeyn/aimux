@@ -128,7 +128,7 @@ export function StatusBar() {
   const tileX = t.backgroundElement
   const tileY = modeColor
 
-  const hasB = model.sessionSegments.length > 0
+  const hasB = model.projectSegments.length > 0
   const hasX = aiEnabled
 
   return (
@@ -161,7 +161,7 @@ export function StatusBar() {
               flexShrink={1}
               overflow="hidden"
             >
-              <Segments segments={model.sessionSegments} t={t} />
+              <Segments segments={model.projectSegments} t={t} />
             </box>
             <Separator glyph={glyphs.right} bg={tileFiller} fg={tileB} />
           </>

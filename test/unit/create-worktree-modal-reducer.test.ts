@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import type { AppState, SessionRecord, WorktreeRecord } from '../../src/state/types'
+import type { AppState, ProjectRecord, WorktreeRecord } from '../../src/state/types'
 
 import { appReducer, createInitialState } from '../../src/state/store'
 
@@ -21,7 +21,7 @@ function worktree(id: string, overrides: Partial<WorktreeRecord> = {}): Worktree
 }
 
 function seed(): AppState {
-  const session: SessionRecord = {
+  const project: ProjectRecord = {
     activeWorktreeId: 'wt-a',
     createdAt: NOW,
     id: 's1',
@@ -33,7 +33,7 @@ function seed(): AppState {
       worktree('wt-a', { branch: 'feat/a' }),
     ],
   }
-  return { ...createInitialState({}, [session]), currentSessionId: 's1' }
+  return { ...createInitialState({}, [project]), currentProjectId: 's1' }
 }
 
 function open(state: AppState = seed()): AppState {
@@ -100,13 +100,13 @@ test('set-create-worktree-base-branches backfills the base only when unresolved'
   if (kept.modal.type !== 'create-worktree') throw new Error('expected create-worktree modal')
   expect(kept.modal.baseRef).toBe('feat/a')
 
-  // A session whose active worktree has no branch (detached) starts unresolved.
+  // A project whose active worktree has no branch (detached) starts unresolved.
   const detached = seed()
-  const session = detached.sessions[0]
-  if (!session) throw new Error('expected a seeded session')
+  const project = detached.projects[0]
+  if (!project) throw new Error('expected a seeded project')
   const noBranch: AppState = {
     ...detached,
-    sessions: [{ ...session, worktrees: [worktree('wt-a', { branch: undefined })] }],
+    projects: [{ ...project, worktrees: [worktree('wt-a', { branch: undefined })] }],
   }
   const filled = appReducer(open(noBranch), {
     branches: ['develop'],

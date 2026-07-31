@@ -1,4 +1,4 @@
-import type { SessionRecord, WorktreeRecord } from '../../../state/types'
+import type { ProjectRecord, WorktreeRecord } from '../../../state/types'
 import type { DaemonClient } from '../../client/daemon-client'
 
 import { createGitWorktree, removeGitWorktree, resolveGitRef } from '../../../git/worktree'
@@ -18,7 +18,7 @@ export interface CreateWorktreeParams {
   branch: string
   daemon: DaemonClient
   name: string
-  workspace: SessionRecord
+  workspace: ProjectRecord
 }
 
 /**
@@ -97,7 +97,7 @@ export async function createWorkspaceWorktree(
   }
 
   try {
-    await daemon.expectOk('addWorktreeRecord', { sessionId: workspace.id, worktree: record })
+    await daemon.expectOk('addWorktreeRecord', { projectId: workspace.id, worktree: record })
   } catch (error) {
     // Catalog registration failed — roll back the on-disk worktree so
     // `worktree list` doesn't perpetually surface an orphan. Swallow rollback

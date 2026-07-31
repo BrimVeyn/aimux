@@ -22,7 +22,7 @@ export const tabClose: CliCommand = {
         'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
       )
     }
-    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
     await daemon.expectOk('closeTab', { tabId })
 
     writeJson({ ok: true })

@@ -361,7 +361,7 @@ function computeStatusPlaceholder(
 ): StatusPlaceholder | null {
   const t = getCurrentTheme()
   if (!hasProjectPath) {
-    return { label: 'No active session', labelColor: t.textMuted }
+    return { label: 'No active project', labelColor: t.textMuted }
   }
   if (gitPanel.error === 'not-a-repo') {
     return { label: 'Not a git repository', labelColor: t.textMuted }

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 
 import type { DaemonClient } from '../../src/cli/client/daemon-client'
 import type { CliContext } from '../../src/cli/context'
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import { tabSend } from '../../src/cli/commands/tab/send'
 import { IPC_CAPABILITY_THIN_ATTACH } from '../../src/ipc/protocol'
@@ -18,7 +18,7 @@ import { IPC_CAPABILITY_THIN_ATTACH } from '../../src/ipc/protocol'
  */
 
 type TabStatusHandler = (payload: {
-  sessionId: string
+  projectId: string
   status: 'idle' | 'waiting-input' | 'working'
   tabId: string
 }) => void
@@ -41,7 +41,7 @@ function makeFakeDaemon(opts: FakeDaemonOptions): { daemon: DaemonClient; writes
         // Mirror the daemon's async event delivery: the transition arrives on a
         // later tick, after `run` has subscribed and issued the write.
         setTimeout(() => {
-          statusHandler?.({ sessionId: 'ws', status: 'working', tabId })
+          statusHandler?.({ projectId: 'ws', status: 'working', tabId })
         }, 0)
       }
     },
@@ -65,7 +65,7 @@ function makeContext(
   return {
     args: { flags, positionals },
     getDaemon: async () => daemon,
-    getWorkspace: () => ({ id: 'ws' }) as unknown as SessionRecord,
+    getWorkspace: () => ({ id: 'ws' }) as unknown as ProjectRecord,
   }
 }
 

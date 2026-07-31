@@ -8,21 +8,21 @@ import { getBranchDivergence } from './divergence'
 
 const INTERVAL_MS = 4000
 
-// Polls per-worktree base divergence for the current session while enabled and
+// Polls per-worktree base divergence for the current project while enabled and
 // dispatches it into worktreeDivergence. Only worktrees that record a baseRef
 // (the aimux-created ones) are measured; the primary and externally-discovered
 // worktrees have no recorded base and are left out.
 export function useWorktreeDivergencePolling(enabled: boolean): void {
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
 
   useEffect(() => {
     if (!enabled) return
-    const session =
-      currentSessionId != null && currentSessionId !== ''
-        ? sessions.find((s) => s.id === currentSessionId)
+    const project =
+      currentProjectId != null && currentProjectId !== ''
+        ? projects.find((s) => s.id === currentProjectId)
         : undefined
-    const targets = (session?.worktrees ?? []).filter(
+    const targets = (project?.worktrees ?? []).filter(
       (w) => w.baseRef != null && w.baseRef !== '' && w.branch != null && w.branch !== ''
     )
     if (targets.length === 0) return
@@ -55,5 +55,5 @@ export function useWorktreeDivergencePolling(enabled: boolean): void {
       cancelled = true
       if (timer != null) clearTimeout(timer)
     }
-  }, [enabled, currentSessionId, sessions])
+  }, [enabled, currentProjectId, projects])
 }

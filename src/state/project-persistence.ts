@@ -17,7 +17,7 @@ export function createEmptyWorkspaceSnapshot(): WorkspaceSnapshotV1 {
 
 /**
  * The per-worktree last-tab memory is serialized into every snapshot now so the
- * data accrues across sessions, but restoring it at startup stays dormant until
+ * data accrues across projects, but restoring it at startup stays dormant until
  * a future (non-breaking) change is ready to consume it. Flipping this to true
  * makes restart restore the last-viewed tab per worktree; until then restart
  * behavior is unchanged and the live in-memory map is never clobbered on switch.
@@ -43,7 +43,7 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
     layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
     savedAt: new Date().toISOString(),
     // Mirror of the left bar. `isWorkspaceSnapshotV1` requires this key —
-    // dropping it invalidates every entry in the session catalog.
+    // dropping it invalidates every entry in the project catalog.
     sidebar: {
       visible: state.bars.left.visible,
       width: state.bars.left.width,
@@ -70,13 +70,13 @@ export function serializeWorkspace(state: AppState): WorkspaceSnapshotV1 {
 
 export interface RestoreOptions {
   // Force any running/starting tab to 'disconnected' on restore. True for
-  // cold-start (daemon may not own the sessions yet) and the daemon's own
+  // cold-start (daemon may not own the projects yet) and the daemon's own
   // catalog hydration. False for live in-app workspace switches where an
   // attach() is guaranteed to follow within a frame and hydrate-workspace
   // will overwrite the status with daemon truth — leaving the flag on would
   // briefly flash the "Restored snapshot" hint on every j/k cycle.
   forceDisconnected?: boolean
-  // When provided, drop tabs pinned to a worktree id that the session no
+  // When provided, drop tabs pinned to a worktree id that the project no
   // longer owns. Some delete paths (notably the sidebar's "Remove worktree")
   // historically removed the worktree record without closing its tabs, leaving
   // orphans bound to a vanished id. Those orphans are invisible (filtered out
@@ -87,7 +87,7 @@ export interface RestoreOptions {
   validWorktreeIds?: ReadonlySet<string>
 }
 
-// Drop tabs bound to a worktree id the session no longer owns. Unbound tabs
+// Drop tabs bound to a worktree id the project no longer owns. Unbound tabs
 // (no worktreeId) are kept — they surface under the primary worktree.
 function pruneOrphanedTabs(
   tabs: TabSession[],
@@ -168,8 +168,8 @@ export function restoreLayoutTrees(
 }
 
 // When a worktree is removed, its tabs are killed live via disposeWorktreeTabs
-// — but the session's persisted workspaceSnapshot still references them by
-// worktreeId. Without this pruning, a subsequent load-session (session switch
+// — but the project's persisted workspaceSnapshot still references them by
+// worktreeId. Without this pruning, a subsequent load-project (project switch
 // or restart) resurrects the dead tabs and they reappear in h-l navigation.
 export function pruneSnapshotOfWorktree(
   snapshot: WorkspaceSnapshotV1 | undefined,

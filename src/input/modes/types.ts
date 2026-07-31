@@ -10,9 +10,9 @@ export type ModeId =
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
   | 'modal.worktree-delete-confirm'
-  | 'modal.session-picker.filtering'
-  | 'modal.session-name'
-  | 'modal.create-session'
+  | 'modal.project-picker.filtering'
+  | 'modal.project-name'
+  | 'modal.create-project'
   | 'modal.create-worktree'
   | 'modal.rename-tab'
   | 'modal.rename-worktree'
@@ -34,10 +34,10 @@ export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'launch-selected-assistant' }
   | { type: 'edit-selected-assistant' }
-  | { type: 'confirm-selected-session' }
-  | { type: 'delete-selected-session' }
-  | { type: 'open-rename-selected-session' }
-  | { type: 'create-session'; name: string; projectPath?: string }
+  | { type: 'confirm-selected-project' }
+  | { type: 'delete-selected-project' }
+  | { type: 'open-rename-selected-project' }
+  | { type: 'create-project'; name: string; projectPath?: string }
   | { type: 'create-worktree' }
   | { type: 'load-create-worktree-base-branches' }
   | { type: 'close-tab'; tabId: string }
@@ -52,7 +52,7 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'restore' }
   | { type: 'apply-theme'; action: 'confirm' }
   | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
-  | { type: 'rename-session'; sessionId: string; name: string }
+  | { type: 'rename-project'; projectId: string; name: string }
   | { type: 'rename-tab'; tabId: string; title: string }
   | {
       type: 'split-pane'
@@ -72,16 +72,16 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-commit-auto'; title: string; body: string }
-  | { type: 'generate-auto-commit-now'; sessionId: string }
+  | { type: 'generate-auto-commit-now'; projectId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
-  | { type: 'switch-session-by-index'; index: number; worktreeId?: string }
+  | { type: 'switch-project-by-index'; index: number; worktreeId?: string }
   | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
   | { type: 'switch-tab-by-index'; index: number }
-  | { type: 'delete-session'; sessionId: string }
+  | { type: 'delete-project'; projectId: string }
   | {
       type: 'delete-worktree'
-      sessionId: string
+      projectId: string
       worktreeId: string
       // Force the git worktree removal (discards uncommitted changes in the
       // worktree). Also implies closing the worktree's tabs.
@@ -93,7 +93,7 @@ export type SideEffect =
     }
   | {
       type: 'move-worktree'
-      sessionId: string
+      projectId: string
       sourceWorktreeId: string
       targetWorktreeId: string
       deleteSource?: boolean

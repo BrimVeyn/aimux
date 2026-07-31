@@ -8,23 +8,23 @@ function createSession(id: string, order: number) {
     createdAt: '2024-01-01T00:00:00.000Z',
     id,
     lastOpenedAt: '2024-01-01T00:00:00.000Z',
-    name: `Session ${order}`,
+    name: `Project ${order}`,
     order,
     updatedAt: '2024-01-01T00:00:00.000Z',
   }
 }
 
-test('switch-session-by-index exits git mode when clicking the active session', () => {
+test('switch-project-by-index exits git mode when clicking the active project', () => {
   const state = {
     ...createInitialState(),
-    currentSessionId: 'session-1',
+    currentProjectId: 'project-1',
     focusMode: 'git' as const,
-    sessions: [createSession('session-1', 1), createSession('session-2', 2)],
+    projects: [createSession('project-1', 1), createSession('project-2', 2)],
   }
   const dispatched: { type: string }[] = []
 
   executeSideEffect(
-    { index: 1, type: 'switch-session-by-index' },
+    { index: 1, type: 'switch-project-by-index' },
     {
       activeTab: undefined,
       backend: {} as never,
@@ -33,7 +33,7 @@ test('switch-session-by-index exits git mode when clicking the active session', 
       dispatch: (action) => {
         dispatched.push(action)
       },
-      getCurrentSessionProjectPath: () => {},
+      getCurrentProjectProjectPath: () => {},
       getState: () => state,
       renderer: { destroy() {} } as never,
       setThemeId: () => {},
@@ -48,10 +48,10 @@ test('switch-session-by-index exits git mode when clicking the active session', 
 
 test('launch-selected-assistant puts the new tab in the active worktree', () => {
   const now = '2024-01-01T00:00:00.000Z'
-  const session = {
+  const project = {
     activeWorktreeId: 'wt-feature',
     createdAt: now,
-    id: 'session-1',
+    id: 'project-1',
     lastOpenedAt: now,
     name: 'Main',
     projectPath: '/repo/feature',
@@ -79,7 +79,7 @@ test('launch-selected-assistant puts the new tab in the active worktree', () => 
       },
     ],
   }
-  const base = { ...createInitialState({}, [session]), currentSessionId: 'session-1' }
+  const base = { ...createInitialState({}, [project]), currentProjectId: 'project-1' }
   const state = { ...base, modal: appReducer(base, { type: 'open-new-tab-modal' }).modal }
   const dispatched: { type: string; tab?: { worktreeId?: string } }[] = []
 
@@ -93,7 +93,7 @@ test('launch-selected-assistant puts the new tab in the active worktree', () => 
       dispatch: (action) => {
         dispatched.push(action as { type: string; tab?: { worktreeId?: string } })
       },
-      getCurrentSessionProjectPath: () => '/repo/feature',
+      getCurrentProjectProjectPath: () => '/repo/feature',
       getState: () => state,
       renderer: { destroy() {} } as never,
       setThemeId: () => {},

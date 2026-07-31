@@ -67,9 +67,9 @@ describe('ipc protocol framing', () => {
         id: '5',
         payload: {
           cols: '80',
+          projectId: 'project-a',
           protocolVersion: IPC_PROTOCOL_VERSION,
           rows: 24,
-          sessionId: 'session-a',
         },
         type: 'attach',
       })
@@ -204,30 +204,30 @@ describe('ipc protocol framing', () => {
     ).toThrow('tabRender.terminalModes is invalid')
   })
 
-  test('parses tabStatus and sessionStatus events', () => {
+  test('parses tabStatus and projectStatus events', () => {
     expect(
       parseServerMessage({
-        payload: { sessionId: 'session-1', status: 'working', tabId: 'tab-1' },
+        payload: { projectId: 'project-1', status: 'working', tabId: 'tab-1' },
         type: 'tabStatus',
       })
     ).toMatchObject({ type: 'tabStatus' })
     expect(
       parseServerMessage({
-        payload: { sessionId: 'session-1', status: { waiting: true, working: false } },
-        type: 'sessionStatus',
+        payload: { projectId: 'project-1', status: { waiting: true, working: false } },
+        type: 'projectStatus',
       })
-    ).toMatchObject({ type: 'sessionStatus' })
+    ).toMatchObject({ type: 'projectStatus' })
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', status: 'bogus', tabId: 'tab-1' },
+        payload: { projectId: 'project-1', status: 'bogus', tabId: 'tab-1' },
         type: 'tabStatus',
       })
     ).toThrow('tabStatus.status is invalid')
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', status: { waiting: 1, working: true } },
-        type: 'sessionStatus',
+        payload: { projectId: 'project-1', status: { waiting: 1, working: true } },
+        type: 'projectStatus',
       })
-    ).toThrow('sessionStatus.status is invalid')
+    ).toThrow('projectStatus.status is invalid')
   })
 })

@@ -9,17 +9,17 @@ export const workspaceList: CliCommand = {
   flags: SHARED_FLAGS,
   group: 'workspace',
   run: async () => {
-    const sessions = listWorkspaces()
+    const projects = listWorkspaces()
     writeJson({
-      workspaces: sessions.map((session) => ({
-        id: session.id,
-        lastOpenedAt: session.lastOpenedAt,
-        name: session.name,
-        projectPath: session.projectPath,
+      workspaces: projects.map((project) => ({
+        id: project.id,
+        lastOpenedAt: project.lastOpenedAt,
+        name: project.name,
+        projectPath: project.projectPath,
       })),
     })
     return EXIT_OK
   },
-  summary: 'List known workspaces (sessions) in the profile catalog',
+  summary: 'List known workspaces (projects) in the profile catalog',
   verb: 'list',
 }

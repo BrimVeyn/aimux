@@ -6,7 +6,7 @@ import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
-import { reduceSessionState } from './reducers/session-state'
+import { reduceProjectState } from './reducers/project-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
@@ -18,7 +18,7 @@ import {
   EMPTY_MULTI_REPO_STATE,
   type GitModeState,
   type GitPaneState,
-  type SessionRecord,
+  type ProjectRecord,
   type SnippetRecord,
 } from './types'
 
@@ -29,7 +29,7 @@ export interface InitialStateOverrides {
   gitMode?: Partial<GitModeState>
   gitPane?: Partial<GitPaneState>
   bars?: BarsState
-  sessionBarVisible?: boolean
+  projectBarVisible?: boolean
   worktreeTemplates?: WorktreeTemplate[]
 }
 
@@ -71,18 +71,18 @@ function sanitizeBars(bars: BarsState): BarsState {
 
 export function createInitialState(
   customCommands: Record<string, string> = {},
-  sessions: SessionRecord[] = [],
+  projects: ProjectRecord[] = [],
   snippets: SnippetRecord[] = [],
-  showSessionPicker = false,
+  showProjectPicker = false,
   overrides: InitialStateOverrides = {}
 ): AppState {
   return {
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,
     bars: sanitizeBars(overrides.bars ?? DEFAULT_BARS),
-    currentSessionId: null,
+    currentProjectId: null,
     customCommands,
-    focusMode: showSessionPicker ? 'command-edit' : 'navigation',
+    focusMode: showProjectPicker ? 'command-edit' : 'navigation',
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: { ...DEFAULT_GIT_PANE, ...overrides.gitPane },
     gitPanel: emptyGitPanel(),
@@ -92,22 +92,22 @@ export function createInitialState(
       terminalRows: DEFAULT_TERMINAL_ROWS,
     },
     layoutTrees: {},
-    modal: showSessionPicker
+    modal: showProjectPicker
       ? {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'session-picker',
+          type: 'project-picker',
         }
       : emptyModal(),
     multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
-    sessionBar: {
-      visible: overrides.sessionBarVisible ?? true,
+    projectBar: {
+      visible: overrides.projectBarVisible ?? true,
     },
-    sessions,
-    sessionStatuses: {},
+    projects,
+    projectStatuses: {},
     snippets,
     tabGroupMap: {},
     tabs: [],
@@ -117,8 +117,8 @@ export function createInitialState(
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
-  const sessionState = reduceSessionState(state, action)
-  if (sessionState) return sessionState
+  const projectState = reduceProjectState(state, action)
+  if (projectState) return projectState
 
   const tabState = reduceTabState(state, action)
   if (tabState) return tabState

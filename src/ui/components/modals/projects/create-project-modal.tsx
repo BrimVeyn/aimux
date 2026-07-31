@@ -22,23 +22,23 @@ function getDirectoryResultColor(result: DirectoryResult): string {
   return t.text
 }
 
-interface CreateSessionModalProps {
+interface CreateProjectModalProps {
   activeField: 'directory' | 'name'
   directoryQuery: string
-  sessionName: string
+  projectName: string
   results: DirectoryResult[]
   selectedIndex: number
   pendingProjectPath: string | null
 }
 
-export function CreateSessionModal({
+export function CreateProjectModal({
   activeField,
   directoryQuery,
   pendingProjectPath,
+  projectName,
   results,
   selectedIndex,
-  sessionName,
-}: CreateSessionModalProps) {
+}: CreateProjectModalProps) {
   const t = useTheme()
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
@@ -58,7 +58,7 @@ export function CreateSessionModal({
   return (
     <Form
       title="Create workspace"
-      keybindsModeId="modal.create-session"
+      keybindsModeId="modal.create-project"
       width={uiTokens.modalWidth.xl}
     >
       <AutoComplete
@@ -81,7 +81,7 @@ export function CreateSessionModal({
         }
       />
 
-      <TextField active={nameActive} label="Workspace name" value={sessionName} />
+      <TextField active={nameActive} label="Workspace name" value={projectName} />
     </Form>
   )
 }

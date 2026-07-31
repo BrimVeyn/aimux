@@ -25,19 +25,19 @@ function assistantCandidates(): CompletionCandidate[] {
 }
 
 async function workspaceCandidates(): Promise<CompletionCandidate[]> {
-  // Imported lazily: the session catalog pulls in config + state modules that
+  // Imported lazily: the project catalog pulls in config + state modules that
   // the static-source paths (groups, verbs, flags) have no reason to load.
   const { listWorkspaces } = await import('../client/workspace-resolver')
-  const sessions = listWorkspaces()
+  const projects = listWorkspaces()
   const nameCounts = new Map<string, number>()
-  for (const session of sessions) {
-    nameCounts.set(session.name, (nameCounts.get(session.name) ?? 0) + 1)
+  for (const project of projects) {
+    nameCounts.set(project.name, (nameCounts.get(project.name) ?? 0) + 1)
   }
-  return sessions.map((session) =>
+  return projects.map((project) =>
     // Ambiguous names can't be resolved by `--workspace`, so offer the id.
-    (nameCounts.get(session.name) ?? 0) > 1
-      ? { description: session.name, value: session.id }
-      : { description: session.id, value: session.name }
+    (nameCounts.get(project.name) ?? 0) > 1
+      ? { description: project.name, value: project.id }
+      : { description: project.id, value: project.name }
   )
 }
 

@@ -93,7 +93,7 @@ export interface AimuxConfig {
   gitPane?: PersistedGitPane
   bars?: PersistedBars
   sidebar?: PersistedSidebar
-  sessionBarVisible?: boolean
+  projectBarVisible?: boolean
   workspaceSnapshot?: WorkspaceSnapshotV1
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
@@ -346,7 +346,7 @@ export function loadConfigResult(): ConfigLoadResult {
       sidebar?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
-      sessionBarVisible?: unknown
+      projectBarVisible?: unknown
       workspaceSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
@@ -419,10 +419,10 @@ export function loadConfigResult(): ConfigLoadResult {
       }
     }
 
-    const validSessionBarVisible =
-      typeof parsed.sessionBarVisible === 'boolean' ? parsed.sessionBarVisible : undefined
-    if (parsed.sessionBarVisible !== undefined && validSessionBarVisible === undefined) {
-      issues.push('ignored invalid sessionBarVisible')
+    const validProjectBarVisible =
+      typeof parsed.projectBarVisible === 'boolean' ? parsed.projectBarVisible : undefined
+    if (parsed.projectBarVisible !== undefined && validProjectBarVisible === undefined) {
+      issues.push('ignored invalid projectBarVisible')
     }
 
     if (
@@ -451,8 +451,8 @@ export function loadConfigResult(): ConfigLoadResult {
         bars: validBars ?? deriveBarsFromLegacy(validSidebar, validGitPane),
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
+        projectBarVisible: validProjectBarVisible,
         prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
-        sessionBarVisible: validSessionBarVisible,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),

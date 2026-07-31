@@ -148,18 +148,18 @@ function orderWindows(
   primary: WindowSnapshot | null | undefined,
   secondary: WindowSnapshot | null | undefined
 ): {
-  session: WindowSnapshot | null | undefined
+  project: WindowSnapshot | null | undefined
   weekly: WindowSnapshot | null | undefined
 } {
-  const SESSION_MIN_SECONDS = 3 * 3600
-  const SESSION_MAX_SECONDS = 8 * 3600
+  const PROJECT_MIN_SECONDS = 3 * 3600
+  const PROJECT_MAX_SECONDS = 8 * 3600
   const isSession = (w: WindowSnapshot | null | undefined): boolean => {
     const s = w?.limit_window_seconds
-    return typeof s === 'number' && s >= SESSION_MIN_SECONDS && s <= SESSION_MAX_SECONDS
+    return typeof s === 'number' && s >= PROJECT_MIN_SECONDS && s <= PROJECT_MAX_SECONDS
   }
-  if (isSession(primary)) return { session: primary, weekly: secondary }
-  if (isSession(secondary)) return { session: secondary, weekly: primary }
-  return { session: primary, weekly: secondary }
+  if (isSession(primary)) return { project: primary, weekly: secondary }
+  if (isSession(secondary)) return { project: secondary, weekly: primary }
+  return { project: primary, weekly: secondary }
 }
 
 export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<UsageSnapshot> {
@@ -207,14 +207,14 @@ export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<Usage
     const parsed = (await response.json()) as CodexUsageResponse
     const planTier = normalizePlanTier(parsed.plan_type)
     const now = Date.now()
-    const { session, weekly } = orderWindows(
+    const { project, weekly } = orderWindows(
       parsed.rate_limit?.primary_window,
       parsed.rate_limit?.secondary_window
     )
 
     const windows: UsageWindow[] = []
-    const sessionWindow = buildCodexWindow('session', 'Session', session, now)
-    if (sessionWindow) windows.push(sessionWindow)
+    const projectWindow = buildCodexWindow('project', 'Project', project, now)
+    if (projectWindow) windows.push(projectWindow)
     const weeklyWindow = buildCodexWindow('weekly', 'Weekly', weekly, now)
     if (weeklyWindow) windows.push(weeklyWindow)
 
@@ -222,7 +222,7 @@ export async function fetchCodexUsage(_config: AIUsageToolConfig): Promise<Usage
       return { ...base, error: 'no rate_limit data', planTier }
     }
 
-    const summary = sessionWindow ?? weeklyWindow
+    const summary = projectWindow ?? weeklyWindow
 
     return {
       ...base,

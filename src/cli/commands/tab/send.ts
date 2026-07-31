@@ -105,7 +105,7 @@ export const tabSend: CliCommand = {
       )
     }
 
-    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
 
     if (!awaitSubmit) {
       const bytesWritten = await writePromptPayload(daemon, tabId, payload, appendEnter)

@@ -2,23 +2,23 @@ import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { memo, useCallback, useMemo } from 'react'
 
-import type { SessionRecord, WorktreeRecord } from '../../../../state/types'
+import type { ProjectRecord, WorktreeRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/session-worktrees'
+import { formatDivergence } from '../../../../state/project-worktrees'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface WorktreeRowProps {
-  session: SessionRecord
+  project: ProjectRecord
   worktree: WorktreeRecord
-  /** 1-based index of the workspace in the visible order (for switch-session-by-index). */
-  sessionIndex: number
+  /** 1-based index of the workspace in the visible order (for switch-project-by-index). */
+  projectIndex: number
   /** True when this row is the active cursor item. */
   isActiveItem: boolean
-  /** True when this row's workspace is the current session (selection scope). */
+  /** True when this row's workspace is the current project (selection scope). */
   inCurrentGroup: boolean
   /** True when this is the last non-primary worktree of its workspace. Drives └─ vs ├─. */
   isLast: boolean
@@ -28,15 +28,15 @@ export const WorktreeRow = memo(function WorktreeRow({
   inCurrentGroup,
   isActiveItem,
   isLast,
-  session,
-  sessionIndex,
+  project,
+  projectIndex,
   worktree,
 }: WorktreeRowProps) {
   const t = useTheme()
   // Selection highlight must stay opaque in transparent mode.
   const base = useBaseTheme()
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const isCurrentSession = session.id === currentSessionId
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const isCurrentProject = project.id === currentProjectId
   const divergence = useAppStore((s) => s.worktreeDivergence[worktree.id])
 
   const handleMouseDown = useCallback(
@@ -44,9 +44,9 @@ export const WorktreeRow = memo(function WorktreeRow({
       if (event.button !== 0) return
       event.preventDefault()
       event.stopPropagation()
-      if (isCurrentSession) {
+      if (isCurrentProject) {
         dispatchGlobal({
-          sessionId: session.id,
+          projectId: project.id,
           type: 'set-active-worktree',
           worktreeId: worktree.id,
         })
@@ -55,14 +55,14 @@ export const WorktreeRow = memo(function WorktreeRow({
       // Cross-workspace click: send the worktree id along with the switch so
       // the side effect can apply it atomically. Splitting it into a separate
       // dispatch+switch leaves a window where subscribers/re-renders can
-      // re-assert the target session's last-persisted worktree.
+      // re-assert the target project's last-persisted worktree.
       runSideEffectGlobal({
-        index: sessionIndex,
-        type: 'switch-session-by-index',
+        index: projectIndex,
+        type: 'switch-project-by-index',
         worktreeId: worktree.id,
       })
     },
-    [isCurrentSession, session.id, sessionIndex, worktree.id]
+    [isCurrentProject, project.id, projectIndex, worktree.id]
   )
 
   const rightClickMenu = useMemo<[string, () => void][] | undefined>(() => {
@@ -72,7 +72,7 @@ export const WorktreeRow = memo(function WorktreeRow({
         () =>
           dispatchGlobal({
             initialName: worktree.name,
-            sessionId: session.id,
+            projectId: project.id,
             type: 'open-rename-worktree-modal',
             worktreeId: worktree.id,
           }),
@@ -91,8 +91,8 @@ export const WorktreeRow = memo(function WorktreeRow({
           dispatchGlobal({
             closeTabs: true,
             force: false,
+            projectId: project.id,
             reason: 'Its assistant tabs will be closed and the worktree removed.',
-            sessionId: session.id,
             type: 'open-worktree-delete-confirm',
             worktreeId: worktree.id,
             worktreeLabel: worktree.branch ?? worktree.name,
@@ -100,7 +100,7 @@ export const WorktreeRow = memo(function WorktreeRow({
       ])
     }
     return entries
-  }, [session.id, worktree.branch, worktree.id, worktree.name, worktree.source])
+  }, [project.id, worktree.branch, worktree.id, worktree.name, worktree.source])
 
   let bgColor: string | undefined
   if (isActiveItem) {

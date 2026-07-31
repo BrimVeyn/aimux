@@ -101,7 +101,7 @@ async function rollbackCreatedWorktree(
     })
     await pruneEmptyWorktreeParent(record.path)
     await daemon.expectOk('removeWorktreeRecord', {
-      sessionId: workspace.id,
+      projectId: workspace.id,
       worktreeId: record.id,
     })
   } catch (error) {
@@ -199,9 +199,9 @@ export async function createCliTab(
     }
   }
 
-  // Attach before creating a worktree so stale daemon/session failures have no
+  // Attach before creating a worktree so stale daemon/project failures have no
   // git-side effect.
-  await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+  await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
 
   let worktreeId = requestedWorktreeId ?? workspace.activeWorktreeId
   let worktreeRecord =

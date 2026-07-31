@@ -5,14 +5,14 @@ import type { AppAction, AppState, AutoCommitState } from '../../src/state/types
 import { reduceModalState } from '../../src/state/reducers/modal-state'
 import { createInitialState } from '../../src/state/store'
 
-const SESSION = 's1'
+const PROJECT = 's1'
 const HASH = 'h1'
 
 function stateWithReadySuggestion(title: string, body: string): AppState {
   const base = createInitialState()
   const autoCommit: AutoCommitState = {
-    bySession: {
-      [SESSION]: {
+    byProject: {
+      [PROJECT]: {
         body,
         generatedAt: 1,
         kind: 'ready',
@@ -22,13 +22,13 @@ function stateWithReadySuggestion(title: string, body: string): AppState {
       },
     },
   }
-  return { ...base, autoCommit, currentSessionId: SESSION }
+  return { ...base, autoCommit, currentProjectId: PROJECT }
 }
 
 test('open-git-commit-modal always opens empty, even with a ready suggestion', () => {
   const state = stateWithReadySuggestion('feat: add thing', 'body text')
   const next = reduceModalState(state, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction)
   expect(next).not.toBeNull()
@@ -45,11 +45,11 @@ test('open-git-commit-modal always opens empty, even with a ready suggestion', (
 test('git-commit-use-background-suggestion fills title/body and enters confirm', () => {
   const state = stateWithReadySuggestion('feat: x', 'body')
   const opened = reduceModalState(state, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const next = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-use-background-suggestion',
   } as AppAction)
   expect(next).not.toBeNull()
@@ -65,11 +65,11 @@ test('git-commit-use-background-suggestion fills title/body and enters confirm',
 test('git-commit-use-background-suggestion is a no-op when suggestion is not ready', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const next = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-use-background-suggestion',
   } as AppAction)
   expect(next).toBeNull()
@@ -78,7 +78,7 @@ test('git-commit-use-background-suggestion is a no-op when suggestion is not rea
 test('open-git-commit-modal falls back to empty when no ready suggestion exists', () => {
   const base = createInitialState()
   const next = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction)
   expect(next).not.toBeNull()
@@ -90,7 +90,7 @@ test('open-git-commit-modal falls back to empty when no ready suggestion exists'
   expect(n.modal.stage).toBe('edit')
 })
 
-test('open-git-commit-modal without sessionId opens empty', () => {
+test('open-git-commit-modal without projectId opens empty', () => {
   const state = stateWithReadySuggestion('feat: x', 'b')
   const next = reduceModalState(state, { type: 'open-git-commit-modal' } as AppAction)
   const n = next as AppState
@@ -102,7 +102,7 @@ test('open-git-commit-modal without sessionId opens empty', () => {
 test('git-commit-enter-confirm flips stage to confirm', () => {
   const state = stateWithReadySuggestion('t', 'b')
   const opened = reduceModalState(state, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const next = reduceModalState(opened, { type: 'git-commit-enter-confirm' } as AppAction)
@@ -114,7 +114,7 @@ test('git-commit-enter-confirm flips stage to confirm', () => {
 test('git-commit-leave-confirm flips stage back to edit', () => {
   const state = stateWithReadySuggestion('t', 'b')
   const opened = reduceModalState(state, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const confirm = reduceModalState(opened, {
@@ -130,34 +130,34 @@ test('git-commit-leave-confirm flips stage back to edit', () => {
 test('git-commit-enter-generating flips stage to generating', () => {
   const state = stateWithReadySuggestion('t', 'b')
   const opened = reduceModalState(state, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const next = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-enter-generating',
   } as AppAction) as AppState
   if (next.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
   expect(next.modal.stage).toBe('generating')
-  expect(next.modal.sessionTargetId).toBe(SESSION)
+  expect(next.modal.projectTargetId).toBe(PROJECT)
   expect(next.focusMode).toBe('modal')
 })
 
 test('auto-commit-generation-ready while generating fills fields and enters confirm', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const generating = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-enter-generating',
   } as AppAction) as AppState
   const withInFlight = {
     ...generating,
     autoCommit: {
-      bySession: {
-        [SESSION]: {
+      byProject: {
+        [PROJECT]: {
           abortController: new AbortController(),
           kind: 'generating' as const,
           startedAt: 0,
@@ -170,7 +170,7 @@ test('auto-commit-generation-ready while generating fills fields and enters conf
   const ready = reduceModalState(withInFlight, {
     body: 'generated body',
     generatedAt: 123,
-    sessionId: SESSION,
+    projectId: PROJECT,
     title: 'generated title',
     type: 'auto-commit-generation-ready',
     workingTreeHash: HASH,
@@ -185,35 +185,35 @@ test('auto-commit-generation-ready while generating fills fields and enters conf
 test('auto-commit-clear while generating reverts to edit stage', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const generating = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-enter-generating',
   } as AppAction) as AppState
   const cleared = reduceModalState(generating, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'auto-commit-clear',
   } as AppAction) as AppState
   if (cleared.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
   expect(cleared.modal.stage).toBe('edit')
 })
 
-test('auto-commit-generation-ready for a different session does not touch the modal', () => {
+test('auto-commit-generation-ready for a different project does not touch the modal', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   const generating = reduceModalState(opened, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'git-commit-enter-generating',
   } as AppAction) as AppState
   const result = reduceModalState(generating, {
     body: 'x',
     generatedAt: 1,
-    sessionId: 'other-session',
+    projectId: 'other-project',
     title: 'x',
     type: 'auto-commit-generation-ready',
     workingTreeHash: 'h',
@@ -221,10 +221,10 @@ test('auto-commit-generation-ready for a different session does not touch the mo
   expect(result).toBeNull()
 })
 
-test('switch-create-session-field swaps buffers on the git-commit modal', () => {
+test('switch-create-project-field swaps buffers on the git-commit modal', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
-    sessionId: SESSION,
+    projectId: PROJECT,
     type: 'open-git-commit-modal',
   } as AppAction) as AppState
   if (opened.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
@@ -233,7 +233,7 @@ test('switch-create-session-field swaps buffers on the git-commit modal', () => 
     modal: { ...opened.modal, contentBuffer: 'body text', editBuffer: 'feat: x' },
   }
   const switched = reduceModalState(filled, {
-    type: 'switch-create-session-field',
+    type: 'switch-create-project-field',
   } as AppAction) as AppState
   if (switched.modal.type !== 'git-commit') throw new Error('expected git-commit modal')
   expect(switched.modal.activeField).toBe('body')

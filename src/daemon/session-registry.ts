@@ -13,7 +13,7 @@ import {
   normalizeGroupedTabOrder,
   restoreLayoutTrees,
   restoreTabsFromWorkspace,
-} from '../state/session-persistence'
+} from '../state/project-persistence'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 
 interface SessionRegistryEvents {

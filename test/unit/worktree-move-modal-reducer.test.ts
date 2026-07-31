@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 
-import type { AppState, SessionRecord, WorktreeRecord } from '../../src/state/types'
+import type { AppState, ProjectRecord, WorktreeRecord } from '../../src/state/types'
 
 import { appReducer, createInitialState } from '../../src/state/store'
 
@@ -21,7 +21,7 @@ function worktree(id: string, overrides: Partial<WorktreeRecord> = {}): Worktree
 }
 
 function seed(): AppState {
-  const session: SessionRecord = {
+  const project: ProjectRecord = {
     activeWorktreeId: 'wt-a',
     createdAt: NOW,
     id: 's1',
@@ -35,7 +35,7 @@ function seed(): AppState {
     ],
   }
   // The picker is only opened from git mode.
-  return { ...createInitialState({}, [session]), currentSessionId: 's1', focusMode: 'git' }
+  return { ...createInitialState({}, [project]), currentProjectId: 's1', focusMode: 'git' }
 }
 
 test('open-worktree-move-modal overlays git mode without flipping focus', () => {
@@ -100,7 +100,7 @@ test('set-worktree-move-stats is ignored when another modal is open', () => {
 const CONFIRM_FIELDS = {
   deleteSource: true,
   files: ['file.txt'],
-  sessionId: 's1',
+  projectId: 's1',
   sourceLabel: 'feat/a',
   sourceWorktreeId: 'wt-a',
   targetLabel: 'feat/b',

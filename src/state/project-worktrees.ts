@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { BranchDivergence, SessionRecord, TabSession, WorktreeRecord } from './types'
+import type { BranchDivergence, ProjectRecord, TabSession, WorktreeRecord } from './types'
 
 import { createPrefixedId } from '../platform/id'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
@@ -30,42 +30,42 @@ export function createPrimaryWorktree(projectPath: string, now: string): Worktre
   }
 }
 
-export function ensureSessionWorktrees(
-  session: SessionRecord,
+export function ensureProjectWorktrees(
+  project: ProjectRecord,
   now = new Date().toISOString()
-): SessionRecord {
-  if (session.worktrees?.length != null && session.worktrees?.length !== 0) {
+): ProjectRecord {
+  if (project.worktrees?.length != null && project.worktrees?.length !== 0) {
     const worktrees = mergeExistingGitWorktrees(
-      pruneMissingAimuxTempWorktrees(session.worktrees),
+      pruneMissingAimuxTempWorktrees(project.worktrees),
       now
     )
-    if (worktrees.length === 0 && session.projectPath != null && session.projectPath !== '') {
-      const worktree = createPrimaryWorktree(session.projectPath, now)
-      return { ...session, activeWorktreeId: worktree.id, worktrees: [worktree] }
+    if (worktrees.length === 0 && project.projectPath != null && project.projectPath !== '') {
+      const worktree = createPrimaryWorktree(project.projectPath, now)
+      return { ...project, activeWorktreeId: worktree.id, worktrees: [worktree] }
     }
-    const activeWorktreeId = worktrees.some((w) => w.id === session.activeWorktreeId)
-      ? session.activeWorktreeId
+    const activeWorktreeId = worktrees.some((w) => w.id === project.activeWorktreeId)
+      ? project.activeWorktreeId
       : worktrees[0]?.id
     return {
-      ...session,
+      ...project,
       activeWorktreeId,
       // projectPath stays pinned to the repo. The active worktree's path is a
       // separate thing — read it with getActiveWorktreePath.
-      projectPath: worktrees.find((w) => w.source === 'primary')?.repoRoot ?? session.projectPath,
+      projectPath: worktrees.find((w) => w.source === 'primary')?.repoRoot ?? project.projectPath,
       worktrees,
     }
   }
 
-  if (!(session.projectPath != null && session.projectPath !== '')) {
-    return session
+  if (!(project.projectPath != null && project.projectPath !== '')) {
+    return project
   }
 
-  const worktree = createPrimaryWorktree(session.projectPath, now)
+  const worktree = createPrimaryWorktree(project.projectPath, now)
   const worktrees = mergeExistingGitWorktrees([worktree], now)
   return {
-    ...session,
+    ...project,
     activeWorktreeId:
-      worktrees.find((entry) => entry.path === session.projectPath)?.id ?? worktree.id,
+      worktrees.find((entry) => entry.path === project.projectPath)?.id ?? worktree.id,
     worktrees,
   }
 }
@@ -190,27 +190,27 @@ function pruneMissingAimuxTempWorktrees(worktrees: WorktreeRecord[]): WorktreeRe
   })
 }
 
-export function getActiveWorktree(session: SessionRecord | undefined): WorktreeRecord | undefined {
-  if (!(session?.worktrees?.length != null && session?.worktrees?.length !== 0)) return undefined
+export function getActiveWorktree(project: ProjectRecord | undefined): WorktreeRecord | undefined {
+  if (!(project?.worktrees?.length != null && project?.worktrees?.length !== 0)) return undefined
   return (
-    session.worktrees.find((worktree) => worktree.id === session.activeWorktreeId) ??
-    session.worktrees[0]
+    project.worktrees.find((worktree) => worktree.id === project.activeWorktreeId) ??
+    project.worktrees[0]
   )
 }
 
 /**
  * The cwd to work in: the active worktree's path, falling back to the project
- * root. Not the same as `session.projectPath`, which names the repo itself.
+ * root. Not the same as `project.projectPath`, which names the repo itself.
  */
-export function getActiveWorktreePath(session: SessionRecord | undefined): string | undefined {
-  return getActiveWorktree(session)?.path ?? session?.projectPath
+export function getActiveWorktreePath(project: ProjectRecord | undefined): string | undefined {
+  return getActiveWorktree(project)?.path ?? project?.projectPath
 }
 
-export function withActiveWorktree(session: SessionRecord, worktreeId: string): SessionRecord {
-  const worktree = session.worktrees?.find((entry) => entry.id === worktreeId)
-  if (!worktree) return session
+export function withActiveWorktree(project: ProjectRecord, worktreeId: string): ProjectRecord {
+  const worktree = project.worktrees?.find((entry) => entry.id === worktreeId)
+  if (!worktree) return project
   return {
-    ...session,
+    ...project,
     activeWorktreeId: worktreeId,
     updatedAt: new Date().toISOString(),
   }
@@ -225,12 +225,12 @@ export function getRenderedTabWorktreeId(
 
 export function filterTabsForActiveWorktree(
   tabs: TabSession[],
-  session: SessionRecord | undefined
+  project: ProjectRecord | undefined
 ): TabSession[] {
-  if (!session) return tabs
-  const activeWorktreeId = session.activeWorktreeId
+  if (!project) return tabs
+  const activeWorktreeId = project.activeWorktreeId
   if (activeWorktreeId == null || activeWorktreeId === '') return tabs
-  const worktrees = session.worktrees ?? []
+  const worktrees = project.worktrees ?? []
   const primaryId = worktrees[0]?.id
   const activeIsPrimary = primaryId != null && primaryId === activeWorktreeId
   return tabs.filter((tab) => {
@@ -243,9 +243,9 @@ export function filterTabsForActiveWorktree(
 
 export function orderTabsByWorktree(
   tabs: TabSession[],
-  session: SessionRecord | undefined
+  project: ProjectRecord | undefined
 ): TabSession[] {
-  const worktrees = session?.worktrees ?? []
+  const worktrees = project?.worktrees ?? []
   const order = new Map<string, number>()
   for (const [index, worktree] of worktrees.entries()) {
     order.set(worktree.id, index)

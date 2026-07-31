@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { DaemonClient } from '../../src/cli/client/daemon-client'
 import type { CliContext } from '../../src/cli/context'
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import { tabAwait } from '../../src/cli/commands/tab/await'
 import { awaitTurn } from '../../src/cli/commands/tab/await-turn'
@@ -151,7 +151,7 @@ function makeCtx(
   return {
     args: { flags, positionals },
     getDaemon: async () => daemon,
-    getWorkspace: () => ({ id: 'ws' }) as unknown as SessionRecord,
+    getWorkspace: () => ({ id: 'ws' }) as unknown as ProjectRecord,
   }
 }
 

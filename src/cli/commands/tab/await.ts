@@ -57,7 +57,7 @@ export const tabAwait: CliCommand = {
       )
     }
 
-    const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
     const tab = attach.tabs.find((t) => t.id === tabId)
     if (!tab) {
       // Exit 3 (runtime) via runCli — NOT 4, which is reserved for

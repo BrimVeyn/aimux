@@ -63,7 +63,7 @@ export const worktreeRemove: CliCommand = {
     await pruneEmptyWorktreeParent(worktree.path)
     try {
       await daemon.expectOk('removeWorktreeRecord', {
-        sessionId: workspace.id,
+        projectId: workspace.id,
         worktreeId: worktree.id,
       })
     } catch (error) {

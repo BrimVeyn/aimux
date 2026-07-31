@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 
-import { filterSessions, filterSnippets } from '../../src/state/selectors'
+import { filterProjects, filterSnippets } from '../../src/state/selectors'
 
 describe('state selectors', () => {
-  test('filters sessions by name and project path', () => {
+  test('filters projects by name and project path', () => {
     expect(
-      filterSessions(
+      filterProjects(
         [
           {
             createdAt: '2024-01-01T00:00:00.000Z',

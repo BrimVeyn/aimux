@@ -46,8 +46,8 @@ export const tabWait: CliCommand = {
 
     const attach = await daemon.attach({
       cols: 0,
+      projectId: workspace.id,
       rows: 0,
-      sessionId: workspace.id,
       thin: true,
     })
 

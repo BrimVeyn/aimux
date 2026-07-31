@@ -54,7 +54,7 @@ export const workerStop: CliCommand = {
       }
     }
 
-    // `closeTab` is session-scoped on the daemon, so it fails with "No session
+    // `closeTab` is project-scoped on the daemon, so it fails with "No project
     // attached" unless this connection has attached first. Every other worker
     // verb thin-attaches; this one did not, which made teardown the one step of
     // the documented lifecycle a headless orchestrator could not complete.
@@ -63,7 +63,7 @@ export const workerStop: CliCommand = {
         'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
       )
     }
-    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
 
     // Teardown is two independent effects. Report them independently: a failed
     // tab close must not strand a merged worktree on disk with no way to remove
@@ -87,7 +87,7 @@ export const workerStop: CliCommand = {
       await pruneEmptyWorktreeParent(record.path)
       try {
         await daemon.expectOk('removeWorktreeRecord', {
-          sessionId: workspace.id,
+          projectId: workspace.id,
           worktreeId: record.id,
         })
       } catch (error) {

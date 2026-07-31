@@ -1,22 +1,22 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import { createInitialState } from '../../src/state/store'
-import { buildSessionsWithCurrentSnapshot } from '../../src/state/workspace-save'
+import { buildProjectsWithCurrentSnapshot } from '../../src/state/workspace-save'
 
-function makeSession(id: string, name: string): SessionRecord {
+function makeProject(id: string, name: string): ProjectRecord {
   const now = new Date().toISOString()
   return { createdAt: now, id, lastOpenedAt: now, name, updatedAt: now }
 }
 
-describe('buildSessionsWithCurrentSnapshot', () => {
-  test('stamps current session with workspace snapshot', () => {
-    const sessions = [makeSession('s1', 'one'), makeSession('s2', 'two')]
+describe('buildProjectsWithCurrentSnapshot', () => {
+  test('stamps current project with workspace snapshot', () => {
+    const projects = [makeProject('s1', 'one'), makeProject('s2', 'two')]
     const state = {
       ...createInitialState(),
-      currentSessionId: 's1',
-      sessions,
+      currentProjectId: 's1',
+      projects,
       tabs: [
         {
           assistant: 'claude' as const,
@@ -36,17 +36,17 @@ describe('buildSessionsWithCurrentSnapshot', () => {
       ],
     }
 
-    const result = buildSessionsWithCurrentSnapshot(sessions, 's1', state)
+    const result = buildProjectsWithCurrentSnapshot(projects, 's1', state)
     expect(result).toHaveLength(2)
     expect(result[0]?.workspaceSnapshot).toBeDefined()
     expect(result[0]?.workspaceSnapshot?.tabs).toHaveLength(1)
     expect(result[1]?.workspaceSnapshot).toBeUndefined()
   })
 
-  test('returns sessions unchanged when no current session', () => {
-    const sessions = [makeSession('s1', 'one')]
+  test('returns projects unchanged when no current project', () => {
+    const projects = [makeProject('s1', 'one')]
     const state = createInitialState()
-    const result = buildSessionsWithCurrentSnapshot(sessions, null, state)
-    expect(result).toEqual(sessions)
+    const result = buildProjectsWithCurrentSnapshot(projects, null, state)
+    expect(result).toEqual(projects)
   })
 })

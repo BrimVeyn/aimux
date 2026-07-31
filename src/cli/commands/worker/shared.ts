@@ -1,4 +1,4 @@
-import type { SessionRecord, TerminalSnapshot, WorktreeRecord } from '../../../state/types'
+import type { ProjectRecord, TerminalSnapshot, WorktreeRecord } from '../../../state/types'
 import type { CliContext } from '../../context'
 
 import {
@@ -88,7 +88,7 @@ export interface WorkerOutcome {
 /** A worker plus the workspace it is actually bound to. */
 export interface WorkerTarget {
   tab: TabSessionSummary
-  workspace: SessionRecord
+  workspace: ProjectRecord
 }
 
 export function validateWorkerName(name: string): void {
@@ -100,14 +100,14 @@ export function validateWorkerName(name: string): void {
 }
 
 function worktreeFor(
-  workspace: SessionRecord,
+  workspace: ProjectRecord,
   worktreeId: string | undefined
 ): WorktreeRecord | undefined {
   if (worktreeId === undefined) return undefined
   return workspace.worktrees?.find((worktree) => worktree.id === worktreeId)
 }
 
-export function workerView(workspace: SessionRecord, tab: TabSessionSummary): WorkerView {
+export function workerView(workspace: ProjectRecord, tab: TabSessionSummary): WorkerView {
   if (tab.workerName === undefined) {
     throw new Error(`tab is not a named worker: ${tab.id}`)
   }
@@ -143,7 +143,7 @@ async function requireWorkerCapabilities(
 
 export async function listNamedWorkerTabs(
   ctx: CliContext,
-  workspace: SessionRecord = ctx.getWorkspace()
+  workspace: ProjectRecord = ctx.getWorkspace()
 ): Promise<TabSessionSummary[]> {
   const daemon = await requireWorkerCapabilities(ctx)
   return (await daemon.listTabs(workspace.id)).tabs.filter((tab) => tab.workerName !== undefined)
@@ -331,11 +331,11 @@ async function armUptake(
  */
 async function liveUptake(
   daemon: Awaited<ReturnType<CliContext['getDaemon']>>,
-  sessionId: string,
+  projectId: string,
   tabId: string,
   startedAt: number
 ): Promise<UptakeResult | undefined> {
-  const live = (await daemon.listTabs(sessionId)).tabs.find((tab) => tab.id === tabId)
+  const live = (await daemon.listTabs(projectId)).tabs.find((tab) => tab.id === tabId)
   if (live?.activity !== 'working' && live?.activity !== 'waiting-input') return undefined
   return { activity: live.activity, confirmed: true, ms: Date.now() - startedAt }
 }
@@ -357,13 +357,13 @@ export interface DispatchOptions {
 
 export async function dispatchWorkerPrompt(
   ctx: CliContext,
-  workspace: SessionRecord,
+  workspace: ProjectRecord,
   tabId: string,
   text: string,
   options: DispatchOptions
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
-  const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+  const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
   const attached = attach.tabs.find((tab) => tab.id === tabId)
   if (!attached) throw new Error(`tab not found: ${tabId}`)
   const payload = buildPromptPayload(text, false)
@@ -438,12 +438,12 @@ export async function dispatchWorkerPrompt(
  */
 export async function submitWorkerPrompt(
   ctx: CliContext,
-  workspace: SessionRecord,
+  workspace: ProjectRecord,
   tabId: string,
   uptakeTimeoutMs: number
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
-  const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+  const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
   if (!attach.tabs.some((tab) => tab.id === tabId)) throw new Error(`tab not found: ${tabId}`)
   const startedAt = Date.now()
   const uptake = armUptake(daemon, tabId, uptakeTimeoutMs, startedAt)
@@ -466,15 +466,15 @@ export async function submitWorkerPrompt(
 
 export async function awaitExistingWorker(
   ctx: CliContext,
-  workspace: SessionRecord,
+  workspace: ProjectRecord,
   tabId: string,
   timeoutMs: number
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
   const attach = await daemon.attach({
     cols: 0,
+    projectId: workspace.id,
     rows: 0,
-    sessionId: workspace.id,
     thin: true,
   })
   const tab = attach.tabs.find((entry) => entry.id === tabId)
@@ -502,7 +502,7 @@ export async function awaitExistingWorker(
  * can run against the wrong repository unnoticed.
  */
 export function workerEnvelope(
-  workspace: SessionRecord,
+  workspace: ProjectRecord,
   worker: WorkerView,
   outcome?: WorkerOutcome
 ): Record<string, unknown> {

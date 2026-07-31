@@ -5,10 +5,10 @@ import {
   restoreTabsFromWorkspace,
   restoreWorkspaceState,
   serializeWorkspace,
-} from '../../src/state/session-persistence'
+} from '../../src/state/project-persistence'
 import { createInitialState } from '../../src/state/store'
 
-describe('session persistence', () => {
+describe('project persistence', () => {
   test('round-trips auto-rename status in workspace snapshots', () => {
     const state = createInitialState({ claude: 'claude' })
     state.tabs = [
@@ -94,7 +94,7 @@ describe('session persistence', () => {
       version: 1,
     })
     // Gate is off → the key is omitted so spreading the result can't clobber a
-    // caller's live in-memory map on a session switch.
+    // caller's live in-memory map on a project switch.
     expect(restored.lastActiveTabByWorktree).toBeUndefined()
   })
 
@@ -127,7 +127,7 @@ describe('session persistence', () => {
     expect(tabs[0]?.activity).toBe('idle')
   })
 
-  test('prunes tabs pinned to worktrees the session no longer owns', () => {
+  test('prunes tabs pinned to worktrees the project no longer owns', () => {
     const mkTab = (id: string, worktreeId?: string) => ({
       assistant: 'claude' as const,
       buffer: '',

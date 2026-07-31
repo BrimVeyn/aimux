@@ -7,22 +7,22 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
+import { getActiveWorktree } from '../project-worktrees'
 import {
   type BaseRefOption,
   buildBaseRefOptions,
   filterAssistants,
-  filterSessions,
+  filterProjects,
   filterSnippets,
 } from '../selectors'
-import { getActiveWorktree } from '../session-worktrees'
 import { reduceAutoCommitState } from './auto-commit-state'
 
 function emptyModal() {
   return {
     cursorPos: 0,
     editBuffer: null,
+    projectTargetId: null,
     selectedIndex: 0,
-    sessionTargetId: null,
     type: null,
   } as const
 }
@@ -34,14 +34,14 @@ function clampCursor(value: number, max: number): number {
 }
 
 function getCurrentWorktreeCount(state: AppState): number {
-  if (!(state.currentSessionId != null && state.currentSessionId !== '')) return 0
-  return state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees?.length ?? 0
+  if (!(state.currentProjectId != null && state.currentProjectId !== '')) return 0
+  return state.projects.find((entry) => entry.id === state.currentProjectId)?.worktrees?.length ?? 0
 }
 
 function getCreateWorktreeBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
   if (state.modal.type !== 'create-worktree') return []
   const worktrees =
-    state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees ?? []
+    state.projects.find((entry) => entry.id === state.currentProjectId)?.worktrees ?? []
   return buildBaseRefOptions(
     worktrees,
     state.modal.baseBranches,
@@ -73,8 +73,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'new-tab',
         },
       }
@@ -100,8 +100,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'ai-usage',
         },
       }
@@ -115,8 +115,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           deleteSource: false,
           editBuffer: null,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           sourceWorktreeId: action.sourceWorktreeId,
           stats: { kind: 'loading' },
           type: 'worktree-move',
@@ -145,9 +145,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           deleteSource: action.deleteSource,
           editBuffer: null,
           files: action.files,
+          projectId: action.projectId,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionId: action.sessionId,
-          sessionTargetId: null,
           sourceLabel: action.sourceLabel,
           sourceWorktreeId: action.sourceWorktreeId,
           targetLabel: action.targetLabel,
@@ -165,10 +165,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           closeTabs: action.closeTabs,
           editBuffer: null,
           force: action.force,
+          projectId: action.projectId,
+          projectTargetId: null,
           reason: action.reason,
           selectedIndex: 0,
-          sessionId: action.sessionId,
-          sessionTargetId: null,
           type: 'worktree-delete-confirm',
           worktreeId: action.worktreeId,
           worktreeLabel: action.worktreeLabel,
@@ -188,8 +188,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           labels,
           pendingJump: null,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'flash-jump',
         },
       }
@@ -210,9 +210,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           entryCount: scopedEntries.length,
+          projectTargetId: null,
           scope,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'help',
         },
       }
@@ -224,25 +224,25 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           splitDirection: action.direction,
           type: 'split-picker',
         },
       }
-    case 'open-session-picker':
+    case 'open-project-picker':
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'session-picker',
+          type: 'project-picker',
         },
       }
-    case 'open-session-name-modal': {
+    case 'open-project-name-modal': {
       const initialName = action.initialName ?? ''
       return {
         ...state,
@@ -250,14 +250,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: initialName.length,
           editBuffer: initialName,
-          returnToSessionPicker: action.returnToSessionPicker ?? true,
+          projectTargetId: action.projectTargetId ?? null,
+          returnToProjectPicker: action.returnToProjectPicker ?? true,
           selectedIndex: 0,
-          sessionTargetId: action.sessionTargetId ?? null,
-          type: 'session-name',
+          type: 'project-name',
         },
       }
     }
-    case 'open-create-session-modal':
+    case 'open-create-project-modal':
       return {
         ...state,
         focusMode: 'command-edit',
@@ -268,14 +268,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           nameBuffer: '',
           pendingProjectPath: null,
-          returnToSessionPicker: action.returnToSessionPicker,
+          projectTargetId: null,
+          returnToProjectPicker: action.returnToProjectPicker,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'create-session',
+          type: 'create-project',
         },
       }
     case 'set-directory-results': {
-      if (state.modal.type !== 'create-session') {
+      if (state.modal.type !== 'create-project') {
         return state
       }
       return {
@@ -298,14 +298,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           // Default to the active worktree's branch, preserving the previous
           // always-fork-from-source behaviour until the user picks another base.
           baseRef:
-            getActiveWorktree(state.sessions.find((entry) => entry.id === state.currentSessionId))
+            getActiveWorktree(state.projects.find((entry) => entry.id === state.currentProjectId))
               ?.branch ?? '',
           branchError: null,
           branchName: '',
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           step: 'form',
           type: 'create-worktree',
           worktreeName: '',
@@ -388,8 +388,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           actionMessage: null,
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'snippet-picker',
         },
       }
@@ -413,8 +413,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: initialName.length,
           editBuffer: initialName,
           nameBuffer: initialName,
+          projectTargetId: snippet?.id ?? null,
           selectedIndex: 0,
-          sessionTargetId: snippet?.id ?? null,
           triggerBuffer: snippet?.trigger ?? '',
           type: 'snippet-editor',
         },
@@ -428,8 +428,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           entryCount: 0,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'theme-picker',
         },
       }
@@ -442,13 +442,13 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: null,
           latestVersion: action.latestVersion,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'update-available',
         },
       }
     case 'open-git-commit-modal': {
-      const sessionId = action.sessionId
+      const projectId = action.projectId
       return {
         ...state,
         focusMode: 'command-edit',
@@ -457,8 +457,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           contentBuffer: '',
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: projectId ?? null,
           selectedIndex: 0,
-          sessionTargetId: sessionId ?? null,
           stage: 'edit',
           type: 'git-commit',
         },
@@ -485,7 +485,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return {
         ...state,
         focusMode: 'modal',
-        modal: { ...state.modal, sessionTargetId: action.sessionId, stage: 'generating' },
+        modal: { ...state.modal, projectTargetId: action.projectId, stage: 'generating' },
       }
     }
     case 'git-commit-leave-generating': {
@@ -500,7 +500,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (
         state.modal.type !== 'git-commit' ||
         state.modal.stage !== 'generating' ||
-        state.modal.sessionTargetId !== action.sessionId
+        state.modal.projectTargetId !== action.projectId
       ) {
         return null
       }
@@ -530,10 +530,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'git-commit-use-background-suggestion': {
-      if (state.modal.type !== 'git-commit' || state.modal.sessionTargetId !== action.sessionId) {
+      if (state.modal.type !== 'git-commit' || state.modal.projectTargetId !== action.projectId) {
         return null
       }
-      const suggestion = state.autoCommit.bySession[action.sessionId]
+      const suggestion = state.autoCommit.byProject[action.projectId]
       if (!suggestion || suggestion.kind !== 'ready') return null
       return {
         ...state,
@@ -552,7 +552,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       if (
         state.modal.type !== 'git-commit' ||
         state.modal.stage !== 'generating' ||
-        state.modal.sessionTargetId !== action.sessionId
+        state.modal.projectTargetId !== action.projectId
       ) {
         return null
       }
@@ -614,10 +614,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       if (
         state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'session-picker' &&
+        state.modal.type !== 'project-picker' &&
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-session' &&
+        state.modal.type !== 'create-project' &&
         state.modal.type !== 'create-worktree' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
@@ -625,7 +625,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       ) {
         return state
       }
-      if (state.modal.type === 'create-session' && state.modal.activeField !== 'directory') {
+      if (state.modal.type === 'create-project' && state.modal.activeField !== 'directory') {
         return state
       }
       if (state.modal.type === 'create-worktree') {
@@ -661,7 +661,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ).length
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-session') {
+      } else if (state.modal.type === 'create-project') {
         optionCount = state.modal.directoryResults.length
       } else if (state.modal.type === 'snippet-picker') {
         const filtered = filterSnippets(state.snippets, state.modal.editBuffer)
@@ -673,7 +673,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       } else if (state.modal.type === 'worktree-move') {
         optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
       } else {
-        const filtered = filterSessions(state.sessions, state.modal.editBuffer)
+        const filtered = filterProjects(state.projects, state.modal.editBuffer)
         optionCount = Math.max(1, filtered.length + 1)
       }
       if (optionCount === 0) {
@@ -690,10 +690,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
     case 'set-modal-selection-index': {
       if (
         state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'session-picker' &&
+        state.modal.type !== 'project-picker' &&
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-session' &&
+        state.modal.type !== 'create-project' &&
         state.modal.type !== 'create-worktree' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
@@ -734,7 +734,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         ).length
       } else if (state.modal.type === 'split-picker') {
         optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-session') {
+      } else if (state.modal.type === 'create-project') {
         optionCount = state.modal.directoryResults.length
       } else if (state.modal.type === 'snippet-picker') {
         optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
@@ -745,7 +745,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       } else if (state.modal.type === 'worktree-move') {
         optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
       } else {
-        optionCount = Math.max(1, filterSessions(state.sessions, state.modal.editBuffer).length + 1)
+        optionCount = Math.max(1, filterProjects(state.projects, state.modal.editBuffer).length + 1)
       }
       if (optionCount === 0) return state
       const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
@@ -857,7 +857,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
       const resetIndex =
         !isNewTabEditing &&
-        (state.modal.type === 'session-picker' ||
+        (state.modal.type === 'project-picker' ||
           state.modal.type === 'snippet-picker' ||
           state.modal.type === 'theme-picker' ||
           state.modal.type === 'new-tab' ||
@@ -886,12 +886,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
+      if (state.modal.type === 'create-project' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
       // Pickers and overlays with auto-filter — Esc closes the modal entirely.
       if (
-        state.modal.type === 'session-picker' ||
+        state.modal.type === 'project-picker' ||
         state.modal.type === 'snippet-picker' ||
         state.modal.type === 'theme-picker' ||
         state.modal.type === 'help'
@@ -904,8 +904,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: { ...state.modal, cursorPos: 0, editBuffer: null },
       }
     }
-    case 'switch-create-session-field': {
-      if (state.modal.type === 'create-session') {
+    case 'switch-create-project-field': {
+      if (state.modal.type === 'create-project') {
         const nextField = state.modal.activeField === 'directory' ? 'name' : 'directory'
         const nextEdit = state.modal.nameBuffer
         return {
@@ -969,7 +969,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return state
     }
     case 'select-directory': {
-      if (state.modal.type !== 'create-session') {
+      if (state.modal.type !== 'create-project') {
         return state
       }
       const selected = state.modal.directoryResults[state.modal.selectedIndex]
@@ -1010,8 +1010,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: activeTab.title.length,
           editBuffer: activeTab.title,
+          projectTargetId: activeTab.id,
           selectedIndex: 0,
-          sessionTargetId: activeTab.id,
           type: 'rename-tab',
         },
       }
@@ -1023,10 +1023,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: action.initialName.length,
           editBuffer: action.initialName,
+          projectTargetId: action.worktreeId,
           selectedIndex: 0,
-          sessionTargetId: action.worktreeId,
           type: 'rename-worktree',
-          worktreeSessionId: action.sessionId,
+          worktreeProjectId: action.projectId,
         },
       }
     }

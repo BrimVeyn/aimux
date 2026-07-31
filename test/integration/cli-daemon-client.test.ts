@@ -79,7 +79,7 @@ async function startMockDaemon(socketPath: string, capabilities: string[]): Prom
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -146,7 +146,7 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    const result = await client.listTabs('session-1')
+    const result = await client.listTabs('project-1')
     expect(result.activeTabId).toBe('tab-1')
     expect(result.tabs).toHaveLength(1)
     expect(result.tabs[0]).toMatchObject({
@@ -157,7 +157,7 @@ describe('CLI DaemonClient', () => {
     })
 
     const listTabsRequest = mock.received.find((m) => m.type === 'listTabs')
-    expect(listTabsRequest?.payload).toEqual({ sessionId: 'session-1' })
+    expect(listTabsRequest?.payload).toEqual({ projectId: 'project-1' })
   })
 
   test('attach with thin:true sends the flag on the wire', async () => {
@@ -171,7 +171,7 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.attach({ cols: 0, rows: 0, sessionId: 'session-1', thin: true })
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
     const attach = mock.received.find((m) => m.type === 'attach')
     expect(attach?.payload).toMatchObject({ cols: 0, rows: 0, thin: true })
   })
@@ -184,10 +184,10 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    const seen: { sessionId: string; tabId: string; worktreeId: string | undefined }[] = []
+    const seen: { projectId: string; tabId: string; worktreeId: string | undefined }[] = []
     client.on('tabAdded', (payload) => {
       seen.push({
-        sessionId: payload.sessionId,
+        projectId: payload.projectId,
         tabId: payload.tab.id,
         worktreeId: payload.tab.worktreeId,
       })
@@ -195,7 +195,7 @@ describe('CLI DaemonClient', () => {
 
     mock.emit({
       payload: {
-        sessionId: 'session-1',
+        projectId: 'project-1',
         tab: {
           assistant: 'claude',
           buffer: '',
@@ -220,7 +220,7 @@ describe('CLI DaemonClient', () => {
     while (seen.length === 0 && Date.now() < deadline) {
       await Bun.sleep(10)
     }
-    expect(seen).toEqual([{ sessionId: 'session-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
+    expect(seen).toEqual([{ projectId: 'project-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
   })
 
   test('createWorkspace request round-trips (v12)', async () => {
@@ -244,9 +244,9 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('switchWorkspace', { targetSessionId: 'session-2' })
+    await client.expectOk('switchWorkspace', { targetProjectId: 'project-2' })
     const req = mock.received.find((m) => m.type === 'switchWorkspace')
-    expect(req?.payload).toEqual({ targetSessionId: 'session-2' })
+    expect(req?.payload).toEqual({ targetProjectId: 'project-2' })
   })
 
   test('closeWorkspace request round-trips (v12)', async () => {
@@ -257,9 +257,9 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('closeWorkspace', { targetSessionId: 'session-3' })
+    await client.expectOk('closeWorkspace', { targetProjectId: 'project-3' })
     const req = mock.received.find((m) => m.type === 'closeWorkspace')
-    expect(req?.payload).toEqual({ targetSessionId: 'session-3' })
+    expect(req?.payload).toEqual({ targetProjectId: 'project-3' })
   })
 
   test('workspaceSwitched broadcast lands on the subscriber', async () => {
@@ -271,10 +271,10 @@ describe('CLI DaemonClient', () => {
     cleanups.push(() => client.close())
 
     const seen: string[] = []
-    client.on('workspaceSwitched', (payload) => seen.push(payload.sessionId))
+    client.on('workspaceSwitched', (payload) => seen.push(payload.projectId))
 
     mock.emit({
-      payload: { sessionId: 'session-9' },
+      payload: { projectId: 'project-9' },
       type: 'workspaceSwitched',
     })
 
@@ -282,7 +282,7 @@ describe('CLI DaemonClient', () => {
     while (seen.length === 0 && Date.now() < deadline) {
       await Bun.sleep(10)
     }
-    expect(seen).toEqual(['session-9'])
+    expect(seen).toEqual(['project-9'])
   })
 
   test('addWorktreeRecord request round-trips (v12)', async () => {
@@ -303,9 +303,9 @@ describe('CLI DaemonClient', () => {
       source: 'aimux-temp' as const,
       updatedAt: '2026-07-01T00:00:00.000Z',
     }
-    await client.expectOk('addWorktreeRecord', { sessionId: 'session-1', worktree })
+    await client.expectOk('addWorktreeRecord', { projectId: 'project-1', worktree })
     const req = mock.received.find((m) => m.type === 'addWorktreeRecord')
-    expect(req?.payload).toMatchObject({ sessionId: 'session-1', worktree: { id: 'wt-1' } })
+    expect(req?.payload).toMatchObject({ projectId: 'project-1', worktree: { id: 'wt-1' } })
   })
 
   test('tabRender + tabExit stream through to subscribers (tab tail)', async () => {
@@ -324,7 +324,7 @@ describe('CLI DaemonClient', () => {
       events.push(`exit:${payload.tabId}:${payload.exitCode}`)
     })
 
-    await client.attach({ cols: 0, rows: 0, sessionId: 'session-1', thin: true })
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
 
     mock.emit({
       payload: {
@@ -368,10 +368,10 @@ describe('CLI DaemonClient', () => {
     const seen: string[] = []
     client.on('tabStatus', (payload) => seen.push(payload.status))
     // Attach so the mock has an active socket to fan an event back through.
-    await client.attach({ cols: 0, rows: 0, sessionId: 'session-1', thin: true })
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
 
     mock.emit({
-      payload: { sessionId: 'session-1', status: 'idle', tabId: 'tab-1' },
+      payload: { projectId: 'project-1', status: 'idle', tabId: 'tab-1' },
       type: 'tabStatus',
     })
 

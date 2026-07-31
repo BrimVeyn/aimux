@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { WorkspaceOrigin } from '../../src/cli/client/workspace-resolver'
 import type { CliContext } from '../../src/cli/context'
-import type { SessionRecord } from '../../src/state/types'
+import type { ProjectRecord } from '../../src/state/types'
 
 import {
   normalizeTurnOutcome,
@@ -19,7 +19,7 @@ import {
   type TabSessionSummary,
 } from '../../src/ipc/protocol'
 
-const workspace: SessionRecord = {
+const workspace: ProjectRecord = {
   createdAt: '2026-01-01T00:00:00.000Z',
   id: 'ws-1',
   lastOpenedAt: '2026-01-01T00:00:00.000Z',
@@ -51,7 +51,7 @@ const workspace: SessionRecord = {
 }
 
 /** A second catalogued workspace — the UI switching to this is what §1/§2 was. */
-const otherWorkspace: SessionRecord = {
+const otherWorkspace: ProjectRecord = {
   createdAt: '2026-01-01T00:00:00.000Z',
   id: 'ws-2',
   lastOpenedAt: '2026-01-02T00:00:00.000Z',
@@ -99,15 +99,15 @@ function namedTab(): TabSessionSummary {
   return tab
 }
 
-function context(options: { active?: SessionRecord; origin?: WorkspaceOrigin } = {}): CliContext {
-  const bySession: Record<string, TabSessionSummary[]> = { 'ws-1': tabs, 'ws-2': [] }
+function context(options: { active?: ProjectRecord; origin?: WorkspaceOrigin } = {}): CliContext {
+  const byProject: Record<string, TabSessionSummary[]> = { 'ws-1': tabs, 'ws-2': [] }
   const daemon = {
     getCapabilities: () => [IPC_CAPABILITY_LIST_TABS, IPC_CAPABILITY_WORKER_METADATA],
     hasCapability: (name: string) =>
       name === IPC_CAPABILITY_LIST_TABS || name === IPC_CAPABILITY_WORKER_METADATA,
-    listTabs: async (sessionId: string) => ({
+    listTabs: async (projectId: string) => ({
       activeTabId: null,
-      tabs: bySession[sessionId] ?? [],
+      tabs: byProject[projectId] ?? [],
     }),
   }
   return {

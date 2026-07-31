@@ -14,7 +14,7 @@ export const workspaceClose: CliCommand = {
     if (typeof target !== 'string' || target.length === 0) {
       throw new Error('target workspace is required (id or name)')
     }
-    const session = resolveWorkspace(target)
+    const project = resolveWorkspace(target)
 
     const daemon = await ctx.getDaemon()
     if (!daemon.hasCapability(IPC_CAPABILITY_WORKSPACE_LIFECYCLE)) {
@@ -23,8 +23,8 @@ export const workspaceClose: CliCommand = {
       )
     }
 
-    await daemon.expectOk('closeWorkspace', { targetSessionId: session.id })
-    writeJson({ closedSessionId: session.id, name: session.name })
+    await daemon.expectOk('closeWorkspace', { targetProjectId: project.id })
+    writeJson({ closedProjectId: project.id, name: project.name })
     return EXIT_OK
   },
   summary: 'Close a workspace (via the UI when attached, otherwise the catalog)',

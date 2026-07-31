@@ -1,9 +1,9 @@
 import { describe, expect, mock, test } from 'bun:test'
 
 import {
-  createSessionFromCurrentState,
-  deleteSessionRecords,
-} from '../../src/app-runtime/session-actions'
+  createProjectFromCurrentState,
+  deleteProjectRecords,
+} from '../../src/app-runtime/project-actions'
 import {
   deleteSnippetState,
   pasteSnippetToTab,
@@ -13,8 +13,8 @@ import { mergeConfigSnippets, stripUserVars } from '../../src/state/snippet-cata
 import { createInitialState } from '../../src/state/store'
 import { createDefaultTerminalModes } from '../../src/state/terminal-modes'
 
-describe('session and snippet actions', () => {
-  test('creates a new session from current state', () => {
+describe('project and snippet actions', () => {
+  test('creates a new project from current state', () => {
     const state = {
       ...createInitialState(),
       tabs: [
@@ -37,16 +37,16 @@ describe('session and snippet actions', () => {
       ],
     }
 
-    const result = createSessionFromCurrentState(state, 'Workspace A', '/tmp/workspace-a')
+    const result = createProjectFromCurrentState(state, 'Workspace A', '/tmp/workspace-a')
 
-    expect(result.session.name).toBe('Workspace A')
-    expect(result.sessions).toHaveLength(1)
-    expect(result.session.workspaceSnapshot?.tabs).toHaveLength(1)
+    expect(result.project.name).toBe('Workspace A')
+    expect(result.projects).toHaveLength(1)
+    expect(result.project.workspaceSnapshot?.tabs).toHaveLength(1)
   })
 
-  test('deletes sessions and snippets immutably', () => {
+  test('deletes projects and snippets immutably', () => {
     expect(
-      deleteSessionRecords(
+      deleteProjectRecords(
         [
           {
             createdAt: '2024-01-01T00:00:00.000Z',
@@ -86,8 +86,8 @@ describe('session and snippet actions', () => {
         contentBuffer: 'Check for bugs',
         editBuffer: 'Review',
         nameBuffer: '',
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
         triggerBuffer: '',
         type: 'snippet-editor' as const,
       },
@@ -106,8 +106,8 @@ describe('session and snippet actions', () => {
         contentBuffer: 'New content',
         editBuffer: 'New',
         nameBuffer: '',
+        projectTargetId: 'n1',
         selectedIndex: 0,
-        sessionTargetId: 'n1',
         triggerBuffer: 'rv',
         type: 'snippet-editor' as const,
       },
@@ -172,8 +172,8 @@ describe('session and snippet actions', () => {
         contentBuffer: 'New content',
         editBuffer: 'gco',
         nameBuffer: '',
+        projectTargetId: 'config:gco',
         selectedIndex: 0,
-        sessionTargetId: 'config:gco',
         triggerBuffer: 'gco',
         type: 'snippet-editor' as const,
       },

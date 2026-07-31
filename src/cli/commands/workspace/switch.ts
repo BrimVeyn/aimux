@@ -28,7 +28,7 @@ export const workspaceSwitch: CliCommand = {
     if (typeof target !== 'string' || target.length === 0) {
       throw new Error('target workspace is required (id or name)')
     }
-    const session = resolveWorkspace(target)
+    const project = resolveWorkspace(target)
     const wait = ctx.args.flags.wait === true
     const timeoutMs =
       typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_WAIT_TIMEOUT_MS
@@ -41,8 +41,8 @@ export const workspaceSwitch: CliCommand = {
     }
 
     if (!wait) {
-      await daemon.expectOk('switchWorkspace', { targetSessionId: session.id })
-      writeJson({ name: session.name, targetSessionId: session.id })
+      await daemon.expectOk('switchWorkspace', { targetProjectId: project.id })
+      writeJson({ name: project.name, targetProjectId: project.id })
       return EXIT_OK
     }
 
@@ -51,23 +51,23 @@ export const workspaceSwitch: CliCommand = {
     // that branch).
     const settled = new Promise<number>((resolve) => {
       const off = daemon.on('workspaceSwitched', (payload) => {
-        if (payload.sessionId !== session.id) return
+        if (payload.projectId !== project.id) return
         off()
         clearTimeout(timer)
-        writeJson({ name: session.name, targetSessionId: session.id })
+        writeJson({ name: project.name, targetProjectId: project.id })
         resolve(EXIT_OK)
       })
       const timer = setTimeout(() => {
         off()
         writeJson({
           error: 'timed out waiting for workspaceSwitched',
-          targetSessionId: session.id,
+          targetProjectId: project.id,
         })
         resolve(EXIT_TIMEOUT)
       }, timeoutMs)
     })
 
-    await daemon.expectOk('switchWorkspace', { targetSessionId: session.id })
+    await daemon.expectOk('switchWorkspace', { targetProjectId: project.id })
     return settled
   },
   summary: 'Switch the UI (or catalog when headless) to another workspace',
