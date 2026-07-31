@@ -70,7 +70,7 @@ to press `Ctrl+P` instead.
 The rule follows from what a workspace is for: work happens on a branch in a
 worktree, so nothing you start is ever left sitting on `main`.
 
-Opening a project selects one of its worktrees, falling back to the primary
+Opening a project selects one of its workspaces, falling back to the primary
 only when the project has none. Selecting the primary yourself still works —
 useful for reading the git panel against the repo — it just cannot host tabs.
 

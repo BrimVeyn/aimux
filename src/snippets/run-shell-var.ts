@@ -30,6 +30,13 @@ function buildShellArgv(cmd: string): string[] {
 export async function runShellVar(name: string, v: SnippetShellVar): Promise<string> {
   const requested = v.timeout ?? DEFAULT_TIMEOUT_MS
   const timeoutMs = Math.min(Math.max(requested, 0), MAX_TIMEOUT_MS)
+  const logFailure = (event: string, error: unknown): void => {
+    logDebug(event, {
+      cmd: v.sh,
+      error: error instanceof Error ? error.message : String(error),
+      name,
+    })
+  }
 
   let proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
   try {
@@ -39,11 +46,7 @@ export async function runShellVar(name: string, v: SnippetShellVar): Promise<str
       stdout: 'pipe',
     })
   } catch (error) {
-    logDebug('snippets.shellVar.spawnError', {
-      cmd: v.sh,
-      error: error instanceof Error ? error.message : String(error),
-      name,
-    })
+    logFailure('snippets.shellVar.spawnError', error)
     return ''
   }
 
@@ -78,11 +81,7 @@ export async function runShellVar(name: string, v: SnippetShellVar): Promise<str
         proc.exited,
       ])
     } catch (error) {
-      logDebug('snippets.shellVar.error', {
-        cmd: v.sh,
-        error: error instanceof Error ? error.message : String(error),
-        name,
-      })
+      logFailure('snippets.shellVar.error', error)
       return 'failed'
     }
   })()
@@ -109,11 +108,10 @@ export async function runShellVar(name: string, v: SnippetShellVar): Promise<str
 
     return v.trim === false ? stdout : stdout.replace(/\s+$/, '')
   } catch (error) {
-    logDebug('snippets.shellVar.error', {
-      cmd: v.sh,
-      error: error instanceof Error ? error.message : String(error),
-      name,
-    })
+    // Belt and braces: nothing in the try can reject today (`collected` swallows
+    // its own errors, `expired` never rejects), but this runs arbitrary user
+    // shell and the contract is that it never throws at its caller.
+    logFailure('snippets.shellVar.error', error)
     return ''
   } finally {
     clearTimeout(timeoutHandle)
