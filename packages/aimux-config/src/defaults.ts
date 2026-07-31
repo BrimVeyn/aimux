@@ -283,9 +283,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.cancelNewTabModal, 'Cancel')
         .map('<CR>', actions.launchSelectedAssistant, 'Launch')
-        .map('<C-w>', actions.toggleNewTabWorktree, 'WT')
-        .map('<C-d>', actions.deleteSelectedWorktree, 'Delete WT')
-        .map('<Tab>', actions.switchField, 'Next field')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -299,17 +296,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.cancelEditCustomCommand, 'Cancel')
         .map('<CR>', actions.saveCustomCommand, 'Save')
         .passthrough()
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: new-tab worktree delete confirmation dialog
-    // -----------------------------------------------------------------------
-    .mode('modal.new-tab.worktree-delete-confirm', (m) =>
-      m
-        .map('<Esc>', actions.cancelDeleteWorktree, 'Cancel')
-        .map('n', actions.cancelDeleteWorktree, 'Cancel')
-        .map('<CR>', actions.confirmDeleteWorktree, 'Delete worktree')
-        .map('y', actions.confirmDeleteWorktree, 'Delete worktree')
     )
 
     // -----------------------------------------------------------------------

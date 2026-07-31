@@ -9,7 +9,6 @@ export type ModeId =
   | 'git-mode'
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
-  | 'modal.new-tab.worktree-delete-confirm'
   | 'modal.worktree-delete-confirm'
   | 'modal.session-picker.filtering'
   | 'modal.session-name'
@@ -34,7 +33,6 @@ export type ModeId =
 export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'launch-selected-assistant' }
-  | { type: 'load-new-tab-base-branches' }
   | { type: 'edit-selected-assistant' }
   | { type: 'confirm-selected-session' }
   | { type: 'delete-selected-session' }

@@ -369,24 +369,13 @@ export interface ModalClosed extends ModalBase {
   sessionTargetId: null
 }
 
+/**
+ * Picking an assistant for a new tab, and nothing else. The tab lands in the
+ * session's active worktree; creating a worktree is `create-worktree`'s job.
+ */
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name' | 'base'
-  branchError: string | null
-  branchName: string
-  createWorktree: boolean
-  selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create' | 'template'
-  targetWorktreeIndex: number
-  worktreeDeletePrompt: { worktreeId: string; reason: string } | null
-  worktreeName: string
-  /** Filter text typed into the "Base" picker on the worktree-create step. */
-  baseQuery: string
-  /** Resolved base ref the new worktree is forked from (branch of a worktree or a local branch). */
-  baseRef: string
-  /** Local branches available as base refs, loaded when the create step opens. */
-  baseBranches: string[]
 }
 
 export interface ModalSessionPicker extends ModalBase {
@@ -669,17 +658,6 @@ export interface AppState {
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
   | { type: 'open-new-tab-modal' }
-  | { type: 'set-new-tab-branch-error'; message: string | null }
-  | {
-      type: 'set-new-tab-worktree-delete-prompt'
-      prompt: { worktreeId: string; reason: string } | null
-    }
-  | { type: 'set-new-tab-base-branches'; branches: string[] }
-  | { type: 'enter-new-tab-worktree-create' }
-  | { type: 'enter-new-tab-template-pick' }
-  | { type: 'enter-new-tab-template-shortcut' }
-  | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
-  | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }

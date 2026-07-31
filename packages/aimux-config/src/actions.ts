@@ -199,57 +199,7 @@ export function moveModalSelectionWithPreview(
 // Modal-specific actions
 // ---------------------------------------------------------------------------
 
-export const launchSelectedAssistant: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'assistant') {
-    return r([{ type: 'select-new-tab-assistant' }])
-  }
-  if (
-    ctx.state.modal.type === 'new-tab' &&
-    ctx.state.modal.step === 'worktree' &&
-    ctx.state.modal.createWorktree
-  ) {
-    return r([{ type: 'enter-new-tab-worktree-create' }], [{ type: 'load-new-tab-base-branches' }])
-  }
-  return r([], [{ type: 'launch-selected-assistant' }])
-}
-
-export const toggleNewTabWorktree: KeyResult = r([{ type: 'toggle-new-tab-worktree' }])
-
-export const deleteSelectedWorktree: ActionFn = (ctx: ModeContext) => {
-  const modal = ctx.state.modal
-  const sessionId = ctx.state.currentSessionId
-  if (modal.type !== 'new-tab' || modal.step !== 'worktree' || modal.createWorktree) return null
-  if (!(sessionId != null && sessionId !== '')) return null
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
-  const worktree = session?.worktrees?.[modal.selectedIndex]
-  if (!worktree) return null
-  // First attempt is never forced — a recoverable failure opens the confirm
-  // dialog (see set-new-tab-worktree-delete-prompt), where confirmDeleteWorktree
-  // retries with force.
-  return r(
-    [{ index: modal.selectedIndex, type: 'set-modal-selection-index' }],
-    [{ force: false, sessionId, type: 'delete-worktree', worktreeId: worktree.id }]
-  )
-}
-
-export const confirmDeleteWorktree: ActionFn = (ctx: ModeContext) => {
-  const modal = ctx.state.modal
-  const sessionId = ctx.state.currentSessionId
-  if (modal.type !== 'new-tab' || modal.worktreeDeletePrompt == null) return null
-  if (!(sessionId != null && sessionId !== '')) return null
-  const { worktreeId } = modal.worktreeDeletePrompt
-  return r(
-    [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
-    [{ force: true, sessionId, type: 'delete-worktree', worktreeId }],
-    'modal.new-tab.command-edit'
-  )
-}
-
-export const cancelDeleteWorktree: KeyResult = r(
-  [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
-  [],
-  'modal.new-tab.command-edit'
-)
+export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
 
 export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal

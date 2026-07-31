@@ -137,17 +137,16 @@ describe('mode handlers', () => {
     expect(result.transition).toBe('modal.session-picker.filtering')
   })
 
-  test('new-tab modal: Ctrl+W toggles worktree mode', () => {
-    const handler = requireValue(
-      getHandler('modal.new-tab.command-edit'),
-      'Missing new-tab handler'
-    )
+  test('navigation: Ctrl+P opens the create-worktree modal', () => {
+    const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('w', { ctrl: true }), ctx()),
-      'Expected WT result'
+      handler.handleKey(key('p', { ctrl: true }), ctx()),
+      'Expected create-worktree result'
     )
 
-    expect(result.actions).toEqual([{ type: 'toggle-new-tab-worktree' }])
+    expect(result.actions).toEqual([{ type: 'open-create-worktree-modal' }])
+    expect(result.effects).toEqual([{ type: 'load-create-worktree-base-branches' }])
+    expect(result.transition).toBe('modal.create-worktree')
   })
 
   test('navigation: Shift+L reorders tab right', () => {

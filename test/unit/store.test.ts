@@ -239,7 +239,7 @@ describe('appReducer', () => {
     expect(session?.projectPath).toBe('/repo/main')
   })
 
-  test('new assistant flow chooses assistant before worktree', () => {
+  test('the new-tab modal is an assistant picker and nothing else', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = createInitialState(
       {},
@@ -283,24 +283,16 @@ describe('appReducer', () => {
       { ...initial, currentSessionId: 'session-1' },
       { type: 'open-new-tab-modal' }
     )
-    expect(opened.modal.type).toBe('new-tab')
     if (opened.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(opened.modal.step).toBe('assistant')
-    expect(opened.modal.targetWorktreeIndex).toBe(1)
+    expect(opened.modal.selectedIndex).toBe(0)
+    expect(opened.modal.editingCommand).toBeNull()
 
-    const selected = appReducer(opened, { type: 'select-new-tab-assistant' })
-    expect(selected.modal.type).toBe('new-tab')
-    if (selected.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(selected.modal.step).toBe('worktree')
-    expect(selected.modal.selectedIndex).toBe(1)
-    expect(selected.modal.createWorktree).toBe(false)
-
-    const createNew = appReducer(selected, { delta: 1, type: 'move-modal-selection' })
-    expect(createNew.modal.type).toBe('new-tab')
-    if (createNew.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(createNew.modal.selectedIndex).toBe(2)
-    expect(createNew.modal.createWorktree).toBe(true)
-    expect(createNew.modal.targetWorktreeIndex).toBe(1)
+    // Moving the selection walks the assistant list — there is no worktree step
+    // to fall into, and no trailing "create worktree" row.
+    const moved = appReducer(opened, { delta: 1, type: 'move-modal-selection' })
+    if (moved.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
+    expect(moved.modal.selectedIndex).toBe(1)
+    expect(moved.modal.type).toBe('new-tab')
   })
 
   test('deleting a non-current session keeps the current workspace and modal state', () => {

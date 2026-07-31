@@ -61,9 +61,6 @@ export function deriveModeId(state: AppState): ModeId {
     if (state.modal.type === 'new-tab' && state.modal.editingCommand !== null) {
       return 'modal.new-tab.editing-command'
     }
-    if (state.modal.type === 'new-tab' && state.modal.worktreeDeletePrompt !== null) {
-      return 'modal.new-tab.worktree-delete-confirm'
-    }
     if (state.modal.type === 'git-commit' && state.modal.stage === 'confirm') {
       return 'modal.git-commit.confirm'
     }

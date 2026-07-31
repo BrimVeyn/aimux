@@ -46,7 +46,6 @@ import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { useTheme } from './theme'
 
 const EMPTY_WORKTREES: WorktreeRecord[] = []
-const EMPTY_BASE_BRANCHES: string[] = []
 
 function getCreateSessionFields(modal: ModalState) {
   if (modal.type !== 'create-session') {
@@ -106,28 +105,8 @@ function renderModal(
           customCommands={options.customCommands}
           filter={modal.editBuffer}
           cursorPos={modal.cursorPos}
-          currentSessionId={options.currentSessionId}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
-          activeField={modal.type === 'new-tab' ? modal.activeField : 'assistant'}
-          branchError={modal.type === 'new-tab' ? modal.branchError : null}
-          branchName={modal.type === 'new-tab' ? modal.branchName : ''}
-          createWorktree={modal.type === 'new-tab' ? modal.createWorktree : false}
-          selectedAssistantId={modal.type === 'new-tab' ? modal.selectedAssistantId : null}
-          step={modal.type === 'new-tab' ? modal.step : 'assistant'}
-          baseQuery={modal.type === 'new-tab' ? modal.baseQuery : ''}
-          baseRef={modal.type === 'new-tab' ? modal.baseRef : ''}
-          baseBranches={modal.type === 'new-tab' ? modal.baseBranches : EMPTY_BASE_BRANCHES}
-          worktreeDeletePrompt={modal.type === 'new-tab' ? modal.worktreeDeletePrompt : null}
-          worktrees={
-            options.currentSessionId != null && options.currentSessionId !== ''
-              ? (options.sessions.find((session) => session.id === options.currentSessionId)
-                  ?.worktrees ?? EMPTY_WORKTREES)
-              : EMPTY_WORKTREES
-          }
-          worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
-          worktreeTemplates={options.worktreeTemplates}
-          allowTemplateShortcut={modal.type === 'new-tab'}
         />
       )
     case 'create-worktree':

@@ -57,12 +57,7 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import {
-  filterAssistants,
-  filterSessions,
-  filterSnippets,
-  getTemplateNoneOffset,
-} from '../state/selectors'
+import { filterAssistants, filterSessions, filterSnippets } from '../state/selectors'
 import { saveSessionCatalog } from '../state/session-catalog'
 import { pruneSnapshotOfWorktree } from '../state/session-persistence'
 import {
@@ -124,10 +119,6 @@ export interface SideEffectContext {
 
 function getSelectedAssistantOption(state: AppState) {
   const all = getAllAssistantOptions(state.customCommands)
-  if (state.modal.type === 'new-tab' && state.modal.selectedAssistantId != null) {
-    const selectedAssistantId = state.modal.selectedAssistantId
-    return all.find((entry) => entry.id === selectedAssistantId) ?? getAssistantOption(0)
-  }
   const filter = state.modal.type === 'new-tab' ? state.modal.editBuffer : null
   const list = filterAssistants(all, filter)
   return list[state.modal.selectedIndex] ?? list[0] ?? getAssistantOption(0)
@@ -369,20 +360,6 @@ export function startTabSession(
   })
 }
 
-function getNewTabTargetWorktreeId(state: AppState): string | undefined {
-  if (
-    state.modal.type !== 'new-tab' ||
-    !(state.currentSessionId != null && state.currentSessionId !== '')
-  ) {
-    return undefined
-  }
-  const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-  const index = state.modal.createWorktree
-    ? state.modal.targetWorktreeIndex
-    : state.modal.selectedIndex
-  return session?.worktrees?.[index]?.id
-}
-
 function launchAssistant(
   ctx: SideEffectContext,
   assistant: AssistantId,
@@ -417,56 +394,6 @@ function launchAssistant(
     state.layout.terminalCols,
     state.layout.terminalRows,
     getTabProjectPath(ctx, tab)
-  )
-}
-
-async function launchAssistantInNewWorktree(
-  ctx: SideEffectContext,
-  assistant: AssistantId,
-  worktreeName: string,
-  branchName?: string,
-  sourceWorktreeId?: string,
-  baseRef?: string,
-  templateId?: string
-): Promise<void> {
-  const sessionId = ctx.state.currentSessionId
-  if (!(sessionId != null && sessionId !== '')) return
-  const worktree = await createAimuxTempWorktree(
-    ctx,
-    sessionId,
-    worktreeName,
-    branchName,
-    baseRef,
-    sourceWorktreeId
-  )
-  if (!worktree) return
-
-  const template =
-    templateId != null && templateId !== ''
-      ? ctx.state.worktreeTemplates.find((entry) => entry.id === templateId)
-      : undefined
-
-  ctx.dispatch({ type: 'close-modal' })
-
-  if (template) {
-    applyWorktreeTemplate(ctx, template, worktree.id, worktree.path)
-    ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
-    return
-  }
-
-  const customCommand = ctx.state.customCommands[assistant]
-  const tab = createTabSession(assistant, customCommand, ctx.state.customCommands, worktree.id)
-  ctx.dispatch({ tab, type: 'add-tab' })
-  ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
-  startTabSession(
-    ctx.backend,
-    ctx.dispatch,
-    ctx.clearStartupGrace,
-    (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
-    tab,
-    ctx.state.layout.terminalCols,
-    ctx.state.layout.terminalRows,
-    worktree.path
   )
 }
 
@@ -704,64 +631,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'launch-selected-assistant': {
-      if (
-        state.modal.type === 'new-tab' &&
-        state.modal.step === 'worktree-create' &&
-        state.worktreeTemplates.length > 0
-      ) {
-        dispatch({ type: 'enter-new-tab-template-pick' })
-        return
-      }
-      const option = getSelectedAssistantOption(state)
-      if (state.modal.type === 'new-tab' && state.modal.createWorktree) {
-        const worktreeName = state.modal.worktreeName
-        const branchName = state.modal.branchName
-        const baseRef = state.modal.baseRef
-        const sourceWorktreeId = getNewTabTargetWorktreeId(state)
-        let templateId: string | undefined
-        if (state.modal.step === 'template') {
-          const templateIndex =
-            state.modal.selectedIndex - getTemplateNoneOffset(state.modal.selectedAssistantId)
-          if (templateIndex >= 0) {
-            templateId = state.worktreeTemplates[templateIndex]?.id
-          }
-        }
-        void (async () => {
-          try {
-            await enqueueGitOp(async () =>
-              launchAssistantInNewWorktree(
-                ctx,
-                option.id,
-                worktreeName,
-                branchName,
-                sourceWorktreeId,
-                baseRef !== '' ? baseRef : undefined,
-                templateId
-              )
-            )
-          } catch (error) {
-            toast.error(error instanceof Error ? error.message : String(error))
-          }
-        })()
-        return
-      }
-      launchAssistant(ctx, option.id, getNewTabTargetWorktreeId(state))
+      // The tab lands in the session's active worktree — launchAssistant
+      // resolves that itself. Creating a worktree is `create-worktree`'s job.
+      launchAssistant(ctx, getSelectedAssistantOption(state).id)
       return
     }
     case 'edit-selected-assistant': {
       const option = getSelectedAssistantOption(state)
       dispatch({ assistantId: option.id, type: 'open-edit-custom-command' })
-      return
-    }
-    case 'load-new-tab-base-branches': {
-      void (async () => {
-        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-        const sourcePath = getActiveWorktree(session)?.path ?? getSessionProjectPath(session)
-        if (!(sourcePath != null && sourcePath !== '')) return
-        const branches = await listLocalBranches(sourcePath)
-        if (ctx.getState().modal.type !== 'new-tab') return
-        ctx.dispatch({ branches, type: 'set-new-tab-base-branches' })
-      })()
       return
     }
     case 'load-create-worktree-base-branches': {
@@ -833,22 +710,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           // Real errors surface as a toast. Recoverable failures (dirty tree,
-          // active tabs, …) open a confirmation so the user can opt into a
-          // force-delete: in-place inside the new-tab worktree picker (preserving
-          // it), or as a standalone modal elsewhere (e.g. the sidebar's "Remove
-          // worktree").
+          // active tabs, …) open the standalone confirmation modal so the user
+          // can opt into a force-delete.
           if (!isForceableWorktreeDeleteError(message)) {
             toast.error(`Could not delete worktree: ${message}`)
             return
           }
           const latest = ctx.getState()
-          if (latest.modal.type === 'new-tab' && latest.modal.step === 'worktree') {
-            ctx.dispatch({
-              prompt: { reason: message, worktreeId: effect.worktreeId },
-              type: 'set-new-tab-worktree-delete-prompt',
-            })
-            return
-          }
           const session = latest.sessions.find((entry) => entry.id === effect.sessionId)
           const worktree = session?.worktrees?.find((entry) => entry.id === effect.worktreeId)
           ctx.dispatch({
@@ -1594,12 +1462,10 @@ async function createAimuxTempWorktree(
       normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
   )
   if (existingWorktree) {
-    const message = `Branch already checked out in another worktree: ${existingWorktree.path}`
-    ctx.dispatch(
-      ctx.state.modal.type === 'create-worktree'
-        ? { message, type: 'set-create-worktree-branch-error' }
-        : { message, type: 'set-new-tab-branch-error' }
-    )
+    ctx.dispatch({
+      message: `Branch already checked out in another worktree: ${existingWorktree.path}`,
+      type: 'set-create-worktree-branch-error',
+    })
     return undefined
   }
 
@@ -1829,13 +1695,6 @@ function removeWorktreeRecordFromSession(
   }))
   saveSessionCatalog(sessions)
   ctx.dispatch({ sessions, type: 'set-sessions' })
-  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'worktree') {
-    ctx.dispatch({
-      index: Math.min(ctx.state.modal.selectedIndex, Math.max(0, remaining.length - 1)),
-      type: 'set-modal-selection-index',
-    })
-  }
-  ctx.dispatch({ prompt: null, type: 'set-new-tab-worktree-delete-prompt' })
 }
 
 function isForceableWorktreeDeleteError(message: string): boolean {
