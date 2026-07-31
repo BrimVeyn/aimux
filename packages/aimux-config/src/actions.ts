@@ -280,6 +280,24 @@ export const openCreateSessionModal: KeyResult = r(
   'modal.create-session'
 )
 
+export const createWorktreeModal: KeyResult = r(
+  [{ type: 'open-create-worktree-modal' }],
+  [{ type: 'load-create-worktree-base-branches' }],
+  'modal.create-worktree'
+)
+
+export const switchCreateWorktreeField: KeyResult = r([{ type: 'switch-create-worktree-field' }])
+
+export const confirmCreateWorktree: KeyResult = r([], [{ type: 'create-worktree' }])
+
+/** Esc backs out of the template step to the form; from the form it closes. */
+export const createWorktreeEscape: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'create-worktree' && ctx.state.modal.step === 'template') {
+    return r([{ step: 'form', type: 'set-create-worktree-step' }])
+  }
+  return r([{ type: 'close-modal' }], [], 'navigation')
+}
+
 export const openRenameSelectedSession: KeyResult = r(
   [],
   [{ type: 'open-rename-selected-session' }]

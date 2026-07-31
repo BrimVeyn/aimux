@@ -52,6 +52,7 @@ export type ModalType =
   | 'session-picker'
   | 'session-name'
   | 'create-session'
+  | 'create-worktree'
   | 'rename-tab'
   | 'rename-worktree'
   | 'snippet-picker'
@@ -447,6 +448,26 @@ export interface ModalCreateSession extends ModalBase {
   returnToSessionPicker: boolean
 }
 
+/**
+ * Creating a worktree inside the current session — the second of the three
+ * creation actions (project / worktree / tab). Deliberately carries no
+ * assistant: once the worktree exists the effect chains into the new-tab modal.
+ */
+export interface ModalCreateWorktree extends ModalBase {
+  type: 'create-worktree'
+  activeField: 'name' | 'branch' | 'base'
+  step: 'form' | 'template'
+  worktreeName: string
+  branchName: string
+  branchError: string | null
+  /** Filter text typed into the "Base" picker. */
+  baseQuery: string
+  /** Resolved base ref the new worktree is forked from (a worktree's branch or a local branch). */
+  baseRef: string
+  /** Local branches available as base refs, loaded when the modal opens. */
+  baseBranches: string[]
+}
+
 export interface ModalSnippetEditor extends ModalBase {
   type: 'snippet-editor'
   activeField: 'name' | 'trigger' | 'content'
@@ -566,6 +587,7 @@ export type ModalState =
   | ModalHelp
   | ModalSplitPicker
   | ModalCreateSession
+  | ModalCreateWorktree
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
@@ -673,6 +695,11 @@ export type ModalAction =
   | { type: 'update-command-edit'; char: string }
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
+  | { type: 'open-create-worktree-modal' }
+  | { type: 'set-create-worktree-base-branches'; branches: string[] }
+  | { type: 'set-create-worktree-branch-error'; message: string | null }
+  | { type: 'set-create-worktree-step'; step: 'form' | 'template' }
+  | { type: 'switch-create-worktree-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }

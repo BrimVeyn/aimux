@@ -4,6 +4,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'git-mode': ['navigation', 'modal.git-commit', 'modal.worktree-move'],
   'modal.ai-usage': ['navigation', 'terminal-input'],
   'modal.create-session': ['navigation', 'modal.session-picker.filtering'],
+  'modal.create-worktree': ['navigation', 'terminal-input'],
   'modal.flash-jump': ['navigation'],
   'modal.git-commit': ['git-mode', 'modal.git-commit.confirm', 'modal.git-commit.generating'],
   'modal.git-commit.confirm': ['modal.git-commit', 'git-mode'],
@@ -30,6 +31,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.worktree-move-confirm': ['navigation'],
   'navigation': [
     'terminal-input',
+    'modal.create-worktree',
     'modal.new-tab.command-edit',
     'modal.new-tab.editing-command',
     'modal.session-picker.filtering',

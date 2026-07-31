@@ -470,6 +470,48 @@ async function launchAssistantInNewWorktree(
   )
 }
 
+/**
+ * The `<C-p>` flow: create a worktree in the current session, then hand off.
+ * A template already produces tabs, so it wins; otherwise we chain into the
+ * new-tab modal rather than leaving the user in an empty worktree.
+ */
+async function createWorktreeFromModal(
+  ctx: SideEffectContext,
+  sessionId: string,
+  params: {
+    worktreeName: string
+    branchName: string
+    baseRef?: string
+    templateId?: string
+  }
+): Promise<void> {
+  const worktree = await createAimuxTempWorktree(
+    ctx,
+    sessionId,
+    params.worktreeName,
+    params.branchName,
+    params.baseRef
+  )
+  // Undefined means the create was rejected (e.g. branch already checked out);
+  // the modal stays open showing the error.
+  if (!worktree) return
+
+  const template =
+    params.templateId != null && params.templateId !== ''
+      ? ctx.state.worktreeTemplates.find((entry) => entry.id === params.templateId)
+      : undefined
+
+  ctx.dispatch({ type: 'close-modal' })
+
+  if (template) {
+    applyWorktreeTemplate(ctx, template, worktree.id, worktree.path)
+    ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
+    return
+  }
+
+  ctx.dispatch({ type: 'open-new-tab-modal' })
+}
+
 function applyWorktreeTemplate(
   ctx: SideEffectContext,
   template: WorktreeTemplate,
@@ -719,6 +761,48 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const branches = await listLocalBranches(sourcePath)
         if (ctx.getState().modal.type !== 'new-tab') return
         ctx.dispatch({ branches, type: 'set-new-tab-base-branches' })
+      })()
+      return
+    }
+    case 'load-create-worktree-base-branches': {
+      void (async () => {
+        const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
+        const sourcePath = getActiveWorktree(session)?.path ?? getSessionProjectPath(session)
+        if (!(sourcePath != null && sourcePath !== '')) return
+        const branches = await listLocalBranches(sourcePath)
+        if (ctx.getState().modal.type !== 'create-worktree') return
+        ctx.dispatch({ branches, type: 'set-create-worktree-base-branches' })
+      })()
+      return
+    }
+    case 'create-worktree': {
+      if (state.modal.type !== 'create-worktree') return
+      // Templates get their own step: first Enter on the form advances to the
+      // picker, the second one (step 'template') actually creates.
+      if (state.modal.step === 'form' && state.worktreeTemplates.length > 0) {
+        dispatch({ step: 'template', type: 'set-create-worktree-step' })
+        return
+      }
+      const sessionId = state.currentSessionId
+      if (!(sessionId != null && sessionId !== '')) return
+      const { baseRef, branchName, worktreeName } = state.modal
+      const templateId =
+        state.modal.step === 'template'
+          ? state.worktreeTemplates[state.modal.selectedIndex]?.id
+          : undefined
+      void (async () => {
+        try {
+          await enqueueGitOp(async () =>
+            createWorktreeFromModal(ctx, sessionId, {
+              baseRef: baseRef !== '' ? baseRef : undefined,
+              branchName,
+              templateId,
+              worktreeName,
+            })
+          )
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : String(error))
+        }
       })()
       return
     }
@@ -1510,10 +1594,12 @@ async function createAimuxTempWorktree(
       normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
   )
   if (existingWorktree) {
-    ctx.dispatch({
-      message: `Branch already checked out in another worktree: ${existingWorktree.path}`,
-      type: 'set-new-tab-branch-error',
-    })
+    const message = `Branch already checked out in another worktree: ${existingWorktree.path}`
+    ctx.dispatch(
+      ctx.state.modal.type === 'create-worktree'
+        ? { message, type: 'set-create-worktree-branch-error' }
+        : { message, type: 'set-new-tab-branch-error' }
+    )
     return undefined
   }
 

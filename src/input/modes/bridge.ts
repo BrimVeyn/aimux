@@ -11,6 +11,7 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'create-session': 'modal.create-session',
+  'create-worktree': 'modal.create-worktree',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',

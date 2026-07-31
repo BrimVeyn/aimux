@@ -37,6 +37,7 @@ import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
+import { CreateWorktreeModal } from './components/modals/worktree/create-worktree-modal'
 import { WorktreeMoveConfirmModal } from './components/modals/worktree/worktree-move-confirm-modal'
 import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
@@ -127,6 +128,28 @@ function renderModal(
           worktreeName={modal.type === 'new-tab' ? modal.worktreeName : ''}
           worktreeTemplates={options.worktreeTemplates}
           allowTemplateShortcut={modal.type === 'new-tab'}
+        />
+      )
+    case 'create-worktree':
+      return (
+        <CreateWorktreeModal
+          activeField={modal.activeField}
+          step={modal.step}
+          worktreeName={modal.worktreeName}
+          branchName={modal.branchName}
+          branchError={modal.branchError}
+          baseQuery={modal.baseQuery}
+          baseRef={modal.baseRef}
+          baseBranches={modal.baseBranches}
+          cursorPos={modal.cursorPos}
+          selectedIndex={modal.selectedIndex}
+          worktrees={
+            options.currentSessionId != null && options.currentSessionId !== ''
+              ? (options.sessions.find((session) => session.id === options.currentSessionId)
+                  ?.worktrees ?? EMPTY_WORKTREES)
+              : EMPTY_WORKTREES
+          }
+          worktreeTemplates={options.worktreeTemplates}
         />
       )
     case 'session-picker':

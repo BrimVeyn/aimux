@@ -15,6 +15,7 @@ import {
   filterSnippets,
   getTemplateNoneOffset,
 } from '../selectors'
+import { getActiveWorktree } from '../session-worktrees'
 import { reduceAutoCommitState } from './auto-commit-state'
 
 function emptyModal() {
@@ -56,6 +57,31 @@ function getNewTabBaseOptions(state: AppState, queryOverride?: string): BaseRefO
     state.modal.baseBranches,
     queryOverride ?? state.modal.baseQuery
   )
+}
+
+function getCreateWorktreeBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
+  if (state.modal.type !== 'create-worktree') return []
+  const worktrees =
+    state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees ?? []
+  return buildBaseRefOptions(
+    worktrees,
+    state.modal.baseBranches,
+    queryOverride ?? state.modal.baseQuery
+  )
+}
+
+const CREATE_WORKTREE_FIELDS = ['name', 'branch', 'base'] as const
+
+type CreateWorktreeField = (typeof CREATE_WORKTREE_FIELDS)[number]
+
+/** The buffer a create-worktree field edits, so cursor math has one source. */
+function getCreateWorktreeFieldValue(
+  modal: { worktreeName: string; branchName: string; baseQuery: string },
+  field: CreateWorktreeField
+): string {
+  if (field === 'name') return modal.worktreeName
+  if (field === 'branch') return modal.branchName
+  return modal.baseQuery
 }
 
 function getSelectedNewTabAssistant(state: AppState, assistantId?: string) {
@@ -474,6 +500,88 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-create-worktree-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          activeField: 'name',
+          baseBranches: [],
+          baseQuery: '',
+          // Default to the active worktree's branch, preserving the previous
+          // always-fork-from-source behaviour until the user picks another base.
+          baseRef:
+            getActiveWorktree(state.sessions.find((entry) => entry.id === state.currentSessionId))
+              ?.branch ?? '',
+          branchError: null,
+          branchName: '',
+          cursorPos: 0,
+          editBuffer: '',
+          selectedIndex: 0,
+          sessionTargetId: null,
+          step: 'form',
+          type: 'create-worktree',
+          worktreeName: '',
+        },
+      }
+    case 'switch-create-worktree-field': {
+      if (state.modal.type !== 'create-worktree') return state
+      const next =
+        CREATE_WORKTREE_FIELDS[
+          (CREATE_WORKTREE_FIELDS.indexOf(state.modal.activeField) + 1) %
+            CREATE_WORKTREE_FIELDS.length
+        ] ?? 'name'
+      const buffer = getCreateWorktreeFieldValue(state.modal, next)
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: next,
+          cursorPos: buffer.length,
+          selectedIndex: 0,
+        },
+      }
+    }
+    case 'set-create-worktree-base-branches': {
+      if (state.modal.type !== 'create-worktree') return state
+      const modalWithBranches = { ...state.modal, baseBranches: action.branches }
+      const withBranches: AppState = { ...state, modal: modalWithBranches }
+      // Backfill a default base if none resolved yet (e.g. detached source).
+      if (state.modal.baseRef !== '') return withBranches
+      const firstOption = getCreateWorktreeBaseOptions(withBranches)[0]
+      return {
+        ...withBranches,
+        modal: { ...modalWithBranches, baseRef: firstOption?.ref ?? '' },
+      }
+    }
+    case 'set-create-worktree-branch-error': {
+      if (state.modal.type !== 'create-worktree') return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: 'branch',
+          branchError: action.message,
+          cursorPos: state.modal.branchName.length,
+        },
+      }
+    }
+    case 'set-create-worktree-step': {
+      if (state.modal.type !== 'create-worktree') return state
+      if (state.modal.step === action.step) return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          cursorPos: action.step === 'form' ? state.modal.worktreeName.length : 0,
+          // Returning to the form always lands on the name field, so the
+          // cursor above matches whatever the user sees.
+          ...(action.step === 'form' ? { activeField: 'name' as const } : null),
+          selectedIndex: 0,
+          step: action.step,
+        },
+      }
+    }
     case 'open-snippet-picker':
       return {
         ...state,
@@ -712,6 +820,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
+        state.modal.type !== 'create-worktree' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
         state.modal.type !== 'worktree-move'
@@ -720,6 +829,31 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       if (state.modal.type === 'create-session' && state.modal.activeField !== 'directory') {
         return state
+      }
+      if (state.modal.type === 'create-worktree') {
+        if (state.modal.step === 'template') {
+          const count = state.worktreeTemplates.length
+          if (count === 0) return state
+          return {
+            ...state,
+            modal: {
+              ...state.modal,
+              selectedIndex: (state.modal.selectedIndex + action.delta + count) % count,
+            },
+          }
+        }
+        if (state.modal.activeField !== 'base') return state
+        const options = getCreateWorktreeBaseOptions(state)
+        if (options.length === 0) return state
+        const next = (state.modal.selectedIndex + action.delta + options.length) % options.length
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseRef: options[next]?.ref ?? state.modal.baseRef,
+            selectedIndex: next,
+          },
+        }
       }
       if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
         if (state.modal.activeField !== 'base') return state
@@ -791,12 +925,35 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-session' &&
+        state.modal.type !== 'create-worktree' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
         state.modal.type !== 'worktree-move' &&
         state.modal.type !== 'help'
       ) {
         return state
+      }
+      if (state.modal.type === 'create-worktree') {
+        if (state.modal.step === 'template') {
+          const count = state.worktreeTemplates.length
+          if (count === 0) return state
+          const clamped = Math.max(0, Math.min(count - 1, action.index))
+          if (clamped === state.modal.selectedIndex) return state
+          return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
+        }
+        if (state.modal.activeField !== 'base') return state
+        const options = getCreateWorktreeBaseOptions(state)
+        if (options.length === 0) return state
+        const clamped = Math.max(0, Math.min(options.length - 1, action.index))
+        if (clamped === state.modal.selectedIndex) return state
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseRef: options[clamped]?.ref ?? state.modal.baseRef,
+            selectedIndex: clamped,
+          },
+        }
       }
       if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
         if (state.modal.activeField !== 'base') return state
@@ -923,6 +1080,44 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           }
         }
         return { ...state, modal: { ...state.modal, buffer: nextBuffer, pendingJump: null } }
+      }
+      if (state.modal.type === 'create-worktree') {
+        // The template step is a pure picker — swallow typed characters.
+        if (state.modal.step === 'template') return state
+        const field = state.modal.activeField
+        const current = getCreateWorktreeFieldValue(state.modal, field)
+        const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)
+        let text: string
+        let pos: number
+        if (action.char === '\b') {
+          if (at === 0) return state
+          text = current.slice(0, at - 1) + current.slice(at)
+          pos = at - 1
+        } else {
+          text = current.slice(0, at) + action.char + current.slice(at)
+          pos = at + action.char.length
+        }
+        if (field === 'name') {
+          return { ...state, modal: { ...state.modal, cursorPos: pos, worktreeName: text } }
+        }
+        if (field === 'branch') {
+          return {
+            ...state,
+            modal: { ...state.modal, branchError: null, branchName: text, cursorPos: pos },
+          }
+        }
+        // Re-filter and snap the base to the top match as the query changes.
+        const topOption = getCreateWorktreeBaseOptions(state, text)[0]
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseQuery: text,
+            baseRef: topOption?.ref ?? state.modal.baseRef,
+            cursorPos: pos,
+            selectedIndex: 0,
+          },
+        }
       }
       if (state.modal.editBuffer === null) {
         return state

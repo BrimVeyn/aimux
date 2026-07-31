@@ -49,6 +49,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
+        .map('<C-p>', actions.createWorktreeModal, 'Create workspace')
         .map('<C-g>', actions.sessionPicker, 'Session picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')
@@ -343,6 +344,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Esc>', actions.createSessionEscape, 'Cancel')
         .map('<Tab>', actions.switchField, 'Next field')
         .map('<CR>', actions.confirmCreateSession, 'Confirm')
+        .map('<C-n>', actions.moveModalSelection(1), 'Next')
+        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: create-worktree (a workspace inside the current project)
+    // -----------------------------------------------------------------------
+    .mode('modal.create-worktree', (m) =>
+      m
+        .map('<Esc>', actions.createWorktreeEscape, 'Back/Cancel')
+        .map('<Tab>', actions.switchCreateWorktreeField, 'Next field')
+        .map('<CR>', actions.confirmCreateWorktree, 'Create')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

@@ -14,6 +14,7 @@ export type ModeId =
   | 'modal.session-picker.filtering'
   | 'modal.session-name'
   | 'modal.create-session'
+  | 'modal.create-worktree'
   | 'modal.rename-tab'
   | 'modal.rename-worktree'
   | 'modal.snippet-picker.filtering'
@@ -39,6 +40,8 @@ export type SideEffect =
   | { type: 'delete-selected-session' }
   | { type: 'open-rename-selected-session' }
   | { type: 'create-session'; name: string; projectPath?: string }
+  | { type: 'create-worktree' }
+  | { type: 'load-create-worktree-base-branches' }
   | { type: 'close-tab'; tabId: string }
   | { type: 'restart-tab'; tab: TabSession }
   | { type: 'paste-selected-snippet' }

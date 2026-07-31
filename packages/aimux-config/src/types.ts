@@ -19,6 +19,7 @@ export type ModeId =
   | 'modal.session-picker.filtering'
   | 'modal.session-name'
   | 'modal.create-session'
+  | 'modal.create-worktree'
   | 'modal.rename-tab'
   | 'modal.rename-worktree'
   | 'modal.snippet-picker.filtering'
@@ -377,6 +378,17 @@ export interface ModalCreateSession extends ModalBase {
   nameBuffer: string
   returnToSessionPicker: boolean
 }
+export interface ModalCreateWorktree extends ModalBase {
+  type: 'create-worktree'
+  activeField: 'name' | 'branch' | 'base'
+  step: 'form' | 'template'
+  worktreeName: string
+  branchName: string
+  branchError: string | null
+  baseQuery: string
+  baseRef: string
+  baseBranches: string[]
+}
 export interface ModalGitCommit extends ModalBase {
   type: 'git-commit'
   activeField: 'title' | 'body'
@@ -479,6 +491,7 @@ export type ModalState =
   | ModalHelp
   | ModalSplitPicker
   | ModalCreateSession
+  | ModalCreateWorktree
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
@@ -585,6 +598,11 @@ export type ModalAction =
   | { type: 'update-command-edit'; char: string }
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
+  | { type: 'open-create-worktree-modal' }
+  | { type: 'set-create-worktree-base-branches'; branches: string[] }
+  | { type: 'set-create-worktree-branch-error'; message: string | null }
+  | { type: 'set-create-worktree-step'; step: 'form' | 'template' }
+  | { type: 'switch-create-worktree-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-session-field' }
   | { type: 'select-directory' }
@@ -840,6 +858,8 @@ export type SideEffect =
   | { type: 'delete-selected-session' }
   | { type: 'open-rename-selected-session' }
   | { type: 'create-session'; name: string; projectPath?: string }
+  | { type: 'create-worktree' }
+  | { type: 'load-create-worktree-base-branches' }
   | { type: 'close-tab'; tabId: string }
   | { type: 'restart-tab'; tab: TabSession }
   | { type: 'paste-selected-snippet' }
