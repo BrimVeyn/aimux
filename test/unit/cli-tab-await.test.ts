@@ -151,7 +151,7 @@ function makeCtx(
   return {
     args: { flags, positionals },
     getDaemon: async () => daemon,
-    getWorkspace: () => ({ id: 'ws' }) as unknown as ProjectRecord,
+    getProject: () => ({ id: 'ws' }) as unknown as ProjectRecord,
   }
 }
 

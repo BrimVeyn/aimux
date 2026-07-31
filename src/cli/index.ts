@@ -2,7 +2,7 @@ import type { DaemonClient } from './client/daemon-client'
 import type { CliContext } from './context'
 
 import { connectToDaemon, DaemonUnreachableError } from './client/bootstrap'
-import { listWorkspaces, resolveWorkspaceWithOrigin } from './client/workspace-resolver'
+import { listProjects, resolveProjectWithOrigin } from './client/project-resolver'
 import { type ArgSpec, CliUsageError, type FlagSpec, parseArgs, SHARED_FLAGS } from './flags'
 import {
   EXIT_DAEMON_UNREACHABLE,
@@ -22,7 +22,7 @@ const EXIT_CODES_BLOCK = [
   '  4    daemon unreachable (socket missing and autostart failed)',
   '  10   question (tab run / tab await: worker is blocked on a question/permission)',
   '  11   pending submit (worker holds an unsubmitted prompt — see `worker submit`)',
-  '  124  timeout (tab run, tab await, tab wait, tab tail --timeout, workspace switch --wait)',
+  '  124  timeout (tab run, tab await, tab wait, tab tail --timeout, project switch --wait)',
 ].join('\n')
 
 const OUTPUT_CONTRACT_BLOCK = [
@@ -100,12 +100,12 @@ function printHelp(): void {
       '',
       'Env:',
       '  AIMUX_PROFILE                  Runtime profile (state dir, socket paths); --profile overrides.',
-      '  AIMUX_WORKSPACE                Pin the target workspace (id or name); --workspace overrides.',
+      '  AIMUX_PROJECT                Pin the target project (id or name); --project overrides.',
       '',
       'Agent recipe:',
       '  # create an isolated named worker, dispatch, and await one structured outcome',
-      '  # --workspace pins the target repo so a UI workspace switch cannot redirect it',
-      '  aimux worker run --workspace myrepo --name fixup --assistant claude "explain this repo"',
+      '  # --project pins the target repo so a UI project switch cannot redirect it',
+      '  aimux worker run --project myrepo --name fixup --assistant claude "explain this repo"',
       '',
       'Maintenance:',
       '  aimux doctor | update | restart-daemon | restart-terminal-manager | version',
@@ -225,17 +225,16 @@ export async function runCli(argv: readonly string[]): Promise<number> {
 
   const state: {
     daemon: DaemonClient | null
-    workspace: ReturnType<typeof resolveWorkspaceWithOrigin> | null
+    project: ReturnType<typeof resolveProjectWithOrigin> | null
   } = {
     daemon: null,
-    workspace: null,
+    project: null,
   }
-  const resolveOnce = (): ReturnType<typeof resolveWorkspaceWithOrigin> => {
-    if (state.workspace) return state.workspace
-    const workspaceFlag =
-      typeof parsed.flags.workspace === 'string' ? parsed.flags.workspace : undefined
-    state.workspace = resolveWorkspaceWithOrigin(workspaceFlag)
-    return state.workspace
+  const resolveOnce = (): ReturnType<typeof resolveProjectWithOrigin> => {
+    if (state.project) return state.project
+    const projectFlag = typeof parsed.flags.project === 'string' ? parsed.flags.project : undefined
+    state.project = resolveProjectWithOrigin(projectFlag)
+    return state.project
   }
   const ctx: CliContext = {
     args: parsed,
@@ -244,9 +243,9 @@ export async function runCli(argv: readonly string[]): Promise<number> {
       state.daemon = await connectToDaemon()
       return state.daemon
     },
-    getWorkspace: () => resolveOnce().record,
-    getWorkspaceOrigin: () => resolveOnce().origin,
-    getWorkspaces: () => listWorkspaces(),
+    getProject: () => resolveOnce().record,
+    getProjectOrigin: () => resolveOnce().origin,
+    getProjects: () => listProjects(),
   }
 
   try {

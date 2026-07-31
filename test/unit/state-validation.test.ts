@@ -1,11 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isProjectRecord, isSnippetRecord, isWorkspaceSnapshotV1 } from '../../src/state/validation'
+import { isProjectRecord, isProjectSnapshotV1, isSnippetRecord } from '../../src/state/validation'
 
 describe('state validation', () => {
-  test('accepts a valid workspace snapshot', () => {
+  test('accepts a valid project snapshot', () => {
     expect(
-      isWorkspaceSnapshotV1({
+      isProjectSnapshotV1({
         activeTabId: 'tab-1',
         savedAt: new Date().toISOString(),
         sidebar: { visible: true, width: 28 },
@@ -31,9 +31,9 @@ describe('state validation', () => {
     ).toBe(true)
   })
 
-  test('rejects malformed workspace snapshots', () => {
+  test('rejects malformed project snapshots', () => {
     expect(
-      isWorkspaceSnapshotV1({
+      isProjectSnapshotV1({
         activeTabId: 'tab-1',
         savedAt: new Date().toISOString(),
         sidebar: { visible: true, width: 28 },
@@ -65,7 +65,7 @@ describe('state validation', () => {
         createdAt: new Date().toISOString(),
         id: 'project-1',
         lastOpenedAt: 123,
-        name: 'Main workspace',
+        name: 'Main project',
         updatedAt: new Date().toISOString(),
       })
     ).toBe(false)

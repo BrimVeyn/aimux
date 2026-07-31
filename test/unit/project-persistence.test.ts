@@ -2,14 +2,14 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   pruneSnapshotOfWorktree,
-  restoreTabsFromWorkspace,
-  restoreWorkspaceState,
-  serializeWorkspace,
+  restoreProjectState,
+  restoreTabsFromProject,
+  serializeProject,
 } from '../../src/state/project-persistence'
 import { createInitialState } from '../../src/state/store'
 
 describe('project persistence', () => {
-  test('round-trips auto-rename status in workspace snapshots', () => {
+  test('round-trips auto-rename status in project snapshots', () => {
     const state = createInitialState({ claude: 'claude' })
     state.tabs = [
       {
@@ -29,11 +29,11 @@ describe('project persistence', () => {
         title: 'Cache fix',
       },
     ]
-    const snapshot = serializeWorkspace(state)
+    const snapshot = serializeProject(state)
     expect(snapshot.tabs[0]?.autoRenameStatus).toBe('attempted')
-    expect(restoreTabsFromWorkspace(snapshot)[0]?.autoRenameStatus).toBe('attempted')
+    expect(restoreTabsFromProject(snapshot)[0]?.autoRenameStatus).toBe('attempted')
   })
-  test('serializes workspace snapshot', () => {
+  test('serializes project snapshot', () => {
     const state = {
       ...createInitialState({ claude: 'claude' }),
       activeTabId: 'tab-1',
@@ -58,7 +58,7 @@ describe('project persistence', () => {
       ],
     }
 
-    const snapshot = serializeWorkspace(state)
+    const snapshot = serializeProject(state)
     expect(snapshot.version).toBe(1)
     expect(snapshot.activeTabId).toBe('tab-1')
     expect(snapshot.tabs[0]?.status).toBe('running')
@@ -70,7 +70,7 @@ describe('project persistence', () => {
       lastActiveTabByWorktree: { 'wt-feature': 'feature-2', 'wt-main': 'main-2' },
     }
 
-    const snapshot = serializeWorkspace(state)
+    const snapshot = serializeProject(state)
     expect(snapshot.version).toBe(1)
     expect(snapshot.lastActiveTabByWorktree).toEqual({
       'wt-feature': 'feature-2',
@@ -79,13 +79,13 @@ describe('project persistence', () => {
   })
 
   test('omits the per-worktree memory when empty', () => {
-    const snapshot = serializeWorkspace(createInitialState())
+    const snapshot = serializeProject(createInitialState())
     expect(snapshot.lastActiveTabByWorktree).toBeUndefined()
   })
 
   test('restoring stays dormant: does not surface the persisted per-worktree memory yet', () => {
     const state = createInitialState()
-    const restored = restoreWorkspaceState(state, {
+    const restored = restoreProjectState(state, {
       activeTabId: null,
       lastActiveTabByWorktree: { 'wt-main': 'main-2' },
       savedAt: new Date().toISOString(),
@@ -99,7 +99,7 @@ describe('project persistence', () => {
   })
 
   test('restores running tabs as disconnected', () => {
-    const tabs = restoreTabsFromWorkspace({
+    const tabs = restoreTabsFromProject({
       activeTabId: 'tab-1',
       savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
@@ -145,7 +145,7 @@ describe('project persistence', () => {
       worktreeId,
     })
 
-    const tabs = restoreTabsFromWorkspace(
+    const tabs = restoreTabsFromProject(
       {
         activeTabId: 'tab-live',
         savedAt: new Date().toISOString(),
@@ -182,7 +182,7 @@ describe('project persistence', () => {
       worktreeId,
     })
 
-    const tabs = restoreTabsFromWorkspace({
+    const tabs = restoreTabsFromProject({
       activeTabId: 'tab-1',
       savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
@@ -202,7 +202,7 @@ describe('project persistence', () => {
         left: { ...initialState.bars.left, visible: true, width: 31 },
       },
     }
-    const restored = restoreWorkspaceState(baseState, {
+    const restored = restoreProjectState(baseState, {
       activeTabId: 'tab-1',
       savedAt: new Date().toISOString(),
       sidebar: { visible: false, width: 22 },
@@ -233,7 +233,7 @@ describe('project persistence', () => {
 
   test('restores grouped tabs as contiguous blocks', () => {
     const baseState = createInitialState()
-    const restored = restoreWorkspaceState(baseState, {
+    const restored = restoreProjectState(baseState, {
       activeTabId: 'tab-2',
       layoutTrees: {
         'group-1': {

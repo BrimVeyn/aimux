@@ -49,7 +49,7 @@ export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
 
 /**
- * Status values that may appear in legacy on-disk workspace snapshots but are
+ * Status values that may appear in legacy on-disk project snapshots but are
  * not produced by the running app anymore.
  */
 export type LegacyPersistedTabStatus = TabStatus | 'exited'
@@ -125,7 +125,7 @@ export interface PersistedTabSnapshot {
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 
-export interface WorkspaceSnapshotV1 {
+export interface ProjectSnapshotV1 {
   version: 1
   savedAt: string
   activeTabId: string | null
@@ -171,7 +171,7 @@ export interface ProjectRecord {
   updatedAt: string
   lastOpenedAt: string
   order?: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
   worktrees?: WorktreeRecord[]
   activeWorktreeId?: string
 }
@@ -200,7 +200,7 @@ export interface SnippetRecord {
   vars?: Record<string, SnippetVar>
 }
 
-export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
+export type DirectoryResultType = 'git-repo' | 'worktree' | 'project'
 
 export interface DirectoryResult {
   path: string
@@ -440,7 +440,7 @@ export interface ModalWorktreeDeleteConfirm extends ModalBase {
   force: boolean
 }
 
-export type FlashJumpTargetKind = 'workspace' | 'worktree' | 'tab'
+export type FlashJumpTargetKind = 'project' | 'worktree' | 'tab'
 
 export interface FlashJumpTarget {
   kind: FlashJumpTargetKind
@@ -622,7 +622,7 @@ export type ModalAction =
   | { type: 'clear-flash-jump-pending' }
 
 export type ProjectAction =
-  | { type: 'load-project'; projectId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
+  | { type: 'load-project'; projectId: string; projectSnapshot?: ProjectSnapshotV1 }
   | { type: 'set-projects'; projects: ProjectRecord[] }
   | { type: 'create-project-record'; project: ProjectRecord }
   | { type: 'rename-project-record'; projectId: string; name: string }
@@ -642,7 +642,7 @@ export type ProjectAction =
 export type TabAction =
   | { type: 'add-tab'; tab: TabSession }
   | {
-      type: 'hydrate-workspace'
+      type: 'hydrate-project'
       tabs: TabSession[]
       activeTabId: string | null
       layoutTree?: LayoutNode | null

@@ -18,7 +18,7 @@ export type AssistantId = BuiltinAssistantId | (string & {})
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
 
 /**
- * Status values that may appear in legacy on-disk workspace snapshots but are
+ * Status values that may appear in legacy on-disk project snapshots but are
  * not produced by the running app anymore. Filtered at restore time.
  */
 export type LegacyPersistedTabStatus = TabStatus | 'exited'
@@ -134,12 +134,12 @@ export interface PersistedTabSnapshot {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
-  /** Stable workspace-scoped name assigned by the headless worker facade. */
+  /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
 
-export interface WorkspaceSnapshotV1 {
+export interface ProjectSnapshotV1 {
   version: 1
   savedAt: string
   activeTabId: string | null
@@ -185,7 +185,7 @@ export interface ProjectRecord {
   updatedAt: string
   lastOpenedAt: string
   order?: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
   worktrees?: WorktreeRecord[]
   activeWorktreeId?: string
 }
@@ -207,7 +207,7 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   worktreeId?: string
-  /** Stable workspace-scoped name assigned by the headless worker facade. */
+  /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
@@ -521,19 +521,19 @@ export interface ModalWorktreeDeleteConfirm extends ModalBase {
   force: boolean
 }
 
-export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
+export type DirectoryResultType = 'git-repo' | 'worktree' | 'project'
 
 export interface DirectoryResult {
   path: string
   type: DirectoryResultType
 }
 
-export type FlashJumpTargetKind = 'workspace' | 'worktree' | 'tab'
+export type FlashJumpTargetKind = 'project' | 'worktree' | 'tab'
 
 export interface FlashJumpTarget {
   kind: FlashJumpTargetKind
   /**
-   * 1-based index of the workspace in the visible project ordering — fed to
+   * 1-based index of the project in the visible project ordering — fed to
    * the existing `switch-project-by-index` side effect when jumping.
    */
   projectIndex: number
@@ -602,7 +602,7 @@ export interface SnippetRecord {
 export interface DiscoveredRepo {
   /** Absolute path to the repo. */
   path: string
-  /** Label shown in UI (relative to the workspace root or repo basename). */
+  /** Label shown in UI (relative to the project root or repo basename). */
   name: string
   /** True when the repo is the project's projectPath itself. */
   isRoot: boolean
@@ -727,7 +727,7 @@ export type ProjectAction =
   | {
       type: 'load-project'
       projectId: string
-      workspaceSnapshot?: WorkspaceSnapshotV1
+      projectSnapshot?: ProjectSnapshotV1
       forceDisconnected?: boolean
     }
   | { type: 'set-projects'; projects: ProjectRecord[] }
@@ -750,7 +750,7 @@ export type ProjectAction =
 export type TabAction =
   | { type: 'add-tab'; tab: TabSession }
   | {
-      type: 'hydrate-workspace'
+      type: 'hydrate-project'
       tabs: TabSession[]
       activeTabId: string | null
       layoutTree?: LayoutNode | null

@@ -147,8 +147,8 @@ function renderModal(
         <ProjectNameModal
           title={
             modal.projectTargetId != null && modal.projectTargetId !== ''
-              ? 'Rename workspace'
-              : 'Create workspace'
+              ? 'Rename project'
+              : 'Create project'
           }
           value={modal.editBuffer ?? ''}
         />

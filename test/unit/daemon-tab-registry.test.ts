@@ -120,14 +120,14 @@ describe('mergeTabRegistryEntry', () => {
 })
 
 describe('findWorkerNameConflict', () => {
-  test('scopes worker names to a workspace project', () => {
+  test('scopes worker names to a project project', () => {
     const registry = new Map<string, DaemonTabEntry>([
       [
         'tab-a',
         {
           assistant: 'claude',
           command: 'claude',
-          projectId: 'workspace-a',
+          projectId: 'project-a',
           viewport: undefined,
           viewportSeq: 0,
           workerName: 'api',
@@ -138,7 +138,7 @@ describe('findWorkerNameConflict', () => {
         {
           assistant: 'codex',
           command: 'codex',
-          projectId: 'workspace-b',
+          projectId: 'project-b',
           viewport: undefined,
           viewportSeq: 0,
           workerName: 'api',
@@ -146,8 +146,8 @@ describe('findWorkerNameConflict', () => {
       ],
     ])
 
-    expect(findWorkerNameConflict(registry, 'workspace-a', 'api')).toBe('tab-a')
-    expect(findWorkerNameConflict(registry, 'workspace-b', 'api')).toBe('tab-b')
-    expect(findWorkerNameConflict(registry, 'workspace-a', 'web')).toBeUndefined()
+    expect(findWorkerNameConflict(registry, 'project-a', 'api')).toBe('tab-a')
+    expect(findWorkerNameConflict(registry, 'project-b', 'api')).toBe('tab-b')
+    expect(findWorkerNameConflict(registry, 'project-a', 'web')).toBeUndefined()
   })
 })

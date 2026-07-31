@@ -78,7 +78,7 @@ describe('mode handlers', () => {
     expect(armed.actions).toEqual([])
   })
 
-  test('navigation: Ctrl+Z opens the workspaces bar when hidden, no-op when visible', () => {
+  test('navigation: Ctrl+Z opens the projects bar when hidden, no-op when visible', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const hiddenCtx = ctx()
     hiddenCtx.state.bars = {

@@ -46,7 +46,7 @@ export const DEFAULT_BARS: BarsState = {
   left: {
     visible: true,
     widgets: [
-      { grow: 50, id: 'workspaces', visible: true },
+      { grow: 50, id: 'projects', visible: true },
       { grow: 50, id: 'git', visible: true },
     ],
     width: 28,

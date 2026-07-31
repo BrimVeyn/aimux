@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 import type { SplitDirection } from './state/layout-tree'
-import type { GitFileListMode, WorkspaceSnapshotV1 } from './state/types'
+import type { GitFileListMode, ProjectSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
-import { isWorkspaceSnapshotV1 } from './state/validation'
+import { isProjectSnapshotV1 } from './state/validation'
 import { migrateThemeId as resolveLegacyThemeId, type ThemeId, type ThemeMode } from './ui/themes'
 
 function migrateThemeId(value: unknown): ThemeId | undefined {
@@ -94,7 +94,7 @@ export interface AimuxConfig {
   bars?: PersistedBars
   sidebar?: PersistedSidebar
   projectBarVisible?: boolean
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
   prunedOrphanAimuxBranches?: boolean
@@ -198,11 +198,11 @@ export function deriveBarsFromLegacy(
   const embeddedRatio = gitPane?.embeddedRatio ?? gitPane?.ratio ?? 0.5
   const gitGrow = Math.max(1, Math.round(embeddedRatio * 100))
   const git = { grow: gitGrow, id: 'git', visible: gitVisible }
-  const workspaces = { grow: Math.max(1, 100 - gitGrow), id: 'workspaces', visible: true }
+  const projects = { grow: Math.max(1, 100 - gitGrow), id: 'projects', visible: true }
 
   const left: PersistedBar = {
     visible: sidebar?.visible ?? true,
-    widgets: gitPane?.position === 'top' ? [git, workspaces] : [workspaces, git],
+    widgets: gitPane?.position === 'top' ? [git, projects] : [projects, git],
     width: sidebar?.width ?? 28,
   }
   const right: PersistedBar = { visible: false, widgets: [], width: 40 }
@@ -211,7 +211,7 @@ export function deriveBarsFromLegacy(
   // column — it maps straight onto the right bar. On the left it shared the
   // edge with the sidebar, which the single-bar model expresses as a stack.
   if (gitPane?.mode === 'pane' && gitPane.position === 'right') {
-    left.widgets = [{ ...workspaces, grow: 100 }]
+    left.widgets = [{ ...projects, grow: 100 }]
     right.visible = true
     right.widgets = [{ ...git, grow: 100 }]
     right.width = Math.round((gitPane.paneRatio ?? gitPane.ratio ?? 0.5) * 80)
@@ -347,7 +347,7 @@ export function loadConfigResult(): ConfigLoadResult {
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       projectBarVisible?: unknown
-      workspaceSnapshot?: unknown
+      projectSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
       worktreeTemplates?: unknown
@@ -425,11 +425,8 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid projectBarVisible')
     }
 
-    if (
-      parsed.workspaceSnapshot !== undefined &&
-      !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-    ) {
-      issues.push('ignored invalid workspaceSnapshot')
+    if (parsed.projectSnapshot !== undefined && !isProjectSnapshotV1(parsed.projectSnapshot)) {
+      issues.push('ignored invalid projectSnapshot')
     }
 
     const validSkippedUpdateVersion =
@@ -452,6 +449,9 @@ export function loadConfigResult(): ConfigLoadResult {
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
         projectBarVisible: validProjectBarVisible,
+        projectSnapshot: isProjectSnapshotV1(parsed.projectSnapshot)
+          ? parsed.projectSnapshot
+          : undefined,
         prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
@@ -459,9 +459,6 @@ export function loadConfigResult(): ConfigLoadResult {
         themeMode: validThemeMode,
         themeTransparent: validThemeTransparent,
         version: 2,
-        workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-          ? parsed.workspaceSnapshot
-          : undefined,
         worktreeTemplates: validWorktreeTemplates,
       },
       issues,

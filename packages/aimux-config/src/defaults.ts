@@ -49,7 +49,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
-        .map('<C-p>', actions.createWorktreeModal, 'Create workspace')
+        .map('<C-p>', actions.createWorktreeModal, 'Create project')
         .map('<C-g>', actions.projectPicker, 'Project picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')
@@ -63,14 +63,14 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-d>', actions.enterGitMode, 'Enter git mode')
         .map('<C-j>', actions.resizeGitPane(-0.05), 'Git pane smaller')
         .map('<C-k>', actions.resizeGitPane(0.05), 'Git pane larger')
-        .map('j', actions.nextSidebarItem, 'Next workspace/worktree')
-        .map('k', actions.prevSidebarItem, 'Prev workspace/worktree')
+        .map('j', actions.nextSidebarItem, 'Next project/worktree')
+        .map('k', actions.prevSidebarItem, 'Prev project/worktree')
         .map('l', actions.nextTab, 'Next tab')
         .map('h', actions.prevTab, 'Prev tab')
         .map('L', actions.reorderTab(1), 'Move tab right')
         .map('H', actions.reorderTab(-1), 'Move tab left')
-        .map('J', actions.reorderProject(1), 'Move workspace down')
-        .map('K', actions.reorderProject(-1), 'Move workspace up')
+        .map('J', actions.reorderProject(1), 'Move project down')
+        .map('K', actions.reorderProject(-1), 'Move project up')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
         .map('S', actions.openFlashJump, 'Flash jump')
@@ -338,7 +338,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: create-worktree (a workspace inside the current project)
+    // Modal: create-worktree (a project inside the current project)
     // -----------------------------------------------------------------------
     .mode('modal.create-worktree', (m) =>
       m

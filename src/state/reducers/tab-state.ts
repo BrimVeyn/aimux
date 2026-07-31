@@ -218,7 +218,7 @@ function withActiveTabWorktree(
   if (!(tab?.worktreeId != null && tab?.worktreeId !== '')) return state
   const worktreeId = tab.worktreeId
   // When `onlyIfMissing` is set, we leave the project's worktree alone if it
-  // already points at a known worktree. Used by `hydrate-workspace` so that
+  // already points at a known worktree. Used by `hydrate-project` so that
   // a backend re-attach after a user-initiated worktree switch (j/k cycling)
   // doesn't clobber the freshly chosen worktree by re-syncing from the
   // restored active tab.
@@ -320,7 +320,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         newTab.id
       )
     }
-    case 'hydrate-workspace': {
+    case 'hydrate-project': {
       // The project's activeWorktreeId may have just been switched by the
       // user (j/k cycle, sidebar click) before the backend attached. Honor
       // that choice by only considering tabs visible in that worktree —

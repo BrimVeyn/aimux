@@ -76,8 +76,7 @@ describe('appReducer', () => {
           id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          workspaceSnapshot: {
+          projectSnapshot: {
             activeTabId: 'tab-1',
             savedAt: '2024-01-01T00:00:00.000Z',
             sidebar: { visible: false, width: 22 },
@@ -100,6 +99,7 @@ describe('appReducer', () => {
             ],
             version: 1,
           },
+          updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       focusMode: 'modal' as const,
@@ -296,7 +296,7 @@ describe('appReducer', () => {
     expect(moved.modal.type).toBe('new-tab')
   })
 
-  test('deleting a non-current project keeps the current workspace and modal state', () => {
+  test('deleting a non-current project keeps the current project and modal state', () => {
     const initial = {
       ...createInitialState({}, [
         {

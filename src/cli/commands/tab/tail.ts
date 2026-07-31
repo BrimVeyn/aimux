@@ -57,7 +57,7 @@ export const tabTail: CliCommand = {
     const followStatus = ctx.args.flags['follow-status'] === true
     const timeoutMs = typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : 0
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
       throw new Error(
@@ -69,7 +69,7 @@ export const tabTail: CliCommand = {
     // Attach before wiring subscribers so replay renders arrive after we
     // print the "attached" marker; that keeps NDJSON output deterministic
     // for downstream consumers.
-    const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
 
     // Fail fast on a bad tabId — otherwise tail would sit silent until
     // --timeout, since no matching tabRender/tabExit would ever fire.

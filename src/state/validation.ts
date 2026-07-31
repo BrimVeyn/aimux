@@ -1,10 +1,10 @@
 import type {
   ProjectRecord,
+  ProjectSnapshotV1,
   SnippetRecord,
   TerminalLine,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
   WorktreeRecord,
 } from './types'
 
@@ -125,7 +125,7 @@ export function isWorktreeRecord(value: unknown): value is WorktreeRecord {
   )
 }
 
-export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
+export function isProjectSnapshotV1(value: unknown): value is ProjectSnapshotV1 {
   return (
     isObjectRecord(value) &&
     value.version === 1 &&
@@ -175,7 +175,7 @@ export function isProjectRecord(value: unknown): value is ProjectRecord {
     isString(value.lastOpenedAt) &&
     (value.order === undefined ||
       (typeof value.order === 'number' && Number.isFinite(value.order))) &&
-    (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot)) &&
+    (value.projectSnapshot === undefined || isProjectSnapshotV1(value.projectSnapshot)) &&
     (value.worktrees === undefined ||
       (Array.isArray(value.worktrees) && value.worktrees.every(isWorktreeRecord))) &&
     (value.activeWorktreeId === undefined || isString(value.activeWorktreeId))

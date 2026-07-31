@@ -5,10 +5,10 @@ import { CliUsageError, parseArgs, SHARED_FLAGS } from '../../src/cli/flags'
 describe('cli flag parser', () => {
   test('parses --flag value and --flag=value identically', () => {
     const spec = [...SHARED_FLAGS]
-    const a = parseArgs(['--workspace', 'main'], spec, [])
-    const b = parseArgs(['--workspace=main'], spec, [])
-    expect(a.flags.workspace).toBe('main')
-    expect(b.flags.workspace).toBe('main')
+    const a = parseArgs(['--project', 'main'], spec, [])
+    const b = parseArgs(['--project=main'], spec, [])
+    expect(a.flags.project).toBe('main')
+    expect(b.flags.project).toBe('main')
   })
 
   test('treats --json as a boolean', () => {
@@ -21,9 +21,9 @@ describe('cli flag parser', () => {
   })
 
   test('positionals after -- are not parsed as flags', () => {
-    const parsed = parseArgs(['--workspace', 'main', '--', '--workspace'], SHARED_FLAGS, [])
-    expect(parsed.flags.workspace).toBe('main')
-    expect(parsed.positionals).toEqual(['--workspace'])
+    const parsed = parseArgs(['--project', 'main', '--', '--project'], SHARED_FLAGS, [])
+    expect(parsed.flags.project).toBe('main')
+    expect(parsed.positionals).toEqual(['--project'])
   })
 
   test('unknown flags surface as usage errors', () => {

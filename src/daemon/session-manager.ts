@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events'
 
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
@@ -44,7 +44,7 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     return registry
   }
 
-  attachSession(projectId: string, snapshot?: WorkspaceSnapshotV1) {
+  attachSession(projectId: string, snapshot?: ProjectSnapshotV1) {
     logDebug('daemon.sessionManager.attachSession', {
       hasSnapshot: !!snapshot,
       projectId,

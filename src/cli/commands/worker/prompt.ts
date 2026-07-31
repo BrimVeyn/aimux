@@ -48,7 +48,7 @@ export const workerPrompt: CliCommand = {
   group: 'worker',
   run: async (ctx) => {
     const selector = ctx.args.positionals[0] ?? ''
-    const { tab, workspace } = await resolveWorkerTarget(ctx, selector)
+    const { project, tab } = await resolveWorkerTarget(ctx, selector)
     const promptFile =
       typeof ctx.args.flags['prompt-file'] === 'string' ? ctx.args.flags['prompt-file'] : undefined
     const text = await resolvePromptText(
@@ -56,7 +56,7 @@ export const workerPrompt: CliCommand = {
       ctx.args.flags.stdin === true,
       ctx.args.positionals[1]
     )
-    const outcome = await dispatchWorkerPrompt(ctx, workspace, tab.id, text, {
+    const outcome = await dispatchWorkerPrompt(ctx, project, tab.id, text, {
       detach: ctx.args.flags.detach === true,
       replace: ctx.args.flags.replace === true,
       timeoutMs:
@@ -66,7 +66,7 @@ export const workerPrompt: CliCommand = {
           ? ctx.args.flags['uptake-timeout']
           : undefined,
     })
-    writeJson(workerEnvelope(workspace, workerView(workspace, tab), outcome))
+    writeJson(workerEnvelope(project, workerView(project, tab), outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: 'Prompt an existing named worker and await its outcome',

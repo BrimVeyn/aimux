@@ -97,7 +97,7 @@ export const tabSend: CliCommand = {
     }
     const payload = buildPromptPayload(text, asKeys)
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
       throw new Error(
@@ -105,7 +105,7 @@ export const tabSend: CliCommand = {
       )
     }
 
-    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+    await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
 
     if (!awaitSubmit) {
       const bytesWritten = await writePromptPayload(daemon, tabId, payload, appendEnter)

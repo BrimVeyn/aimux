@@ -2,7 +2,7 @@ import type { CliCommand } from '../../registry'
 
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createWorkspaceWorktree } from './create-core'
+import { createProjectWorktree } from './create-core'
 
 export const worktreeCreate: CliCommand = {
   args: [],
@@ -37,9 +37,9 @@ export const worktreeCreate: CliCommand = {
       typeof ctx.args.flags.branch === 'string' ? ctx.args.flags.branch : `aimux/${name}`
     const base = typeof ctx.args.flags.base === 'string' ? ctx.args.flags.base : 'HEAD'
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
-    const record = await createWorkspaceWorktree({ base, branch, daemon, name, workspace })
+    const record = await createProjectWorktree({ base, branch, daemon, name, project })
 
     writeJson({
       branch: record.branch,
@@ -50,6 +50,6 @@ export const worktreeCreate: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'Create a new worktree in the active workspace',
+  summary: 'Create a new worktree in the active project',
   verb: 'create',
 }

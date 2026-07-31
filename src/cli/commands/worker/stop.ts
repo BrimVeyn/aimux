@@ -6,7 +6,7 @@ import {
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
 } from '../../../ipc/protocol'
 import { pruneEmptyWorktreeParent } from '../../../platform/worktree-paths'
-import { workspaceIdentity } from '../../client/workspace-resolver'
+import { projectIdentity } from '../../client/project-resolver'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeJson } from '../../output'
 import { resolveWorkerTarget, WORKER_SCHEMA_VERSION, workerView } from './shared'
@@ -24,21 +24,21 @@ export const workerStop: CliCommand = {
   ],
   group: 'worker',
   run: async (ctx) => {
-    const { tab, workspace } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
-    const worker = workerView(workspace, tab)
+    const { project, tab } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
+    const worker = workerView(project, tab)
     const daemon = await ctx.getDaemon()
     const cleanup = ctx.args.flags['cleanup-worktree'] === true
     const record =
       tab.worktreeId === undefined
         ? undefined
-        : workspace.worktrees?.find((worktree) => worktree.id === tab.worktreeId)
+        : project.worktrees?.find((worktree) => worktree.id === tab.worktreeId)
 
     if (cleanup) {
       if (record === undefined) throw new Error('worker has no registered worktree to clean up')
       if (record.source !== 'aimux-temp' || !record.createdByAimux) {
         throw new Error('refusing to clean up a primary or externally managed worktree')
       }
-      const siblings = (await daemon.listTabs(workspace.id)).tabs.filter(
+      const siblings = (await daemon.listTabs(project.id)).tabs.filter(
         (entry) => entry.id !== tab.id && entry.worktreeId === record.id
       )
       if (siblings.length > 0) {
@@ -63,7 +63,7 @@ export const workerStop: CliCommand = {
         'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
       )
     }
-    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+    await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
 
     // Teardown is two independent effects. Report them independently: a failed
     // tab close must not strand a merged worktree on disk with no way to remove
@@ -87,7 +87,7 @@ export const workerStop: CliCommand = {
       await pruneEmptyWorktreeParent(record.path)
       try {
         await daemon.expectOk('removeWorktreeRecord', {
-          projectId: workspace.id,
+          projectId: project.id,
           worktreeId: record.id,
         })
       } catch (error) {
@@ -101,9 +101,9 @@ export const workerStop: CliCommand = {
     writeJson({
       closed: closeError === undefined,
       ...(closeError === undefined ? {} : { closeError }),
+      project: projectIdentity(project),
       schemaVersion: WORKER_SCHEMA_VERSION,
       worker,
-      workspace: workspaceIdentity(workspace),
       worktreeRemoved,
     })
     return closeError === undefined ? EXIT_OK : EXIT_RUNTIME

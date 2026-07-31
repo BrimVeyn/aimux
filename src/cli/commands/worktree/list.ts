@@ -10,8 +10,8 @@ export const worktreeList: CliCommand = {
   flags: SHARED_FLAGS,
   group: 'worktree',
   run: async (ctx) => {
-    const workspace = ctx.getWorkspace()
-    const records = workspace.worktrees ?? []
+    const project = ctx.getProject()
+    const records = project.worktrees ?? []
 
     // Count live tabs per worktree so an orchestrator can see co-location
     // (several workers sharing one worktree) at a glance. Best-effort: `null`
@@ -23,7 +23,7 @@ export const worktreeList: CliCommand = {
     try {
       const daemon = await ctx.getDaemon()
       if (daemon.hasCapability(IPC_CAPABILITY_LIST_TABS)) {
-        const { tabs } = await daemon.listTabs(workspace.id)
+        const { tabs } = await daemon.listTabs(project.id)
         for (const tab of tabs) {
           if (tab.worktreeId != null) {
             tabCounts.set(tab.worktreeId, (tabCounts.get(tab.worktreeId) ?? 0) + 1)
@@ -47,8 +47,8 @@ export const worktreeList: CliCommand = {
     }
 
     writeJson({
-      activeWorktreeId: workspace.activeWorktreeId ?? null,
-      workspaceId: workspace.id,
+      activeWorktreeId: project.activeWorktreeId ?? null,
+      projectId: project.id,
       worktrees: records.map((w) => ({
         branch: w.branch,
         createdByAimux: w.createdByAimux,
@@ -63,6 +63,6 @@ export const worktreeList: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'List worktrees for a workspace',
+  summary: 'List worktrees for a project',
   verb: 'list',
 }

@@ -455,9 +455,9 @@ export const closePane: ActionFn = (ctx: ModeContext) => {
 }
 
 // Navigation-specific dynamic actions
-// Reveals whichever bar hosts the workspace list — it is not pinned to the left.
+// Reveals whichever bar hosts the project list — it is not pinned to the left.
 export const ctrlZSidebar: ActionFn = (ctx: ModeContext) => {
-  const side = ctx.state.bars.left.widgets.some((w) => w.id === 'workspaces') ? 'left' : 'right'
+  const side = ctx.state.bars.left.widgets.some((w) => w.id === 'projects') ? 'left' : 'right'
   if (!ctx.state.bars[side].visible) {
     return r([{ side, type: 'toggle-bar' }])
   }

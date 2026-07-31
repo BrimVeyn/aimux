@@ -37,11 +37,11 @@ describe('project and snippet actions', () => {
       ],
     }
 
-    const result = createProjectFromCurrentState(state, 'Workspace A', '/tmp/workspace-a')
+    const result = createProjectFromCurrentState(state, 'Project A', '/tmp/project-a')
 
-    expect(result.project.name).toBe('Workspace A')
+    expect(result.project.name).toBe('Project A')
     expect(result.projects).toHaveLength(1)
-    expect(result.project.workspaceSnapshot?.tabs).toHaveLength(1)
+    expect(result.project.projectSnapshot?.tabs).toHaveLength(1)
   })
 
   test('deletes projects and snippets immutably', () => {

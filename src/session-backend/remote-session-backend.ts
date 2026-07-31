@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { connect, type Socket } from 'node:net'
 
-import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
+import type { AssistantId, ProjectSnapshotV1 } from '../state/types'
 import type { ProjectBackendEvents, ResizeOptions, SessionBackend } from './types'
 
 import { getIpcDaemonSocketPath } from '../daemon/runtime-paths'
@@ -43,7 +43,7 @@ export class RemoteSessionBackend
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   } | null = null
   private selectedProtocolVersion: number | null = null
   private daemonCapabilities: ReadonlySet<string> = new Set()
@@ -218,22 +218,22 @@ export class RemoteSessionBackend
           title: message.payload.title,
         })
         break
-      case 'workspaceCreateRequested':
+      case 'projectCreateRequested':
         this.emit(
-          'workspaceCreateRequested',
+          'projectCreateRequested',
           message.payload.name,
           message.payload.projectPath,
           message.payload.switch === true
         )
         break
-      case 'workspaceSwitchRequested':
-        this.emit('workspaceSwitchRequested', message.payload.targetProjectId)
+      case 'projectSwitchRequested':
+        this.emit('projectSwitchRequested', message.payload.targetProjectId)
         break
-      case 'workspaceCloseRequested':
-        this.emit('workspaceCloseRequested', message.payload.targetProjectId)
+      case 'projectCloseRequested':
+        this.emit('projectCloseRequested', message.payload.targetProjectId)
         break
-      case 'workspaceSwitched':
-        this.emit('workspaceSwitched', message.payload.projectId)
+      case 'projectSwitched':
+        this.emit('projectSwitched', message.payload.projectId)
         break
       case 'worktreeAdded':
         this.emit('worktreeAdded', message.payload.projectId, message.payload.worktree)
@@ -317,7 +317,7 @@ export class RemoteSessionBackend
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<AttachResult> {
     await this.connectAndHandshake()
 
@@ -384,7 +384,7 @@ export class RemoteSessionBackend
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<AttachResult> {
     this.shouldReconnect = true
     this.currentProjectId = options.projectId
@@ -394,7 +394,7 @@ export class RemoteSessionBackend
       cols: options.cols,
       projectId: options.projectId,
       rows: options.rows,
-      snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
+      snapshotTabs: options.projectSnapshot?.tabs.length ?? 0,
       socketPath: getIpcDaemonSocketPath(),
     })
 
@@ -533,17 +533,17 @@ export class RemoteSessionBackend
     this.dispatchCommand({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }, 'disposeAll')
   }
 
-  announceWorkspaceSwitched(projectId: string): void {
+  announceProjectSwitched(projectId: string): void {
     // Fire-and-forget so `handleSwitchProjectEffect` doesn't block waiting on
-    // the daemon roundtrip. The daemon relays this as a `workspaceSwitched`
-    // broadcast that unblocks any `aimux workspace switch --wait` CLI.
+    // the daemon roundtrip. The daemon relays this as a `projectSwitched`
+    // broadcast that unblocks any `aimux project switch --wait` CLI.
     this.dispatchCommand(
       {
         id: crypto.randomUUID(),
         payload: { projectId },
-        type: 'announceWorkspaceSwitched',
+        type: 'announceProjectSwitched',
       },
-      'announceWorkspaceSwitched'
+      'announceProjectSwitched'
     )
   }
 

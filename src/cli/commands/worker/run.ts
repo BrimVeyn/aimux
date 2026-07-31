@@ -19,7 +19,7 @@ export const workerRun: CliCommand = {
     ...SHARED_FLAGS,
     {
       complete: { kind: 'none' },
-      description: 'unique workspace-scoped worker name',
+      description: 'unique project-scoped worker name',
       kind: 'string',
       name: 'name',
     },
@@ -67,7 +67,7 @@ export const workerRun: CliCommand = {
       name: 'worktree',
     },
     {
-      description: 'run in the workspace active worktree instead of creating one',
+      description: 'run in the project active worktree instead of creating one',
       kind: 'boolean',
       name: 'no-worktree',
     },
@@ -103,11 +103,11 @@ export const workerRun: CliCommand = {
       ctx.args.flags.stdin === true,
       ctx.args.positionals[0]
     )
-    // Resolve the target workspace ONCE, up front, and use that record for
+    // Resolve the target project ONCE, up front, and use that record for
     // every later step. The repo a worktree is cut from comes from this record,
-    // so an orchestrator that omits --workspace at least gets the resolved
+    // so an orchestrator that omits --project at least gets the resolved
     // identity echoed back in the response instead of having to infer it.
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const result = await createCliTab(ctx, {
       assistantId: assistant,
       base: typeof ctx.args.flags.base === 'string' ? ctx.args.flags.base : undefined,
@@ -119,11 +119,11 @@ export const workerRun: CliCommand = {
       workerName: name,
       worktreeId: worktree,
     })
-    const tabs = await (await ctx.getDaemon()).listTabs(workspace.id)
+    const tabs = await (await ctx.getDaemon()).listTabs(project.id)
     const tab = tabs.tabs.find((entry) => entry.id === result.tabId)
     if (!tab) throw new Error(`created worker disappeared: ${result.tabId}`)
-    const worker = workerView(workspace, tab)
-    const outcome = await dispatchWorkerPrompt(ctx, workspace, result.tabId, text, {
+    const worker = workerView(project, tab)
+    const outcome = await dispatchWorkerPrompt(ctx, project, result.tabId, text, {
       // The tab was spawned microseconds ago: its assistant is still booting, so
       // the prompt must not be written until the TUI is reading keystrokes.
       awaitFirstPaint: true,
@@ -135,7 +135,7 @@ export const workerRun: CliCommand = {
           ? ctx.args.flags['uptake-timeout']
           : undefined,
     })
-    writeJson(workerEnvelope(workspace, worker, outcome))
+    writeJson(workerEnvelope(project, worker, outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: 'Create a named worker, dispatch a prompt, and await its outcome',

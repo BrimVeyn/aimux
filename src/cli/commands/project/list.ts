@@ -1,17 +1,17 @@
 import type { CliCommand } from '../../registry'
 
-import { listWorkspaces } from '../../client/workspace-resolver'
+import { listProjects } from '../../client/project-resolver'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 
-export const workspaceList: CliCommand = {
+export const projectList: CliCommand = {
   args: [],
   flags: SHARED_FLAGS,
-  group: 'workspace',
+  group: 'project',
   run: async () => {
-    const projects = listWorkspaces()
+    const projects = listProjects()
     writeJson({
-      workspaces: projects.map((project) => ({
+      projects: projects.map((project) => ({
         id: project.id,
         lastOpenedAt: project.lastOpenedAt,
         name: project.name,
@@ -20,6 +20,6 @@ export const workspaceList: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'List known workspaces (projects) in the profile catalog',
+  summary: 'List known projects (projects) in the profile catalog',
   verb: 'list',
 }

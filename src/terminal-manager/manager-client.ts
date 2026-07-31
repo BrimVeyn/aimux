@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { connect, type Socket } from 'node:net'
 
-import type { TerminalModeState, TerminalSnapshot, WorkspaceSnapshotV1 } from '../state/types'
+import type { ProjectSnapshotV1, TerminalModeState, TerminalSnapshot } from '../state/types'
 
 import { getTerminalManagerSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
@@ -256,13 +256,13 @@ export class TerminalManagerClient extends EventEmitter<ManagerClientEvents> {
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<ManagerAttachResult> {
     logDebug('managerClient.attach.start', {
       cols: options.cols,
       projectId: options.projectId,
       rows: options.rows,
-      snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
+      snapshotTabs: options.projectSnapshot?.tabs.length ?? 0,
     })
     await this.connect()
     const response = await this.send({

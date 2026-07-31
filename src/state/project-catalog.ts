@@ -60,7 +60,7 @@ export function loadProjectCatalog(): ProjectRecord[] {
   }
 
   const config = loadConfig()
-  if (!config.workspaceSnapshot) {
+  if (!config.projectSnapshot) {
     logDebug('projects.catalog.load', { projectCount: 0 })
     return []
   }
@@ -70,17 +70,17 @@ export function loadProjectCatalog(): ProjectRecord[] {
     createdAt: now,
     id: `project-${Date.now()}`,
     lastOpenedAt: now,
-    name: 'Last workspace',
+    name: 'Last project',
+    projectSnapshot: config.projectSnapshot,
     updatedAt: now,
-    workspaceSnapshot: config.workspaceSnapshot,
   }
 
   const normalized = normalizeProjects([migrated])
   saveProjectCatalog(normalized)
-  saveConfig({ ...config, workspaceSnapshot: undefined })
-  logDebug('projects.catalog.migrateLegacyWorkspace', {
+  saveConfig({ ...config, projectSnapshot: undefined })
+  logDebug('projects.catalog.migrateLegacyProject', {
     migratedProjectId: migrated.id,
-    tabCount: migrated.workspaceSnapshot?.tabs.length ?? 0,
+    tabCount: migrated.projectSnapshot?.tabs.length ?? 0,
   })
   return normalized
 }
@@ -97,7 +97,7 @@ export function saveProjectCatalog(projects: ProjectRecord[]): void {
       path: PROJECTS_PATH,
       projectCount: projects.length,
     })
-    // Persisting the catalog underpins workspace/worktree state — a silent
+    // Persisting the catalog underpins project/worktree state — a silent
     // failure means the user loses projects on restart. Surface it.
     toast.error(`Failed to save projects: ${message}`)
   }

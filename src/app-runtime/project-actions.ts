@@ -4,10 +4,10 @@ import type { AppAction, AppState, ProjectRecord, TabSession } from '../state/ty
 import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import { saveProjectCatalog } from '../state/project-catalog'
-import { createEmptyWorkspaceSnapshot, serializeWorkspace } from '../state/project-persistence'
+import { createEmptyProjectSnapshot, serializeProject } from '../state/project-persistence'
+import { buildProjectsWithCurrentSnapshot } from '../state/project-save'
 import { createPrimaryWorktree, ensureProjectWorktrees } from '../state/project-worktrees'
 import { toast } from '../state/toast-store'
-import { buildProjectsWithCurrentSnapshot } from '../state/workspace-save'
 
 export function createProjectFromCurrentState(
   state: AppState,
@@ -15,10 +15,10 @@ export function createProjectFromCurrentState(
   projectPath?: string
 ): { project: ProjectRecord; projects: ProjectRecord[] } {
   const now = new Date().toISOString()
-  const workspaceSnapshot =
+  const projectSnapshot =
     (state.currentProjectId != null && state.currentProjectId !== '') || state.tabs.length === 0
-      ? createEmptyWorkspaceSnapshot()
-      : serializeWorkspace(state)
+      ? createEmptyProjectSnapshot()
+      : serializeProject(state)
   const project: ProjectRecord = {
     activeWorktreeId: undefined,
     createdAt: now,
@@ -26,8 +26,8 @@ export function createProjectFromCurrentState(
     lastOpenedAt: now,
     name,
     projectPath,
+    projectSnapshot,
     updatedAt: now,
-    workspaceSnapshot,
     worktrees: undefined,
   }
   if (projectPath != null && projectPath !== '') {
@@ -38,10 +38,10 @@ export function createProjectFromCurrentState(
 
   let updatedProjects = state.projects
   if (state.currentProjectId != null && state.currentProjectId !== '') {
-    const currentSnapshot = serializeWorkspace(state)
+    const currentSnapshot = serializeProject(state)
     updatedProjects = state.projects.map((entry) =>
       entry.id === state.currentProjectId
-        ? { ...entry, updatedAt: now, workspaceSnapshot: currentSnapshot }
+        ? { ...entry, projectSnapshot: currentSnapshot, updatedAt: now }
         : entry
     )
   }
@@ -88,18 +88,18 @@ export function handleCreateProjectEffect(
 ): void {
   const { project, projects } = createProjectFromCurrentState(state, name, projectPath)
   logInputDebug('app.project.create', {
-    fromCurrentWorkspace:
+    fromCurrentProject:
       (state.currentProjectId == null || state.currentProjectId === '') && state.tabs.length > 0,
     name,
     projectId: project.id,
-    tabCount: project.workspaceSnapshot?.tabs.length ?? 0,
+    tabCount: project.projectSnapshot?.tabs.length ?? 0,
   })
   saveProjectCatalog(projects)
   dispatch({ projects, type: 'set-projects' })
   dispatch({
     projectId: project.id,
+    projectSnapshot: project.projectSnapshot,
     type: 'load-project',
-    workspaceSnapshot: project.workspaceSnapshot,
   })
 }
 
@@ -124,7 +124,7 @@ export function handleSwitchProjectEffect(
   logInputDebug('app.project.switch.start', {
     currentTabCount: state.tabs.length,
     fromProjectId: state.currentProjectId,
-    restoredTabCount: project.workspaceSnapshot?.tabs.length ?? 0,
+    restoredTabCount: project.projectSnapshot?.tabs.length ?? 0,
     toName: project.name,
     toProjectId: project.id,
   })
@@ -134,8 +134,8 @@ export function handleSwitchProjectEffect(
   dispatch({ projects, type: 'set-projects' })
   dispatch({
     projectId: project.id,
+    projectSnapshot: project.projectSnapshot,
     type: 'load-project',
-    workspaceSnapshot: project.workspaceSnapshot,
   })
   logInputDebug('app.project.switch.dispatched', { toProjectId: project.id })
 }
@@ -163,7 +163,7 @@ export function handleDeleteProjectEffect(
     projectId,
     type: 'delete-project-record',
   })
-  toast.success(name != null && name !== '' ? `Deleted workspace "${name}"` : 'Workspace deleted')
+  toast.success(name != null && name !== '' ? `Deleted project "${name}"` : 'Project deleted')
 }
 
 export function restartTabSession(

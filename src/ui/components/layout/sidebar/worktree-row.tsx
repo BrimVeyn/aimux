@@ -14,13 +14,13 @@ import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 interface WorktreeRowProps {
   project: ProjectRecord
   worktree: WorktreeRecord
-  /** 1-based index of the workspace in the visible order (for switch-project-by-index). */
+  /** 1-based index of the project in the visible order (for switch-project-by-index). */
   projectIndex: number
   /** True when this row is the active cursor item. */
   isActiveItem: boolean
-  /** True when this row's workspace is the current project (selection scope). */
+  /** True when this row's project is the current project (selection scope). */
   inCurrentGroup: boolean
-  /** True when this is the last non-primary worktree of its workspace. Drives └─ vs ├─. */
+  /** True when this is the last non-primary worktree of its project. Drives └─ vs ├─. */
   isLast: boolean
 }
 
@@ -52,7 +52,7 @@ export const WorktreeRow = memo(function WorktreeRow({
         })
         return
       }
-      // Cross-workspace click: send the worktree id along with the switch so
+      // Cross-project click: send the worktree id along with the switch so
       // the side effect can apply it atomically. Splitting it into a separate
       // dispatch+switch leaves a window where subscribers/re-renders can
       // re-assert the target project's last-persisted worktree.

@@ -15,7 +15,7 @@ describe('getStatusBarModel', () => {
     const state = createInitialState()
     const model = getStatusBarModel(state, CONFIG)
 
-    expect(identityText(model)).toContain('no workspace')
+    expect(identityText(model)).toContain('no project')
     // Hints derive from default keymap descriptions.
     expect(model.right).toContain('Quit')
     expect(model.right).toContain('New tab')
@@ -45,7 +45,7 @@ describe('getStatusBarModel', () => {
     }
     const model = getStatusBarModel(state, CONFIG)
 
-    expect(identityText(model)).toContain('no workspace')
+    expect(identityText(model)).toContain('no project')
     expect(model.right).toContain('Open')
   })
 

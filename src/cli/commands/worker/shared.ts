@@ -9,11 +9,7 @@ import {
   IPC_CAPABILITY_WORKER_METADATA,
   type TabSessionSummary,
 } from '../../../ipc/protocol'
-import {
-  listWorkspaces,
-  workspaceIdentity,
-  workspaceRepoRoot,
-} from '../../client/workspace-resolver'
+import { listProjects, projectIdentity, projectRepoRoot } from '../../client/project-resolver'
 import { CliUsageError } from '../../flags'
 import {
   EXIT_OK,
@@ -62,7 +58,7 @@ export interface WorkerView {
   lastLine?: string
   name: string
   path: string | null
-  /** Repository the worker's worktree was cut from — see `workspaceRepoRoot`. */
+  /** Repository the worker's worktree was cut from — see `projectRepoRoot`. */
   repoRoot: string | null
   status: TabSessionSummary['status']
   tabId: string
@@ -85,10 +81,10 @@ export interface WorkerOutcome {
   }
 }
 
-/** A worker plus the workspace it is actually bound to. */
+/** A worker plus the project it is actually bound to. */
 export interface WorkerTarget {
   tab: TabSessionSummary
-  workspace: ProjectRecord
+  project: ProjectRecord
 }
 
 export function validateWorkerName(name: string): void {
@@ -100,18 +96,18 @@ export function validateWorkerName(name: string): void {
 }
 
 function worktreeFor(
-  workspace: ProjectRecord,
+  project: ProjectRecord,
   worktreeId: string | undefined
 ): WorktreeRecord | undefined {
   if (worktreeId === undefined) return undefined
-  return workspace.worktrees?.find((worktree) => worktree.id === worktreeId)
+  return project.worktrees?.find((worktree) => worktree.id === worktreeId)
 }
 
-export function workerView(workspace: ProjectRecord, tab: TabSessionSummary): WorkerView {
+export function workerView(project: ProjectRecord, tab: TabSessionSummary): WorkerView {
   if (tab.workerName === undefined) {
     throw new Error(`tab is not a named worker: ${tab.id}`)
   }
-  const worktree = worktreeFor(workspace, tab.worktreeId)
+  const worktree = worktreeFor(project, tab.worktreeId)
   return {
     activity: tab.activity,
     assistant: tab.assistant,
@@ -120,7 +116,7 @@ export function workerView(workspace: ProjectRecord, tab: TabSessionSummary): Wo
     lastLine: tab.lastLine,
     name: tab.workerName,
     path: worktree?.path ?? null,
-    repoRoot: worktree?.repoRoot ?? workspaceRepoRoot(workspace),
+    repoRoot: worktree?.repoRoot ?? projectRepoRoot(project),
     status: tab.status,
     tabId: tab.id,
     title: tab.title,
@@ -143,20 +139,20 @@ async function requireWorkerCapabilities(
 
 export async function listNamedWorkerTabs(
   ctx: CliContext,
-  workspace: ProjectRecord = ctx.getWorkspace()
+  project: ProjectRecord = ctx.getProject()
 ): Promise<TabSessionSummary[]> {
   const daemon = await requireWorkerCapabilities(ctx)
-  return (await daemon.listTabs(workspace.id)).tabs.filter((tab) => tab.workerName !== undefined)
+  return (await daemon.listTabs(project.id)).tabs.filter((tab) => tab.workerName !== undefined)
 }
 
-/** Every named worker the daemon knows about, across every catalogued workspace. */
+/** Every named worker the daemon knows about, across every catalogued project. */
 export async function listWorkerTargets(ctx: CliContext): Promise<WorkerTarget[]> {
   const daemon = await requireWorkerCapabilities(ctx)
   const targets: WorkerTarget[] = []
-  for (const workspace of ctx.getWorkspaces?.() ?? listWorkspaces()) {
-    const { tabs } = await daemon.listTabs(workspace.id)
+  for (const project of ctx.getProjects?.() ?? listProjects()) {
+    const { tabs } = await daemon.listTabs(project.id)
     for (const tab of tabs) {
-      if (tab.workerName !== undefined) targets.push({ tab, workspace })
+      if (tab.workerName !== undefined) targets.push({ project, tab })
     }
   }
   return targets
@@ -167,47 +163,45 @@ function matches(tab: TabSessionSummary, selector: string): boolean {
 }
 
 /**
- * Resolve a worker selector to the tab AND the workspace that owns it.
+ * Resolve a worker selector to the tab AND the project that owns it.
  *
- * A worker is addressed for its whole lifetime, but the *active* workspace can
+ * A worker is addressed for its whole lifetime, but the *active* project can
  * change under it (the UI switching projects is enough). Resolving only against
- * the active workspace is what made a live fleet look dead — `worker list`
+ * the active project is what made a live fleet look dead — `worker list`
  * returning `[]` and `worker await` saying "worker not found" while all twelve
- * workers were healthy. So when the workspace was merely inferred, fall back to
+ * workers were healthy. So when the project was merely inferred, fall back to
  * a catalog-wide search and bind to wherever the worker actually lives; when it
- * was pinned (`--workspace` / `AIMUX_WORKSPACE`), keep the boundary but name the
- * workspace that does hold it instead of a bare "not found".
+ * was pinned (`--project` / `AIMUX_PROJECT`), keep the boundary but name the
+ * project that does hold it instead of a bare "not found".
  */
 export async function resolveWorkerTarget(
   ctx: CliContext,
   selector: string
 ): Promise<WorkerTarget> {
-  const workspace = ctx.getWorkspace()
-  const local = (await listNamedWorkerTabs(ctx, workspace)).filter((tab) => matches(tab, selector))
+  const project = ctx.getProject()
+  const local = (await listNamedWorkerTabs(ctx, project)).filter((tab) => matches(tab, selector))
   if (local.length > 1) {
     throw new Error(
-      `worker selector is ambiguous in workspace "${workspace.name}": ${selector} (${local
+      `worker selector is ambiguous in project "${project.name}": ${selector} (${local
         .map((tab) => tab.id)
         .join(', ')})`
     )
   }
   const only = local[0]
-  if (only) return { tab: only, workspace }
+  if (only) return { project, tab: only }
 
   const elsewhere = (await listWorkerTargets(ctx)).filter(
-    (target) => target.workspace.id !== workspace.id && matches(target.tab, selector)
+    (target) => target.project.id !== project.id && matches(target.tab, selector)
   )
-  const pinned = (ctx.getWorkspaceOrigin?.() ?? 'active') !== 'active'
+  const pinned = (ctx.getProjectOrigin?.() ?? 'active') !== 'active'
   if (elsewhere.length === 1 && elsewhere[0] && !pinned) return elsewhere[0]
   if (elsewhere.length > 0) {
-    const where = elsewhere
-      .map((target) => `${target.workspace.name} (${target.tab.id})`)
-      .join(', ')
+    const where = elsewhere.map((target) => `${target.project.name} (${target.tab.id})`).join(', ')
     throw new Error(
-      `worker not found in workspace "${workspace.name}": ${selector} — it lives in ${where}; re-run with --workspace`
+      `worker not found in project "${project.name}": ${selector} — it lives in ${where}; re-run with --project`
     )
   }
-  throw new Error(`worker not found in workspace "${workspace.name}": ${selector}`)
+  throw new Error(`worker not found in project "${project.name}": ${selector}`)
 }
 
 export function normalizeTurnOutcome(outcome: TurnOutcome): WorkerOutcome {
@@ -357,13 +351,13 @@ export interface DispatchOptions {
 
 export async function dispatchWorkerPrompt(
   ctx: CliContext,
-  workspace: ProjectRecord,
+  project: ProjectRecord,
   tabId: string,
   text: string,
   options: DispatchOptions
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
-  const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+  const attach = await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
   const attached = attach.tabs.find((tab) => tab.id === tabId)
   if (!attached) throw new Error(`tab not found: ${tabId}`)
   const payload = buildPromptPayload(text, false)
@@ -397,7 +391,7 @@ export async function dispatchWorkerPrompt(
   let resubmits = 0
 
   while (!result.confirmed && resubmits < MAX_UPTAKE_RESUBMITS) {
-    const live = await liveUptake(daemon, workspace.id, tabId, startedAt)
+    const live = await liveUptake(daemon, project.id, tabId, startedAt)
     if (live) {
       result = live
       break
@@ -413,7 +407,7 @@ export async function dispatchWorkerPrompt(
   // Last look before declaring failure: never report a healthy, working worker
   // as pending just because an edge-triggered event was missed.
   if (!result.confirmed) {
-    result = (await liveUptake(daemon, workspace.id, tabId, startedAt)) ?? result
+    result = (await liveUptake(daemon, project.id, tabId, startedAt)) ?? result
   }
 
   if (!result.confirmed) {
@@ -438,19 +432,19 @@ export async function dispatchWorkerPrompt(
  */
 export async function submitWorkerPrompt(
   ctx: CliContext,
-  workspace: ProjectRecord,
+  project: ProjectRecord,
   tabId: string,
   uptakeTimeoutMs: number
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
-  const attach = await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+  const attach = await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
   if (!attach.tabs.some((tab) => tab.id === tabId)) throw new Error(`tab not found: ${tabId}`)
   const startedAt = Date.now()
   const uptake = armUptake(daemon, tabId, uptakeTimeoutMs, startedAt)
   await daemon.expectOk('write', { data: '\r', tabId })
   const result = await uptake
   if (!result.confirmed) {
-    const live = await liveUptake(daemon, workspace.id, tabId, startedAt)
+    const live = await liveUptake(daemon, project.id, tabId, startedAt)
     if (live) {
       return { durationMs: Date.now() - startedAt, status: 'dispatched', uptake: live }
     }
@@ -466,14 +460,14 @@ export async function submitWorkerPrompt(
 
 export async function awaitExistingWorker(
   ctx: CliContext,
-  workspace: ProjectRecord,
+  project: ProjectRecord,
   tabId: string,
   timeoutMs: number
 ): Promise<WorkerOutcome> {
   const { daemon } = await requireTurnCapabilities(ctx)
   const attach = await daemon.attach({
     cols: 0,
-    projectId: workspace.id,
+    projectId: project.id,
     rows: 0,
     thin: true,
   })
@@ -497,19 +491,19 @@ export async function awaitExistingWorker(
 }
 
 /**
- * Versioned envelope. `workspace` is not decoration: without it a caller cannot
+ * Versioned envelope. `project` is not decoration: without it a caller cannot
  * tell which project a worker belongs to, which is how a whole orchestration
  * can run against the wrong repository unnoticed.
  */
 export function workerEnvelope(
-  workspace: ProjectRecord,
+  project: ProjectRecord,
   worker: WorkerView,
   outcome?: WorkerOutcome
 ): Record<string, unknown> {
   return {
+    project: projectIdentity(project),
     schemaVersion: WORKER_SCHEMA_VERSION,
     worker,
-    workspace: workspaceIdentity(workspace),
     ...(outcome === undefined ? {} : { outcome }),
   }
 }

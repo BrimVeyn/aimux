@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events'
 
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
@@ -12,7 +12,7 @@ import { PtyManager } from '../pty/pty-manager'
 import {
   normalizeGroupedTabOrder,
   restoreLayoutTrees,
-  restoreTabsFromWorkspace,
+  restoreTabsFromProject,
 } from '../state/project-persistence'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 
@@ -65,7 +65,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     })
   }
 
-  attachFromSnapshot(snapshot: WorkspaceSnapshotV1 | undefined): {
+  attachFromSnapshot(snapshot: ProjectSnapshotV1 | undefined): {
     tabs: TabSession[]
     activeTabId: string | null
   } {
@@ -75,7 +75,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       snapshotTabs: snapshot?.tabs.length ?? 0,
     })
     if (this.tabs.size === 0 && snapshot) {
-      const restoredTabs = restoreTabsFromWorkspace(snapshot)
+      const restoredTabs = restoreTabsFromProject(snapshot)
       for (const tab of restoredTabs) {
         this.tabs.set(tab.id, tab)
       }
@@ -116,10 +116,10 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       .map((persistedTab) => this.tabs.get(persistedTab.id))
       .filter((tab): tab is TabSession => tab !== undefined)
     // The registry — not the snapshot — is the source of truth for *which*
-    // tabs exist. A tab spawned by a sibling CLI after this workspace's
+    // tabs exist. A tab spawned by a sibling CLI after this project's
     // snapshot was last persisted lives in `this.tabs` but is absent from
     // `snapshot.tabs`; ordering by the snapshot alone would silently drop it
-    // from the attach result, so the UI would render an empty/stale workspace
+    // from the attach result, so the UI would render an empty/stale project
     // on switch. Append any live tab the snapshot doesn't mention (in
     // registry order) so membership stays authoritative while the snapshot
     // still supplies ordering + layout for the tabs it captured.
@@ -156,7 +156,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
      * worktree column. Optional — tabs not bound to a worktree are valid.
      */
     worktreeId?: string
-    /** Workspace-scoped orchestration handle; does not affect PTY behavior. */
+    /** Project-scoped orchestration handle; does not affect PTY behavior. */
     workerName?: string
   }): void {
     logDebug('daemon.registry.createSession', {

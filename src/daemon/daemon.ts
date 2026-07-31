@@ -32,7 +32,7 @@ import {
   addWorktreeToCatalog,
   assertProjectInCatalog,
   bumpLastOpenedInCatalog,
-  createWorkspaceInCatalog,
+  createProjectInCatalog,
   deleteFromCatalog,
   removeWorktreeFromCatalog,
 } from './catalog-writer'
@@ -252,7 +252,7 @@ export async function runDaemon(): Promise<void> {
   const negotiatedVersions = new Map<Socket, number>()
   // Sockets that attached with `thin: true` (headless CLIs). Used to
   // distinguish "a UI is attached" from "only CLIs are talking to me" when
-  // deciding whether workspace/worktree mutations go via broadcast (UI does
+  // deciding whether project/worktree mutations go via broadcast (UI does
   // the write) or via catalog-writer (daemon does the write).
   const thinAttachers = new Set<Socket>()
 
@@ -339,8 +339,8 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
-  // Workspace-scope broadcast: reaches every socket that negotiated at least
-  // `minVersion` regardless of which project it's attached to. Workspace
+  // Project-scope broadcast: reaches every socket that negotiated at least
+  // `minVersion` regardless of which project it's attached to. Project
   // lifecycle events (create/switch/close) target a project that the UI may
   // not currently be attached to, so `broadcastForProjectVersioned` won't do.
   const broadcastAllVersioned = (minVersion: number, event: ServerEvent): void => {
@@ -390,7 +390,7 @@ export async function runDaemon(): Promise<void> {
     updateTab: applyTabMetadata,
   })
 
-  // Count UI attachers so workspace/worktree handlers can decide whether to
+  // Count UI attachers so project/worktree handlers can decide whether to
   // relay via broadcast (UI attached → its reducer owns the write) or mutate
   // the catalog directly. A "UI attacher" here is any non-thin attach — thin
   // attachers are CLIs which don't run reducers.
@@ -635,7 +635,7 @@ export async function runDaemon(): Promise<void> {
                     cols: message.payload.cols,
                     projectId: message.payload.projectId,
                     rows: message.payload.rows,
-                    snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                    snapshotTabs: message.payload.projectSnapshot?.tabs.length ?? 0,
                     thin: message.payload.thin === true,
                   })
                   const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
@@ -695,8 +695,8 @@ export async function runDaemon(): Promise<void> {
                   const attachResult = await manager.attachSession({
                     cols: attachCols,
                     projectId: message.payload.projectId,
+                    projectSnapshot: message.payload.projectSnapshot,
                     rows: attachRows,
-                    workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
                   projectActiveTabIds.set(message.payload.projectId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
@@ -724,7 +724,7 @@ export async function runDaemon(): Promise<void> {
                   // Classify synchronously BEFORE sending attachResult so
                   // each tab's activity and the full project-status snapshot
                   // are available to embed in the reply. This makes the
-                  // client apply them atomically with `hydrate-workspace`
+                  // client apply them atomically with `hydrate-project`
                   // and closes the race where separate `tabStatus` events
                   // landed before the tab existed in client state.
                   const tabsForLoop = listTabsForProject(message.payload.projectId)
@@ -787,7 +787,7 @@ export async function runDaemon(): Promise<void> {
                     )
                     if (conflictTabId !== undefined) {
                       throw new Error(
-                        `worker name already exists in this workspace: ${message.payload.workerName} (${conflictTabId})`
+                        `worker name already exists in this project: ${message.payload.workerName} (${conflictTabId})`
                       )
                     }
                   }
@@ -1043,30 +1043,30 @@ export async function runDaemon(): Promise<void> {
                   await handleReexecRequest(socket, message.id, message.payload.reason)
                   break
                 }
-                case 'createWorkspace': {
+                case 'createProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { name, projectPath, switch: doSwitch } = message.payload
                   if (countUiAttachers() > 0) {
                     // Relay to the UI so it can preserve the live snapshot
-                    // of the currently-open workspace before appending the
+                    // of the currently-open project before appending the
                     // new one. Fire-and-forget from the daemon's side.
                     broadcastAllVersioned(12, {
                       payload: { name, projectPath, switch: doSwitch },
-                      type: 'workspaceCreateRequested',
+                      type: 'projectCreateRequested',
                     })
-                    logDebug('daemon.request.createWorkspace.relay', { name, projectPath })
+                    logDebug('daemon.request.createProject.relay', { name, projectPath })
                   } else {
-                    const created = createWorkspaceInCatalog(name, projectPath)
+                    const created = createProjectInCatalog(name, projectPath)
                     if (doSwitch === true) {
                       bumpLastOpenedInCatalog(created.id)
                       // Mirror the UI-attached path: an ack event so a
                       // `--wait` CLI can exit even in the headless flow.
                       broadcastAllVersioned(12, {
                         payload: { projectId: created.id },
-                        type: 'workspaceSwitched',
+                        type: 'projectSwitched',
                       })
                     }
-                    logDebug('daemon.request.createWorkspace.direct', {
+                    logDebug('daemon.request.createProject.direct', {
                       name,
                       projectId: created.id,
                     })
@@ -1074,7 +1074,7 @@ export async function runDaemon(): Promise<void> {
                   sendOk(socket, message.id)
                   break
                 }
-                case 'switchWorkspace': {
+                case 'switchProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetProjectId } = message.payload
                   // Fail fast when the target is unknown — otherwise a UI-
@@ -1084,9 +1084,9 @@ export async function runDaemon(): Promise<void> {
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
                       payload: { targetProjectId },
-                      type: 'workspaceSwitchRequested',
+                      type: 'projectSwitchRequested',
                     })
-                    logDebug('daemon.request.switchWorkspace.relay', { targetProjectId })
+                    logDebug('daemon.request.switchProject.relay', { targetProjectId })
                   } else {
                     bumpLastOpenedInCatalog(targetProjectId)
                     // No UI to run the switch handler, so the switch is
@@ -1094,31 +1094,31 @@ export async function runDaemon(): Promise<void> {
                     // Emit the switched event so a --wait CLI can exit.
                     broadcastAllVersioned(12, {
                       payload: { projectId: targetProjectId },
-                      type: 'workspaceSwitched',
+                      type: 'projectSwitched',
                     })
-                    logDebug('daemon.request.switchWorkspace.direct', { targetProjectId })
+                    logDebug('daemon.request.switchProject.direct', { targetProjectId })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'closeWorkspace': {
+                case 'closeProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetProjectId } = message.payload
                   assertProjectInCatalog(targetProjectId)
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
                       payload: { targetProjectId },
-                      type: 'workspaceCloseRequested',
+                      type: 'projectCloseRequested',
                     })
-                    logDebug('daemon.request.closeWorkspace.relay', { targetProjectId })
+                    logDebug('daemon.request.closeProject.relay', { targetProjectId })
                   } else {
                     deleteFromCatalog(targetProjectId)
-                    logDebug('daemon.request.closeWorkspace.direct', { targetProjectId })
+                    logDebug('daemon.request.closeProject.direct', { targetProjectId })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'announceWorkspaceSwitched': {
+                case 'announceProjectSwitched': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   // UI-emitted acknowledgement. Relay so any --wait CLI can
                   // exit. We don't validate that the announcement matches
@@ -1126,7 +1126,7 @@ export async function runDaemon(): Promise<void> {
                   // happened via any means (menu, keybind, CLI).
                   broadcastAllVersioned(12, {
                     payload: { projectId: message.payload.projectId },
-                    type: 'workspaceSwitched',
+                    type: 'projectSwitched',
                   })
                   sendOk(socket, message.id)
                   break

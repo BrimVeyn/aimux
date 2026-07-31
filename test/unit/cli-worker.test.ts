@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { WorkspaceOrigin } from '../../src/cli/client/workspace-resolver'
+import type { ProjectOrigin } from '../../src/cli/client/project-resolver'
 import type { CliContext } from '../../src/cli/context'
 import type { ProjectRecord } from '../../src/state/types'
 
@@ -19,7 +19,7 @@ import {
   type TabSessionSummary,
 } from '../../src/ipc/protocol'
 
-const workspace: ProjectRecord = {
+const project: ProjectRecord = {
   createdAt: '2026-01-01T00:00:00.000Z',
   id: 'ws-1',
   lastOpenedAt: '2026-01-01T00:00:00.000Z',
@@ -50,8 +50,8 @@ const workspace: ProjectRecord = {
   ],
 }
 
-/** A second catalogued workspace — the UI switching to this is what §1/§2 was. */
-const otherWorkspace: ProjectRecord = {
+/** A second catalogued project — the UI switching to this is what §1/§2 was. */
+const otherProject: ProjectRecord = {
   createdAt: '2026-01-01T00:00:00.000Z',
   id: 'ws-2',
   lastOpenedAt: '2026-01-02T00:00:00.000Z',
@@ -99,7 +99,7 @@ function namedTab(): TabSessionSummary {
   return tab
 }
 
-function context(options: { active?: ProjectRecord; origin?: WorkspaceOrigin } = {}): CliContext {
+function context(options: { active?: ProjectRecord; origin?: ProjectOrigin } = {}): CliContext {
   const byProject: Record<string, TabSessionSummary[]> = { 'ws-1': tabs, 'ws-2': [] }
   const daemon = {
     getCapabilities: () => [IPC_CAPABILITY_LIST_TABS, IPC_CAPABILITY_WORKER_METADATA],
@@ -113,9 +113,9 @@ function context(options: { active?: ProjectRecord; origin?: WorkspaceOrigin } =
   return {
     args: { flags: {}, positionals: [] },
     getDaemon: async () => daemon as never,
-    getWorkspace: () => options.active ?? workspace,
-    getWorkspaceOrigin: () => options.origin ?? 'active',
-    getWorkspaces: () => [workspace, otherWorkspace],
+    getProject: () => options.active ?? project,
+    getProjectOrigin: () => options.origin ?? 'active',
+    getProjects: () => [project, otherProject],
   }
 }
 
@@ -140,22 +140,22 @@ describe('worker facade helpers', () => {
     expect(resolveWorkerTarget(context(), 'tab-2')).rejects.toThrow('worker not found')
   })
 
-  test('binds a worker to the workspace that owns it when the active one moved', async () => {
+  test('binds a worker to the project that owns it when the active one moved', async () => {
     // The UI switched to `playground` mid-run. The worker still lives in `main`,
     // so addressing it must keep working instead of reporting an empty fleet.
-    const target = await resolveWorkerTarget(context({ active: otherWorkspace }), 'auth')
-    expect(target.workspace.id).toBe('ws-1')
+    const target = await resolveWorkerTarget(context({ active: otherProject }), 'auth')
+    expect(target.project.id).toBe('ws-1')
     expect(target.tab.id).toBe('tab-1')
   })
 
-  test('keeps an explicitly pinned workspace as a boundary but names the real one', async () => {
+  test('keeps an explicitly pinned project as a boundary but names the real one', async () => {
     expect(
-      resolveWorkerTarget(context({ active: otherWorkspace, origin: 'flag' }), 'auth')
+      resolveWorkerTarget(context({ active: otherProject, origin: 'flag' }), 'auth')
     ).rejects.toThrow('it lives in main (tab-1)')
   })
 
   test('joins worktree context into the stable worker view', () => {
-    expect(workerView(workspace, namedTab())).toEqual({
+    expect(workerView(project, namedTab())).toEqual({
       activity: 'working',
       assistant: 'claude',
       branch: 'aimux/auth',
@@ -188,13 +188,13 @@ describe('worker facade helpers', () => {
     expect(workerOutcomeExitCode({ durationMs: 1, status: 'error' })).toBe(3)
   })
 
-  test('emits a versioned envelope carrying workspace identity', () => {
-    const view = workerView(workspace, namedTab())
-    expect(workerEnvelope(workspace, view, { durationMs: 4, status: 'completed' })).toMatchObject({
+  test('emits a versioned envelope carrying project identity', () => {
+    const view = workerView(project, namedTab())
+    expect(workerEnvelope(project, view, { durationMs: 4, status: 'completed' })).toMatchObject({
       outcome: { status: 'completed' },
+      project: { id: 'ws-1', name: 'main', repoRoot: '/repo' },
       schemaVersion: 1,
       worker: { name: 'auth', repoRoot: '/repo', tabId: 'tab-1' },
-      workspace: { id: 'ws-1', name: 'main', repoRoot: '/repo' },
     })
   })
 

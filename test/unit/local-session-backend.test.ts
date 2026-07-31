@@ -1,10 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test'
 
-import type { TabSession, WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { ProjectSnapshotV1, TabSession } from '../../src/state/types'
 
 import { LocalSessionBackend } from '../../src/session-backend/local-session-backend'
 
-function createSnapshot(): WorkspaceSnapshotV1 {
+function createSnapshot(): ProjectSnapshotV1 {
   return {
     activeTabId: 'tab-a',
     savedAt: new Date().toISOString(),
@@ -64,8 +64,8 @@ describe('LocalSessionBackend.attach', () => {
     await backend.attach({
       cols: 80,
       projectId: 'project-a',
+      projectSnapshot: snapshot,
       rows: 24,
-      workspaceSnapshot: snapshot,
     })
 
     const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as [

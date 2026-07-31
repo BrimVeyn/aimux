@@ -91,12 +91,12 @@ describe('resolveAssistantCommand', () => {
 function ctxFor(
   flags: Record<string, string | number | boolean>,
   daemon: DaemonClient,
-  workspace: Partial<ProjectRecord> = {}
+  project: Partial<ProjectRecord> = {}
 ): CliContext {
   return {
     args: { flags, positionals: [] },
     getDaemon: async () => daemon,
-    getWorkspace: () => ({ id: 'ws', name: 'ws', ...workspace }) as unknown as ProjectRecord,
+    getProject: () => ({ id: 'ws', name: 'ws', ...project }) as unknown as ProjectRecord,
   }
 }
 

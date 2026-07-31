@@ -26,15 +26,13 @@ function formatProjectLine(
   displayIndex: number
 ): string {
   const tabCount =
-    project.id === currentProjectId
-      ? currentTabCount
-      : (project.workspaceSnapshot?.tabs.length ?? 0)
+    project.id === currentProjectId ? currentTabCount : (project.projectSnapshot?.tabs.length ?? 0)
   return `[${displayIndex}] ${project.name} (${tabCount} tab${tabCount === 1 ? '' : 's'})`
 }
 
 function getEmptyStateMessage(hasFilter: boolean): string {
-  if (hasFilter) return 'No matching workspaces.'
-  return 'No workspaces yet. Press Enter or n to create your first workspace.'
+  if (hasFilter) return 'No matching projects.'
+  return 'No projects yet. Press Enter or n to create your first project.'
 }
 
 export function ProjectPickerModal({
@@ -75,7 +73,7 @@ export function ProjectPickerModal({
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-project' }),
       title: (
         <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
-          Create new workspace
+          Create new project
         </text>
       ),
     }
@@ -89,7 +87,7 @@ export function ProjectPickerModal({
 
   return (
     <Picker
-      title="Workspaces"
+      title="Projects"
       keybindsModeId="modal.project-picker.filtering"
       width={uiTokens.modalWidth.lg}
       gap={1}

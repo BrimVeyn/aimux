@@ -1,12 +1,12 @@
 import type { EventEmitter } from 'node:events'
 
 import type {
+  ProjectSnapshotV1,
   ProjectStatus,
   TabActivity,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
   WorktreeRecord,
 } from '../state/types'
 
@@ -29,15 +29,15 @@ export interface ProjectBackendEvents {
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' },
   ]
   /**
-   * v12 workspace-lifecycle events. Fired when a CLI issued
-   * `createWorkspace` / `switchWorkspace` / `closeWorkspace` and the daemon
+   * v12 project-lifecycle events. Fired when a CLI issued
+   * `createProject` / `switchProject` / `closeProject` and the daemon
    * relays as an event because a UI is attached. The UI reducer owns the
    * catalog write; see `backend-runtime-events.ts` for the wiring.
    */
-  workspaceCreateRequested: [name: string, projectPath: string | undefined, doSwitch: boolean]
-  workspaceSwitchRequested: [targetProjectId: string]
-  workspaceCloseRequested: [targetProjectId: string]
-  workspaceSwitched: [projectId: string]
+  projectCreateRequested: [name: string, projectPath: string | undefined, doSwitch: boolean]
+  projectSwitchRequested: [targetProjectId: string]
+  projectCloseRequested: [targetProjectId: string]
+  projectSwitched: [projectId: string]
   /**
    * v12 worktree-lifecycle events. Fired when a CLI issued
    * `addWorktreeRecord` / `removeWorktreeRecord` and the daemon relays.
@@ -76,7 +76,7 @@ export interface SessionBackend extends EventEmitter<ProjectBackendEvents> {
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<BackendAttachResult | null>
   createSession(options: {
     tabId: string
@@ -105,8 +105,8 @@ export interface SessionBackend extends EventEmitter<ProjectBackendEvents> {
   destroy(keepSessions?: boolean): Promise<void> | void
   /**
    * v12 — the UI calls this after `handleSwitchProjectEffect` finishes so the
-   * daemon can broadcast `workspaceSwitched` and any `aimux workspace switch
+   * daemon can broadcast `projectSwitched` and any `aimux project switch
    * --wait` CLI can exit. No-op on local backends (no daemon).
    */
-  announceWorkspaceSwitched(projectId: string): void
+  announceProjectSwitched(projectId: string): void
 }

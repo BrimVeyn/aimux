@@ -1,5 +1,6 @@
 import type {
   AssistantId,
+  ProjectSnapshotV1,
   ProjectStatus,
   QuestionKind,
   TabActivity,
@@ -7,11 +8,10 @@ import type {
   TabStatus,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
   WorktreeRecord,
 } from '../state/types'
 
-import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
+import { isProjectSnapshotV1, isWorktreeRecord } from '../state/validation'
 
 // v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
@@ -26,8 +26,8 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // capabilities; MIN stays at 10 so a v10 UI keeps talking to a v11 daemon
 // (and vice-versa).
 //
-// v12: additive — workspace lifecycle requests (`createWorkspace`,
-// `switchWorkspace`, `closeWorkspace`, `announceWorkspaceSwitched`) and
+// v12: additive — project lifecycle requests (`createProject`,
+// `switchProject`, `closeProject`, `announceProjectSwitched`) and
 // worktree record requests (`addWorktreeRecord`, `removeWorktreeRecord`),
 // plus matching broadcast events. All capability-gated; MIN stays at 10.
 //
@@ -41,7 +41,7 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // v14: additive — tab metadata synchronization for manual and automatic
 // renames. The new request/event are capability-gated; MIN stays at 10.
 //
-// v15: additive — workspace-scoped `workerName` metadata on create, attach,
+// v15: additive — project-scoped `workerName` metadata on create, attach,
 // and list results. This powers stable name-or-id orchestration selectors.
 //
 // v16: breaking release boundary — the agent-first worker control plane and
@@ -96,20 +96,20 @@ export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
 export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
 
 /**
- * v12 — capability gating headless workspace lifecycle requests
- * (`createWorkspace`, `switchWorkspace`, `closeWorkspace`,
- * `announceWorkspaceSwitched`) and their `workspace*Requested` /
- * `workspaceSwitched` broadcasts. When a UI is attached the daemon relays
+ * v12 — capability gating headless project lifecycle requests
+ * (`createProject`, `switchProject`, `closeProject`,
+ * `announceProjectSwitched`) and their `project*Requested` /
+ * `projectSwitched` broadcasts. When a UI is attached the daemon relays
  * the request as an event so the UI's reducer stays authoritative for the
- * live workspace snapshot; when no UI is attached the daemon mutates the
+ * live project snapshot; when no UI is attached the daemon mutates the
  * catalog directly.
  */
-export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE = 'workspaceLifecycle'
+export const IPC_CAPABILITY_PROJECT_LIFECYCLE = 'projectLifecycle'
 
 /**
  * v12 — capability gating `addWorktreeRecord` / `removeWorktreeRecord` and
  * their `worktreeAdded` / `worktreeRemoved` broadcasts. Same UI-vs-headless
- * fanout as workspaceLifecycle.
+ * fanout as projectLifecycle.
  */
 export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents'
 export const IPC_CAPABILITY_WORKER_METADATA = 'workerMetadata'
@@ -167,7 +167,7 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
-  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_TAB_TAIL,
   IPC_CAPABILITY_TURN_LIFECYCLE,
@@ -212,7 +212,7 @@ export interface AttachRequest {
   projectId: string
   cols: number
   rows: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
   /**
    * v11 / capability `thinAttach`. When true, the daemon does not call
    * `manager.resize` on the project — the headless attacher (CLI) does not
@@ -259,7 +259,7 @@ export interface AttachResult {
   activeTabId: string | null
   /**
    * Snapshot of every known project's status at attach time. Applied by
-   * the client atomically with `hydrate-workspace` so chips render the
+   * the client atomically with `hydrate-project` so chips render the
    * right state immediately, without the per-event race where a separate
    * `projectStatus` event could arrive before the project was in state.
    */
@@ -289,7 +289,7 @@ export type ClientRequest =
          * only forwards it to the TM when its own capability is in play.
          */
         worktreeId?: string
-        /** v15 / capability `workerMetadata`: stable workspace-scoped handle. */
+        /** v15 / capability `workerMetadata`: stable project-scoped handle. */
         workerName?: string
         /** True only when the creator did not provide an explicit title. */
         autoRenameCandidate?: boolean
@@ -322,32 +322,32 @@ export type ClientRequest =
   // tabs — does NOT attach. Lets a headless CLI inspect a project without
   // implicit `manager.resize` or `setBroadcastEnabled` side effects.
   | { id: string; type: 'listTabs'; payload: { projectId: string } }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to create a new
-  // workspace in the catalog. When any UI socket is attached the daemon
-  // broadcasts `workspaceCreateRequested` so the UI's reducer performs the
-  // create (owning the live workspace snapshot); when no UI is attached the
+  // v12 / capability `projectLifecycle`. Ask the daemon to create a new
+  // project in the catalog. When any UI socket is attached the daemon
+  // broadcasts `projectCreateRequested` so the UI's reducer performs the
+  // create (owning the live project snapshot); when no UI is attached the
   // daemon writes the catalog directly.
   | {
       id: string
-      type: 'createWorkspace'
+      type: 'createProject'
       payload: { name: string; projectPath?: string; switch?: boolean }
     }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to switch to
-  // another workspace. Broadcast → `workspaceSwitchRequested`; headless
+  // v12 / capability `projectLifecycle`. Ask the daemon to switch to
+  // another project. Broadcast → `projectSwitchRequested`; headless
   // path bumps `lastOpenedAt` on the target so the next UI boot picks it.
-  | { id: string; type: 'switchWorkspace'; payload: { targetProjectId: string } }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to remove a
-  // workspace. Broadcast → `workspaceCloseRequested`; headless deletes the
+  | { id: string; type: 'switchProject'; payload: { targetProjectId: string } }
+  // v12 / capability `projectLifecycle`. Ask the daemon to remove a
+  // project. Broadcast → `projectCloseRequested`; headless deletes the
   // catalog entry directly.
   | {
       id: string
-      type: 'closeWorkspace'
+      type: 'closeProject'
       payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. UI announces that its own
+  // v12 / capability `projectLifecycle`. UI announces that its own
   // `handleSwitchProjectEffect` has finished; the daemon relays as a
-  // `workspaceSwitched` broadcast so a `--wait`ing CLI can exit.
-  | { id: string; type: 'announceWorkspaceSwitched'; payload: { projectId: string } }
+  // `projectSwitched` broadcast so a `--wait`ing CLI can exit.
+  | { id: string; type: 'announceProjectSwitched'; payload: { projectId: string } }
   // v12 / capability `worktreeLifecycleEvents`. Append a worktree record to
   // a project in the catalog. UI-attached path relays as `worktreeAdded`;
   // headless path writes the catalog directly.
@@ -429,32 +429,32 @@ export type ServerEvent =
         autoRenameStatus?: 'eligible' | 'attempted'
       }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast to every socket when a
-  // CLI issues `createWorkspace` while a UI is attached — the UI runs its
-  // create-project handler so the live workspace snapshot is preserved.
+  // v12 / capability `projectLifecycle`. Broadcast to every socket when a
+  // CLI issues `createProject` while a UI is attached — the UI runs its
+  // create-project handler so the live project snapshot is preserved.
   // Broadcast is NOT project-scoped; the UI may be attached to a different
   // project than the one being created.
   | {
-      type: 'workspaceCreateRequested'
+      type: 'projectCreateRequested'
       payload: { name: string; projectPath?: string; switch?: boolean }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
-  // `switchWorkspace`; UI runs `handleSwitchProjectEffect` and then emits
-  // `announceWorkspaceSwitched` when done.
+  // v12 / capability `projectLifecycle`. Broadcast when a CLI issues
+  // `switchProject`; UI runs `handleSwitchProjectEffect` and then emits
+  // `announceProjectSwitched` when done.
   | {
-      type: 'workspaceSwitchRequested'
+      type: 'projectSwitchRequested'
       payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
-  // `closeWorkspace`; UI runs `handleDeleteProjectEffect`.
+  // v12 / capability `projectLifecycle`. Broadcast when a CLI issues
+  // `closeProject`; UI runs `handleDeleteProjectEffect`.
   | {
-      type: 'workspaceCloseRequested'
+      type: 'projectCloseRequested'
       payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. Daemon relay of the UI's
-  // `announceWorkspaceSwitched` so a `--wait`ing CLI can exit.
+  // v12 / capability `projectLifecycle`. Daemon relay of the UI's
+  // `announceProjectSwitched` so a `--wait`ing CLI can exit.
   | {
-      type: 'workspaceSwitched'
+      type: 'projectSwitched'
       payload: { projectId: string }
     }
   // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
@@ -721,9 +721,9 @@ export function parseClientRequest(value: unknown): ClientRequest {
       assert(isFiniteNumber(value.payload.cols), 'attach.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'attach.rows must be a number')
       assert(
-        value.payload.workspaceSnapshot === undefined ||
-          isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
-        'attach.workspaceSnapshot must be a valid workspace snapshot'
+        value.payload.projectSnapshot === undefined ||
+          isProjectSnapshotV1(value.payload.projectSnapshot),
+        'attach.projectSnapshot must be a valid project snapshot'
       )
       assert(
         value.payload.thin === undefined || typeof value.payload.thin === 'boolean',
@@ -807,36 +807,36 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'prepareReexec.reason must be a string when present'
       )
       return value as ClientRequest
-    case 'createWorkspace':
+    case 'createProject':
       assert(
         isString(value.payload.name) && value.payload.name.length > 0,
-        'createWorkspace.name must be a non-empty string'
+        'createProject.name must be a non-empty string'
       )
       assert(
         value.payload.projectPath === undefined || isString(value.payload.projectPath),
-        'createWorkspace.projectPath must be a string when present'
+        'createProject.projectPath must be a string when present'
       )
       assert(
         value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
-        'createWorkspace.switch must be a boolean when present'
+        'createProject.switch must be a boolean when present'
       )
       return value as ClientRequest
-    case 'switchWorkspace':
+    case 'switchProject':
       assert(
         isString(value.payload.targetProjectId),
-        'switchWorkspace.targetProjectId must be a string'
+        'switchProject.targetProjectId must be a string'
       )
       return value as ClientRequest
-    case 'closeWorkspace':
+    case 'closeProject':
       assert(
         isString(value.payload.targetProjectId),
-        'closeWorkspace.targetProjectId must be a string'
+        'closeProject.targetProjectId must be a string'
       )
       return value as ClientRequest
-    case 'announceWorkspaceSwitched':
+    case 'announceProjectSwitched':
       assert(
         isString(value.payload.projectId),
-        'announceWorkspaceSwitched.projectId must be a string'
+        'announceProjectSwitched.projectId must be a string'
       )
       return value as ClientRequest
     case 'addWorktreeRecord':
@@ -947,34 +947,34 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.projectId), 'projectStatus.projectId must be a string')
       assert(isProjectStatus(value.payload.status), 'projectStatus.status is invalid')
       return value as ServerEvent
-    case 'workspaceCreateRequested':
+    case 'projectCreateRequested':
       assert(
         isString(value.payload.name) && value.payload.name.length > 0,
-        'workspaceCreateRequested.name must be a non-empty string'
+        'projectCreateRequested.name must be a non-empty string'
       )
       assert(
         value.payload.projectPath === undefined || isString(value.payload.projectPath),
-        'workspaceCreateRequested.projectPath must be a string when present'
+        'projectCreateRequested.projectPath must be a string when present'
       )
       assert(
         value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
-        'workspaceCreateRequested.switch must be a boolean when present'
+        'projectCreateRequested.switch must be a boolean when present'
       )
       return value as ServerEvent
-    case 'workspaceSwitchRequested':
+    case 'projectSwitchRequested':
       assert(
         isString(value.payload.targetProjectId),
-        'workspaceSwitchRequested.targetProjectId must be a string'
+        'projectSwitchRequested.targetProjectId must be a string'
       )
       return value as ServerEvent
-    case 'workspaceCloseRequested':
+    case 'projectCloseRequested':
       assert(
         isString(value.payload.targetProjectId),
-        'workspaceCloseRequested.targetProjectId must be a string'
+        'projectCloseRequested.targetProjectId must be a string'
       )
       return value as ServerEvent
-    case 'workspaceSwitched':
-      assert(isString(value.payload.projectId), 'workspaceSwitched.projectId must be a string')
+    case 'projectSwitched':
+      assert(isString(value.payload.projectId), 'projectSwitched.projectId must be a string')
       return value as ServerEvent
     case 'worktreeAdded':
       assert(isString(value.payload.projectId), 'worktreeAdded.projectId must be a string')

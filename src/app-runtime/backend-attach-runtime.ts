@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState, TabSession, WorkspaceSnapshotV1 } from '../state/types'
+import type { AppAction, LayoutState, ProjectSnapshotV1, TabSession } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import {
@@ -12,7 +12,7 @@ import {
 } from '../state/layout-resize'
 
 export function resizeSnapshotPanes(
-  snapshot: WorkspaceSnapshotV1 | undefined,
+  snapshot: ProjectSnapshotV1 | undefined,
   layoutRef: MutableRefObject<LayoutState>,
   backend: SessionBackend
 ): void {
@@ -33,10 +33,10 @@ export function resizeSnapshotPanes(
 
 function mergeSnapshotTabMetadata(
   tabs: TabSession[],
-  workspaceSnapshot: WorkspaceSnapshotV1 | undefined
+  projectSnapshot: ProjectSnapshotV1 | undefined
 ): TabSession[] {
-  if (!workspaceSnapshot) return tabs
-  const persistedById = new Map(workspaceSnapshot.tabs.map((tab) => [tab.id, tab]))
+  if (!projectSnapshot) return tabs
+  const persistedById = new Map(projectSnapshot.tabs.map((tab) => [tab.id, tab]))
   return tabs.map((tab) => {
     const persisted = persistedById.get(tab.id)
     return persisted?.worktreeId != null &&
@@ -50,7 +50,7 @@ function mergeSnapshotTabMetadata(
 function hydrateAttachedSession(
   dispatch: (action: AppAction) => void,
   projectId: string,
-  workspaceSnapshot: WorkspaceSnapshotV1 | undefined,
+  projectSnapshot: ProjectSnapshotV1 | undefined,
   result: Awaited<ReturnType<SessionBackend['attach']>>,
   layoutRef: MutableRefObject<LayoutState>,
   backend: SessionBackend
@@ -58,39 +58,39 @@ function hydrateAttachedSession(
   if (result) {
     dispatch({
       activeTabId: result.activeTabId,
-      layoutTree: workspaceSnapshot?.layoutTree,
-      layoutTrees: workspaceSnapshot?.layoutTrees,
-      tabGroupMap: workspaceSnapshot?.tabGroupMap,
-      tabs: mergeSnapshotTabMetadata(result.tabs, workspaceSnapshot),
-      type: 'hydrate-workspace',
+      layoutTree: projectSnapshot?.layoutTree,
+      layoutTrees: projectSnapshot?.layoutTrees,
+      tabGroupMap: projectSnapshot?.tabGroupMap,
+      tabs: mergeSnapshotTabMetadata(result.tabs, projectSnapshot),
+      type: 'hydrate-project',
     })
-    // Dispatch the project-status snapshot *after* hydrate-workspace so
+    // Dispatch the project-status snapshot *after* hydrate-project so
     // sidebar chips reflect per-project state on attach without waiting
     // for the next daemon-side status transition.
     for (const entry of result.initialProjectStatuses) {
       dispatch({ projectId: entry.projectId, status: entry.status, type: 'set-project-status' })
     }
-    resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
+    resizeSnapshotPanes(projectSnapshot, layoutRef, backend)
     return
   }
 
-  if (!workspaceSnapshot) {
+  if (!projectSnapshot) {
     return
   }
 
   dispatch({
     projectId,
+    projectSnapshot,
     type: 'load-project',
-    workspaceSnapshot,
   })
-  resizeSnapshotPanes(workspaceSnapshot, layoutRef, backend)
+  resizeSnapshotPanes(projectSnapshot, layoutRef, backend)
 }
 
 interface AttachCurrentSessionOptions {
   backend: SessionBackend
   dispatch: (action: AppAction) => void
   currentProjectId: string
-  currentProjectWorkspaceSnapshot: Parameters<SessionBackend['attach']>[0]['workspaceSnapshot']
+  currentProjectProjectSnapshot: Parameters<SessionBackend['attach']>[0]['projectSnapshot']
   layoutRef: MutableRefObject<LayoutState>
   attachRequestIdRef: MutableRefObject<number>
 }
@@ -99,7 +99,7 @@ export function attachCurrentSession({
   attachRequestIdRef,
   backend,
   currentProjectId,
-  currentProjectWorkspaceSnapshot,
+  currentProjectProjectSnapshot,
   dispatch,
   layoutRef,
 }: AttachCurrentSessionOptions): () => void {
@@ -112,8 +112,8 @@ export function attachCurrentSession({
       const result = await backend.attach({
         cols: layoutRef.current.terminalCols,
         projectId: currentProjectId,
+        projectSnapshot: currentProjectProjectSnapshot,
         rows: layoutRef.current.terminalRows,
-        workspaceSnapshot: currentProjectWorkspaceSnapshot,
       })
       if (cancelled || attachRequestIdRef.current !== attachRequestId) {
         return
@@ -127,7 +127,7 @@ export function attachCurrentSession({
       hydrateAttachedSession(
         dispatch,
         currentProjectId,
-        currentProjectWorkspaceSnapshot,
+        currentProjectProjectSnapshot,
         result,
         layoutRef,
         backend
@@ -143,7 +143,7 @@ export function attachCurrentSession({
       hydrateAttachedSession(
         dispatch,
         currentProjectId,
-        currentProjectWorkspaceSnapshot,
+        currentProjectProjectSnapshot,
         null,
         layoutRef,
         backend

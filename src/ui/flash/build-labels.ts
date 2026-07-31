@@ -12,7 +12,7 @@ interface PendingTarget {
 
 /**
  * Collect every visible flash-jump target in the same order the UI renders:
- * workspace rows first (each followed by its non-primary worktrees), then the
+ * project rows first (each followed by its non-primary worktrees), then the
  * tabs of the active worktree. Stable ordering keeps the assigned labels
  * predictable across re-opens when nothing changed.
  */
@@ -27,7 +27,7 @@ function collectTargets(state: AppState): PendingTarget[] {
       key: `ws:${project.id}`,
       name: project.name,
       target: {
-        kind: 'workspace',
+        kind: 'project',
         projectId: project.id,
         projectIndex,
         worktreeId: primary?.id,

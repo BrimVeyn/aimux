@@ -14,7 +14,7 @@ interface BackendRuntimeOptions {
   currentProjectId: string | null
   layoutRef: MutableRefObject<LayoutState>
   resizingRef: MutableRefObject<boolean>
-  currentProjectWorkspaceSnapshot: Parameters<SessionBackend['attach']>[0]['workspaceSnapshot']
+  currentProjectProjectSnapshot: Parameters<SessionBackend['attach']>[0]['projectSnapshot']
   syntaxOverlayEnabled: () => boolean
 }
 
@@ -28,7 +28,7 @@ export function useBackendRuntime({
   activeTabId,
   backend,
   currentProjectId,
-  currentProjectWorkspaceSnapshot,
+  currentProjectProjectSnapshot,
   dispatch,
   layoutRef,
   resizingRef,
@@ -48,11 +48,11 @@ export function useBackendRuntime({
       attachRequestIdRef,
       backend,
       currentProjectId,
-      currentProjectWorkspaceSnapshot,
+      currentProjectProjectSnapshot,
       dispatch,
       layoutRef,
     })
-  }, [backend, currentProjectId, currentProjectWorkspaceSnapshot, dispatch, layoutRef])
+  }, [backend, currentProjectId, currentProjectProjectSnapshot, dispatch, layoutRef])
 
   useEffect(() => {
     if (!(currentProjectId != null && currentProjectId !== '')) {

@@ -179,12 +179,12 @@ export function useTerminalResize({
   // loop so an unchanged box never re-triggers a resize.
   const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
 
-  // Drop the dedupe cache when the workspace changes. attach() re-gates every
+  // Drop the dedupe cache when the project changes. attach() re-gates every
   // restored tab's paneReady to false; if a tabId carries the same dimensions
-  // across workspaces, handleMeasure's prev-match would short-circuit and
+  // across projects, handleMeasure's prev-match would short-circuit and
   // never call resizeTab({confirmedFromMeasurement:true}), leaving the gate
   // closed forever — the new pane then paints a stale buffered snapshot from
-  // the old workspace, which is the 2–3 row offset users see.
+  // the old project, which is the 2–3 row offset users see.
   const lastProjectIdRef = useRef(state.currentProjectId)
   if (lastProjectIdRef.current !== state.currentProjectId) {
     lastProjectIdRef.current = state.currentProjectId

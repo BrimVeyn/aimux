@@ -22,7 +22,7 @@ import {
 } from '../../../pty/command-registry'
 import { CliUsageError, SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createWorkspaceWorktree } from '../worktree/create-core'
+import { createProjectWorktree } from '../worktree/create-core'
 
 const FALLBACK_COLS = 200
 const FALLBACK_ROWS = 60
@@ -72,7 +72,7 @@ export function resolveTabCwd(
 /**
  * Resolve the base command a tab launches. Mirrors the UI's precedence
  * (`src/app-runtime/side-effects.ts`): an explicit `--command` override wins,
- * else the workspace's persisted `customCommands[assistantId]` (so CLI workers
+ * else the project's persisted `customCommands[assistantId]` (so CLI workers
  * inherit e.g. `claude --dangerously-skip-permissions`), else the builtin
  * default. `getAllAssistantOptions` deliberately does NOT apply builtin
  * overrides, so this lookup must be explicit.
@@ -91,7 +91,7 @@ async function rollbackCreatedWorktree(
   originalError: unknown
 ): Promise<never> {
   const daemon = await ctx.getDaemon()
-  const workspace = ctx.getWorkspace()
+  const project = ctx.getProject()
   let rollbackError: unknown
   try {
     await removeGitWorktree({
@@ -101,7 +101,7 @@ async function rollbackCreatedWorktree(
     })
     await pruneEmptyWorktreeParent(record.path)
     await daemon.expectOk('removeWorktreeRecord', {
-      projectId: workspace.id,
+      projectId: project.id,
       worktreeId: record.id,
     })
   } catch (error) {
@@ -177,7 +177,7 @@ export async function createCliTab(
   const title = requestedTitle ?? option.label
   const tabId = createPrefixedId('tab')
 
-  const workspace = ctx.getWorkspace()
+  const project = ctx.getProject()
   const daemon = await ctx.getDaemon()
   if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
     throw new Error(
@@ -193,23 +193,23 @@ export async function createCliTab(
     if (!daemon.hasCapability(IPC_CAPABILITY_LIST_TABS)) {
       throw new Error('daemon cannot validate worker-name uniqueness — restart aimux')
     }
-    const existing = await daemon.listTabs(workspace.id)
+    const existing = await daemon.listTabs(project.id)
     if (existing.tabs.some((tab) => tab.workerName === workerName)) {
-      throw new Error(`worker name already exists in workspace "${workspace.name}": ${workerName}`)
+      throw new Error(`worker name already exists in project "${project.name}": ${workerName}`)
     }
   }
 
   // Attach before creating a worktree so stale daemon/project failures have no
   // git-side effect.
-  await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+  await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
 
-  let worktreeId = requestedWorktreeId ?? workspace.activeWorktreeId
+  let worktreeId = requestedWorktreeId ?? project.activeWorktreeId
   let worktreeRecord =
     worktreeId !== undefined
-      ? workspace.worktrees?.find((entry) => entry.id === worktreeId)
+      ? project.worktrees?.find((entry) => entry.id === worktreeId)
       : undefined
   if (requestedWorktreeId !== undefined && worktreeRecord === undefined) {
-    const ids = workspace.worktrees?.map((entry) => entry.id).join(', ') ?? '(none)'
+    const ids = project.worktrees?.map((entry) => entry.id).join(', ') ?? '(none)'
     throw new Error(`unknown worktree id: ${requestedWorktreeId} (known: ${ids})`)
   }
 
@@ -219,12 +219,12 @@ export async function createCliTab(
       typeof newWorktree === 'string' && newWorktree !== ''
         ? newWorktree
         : `${assistantId}-${tabId.slice(-6)}`
-    createdWorktree = await createWorkspaceWorktree({
+    createdWorktree = await createProjectWorktree({
       base: base ?? 'HEAD',
       branch: branch ?? `aimux/${worktreeName}`,
       daemon,
       name: worktreeName,
-      workspace,
+      project,
     })
     worktreeId = createdWorktree.id
     worktreeRecord = createdWorktree
@@ -311,7 +311,7 @@ export const tabCreate: CliCommand = {
     },
     {
       complete: { kind: 'dynamic', source: 'worktree' },
-      description: 'worktree id the tab belongs to (defaults to the workspace’s active worktree)',
+      description: 'worktree id the tab belongs to (defaults to the project’s active worktree)',
       kind: 'string',
       name: 'worktree',
     },
@@ -371,6 +371,6 @@ export const tabCreate: CliCommand = {
     writeJson(result)
     return EXIT_OK
   },
-  summary: 'Create a new tab in the active workspace',
+  summary: 'Create a new tab in the active project',
   verb: 'create',
 }

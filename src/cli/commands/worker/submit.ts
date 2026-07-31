@@ -23,16 +23,16 @@ export const workerSubmit: CliCommand = {
   ],
   group: 'worker',
   run: async (ctx) => {
-    const { tab, workspace } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
+    const { project, tab } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
     const outcome = await submitWorkerPrompt(
       ctx,
-      workspace,
+      project,
       tab.id,
       typeof ctx.args.flags['uptake-timeout'] === 'number'
         ? ctx.args.flags['uptake-timeout']
         : DETACH_UPTAKE_TIMEOUT_MS
     )
-    writeJson(workerEnvelope(workspace, workerView(workspace, tab), outcome))
+    writeJson(workerEnvelope(project, workerView(project, tab), outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: 'Submit a prompt already sitting in a worker composer and confirm uptake',

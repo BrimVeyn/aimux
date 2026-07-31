@@ -11,14 +11,14 @@ const VISIBLE_ROWS = 8
 
 function getDirectoryResultIcon(result: DirectoryResult): string {
   if (result.type === 'worktree') return '\u{e728}'
-  if (result.type === 'workspace') return '\u{f07c}'
+  if (result.type === 'project') return '\u{f07c}'
   return '\u{e702}'
 }
 
 function getDirectoryResultColor(result: DirectoryResult): string {
   const t = getCurrentTheme()
   if (result.type === 'worktree') return t.warning
-  if (result.type === 'workspace') return t.info
+  if (result.type === 'project') return t.info
   return t.text
 }
 
@@ -57,7 +57,7 @@ export function CreateProjectModal({
 
   return (
     <Form
-      title="Create workspace"
+      title="Create project"
       keybindsModeId="modal.create-project"
       width={uiTokens.modalWidth.xl}
     >
@@ -81,7 +81,7 @@ export function CreateProjectModal({
         }
       />
 
-      <TextField active={nameActive} label="Workspace name" value={projectName} />
+      <TextField active={nameActive} label="Project name" value={projectName} />
     </Form>
   )
 }

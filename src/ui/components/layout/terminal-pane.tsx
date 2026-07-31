@@ -48,15 +48,15 @@ function getTitle(
   tab: TabSession | undefined,
   isActive: boolean,
   focusMode: TerminalPaneProps['focusMode'],
-  emptyContext: { workspaceName: string; worktreeName: string }
+  emptyContext: { projectName: string; worktreeName: string }
 ): string {
   if (!tab) {
-    const { workspaceName, worktreeName } = emptyContext
-    if (workspaceName === '' && worktreeName === '') return 'No active workspace'
-    if (worktreeName === '' || worktreeName === workspaceName) {
-      return `${workspaceName} · no tabs`
+    const { projectName, worktreeName } = emptyContext
+    if (projectName === '' && worktreeName === '') return 'No active project'
+    if (worktreeName === '' || worktreeName === projectName) {
+      return `${projectName} · no tabs`
     }
-    return `${workspaceName} / ${worktreeName} · no tabs`
+    return `${projectName} / ${worktreeName} · no tabs`
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -179,7 +179,7 @@ function useHardwareCursor(
     // Cursor state only reaches the terminal with the next rendered frame
     // (same reason opentui's editor calls requestRender() in focus/blur).
     // Without it, a hide issued while the UI is static — e.g. switching to
-    // a workspace with no live PTY — never flushes and the host cursor
+    // a project with no live PTY — never flushes and the host cursor
     // stays stranded at its old position.
     renderer.requestRender()
     // React runs all cleanups in a commit before all effects, so when focus
@@ -239,7 +239,7 @@ const TerminalViewport = memo(function TerminalViewport({
 
   return (
     <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
-      {buffer.length > 0 ? buffer : 'Waiting for workspace output...'}
+      {buffer.length > 0 ? buffer : 'Waiting for project output...'}
     </text>
   )
 })
@@ -281,7 +281,7 @@ export function TerminalPane({
   // These are only used when this pane is rendered without a tab (the
   // top-level pane on a worktree with zero tabs). Selectors return plain
   // strings so re-renders are cheap and bounded to actual name changes.
-  const emptyWorkspaceName = useAppStore((s) => {
+  const emptyProjectName = useAppStore((s) => {
     const id = s.currentProjectId
     if (id == null || id === '') return ''
     return s.projects.find((sess) => sess.id === id)?.name ?? ''
@@ -525,7 +525,7 @@ export function TerminalPane({
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
         title={getTitle(tab, paneIsActive, focusMode, {
-          workspaceName: emptyWorkspaceName,
+          projectName: emptyProjectName,
           worktreeName: emptyWorktreeName,
         })}
         padding={0}
@@ -542,10 +542,10 @@ export function TerminalPane({
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
             <text fg={t.textMuted}>· · ·</text>
             <text fg={t.textMuted}> </text>
-            {emptyWorkspaceName !== '' ? (
+            {emptyProjectName !== '' ? (
               <box flexDirection="row">
-                <text fg={t.text}>{emptyWorkspaceName}</text>
-                {emptyWorktreeName !== '' && emptyWorktreeName !== emptyWorkspaceName ? (
+                <text fg={t.text}>{emptyProjectName}</text>
+                {emptyWorktreeName !== '' && emptyWorktreeName !== emptyProjectName ? (
                   <>
                     <text fg={t.textMuted}> / </text>
                     <text fg={t.text}>{emptyWorktreeName}</text>
@@ -598,7 +598,7 @@ export function TerminalPane({
         // re-introducing the shifted-content / dead-row bug.
         <box position="absolute" bottom={0} left={0} backgroundColor={editorBg}>
           {tab?.status === 'disconnected' ? (
-            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
+            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this project.</text>
           ) : null}
           {tab?.errorMessage != null && tab?.errorMessage !== '' ? (
             <text fg={t.error}>{tab.errorMessage}</text>

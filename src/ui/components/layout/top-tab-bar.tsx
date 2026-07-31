@@ -260,7 +260,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   )
 
   // --- Drag-and-drop reorder of the tab strip ---------------------------------
-  // Mirrors the workspace-list drag, but on the horizontal axis: entries are
+  // Mirrors the project-list drag, but on the horizontal axis: entries are
   // laid out left-to-right inside a scrollX box, so hit-testing is on x/width.
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)

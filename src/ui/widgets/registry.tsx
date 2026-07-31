@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 
 import { GitPaneWidget } from '../components/git/pane/git-pane-widget'
-import { WorkspaceList } from '../components/layout/sidebar/workspace-list'
+import { ProjectList } from '../components/layout/sidebar/project-list'
 
 /**
  * Everything a bar can host. Adding a widget = one entry here plus its id in
@@ -9,10 +9,10 @@ import { WorkspaceList } from '../components/layout/sidebar/workspace-list'
  */
 export const WIDGET_RENDERERS: Record<string, (contentWidth: number) => ReactNode> = {
   git: (contentWidth) => <GitPaneWidget contentWidth={contentWidth} pollingEnabled />,
-  workspaces: (contentWidth) => <WorkspaceList contentWidth={contentWidth} />,
+  projects: (contentWidth) => <ProjectList contentWidth={contentWidth} />,
 }
 
 export const WIDGET_LABELS: Record<string, string> = {
   git: 'Git',
-  workspaces: 'Workspaces',
+  projects: 'Projects',
 }

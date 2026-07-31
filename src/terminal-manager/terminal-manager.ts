@@ -156,7 +156,7 @@ export async function runTerminalManager(): Promise<void> {
                   cols: message.payload.cols,
                   projectId: message.payload.projectId,
                   rows: message.payload.rows,
-                  snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                  snapshotTabs: message.payload.projectSnapshot?.tabs.length ?? 0,
                 })
                 const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
                 if (message.payload.protocolVersion !== negotiatedVersion) {
@@ -171,7 +171,7 @@ export async function runTerminalManager(): Promise<void> {
                 )
                 const attachResult = sessionManager.attachSession(
                   message.payload.projectId,
-                  message.payload.workspaceSnapshot
+                  message.payload.projectSnapshot
                 )
                 send(socket, {
                   id: message.id,

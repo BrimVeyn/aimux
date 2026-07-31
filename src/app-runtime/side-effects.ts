@@ -59,6 +59,7 @@ import {
 } from '../state/layout-tree'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorktree } from '../state/project-persistence'
+import { saveCurrentProject } from '../state/project-save'
 import {
   filterTabsForActiveWorktree,
   getActiveWorktree,
@@ -71,7 +72,6 @@ import { appReducer } from '../state/store'
 import { buildTabEntries } from '../state/tab-entries'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { toast } from '../state/toast-store'
-import { saveCurrentWorkspace } from '../state/workspace-save'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
@@ -624,7 +624,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
 
   switch (effect.type) {
     case 'quit': {
-      saveCurrentWorkspace(effect.state)
+      saveCurrentProject(effect.state)
       void backend.destroy(true)
       ctx.renderer.destroy()
       process.exit(0)
@@ -1213,7 +1213,7 @@ function handleSwitchProjectByIndex(
   }
 
   // Resolve which worktree to land on. If the caller passed an explicit
-  // `worktreeId` (workspace-row tap → its primary, worktree-row tap → that
+  // `worktreeId` (project-row tap → its primary, worktree-row tap → that
   // worktree), honor it; otherwise let the target project keep its persisted
   // activeWorktreeId.
   const resolvedWorktreeId =
@@ -1239,7 +1239,7 @@ function handleSwitchProjectByIndex(
     return
   }
 
-  // Cross-workspace: bundle the worktree change into the project record AND
+  // Cross-project: bundle the worktree change into the project record AND
   // fold set-projects + load-project into a SINGLE setState call. Otherwise
   // any subscriber notification (re-render, useEffect, backend re-attach)
   // between dispatches can re-assert the project's previously-persisted
@@ -1261,8 +1261,8 @@ function handleSwitchProjectByIndex(
     return appReducer(afterSet, {
       forceDisconnected: false,
       projectId: patchedProject.id,
+      projectSnapshot: patchedProject.projectSnapshot,
       type: 'load-project',
-      workspaceSnapshot: patchedProject.workspaceSnapshot,
     })
   })
 }
@@ -1296,8 +1296,8 @@ function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
   const worktrees = project?.worktrees ?? []
   const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
   const activeWtId = project?.activeWorktreeId ?? null
-  // The workspace row IS the primary worktree (no separate row), so an active
-  // primary or undefined active maps to the workspace-item.
+  // The project row IS the primary worktree (no separate row), so an active
+  // primary or undefined active maps to the project-item.
   const targetWorktreeId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
   return items.findIndex(
     (item) => item.projectId === projectId && item.worktreeId === targetWorktreeId
@@ -1327,17 +1327,17 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   const project = state.projects.find((s) => s.id === target.projectId)
   if (!project) return
 
-  // Determine the worktree to activate. For workspace-items, that's the
+  // Determine the worktree to activate. For project-items, that's the
   // primary; for worktree-items, the specific worktree.
   const worktrees = project.worktrees ?? []
   const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
   const targetWorktreeId = target.worktreeId ?? primary?.id
 
-  const isCrossWorkspace = project.id !== state.currentProjectId
+  const isCrossProject = project.id !== state.currentProjectId
   const needsWorktreeChange =
     targetWorktreeId != null && targetWorktreeId !== project.activeWorktreeId
 
-  if (isCrossWorkspace) {
+  if (isCrossProject) {
     // Bundle the worktree change into the project record AND fold the
     // project switch's two dispatches (set-projects + load-project) into a
     // SINGLE Zustand setState call — otherwise each dispatch fires a
@@ -1364,8 +1364,8 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
         // otherwise the "Restored snapshot" hint flashes on every j/k cycle.
         forceDisconnected: false,
         projectId: patchedProject.id,
+        projectSnapshot: patchedProject.projectSnapshot,
         type: 'load-project',
-        workspaceSnapshot: patchedProject.workspaceSnapshot,
       })
     })
     return
@@ -1686,8 +1686,8 @@ function removeWorktreeRecordFromProject(
   const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
     activeWorktreeId: nextActive?.id,
+    projectSnapshot: pruneSnapshotOfWorktree(entry.projectSnapshot, worktreeId),
     updatedAt: new Date().toISOString(),
-    workspaceSnapshot: pruneSnapshotOfWorktree(entry.workspaceSnapshot, worktreeId),
     worktrees: remaining,
   }))
   saveProjectCatalog(projects)
@@ -1722,7 +1722,7 @@ function handleConfirmUpdateSelection(ctx: SideEffectContext): void {
 }
 
 function runUpdateFromTui(ctx: SideEffectContext, latestVersion: string): void {
-  saveCurrentWorkspace(ctx.state)
+  saveCurrentProject(ctx.state)
   void ctx.backend.destroy(true)
   ctx.renderer.destroy()
   process.stdout.write(`\nUpdating aimux to ${latestVersion}...\n`)

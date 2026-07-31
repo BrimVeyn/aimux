@@ -1,7 +1,7 @@
 import type { AppAction, AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
-import { restoreWorkspaceState } from '../project-persistence'
+import { restoreProjectState } from '../project-persistence'
 import { filterTabsForActiveWorktree, withActiveWorktree } from '../project-worktrees'
 import { filterProjects } from '../selectors'
 
@@ -16,16 +16,16 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
   switch (action.type) {
     case 'load-project': {
       const snapshot =
-        action.workspaceSnapshot ??
-        state.projects.find((entry) => entry.id === action.projectId)?.workspaceSnapshot
+        action.projectSnapshot ??
+        state.projects.find((entry) => entry.id === action.projectId)?.projectSnapshot
       // The project's activeWorktreeId may have been patched right before
-      // this load (e.g. the cross-workspace branch of handleCycleSidebarItem
+      // this load (e.g. the cross-project branch of handleCycleSidebarItem
       // sets it to the worktree the user just clicked). The snapshot's
       // activeTabId still reflects the *last* worktree they were on, so
       // honor the patched worktree by filtering the restored tab list.
       const loadedProject = state.projects.find((entry) => entry.id === action.projectId)
       const loadedWorktrees = loadedProject?.worktrees ?? []
-      const restored = restoreWorkspaceState(state, snapshot, {
+      const restored = restoreProjectState(state, snapshot, {
         forceDisconnected: action.forceDisconnected ?? true,
         // Drop tabs bound to worktrees this project no longer owns so a stale
         // id can't be caught by a later worktree delete (closing "another

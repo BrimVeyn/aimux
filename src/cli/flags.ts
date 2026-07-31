@@ -15,7 +15,7 @@ export type DynamicCompletionSource =
   | 'git-ref'
   | 'tab'
   | 'worker'
-  | 'workspace'
+  | 'project'
   | 'worktree'
 
 /**
@@ -129,17 +129,17 @@ export function parseArgs(
 }
 
 /**
- * Shared flag set — every command takes these. `--workspace` selects the
+ * Shared flag set — every command takes these. `--project` selects the
  * target project (by id or name); `--profile` overrides `AIMUX_PROFILE`
  * before any runtime path is resolved; `--json` is a no-op kept for
  * consistency with future formats.
  */
 export const SHARED_FLAGS: readonly FlagSpec[] = [
   {
-    complete: { kind: 'dynamic', source: 'workspace' },
-    description: 'workspace id or name',
+    complete: { kind: 'dynamic', source: 'project' },
+    description: 'project id or name',
     kind: 'string',
-    name: 'workspace',
+    name: 'project',
   },
   {
     complete: { kind: 'none' },

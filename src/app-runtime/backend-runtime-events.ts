@@ -96,7 +96,7 @@ export function bindBackendRuntimeEvents({
     dispatch({ activity, tabId, type: 'set-tab-activity' })
   }
 
-  // Serialise workspace lifecycle handlers behind a small FIFO so back-to-back
+  // Serialise project lifecycle handlers behind a small FIFO so back-to-back
   // switch/create/close broadcasts from multiple CLIs don't race the
   // in-flight `handleSwitchProjectEffect`. Every lifecycle handler awaits the
   // previous chain link before running.
@@ -115,13 +115,13 @@ export function bindBackendRuntimeEvents({
     })()
   }
 
-  const handleWorkspaceCreateRequested = (
+  const handleProjectCreateRequested = (
     name: string,
     projectPath: string | undefined,
     doSwitch: boolean
   ) => {
     enqueueLifecycle(() => {
-      logInputDebug('app.backend.event.workspaceCreateRequested', { doSwitch, name, projectPath })
+      logInputDebug('app.backend.event.projectCreateRequested', { doSwitch, name, projectPath })
       const state = appStore.getState()
       handleCreateProjectEffect(state, dispatch, name, projectPath)
       if (doSwitch) {
@@ -131,14 +131,14 @@ export function bindBackendRuntimeEvents({
         const created = appStore
           .getState()
           .projects.find((s) => s.name === name && s.projectPath === projectPath)
-        if (created) backend.announceWorkspaceSwitched(created.id)
+        if (created) backend.announceProjectSwitched(created.id)
       }
     })
   }
 
-  const handleWorkspaceSwitchRequested = (targetProjectId: string) => {
+  const handleProjectSwitchRequested = (targetProjectId: string) => {
     enqueueLifecycle(async () => {
-      logInputDebug('app.backend.event.workspaceSwitchRequested', { targetProjectId })
+      logInputDebug('app.backend.event.projectSwitchRequested', { targetProjectId })
       let state = appStore.getState()
       let target = state.projects.find((s) => s.id === targetProjectId)
       if (!target) {
@@ -155,8 +155,8 @@ export function bindBackendRuntimeEvents({
       if (!target) {
         // Announce anyway so any `--wait` CLI unblocks — better a spurious
         // exit than a 30s hang while the caller retries.
-        logInputDebug('app.backend.event.workspaceSwitchRequested.notFound', { targetProjectId })
-        backend.announceWorkspaceSwitched(targetProjectId)
+        logInputDebug('app.backend.event.projectSwitchRequested.notFound', { targetProjectId })
+        backend.announceProjectSwitched(targetProjectId)
         return
       }
       handleSwitchProjectEffect(state, backend, dispatch, target)
@@ -164,22 +164,22 @@ export function bindBackendRuntimeEvents({
       // fires `set-projects`+`load-project` synchronously but the backend
       // re-attach happens async.
       await Promise.resolve()
-      backend.announceWorkspaceSwitched(targetProjectId)
+      backend.announceProjectSwitched(targetProjectId)
     })
   }
 
-  const handleWorkspaceCloseRequested = (targetProjectId: string) => {
+  const handleProjectCloseRequested = (targetProjectId: string) => {
     enqueueLifecycle(() => {
-      logInputDebug('app.backend.event.workspaceCloseRequested', { targetProjectId })
+      logInputDebug('app.backend.event.projectCloseRequested', { targetProjectId })
       const state = appStore.getState()
       handleDeleteProjectEffect(state, backend, dispatch, targetProjectId)
     })
   }
 
-  const handleWorkspaceSwitched = (projectId: string) => {
+  const handleProjectSwitched = (projectId: string) => {
     // The daemon's own relay for --wait CLIs. UI side has no work to do —
     // logging is enough.
-    logInputDebug('app.backend.event.workspaceSwitched', { projectId })
+    logInputDebug('app.backend.event.projectSwitched', { projectId })
   }
 
   const handleWorktreeAdded = (projectId: string, worktree: WorktreeRecord) => {
@@ -274,10 +274,10 @@ export function bindBackendRuntimeEvents({
   backend.on('tabActivity', handleTabActivity)
   backend.on('tabAdded', handleTabAdded)
   backend.on('tabMetadataUpdated', handleTabMetadataUpdated)
-  backend.on('workspaceCreateRequested', handleWorkspaceCreateRequested)
-  backend.on('workspaceSwitchRequested', handleWorkspaceSwitchRequested)
-  backend.on('workspaceCloseRequested', handleWorkspaceCloseRequested)
-  backend.on('workspaceSwitched', handleWorkspaceSwitched)
+  backend.on('projectCreateRequested', handleProjectCreateRequested)
+  backend.on('projectSwitchRequested', handleProjectSwitchRequested)
+  backend.on('projectCloseRequested', handleProjectCloseRequested)
+  backend.on('projectSwitched', handleProjectSwitched)
   backend.on('worktreeAdded', handleWorktreeAdded)
   backend.on('worktreeRemoved', handleWorktreeRemoved)
 
@@ -290,10 +290,10 @@ export function bindBackendRuntimeEvents({
     backend.off('tabActivity', handleTabActivity)
     backend.off('tabAdded', handleTabAdded)
     backend.off('tabMetadataUpdated', handleTabMetadataUpdated)
-    backend.off('workspaceCreateRequested', handleWorkspaceCreateRequested)
-    backend.off('workspaceSwitchRequested', handleWorkspaceSwitchRequested)
-    backend.off('workspaceCloseRequested', handleWorkspaceCloseRequested)
-    backend.off('workspaceSwitched', handleWorkspaceSwitched)
+    backend.off('projectCreateRequested', handleProjectCreateRequested)
+    backend.off('projectSwitchRequested', handleProjectSwitchRequested)
+    backend.off('projectCloseRequested', handleProjectCloseRequested)
+    backend.off('projectSwitched', handleProjectSwitched)
     backend.off('worktreeAdded', handleWorktreeAdded)
     backend.off('worktreeRemoved', handleWorktreeRemoved)
     void backend.destroy(true)

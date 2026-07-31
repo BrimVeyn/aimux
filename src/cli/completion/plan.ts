@@ -51,10 +51,10 @@ const COMPLETION_SUBCOMMANDS: readonly CompletionCandidate[] = [
 ]
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
+  project: 'Projects (projects) in the profile catalog',
   tab: 'Drive individual tabs (create, send, snapshot, await)',
   worker: 'Named agent workers — the preferred orchestration surface',
-  workspace: 'Workspaces (projects) in the profile catalog',
-  worktree: 'Git worktrees attached to the active workspace',
+  worktree: 'Git worktrees attached to the active project',
 }
 
 function groupCandidates(): CompletionCandidate[] {

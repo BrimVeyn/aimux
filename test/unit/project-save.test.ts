@@ -2,8 +2,8 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ProjectRecord } from '../../src/state/types'
 
+import { buildProjectsWithCurrentSnapshot } from '../../src/state/project-save'
 import { createInitialState } from '../../src/state/store'
-import { buildProjectsWithCurrentSnapshot } from '../../src/state/workspace-save'
 
 function makeProject(id: string, name: string): ProjectRecord {
   const now = new Date().toISOString()
@@ -11,7 +11,7 @@ function makeProject(id: string, name: string): ProjectRecord {
 }
 
 describe('buildProjectsWithCurrentSnapshot', () => {
-  test('stamps current project with workspace snapshot', () => {
+  test('stamps current project with project snapshot', () => {
     const projects = [makeProject('s1', 'one'), makeProject('s2', 'two')]
     const state = {
       ...createInitialState(),
@@ -38,9 +38,9 @@ describe('buildProjectsWithCurrentSnapshot', () => {
 
     const result = buildProjectsWithCurrentSnapshot(projects, 's1', state)
     expect(result).toHaveLength(2)
-    expect(result[0]?.workspaceSnapshot).toBeDefined()
-    expect(result[0]?.workspaceSnapshot?.tabs).toHaveLength(1)
-    expect(result[1]?.workspaceSnapshot).toBeUndefined()
+    expect(result[0]?.projectSnapshot).toBeDefined()
+    expect(result[0]?.projectSnapshot?.tabs).toHaveLength(1)
+    expect(result[1]?.projectSnapshot).toBeUndefined()
   })
 
   test('returns projects unchanged when no current project', () => {

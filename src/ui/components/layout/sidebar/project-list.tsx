@@ -21,7 +21,7 @@ import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
 import { WorktreeRow } from './worktree-row'
 
-interface WorkspaceListProps {
+interface ProjectListProps {
   contentWidth: number
 }
 
@@ -42,7 +42,7 @@ function truncate(label: string, max: number): string {
   return `${label.slice(0, max - 1)}…`
 }
 
-export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
+export function ProjectList({ contentWidth }: ProjectListProps) {
   const t = useTheme()
   const projects = useAppStore((s) => s.projects)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
@@ -64,10 +64,10 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         : undefined,
     [currentProjectId, projects]
   )
-  // The active row can be either a worktree row OR the workspace row
+  // The active row can be either a worktree row OR the project row
   // (when the primary worktree is active). Both must scroll into view —
   // otherwise the cursor visually "disappears" off-screen when crossing
-  // a workspace boundary on a key press.
+  // a project boundary on a key press.
   const currentWorktrees = currentProject?.worktrees ?? []
   const currentPrimary = currentWorktrees.find((w) => w.source === 'primary') ?? currentWorktrees[0]
   const rawActiveWorktreeId = currentProject?.activeWorktreeId
@@ -145,9 +145,9 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      // The workspace row visually anchors the project's primary worktree
+      // The project row visually anchors the project's primary worktree
       // (its branch line shows the primary's branch). Clicking it should
-      // land on the primary — same semantics as j/k cycling onto a workspace
+      // land on the primary — same semantics as j/k cycling onto a project
       // item — instead of preserving whatever non-primary worktree happened
       // to be active last time we left this project.
       const sourceProject = ordered.find((s) => s.id === source)
@@ -192,7 +192,7 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         contentOptions={COLUMN_CONTENT_OPTIONS}
       >
         {(() => {
-          // Build a single flat list of items — workspace rows interleaved
+          // Build a single flat list of items — project rows interleaved
           // with their non-primary worktrees. One map, one React keypath per
           // visible row; transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
@@ -202,16 +202,16 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
             const worktrees = project.worktrees ?? []
             const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
             const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
-            const workspaceIsActiveItem =
+            const projectIsActiveItem =
               isCurrentProject &&
               (project.activeWorktreeId == null ||
                 project.activeWorktreeId === '' ||
                 project.activeWorktreeId === primaryWorktree?.id)
             rows.push(
-              <WorkspaceRow
+              <ProjectRow
                 key={`ws:${project.id}`}
                 project={project}
-                isActiveItem={workspaceIsActiveItem}
+                isActiveItem={projectIsActiveItem}
                 inCurrentGroup={isCurrentProject}
                 primaryWorktree={primaryWorktree}
                 hasExtraWorktrees={extraWorktrees.length > 0}
@@ -252,27 +252,27 @@ export function WorkspaceList({ contentWidth }: WorkspaceListProps) {
         onMouseDown={handleNewProject}
       >
         <text fg={t.text} selectable={false}>
-          + New workspace
+          + New project
         </text>
       </box>
     </box>
   )
 }
 
-interface WorkspaceRowProps {
+interface ProjectRowProps {
   project: ProjectRecord
-  /** True when this row is the active cursor item (workspace's primary active). */
+  /** True when this row is the active cursor item (project's primary active). */
   isActiveItem: boolean
-  /** True when this row belongs to the current workspace (selection scope). */
+  /** True when this row belongs to the current project (selection scope). */
   inCurrentGroup: boolean
-  /** The project's primary worktree — its git branch is shown as the workspace's anchor identity. */
+  /** The project's primary worktree — its git branch is shown as the project's anchor identity. */
   primaryWorktree: WorktreeRecord | undefined
   /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
   hasExtraWorktrees: boolean
   status: ProjectStatus
   dragging: boolean
   contentWidth: number
-  /** Vertical spacing above this row — used to separate workspace blocks. */
+  /** Vertical spacing above this row — used to separate project blocks. */
   marginTop: number
   setRowRef: (id: string, ref: BoxRenderable | null) => void
   onDragStart: (id: string) => void
@@ -281,7 +281,7 @@ interface WorkspaceRowProps {
   onDragCancel: () => void
 }
 
-const WorkspaceRow = memo(function WorkspaceRow({
+const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
   hasExtraWorktrees,
@@ -296,7 +296,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   project,
   setRowRef,
   status,
-}: WorkspaceRowProps) {
+}: ProjectRowProps) {
   const t = useTheme()
   // Selection highlight must stay opaque in transparent mode — otherwise the
   // cursor row visually disappears against the see-through chrome.
@@ -338,7 +338,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
   const rightClickMenu = useMemo<[string, () => void][]>(
     () => [
       [
-        'Rename workspace',
+        'Rename project',
         () =>
           dispatchGlobal({
             initialName: project.name,
@@ -348,7 +348,7 @@ const WorkspaceRow = memo(function WorkspaceRow({
           }),
       ],
       [
-        'Delete workspace',
+        'Delete project',
         () => runSideEffectGlobal({ projectId: project.id, type: 'delete-project' }),
       ],
     ],

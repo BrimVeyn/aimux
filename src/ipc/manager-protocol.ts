@@ -1,11 +1,11 @@
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
-import { isWorkspaceSnapshotV1 } from '../state/validation'
+import { isProjectSnapshotV1 } from '../state/validation'
 import {
   getProcessVersion,
   IpcProtocolError,
@@ -36,7 +36,7 @@ import {
 // v9: additive — `tabMetadata` updates titles and auto-rename state without
 // restarting PTYs. Capability-gated; MIN remains at 8.
 //
-// v10: additive — `workerName` persists a workspace-scoped orchestration
+// v10: additive — `workerName` persists a project-scoped orchestration
 // handle on tabs created through the headless worker facade.
 //
 // v11: breaking release boundary — force a fresh terminal-manager so named
@@ -99,7 +99,7 @@ export interface ManagerAttachRequest {
   projectId: string
   cols: number
   rows: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
 }
 
 export interface ManagerAttachResult {
@@ -358,9 +358,9 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       assert(isFiniteNumber(value.payload.cols), 'attachSession.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'attachSession.rows must be a number')
       assert(
-        value.payload.workspaceSnapshot === undefined ||
-          isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
-        'attachSession.workspaceSnapshot must be a valid workspace snapshot'
+        value.payload.projectSnapshot === undefined ||
+          isProjectSnapshotV1(value.payload.projectSnapshot),
+        'attachSession.projectSnapshot must be a valid project snapshot'
       )
       return value as ManagerRequest
     case 'createTab':

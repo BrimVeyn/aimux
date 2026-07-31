@@ -19,9 +19,9 @@ import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
+import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
-import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
@@ -59,7 +59,7 @@ import {
   isNewerVersion,
 } from './update/version-check'
 
-const WORKSPACE_SAVE_DEBOUNCE_MS = 250
+const PROJECT_SAVE_DEBOUNCE_MS = 250
 
 export function App({
   backend,
@@ -142,8 +142,8 @@ export function App({
     if (mostRecent) {
       appStore.getState().dispatch({
         projectId: mostRecent.id,
+        projectSnapshot: mostRecent.projectSnapshot,
         type: 'load-project',
-        workspaceSnapshot: mostRecent.workspaceSnapshot,
       })
     }
     return null
@@ -256,7 +256,7 @@ export function App({
   // still the bootstrap default, and useBackendRuntime's attach effect would
   // then hand 80x24 to the backend, resizing the daemon-persisted PTYs (or
   // newly-spawned ones) to the wrong size and stranding the assistant's
-  // already-drawn content in the top-left until a workspace switch.
+  // already-drawn content in the top-left until a project switch.
   const layoutRef = useRef(state.layout)
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeTabId),
@@ -289,7 +289,7 @@ export function App({
   triggerCharRef.current = resolvedConfig.snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
-  const currentProjectWorkspaceSnapshot = currentProject?.workspaceSnapshot
+  const currentProjectProjectSnapshot = currentProject?.projectSnapshot
 
   // Must run before useBackendRuntime so its open-loop terminalSize seeds
   // layoutRef before the attach effect reads it. See the comment on layoutRef.
@@ -338,14 +338,14 @@ export function App({
     activeTabId: state.activeTabId,
     backend,
     currentProjectId: state.currentProjectId,
-    currentProjectWorkspaceSnapshot,
+    currentProjectProjectSnapshot,
     dispatch,
     layoutRef,
     resizingRef,
     syntaxOverlayEnabled,
   })
 
-  useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
+  useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
   useAutoCommitDriver({
     config: resolvedConfig.autoCommit,
@@ -488,7 +488,7 @@ export function App({
       dispatch({ tabId: target.tabId, type: 'set-active-tab' })
       return
     }
-    if (target.kind === 'workspace' || target.kind === 'worktree') {
+    if (target.kind === 'project' || target.kind === 'worktree') {
       executeSideEffect(
         {
           index: target.projectIndex,

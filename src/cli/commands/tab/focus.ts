@@ -14,7 +14,7 @@ export const tabFocus: CliCommand = {
       throw new Error('tabId is required')
     }
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
 
     if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
@@ -22,12 +22,12 @@ export const tabFocus: CliCommand = {
         'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
       )
     }
-    await daemon.attach({ cols: 0, projectId: workspace.id, rows: 0, thin: true })
+    await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
     await daemon.expectOk('setActiveTab', { tabId })
 
     writeJson({ ok: true })
     return EXIT_OK
   },
-  summary: 'Set the active tab in the workspace',
+  summary: 'Set the active tab in the project',
   verb: 'focus',
 }

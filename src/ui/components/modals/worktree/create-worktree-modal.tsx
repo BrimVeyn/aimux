@@ -94,7 +94,7 @@ export function CreateWorktreeModal({
   if (step === 'template') {
     return (
       <Picker
-        title="New workspace: pick template"
+        title="New project: pick template"
         keybindsModeId="modal.create-worktree"
         width={uiTokens.modalWidth.md}
         gap={1}
@@ -110,15 +110,11 @@ export function CreateWorktreeModal({
 
   const baseActive = activeField === 'base'
   return (
-    <Form
-      title="New workspace"
-      keybindsModeId="modal.create-worktree"
-      width={uiTokens.modalWidth.xl}
-    >
+    <Form title="New project" keybindsModeId="modal.create-worktree" width={uiTokens.modalWidth.xl}>
       <box flexDirection="column" gap={1}>
         <TextField
           active={activeField === 'name'}
-          label="Workspace name"
+          label="Project name"
           value={worktreeName}
           cursorPos={activeField === 'name' ? cursorPos : undefined}
           placeholder="my-feature"

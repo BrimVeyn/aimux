@@ -2,9 +2,9 @@ import { useEffect, useRef } from 'react'
 
 import type { AppState } from '../state/types'
 
-import { saveCurrentWorkspace } from '../state/workspace-save'
+import { saveCurrentProject } from '../state/project-save'
 
-export function useWorkspaceAutosave(state: AppState, debounceMs: number): void {
+export function useProjectAutosave(state: AppState, debounceMs: number): void {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestStateRef = useRef(state)
   latestStateRef.current = state
@@ -15,7 +15,7 @@ export function useWorkspaceAutosave(state: AppState, debounceMs: number): void 
     }
 
     timeoutRef.current = setTimeout(() => {
-      saveCurrentWorkspace(latestStateRef.current)
+      saveCurrentProject(latestStateRef.current)
       timeoutRef.current = null
     }, debounceMs)
 
@@ -33,7 +33,7 @@ export function useWorkspaceAutosave(state: AppState, debounceMs: number): void 
         clearTimeout(timeoutRef.current)
         timeoutRef.current = null
       }
-      saveCurrentWorkspace(latestStateRef.current)
+      saveCurrentProject(latestStateRef.current)
     }
   }, [])
 }

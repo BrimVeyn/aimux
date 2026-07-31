@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_TAB_TAIL,
-  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_VERSION,
@@ -27,67 +27,67 @@ describe('ipc protocol v12', () => {
   })
 
   test('advertises every v12 capability', () => {
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKSPACE_LIFECYCLE)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_PROJECT_LIFECYCLE)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_TAIL)
   })
 
-  test('createWorkspace round-trips with a name', () => {
+  test('createProject round-trips with a name', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
         payload: { name: 'my-ws', projectPath: '/tmp/foo', switch: true },
-        type: 'createWorkspace',
+        type: 'createProject',
       })
     ).not.toThrow()
   })
 
-  test('createWorkspace rejects an empty name', () => {
+  test('createProject rejects an empty name', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
         payload: { name: '' },
-        type: 'createWorkspace',
+        type: 'createProject',
       })
-    ).toThrow('createWorkspace.name must be a non-empty string')
+    ).toThrow('createProject.name must be a non-empty string')
   })
 
-  test('switchWorkspace round-trips with a targetProjectId', () => {
+  test('switchProject round-trips with a targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
         payload: { targetProjectId: 'project-2' },
-        type: 'switchWorkspace',
+        type: 'switchProject',
       })
     ).not.toThrow()
   })
 
-  test('switchWorkspace rejects a missing targetProjectId', () => {
+  test('switchProject rejects a missing targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
         payload: {},
-        type: 'switchWorkspace',
+        type: 'switchProject',
       })
-    ).toThrow('switchWorkspace.targetProjectId must be a string')
+    ).toThrow('switchProject.targetProjectId must be a string')
   })
 
-  test('closeWorkspace round-trips with targetProjectId', () => {
+  test('closeProject round-trips with targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r3',
         payload: { targetProjectId: 'project-3' },
-        type: 'closeWorkspace',
+        type: 'closeProject',
       })
     ).not.toThrow()
   })
 
-  test('announceWorkspaceSwitched round-trips', () => {
+  test('announceProjectSwitched round-trips', () => {
     expect(() =>
       parseClientRequest({
         id: 'r4',
         payload: { projectId: 'project-4' },
-        type: 'announceWorkspaceSwitched',
+        type: 'announceProjectSwitched',
       })
     ).not.toThrow()
   })
@@ -122,38 +122,38 @@ describe('ipc protocol v12', () => {
     ).not.toThrow()
   })
 
-  test('workspaceSwitchRequested event round-trips', () => {
+  test('projectSwitchRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
         payload: { targetProjectId: 'project-1' },
-        type: 'workspaceSwitchRequested',
+        type: 'projectSwitchRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceCreateRequested event round-trips', () => {
+  test('projectCreateRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
         payload: { name: 'ws', projectPath: '/tmp/x', switch: false },
-        type: 'workspaceCreateRequested',
+        type: 'projectCreateRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceCloseRequested event round-trips', () => {
+  test('projectCloseRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
         payload: { targetProjectId: 'project-1' },
-        type: 'workspaceCloseRequested',
+        type: 'projectCloseRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceSwitched event round-trips', () => {
+  test('projectSwitched event round-trips', () => {
     expect(() =>
       parseServerMessage({
         payload: { projectId: 'project-1' },
-        type: 'workspaceSwitched',
+        type: 'projectSwitched',
       })
     ).not.toThrow()
   })

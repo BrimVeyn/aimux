@@ -18,25 +18,23 @@ export interface CreateWorktreeParams {
   branch: string
   daemon: DaemonClient
   name: string
-  workspace: ProjectRecord
+  project: ProjectRecord
 }
 
 /**
- * Create a git worktree + its catalog record for a workspace. Shared by
+ * Create a git worktree + its catalog record for a project. Shared by
  * `worktree create` and `tab create --new-worktree`. Checks the daemon
  * capability BEFORE touching disk, and rolls back the on-disk worktree if
  * catalog registration fails (so `worktree list` never surfaces an orphan).
  * Throws on any failure; returns the registered record on success.
  */
-export async function createWorkspaceWorktree(
-  params: CreateWorktreeParams
-): Promise<WorktreeRecord> {
-  const { base, branch, daemon, name, workspace } = params
+export async function createProjectWorktree(params: CreateWorktreeParams): Promise<WorktreeRecord> {
+  const { base, branch, daemon, name, project } = params
 
-  const primary = workspace.worktrees?.find((w) => w.source === 'primary')
+  const primary = project.worktrees?.find((w) => w.source === 'primary')
   if (!primary) {
     throw new Error(
-      `workspace "${workspace.name}" has no primary worktree — set --project when creating it`
+      `project "${project.name}" has no primary worktree — set --project when creating it`
     )
   }
 
@@ -49,13 +47,13 @@ export async function createWorkspaceWorktree(
   }
 
   // Verify the base ref in the REPO WE ARE ABOUT TO USE, before touching disk.
-  // The workspace decides the repo, so a caller who believes it is orchestrating
-  // project A while the resolved workspace points at project B would otherwise
+  // The project decides the repo, so a caller who believes it is orchestrating
+  // project A while the resolved project points at project B would otherwise
   // get either a confusing bare git error or — when the ref exists in both repos
   // — a silent success in the wrong project.
   if ((await resolveGitRef(primary.repoRoot, base)) === undefined) {
     throw new Error(
-      `base ref "${base}" does not exist in ${primary.repoRoot} (workspace "${workspace.name}") — check that this is the repository you meant`
+      `base ref "${base}" does not exist in ${primary.repoRoot} (project "${project.name}") — check that this is the repository you meant`
     )
   }
 
@@ -97,7 +95,7 @@ export async function createWorkspaceWorktree(
   }
 
   try {
-    await daemon.expectOk('addWorktreeRecord', { projectId: workspace.id, worktree: record })
+    await daemon.expectOk('addWorktreeRecord', { projectId: project.id, worktree: record })
   } catch (error) {
     // Catalog registration failed — roll back the on-disk worktree so
     // `worktree list` doesn't perpetually surface an orphan. Swallow rollback

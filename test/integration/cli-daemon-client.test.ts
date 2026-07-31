@@ -9,8 +9,8 @@ import {
   type ClientRequest,
   encodeMessage,
   IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_THIN_ATTACH,
-  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
   IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
@@ -223,59 +223,59 @@ describe('CLI DaemonClient', () => {
     expect(seen).toEqual([{ projectId: 'project-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
   })
 
-  test('createWorkspace request round-trips (v12)', async () => {
+  test('createProject request round-trips (v12)', async () => {
     const socketPath = tempSocketPath()
-    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
     cleanups.push(mock.close)
 
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('createWorkspace', { name: 'ws', projectPath: '/tmp/x', switch: true })
-    const req = mock.received.find((m) => m.type === 'createWorkspace')
+    await client.expectOk('createProject', { name: 'ws', projectPath: '/tmp/x', switch: true })
+    const req = mock.received.find((m) => m.type === 'createProject')
     expect(req?.payload).toEqual({ name: 'ws', projectPath: '/tmp/x', switch: true })
   })
 
-  test('switchWorkspace request round-trips (v12)', async () => {
+  test('switchProject request round-trips (v12)', async () => {
     const socketPath = tempSocketPath()
-    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
     cleanups.push(mock.close)
 
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('switchWorkspace', { targetProjectId: 'project-2' })
-    const req = mock.received.find((m) => m.type === 'switchWorkspace')
+    await client.expectOk('switchProject', { targetProjectId: 'project-2' })
+    const req = mock.received.find((m) => m.type === 'switchProject')
     expect(req?.payload).toEqual({ targetProjectId: 'project-2' })
   })
 
-  test('closeWorkspace request round-trips (v12)', async () => {
+  test('closeProject request round-trips (v12)', async () => {
     const socketPath = tempSocketPath()
-    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
     cleanups.push(mock.close)
 
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    await client.expectOk('closeWorkspace', { targetProjectId: 'project-3' })
-    const req = mock.received.find((m) => m.type === 'closeWorkspace')
+    await client.expectOk('closeProject', { targetProjectId: 'project-3' })
+    const req = mock.received.find((m) => m.type === 'closeProject')
     expect(req?.payload).toEqual({ targetProjectId: 'project-3' })
   })
 
-  test('workspaceSwitched broadcast lands on the subscriber', async () => {
+  test('projectSwitched broadcast lands on the subscriber', async () => {
     const socketPath = tempSocketPath()
-    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE])
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
     cleanups.push(mock.close)
 
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
     const seen: string[] = []
-    client.on('workspaceSwitched', (payload) => seen.push(payload.projectId))
+    client.on('projectSwitched', (payload) => seen.push(payload.projectId))
 
     mock.emit({
       payload: { projectId: 'project-9' },
-      type: 'workspaceSwitched',
+      type: 'projectSwitched',
     })
 
     const deadline = Date.now() + 500

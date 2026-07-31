@@ -2,9 +2,9 @@ import { EventEmitter } from 'node:events'
 
 import type {
   AssistantId,
+  ProjectSnapshotV1,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 import type { ProjectBackendEvents, ResizeOptions, SessionBackend } from './types'
 
@@ -101,16 +101,16 @@ export class LocalSessionBackend
     projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }) {
     logDebug('backend.local.attach', {
       cols: options.cols,
       projectId: options.projectId,
       rows: options.rows,
-      snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
+      snapshotTabs: options.projectSnapshot?.tabs.length ?? 0,
     })
     this.currentProjectId = options.projectId
-    const trees = getSnapshotTrees(options.workspaceSnapshot)
+    const trees = getSnapshotTrees(options.projectSnapshot)
     const splitTrees = trees.filter((t) => t.type === 'split')
     if (splitTrees.length > 0) {
       const bounds = createTerminalBounds(options.cols, options.rows)
@@ -124,7 +124,7 @@ export class LocalSessionBackend
     }
     const attachResult = this.sessionManager.attachSession(
       options.projectId,
-      options.workspaceSnapshot
+      options.projectSnapshot
     )
     for (const tab of attachResult.tabs) {
       this.gatePaneRender(tab.id)
@@ -279,7 +279,7 @@ export class LocalSessionBackend
     this.currentProjectId = null
   }
 
-  announceWorkspaceSwitched(_projectId: string): void {
+  announceProjectSwitched(_projectId: string): void {
     // No daemon on the local backend, so there's no CLI to notify.
   }
 

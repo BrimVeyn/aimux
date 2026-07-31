@@ -32,7 +32,7 @@ export const tabList: CliCommand = {
   ],
   group: 'tab',
   run: async (ctx) => {
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     const verbose = ctx.args.flags.verbose === true
 
@@ -43,7 +43,7 @@ export const tabList: CliCommand = {
     }
 
     if (daemon.hasCapability(IPC_CAPABILITY_LIST_TABS)) {
-      const result = await daemon.listTabs(workspace.id)
+      const result = await daemon.listTabs(project.id)
       const tabs = verbose ? result.tabs : result.tabs.map(stripLastLine)
       writeJson({ activeTabId: result.activeTabId, tabs })
       return EXIT_OK
@@ -60,7 +60,7 @@ export const tabList: CliCommand = {
     // principle land here, but that combination shouldn't ship.
     const attach = await daemon.attach({
       cols: 0,
-      projectId: workspace.id,
+      projectId: project.id,
       rows: 0,
       thin: true,
     })
@@ -78,6 +78,6 @@ export const tabList: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'List tabs in the active workspace',
+  summary: 'List tabs in the active project',
   verb: 'list',
 }

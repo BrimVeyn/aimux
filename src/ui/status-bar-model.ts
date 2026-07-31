@@ -61,7 +61,7 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
     state.currentProjectId != null && state.currentProjectId !== ''
       ? state.projects.find((project) => project.id === state.currentProjectId)
       : undefined
-  const projectName = currentProject?.name ?? 'no workspace'
+  const projectName = currentProject?.name ?? 'no project'
   const projectPath = getActiveWorktreePath(currentProject)
   const projectSegs = projectSegments(projectName, projectPath)
 

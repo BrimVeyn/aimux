@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { isWorkspaceSnapshotV1 } from '../../src/state/validation'
+import { isProjectSnapshotV1 } from '../../src/state/validation'
 
 describe('config edge cases', () => {
-  test('workspace snapshot accepts custom assistant ids', () => {
+  test('project snapshot accepts custom assistant ids', () => {
     const snapshot = {
       activeTabId: 'tab-1',
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -31,10 +31,10 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(true)
+    expect(isProjectSnapshotV1(snapshot)).toBe(true)
   })
 
-  test('workspace snapshot rejects empty assistant id', () => {
+  test('project snapshot rejects empty assistant id', () => {
     const snapshot = {
       activeTabId: 'tab-1',
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -59,10 +59,10 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 
-  test('workspace snapshot rejects non-string assistant id', () => {
+  test('project snapshot rejects non-string assistant id', () => {
     const snapshot = {
       activeTabId: null,
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -87,18 +87,18 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 
-  test('workspace snapshot rejects missing required fields', () => {
-    expect(isWorkspaceSnapshotV1(null)).toBe(false)
-    expect(isWorkspaceSnapshotV1(undefined)).toBe(false)
-    expect(isWorkspaceSnapshotV1({})).toBe(false)
-    expect(isWorkspaceSnapshotV1({ version: 2 })).toBe(false)
-    expect(isWorkspaceSnapshotV1('string')).toBe(false)
+  test('project snapshot rejects missing required fields', () => {
+    expect(isProjectSnapshotV1(null)).toBe(false)
+    expect(isProjectSnapshotV1(undefined)).toBe(false)
+    expect(isProjectSnapshotV1({})).toBe(false)
+    expect(isProjectSnapshotV1({ version: 2 })).toBe(false)
+    expect(isProjectSnapshotV1('string')).toBe(false)
   })
 
-  test('workspace snapshot rejects tabs with invalid status', () => {
+  test('project snapshot rejects tabs with invalid status', () => {
     const snapshot = {
       activeTabId: null,
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -123,7 +123,7 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 })
 
@@ -228,7 +228,7 @@ describe('bars config loading', () => {
       left: {
         visible: true,
         widgets: [
-          { grow: 60, id: 'workspaces', visible: true },
+          { grow: 60, id: 'projects', visible: true },
           { grow: 40, id: 'git', visible: true },
         ],
         width: 33,
@@ -256,7 +256,7 @@ describe('bars config loading', () => {
 
     const { loadConfig } = await import(`../../src/config.ts?bars-pane=${Date.now()}`)
     const bars = loadConfig().bars
-    expect(bars?.left.widgets).toEqual([{ grow: 100, id: 'workspaces', visible: true }])
+    expect(bars?.left.widgets).toEqual([{ grow: 100, id: 'projects', visible: true }])
     expect(bars?.right).toEqual({
       visible: true,
       widgets: [{ grow: 100, id: 'git', visible: true }],
@@ -275,7 +275,7 @@ describe('bars config loading', () => {
       left: { visible: true, widgets: [{ grow: 100, id: 'git', visible: true }], width: 20 },
       right: {
         visible: true,
-        widgets: [{ grow: 100, id: 'workspaces', visible: true }],
+        widgets: [{ grow: 100, id: 'projects', visible: true }],
         width: 25,
       },
     }
