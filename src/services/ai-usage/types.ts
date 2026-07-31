@@ -2,7 +2,7 @@ import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 export type { AIUsageTool }
 
-export type UsageWindowKind = 'project' | 'weekly' | 'sonnet' | 'opus' | 'primary' | 'secondary'
+export type UsageWindowKind = 'session' | 'weekly' | 'sonnet' | 'opus' | 'primary' | 'secondary'
 
 export type UsagePaceStage =
   | 'farAhead'

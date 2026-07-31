@@ -20,7 +20,9 @@ describe('initial state', () => {
 
     expect(state.bars.left.visible).toBe(false)
     expect(state.bars.left.width).toBe(33)
-    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git'])
+    // `projects` was in neither bar, so it is restored — see the widget
+    // integrity test below.
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
   })
 
   test('clamps persisted bar width and drops unknown widget ids', () => {
@@ -32,8 +34,62 @@ describe('initial state', () => {
     })
 
     expect(state.bars.left.width).toBe(18)
-    expect(state.bars.left.widgets).toEqual([])
     expect(state.bars.right.width).toBe(80)
+    expect(state.bars.left.widgets.map((w) => w.id)).not.toContain('nope')
+  })
+
+  test('restores a widget that is in neither bar', () => {
+    // A widget can only be moved between bars or hidden, never deleted, so an
+    // id present nowhere means the persisted layout was corrupted. This is the
+    // state the pre-rename `workspaces` id left behind: it was pruned as
+    // unknown, the sidebar rendered empty, and the emptiness was saved back.
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: { visible: true, widgets: [], width: 33 },
+        right: { visible: true, widgets: [{ grow: 50, id: 'git', visible: true }], width: 40 },
+      },
+    })
+
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['projects'])
+    // git was already placed by the user; it must not be duplicated.
+    expect(state.bars.right.widgets.map((w) => w.id)).toEqual(['git'])
+  })
+
+  test('migrates the pre-rename `workspaces` widget id to `projects`', () => {
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: {
+          visible: true,
+          widgets: [{ grow: 50, id: 'workspaces', visible: true }],
+          width: 33,
+        },
+        right: { visible: true, widgets: [{ grow: 50, id: 'git', visible: true }], width: 40 },
+      },
+    })
+
+    // Renamed in place, keeping the user's grow/visible and bar placement.
+    expect(state.bars.left.widgets).toEqual([{ grow: 50, id: 'projects', visible: true }])
+  })
+
+  test('a hidden widget stays in place and is not treated as missing', () => {
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: {
+          visible: true,
+          widgets: [
+            { grow: 50, id: 'projects', visible: false },
+            { grow: 50, id: 'git', visible: true },
+          ],
+          width: 33,
+        },
+        right: { visible: false, widgets: [], width: 40 },
+      },
+    })
+
+    expect(state.bars.left.widgets).toEqual([
+      { grow: 50, id: 'projects', visible: false },
+      { grow: 50, id: 'git', visible: true },
+    ])
   })
 })
 

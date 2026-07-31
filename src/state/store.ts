@@ -55,6 +55,15 @@ export const DEFAULT_BARS: BarsState = {
 }
 
 /**
+ * Persisted widget ids from before the project/workspace rename. Without this
+ * the old id is simply unknown, so the widget is pruned, the bar renders empty
+ * and the emptied layout is written straight back to aimux.json.
+ *
+ * ponytail: drop with the other rename shims.
+ */
+const LEGACY_WIDGET_IDS: Record<string, string> = { workspaces: 'projects' }
+
+/**
  * Drop widget ids this build cannot render (config written by a newer or
  * patched version) and normalise widths — the only place unknown ids can enter.
  */
@@ -62,11 +71,29 @@ function sanitizeBars(bars: BarsState): BarsState {
   const sanitizeBar = (bar: BarsState[keyof BarsState]): BarsState[keyof BarsState] => ({
     ...bar,
     widgets: bar.widgets
+      .map((widget) => ({ ...widget, id: LEGACY_WIDGET_IDS[widget.id] ?? widget.id }))
       .filter((widget) => (KNOWN_WIDGET_IDS as readonly string[]).includes(widget.id))
       .map((widget) => ({ ...widget, grow: Math.max(1, Math.round(widget.grow)) })),
     width: clampBarWidth(bar.width),
   })
-  return { left: sanitizeBar(bars.left), right: sanitizeBar(bars.right) }
+  const sanitized: BarsState = { left: sanitizeBar(bars.left), right: sanitizeBar(bars.right) }
+
+  // A widget can only ever be moved between bars or hidden, never deleted, so
+  // one that is in neither bar means the persisted layout was corrupted —
+  // which is exactly what the pre-rename `workspaces` id did to older files
+  // before LEGACY_WIDGET_IDS existed. Put it back where it ships by default,
+  // otherwise the bar renders empty forever and re-saves that emptiness.
+  for (const side of ['left', 'right'] as const) {
+    for (const fallback of DEFAULT_BARS[side].widgets) {
+      const present =
+        sanitized.left.widgets.some((w) => w.id === fallback.id) ||
+        sanitized.right.widgets.some((w) => w.id === fallback.id)
+      if (!present) {
+        sanitized[side] = { ...sanitized[side], widgets: [...sanitized[side].widgets, fallback] }
+      }
+    }
+  }
+  return sanitized
 }
 
 export function createInitialState(
