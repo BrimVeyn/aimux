@@ -61,10 +61,11 @@ Mode ids are not aliased; `.mode('modal.create-session', …)` throws.
 | `modal.new-tab.worktree-delete-confirm` | _(removed)_                      |
 | _(new)_                                 | `modal.create-workspace`         |
 
-### Renamed config key
+### Renamed config keys
 
-`worktreeTemplates` is now `workspaceTemplates`. The old key is still read in
-0.9.0 and reports a config issue; rename it.
+`worktreeTemplates` is now `workspaceTemplates`, and `sessionBar` is now
+`projectBar`. Both old keys are still read in 0.9.0; rename them. (An unknown
+key parses silently, so without the fallback the setting would just vanish.)
 
 ## What This Package Does
 
@@ -104,20 +105,20 @@ If you use another profile, replace `default` with that profile name.
 import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  sessionBar: {
+  projectBar: {
     initialPosition: 'top',
     initialVisible: true,
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
+    k.mode('navigation', (m) => m.map('<C-g>', actions.projectPicker, 'Project picker')),
 })
 ```
 
 This example only uses surfaces that are wired into the runtime today.
 
 Important: typed config expresses startup intent. Fields such as
-`sessionBar.initialVisible` or `gitPane.initialMode` are reapplied on every
+`projectBar.initialVisible` or `gitPane.initialMode` are reapplied on every
 launch; runtime UI changes do not write back into `aimux.config.ts`.
 
 ## Key Notation
@@ -201,11 +202,12 @@ explanation.
 Pre-built actions include:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
+- projects: `projectPicker`, `switchProjectByIndex(n)` and project modal actions
+- workspaces: `createWorkspaceModal`, `openWorkspaceMove` and workspace modal actions
 - snippets: `snippetPicker`, snippet editor and filter actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `toggleSessionBar`, `toggleGitPane`,
+- UI: `toggleSidebar`, `toggleProjectBar`, `toggleGitPane`,
   `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: enter git mode, stage, delete or unstage, commit, push
@@ -244,7 +246,7 @@ palette guidance, and precedence details.
 | Surface      | Status             | Notes                                                                                |
 | ------------ | ------------------ | ------------------------------------------------------------------------------------ |
 | `keymaps`    | Supported          | Fully registered by the runtime                                                      |
-| `sessionBar` | Supported          | Startup overrides; app-managed runtime state still persists separately               |
+| `projectBar` | Supported          | Startup overrides; app-managed runtime state still persists separately               |
 | `gitPane`    | Supported          | Startup overrides for placement and rendering; runtime state persists separately     |
 | `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins |
 | `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting                 |

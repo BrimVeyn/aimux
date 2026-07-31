@@ -1213,6 +1213,8 @@ export interface AimuxUserConfig {
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
   projectBar?: ProjectBarConfig
+  /** @deprecated renamed to `projectBar`. Still read in 0.9.0. */
+  sessionBar?: ProjectBarConfig
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
@@ -1233,6 +1235,8 @@ export interface AimuxUserConfig {
    * workspace creation. Selected from a picker in the new-tab modal.
    */
   workspaceTemplates?: WorkspaceTemplate[]
+  /** @deprecated renamed to `workspaceTemplates`. Still read in 0.9.0. */
+  worktreeTemplates?: WorkspaceTemplate[]
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────

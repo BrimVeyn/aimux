@@ -347,6 +347,8 @@ export function loadConfigResult(): ConfigLoadResult {
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
       projectBarVisible?: unknown
+      /** ponytail: pre-rename spelling, honoured for one release. */
+      sessionBarVisible?: unknown
       projectSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
@@ -421,9 +423,12 @@ export function loadConfigResult(): ConfigLoadResult {
       }
     }
 
+    // `sessionBarVisible` was the pre-rename key; without the fallback the bar
+    // would silently reset to its default on the first launch after upgrading.
+    const rawProjectBarVisible = parsed.projectBarVisible ?? parsed.sessionBarVisible
     const validProjectBarVisible =
-      typeof parsed.projectBarVisible === 'boolean' ? parsed.projectBarVisible : undefined
-    if (parsed.projectBarVisible !== undefined && validProjectBarVisible === undefined) {
+      typeof rawProjectBarVisible === 'boolean' ? rawProjectBarVisible : undefined
+    if (rawProjectBarVisible !== undefined && validProjectBarVisible === undefined) {
       issues.push('ignored invalid projectBarVisible')
     }
 

@@ -52,7 +52,7 @@ The terminal manager owns:
 
 - PTYs
 - headless terminal emulators
-- live workspace state
+- live project state
 
 This is why a daemon restart does not need to kill live tabs.
 
@@ -71,7 +71,7 @@ Important files:
 Important nuance:
 
 - `resolvedConfig.keymaps` is registered by the runtime
-- `resolvedConfig.sessionBar` is consumed at startup
+- `resolvedConfig.projectBar` is consumed at startup
 - several other resolved top-level fields are currently exported but not fully
   consumed by the runtime
 
@@ -82,16 +82,16 @@ Important nuance:
 - `src/config.ts`
 - file: `aimux.json`
 
-Stores UI/runtime preferences such as theme ID, workspace bar state, git panel
-state, custom commands, and legacy workspace data.
+Stores UI/runtime preferences such as theme ID, project bar state, git panel
+state, custom commands, and legacy project data.
 
-### Workspace catalog
+### Project catalog
 
-- `src/state/session-catalog.ts`
-- `src/state/session-persistence.ts`
-- file: `aimux-sessions.json`
+- `src/state/project-catalog.ts`
+- `src/state/project-persistence.ts`
+- file: `aimux-projects.json`
 
-Stores named workspaces and per-workspace workspace snapshots.
+Stores named projects and per-project project snapshots.
 
 ### Snippet catalog
 
@@ -144,21 +144,21 @@ tab's viewport through heuristics adapted from
 ### Data flow
 
 1. `src/pty/assistant-status-detection-loop.ts` — the loop; calls
-   `AssistantStatusDetector` per tab, emits `onTabStatus` / `onSessionStatus`
+   `AssistantStatusDetector` per tab, emits `onTabStatus` / `onProjectStatus`
    callbacks when the classification changes.
 2. `src/daemon/daemon.ts` — owns the `tabRegistry` (tab → viewport / sessionId
-   map) and feeds it to the loop; broadcasts `tabStatus` and `sessionStatus`
+   map) and feeds it to the loop; broadcasts `tabStatus` and `projectStatus`
    IPC events to all connected clients.
 3. Client-side (`src/app-runtime/backend-runtime-events.ts`) dispatches
-   `set-tab-activity` and `set-session-status` state actions on receipt.
+   `set-tab-activity` and `set-project-status` state actions on receipt.
 
 ### Atomic attach
 
 When a client attaches, the daemon runs `classifyNow` synchronously before
 sending the `attachResult` response. The result payload embeds the current
-tab activities and session statuses (`initialSessionStatuses`) so the client
-applies them in a single `hydrate-workspace` dispatch — preventing the race
-where separate `tabStatus` / `sessionStatus` events arrived before the tab
+tab activities and project statuses (`initialProjectStatuses`) so the client
+applies them in a single `hydrate-project` dispatch — preventing the race
+where separate `tabStatus` / `projectStatus` events arrived before the tab
 existed in client state.
 
 ### Viewport sequencing
