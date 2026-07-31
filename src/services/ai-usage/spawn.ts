@@ -10,9 +10,11 @@ const DEFAULT_TIMEOUT_MS = 15_000
 export async function runCli(
   command: string,
   args: string[],
-  timeoutMs: number = DEFAULT_TIMEOUT_MS
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+  cwd?: string
 ): Promise<CliResult> {
   const proc = Bun.spawn([command, ...args], {
+    cwd,
     stderr: 'pipe',
     stdin: 'ignore',
     stdout: 'pipe',
