@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { ProjectRecord } from './types'
@@ -84,6 +84,25 @@ function migrateV1(records: LegacyProjectRecordV1[]): unknown[] {
   })
 }
 
+/**
+ * Copy the catalog aside before the load path writes over it. Called whenever
+ * we could not read the file whole: the app is about to persist its own
+ * reduced view, and without this that write is the point of no return.
+ */
+function backupUnreadableCatalog(): void {
+  const source = projectsPath()
+  if (!existsSync(source)) return
+  const target = `${source}.unreadable`
+  try {
+    copyFileSync(source, target)
+    logDebug('projects.catalog.backup', { target })
+  } catch (error) {
+    logDebug('projects.catalog.backupFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
 function parseCatalog(path: string, version: number): { projects: unknown[] } | { issue: string } {
   const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
     version?: unknown
@@ -106,7 +125,10 @@ function readCatalogFile(): { file: ProjectCatalogFile | null; issue?: string } 
     let records: unknown[]
     if (existsSync(projectsPath())) {
       const parsed = parseCatalog(projectsPath(), CATALOG_VERSION)
-      if ('issue' in parsed) return { file: null, issue: parsed.issue }
+      if ('issue' in parsed) {
+        backupUnreadableCatalog()
+        return { file: null, issue: parsed.issue }
+      }
       records = parsed.projects
     } else if (existsSync(legacySessionsPath())) {
       const parsed = parseCatalog(legacySessionsPath(), 1)
@@ -117,12 +139,23 @@ function readCatalogFile(): { file: ProjectCatalogFile | null; issue?: string } 
       return { file: null }
     }
 
-    if (!records.every(isProjectRecord)) {
-      return { file: null, issue: 'invalid project catalog entries' }
+    // Keep the records that survive validation instead of failing the whole
+    // file: one malformed entry used to cost the user every project, and since
+    // the load path writes back what it loaded, that loss became permanent on
+    // the next save. Whatever we could not read is preserved by the backup
+    // below, so nothing is destroyed either way.
+    const valid = records.filter(isProjectRecord)
+    if (valid.length !== records.length) {
+      backupUnreadableCatalog()
+      return {
+        file: { projects: valid, version: CATALOG_VERSION },
+        issue: `${records.length - valid.length} unreadable project record(s) skipped`,
+      }
     }
 
-    return { file: { projects: records, version: CATALOG_VERSION } }
+    return { file: { projects: valid, version: CATALOG_VERSION } }
   } catch (error) {
+    backupUnreadableCatalog()
     return {
       file: null,
       issue: `failed to load project catalog: ${error instanceof Error ? error.message : String(error)}`,
@@ -134,6 +167,11 @@ export function loadProjectCatalog(): ProjectRecord[] {
   const { file, issue } = readCatalogFile()
   if (file) {
     logDebug('projects.catalog.load', { projectCount: file.projects.length })
+    if (issue != null && issue !== '') {
+      // Same reasoning as the save path below: losing projects is not something
+      // the user should have to read a debug log to discover.
+      toast.error(`${issue} — original kept at ${projectsPath()}.unreadable`)
+    }
     const normalized = normalizeProjects(file.projects)
     // A fresh migration has no v2 file yet, so write even when normalizing
     // changed nothing.

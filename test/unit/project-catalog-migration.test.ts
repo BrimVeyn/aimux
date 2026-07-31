@@ -182,3 +182,33 @@ test('an existing v2 catalog wins and the migration does not re-run', () => {
 test('no catalog at all yields no projects', () => {
   expect(loadProjectCatalog()).toEqual([])
 })
+
+test('a corrupt record costs only itself, and the original is kept', () => {
+  mkdirSync(configDir(), { recursive: true })
+  mkdirSync(repoPath(), { recursive: true })
+  mkdirSync(featurePath(), { recursive: true })
+  const good = { ...legacyRecord(), activeWorktreeId: undefined, id: 'project-good' }
+  writeFileSync(
+    getProjectCatalogPath(),
+    JSON.stringify(
+      { projects: [good, { id: 'project-broken' }, { ...good, id: 'project-good-2' }], version: 2 },
+      null,
+      2
+    )
+  )
+
+  const projects = loadProjectCatalog()
+
+  // The two readable projects survive; only the malformed one is dropped.
+  expect(projects.map((p) => p.id)).toEqual(['project-good', 'project-good-2'])
+  // ...and the file as it was on disk is still recoverable, because the load
+  // path is about to write its own reduced view over the original.
+  const backup = `${getProjectCatalogPath()}.unreadable`
+  expect(existsSync(backup)).toBe(true)
+  const saved = JSON.parse(readFileSync(backup, 'utf8')) as { projects: { id: string }[] }
+  expect(saved.projects.map((p) => p.id)).toEqual([
+    'project-good',
+    'project-broken',
+    'project-good-2',
+  ])
+})
