@@ -57,14 +57,13 @@ function screenText(viewport: TerminalSnapshot | undefined): string {
   return viewport.lines.map((line) => getLineText(line)).join('\n')
 }
 
-/** The needle we look for on screen, or null when the prompt is too short to match on. */
+/** The needle we look for on screen, or null when the prompt cannot be matched on. */
 function echoProbe(prompt: string): string | null {
-  const firstLine = prompt
-    .split('\n')
-    .map((line) => line.trim())
-    .find((line) => line !== '')
-  if (firstLine == null) return null
-  const probe = firstLine.slice(0, PROBE_LENGTH)
+  // A multi-line paste is folded into a "[Pasted text #1 +N lines]" placeholder
+  // by every assistant we ship, so there would be nothing on screen to find and
+  // every attempt would "fail" until the cap.
+  if (prompt.includes('\n')) return null
+  const probe = prompt.trim().slice(0, PROBE_LENGTH)
   return probe.length >= MIN_PROBE_LENGTH ? probe : null
 }
 

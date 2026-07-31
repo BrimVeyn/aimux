@@ -516,18 +516,12 @@ export function TerminalPane({
       onTerminalScrollEvent,
     ]
   )
-  const handleNoTabMouseDown = useCallback(
-    (event: OtuiMouseEvent) => {
-      event.stopPropagation()
-      if (emptyAcceptsTabs) {
-        runSideEffectGlobal({ type: 'open-new-tab' })
-        return
-      }
-      dispatchGlobal({ type: 'open-create-workspace-modal' })
-      runSideEffectGlobal({ type: 'load-create-workspace-base-branches' })
-    },
-    [emptyAcceptsTabs]
-  )
+  const handleNoTabMouseDown = useCallback((event: OtuiMouseEvent) => {
+    event.stopPropagation()
+    // Opens the picker, or the create-workspace modal when there is no
+    // workspace to put a tab in — the effect owns that rule.
+    runSideEffectGlobal({ type: 'open-new-tab' })
+  }, [])
   const handleContentMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
       e.stopPropagation()

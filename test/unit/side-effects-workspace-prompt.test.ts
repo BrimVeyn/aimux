@@ -117,7 +117,7 @@ test('a plain new tab sends nothing', async () => {
   expect(writes).toEqual([])
 })
 
-test('<C-n> is refused while the project sits on its primary checkout', () => {
+test('<C-n> asks for a workspace while the project sits on its primary checkout', () => {
   const base = seed()
   const project = base.projects[0]
   if (!project) throw new Error('expected a seeded project')
@@ -147,8 +147,9 @@ test('<C-n> is refused while the project sits on its primary checkout', () => {
 
   executeSideEffect({ type: 'open-new-tab' }, ctx)
 
-  // Nothing opens: tabs live in workspaces, and `<C-p>` is the way out.
-  expect(ctx.getState().modal.type).toBeNull()
+  // No new-tab picker: tabs live in workspaces, so the ask is redirected to
+  // the one thing that would make a tab possible.
+  expect(ctx.getState().modal.type).toBe('create-workspace')
 })
 
 test('<C-n> opens the picker once a real workspace is active', () => {

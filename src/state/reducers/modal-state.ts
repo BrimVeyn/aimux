@@ -50,6 +50,46 @@ function getCreateWorkspaceBaseOptions(state: AppState, queryOverride?: string):
   )
 }
 
+/**
+ * How many rows the open modal's list has, for the two cases that move the
+ * selection through it. They read the same list, so they read it from here:
+ * two copies of this chain drift apart the moment one modal's list changes.
+ * Modals whose list is not indexed this way (create-workspace's own fields,
+ * flash-jump) return 0 and are handled by their case before it gets here.
+ */
+function getModalOptionCount(state: AppState): number {
+  const { modal } = state
+  switch (modal.type) {
+    case 'create-project':
+      return modal.directoryResults.length
+    case 'help':
+      return modal.entryCount
+    case 'new-tab':
+      return getNewTabAssistantOptions(
+        state.customCommands,
+        modal.editBuffer,
+        modal.pendingWorkspace != null
+      ).length
+    case 'project-picker':
+      // `+1` for the "create a project" row the picker appends, and at least
+      // that row exists even when nothing matches the filter.
+      return Math.max(1, filterProjects(state.projects, modal.editBuffer).length + 1)
+    case 'snippet-picker':
+      return filterSnippets(state.snippets, modal.editBuffer).length
+    case 'split-picker':
+      return getAllAssistantOptions(state.customCommands).length
+    case 'theme-picker':
+      return filterThemeIds(modal.editBuffer).length
+    case 'update-available':
+      return 2
+    case 'workspace-move':
+      // Every workspace but the one being moved.
+      return Math.max(0, getCurrentWorkspaceCount(state) - 1)
+    default:
+      return 0
+  }
+}
+
 const CREATE_WORKSPACE_FIELDS = ['prompt', 'base'] as const
 
 type CreateWorkspaceField = (typeof CREATE_WORKSPACE_FIELDS)[number]
@@ -659,30 +699,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      let optionCount: number
-      if (state.modal.type === 'new-tab') {
-        optionCount = getNewTabAssistantOptions(
-          state.customCommands,
-          state.modal.editBuffer,
-          state.modal.pendingWorkspace != null
-        ).length
-      } else if (state.modal.type === 'split-picker') {
-        optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-project') {
-        optionCount = state.modal.directoryResults.length
-      } else if (state.modal.type === 'snippet-picker') {
-        const filtered = filterSnippets(state.snippets, state.modal.editBuffer)
-        optionCount = filtered.length
-      } else if (state.modal.type === 'theme-picker') {
-        optionCount = filterThemeIds(state.modal.editBuffer).length
-      } else if (state.modal.type === 'update-available') {
-        optionCount = 2
-      } else if (state.modal.type === 'workspace-move') {
-        optionCount = Math.max(0, getCurrentWorkspaceCount(state) - 1)
-      } else {
-        const filtered = filterProjects(state.projects, state.modal.editBuffer)
-        optionCount = Math.max(1, filtered.length + 1)
-      }
+      const optionCount = getModalOptionCount(state)
       if (optionCount === 0) {
         return state
       }
@@ -731,30 +748,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      let optionCount: number
-      if (state.modal.type === 'help') {
-        optionCount = state.modal.entryCount
-      } else if (state.modal.type === 'new-tab') {
-        optionCount = getNewTabAssistantOptions(
-          state.customCommands,
-          state.modal.editBuffer,
-          state.modal.pendingWorkspace != null
-        ).length
-      } else if (state.modal.type === 'split-picker') {
-        optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-project') {
-        optionCount = state.modal.directoryResults.length
-      } else if (state.modal.type === 'snippet-picker') {
-        optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
-      } else if (state.modal.type === 'theme-picker') {
-        optionCount = filterThemeIds(state.modal.editBuffer).length
-      } else if (state.modal.type === 'update-available') {
-        optionCount = 2
-      } else if (state.modal.type === 'workspace-move') {
-        optionCount = Math.max(0, getCurrentWorkspaceCount(state) - 1)
-      } else {
-        optionCount = Math.max(1, filterProjects(state.projects, state.modal.editBuffer).length + 1)
-      }
+      const optionCount = getModalOptionCount(state)
       if (optionCount === 0) return state
       const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
       if (clamped === state.modal.selectedIndex) return state

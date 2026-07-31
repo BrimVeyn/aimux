@@ -8,6 +8,7 @@ import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDiffStat } from '../../../../state/project-workspaces'
 import { useBaseTheme, useTheme } from '../../../theme'
+import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -21,13 +22,6 @@ interface WorkspaceRowProps {
   /** True when this row's project is the current project (selection scope). */
   inCurrentGroup: boolean
   contentWidth: number
-}
-
-function truncate(label: string, max: number): string {
-  if (max <= 0) return ''
-  if (label.length <= max) return label
-  if (max === 1) return '…'
-  return `${label.slice(0, max - 1)}…`
 }
 
 export const WorkspaceRow = memo(function WorkspaceRow({

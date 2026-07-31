@@ -695,17 +695,20 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'open-new-tab': {
       // aimux never works on the primary checkout: tabs belong to a workspace,
-      // so a project with none is a dead end until `<C-p>` creates one.
+      // so asking for one where there is no workspace asks for the workspace
+      // instead. Every entry point — `<C-n>`, the tab bar's `+`, the empty pane
+      // — routes here, so none of them has to know the rule.
       const project = state.projects.find((entry) => entry.id === state.currentProjectId)
       if (!project) {
         toast.error('Open a project first — <C-g>')
         return
       }
-      if (!acceptsTabs(project)) {
-        toast.error('No workspace yet — <C-p> to create one. aimux never opens tabs on the repo.')
+      if (acceptsTabs(project)) {
+        dispatch({ type: 'open-new-tab-modal' })
         return
       }
-      dispatch({ type: 'open-new-tab-modal' })
+      dispatch({ type: 'open-create-workspace-modal' })
+      executeSideEffect({ type: 'load-create-workspace-base-branches' }, ctx)
       return
     }
     case 'launch-selected-assistant': {

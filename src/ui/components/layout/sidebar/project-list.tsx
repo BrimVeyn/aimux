@@ -15,6 +15,7 @@ import { IDLE_PROJECT_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
+import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
@@ -35,13 +36,6 @@ function arraysEqual(a: string[], b: string[]): boolean {
     if (a[i] !== b[i]) return false
   }
   return true
-}
-
-function truncate(label: string, max: number): string {
-  if (max <= 0) return ''
-  if (label.length <= max) return label
-  if (max === 1) return '…'
-  return `${label.slice(0, max - 1)}…`
 }
 
 export function ProjectList({ contentWidth }: ProjectListProps) {
