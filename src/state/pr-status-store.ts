@@ -25,6 +25,15 @@ export const prStatusStore = createStore<PrStatusState>((set) => ({
   stale: false,
 }))
 
+/**
+ * The PR state row occupies its band both while the first fetch is in flight
+ * and once it resolved to a PR — anything else (no PR, no gh, error) gives the
+ * row back. Shared so the header and the row itself can never disagree and
+ * shift the layout under the user.
+ */
+export const selectPrRowVisible = (state: PrStatusState): boolean =>
+  state.result === null || state.result.kind === 'ok'
+
 export function usePrStatusStore<T>(selector: (state: PrStatusState) => T): T {
   return useStore(prStatusStore, selector)
 }

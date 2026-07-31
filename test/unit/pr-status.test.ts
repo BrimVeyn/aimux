@@ -1,15 +1,24 @@
 import { describe, expect, test } from 'bun:test'
 
-import { parsePrView } from '../../src/git/pr-status'
+import {
+  clampPrBody,
+  parsePrView,
+  prActionState,
+  type PrCheck,
+  type PrSummary,
+} from '../../src/git/pr-status'
 
 // Verbatim `gh pr view --json …` output for BrimVeyn/aimux#98.
 const REAL_PR_98 = {
   additions: 1214,
   baseRefName: 'main',
+  body: 'Adds configurable bars.\n',
   changedFiles: 41,
   deletions: 1017,
   headRefName: 'feat/widget-bars',
   isDraft: false,
+  mergeable: 'UNKNOWN',
+  mergeStateStatus: 'UNKNOWN',
   number: 98,
   reviewDecision: '',
   state: 'MERGED',
@@ -37,10 +46,13 @@ describe('parsePrView', () => {
     expect(result.pr).toEqual({
       additions: 1214,
       base: 'main',
+      body: 'Adds configurable bars.',
       changedFiles: 41,
       deletions: 1017,
       head: 'feat/widget-bars',
       isDraft: false,
+      mergeable: 'UNKNOWN',
+      mergeStateStatus: 'UNKNOWN',
       number: 98,
       reviewDecision: '',
       state: 'MERGED',
@@ -145,5 +157,120 @@ describe('parsePrView', () => {
     expect(result.checks).toEqual([])
     expect(result.pr.additions).toBe(0)
     expect(result.pr.base).toBe('')
+    expect(result.pr.body).toBe('')
+  })
+})
+
+function pr(overrides: Partial<PrSummary> = {}): PrSummary {
+  return {
+    additions: 0,
+    base: 'main',
+    body: '',
+    changedFiles: 0,
+    deletions: 0,
+    head: 'feature',
+    isDraft: false,
+    mergeable: 'MERGEABLE',
+    mergeStateStatus: 'CLEAN',
+    number: 1,
+    reviewDecision: '',
+    state: 'OPEN',
+    title: 'wip',
+    url: 'https://github.com/o/r/pull/1',
+    ...overrides,
+  }
+}
+
+const PENDING: PrCheck[] = [
+  { durationMs: null, name: 'build', state: 'pending', url: '', workflow: 'CI' },
+]
+
+describe('prActionState', () => {
+  test('offers merge on a clean PR', () => {
+    expect(prActionState(pr(), [])).toEqual({
+      action: 'merge',
+      label: 'Ready to merge',
+      tone: 'ok',
+    })
+  })
+
+  test('still offers merge when only non-required checks failed', () => {
+    const state = prActionState(pr({ mergeStateStatus: 'UNSTABLE' }), [])
+    expect(state.action).toBe('merge')
+    expect(state.label).toBe('Checks failing')
+  })
+
+  test('offers nothing while a check is still running', () => {
+    expect(prActionState(pr(), PENDING)).toEqual({
+      action: null,
+      label: 'Checks running',
+      tone: 'neutral',
+    })
+  })
+
+  test('conflicts outrank a still-running check', () => {
+    const state = prActionState(
+      pr({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }),
+      PENDING
+    )
+    expect(state).toEqual({ action: null, label: 'Merge conflicts', tone: 'blocked' })
+  })
+
+  test('terminal states outrank everything, including conflicts', () => {
+    expect(prActionState(pr({ mergeable: 'CONFLICTING', state: 'MERGED' }), PENDING).label).toBe(
+      'Merged'
+    )
+    expect(prActionState(pr({ state: 'CLOSED' }), []).label).toBe('Closed')
+  })
+
+  test('never offers merge on a draft', () => {
+    expect(prActionState(pr({ isDraft: true }), [])).toEqual({
+      action: null,
+      label: 'Draft',
+      tone: 'neutral',
+    })
+  })
+
+  test('labels the blocking merge states without an action', () => {
+    expect(prActionState(pr({ mergeStateStatus: 'BLOCKED' }), []).label).toBe('Blocked')
+    expect(prActionState(pr({ mergeStateStatus: 'BEHIND' }), []).label).toBe('Out of date')
+    expect(prActionState(pr({ mergeStateStatus: 'BLOCKED' }), []).action).toBeNull()
+    expect(prActionState(pr({ mergeStateStatus: 'BEHIND' }), []).action).toBeNull()
+  })
+
+  test('falls back to a neutral label on an unknown merge state', () => {
+    expect(prActionState(pr({ mergeStateStatus: 'UNKNOWN' }), [])).toEqual({
+      action: null,
+      label: 'Checking…',
+      tone: 'neutral',
+    })
+  })
+})
+
+describe('clampPrBody', () => {
+  test('leaves a short body alone', () => {
+    expect(clampPrBody('one\ntwo')).toEqual({ text: 'one\ntwo', truncated: false })
+  })
+
+  test('cuts a bullet list on the line limit', () => {
+    const body = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].join('\n')
+    expect(clampPrBody(body)).toEqual({ text: 'a\nb\nc\nd\ne', truncated: true })
+  })
+
+  test('cuts a wall of text on the char limit, at a word boundary', () => {
+    const { text, truncated } = clampPrBody('lorem ipsum '.repeat(60), 5, 40)
+    expect(truncated).toBe(true)
+    expect(text.length).toBeLessThanOrEqual(40)
+    expect(text.endsWith('ipsum') || text.endsWith('lorem')).toBe(true)
+  })
+
+  test('hard-cuts when no word boundary is reachable', () => {
+    const { text, truncated } = clampPrBody('x'.repeat(200), 5, 40)
+    expect(truncated).toBe(true)
+    expect(text).toHaveLength(40)
+  })
+
+  test('trailing whitespace alone is not a truncation', () => {
+    expect(clampPrBody('one\ntwo\n\n\n')).toEqual({ text: 'one\ntwo', truncated: false })
   })
 })

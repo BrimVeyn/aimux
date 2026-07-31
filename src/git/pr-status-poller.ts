@@ -13,6 +13,11 @@ interface Options {
   projectPath: string | undefined
 }
 
+/** One-shot refetch, for when an action we took just invalidated the state. */
+export async function refreshPrStatus(projectPath: string): Promise<void> {
+  prStatusStore.getState().setResult(await collectPrStatus(projectPath))
+}
+
 export function usePrStatusPolling({ enabled, projectPath }: Options): void {
   useEffect(() => {
     if (!enabled || !(projectPath != null && projectPath !== '')) return

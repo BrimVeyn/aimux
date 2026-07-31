@@ -38,8 +38,8 @@ export const GitPaneWidget = memo(function GitPaneWidget({
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })
-  // Nobody looking at the checks means nobody paying for a `gh` round-trip.
-  usePrStatusPolling({ enabled: pollingEnabled && tab === 'checks', projectPath })
+  // The PR state row sits above the tabs, so this has to run on both of them.
+  usePrStatusPolling({ enabled: pollingEnabled, projectPath })
 
   const lastGoodRef = useRef<GitPanelState | null>(null)
   const prevProjectPathRef = useRef(projectPath)

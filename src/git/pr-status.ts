@@ -13,11 +13,16 @@ export interface PrCheck {
 export interface PrSummary {
   number: number
   title: string
+  body: string
   state: string
   isDraft: boolean
   base: string
   head: string
   reviewDecision: string
+  /** MERGEABLE | CONFLICTING | UNKNOWN */
+  mergeable: string
+  /** CLEAN | BLOCKED | BEHIND | UNSTABLE | DIRTY | DRAFT | HAS_HOOKS | UNKNOWN */
+  mergeStateStatus: string
   additions: number
   deletions: number
   changedFiles: number
@@ -33,12 +38,15 @@ export type PrStatusResult =
 const PR_VIEW_FIELDS = [
   'number',
   'title',
+  'body',
   'state',
   'isDraft',
   'url',
   'baseRefName',
   'headRefName',
   'reviewDecision',
+  'mergeable',
+  'mergeStateStatus',
   'additions',
   'deletions',
   'changedFiles',
@@ -121,10 +129,13 @@ export function parsePrView(raw: unknown): PrStatusResult {
     pr: {
       additions: num(pr.additions),
       base: str(pr.baseRefName),
+      body: str(pr.body).trim(),
       changedFiles: num(pr.changedFiles),
       deletions: num(pr.deletions),
       head: str(pr.headRefName),
       isDraft: pr.isDraft === true,
+      mergeable: str(pr.mergeable),
+      mergeStateStatus: str(pr.mergeStateStatus),
       number: pr.number,
       reviewDecision: str(pr.reviewDecision),
       state: str(pr.state),
@@ -132,6 +143,66 @@ export function parsePrView(raw: unknown): PrStatusResult {
       url: str(pr.url),
     },
   }
+}
+
+export type PrAction = 'merge' | null
+
+export interface PrActionState {
+  label: string
+  action: PrAction
+  tone: 'ok' | 'blocked' | 'neutral'
+}
+
+/**
+ * The headline GitHub puts on the merge box, and the one action worth wiring to
+ * it. Order matters: a terminal state beats everything, then a hard blocker
+ * (conflicts, draft), then whatever the checks are doing. Anything we can't
+ * offer an action for still gets an honest label rather than a dead button.
+ */
+export function prActionState(pr: PrSummary, checks: PrCheck[]): PrActionState {
+  if (pr.state === 'MERGED') return { action: null, label: 'Merged', tone: 'neutral' }
+  if (pr.state === 'CLOSED') return { action: null, label: 'Closed', tone: 'blocked' }
+  if (pr.isDraft) return { action: null, label: 'Draft', tone: 'neutral' }
+  if (pr.mergeable === 'CONFLICTING') {
+    return { action: null, label: 'Merge conflicts', tone: 'blocked' }
+  }
+  if (checks.some((c) => c.state === 'pending')) {
+    return { action: null, label: 'Checks running', tone: 'neutral' }
+  }
+  if (pr.mergeStateStatus === 'BLOCKED') return { action: null, label: 'Blocked', tone: 'blocked' }
+  if (pr.mergeStateStatus === 'BEHIND')
+    return { action: null, label: 'Out of date', tone: 'blocked' }
+  // UNSTABLE means a non-required check failed; GitHub still lets you merge.
+  if (pr.mergeStateStatus === 'UNSTABLE') {
+    return { action: 'merge', label: 'Checks failing', tone: 'blocked' }
+  }
+  if (pr.mergeStateStatus === 'CLEAN') {
+    return { action: 'merge', label: 'Ready to merge', tone: 'ok' }
+  }
+  return { action: null, label: 'Checking…', tone: 'neutral' }
+}
+
+export interface ClampedBody {
+  text: string
+  truncated: boolean
+}
+
+/**
+ * A PR body is a whole document; a bar widget gets a preview of it. Clamping on
+ * lines alone breaks on a wall-of-text paragraph and clamping on characters
+ * alone breaks on a bullet list, so whichever limit bites first wins.
+ */
+export function clampPrBody(body: string, maxLines = 5, maxChars = 260): ClampedBody {
+  const full = body.trimEnd()
+  const lines = full.split('\n')
+  let text = lines.slice(0, maxLines).join('\n')
+  if (text.length > maxChars) {
+    const space = text.lastIndexOf(' ', maxChars)
+    // Only respect a word boundary that isn't absurdly early, else hard-cut.
+    text = text.slice(0, space > maxChars / 2 ? space : maxChars)
+  }
+  text = text.trimEnd()
+  return { text, truncated: text.length < full.length }
 }
 
 export async function collectPrStatus(cwd: string): Promise<PrStatusResult> {
