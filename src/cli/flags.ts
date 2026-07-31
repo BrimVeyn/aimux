@@ -16,7 +16,7 @@ export type DynamicCompletionSource =
   | 'tab'
   | 'worker'
   | 'project'
-  | 'worktree'
+  | 'workspace'
 
 /**
  * Where a flag value or positional draws its shell-completion candidates.

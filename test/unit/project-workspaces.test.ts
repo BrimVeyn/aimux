@@ -13,10 +13,10 @@ import {
   pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
 import {
-  ensureProjectWorktrees,
-  getActiveWorktreePath,
-  withActiveWorktree,
-} from '../../src/state/project-worktrees'
+  ensureProjectWorkspaces,
+  getActiveWorkspacePath,
+  withActiveWorkspace,
+} from '../../src/state/project-workspaces'
 
 function makeProject(projectPath = '/repo/main'): ProjectRecord {
   return {
@@ -29,41 +29,41 @@ function makeProject(projectPath = '/repo/main'): ProjectRecord {
   }
 }
 
-describe('project worktrees', () => {
-  test('normalizes a legacy projectPath into a primary worktree', () => {
-    const project = ensureProjectWorktrees(makeProject(), '2024-01-02T00:00:00.000Z')
+describe('project workspaces', () => {
+  test('normalizes a legacy projectPath into a primary workspace', () => {
+    const project = ensureProjectWorkspaces(makeProject(), '2024-01-02T00:00:00.000Z')
 
-    expect(project.worktrees).toHaveLength(1)
-    expect(project.worktrees?.[0]?.path).toBe('/repo/main')
-    expect(project.worktrees?.[0]?.source).toBe('primary')
-    expect(project.worktrees?.[0]?.createdByAimux).toBe(false)
-    expect(project.activeWorktreeId).toBe(project.worktrees?.[0]?.id)
+    expect(project.workspaces).toHaveLength(1)
+    expect(project.workspaces?.[0]?.path).toBe('/repo/main')
+    expect(project.workspaces?.[0]?.source).toBe('primary')
+    expect(project.workspaces?.[0]?.createdByAimux).toBe(false)
+    expect(project.activeWorkspaceId).toBe(project.workspaces?.[0]?.id)
   })
 
-  test('switching the active worktree leaves projectPath pinned to the repo', () => {
-    const project = ensureProjectWorktrees(makeProject())
-    const first = project.worktrees?.[0]
-    if (!first) throw new Error('expected primary worktree')
+  test('switching the active workspace leaves projectPath pinned to the repo', () => {
+    const project = ensureProjectWorkspaces(makeProject())
+    const first = project.workspaces?.[0]
+    if (!first) throw new Error('expected primary workspace')
     const second = {
       ...first,
-      id: 'worktree-2',
+      id: 'workspace-2',
       name: 'feature',
       path: '/repo/feature',
     }
 
-    const switched = withActiveWorktree({ ...project, worktrees: [first, second] }, second.id)
+    const switched = withActiveWorkspace({ ...project, workspaces: [first, second] }, second.id)
 
-    expect(switched.activeWorktreeId).toBe(second.id)
-    // The cwd follows the worktree; the project keeps naming the repo.
-    expect(getActiveWorktreePath(switched)).toBe('/repo/feature')
+    expect(switched.activeWorkspaceId).toBe(second.id)
+    // The cwd follows the workspace; the project keeps naming the repo.
+    expect(getActiveWorkspacePath(switched)).toBe('/repo/feature')
     expect(switched.projectPath).toBe('/repo/main')
   })
 
-  test('generated temp worktree paths stay inside the Aimux root', () => {
+  test('generated temp workspace paths stay inside the Aimux root', () => {
     const path = makeWorktreePath({
       repoRoot: '/Users/me/repo',
-      worktreeId: 'worktree-1',
-      worktreeName: '../feature bad with an absurdly long human name that should not leak',
+      workspaceId: 'workspace-1',
+      workspaceName: '../feature bad with an absurdly long human name that should not leak',
     })
 
     expect(path).toStartWith('/tmp/aimux-wt/')
@@ -76,63 +76,63 @@ describe('project worktrees', () => {
   test('different repos with the same basename do not collide', () => {
     const first = makeWorktreePath({
       repoRoot: '/Users/a/repo',
-      worktreeId: 'worktree-1',
-      worktreeName: 'feature',
+      workspaceId: 'workspace-1',
+      workspaceName: 'feature',
     })
     const second = makeWorktreePath({
       repoRoot: '/Users/b/repo',
-      worktreeId: 'worktree-1',
-      worktreeName: 'feature',
+      workspaceId: 'workspace-1',
+      workspaceName: 'feature',
     })
 
     expect(first).not.toBe(second)
   })
 
-  test('prunes missing Aimux temp worktrees on normalization', () => {
-    const project = ensureProjectWorktrees(makeProject('/repo/main'))
-    const primary = project.worktrees?.[0]
-    if (!primary) throw new Error('expected primary worktree')
+  test('prunes missing Aimux temp workspaces on normalization', () => {
+    const project = ensureProjectWorkspaces(makeProject('/repo/main'))
+    const primary = project.workspaces?.[0]
+    if (!primary) throw new Error('expected primary workspace')
     const missingTemp = {
       ...primary,
       createdByAimux: true,
-      id: 'worktree-missing',
+      id: 'workspace-missing',
       name: 'missing',
       path: makeWorktreePath({
         repoRoot: '/repo/main',
-        worktreeId: 'worktree-missing',
-        worktreeName: 'missing',
+        workspaceId: 'workspace-missing',
+        workspaceName: 'missing',
       }),
       source: 'aimux-temp' as const,
     }
 
-    const normalized = ensureProjectWorktrees({
+    const normalized = ensureProjectWorkspaces({
       ...project,
-      activeWorktreeId: missingTemp.id,
+      activeWorkspaceId: missingTemp.id,
       projectPath: missingTemp.path,
-      worktrees: [primary, missingTemp],
+      workspaces: [primary, missingTemp],
     })
 
-    expect(normalized.worktrees?.map((worktree) => worktree.id)).toEqual([primary.id])
-    expect(normalized.activeWorktreeId).toBe(primary.id)
+    expect(normalized.workspaces?.map((workspace) => workspace.id)).toEqual([primary.id])
+    expect(normalized.activeWorkspaceId).toBe(primary.id)
     expect(normalized.projectPath).toBe(primary.path)
   })
 
-  test('/private/tmp aliases are treated as inside the Aimux worktree root', () => {
+  test('/private/tmp aliases are treated as inside the Aimux workspace root', () => {
     expect(isInsideAimuxWorktreeRoot('/private/tmp/aimux-wt/r-test/wt-test')).toBe(true)
   })
 
-  test('accepts the first worktree of a repo before its repo-scoped parent exists', async () => {
+  test('accepts the first workspace of a repo before its repo-scoped parent exists', async () => {
     const previousRoot = process.env.AIMUX_WORKTREE_ROOT
     const root = await mkdtemp(join(tmpdir(), 'aimux-wt-test-'))
     process.env.AIMUX_WORKTREE_ROOT = root
     try {
       const targetPath = makeWorktreePath({
-        repoRoot: '/Users/me/first-worktree-repo',
-        worktreeId: 'worktree-1',
-        worktreeName: 'feature',
+        repoRoot: '/Users/me/first-workspace-repo',
+        workspaceId: 'workspace-1',
+        workspaceName: 'feature',
       })
       // The repo-scoped parent (<root>/r-<hash>) does not exist yet — this is
-      // the first worktree for the repo. It must not throw ENOENT.
+      // the first workspace for the repo. It must not throw ENOENT.
       await assertSafeAimuxWorktreePath(targetPath)
       // and the parent must now exist so git worktree add can populate it.
       expect((await stat(dirname(targetPath))).isDirectory()).toBe(true)
@@ -150,18 +150,18 @@ describe('project worktrees', () => {
     try {
       const first = makeWorktreePath({
         repoRoot: '/Users/me/prune-repo',
-        worktreeId: 'worktree-1',
-        worktreeName: 'one',
+        workspaceId: 'workspace-1',
+        workspaceName: 'one',
       })
       const second = makeWorktreePath({
         repoRoot: '/Users/me/prune-repo',
-        worktreeId: 'worktree-2',
-        worktreeName: 'two',
+        workspaceId: 'workspace-2',
+        workspaceName: 'two',
       })
       await assertSafeAimuxWorktreePath(first)
       await mkdir(second, { recursive: true })
 
-      // A sibling worktree is still live — the shared parent must survive.
+      // A sibling workspace is still live — the shared parent must survive.
       await pruneEmptyWorktreeParent(first)
       expect((await stat(dirname(first))).isDirectory()).toBe(true)
 

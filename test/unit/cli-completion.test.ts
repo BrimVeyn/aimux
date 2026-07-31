@@ -23,7 +23,7 @@ describe('completion planner', () => {
   })
 
   test('filters the first word by its prefix', () => {
-    expect(valuesOf(planFor(['aimux', 'work']))).toEqual(['worktree', 'worker'])
+    expect(valuesOf(planFor(['aimux', 'work']))).toEqual(['workspace', 'worker'])
   })
 
   test('offers long help flags when the first word starts with a dash', () => {
@@ -34,7 +34,7 @@ describe('completion planner', () => {
     const values = valuesOf(planFor(['aimux', 'tab', '']))
     expect(values).toContain('list')
     expect(values).toContain('send')
-    expect(values).not.toContain('create-worktree')
+    expect(values).not.toContain('create-workspace')
   })
 
   test('verb candidates carry the registry summary as their description', () => {
@@ -91,8 +91,8 @@ describe('completion planner', () => {
   })
 
   test('optional-string flags only bind a value via =', () => {
-    // A bare `--new-worktree` is boolean-like, so the next word is a flag slot.
-    const values = valuesOf(planFor(['aimux', 'tab', 'create', '--new-worktree', '--as']))
+    // A bare `--new-workspace` is boolean-like, so the next word is a flag slot.
+    const values = valuesOf(planFor(['aimux', 'tab', 'create', '--new-workspace', '--as']))
     expect(values).toEqual(['--assistant'])
   })
 

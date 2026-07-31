@@ -11,7 +11,7 @@ import {
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_CAPABILITY_WORKER_METADATA,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
 } from '../../../ipc/protocol'
 import {
   getAllAssistantOptions,
@@ -19,7 +19,7 @@ import {
   parseCommand,
 } from '../../../pty/command-registry'
 import {
-  findPrimaryWorktree,
+  findPrimaryWorkspace,
   PROJECT_ENV_VAR,
   projectRepoRoot,
 } from '../../client/project-resolver'
@@ -33,7 +33,7 @@ const REQUIRED_DAEMON_CAPABILITIES = [
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_CAPABILITY_WORKER_METADATA,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
 ] as const
 
 export const workerDoctor: CliCommand = {
@@ -61,7 +61,7 @@ export const workerDoctor: CliCommand = {
     const missingManagerCapabilities = [MANAGER_CAPABILITY_WORKER_METADATA].filter(
       (capability) => !managerCapabilities.includes(capability)
     )
-    const primaryWorktree = findPrimaryWorktree(project)
+    const primaryWorkspace = findPrimaryWorkspace(project)
     const projectOrigin = ctx.getProjectOrigin?.() ?? 'active'
     const availableAssistants = assistants.filter((assistant) => assistant.available)
     const skillPath = fileURLToPath(
@@ -78,8 +78,8 @@ export const workerDoctor: CliCommand = {
         `restart the terminal manager; it is missing: ${missingManagerCapabilities.join(', ')}`
       )
     }
-    if (primaryWorktree === undefined) {
-      issues.push('project has no primary worktree; default isolated worker runs are unavailable')
+    if (primaryWorkspace === undefined) {
+      issues.push('project has no primary workspace; default isolated worker runs are unavailable')
     }
     if (availableAssistants.length === 0) {
       issues.push('no configured assistant executable is available on PATH')
@@ -114,10 +114,10 @@ export const workerDoctor: CliCommand = {
           ok: missingManagerCapabilities.length === 0,
         },
         project: {
-          hasPrimaryWorktree: primaryWorktree !== undefined,
+          hasPrimaryWorkspace: primaryWorkspace !== undefined,
           name: project.name,
-          ok: primaryWorktree !== undefined,
-          /** Repo every fresh worker worktree is cut from — confirm before dispatching. */
+          ok: primaryWorkspace !== undefined,
+          /** Repo every fresh worker workspace is cut from — confirm before dispatching. */
           repoRoot: projectRepoRoot(project),
           /** 'flag' | 'env' | 'active'; only 'active' can follow the UI. */
           source: projectOrigin,

@@ -61,25 +61,25 @@ export const workerRun: CliCommand = {
       name: 'uptake-timeout',
     },
     {
-      complete: { kind: 'dynamic', source: 'worktree' },
-      description: 'co-locate in an existing worktree id',
+      complete: { kind: 'dynamic', source: 'workspace' },
+      description: 'co-locate in an existing workspace id',
       kind: 'string',
-      name: 'worktree',
+      name: 'workspace',
     },
     {
-      description: 'run in the project active worktree instead of creating one',
+      description: 'run in the project active workspace instead of creating one',
       kind: 'boolean',
-      name: 'no-worktree',
+      name: 'no-workspace',
     },
     {
       complete: { kind: 'dynamic', source: 'git-ref' },
-      description: 'base ref for the fresh worktree (default HEAD)',
+      description: 'base ref for the fresh workspace (default HEAD)',
       kind: 'string',
       name: 'base',
     },
     {
       complete: { kind: 'none' },
-      description: 'branch for the fresh worktree (default aimux/<name>)',
+      description: 'branch for the fresh workspace (default aimux/<name>)',
       kind: 'string',
       name: 'branch',
     },
@@ -90,11 +90,11 @@ export const workerRun: CliCommand = {
     const assistant = typeof ctx.args.flags.assistant === 'string' ? ctx.args.flags.assistant : ''
     validateWorkerName(name)
     if (assistant === '') throw new CliUsageError('--assistant is required')
-    const worktree =
-      typeof ctx.args.flags.worktree === 'string' ? ctx.args.flags.worktree : undefined
-    const noWorktree = ctx.args.flags['no-worktree'] === true
-    if (worktree !== undefined && noWorktree) {
-      throw new CliUsageError('--worktree and --no-worktree are mutually exclusive')
+    const workspace =
+      typeof ctx.args.flags.workspace === 'string' ? ctx.args.flags.workspace : undefined
+    const noWorkspace = ctx.args.flags['no-workspace'] === true
+    if (workspace !== undefined && noWorkspace) {
+      throw new CliUsageError('--workspace and --no-workspace are mutually exclusive')
     }
     const promptFile =
       typeof ctx.args.flags['prompt-file'] === 'string' ? ctx.args.flags['prompt-file'] : undefined
@@ -104,7 +104,7 @@ export const workerRun: CliCommand = {
       ctx.args.positionals[0]
     )
     // Resolve the target project ONCE, up front, and use that record for
-    // every later step. The repo a worktree is cut from comes from this record,
+    // every later step. The repo a workspace is cut from comes from this record,
     // so an orchestrator that omits --project at least gets the resolved
     // identity echoed back in the response instead of having to infer it.
     const project = ctx.getProject()
@@ -114,10 +114,10 @@ export const workerRun: CliCommand = {
       branch: typeof ctx.args.flags.branch === 'string' ? ctx.args.flags.branch : undefined,
       effort: typeof ctx.args.flags.effort === 'string' ? ctx.args.flags.effort : undefined,
       model: typeof ctx.args.flags.model === 'string' ? ctx.args.flags.model : undefined,
-      newWorktree: noWorktree || worktree !== undefined ? undefined : name,
+      newWorkspace: noWorkspace || workspace !== undefined ? undefined : name,
       title: name,
       workerName: name,
-      worktreeId: worktree,
+      workspaceId: workspace,
     })
     const tabs = await (await ctx.getDaemon()).listTabs(project.id)
     const tab = tabs.tabs.find((entry) => entry.id === result.tabId)

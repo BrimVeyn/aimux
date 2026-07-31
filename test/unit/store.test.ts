@@ -118,21 +118,21 @@ describe('appReducer', () => {
     expect(next.focusMode).toBe('navigation')
   })
 
-  test('activating a tab switches active project worktree', () => {
+  test('activating a tab switches active project workspace', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-1',
+            activeWorkspaceId: 'wt-1',
             createdAt: now,
             id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -168,7 +168,7 @@ describe('appReducer', () => {
           id: 'tab-1',
           status: 'running',
           title: 'Claude',
-          worktreeId: 'wt-1',
+          workspaceId: 'wt-1',
         }),
         createTab({
           assistant: 'codex',
@@ -176,7 +176,7 @@ describe('appReducer', () => {
           id: 'tab-2',
           status: 'running',
           title: 'Codex',
-          worktreeId: 'wt-2',
+          workspaceId: 'wt-2',
         }),
       ],
     }
@@ -184,26 +184,26 @@ describe('appReducer', () => {
     const next = appReducer(initial, { tabId: 'tab-2', type: 'set-active-tab' })
     const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(project?.activeWorktreeId).toBe('wt-2')
-    // Only the active worktree moves — projectPath keeps naming the repo.
+    expect(project?.activeWorkspaceId).toBe('wt-2')
+    // Only the active workspace moves — projectPath keeps naming the repo.
     expect(project?.projectPath).toBe('/repo/main')
   })
 
-  test('activating a legacy tab leaves active worktree unchanged', () => {
+  test('activating a legacy tab leaves active workspace unchanged', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-1',
+            activeWorkspaceId: 'wt-1',
             createdAt: now,
             id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -236,7 +236,7 @@ describe('appReducer', () => {
     const next = appReducer(initial, { tabId: 'tab-1', type: 'set-active-tab' })
     const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(project?.activeWorktreeId).toBe('wt-1')
+    expect(project?.activeWorkspaceId).toBe('wt-1')
     expect(project?.projectPath).toBe('/repo/main')
   })
 
@@ -246,14 +246,14 @@ describe('appReducer', () => {
       {},
       [
         {
-          activeWorktreeId: 'wt-feature',
+          activeWorkspaceId: 'wt-feature',
           createdAt: now,
           id: 'project-1',
           lastOpenedAt: now,
           name: 'Main',
           projectPath: '/repo/feature',
           updatedAt: now,
-          worktrees: [
+          workspaces: [
             {
               createdAt: now,
               createdByAimux: false,
@@ -288,8 +288,8 @@ describe('appReducer', () => {
     expect(opened.modal.selectedIndex).toBe(0)
     expect(opened.modal.editingCommand).toBeNull()
 
-    // Moving the selection walks the assistant list — there is no worktree step
-    // to fall into, and no trailing "create worktree" row.
+    // Moving the selection walks the assistant list — there is no workspace step
+    // to fall into, and no trailing "create workspace" row.
     const moved = appReducer(opened, { delta: 1, type: 'move-modal-selection' })
     if (moved.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
     expect(moved.modal.selectedIndex).toBe(1)
@@ -474,21 +474,21 @@ describe('appReducer', () => {
     expect(next.activeTabId).toBe('2')
   })
 
-  test('moves active tab by grouped sidebar worktree order', () => {
+  test('moves active tab by grouped sidebar workspace order', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-main',
+            activeWorkspaceId: 'wt-main',
             createdAt: now,
             id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -524,7 +524,7 @@ describe('appReducer', () => {
           id: 'main-1',
           status: 'running',
           title: 'Main 1',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         }),
         createTab({
           assistant: 'codex',
@@ -532,7 +532,7 @@ describe('appReducer', () => {
           id: 'feature-1',
           status: 'running',
           title: 'Feature 1',
-          worktreeId: 'wt-feature',
+          workspaceId: 'wt-feature',
         }),
         createTab({
           assistant: 'opencode',
@@ -540,7 +540,7 @@ describe('appReducer', () => {
           id: 'main-2',
           status: 'running',
           title: 'Main 2',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         }),
       ],
     }
@@ -549,17 +549,17 @@ describe('appReducer', () => {
     expect(next.activeTabId).toBe('main-2')
   })
 
-  test('cycles only within the active worktree (does not cross worktrees)', () => {
+  test('cycles only within the active workspace (does not cross workspaces)', () => {
     const now = '2024-01-01T00:00:00.000Z'
-    const projectWithTwoWorktrees = {
-      activeWorktreeId: 'wt-main',
+    const projectWithTwoWorkspaces = {
+      activeWorkspaceId: 'wt-main',
       createdAt: now,
       id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
       projectPath: '/repo/main',
       updatedAt: now,
-      worktrees: [
+      workspaces: [
         {
           createdAt: now,
           createdByAimux: false,
@@ -589,7 +589,7 @@ describe('appReducer', () => {
         id: 'main-1',
         status: 'running' as const,
         title: 'Main 1',
-        worktreeId: 'wt-main',
+        workspaceId: 'wt-main',
       }),
       createTab({
         assistant: 'codex',
@@ -597,7 +597,7 @@ describe('appReducer', () => {
         id: 'main-2',
         status: 'running' as const,
         title: 'Main 2',
-        worktreeId: 'wt-main',
+        workspaceId: 'wt-main',
       }),
       createTab({
         assistant: 'opencode',
@@ -605,7 +605,7 @@ describe('appReducer', () => {
         id: 'feature-1',
         status: 'running' as const,
         title: 'Feature 1',
-        worktreeId: 'wt-feature',
+        workspaceId: 'wt-feature',
       }),
       createTab({
         assistant: 'terminal',
@@ -613,14 +613,14 @@ describe('appReducer', () => {
         id: 'feature-2',
         status: 'running' as const,
         title: 'Feature 2',
-        worktreeId: 'wt-feature',
+        workspaceId: 'wt-feature',
       }),
     ]
 
-    // From last tab of active worktree, +1 wraps to FIRST of same worktree
+    // From last tab of active workspace, +1 wraps to FIRST of same workspace
     // (must not cross to feature-1).
     const fromLastOfActive = {
-      ...createInitialState({}, [projectWithTwoWorktrees], [], false),
+      ...createInitialState({}, [projectWithTwoWorkspaces], [], false),
       activeTabId: 'main-2',
       currentProjectId: 'project-1',
       tabs,
@@ -628,11 +628,11 @@ describe('appReducer', () => {
     const wrapped = appReducer(fromLastOfActive, { delta: 1, type: 'move-active-tab' })
     expect(wrapped.activeTabId).toBe('main-1')
 
-    // Switching the active worktree to wt-feature scopes h/l to its tabs.
+    // Switching the active workspace to wt-feature scopes h/l to its tabs.
     const onFeature = {
       ...createInitialState(
         {},
-        [{ ...projectWithTwoWorktrees, activeWorktreeId: 'wt-feature' }],
+        [{ ...projectWithTwoWorkspaces, activeWorkspaceId: 'wt-feature' }],
         [],
         false
       ),
@@ -980,19 +980,19 @@ describe('appReducer', () => {
   })
 })
 
-describe('set-active-worktree remembers the last viewed tab per worktree', () => {
+describe('set-active-workspace remembers the last viewed tab per workspace', () => {
   const now = '2024-01-01T00:00:00.000Z'
 
-  function twoWorktreeProject(activeWorktreeId: 'wt-main' | 'wt-feature') {
+  function twoWorkspaceProject(activeWorkspaceId: 'wt-main' | 'wt-feature') {
     return {
-      activeWorktreeId,
+      activeWorkspaceId,
       createdAt: now,
       id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
-      projectPath: activeWorktreeId === 'wt-main' ? '/repo/main' : '/repo/feature',
+      projectPath: activeWorkspaceId === 'wt-main' ? '/repo/main' : '/repo/feature',
       updatedAt: now,
-      worktrees: [
+      workspaces: [
         {
           createdAt: now,
           createdByAimux: false,
@@ -1024,7 +1024,7 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'main-1',
       status: 'running',
       title: 'Main 1',
-      worktreeId: 'wt-main',
+      workspaceId: 'wt-main',
     }),
     createTab({
       assistant: 'codex',
@@ -1032,7 +1032,7 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'main-2',
       status: 'running',
       title: 'Main 2',
-      worktreeId: 'wt-main',
+      workspaceId: 'wt-main',
     }),
     createTab({
       assistant: 'opencode',
@@ -1040,14 +1040,14 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'feature-1',
       status: 'running',
       title: 'Feature 1',
-      worktreeId: 'wt-feature',
+      workspaceId: 'wt-feature',
     }),
   ]
 
-  test('restores the last viewed tab when switching back to a worktree', () => {
+  test('restores the last viewed tab when switching back to a workspace', () => {
     // On wt-main viewing main-2 (the second tab, not the first).
     const onMain = {
-      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-2',
       currentProjectId: 'project-1',
       tabs,
@@ -1056,24 +1056,24 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
     // Switch to wt-feature → lands on its first tab and remembers main-2.
     const onFeature = appReducer(onMain, {
       projectId: 'project-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     expect(onFeature.activeTabId).toBe('feature-1')
-    expect(onFeature.lastActiveTabByWorktree['wt-main']).toBe('main-2')
+    expect(onFeature.lastActiveTabByWorkspace['wt-main']).toBe('main-2')
 
     // Switch back to wt-main → restores main-2 instead of snapping to main-1.
     const backOnMain = appReducer(onFeature, {
       projectId: 'project-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-main',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-main',
     })
     expect(backOnMain.activeTabId).toBe('main-2')
   })
 
   test('falls back to the first visible tab when no tab is remembered', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-1',
       currentProjectId: 'project-1',
       tabs,
@@ -1081,25 +1081,25 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
 
     const onFeature = appReducer(onMain, {
       projectId: 'project-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     expect(onFeature.activeTabId).toBe('feature-1')
   })
 
   test('falls back to the first visible tab when the remembered tab is gone', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeProject('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-2',
       currentProjectId: 'project-1',
-      lastActiveTabByWorktree: { 'wt-feature': 'feature-removed' },
+      lastActiveTabByWorkspace: { 'wt-feature': 'feature-removed' },
       tabs,
     }
 
     const onFeature = appReducer(onMain, {
       projectId: 'project-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     // Remembered feature tab no longer exists → first visible feature tab.
     expect(onFeature.activeTabId).toBe('feature-1')

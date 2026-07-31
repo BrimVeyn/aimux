@@ -16,7 +16,7 @@ export function parseDivergenceCount(output: string): BranchDivergence | undefin
   }
 }
 
-// Commits a worktree branch is ahead/behind the ref it forked from. Returns
+// Commits a workspace branch is ahead/behind the ref it forked from. Returns
 // undefined when the refs can't be compared (missing ref, not a repo, …) so
 // callers can simply render nothing.
 export async function getBranchDivergence(
@@ -33,7 +33,7 @@ export async function getBranchDivergence(
 }
 
 // Fork point: the most recent commit shared by baseRef and ref. Diffing the
-// working tree against this shows everything the worktree changed since it
+// working tree against this shows everything the workspace changed since it
 // branched off (commits + staged + unstaged) — i.e. what a squash-move lands.
 export async function getMergeBase(
   repoPath: string,

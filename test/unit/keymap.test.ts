@@ -137,16 +137,16 @@ describe('mode handlers', () => {
     expect(result.transition).toBe('modal.project-picker.filtering')
   })
 
-  test('navigation: Ctrl+P opens the create-worktree modal', () => {
+  test('navigation: Ctrl+P opens the create-workspace modal', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
       handler.handleKey(key('p', { ctrl: true }), ctx()),
-      'Expected create-worktree result'
+      'Expected create-workspace result'
     )
 
-    expect(result.actions).toEqual([{ type: 'open-create-worktree-modal' }])
-    expect(result.effects).toEqual([{ type: 'load-create-worktree-base-branches' }])
-    expect(result.transition).toBe('modal.create-worktree')
+    expect(result.actions).toEqual([{ type: 'open-create-workspace-modal' }])
+    expect(result.effects).toEqual([{ type: 'load-create-workspace-base-branches' }])
+    expect(result.transition).toBe('modal.create-workspace')
   })
 
   test('navigation: Shift+L reorders tab right', () => {

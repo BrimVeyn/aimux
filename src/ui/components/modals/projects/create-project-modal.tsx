@@ -10,14 +10,14 @@ import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/fo
 const VISIBLE_ROWS = 8
 
 function getDirectoryResultIcon(result: DirectoryResult): string {
-  if (result.type === 'worktree') return '\u{e728}'
+  if (result.type === 'workspace') return '\u{e728}'
   if (result.type === 'project') return '\u{f07c}'
   return '\u{e702}'
 }
 
 function getDirectoryResultColor(result: DirectoryResult): string {
   const t = getCurrentTheme()
-  if (result.type === 'worktree') return t.warning
+  if (result.type === 'workspace') return t.warning
   if (result.type === 'project') return t.info
   return t.text
 }

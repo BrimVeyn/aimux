@@ -4,13 +4,13 @@ import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { moveWorktree } from '../../src/git/move-worktree'
+import { moveWorkspace } from '../../src/git/move-workspace'
 
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8' })
 }
 
-describe('moveWorktree', () => {
+describe('moveWorkspace', () => {
   let base: string
   let main: string
   let feature: string
@@ -40,7 +40,7 @@ describe('moveWorktree', () => {
     writeFileSync(join(feature, 'file.txt'), 'base\ncommitted\nuncommitted\n')
     writeFileSync(join(feature, 'new.txt'), 'brand new\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -64,7 +64,7 @@ describe('moveWorktree', () => {
     // Unrelated dirty file in the target must not block the move.
     writeFileSync(join(main, 'other.txt'), 'local edit\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -84,7 +84,7 @@ describe('moveWorktree', () => {
     writeFileSync(join(feature, 'wip.txt'), 'wip\n')
     writeFileSync(join(main, 'file.txt'), 'base\nlocal edit\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -106,7 +106,7 @@ describe('moveWorktree', () => {
     // Same path exists untracked in the target.
     writeFileSync(join(main, 'new.txt'), 'local untracked\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -122,7 +122,7 @@ describe('moveWorktree', () => {
     git(feature, 'commit', '-am', 'feature work')
     writeFileSync(join(main, 'file.txt'), 'base\nlocal edit\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       stashTarget: true,
@@ -136,7 +136,7 @@ describe('moveWorktree', () => {
     expect(git(main, 'stash', 'list')).toContain('aimux: backup before move from feature')
   })
 
-  test('reports conflicts and restores both worktrees', async () => {
+  test('reports conflicts and restores both workspaces', async () => {
     writeFileSync(join(feature, 'file.txt'), 'base\nfrom-feature\n')
     git(feature, 'commit', '-am', 'feature change')
     const featureHead = git(feature, 'rev-parse', 'HEAD').trim()
@@ -145,7 +145,7 @@ describe('moveWorktree', () => {
     git(main, 'commit', '-am', 'main change')
     const mainHead = git(main, 'rev-parse', 'HEAD').trim()
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -166,7 +166,7 @@ describe('moveWorktree', () => {
     // Unrelated dirty file must survive the abort (reset --merge, not --hard).
     writeFileSync(join(main, 'notes.txt'), 'precious local notes\n')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       sourceBranch: 'feature',
       sourcePath: feature,
       targetPath: main,
@@ -185,7 +185,7 @@ describe('moveWorktree', () => {
     writeFileSync(join(main, 'file.txt'), 'base\nfrom-main\n')
     git(main, 'commit', '-am', 'main change')
 
-    const result = await moveWorktree({
+    const result = await moveWorkspace({
       keepConflicts: true,
       sourceBranch: 'feature',
       sourcePath: feature,

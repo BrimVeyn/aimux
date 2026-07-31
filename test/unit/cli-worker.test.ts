@@ -25,7 +25,7 @@ const project: ProjectRecord = {
   lastOpenedAt: '2026-01-01T00:00:00.000Z',
   name: 'main',
   updatedAt: '2026-01-01T00:00:00.000Z',
-  worktrees: [
+  workspaces: [
     {
       createdAt: '2026-01-01T00:00:00.000Z',
       createdByAimux: false,
@@ -57,7 +57,7 @@ const otherProject: ProjectRecord = {
   lastOpenedAt: '2026-01-02T00:00:00.000Z',
   name: 'playground',
   updatedAt: '2026-01-01T00:00:00.000Z',
-  worktrees: [
+  workspaces: [
     {
       createdAt: '2026-01-01T00:00:00.000Z',
       createdByAimux: false,
@@ -81,7 +81,7 @@ const tabs: TabSessionSummary[] = [
     status: 'running',
     title: 'auth',
     workerName: 'auth',
-    worktreeId: 'wt-1',
+    workspaceId: 'wt-1',
   },
   {
     activity: 'idle',
@@ -154,7 +154,7 @@ describe('worker facade helpers', () => {
     ).rejects.toThrow('it lives in main (tab-1)')
   })
 
-  test('joins worktree context into the stable worker view', () => {
+  test('joins workspace context into the stable worker view', () => {
     expect(workerView(project, namedTab())).toEqual({
       activity: 'working',
       assistant: 'claude',
@@ -167,7 +167,7 @@ describe('worker facade helpers', () => {
       status: 'running',
       tabId: 'tab-1',
       title: 'auth',
-      worktreeId: 'wt-1',
+      workspaceId: 'wt-1',
     })
   })
 

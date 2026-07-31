@@ -2,15 +2,15 @@ import type { CliCommand } from '../../registry'
 
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createProjectWorktree } from './create-core'
+import { createProjectWorkspace } from './create-core'
 
-export const worktreeCreate: CliCommand = {
+export const workspaceCreate: CliCommand = {
   args: [],
   flags: [
     ...SHARED_FLAGS,
     {
       complete: { kind: 'none' },
-      description: 'display name for the new worktree',
+      description: 'display name for the new workspace',
       kind: 'string',
       name: 'name',
     },
@@ -27,7 +27,7 @@ export const worktreeCreate: CliCommand = {
       name: 'base',
     },
   ],
-  group: 'worktree',
+  group: 'workspace',
   run: async (ctx) => {
     const name = ctx.args.flags.name
     if (typeof name !== 'string' || name.length === 0) {
@@ -39,7 +39,7 @@ export const worktreeCreate: CliCommand = {
 
     const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
-    const record = await createProjectWorktree({ base, branch, daemon, name, project })
+    const record = await createProjectWorkspace({ base, branch, daemon, name, project })
 
     writeJson({
       branch: record.branch,
@@ -50,6 +50,6 @@ export const worktreeCreate: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'Create a new worktree in the active project',
+  summary: 'Create a new workspace in the active project',
   verb: 'create',
 }

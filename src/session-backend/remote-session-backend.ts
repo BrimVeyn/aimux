@@ -235,11 +235,11 @@ export class RemoteSessionBackend
       case 'projectSwitched':
         this.emit('projectSwitched', message.payload.projectId)
         break
-      case 'worktreeAdded':
-        this.emit('worktreeAdded', message.payload.projectId, message.payload.worktree)
+      case 'workspaceAdded':
+        this.emit('workspaceAdded', message.payload.projectId, message.payload.workspace)
         break
-      case 'worktreeRemoved':
-        this.emit('worktreeRemoved', message.payload.projectId, message.payload.worktreeId)
+      case 'workspaceRemoved':
+        this.emit('workspaceRemoved', message.payload.projectId, message.payload.workspaceId)
         break
     }
   }
@@ -417,7 +417,7 @@ export class RemoteSessionBackend
     cols: number
     rows: number
     cwd?: string
-    worktreeId?: string
+    workspaceId?: string
     autoRenameCandidate?: boolean
   }): void {
     if (!this.attached) {

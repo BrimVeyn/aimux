@@ -48,15 +48,15 @@ function getTitle(
   tab: TabSession | undefined,
   isActive: boolean,
   focusMode: TerminalPaneProps['focusMode'],
-  emptyContext: { projectName: string; worktreeName: string }
+  emptyContext: { projectName: string; workspaceName: string }
 ): string {
   if (!tab) {
-    const { projectName, worktreeName } = emptyContext
-    if (projectName === '' && worktreeName === '') return 'No active project'
-    if (worktreeName === '' || worktreeName === projectName) {
+    const { projectName, workspaceName } = emptyContext
+    if (projectName === '' && workspaceName === '') return 'No active project'
+    if (workspaceName === '' || workspaceName === projectName) {
       return `${projectName} · no tabs`
     }
-    return `${projectName} / ${worktreeName} · no tabs`
+    return `${projectName} / ${workspaceName} · no tabs`
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -279,24 +279,24 @@ export function TerminalPane({
     paneIsActive && focusMode === 'terminal-input' && tab?.status === 'running'
   )
   // These are only used when this pane is rendered without a tab (the
-  // top-level pane on a worktree with zero tabs). Selectors return plain
+  // top-level pane on a workspace with zero tabs). Selectors return plain
   // strings so re-renders are cheap and bounded to actual name changes.
   const emptyProjectName = useAppStore((s) => {
     const id = s.currentProjectId
     if (id == null || id === '') return ''
     return s.projects.find((sess) => sess.id === id)?.name ?? ''
   })
-  const emptyWorktreeName = useAppStore((s) => {
+  const emptyWorkspaceName = useAppStore((s) => {
     const id = s.currentProjectId
     if (id == null || id === '') return ''
     const project = s.projects.find((sess) => sess.id === id)
     if (!project) return ''
     const activeId =
-      project.activeWorktreeId != null && project.activeWorktreeId !== ''
-        ? project.activeWorktreeId
-        : project.worktrees?.[0]?.id
+      project.activeWorkspaceId != null && project.activeWorkspaceId !== ''
+        ? project.activeWorkspaceId
+        : project.workspaces?.[0]?.id
     if (activeId == null || activeId === '') return ''
-    return project.worktrees?.find((w) => w.id === activeId)?.name ?? ''
+    return project.workspaces?.find((w) => w.id === activeId)?.name ?? ''
   })
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
@@ -526,7 +526,7 @@ export function TerminalPane({
         borderColor={getBorderColor(paneIsActive, focusMode)}
         title={getTitle(tab, paneIsActive, focusMode, {
           projectName: emptyProjectName,
-          worktreeName: emptyWorktreeName,
+          workspaceName: emptyWorkspaceName,
         })}
         padding={0}
         flexDirection="column"
@@ -545,10 +545,10 @@ export function TerminalPane({
             {emptyProjectName !== '' ? (
               <box flexDirection="row">
                 <text fg={t.text}>{emptyProjectName}</text>
-                {emptyWorktreeName !== '' && emptyWorktreeName !== emptyProjectName ? (
+                {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
                   <>
                     <text fg={t.textMuted}> / </text>
-                    <text fg={t.text}>{emptyWorktreeName}</text>
+                    <text fg={t.text}>{emptyWorkspaceName}</text>
                   </>
                 ) : null}
               </box>

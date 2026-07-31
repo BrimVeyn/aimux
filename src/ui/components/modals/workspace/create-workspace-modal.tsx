@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react'
 
-import type { WorktreeTemplate } from '../../../../config'
-import type { WorktreeRecord } from '../../../../state/types'
+import type { WorkspaceTemplate } from '../../../../config'
+import type { WorkspaceRecord } from '../../../../state/types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { buildBaseRefOptions } from '../../../../state/selectors'
@@ -10,10 +10,10 @@ import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
 import { Picker, type PickerItem } from '../shared/picker'
 
-interface CreateWorktreeModalProps {
+interface CreateWorkspaceModalProps {
   activeField: 'name' | 'branch' | 'base'
   step: 'form' | 'template'
-  worktreeName: string
+  workspaceName: string
   branchName: string
   branchError: string | null
   baseQuery: string
@@ -21,11 +21,11 @@ interface CreateWorktreeModalProps {
   baseBranches: string[]
   cursorPos?: number
   selectedIndex: number
-  worktrees: WorktreeRecord[]
-  worktreeTemplates: WorktreeTemplate[]
+  workspaces: WorkspaceRecord[]
+  workspaceTemplates: WorkspaceTemplate[]
 }
 
-export function CreateWorktreeModal({
+export function CreateWorkspaceModal({
   activeField,
   baseBranches,
   baseQuery,
@@ -35,10 +35,10 @@ export function CreateWorktreeModal({
   cursorPos,
   selectedIndex,
   step,
-  worktreeName,
-  worktrees,
-  worktreeTemplates,
-}: CreateWorktreeModalProps) {
+  workspaceName,
+  workspaces,
+  workspaceTemplates,
+}: CreateWorkspaceModalProps) {
   const t = useTheme()
 
   const handleHover = useCallback(
@@ -48,25 +48,25 @@ export function CreateWorktreeModal({
 
   const baseItems = useMemo<FormOptionItem[]>(
     () =>
-      buildBaseRefOptions(worktrees, baseBranches, baseQuery).map((option) => ({
+      buildBaseRefOptions(workspaces, baseBranches, baseQuery).map((option) => ({
         key: option.ref,
         leading: (
-          <text fg={option.kind === 'worktree' ? t.warning : t.textMuted}>
-            {option.kind === 'worktree' ? '\u{e728}' : '\u{e702}'}
+          <text fg={option.kind === 'workspace' ? t.warning : t.textMuted}>
+            {option.kind === 'workspace' ? '\u{e728}' : '\u{e702}'}
           </text>
         ),
         subtitle:
-          option.kind === 'worktree' ? (
-            <text fg={t.textMuted}>worktree: {option.detail}</text>
+          option.kind === 'workspace' ? (
+            <text fg={t.textMuted}>workspace: {option.detail}</text>
           ) : null,
         title: (active) => <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
       })),
-    [baseBranches, baseQuery, t, worktrees]
+    [baseBranches, baseQuery, t, workspaces]
   )
 
   const templateItems = useMemo<PickerItem[]>(
     () =>
-      worktreeTemplates.map((template, index) => {
+      workspaceTemplates.map((template, index) => {
         const active = index === selectedIndex
         const tabCount = template.tabs.length
         const paneCount = template.tabs.reduce((sum, tab) => sum + tab.panes.length, 0)
@@ -74,7 +74,7 @@ export function CreateWorktreeModal({
           key: template.id,
           onClick: () => {
             dispatchGlobal({ index, type: 'set-modal-selection-index' })
-            runSideEffectGlobal({ type: 'create-worktree' })
+            runSideEffectGlobal({ type: 'create-workspace' })
           },
           subtitle:
             template.description != null && template.description !== '' ? (
@@ -88,14 +88,14 @@ export function CreateWorktreeModal({
           title: <text fg={active ? t.text : t.textMuted}>{template.name}</text>,
         }
       }),
-    [selectedIndex, t, worktreeTemplates]
+    [selectedIndex, t, workspaceTemplates]
   )
 
   if (step === 'template') {
     return (
       <Picker
         title="New project: pick template"
-        keybindsModeId="modal.create-worktree"
+        keybindsModeId="modal.create-workspace"
         width={uiTokens.modalWidth.md}
         gap={1}
         filter={null}
@@ -110,12 +110,16 @@ export function CreateWorktreeModal({
 
   const baseActive = activeField === 'base'
   return (
-    <Form title="New project" keybindsModeId="modal.create-worktree" width={uiTokens.modalWidth.xl}>
+    <Form
+      title="New project"
+      keybindsModeId="modal.create-workspace"
+      width={uiTokens.modalWidth.xl}
+    >
       <box flexDirection="column" gap={1}>
         <TextField
           active={activeField === 'name'}
           label="Project name"
-          value={worktreeName}
+          value={workspaceName}
           cursorPos={activeField === 'name' ? cursorPos : undefined}
           placeholder="my-feature"
         />
@@ -134,7 +138,7 @@ export function CreateWorktreeModal({
         <AutoComplete
           active={baseActive}
           label="Base (fork from)"
-          placeholder="branch or worktree to fork from..."
+          placeholder="branch or workspace to fork from..."
           value={baseQuery}
           displayValue={baseRef !== '' ? baseRef : 'current branch'}
           items={baseItems}

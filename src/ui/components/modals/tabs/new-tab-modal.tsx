@@ -94,7 +94,7 @@ export function NewTabModal({
       selectedIndex={selectedIndex}
       emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
       onHover={handleHover}
-      footer={<text fg={t.textMuted}>Enter launches in the active worktree</text>}
+      footer={<text fg={t.textMuted}>Enter launches in the active workspace</text>}
     />
   )
 }

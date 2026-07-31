@@ -11,14 +11,14 @@ const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'create-project': 'modal.create-project',
-  'create-worktree': 'modal.create-worktree',
+  'create-workspace': 'modal.create-workspace',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
   'project-name': 'modal.project-name',
   'project-picker': 'modal.project-picker.filtering',
   'rename-tab': 'modal.rename-tab',
-  'rename-worktree': 'modal.rename-worktree',
+  'rename-workspace': 'modal.rename-workspace',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
   'split-picker': 'modal.split-picker',
@@ -28,9 +28,9 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'ai-usage': 'modal.ai-usage',
   'update-available': 'modal.update-available',
-  'worktree-delete-confirm': 'modal.worktree-delete-confirm',
-  'worktree-move': 'modal.worktree-move',
-  'worktree-move-confirm': 'modal.worktree-move-confirm',
+  'workspace-delete-confirm': 'modal.workspace-delete-confirm',
+  'workspace-move': 'modal.workspace-move',
+  'workspace-move-confirm': 'modal.workspace-move-confirm',
 }
 
 export function deriveModeId(state: AppState): ModeId {
@@ -42,8 +42,8 @@ export function deriveModeId(state: AppState): ModeId {
 
   // Overlay on top of git mode without flipping focusMode (like help) — route
   // input to the picker while it's open even though focus stays 'git'.
-  if (state.modal.type === 'worktree-move') {
-    return 'modal.worktree-move'
+  if (state.modal.type === 'workspace-move') {
+    return 'modal.workspace-move'
   }
 
   // Flash-jump overlay: same pattern — renders on top of navigation, all

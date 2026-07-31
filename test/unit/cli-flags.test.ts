@@ -43,25 +43,25 @@ describe('cli flag parser', () => {
   })
 
   describe('optional-string kind', () => {
-    const spec = [{ kind: 'optional-string', name: 'new-worktree' } as const]
+    const spec = [{ kind: 'optional-string', name: 'new-workspace' } as const]
 
     test('bare flag parses as boolean true', () => {
-      expect(parseArgs(['--new-worktree'], spec, []).flags['new-worktree']).toBe(true)
+      expect(parseArgs(['--new-workspace'], spec, []).flags['new-workspace']).toBe(true)
     })
 
     test('=form binds the value', () => {
-      expect(parseArgs(['--new-worktree=fix-auth'], spec, []).flags['new-worktree']).toBe(
+      expect(parseArgs(['--new-workspace=fix-auth'], spec, []).flags['new-workspace']).toBe(
         'fix-auth'
       )
     })
 
     test('=form binds an empty value', () => {
-      expect(parseArgs(['--new-worktree='], spec, []).flags['new-worktree']).toBe('')
+      expect(parseArgs(['--new-workspace='], spec, []).flags['new-workspace']).toBe('')
     })
 
     test('bare flag does NOT swallow the following positional', () => {
-      const parsed = parseArgs(['--new-worktree', 'tab-123'], spec, [{ name: 'tabId' }])
-      expect(parsed.flags['new-worktree']).toBe(true)
+      const parsed = parseArgs(['--new-workspace', 'tab-123'], spec, [{ name: 'tabId' }])
+      expect(parsed.flags['new-workspace']).toBe(true)
       expect(parsed.positionals).toEqual(['tab-123'])
     })
   })

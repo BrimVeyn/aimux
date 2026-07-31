@@ -6,11 +6,11 @@ import type {
 
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { ProjectRecord, ProjectStatus, WorktreeRecord } from '../../../../state/types'
+import type { ProjectRecord, ProjectStatus, WorkspaceRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/project-worktrees'
+import { formatDivergence } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_PROJECT_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
@@ -19,7 +19,7 @@ import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 import { useSidebarAutoScroll } from './use-sidebar-auto-scroll'
-import { WorktreeRow } from './worktree-row'
+import { WorkspaceRow } from './workspace-row'
 
 interface ProjectListProps {
   contentWidth: number
@@ -64,20 +64,21 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
         : undefined,
     [currentProjectId, projects]
   )
-  // The active row can be either a worktree row OR the project row
-  // (when the primary worktree is active). Both must scroll into view —
+  // The active row can be either a workspace row OR the project row
+  // (when the primary workspace is active). Both must scroll into view —
   // otherwise the cursor visually "disappears" off-screen when crossing
   // a project boundary on a key press.
-  const currentWorktrees = currentProject?.worktrees ?? []
-  const currentPrimary = currentWorktrees.find((w) => w.source === 'primary') ?? currentWorktrees[0]
-  const rawActiveWorktreeId = currentProject?.activeWorktreeId
+  const currentWorkspaces = currentProject?.workspaces ?? []
+  const currentPrimary =
+    currentWorkspaces.find((w) => w.source === 'primary') ?? currentWorkspaces[0]
+  const rawActiveWorkspaceId = currentProject?.activeWorkspaceId
   const activeOnNonPrimary =
-    rawActiveWorktreeId != null &&
-    rawActiveWorktreeId !== '' &&
-    rawActiveWorktreeId !== currentPrimary?.id
+    rawActiveWorkspaceId != null &&
+    rawActiveWorkspaceId !== '' &&
+    rawActiveWorkspaceId !== currentPrimary?.id
   let activeRowId: string | null = null
   if (activeOnNonPrimary) {
-    activeRowId = `sidebar-wt-${rawActiveWorktreeId}`
+    activeRowId = `sidebar-wt-${rawActiveWorkspaceId}`
   } else if (currentProjectId != null && currentProjectId !== '') {
     activeRowId = `sidebar-ws-${currentProjectId}`
   }
@@ -145,20 +146,20 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      // The project row visually anchors the project's primary worktree
+      // The project row visually anchors the project's primary workspace
       // (its branch line shows the primary's branch). Clicking it should
       // land on the primary — same semantics as j/k cycling onto a project
-      // item — instead of preserving whatever non-primary worktree happened
+      // item — instead of preserving whatever non-primary workspace happened
       // to be active last time we left this project.
       const sourceProject = ordered.find((s) => s.id === source)
-      const sourceWorktrees = sourceProject?.worktrees ?? []
+      const sourceWorkspaces = sourceProject?.workspaces ?? []
       const sourcePrimaryId = (
-        sourceWorktrees.find((w) => w.source === 'primary') ?? sourceWorktrees[0]
+        sourceWorkspaces.find((w) => w.source === 'primary') ?? sourceWorkspaces[0]
       )?.id
       runSideEffectGlobal({
         index: idx + 1,
         type: 'switch-project-by-index',
-        worktreeId: sourcePrimaryId,
+        workspaceId: sourcePrimaryId,
       })
     }
   }, [baselineOrder, dragOrder, draggingId, ordered])
@@ -193,28 +194,28 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
       >
         {(() => {
           // Build a single flat list of items — project rows interleaved
-          // with their non-primary worktrees. One map, one React keypath per
+          // with their non-primary workspaces. One map, one React keypath per
           // visible row; transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
           for (const [visibleIdx, project] of visibleProjects.entries()) {
             const projectIndex = baselineOrder.indexOf(project.id) + 1
             const isCurrentProject = project.id === currentProjectId
-            const worktrees = project.worktrees ?? []
-            const primaryWorktree = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-            const extraWorktrees = worktrees.filter((w) => w.id !== primaryWorktree?.id)
+            const workspaces = project.workspaces ?? []
+            const primaryWorkspace = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+            const extraWorkspaces = workspaces.filter((w) => w.id !== primaryWorkspace?.id)
             const projectIsActiveItem =
               isCurrentProject &&
-              (project.activeWorktreeId == null ||
-                project.activeWorktreeId === '' ||
-                project.activeWorktreeId === primaryWorktree?.id)
+              (project.activeWorkspaceId == null ||
+                project.activeWorkspaceId === '' ||
+                project.activeWorkspaceId === primaryWorkspace?.id)
             rows.push(
               <ProjectRow
                 key={`ws:${project.id}`}
                 project={project}
                 isActiveItem={projectIsActiveItem}
                 inCurrentGroup={isCurrentProject}
-                primaryWorktree={primaryWorktree}
-                hasExtraWorktrees={extraWorktrees.length > 0}
+                primaryWorkspace={primaryWorkspace}
+                hasExtraWorkspaces={extraWorkspaces.length > 0}
                 status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
@@ -226,16 +227,16 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 onDragCancel={cancelDrag}
               />
             )
-            for (const [wtIdx, worktree] of extraWorktrees.entries()) {
+            for (const [wtIdx, workspace] of extraWorkspaces.entries()) {
               rows.push(
-                <WorktreeRow
-                  key={`wt:${worktree.id}`}
+                <WorkspaceRow
+                  key={`wt:${workspace.id}`}
                   project={project}
-                  worktree={worktree}
+                  workspace={workspace}
                   projectIndex={projectIndex}
-                  isActiveItem={isCurrentProject && worktree.id === project.activeWorktreeId}
+                  isActiveItem={isCurrentProject && workspace.id === project.activeWorkspaceId}
                   inCurrentGroup={isCurrentProject}
-                  isLast={wtIdx === extraWorktrees.length - 1}
+                  isLast={wtIdx === extraWorkspaces.length - 1}
                 />
               )
             }
@@ -265,10 +266,10 @@ interface ProjectRowProps {
   isActiveItem: boolean
   /** True when this row belongs to the current project (selection scope). */
   inCurrentGroup: boolean
-  /** The project's primary worktree — its git branch is shown as the project's anchor identity. */
-  primaryWorktree: WorktreeRecord | undefined
-  /** True when at least one non-primary worktree follows — used to draw the tree continuator. */
-  hasExtraWorktrees: boolean
+  /** The project's primary workspace — its git branch is shown as the project's anchor identity. */
+  primaryWorkspace: WorkspaceRecord | undefined
+  /** True when at least one non-primary workspace follows — used to draw the tree continuator. */
+  hasExtraWorkspaces: boolean
   status: ProjectStatus
   dragging: boolean
   contentWidth: number
@@ -284,7 +285,7 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
-  hasExtraWorktrees,
+  hasExtraWorkspaces,
   inCurrentGroup,
   isActiveItem,
   marginTop,
@@ -292,7 +293,7 @@ const ProjectRow = memo(function ProjectRow({
   onDragCancel,
   onDragStart,
   onDrop,
-  primaryWorktree,
+  primaryWorkspace,
   project,
   setRowRef,
   status,
@@ -313,7 +314,7 @@ const ProjectRow = memo(function ProjectRow({
   const workingColor = t.primary
   const waitingColor = t.warning
   const divergence = useAppStore((s) =>
-    primaryWorktree ? s.worktreeDivergence[primaryWorktree.id] : undefined
+    primaryWorkspace ? s.workspaceDivergence[primaryWorkspace.id] : undefined
   )
 
   const handleRef = useCallback(
@@ -367,7 +368,7 @@ const ProjectRow = memo(function ProjectRow({
     leadingColor = workingColor
   }
 
-  const branchText = primaryWorktree?.branch ?? ''
+  const branchText = primaryWorkspace?.branch ?? ''
   const divergenceText = formatDivergence(divergence)
   const showBranch = branchText !== ''
   const nameLabel = truncate(project.name, Math.max(0, contentWidth - 4))
@@ -407,7 +408,7 @@ const ProjectRow = memo(function ProjectRow({
       {showBranch ? (
         <box flexDirection="row">
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {hasExtraWorktrees ? '│ ' : '  '}
+            {hasExtraWorkspaces ? '│ ' : '  '}
             {'\u{e702}'} {branchLabel}
             {divergenceText !== '' ? ` ${divergenceText}` : ''}
           </text>

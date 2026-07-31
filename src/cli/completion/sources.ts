@@ -9,7 +9,7 @@
  *
  * Phase 1 implements only the sources that read local state (built-in
  * assistants, the project catalog). Daemon-backed sources — tabs, workers,
- * worktrees — and git refs return nothing until phase 2 wires them up.
+ * workspaces — and git refs return nothing until phase 2 wires them up.
  */
 
 import type { DynamicCompletionSource } from '../flags'
@@ -47,7 +47,7 @@ async function resolveSource(source: DynamicCompletionSource): Promise<Completio
       return assistantCandidates()
     case 'project':
       return await projectCandidates()
-    // Phase 2: 'tab' | 'worker' | 'worktree' need a daemon round-trip under a
+    // Phase 2: 'tab' | 'worker' | 'workspace' need a daemon round-trip under a
     // deadline; 'git-ref' needs a `git for-each-ref` in the project repo.
     default:
       return []

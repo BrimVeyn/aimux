@@ -2,7 +2,7 @@ import type { AppAction, AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
 import { restoreProjectState } from '../project-persistence'
-import { filterTabsForActiveWorktree, withActiveWorktree } from '../project-worktrees'
+import { filterTabsForActiveWorkspace, withActiveWorkspace } from '../project-workspaces'
 import { filterProjects } from '../selectors'
 
 const CLOSED_MODAL = {
@@ -18,41 +18,41 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
       const snapshot =
         action.projectSnapshot ??
         state.projects.find((entry) => entry.id === action.projectId)?.projectSnapshot
-      // The project's activeWorktreeId may have been patched right before
+      // The project's activeWorkspaceId may have been patched right before
       // this load (e.g. the cross-project branch of handleCycleSidebarItem
-      // sets it to the worktree the user just clicked). The snapshot's
-      // activeTabId still reflects the *last* worktree they were on, so
-      // honor the patched worktree by filtering the restored tab list.
+      // sets it to the workspace the user just clicked). The snapshot's
+      // activeTabId still reflects the *last* workspace they were on, so
+      // honor the patched workspace by filtering the restored tab list.
       const loadedProject = state.projects.find((entry) => entry.id === action.projectId)
-      const loadedWorktrees = loadedProject?.worktrees ?? []
+      const loadedWorkspaces = loadedProject?.workspaces ?? []
       const restored = restoreProjectState(state, snapshot, {
         forceDisconnected: action.forceDisconnected ?? true,
-        // Drop tabs bound to worktrees this project no longer owns so a stale
-        // id can't be caught by a later worktree delete (closing "another
-        // worktree's" tabs) and so corrupted catalogs self-heal on load. Only
-        // prune once the project has worktrees — an empty list means it hasn't
+        // Drop tabs bound to workspaces this project no longer owns so a stale
+        // id can't be caught by a later workspace delete (closing "another
+        // workspace's" tabs) and so corrupted catalogs self-heal on load. Only
+        // prune once the project has workspaces — an empty list means it hasn't
         // been initialized yet, and pruning then would wrongly drop bound tabs.
-        validWorktreeIds:
-          loadedWorktrees.length > 0 ? new Set(loadedWorktrees.map((w) => w.id)) : undefined,
+        validWorkspaceIds:
+          loadedWorkspaces.length > 0 ? new Set(loadedWorkspaces.map((w) => w.id)) : undefined,
       })
-      const visible = filterTabsForActiveWorktree(restored.tabs, loadedProject)
+      const visible = filterTabsForActiveWorkspace(restored.tabs, loadedProject)
       // Prefer the snapshot's tab; if it isn't visible under the active
-      // worktree (e.g. a multi-worktree project restored onto a different
-      // worktree), fall back to the last tab we viewed in that worktree,
+      // workspace (e.g. a multi-workspace project restored onto a different
+      // workspace), fall back to the last tab we viewed in that workspace,
       // then to the first visible tab.
-      const rememberedForWorktree =
-        loadedProject?.activeWorktreeId != null && loadedProject.activeWorktreeId !== ''
-          ? state.lastActiveTabByWorktree[loadedProject.activeWorktreeId]
+      const rememberedForWorkspace =
+        loadedProject?.activeWorkspaceId != null && loadedProject.activeWorkspaceId !== ''
+          ? state.lastActiveTabByWorkspace[loadedProject.activeWorkspaceId]
           : undefined
       const snapshotTabVisible =
         restored.activeTabId != null &&
         restored.activeTabId !== '' &&
         visible.some((t) => t.id === restored.activeTabId)
       const rememberedTabVisible =
-        rememberedForWorktree != null &&
-        rememberedForWorktree !== '' &&
-        visible.some((t) => t.id === rememberedForWorktree)
-      const fallbackTabId = rememberedTabVisible ? rememberedForWorktree : (visible[0]?.id ?? null)
+        rememberedForWorkspace != null &&
+        rememberedForWorkspace !== '' &&
+        visible.some((t) => t.id === rememberedForWorkspace)
+      const fallbackTabId = rememberedTabVisible ? rememberedForWorkspace : (visible[0]?.id ?? null)
       const activeTabId = snapshotTabVisible ? restored.activeTabId : fallbackTabId
       return {
         ...state,
@@ -178,67 +178,67 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
         projectStatuses: { ...state.projectStatuses, [action.projectId]: action.status },
       }
     }
-    case 'add-worktree-record':
+    case 'add-workspace-record':
       return {
         ...state,
         projects: state.projects.map((project) => {
           if (project.id !== action.projectId) return project
           const next = {
             ...project,
-            activeWorktreeId:
-              action.activate === true ? action.worktree.id : project.activeWorktreeId,
+            activeWorkspaceId:
+              action.activate === true ? action.workspace.id : project.activeWorkspaceId,
             updatedAt: new Date().toISOString(),
-            worktrees: [...(project.worktrees ?? []), action.worktree],
+            workspaces: [...(project.workspaces ?? []), action.workspace],
           }
-          return next.activeWorktreeId != null && next.activeWorktreeId !== ''
+          return next.activeWorkspaceId != null && next.activeWorkspaceId !== ''
             ? next
-            : withActiveWorktree(next, action.worktree.id)
+            : withActiveWorkspace(next, action.workspace.id)
         }),
       }
-    case 'set-active-worktree': {
+    case 'set-active-workspace': {
       const projects = state.projects.map((project) =>
-        project.id === action.projectId ? withActiveWorktree(project, action.worktreeId) : project
+        project.id === action.projectId ? withActiveWorkspace(project, action.workspaceId) : project
       )
-      // Remember the tab we're leaving so coming back to this worktree later
+      // Remember the tab we're leaving so coming back to this workspace later
       // restores it instead of snapping to the first tab. Keyed by the
-      // worktree we're departing (the current project's active one).
+      // workspace we're departing (the current project's active one).
       const leavingProject = state.projects.find((s) => s.id === action.projectId)
-      const leavingWorktreeId = leavingProject?.activeWorktreeId
-      const lastActiveTabByWorktree =
+      const leavingWorkspaceId = leavingProject?.activeWorkspaceId
+      const lastActiveTabByWorkspace =
         action.projectId === state.currentProjectId &&
-        leavingWorktreeId != null &&
-        leavingWorktreeId !== '' &&
+        leavingWorkspaceId != null &&
+        leavingWorkspaceId !== '' &&
         state.activeTabId != null &&
         state.activeTabId !== ''
-          ? { ...state.lastActiveTabByWorktree, [leavingWorktreeId]: state.activeTabId }
-          : state.lastActiveTabByWorktree
-      // Changing the worktree of a non-current project has no effect on
+          ? { ...state.lastActiveTabByWorkspace, [leavingWorkspaceId]: state.activeTabId }
+          : state.lastActiveTabByWorkspace
+      // Changing the workspace of a non-current project has no effect on
       // which tab the user is looking at — leave activeTabId alone.
       if (action.projectId !== state.currentProjectId) {
-        return { ...state, lastActiveTabByWorktree, projects }
+        return { ...state, lastActiveTabByWorkspace, projects }
       }
       // For the current project: if the existing activeTabId belongs to
-      // the new worktree, keep it. Otherwise restore the last tab we viewed
-      // in that worktree, falling back to the first visible tab (or clearing
-      // it if the worktree is empty — the pane then renders the "this
-      // worktree has no tabs" placeholder).
+      // the new workspace, keep it. Otherwise restore the last tab we viewed
+      // in that workspace, falling back to the first visible tab (or clearing
+      // it if the workspace is empty — the pane then renders the "this
+      // workspace has no tabs" placeholder).
       const updated = projects.find((s) => s.id === action.projectId)
-      const visible = filterTabsForActiveWorktree(state.tabs, updated)
+      const visible = filterTabsForActiveWorkspace(state.tabs, updated)
       const currentStillVisible =
         state.activeTabId != null &&
         state.activeTabId !== '' &&
         visible.some((t) => t.id === state.activeTabId)
       if (currentStillVisible) {
-        return { ...state, lastActiveTabByWorktree, projects }
+        return { ...state, lastActiveTabByWorkspace, projects }
       }
-      const remembered = lastActiveTabByWorktree[action.worktreeId]
+      const remembered = lastActiveTabByWorkspace[action.workspaceId]
       const nextActiveTabId =
         remembered != null && remembered !== '' && visible.some((t) => t.id === remembered)
           ? remembered
           : (visible[0]?.id ?? null)
-      return { ...state, activeTabId: nextActiveTabId, lastActiveTabByWorktree, projects }
+      return { ...state, activeTabId: nextActiveTabId, lastActiveTabByWorkspace, projects }
     }
-    case 'update-worktree-record':
+    case 'update-workspace-record':
       return {
         ...state,
         projects: state.projects.map((project) =>
@@ -246,10 +246,10 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
             ? {
                 ...project,
                 updatedAt: new Date().toISOString(),
-                worktrees: project.worktrees?.map((worktree) =>
-                  worktree.id === action.worktreeId
-                    ? { ...worktree, ...action.patch, updatedAt: new Date().toISOString() }
-                    : worktree
+                workspaces: project.workspaces?.map((workspace) =>
+                  workspace.id === action.workspaceId
+                    ? { ...workspace, ...action.patch, updatedAt: new Date().toISOString() }
+                    : workspace
                 ),
               }
             : project

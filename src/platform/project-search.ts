@@ -94,7 +94,7 @@ export async function searchProjectDirectories(query: string): Promise<Directory
         }
         const gitPath = join(path, '.git')
         const st = await stat(gitPath).catch(() => null)
-        const type = st !== null && st.isFile() ? 'worktree' : 'git-repo'
+        const type = st !== null && st.isFile() ? 'workspace' : 'git-repo'
         return { path, type } as const
       })
     )

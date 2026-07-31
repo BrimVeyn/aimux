@@ -1,21 +1,21 @@
 import { useCallback, useMemo } from 'react'
 
-import type { ModalWorktreeMove, WorktreeRecord } from '../../../../state/types'
+import type { ModalWorkspaceMove, WorkspaceRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/project-worktrees'
+import { formatDivergence } from '../../../../state/project-workspaces'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'
 import { ModalShell } from '../shared/modal-shell'
 
-interface WorktreeMoveModalProps {
+interface WorkspaceMoveModalProps {
   deleteSource: boolean
   divergence: Record<string, { ahead: number; behind: number }>
   selectedIndex: number
-  sourceWorktreeId: string
-  stats: ModalWorktreeMove['stats']
-  worktrees: WorktreeRecord[]
+  sourceWorkspaceId: string
+  stats: ModalWorkspaceMove['stats']
+  workspaces: WorkspaceRecord[]
 }
 
 const MOVE_HINTS: [key: string, label: string][] = [
@@ -25,37 +25,37 @@ const MOVE_HINTS: [key: string, label: string][] = [
   ['esc', 'cancel'],
 ]
 
-export function WorktreeMoveModal({
+export function WorkspaceMoveModal({
   deleteSource,
   divergence,
   selectedIndex,
-  sourceWorktreeId,
+  sourceWorkspaceId,
   stats,
-  worktrees,
-}: WorktreeMoveModalProps) {
+  workspaces,
+}: WorkspaceMoveModalProps) {
   const t = useTheme()
   const source = useMemo(
-    () => worktrees.find((w) => w.id === sourceWorktreeId),
-    [sourceWorktreeId, worktrees]
+    () => workspaces.find((w) => w.id === sourceWorkspaceId),
+    [sourceWorkspaceId, workspaces]
   )
   const targets = useMemo(
-    () => worktrees.filter((w) => w.id !== sourceWorktreeId),
-    [sourceWorktreeId, worktrees]
+    () => workspaces.filter((w) => w.id !== sourceWorkspaceId),
+    [sourceWorkspaceId, workspaces]
   )
   const sourceLabel =
-    source?.branch != null && source.branch !== '' ? source.branch : (source?.name ?? 'worktree')
+    source?.branch != null && source.branch !== '' ? source.branch : (source?.name ?? 'workspace')
   // What the move would carry: commits ahead of the fork point (when known) plus
   // uncommitted files, loaded async after the modal opens.
   const sourcePreview = useMemo(() => {
     const parts: string[] = []
-    const ahead = divergence[sourceWorktreeId]?.ahead ?? 0
+    const ahead = divergence[sourceWorkspaceId]?.ahead ?? 0
     if (ahead > 0) parts.push(`${ahead} commit(s)`)
     if (stats.kind === 'ready') {
-      const dirty = stats.dirtyFiles[sourceWorktreeId] ?? 0
+      const dirty = stats.dirtyFiles[sourceWorkspaceId] ?? 0
       if (dirty > 0) parts.push(`${dirty} uncommitted file(s)`)
     }
     return parts.join(' · ')
-  }, [divergence, sourceWorktreeId, stats])
+  }, [divergence, sourceWorkspaceId, stats])
   const handleSelectIndex = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
     []
@@ -63,7 +63,7 @@ export function WorktreeMoveModal({
   return (
     <ModalShell
       title={`Move ${sourceLabel} →`}
-      keybindsModeId="modal.worktree-move"
+      keybindsModeId="modal.workspace-move"
       width={uiTokens.modalWidth.md}
       footer={
         <box flexDirection="column" gap={1} marginTop={1}>
@@ -87,18 +87,20 @@ export function WorktreeMoveModal({
       <box flexDirection="column" marginTop={1}>
         {sourcePreview !== '' ? <text fg={t.textMuted}>will move: {sourcePreview}</text> : null}
         {targets.length === 0 ? (
-          <text fg={t.textMuted}>No other worktree to move into.</text>
+          <text fg={t.textMuted}>No other workspace to move into.</text>
         ) : (
-          targets.map((worktree, index) => {
+          targets.map((workspace, index) => {
             const active = index === selectedIndex
             const label =
-              worktree.branch != null && worktree.branch !== '' ? worktree.branch : worktree.name
-            const ahead = formatDivergence(divergence[worktree.id])
-            const dirty = stats.kind === 'ready' && (stats.dirtyFiles[worktree.id] ?? 0) > 0
+              workspace.branch != null && workspace.branch !== ''
+                ? workspace.branch
+                : workspace.name
+            const ahead = formatDivergence(divergence[workspace.id])
+            const dirty = stats.kind === 'ready' && (stats.dirtyFiles[workspace.id] ?? 0) > 0
             return (
               <ListItem
-                key={worktree.id}
-                id={worktree.id}
+                key={workspace.id}
+                id={workspace.id}
                 index={index}
                 active={active}
                 onHoverIndex={handleSelectIndex}
@@ -106,7 +108,7 @@ export function WorktreeMoveModal({
                 title={
                   <text fg={active ? t.text : t.textMuted} wrapMode="none">
                     {label}
-                    {worktree.source === 'primary' ? ' (primary)' : ''}
+                    {workspace.source === 'primary' ? ' (primary)' : ''}
                     {ahead !== '' ? ` ${ahead}` : ''}
                     {dirty ? <span fg={t.warning}> ●</span> : null}
                   </text>

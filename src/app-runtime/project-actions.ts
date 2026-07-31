@@ -6,7 +6,7 @@ import { createPrefixedId } from '../platform/id'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { createEmptyProjectSnapshot, serializeProject } from '../state/project-persistence'
 import { buildProjectsWithCurrentSnapshot } from '../state/project-save'
-import { createPrimaryWorktree, ensureProjectWorktrees } from '../state/project-worktrees'
+import { createPrimaryWorkspace, ensureProjectWorkspaces } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
 
 export function createProjectFromCurrentState(
@@ -20,7 +20,7 @@ export function createProjectFromCurrentState(
       ? createEmptyProjectSnapshot()
       : serializeProject(state)
   const project: ProjectRecord = {
-    activeWorktreeId: undefined,
+    activeWorkspaceId: undefined,
     createdAt: now,
     id: createPrefixedId('project'),
     lastOpenedAt: now,
@@ -28,12 +28,12 @@ export function createProjectFromCurrentState(
     projectPath,
     projectSnapshot,
     updatedAt: now,
-    worktrees: undefined,
+    workspaces: undefined,
   }
   if (projectPath != null && projectPath !== '') {
-    const worktree = createPrimaryWorktree(projectPath, now)
-    project.activeWorktreeId = worktree.id
-    project.worktrees = [worktree]
+    const workspace = createPrimaryWorkspace(projectPath, now)
+    project.activeWorkspaceId = workspace.id
+    project.workspaces = [workspace]
   }
 
   let updatedProjects = state.projects
@@ -48,7 +48,7 @@ export function createProjectFromCurrentState(
 
   return {
     project,
-    projects: [...updatedProjects, ensureProjectWorktrees(project)],
+    projects: [...updatedProjects, ensureProjectWorkspaces(project)],
   }
 }
 

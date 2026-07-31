@@ -4,7 +4,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { AppState, ProjectRecord, TabSession, WorktreeRecord } from '../../src/state/types'
+import type { AppState, ProjectRecord, TabSession, WorkspaceRecord } from '../../src/state/types'
 
 import { executeSideEffect, type SideEffectContext } from '../../src/app-runtime/side-effects'
 import { enqueueGitOp } from '../../src/git/command-queue'
@@ -36,7 +36,7 @@ beforeEach(() => {
   writeFileSync(join(main, 'file.txt'), 'base\n')
   git(main, 'add', '-A')
   git(main, 'commit', '-m', 'init')
-  // Two aimux-temp worktrees inside the sandboxed root: source + target.
+  // Two aimux-temp workspaces inside the sandboxed root: source + target.
   src = join(base, 'aimux-wt', 'r-test', 'src-1')
   tgt = join(base, 'aimux-wt', 'r-test', 'tgt-1')
   git(main, 'worktree', 'add', '-b', 'feature', src)
@@ -52,7 +52,7 @@ afterEach(() => {
   rmSync(base, { force: true, recursive: true })
 })
 
-function tab(id: string, worktreeId: string): TabSession {
+function tab(id: string, workspaceId: string): TabSession {
   return {
     assistant: 'terminal',
     buffer: '',
@@ -67,11 +67,11 @@ function tab(id: string, worktreeId: string): TabSession {
       sendFocusMode: false,
     },
     title: id,
-    worktreeId,
+    workspaceId,
   }
 }
 
-function tempWorktree(over: Partial<WorktreeRecord> & Pick<WorktreeRecord, 'id' | 'path'>) {
+function tempWorkspace(over: Partial<WorkspaceRecord> & Pick<WorkspaceRecord, 'id' | 'path'>) {
   return {
     branch: 'b',
     createdAt: NOW,
@@ -81,11 +81,11 @@ function tempWorktree(over: Partial<WorktreeRecord> & Pick<WorktreeRecord, 'id' 
     source: 'aimux-temp' as const,
     updatedAt: NOW,
     ...over,
-  } satisfies WorktreeRecord
+  } satisfies WorkspaceRecord
 }
 
-test('move + delete leaves the target active (not snapped back to a default worktree)', async () => {
-  const worktrees: WorktreeRecord[] = [
+test('move + delete leaves the target active (not snapped back to a default workspace)', async () => {
+  const workspaces: WorkspaceRecord[] = [
     {
       createdAt: NOW,
       createdByAimux: false,
@@ -96,20 +96,20 @@ test('move + delete leaves the target active (not snapped back to a default work
       source: 'primary',
       updatedAt: NOW,
     },
-    tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
-    tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
+    tempWorkspace({ branch: 'feature', id: 'wt-src', path: src }),
+    tempWorkspace({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
   ]
   const project: ProjectRecord = {
-    activeWorktreeId: 'wt-src',
+    activeWorkspaceId: 'wt-src',
     createdAt: NOW,
     id: 's1',
     lastOpenedAt: NOW,
     name: 's1',
     updatedAt: NOW,
-    worktrees,
+    workspaces,
   }
-  // A tab in the primary worktree is what the source tab would reselect to on
-  // close — the bug snapped the active worktree there instead of the target.
+  // A tab in the primary workspace is what the source tab would reselect to on
+  // close — the bug snapped the active workspace there instead of the target.
   let state: AppState = {
     ...createInitialState({}, [project]),
     activeTabId: 't-src',
@@ -142,24 +142,24 @@ test('move + delete leaves the target active (not snapped back to a default work
     {
       deleteSource: true,
       projectId: 's1',
-      sourceWorktreeId: 'wt-src',
-      targetWorktreeId: 'wt-tgt',
-      type: 'move-worktree',
+      sourceWorkspaceId: 'wt-src',
+      targetWorkspaceId: 'wt-tgt',
+      type: 'move-workspace',
     },
     ctx
   )
   await enqueueGitOp(async () => {})
 
   const after = state.projects[0]
-  // The target is the active worktree — not the primary the closed tab pointed at.
-  expect(after?.activeWorktreeId).toBe('wt-tgt')
-  expect(after?.worktrees?.map((w) => w.id)).toEqual(['wt-main', 'wt-tgt'])
+  // The target is the active workspace — not the primary the closed tab pointed at.
+  expect(after?.activeWorkspaceId).toBe('wt-tgt')
+  expect(after?.workspaces?.map((w) => w.id)).toEqual(['wt-main', 'wt-tgt'])
   expect(disposed).toContain('t-src')
   expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
 })
 
 function harness() {
-  const worktrees: WorktreeRecord[] = [
+  const workspaces: WorkspaceRecord[] = [
     {
       createdAt: NOW,
       createdByAimux: false,
@@ -170,17 +170,17 @@ function harness() {
       source: 'primary',
       updatedAt: NOW,
     },
-    tempWorktree({ branch: 'feature', id: 'wt-src', path: src }),
-    tempWorktree({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
+    tempWorkspace({ branch: 'feature', id: 'wt-src', path: src }),
+    tempWorkspace({ branch: 'target-branch', id: 'wt-tgt', path: tgt }),
   ]
   const project: ProjectRecord = {
-    activeWorktreeId: 'wt-src',
+    activeWorkspaceId: 'wt-src',
     createdAt: NOW,
     id: 's1',
     lastOpenedAt: NOW,
     name: 's1',
     updatedAt: NOW,
-    worktrees,
+    workspaces,
   }
   let state: AppState = {
     ...createInitialState({}, [project]),
@@ -215,31 +215,31 @@ test('overlapping dirty target opens the stash dialog; retry with stashTarget co
   executeSideEffect(
     {
       projectId: 's1',
-      sourceWorktreeId: 'wt-src',
-      targetWorktreeId: 'wt-tgt',
-      type: 'move-worktree',
+      sourceWorkspaceId: 'wt-src',
+      targetWorkspaceId: 'wt-tgt',
+      type: 'move-workspace',
     },
     ctx
   )
   await enqueueGitOp(async () => {})
 
   const modal = getState().modal
-  expect(modal.type).toBe('worktree-move-confirm')
-  if (modal.type !== 'worktree-move-confirm') return
+  expect(modal.type).toBe('workspace-move-confirm')
+  if (modal.type !== 'workspace-move-confirm') return
   expect(modal.variant).toBe('stash-target')
   expect(modal.files).toContain('file.txt')
-  expect(modal.sourceWorktreeId).toBe('wt-src')
-  expect(modal.targetWorktreeId).toBe('wt-tgt')
+  expect(modal.sourceWorkspaceId).toBe('wt-src')
+  expect(modal.targetWorkspaceId).toBe('wt-tgt')
   // Nothing was touched on the first attempt.
   expect(git(tgt, 'stash', 'list').trim()).toBe('')
 
   executeSideEffect(
     {
       projectId: 's1',
-      sourceWorktreeId: 'wt-src',
+      sourceWorkspaceId: 'wt-src',
       stashTarget: true,
-      targetWorktreeId: 'wt-tgt',
-      type: 'move-worktree',
+      targetWorkspaceId: 'wt-tgt',
+      type: 'move-workspace',
     },
     ctx
   )
@@ -247,7 +247,7 @@ test('overlapping dirty target opens the stash dialog; retry with stashTarget co
 
   expect(git(tgt, 'stash', 'list')).toContain('aimux: backup before move from feature')
   expect(git(tgt, 'diff', '--cached', '--name-only')).toContain('file.txt')
-  expect(getState().projects[0]?.activeWorktreeId).toBe('wt-tgt')
+  expect(getState().projects[0]?.activeWorkspaceId).toBe('wt-tgt')
 })
 
 test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps the source', async () => {
@@ -261,17 +261,17 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
   executeSideEffect(
     {
       projectId: 's1',
-      sourceWorktreeId: 'wt-src',
-      targetWorktreeId: 'wt-tgt',
-      type: 'move-worktree',
+      sourceWorkspaceId: 'wt-src',
+      targetWorkspaceId: 'wt-tgt',
+      type: 'move-workspace',
     },
     ctx
   )
   await enqueueGitOp(async () => {})
 
   const modal = getState().modal
-  expect(modal.type).toBe('worktree-move-confirm')
-  if (modal.type !== 'worktree-move-confirm') return
+  expect(modal.type).toBe('workspace-move-confirm')
+  if (modal.type !== 'workspace-move-confirm') return
   expect(modal.variant).toBe('keep-conflicts')
   expect(modal.files).toContain('file.txt')
   // First attempt fully restored the target.
@@ -282,9 +282,9 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
       deleteSource: true,
       keepConflicts: true,
       projectId: 's1',
-      sourceWorktreeId: 'wt-src',
-      targetWorktreeId: 'wt-tgt',
-      type: 'move-worktree',
+      sourceWorkspaceId: 'wt-src',
+      targetWorkspaceId: 'wt-tgt',
+      type: 'move-workspace',
     },
     ctx
   )
@@ -293,7 +293,7 @@ test('conflict opens the keep-conflicts dialog; retry leaves markers and keeps t
   // Conflict markers left in the target for manual resolution.
   expect(git(tgt, 'diff', '--name-only', '--diff-filter=U')).toContain('file.txt')
   const after = getState().projects[0]
-  expect(after?.activeWorktreeId).toBe('wt-tgt')
+  expect(after?.activeWorkspaceId).toBe('wt-tgt')
   // deleteSource is deliberately ignored: the source's work only landed half-resolved.
-  expect(after?.worktrees?.map((w) => w.id)).toContain('wt-src')
+  expect(after?.workspaces?.map((w) => w.id)).toContain('wt-src')
 })

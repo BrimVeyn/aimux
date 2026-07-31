@@ -6,7 +6,7 @@ import type { ProjectRecord } from './types'
 import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
-import { ensureProjectWorktrees } from './project-worktrees'
+import { ensureProjectWorkspaces } from './project-workspaces'
 import { toast } from './toast-store'
 import { isProjectRecord } from './validation'
 
@@ -97,7 +97,7 @@ export function saveProjectCatalog(projects: ProjectRecord[]): void {
       path: PROJECTS_PATH,
       projectCount: projects.length,
     })
-    // Persisting the catalog underpins project/worktree state — a silent
+    // Persisting the catalog underpins project/workspace state — a silent
     // failure means the user loses projects on restart. Surface it.
     toast.error(`Failed to save projects: ${message}`)
   }
@@ -139,5 +139,5 @@ function normalizeOrder(projects: ProjectRecord[]): ProjectRecord[] {
 }
 
 function normalizeProjects(projects: ProjectRecord[]): ProjectRecord[] {
-  return normalizeOrder(projects).map((project) => ensureProjectWorktrees(project))
+  return normalizeOrder(projects).map((project) => ensureProjectWorkspaces(project))
 }

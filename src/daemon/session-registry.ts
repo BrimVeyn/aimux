@@ -93,7 +93,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
             existing.title = persisted.title
             existing.autoRenameStatus = persisted.autoRenameStatus
           }
-          existing.worktreeId = persisted.worktreeId
+          existing.workspaceId = persisted.workspaceId
           existing.workerName = persisted.workerName
         }
       }
@@ -151,11 +151,11 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     env?: Record<string, string>
     autoRenameStatus?: 'eligible' | 'attempted'
     /**
-     * Worktree this tab belongs to (for UI grouping). Stored on the
+     * Workspace this tab belongs to (for UI grouping). Stored on the
      * TabSession so an attach-time replay surfaces it inside the right
-     * worktree column. Optional — tabs not bound to a worktree are valid.
+     * workspace column. Optional — tabs not bound to a workspace are valid.
      */
-    worktreeId?: string
+    workspaceId?: string
     /** Project-scoped orchestration handle; does not affect PTY behavior. */
     workerName?: string
   }): void {
@@ -179,7 +179,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
         workerName: options.workerName,
-        worktreeId: options.worktreeId,
+        workspaceId: options.workspaceId,
       })
     } else {
       existing.status = 'starting'
@@ -192,7 +192,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
       existing.autoRenameStatus = options.autoRenameStatus
-      if (options.worktreeId !== undefined) existing.worktreeId = options.worktreeId
+      if (options.workspaceId !== undefined) existing.workspaceId = options.workspaceId
       if (options.workerName !== undefined) existing.workerName = options.workerName
     }
 

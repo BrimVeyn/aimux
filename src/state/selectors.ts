@@ -1,38 +1,38 @@
 import type { AssistantOption } from '../pty/command-registry'
-import type { ProjectRecord, SnippetRecord, WorktreeRecord } from './types'
+import type { ProjectRecord, SnippetRecord, WorkspaceRecord } from './types'
 
 export interface BaseRefOption {
-  /** Git ref the new worktree is forked from. */
+  /** Git ref the new workspace is forked from. */
   ref: string
   label: string
-  kind: 'worktree' | 'branch'
-  /** Worktree name, for the 'worktree' kind. */
+  kind: 'workspace' | 'branch'
+  /** Workspace name, for the 'workspace' kind. */
   detail?: string
 }
 
 /**
- * Ordered, filtered base-ref candidates for the worktree-create "Base" picker:
- * branches checked out in the project's worktrees first (labelled with the
- * worktree name), then the remaining local branches. A branch already surfaced
- * via a worktree is not repeated. Throwaway `aimux/` branches are skipped unless
- * a live worktree is on them — `git worktree remove` leaves the branch behind,
- * so deleted temp worktrees would otherwise haunt the list as orphan branches.
+ * Ordered, filtered base-ref candidates for the workspace-create "Base" picker:
+ * branches checked out in the project's workspaces first (labelled with the
+ * workspace name), then the remaining local branches. A branch already surfaced
+ * via a workspace is not repeated. Throwaway `aimux/` branches are skipped unless
+ * a live workspace is on them — `git worktree remove` leaves the branch behind,
+ * so deleted temp workspaces would otherwise haunt the list as orphan branches.
  */
 export function buildBaseRefOptions(
-  worktrees: WorktreeRecord[],
+  workspaces: WorkspaceRecord[],
   localBranches: string[],
   query: string
 ): BaseRefOption[] {
   const seen = new Set<string>()
   const options: BaseRefOption[] = []
-  for (const worktree of worktrees) {
-    if (worktree.branch == null || worktree.branch === '' || seen.has(worktree.branch)) continue
-    seen.add(worktree.branch)
+  for (const workspace of workspaces) {
+    if (workspace.branch == null || workspace.branch === '' || seen.has(workspace.branch)) continue
+    seen.add(workspace.branch)
     options.push({
-      detail: worktree.name,
-      kind: 'worktree',
-      label: worktree.branch,
-      ref: worktree.branch,
+      detail: workspace.name,
+      kind: 'workspace',
+      label: workspace.branch,
+      ref: workspace.branch,
     })
   }
   for (const branch of localBranches) {

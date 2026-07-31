@@ -1,6 +1,6 @@
 import { $ } from 'bun'
 
-export interface MoveWorktreeOptions {
+export interface MoveWorkspaceOptions {
   sourcePath: string
   sourceBranch: string
   targetPath: string
@@ -10,7 +10,7 @@ export interface MoveWorktreeOptions {
   keepConflicts?: boolean
 }
 
-export type MoveWorktreeResult =
+export type MoveWorkspaceResult =
   | { kind: 'ok'; filesChanged: number; stashedTarget: boolean }
   /** Target dirty/untracked files would be overwritten by the move; nothing was touched. */
   | { kind: 'needs-stash'; files: string[] }
@@ -76,8 +76,8 @@ function parseOverwrittenFiles(output: string): string[] {
   return files
 }
 
-// Squashes everything a source worktree changed since its fork point into the
-// target worktree's working tree (staged, uncommitted) — committed work plus
+// Squashes everything a source workspace changed since its fork point into the
+// target workspace's working tree (staged, uncommitted) — committed work plus
 // any uncommitted/untracked changes. The source is left exactly as it was; the
 // caller decides whether to delete it. The target may be dirty as long as its
 // local changes don't overlap the incoming ones: on overlap the move stops
@@ -85,7 +85,7 @@ function parseOverwrittenFiles(output: string): string[] {
 // conflict nothing is kept — target reset, source restored — unless
 // keepConflicts is set, in which case the conflicted squash state is left in
 // the target for manual resolution.
-export async function moveWorktree(opts: MoveWorktreeOptions): Promise<MoveWorktreeResult> {
+export async function moveWorkspace(opts: MoveWorkspaceOptions): Promise<MoveWorkspaceResult> {
   const { sourceBranch, sourcePath, targetPath } = opts
   try {
     const headResult = await $`git -C ${sourcePath} rev-parse HEAD`.quiet().nothrow()

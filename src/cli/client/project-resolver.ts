@@ -1,4 +1,4 @@
-import type { ProjectRecord, WorktreeRecord } from '../../state/types'
+import type { ProjectRecord, WorkspaceRecord } from '../../state/types'
 
 import { findMostRecentProject, loadProjectCatalog } from '../../state/project-catalog'
 
@@ -17,18 +17,18 @@ export interface ResolvedProject {
 /** Env pin for headless orchestrators — `--project` still wins over it. */
 export const PROJECT_ENV_VAR = 'AIMUX_PROJECT'
 
-/** The project's primary (root) worktree, i.e. the repository it is about. */
-export function findPrimaryWorktree(project: ProjectRecord): WorktreeRecord | undefined {
-  return project.worktrees?.find((worktree) => worktree.source === 'primary')
+/** The project's primary (root) workspace, i.e. the repository it is about. */
+export function findPrimaryWorkspace(project: ProjectRecord): WorkspaceRecord | undefined {
+  return project.workspaces?.find((workspace) => workspace.source === 'primary')
 }
 
 /**
- * The repo every fresh worktree for this project is cut from. Surfaced in
+ * The repo every fresh workspace for this project is cut from. Surfaced in
  * every worker envelope so an agent can see *which project* it just acted on
- * instead of inferring it from a worktree path hash.
+ * instead of inferring it from a workspace path hash.
  */
 export function projectRepoRoot(project: ProjectRecord): string | null {
-  return findPrimaryWorktree(project)?.repoRoot ?? project.projectPath ?? null
+  return findPrimaryWorkspace(project)?.repoRoot ?? project.projectPath ?? null
 }
 
 /** Stable project identity block embedded in command output. */

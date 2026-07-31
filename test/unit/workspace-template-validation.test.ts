@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { isWorktreeTemplate, parseWorktreeTemplates } from '../../src/config'
+import { isWorkspaceTemplate, parseWorkspaceTemplates } from '../../src/config'
 
 const validMinimal = {
   id: 'solo',
@@ -32,18 +32,18 @@ const validMultiTab = {
   ],
 }
 
-describe('isWorktreeTemplate', () => {
+describe('isWorkspaceTemplate', () => {
   test('accepts a minimal one-tab one-pane template', () => {
-    expect(isWorktreeTemplate(validMinimal)).toBe(true)
+    expect(isWorkspaceTemplate(validMinimal)).toBe(true)
   })
 
   test('accepts a multi-tab template with splits and sends', () => {
-    expect(isWorktreeTemplate(validMultiTab)).toBe(true)
+    expect(isWorkspaceTemplate(validMultiTab)).toBe(true)
   })
 
   test('reuses pane ids across tabs without conflict', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           { panes: [{ assistant: 'claude', id: 'main' }] },
@@ -54,21 +54,21 @@ describe('isWorktreeTemplate', () => {
   })
 
   test('rejects empty id or name', () => {
-    expect(isWorktreeTemplate({ ...validMinimal, id: '' })).toBe(false)
-    expect(isWorktreeTemplate({ ...validMinimal, name: '' })).toBe(false)
+    expect(isWorkspaceTemplate({ ...validMinimal, id: '' })).toBe(false)
+    expect(isWorkspaceTemplate({ ...validMinimal, name: '' })).toBe(false)
   })
 
   test('rejects empty tabs array', () => {
-    expect(isWorktreeTemplate({ ...validMinimal, tabs: [] })).toBe(false)
+    expect(isWorkspaceTemplate({ ...validMinimal, tabs: [] })).toBe(false)
   })
 
   test('rejects a tab with empty panes array', () => {
-    expect(isWorktreeTemplate({ ...validMinimal, tabs: [{ panes: [] }] })).toBe(false)
+    expect(isWorkspaceTemplate({ ...validMinimal, tabs: [{ panes: [] }] })).toBe(false)
   })
 
   test('rejects a root pane that declares splitFrom', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [{ panes: [{ assistant: 'claude', id: 'main', splitFrom: 'other' }] }],
       })
@@ -77,7 +77,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects a non-root pane missing splitFrom or direction', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           {
@@ -90,7 +90,7 @@ describe('isWorktreeTemplate', () => {
       })
     ).toBe(false)
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           {
@@ -106,7 +106,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects splitFrom referencing a pane in another tab', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           { panes: [{ assistant: 'claude', id: 'main' }] },
@@ -128,7 +128,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects duplicate pane ids within a tab', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           {
@@ -149,7 +149,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects ratio outside [0.15, 0.85]', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           {
@@ -171,7 +171,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects invalid direction', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [
           {
@@ -192,7 +192,7 @@ describe('isWorktreeTemplate', () => {
 
   test('rejects non-string send', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [{ panes: [{ assistant: 'claude', id: 'main', send: 42 }] }],
       })
@@ -200,18 +200,18 @@ describe('isWorktreeTemplate', () => {
   })
 
   test('rejects non-object input', () => {
-    expect(isWorktreeTemplate(null)).toBe(false)
-    expect(isWorktreeTemplate('hi')).toBe(false)
-    expect(isWorktreeTemplate(undefined)).toBe(false)
+    expect(isWorkspaceTemplate(null)).toBe(false)
+    expect(isWorkspaceTemplate('hi')).toBe(false)
+    expect(isWorkspaceTemplate(undefined)).toBe(false)
   })
 
   test('rejects template missing tabs field', () => {
-    expect(isWorktreeTemplate({ id: 'x', name: 'X' })).toBe(false)
+    expect(isWorkspaceTemplate({ id: 'x', name: 'X' })).toBe(false)
   })
 
   test('rejects a root pane that declares ratio', () => {
     expect(
-      isWorktreeTemplate({
+      isWorkspaceTemplate({
         ...validMinimal,
         tabs: [{ panes: [{ assistant: 'claude', id: 'main', ratio: 0.5 }] }],
       })
@@ -219,22 +219,22 @@ describe('isWorktreeTemplate', () => {
   })
 })
 
-describe('parseWorktreeTemplates', () => {
+describe('parseWorkspaceTemplates', () => {
   test('returns undefined when value is missing', () => {
     const issues: string[] = []
-    expect(parseWorktreeTemplates(undefined, issues)).toBeUndefined()
+    expect(parseWorkspaceTemplates(undefined, issues)).toBeUndefined()
     expect(issues).toEqual([])
   })
 
   test('reports and ignores non-array input', () => {
     const issues: string[] = []
-    expect(parseWorktreeTemplates({ not: 'an array' }, issues)).toBeUndefined()
+    expect(parseWorkspaceTemplates({ not: 'an array' }, issues)).toBeUndefined()
     expect(issues).toHaveLength(1)
   })
 
   test('drops invalid entries individually and keeps valid ones', () => {
     const issues: string[] = []
-    const result = parseWorktreeTemplates(
+    const result = parseWorkspaceTemplates(
       [validMinimal, { id: 'bad', name: 'Bad' /* missing tabs */ }, validMultiTab],
       issues
     )
@@ -245,7 +245,7 @@ describe('parseWorktreeTemplates', () => {
   test('dedups by id, keeping the first occurrence', () => {
     const issues: string[] = []
     const dup = { ...validMultiTab, id: 'solo' }
-    const result = parseWorktreeTemplates([validMinimal, dup], issues)
+    const result = parseWorkspaceTemplates([validMinimal, dup], issues)
     expect(result?.map((t) => t.id)).toEqual(['solo'])
     expect(result?.[0]?.name).toBe('Solo')
     expect(issues.some((m) => m.includes('duplicate'))).toBe(true)

@@ -11,7 +11,7 @@ import {
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_THIN_ATTACH,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
   MessageDecoder,
@@ -184,12 +184,12 @@ describe('CLI DaemonClient', () => {
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    const seen: { projectId: string; tabId: string; worktreeId: string | undefined }[] = []
+    const seen: { projectId: string; tabId: string; workspaceId: string | undefined }[] = []
     client.on('tabAdded', (payload) => {
       seen.push({
         projectId: payload.projectId,
         tabId: payload.tab.id,
-        worktreeId: payload.tab.worktreeId,
+        workspaceId: payload.tab.workspaceId,
       })
     })
 
@@ -210,7 +210,7 @@ describe('CLI DaemonClient', () => {
             sendFocusMode: false,
           },
           title: 'Claude',
-          worktreeId: 'wt-42',
+          workspaceId: 'wt-42',
         },
       },
       type: 'tabAdded',
@@ -220,7 +220,7 @@ describe('CLI DaemonClient', () => {
     while (seen.length === 0 && Date.now() < deadline) {
       await Bun.sleep(10)
     }
-    expect(seen).toEqual([{ projectId: 'project-1', tabId: 'tab-fresh', worktreeId: 'wt-42' }])
+    expect(seen).toEqual([{ projectId: 'project-1', tabId: 'tab-fresh', workspaceId: 'wt-42' }])
   })
 
   test('createProject request round-trips (v12)', async () => {
@@ -285,15 +285,15 @@ describe('CLI DaemonClient', () => {
     expect(seen).toEqual(['project-9'])
   })
 
-  test('addWorktreeRecord request round-trips (v12)', async () => {
+  test('addWorkspaceRecord request round-trips (v12)', async () => {
     const socketPath = tempSocketPath()
-    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS])
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS])
     cleanups.push(mock.close)
 
     const client = await DaemonClient.connect(socketPath)
     cleanups.push(() => client.close())
 
-    const worktree = {
+    const workspace = {
       createdAt: '2026-07-01T00:00:00.000Z',
       createdByAimux: true,
       id: 'wt-1',
@@ -303,9 +303,9 @@ describe('CLI DaemonClient', () => {
       source: 'aimux-temp' as const,
       updatedAt: '2026-07-01T00:00:00.000Z',
     }
-    await client.expectOk('addWorktreeRecord', { projectId: 'project-1', worktree })
-    const req = mock.received.find((m) => m.type === 'addWorktreeRecord')
-    expect(req?.payload).toMatchObject({ projectId: 'project-1', worktree: { id: 'wt-1' } })
+    await client.expectOk('addWorkspaceRecord', { projectId: 'project-1', workspace })
+    const req = mock.received.find((m) => m.type === 'addWorkspaceRecord')
+    expect(req?.payload).toMatchObject({ projectId: 'project-1', workspace: { id: 'wt-1' } })
   })
 
   test('tabRender + tabExit stream through to subscribers (tab tail)', async () => {

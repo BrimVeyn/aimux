@@ -7,7 +7,7 @@ import type {
   TabActivity,
   TabSession,
   TerminalModeState,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 import type { TabRuntimeTimeouts } from './tab-runtime-timeouts'
 
@@ -182,49 +182,50 @@ export function bindBackendRuntimeEvents({
     logInputDebug('app.backend.event.projectSwitched', { projectId })
   }
 
-  const handleWorktreeAdded = (projectId: string, worktree: WorktreeRecord) => {
+  const handleWorkspaceAdded = (projectId: string, workspace: WorkspaceRecord) => {
     // Idempotent: skip if a duplicate id is already in the project (the CLI
-    // may have raced the UI's own worktree-add path).
+    // may have raced the UI's own workspace-add path).
     const current = appStore.getState()
     const project = current.projects.find((s) => s.id === projectId)
-    const already = project?.worktrees?.some((w) => w.id === worktree.id) === true
+    const already = project?.workspaces?.some((w) => w.id === workspace.id) === true
     if (already) {
-      logInputDebug('app.backend.event.worktreeAdded.skipDuplicate', {
+      logInputDebug('app.backend.event.workspaceAdded.skipDuplicate', {
         projectId,
-        worktreeId: worktree.id,
+        workspaceId: workspace.id,
       })
       return
     }
-    logInputDebug('app.backend.event.worktreeAdded', {
+    logInputDebug('app.backend.event.workspaceAdded', {
       projectId,
-      worktreeId: worktree.id,
+      workspaceId: workspace.id,
     })
-    dispatch({ projectId, type: 'add-worktree-record', worktree })
+    dispatch({ projectId, type: 'add-workspace-record', workspace })
     // Persist the catalog so the change survives restart even if no other
     // side-effect saves shortly after.
     saveProjectCatalog(appStore.getState().projects)
   }
 
-  const handleWorktreeRemoved = (projectId: string, worktreeId: string) => {
+  const handleWorkspaceRemoved = (projectId: string, workspaceId: string) => {
     const current = appStore.getState()
     const project = current.projects.find((s) => s.id === projectId)
-    const present = project?.worktrees?.some((w) => w.id === worktreeId) === true
+    const present = project?.workspaces?.some((w) => w.id === workspaceId) === true
     if (!present) {
-      logInputDebug('app.backend.event.worktreeRemoved.skipMissing', { projectId, worktreeId })
+      logInputDebug('app.backend.event.workspaceRemoved.skipMissing', { projectId, workspaceId })
       return
     }
-    logInputDebug('app.backend.event.worktreeRemoved', { projectId, worktreeId })
+    logInputDebug('app.backend.event.workspaceRemoved', { projectId, workspaceId })
     // Build the updated projects list and dispatch via `set-projects` — this
-    // matches the pattern used by the existing worktree-delete side-effect
+    // matches the pattern used by the existing workspace-delete side-effect
     // and centralises the write in one action rather than adding a new one.
     const projects = current.projects.map((s) => {
       if (s.id !== projectId) return s
-      const remaining = (s.worktrees ?? []).filter((w) => w.id !== worktreeId)
+      const remaining = (s.workspaces ?? []).filter((w) => w.id !== workspaceId)
       return {
         ...s,
-        activeWorktreeId: s.activeWorktreeId === worktreeId ? remaining[0]?.id : s.activeWorktreeId,
+        activeWorkspaceId:
+          s.activeWorkspaceId === workspaceId ? remaining[0]?.id : s.activeWorkspaceId,
         updatedAt: new Date().toISOString(),
-        worktrees: remaining,
+        workspaces: remaining,
       }
     })
     saveProjectCatalog(projects)
@@ -278,8 +279,8 @@ export function bindBackendRuntimeEvents({
   backend.on('projectSwitchRequested', handleProjectSwitchRequested)
   backend.on('projectCloseRequested', handleProjectCloseRequested)
   backend.on('projectSwitched', handleProjectSwitched)
-  backend.on('worktreeAdded', handleWorktreeAdded)
-  backend.on('worktreeRemoved', handleWorktreeRemoved)
+  backend.on('workspaceAdded', handleWorkspaceAdded)
+  backend.on('workspaceRemoved', handleWorkspaceRemoved)
 
   return () => {
     timeouts.clearAllTimers()
@@ -294,8 +295,8 @@ export function bindBackendRuntimeEvents({
     backend.off('projectSwitchRequested', handleProjectSwitchRequested)
     backend.off('projectCloseRequested', handleProjectCloseRequested)
     backend.off('projectSwitched', handleProjectSwitched)
-    backend.off('worktreeAdded', handleWorktreeAdded)
-    backend.off('worktreeRemoved', handleWorktreeRemoved)
+    backend.off('workspaceAdded', handleWorkspaceAdded)
+    backend.off('workspaceRemoved', handleWorkspaceRemoved)
     void backend.destroy(true)
   }
 }

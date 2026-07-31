@@ -5,7 +5,7 @@ import type {
   TerminalLine,
   TerminalModeState,
   TerminalSnapshot,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from './types'
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -107,7 +107,7 @@ function isStringRecord(value: unknown): boolean {
   return Object.values(value).every(isString)
 }
 
-export function isWorktreeRecord(value: unknown): value is WorktreeRecord {
+export function isWorkspaceRecord(value: unknown): value is WorkspaceRecord {
   return (
     isObjectRecord(value) &&
     isString(value.id) &&
@@ -152,7 +152,7 @@ export function isProjectSnapshotV1(value: unknown): value is ProjectSnapshotV1 
         (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode)) &&
-        (tab.worktreeId === undefined || isString(tab.worktreeId)) &&
+        (tab.workspaceId === undefined || isString(tab.workspaceId)) &&
         (tab.workerName === undefined || isString(tab.workerName)) &&
         (tab.autoRenameStatus === undefined ||
           tab.autoRenameStatus === 'eligible' ||
@@ -176,9 +176,9 @@ export function isProjectRecord(value: unknown): value is ProjectRecord {
     (value.order === undefined ||
       (typeof value.order === 'number' && Number.isFinite(value.order))) &&
     (value.projectSnapshot === undefined || isProjectSnapshotV1(value.projectSnapshot)) &&
-    (value.worktrees === undefined ||
-      (Array.isArray(value.worktrees) && value.worktrees.every(isWorktreeRecord))) &&
-    (value.activeWorktreeId === undefined || isString(value.activeWorktreeId))
+    (value.workspaces === undefined ||
+      (Array.isArray(value.workspaces) && value.workspaces.every(isWorkspaceRecord))) &&
+    (value.activeWorkspaceId === undefined || isString(value.activeWorkspaceId))
   )
 }
 

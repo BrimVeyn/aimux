@@ -15,7 +15,7 @@ import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
-import { getActiveWorktree, getActiveWorktreePath } from '../../../state/project-worktrees'
+import { getActiveWorkspace, getActiveWorkspacePath } from '../../../state/project-workspaces'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
@@ -140,14 +140,14 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
     currentProjectId != null && currentProjectId !== ''
       ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getActiveWorktreePath(currentProject)
+  const projectPath = getActiveWorkspacePath(currentProject)
 
-  // Review-vs-base: when toggled on for a worktree that records a baseRef,
+  // Review-vs-base: when toggled on for a workspace that records a baseRef,
   // resolve the fork point and diff the working tree against it.
-  const activeWorktree = getActiveWorktree(currentProject)
+  const activeWorkspace = getActiveWorkspace(currentProject)
   const reviewBaseRef =
-    gitMode.reviewBase && activeWorktree?.baseRef != null && activeWorktree.baseRef !== ''
-      ? activeWorktree.baseRef
+    gitMode.reviewBase && activeWorkspace?.baseRef != null && activeWorkspace.baseRef !== ''
+      ? activeWorkspace.baseRef
       : null
   const [compareRef, setCompareRef] = useState<string | undefined>(undefined)
   useEffect(() => {

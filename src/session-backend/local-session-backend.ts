@@ -155,7 +155,7 @@ export class LocalSessionBackend
     cols: number
     rows: number
     cwd?: string
-    worktreeId?: string
+    workspaceId?: string
     autoRenameCandidate?: boolean
   }): void {
     if (!(this.currentProjectId != null && this.currentProjectId !== '')) {
@@ -166,7 +166,7 @@ export class LocalSessionBackend
       projectId: this.currentProjectId,
       tabId: options.tabId,
       title: options.title,
-      worktreeId: options.worktreeId ?? null,
+      workspaceId: options.workspaceId ?? null,
     })
     this.gatePaneRender(options.tabId)
     const autoRenameStatus = initialAutoRenameStatus(

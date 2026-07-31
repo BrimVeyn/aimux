@@ -3,7 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
-import { getActiveWorktreePath } from '../state/project-worktrees'
+import { getActiveWorkspacePath } from '../state/project-workspaces'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 
@@ -62,7 +62,7 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
       ? state.projects.find((project) => project.id === state.currentProjectId)
       : undefined
   const projectName = currentProject?.name ?? 'no project'
-  const projectPath = getActiveWorktreePath(currentProject)
+  const projectPath = getActiveWorkspacePath(currentProject)
   const projectSegs = projectSegments(projectName, projectPath)
 
   switch (state.focusMode) {
@@ -131,10 +131,10 @@ function deriveModalModeId(modalType: AppState['modal']['type']): ModeId | null 
       return 'modal.theme-picker.filtering'
     case 'update-available':
       return 'modal.update-available'
-    case 'worktree-move':
-      return 'modal.worktree-move'
-    case 'worktree-move-confirm':
-      return 'modal.worktree-move-confirm'
+    case 'workspace-move':
+      return 'modal.workspace-move'
+    case 'workspace-move-confirm':
+      return 'modal.workspace-move-confirm'
     default:
       return null
   }
@@ -150,8 +150,8 @@ function deriveCommandEditModeId(modalType: AppState['modal']['type']): ModeId |
       return 'modal.new-tab.command-edit'
     case 'rename-tab':
       return 'modal.rename-tab'
-    case 'rename-worktree':
-      return 'modal.rename-worktree'
+    case 'rename-workspace':
+      return 'modal.rename-workspace'
     case 'project-name':
       return 'modal.project-name'
     case 'project-picker':

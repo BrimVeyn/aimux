@@ -1,10 +1,10 @@
-import type { ProjectRecord, WorktreeRecord } from '../state/types'
+import type { ProjectRecord, WorkspaceRecord } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
 import { createEmptyProjectSnapshot } from '../state/project-persistence'
-import { createPrimaryWorktree, ensureProjectWorktrees } from '../state/project-worktrees'
+import { createPrimaryWorkspace, ensureProjectWorkspaces } from '../state/project-workspaces'
 
 /**
  * Catalog mutations invoked by the daemon when NO UI is attached. When a UI
@@ -19,7 +19,7 @@ export function createProjectInCatalog(name: string, projectPath?: string): Proj
   const projects = loadProjectCatalog()
   const now = new Date().toISOString()
   const project: ProjectRecord = {
-    activeWorktreeId: undefined,
+    activeWorkspaceId: undefined,
     createdAt: now,
     id: createPrefixedId('project'),
     lastOpenedAt: now,
@@ -27,14 +27,14 @@ export function createProjectInCatalog(name: string, projectPath?: string): Proj
     projectPath,
     projectSnapshot: createEmptyProjectSnapshot(),
     updatedAt: now,
-    worktrees: undefined,
+    workspaces: undefined,
   }
   if (projectPath != null && projectPath !== '') {
-    const worktree = createPrimaryWorktree(projectPath, now)
-    project.activeWorktreeId = worktree.id
-    project.worktrees = [worktree]
+    const workspace = createPrimaryWorkspace(projectPath, now)
+    project.activeWorkspaceId = workspace.id
+    project.workspaces = [workspace]
   }
-  saveProjectCatalog([...projects, ensureProjectWorktrees(project)])
+  saveProjectCatalog([...projects, ensureProjectWorkspaces(project)])
   logDebug('daemon.catalog.createProject', { name, projectId: project.id, projectPath })
   return project
 }
@@ -74,50 +74,50 @@ export function deleteFromCatalog(projectId: string): void {
   logDebug('daemon.catalog.closeProject', { projectId })
 }
 
-export function addWorktreeToCatalog(projectId: string, worktree: WorktreeRecord): void {
+export function addWorkspaceToCatalog(projectId: string, workspace: WorkspaceRecord): void {
   const projects = loadProjectCatalog()
   const target = projects.find((s) => s.id === projectId)
   if (!target) {
     throw new Error(`project not found: ${projectId}`)
   }
-  const existing = target.worktrees ?? []
-  if (existing.some((w) => w.id === worktree.id)) {
-    throw new Error(`worktree already exists: ${worktree.id}`)
+  const existing = target.workspaces ?? []
+  if (existing.some((w) => w.id === workspace.id)) {
+    throw new Error(`workspace already exists: ${workspace.id}`)
   }
   const updated = projects.map((s) =>
     s.id === projectId
-      ? { ...s, updatedAt: new Date().toISOString(), worktrees: [...existing, worktree] }
+      ? { ...s, updatedAt: new Date().toISOString(), workspaces: [...existing, workspace] }
       : s
   )
   saveProjectCatalog(updated)
-  logDebug('daemon.catalog.addWorktree', {
+  logDebug('daemon.catalog.addWorkspace', {
     projectId,
-    worktreeId: worktree.id,
-    worktreeName: worktree.name,
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
   })
 }
 
-export function removeWorktreeFromCatalog(projectId: string, worktreeId: string): void {
+export function removeWorkspaceFromCatalog(projectId: string, workspaceId: string): void {
   const projects = loadProjectCatalog()
   const target = projects.find((s) => s.id === projectId)
   if (!target) {
     throw new Error(`project not found: ${projectId}`)
   }
-  const existing = target.worktrees ?? []
-  const nextWorktrees = existing.filter((w) => w.id !== worktreeId)
-  if (nextWorktrees.length === existing.length) {
-    throw new Error(`worktree not found: ${worktreeId}`)
+  const existing = target.workspaces ?? []
+  const nextWorkspaces = existing.filter((w) => w.id !== workspaceId)
+  if (nextWorkspaces.length === existing.length) {
+    throw new Error(`workspace not found: ${workspaceId}`)
   }
   const updated = projects.map((s) =>
     s.id === projectId
       ? {
           ...s,
-          activeWorktreeId: s.activeWorktreeId === worktreeId ? undefined : s.activeWorktreeId,
+          activeWorkspaceId: s.activeWorkspaceId === workspaceId ? undefined : s.activeWorkspaceId,
           updatedAt: new Date().toISOString(),
-          worktrees: nextWorktrees,
+          workspaces: nextWorkspaces,
         }
       : s
   )
   saveProjectCatalog(updated)
-  logDebug('daemon.catalog.removeWorktree', { projectId, worktreeId })
+  logDebug('daemon.catalog.removeWorkspace', { projectId, workspaceId })
 }

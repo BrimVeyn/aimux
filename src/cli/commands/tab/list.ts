@@ -73,7 +73,7 @@ export const tabList: CliCommand = {
         id: tab.id,
         status: tab.status,
         title: tab.title,
-        worktreeId: tab.worktreeId,
+        workspaceId: tab.workspaceId,
       })),
     })
     return EXIT_OK

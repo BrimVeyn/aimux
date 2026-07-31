@@ -52,7 +52,7 @@ export const MANAGER_PROTOCOL_VERSION = 11
  */
 export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
   'setBroadcastEnabled',
-  'createTabWorktreeId',
+  'createTabWorkspaceId',
   'tabMetadata',
   'workerMetadata',
 ]
@@ -127,12 +127,12 @@ export type ManagerRequest =
         /** Extra env vars merged into the spawned PTY's environment. */
         env?: Record<string, string>
         /**
-         * Worktree this tab belongs to (UI grouping). Capability-gated on
-         * `createTabWorktreeId`. Pre-cap TMs silently drop the field, which
+         * Workspace this tab belongs to (UI grouping). Capability-gated on
+         * `createTabWorkspaceId`. Pre-cap TMs silently drop the field, which
          * matches the previous behaviour where every new tab had
-         * `worktreeId = undefined`.
+         * `workspaceId = undefined`.
          */
-        worktreeId?: string
+        workspaceId?: string
         workerName?: string
         autoRenameStatus?: 'eligible' | 'attempted'
       }
@@ -387,8 +387,8 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
         'createTab.env must be a string-keyed string record'
       )
       assert(
-        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
-        'createTab.worktreeId must be a string when present'
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'createTab.workspaceId must be a string when present'
       )
       assert(
         value.payload.workerName === undefined || isString(value.payload.workerName),

@@ -29,12 +29,12 @@ import { lastNonBlankLine } from '../pty/last-line'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
-  addWorktreeToCatalog,
+  addWorkspaceToCatalog,
   assertProjectInCatalog,
   bumpLastOpenedInCatalog,
   createProjectInCatalog,
   deleteFromCatalog,
-  removeWorktreeFromCatalog,
+  removeWorkspaceFromCatalog,
 } from './catalog-writer'
 import {
   consumeDaemonHandoff,
@@ -73,7 +73,7 @@ export interface DaemonTabEntry {
    */
   title?: string
   status?: TabStatus
-  worktreeId?: string
+  workspaceId?: string
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
@@ -100,7 +100,7 @@ export function mergeTabRegistryEntry(
   metadata?: {
     title?: string
     status?: TabStatus
-    worktreeId?: string
+    workspaceId?: string
     workerName?: string
     autoRenameStatus?: 'eligible' | 'attempted'
   }
@@ -120,7 +120,7 @@ export function mergeTabRegistryEntry(
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
     workerName: metadata?.workerName ?? existing?.workerName,
-    worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
+    workspaceId: metadata?.workspaceId ?? existing?.workspaceId,
   }
   registry.set(tabId, entry)
   return entry
@@ -252,7 +252,7 @@ export async function runDaemon(): Promise<void> {
   const negotiatedVersions = new Map<Socket, number>()
   // Sockets that attached with `thin: true` (headless CLIs). Used to
   // distinguish "a UI is attached" from "only CLIs are talking to me" when
-  // deciding whether project/worktree mutations go via broadcast (UI does
+  // deciding whether project/workspace mutations go via broadcast (UI does
   // the write) or via catalog-writer (daemon does the write).
   const thinAttachers = new Set<Socket>()
 
@@ -279,7 +279,7 @@ export async function runDaemon(): Promise<void> {
     metadata?: {
       title?: string
       status?: TabStatus
-      worktreeId?: string
+      workspaceId?: string
       workerName?: string
       autoRenameStatus?: 'eligible' | 'attempted'
     }
@@ -390,7 +390,7 @@ export async function runDaemon(): Promise<void> {
     updateTab: applyTabMetadata,
   })
 
-  // Count UI attachers so project/worktree handlers can decide whether to
+  // Count UI attachers so project/workspace handlers can decide whether to
   // relay via broadcast (UI attached → its reducer owns the write) or mutate
   // the catalog directly. A "UI attacher" here is any non-thin attach — thin
   // attachers are CLIs which don't run reducers.
@@ -711,7 +711,7 @@ export async function runDaemon(): Promise<void> {
                         status: tab.status,
                         title: tab.title,
                         workerName: tab.workerName,
-                        worktreeId: tab.worktreeId,
+                        workspaceId: tab.workspaceId,
                       }
                     )
                     autoRename.register({
@@ -839,7 +839,7 @@ export async function runDaemon(): Promise<void> {
                       status: 'starting',
                       title: message.payload.title,
                       workerName: message.payload.workerName,
-                      worktreeId: message.payload.worktreeId,
+                      workspaceId: message.payload.workspaceId,
                     }
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
@@ -885,7 +885,7 @@ export async function runDaemon(): Promise<void> {
                     terminalModes: createDefaultTerminalModes(),
                     title: message.payload.title,
                     workerName: message.payload.workerName,
-                    worktreeId: message.payload.worktreeId,
+                    workspaceId: message.payload.workspaceId,
                   }
                   broadcastForProjectVersioned(projectId, 11, {
                     payload: { projectId, tab: synthesizedTab },
@@ -1001,7 +1001,7 @@ export async function runDaemon(): Promise<void> {
                       status: entry.status ?? 'running',
                       title: entry.title ?? '',
                       workerName: entry.workerName,
-                      worktreeId: entry.worktreeId,
+                      workspaceId: entry.workspaceId,
                     })
                   }
                   send(socket, {
@@ -1131,45 +1131,45 @@ export async function runDaemon(): Promise<void> {
                   sendOk(socket, message.id)
                   break
                 }
-                case 'addWorktreeRecord': {
+                case 'addWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { projectId: targetProjectId, worktree } = message.payload
+                  const { projectId: targetProjectId, workspace } = message.payload
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { projectId: targetProjectId, worktree },
-                      type: 'worktreeAdded',
+                      payload: { projectId: targetProjectId, workspace },
+                      type: 'workspaceAdded',
                     })
-                    logDebug('daemon.request.addWorktreeRecord.relay', {
+                    logDebug('daemon.request.addWorkspaceRecord.relay', {
                       projectId: targetProjectId,
-                      worktreeId: worktree.id,
+                      workspaceId: workspace.id,
                     })
                   } else {
-                    addWorktreeToCatalog(targetProjectId, worktree)
-                    logDebug('daemon.request.addWorktreeRecord.direct', {
+                    addWorkspaceToCatalog(targetProjectId, workspace)
+                    logDebug('daemon.request.addWorkspaceRecord.direct', {
                       projectId: targetProjectId,
-                      worktreeId: worktree.id,
+                      workspaceId: workspace.id,
                     })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'removeWorktreeRecord': {
+                case 'removeWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { projectId: targetProjectId, worktreeId } = message.payload
+                  const { projectId: targetProjectId, workspaceId } = message.payload
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { projectId: targetProjectId, worktreeId },
-                      type: 'worktreeRemoved',
+                      payload: { projectId: targetProjectId, workspaceId },
+                      type: 'workspaceRemoved',
                     })
-                    logDebug('daemon.request.removeWorktreeRecord.relay', {
+                    logDebug('daemon.request.removeWorkspaceRecord.relay', {
                       projectId: targetProjectId,
-                      worktreeId,
+                      workspaceId,
                     })
                   } else {
-                    removeWorktreeFromCatalog(targetProjectId, worktreeId)
-                    logDebug('daemon.request.removeWorktreeRecord.direct', {
+                    removeWorkspaceFromCatalog(targetProjectId, workspaceId)
+                    logDebug('daemon.request.removeWorkspaceRecord.direct', {
                       projectId: targetProjectId,
-                      worktreeId,
+                      workspaceId,
                     })
                   }
                   sendOk(socket, message.id)

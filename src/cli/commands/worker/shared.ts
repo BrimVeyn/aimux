@@ -1,4 +1,4 @@
-import type { ProjectRecord, TerminalSnapshot, WorktreeRecord } from '../../../state/types'
+import type { ProjectRecord, TerminalSnapshot, WorkspaceRecord } from '../../../state/types'
 import type { CliContext } from '../../context'
 
 import {
@@ -58,12 +58,12 @@ export interface WorkerView {
   lastLine?: string
   name: string
   path: string | null
-  /** Repository the worker's worktree was cut from — see `projectRepoRoot`. */
+  /** Repository the worker's workspace was cut from — see `projectRepoRoot`. */
   repoRoot: string | null
   status: TabSessionSummary['status']
   tabId: string
   title: string
-  worktreeId: string | null
+  workspaceId: string | null
 }
 
 export interface WorkerOutcome {
@@ -95,32 +95,32 @@ export function validateWorkerName(name: string): void {
   }
 }
 
-function worktreeFor(
+function workspaceFor(
   project: ProjectRecord,
-  worktreeId: string | undefined
-): WorktreeRecord | undefined {
-  if (worktreeId === undefined) return undefined
-  return project.worktrees?.find((worktree) => worktree.id === worktreeId)
+  workspaceId: string | undefined
+): WorkspaceRecord | undefined {
+  if (workspaceId === undefined) return undefined
+  return project.workspaces?.find((workspace) => workspace.id === workspaceId)
 }
 
 export function workerView(project: ProjectRecord, tab: TabSessionSummary): WorkerView {
   if (tab.workerName === undefined) {
     throw new Error(`tab is not a named worker: ${tab.id}`)
   }
-  const worktree = worktreeFor(project, tab.worktreeId)
+  const workspace = workspaceFor(project, tab.workspaceId)
   return {
     activity: tab.activity,
     assistant: tab.assistant,
-    branch: worktree?.branch ?? null,
+    branch: workspace?.branch ?? null,
     command: tab.command,
     lastLine: tab.lastLine,
     name: tab.workerName,
-    path: worktree?.path ?? null,
-    repoRoot: worktree?.repoRoot ?? projectRepoRoot(project),
+    path: workspace?.path ?? null,
+    repoRoot: workspace?.repoRoot ?? projectRepoRoot(project),
     status: tab.status,
     tabId: tab.id,
     title: tab.title,
-    worktreeId: tab.worktreeId ?? null,
+    workspaceId: tab.workspaceId ?? null,
   }
 }
 

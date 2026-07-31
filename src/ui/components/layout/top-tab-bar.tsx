@@ -8,11 +8,11 @@ import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 're
 
 import type { FocusMode, TabSession } from '../../../state/types'
 
-import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-poller'
+import { useWorkspaceDivergencePolling } from '../../../git/workspace-divergence-poller'
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { filterTabsForActiveWorktree } from '../../../state/project-worktrees'
+import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
 import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
@@ -205,9 +205,9 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const tabGroupMap = useAppStore((s) => s.tabGroupMap)
 
-  // Sidebar now also shows worktree chips with divergence — poll whenever
+  // Sidebar now also shows workspace chips with divergence — poll whenever
   // either surface is visible.
-  useWorktreeDivergencePolling(bar.visible || leftBarVisible || forceVisible)
+  useWorkspaceDivergencePolling(bar.visible || leftBarVisible || forceVisible)
 
   const currentProject = useMemo(
     () =>
@@ -218,7 +218,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   )
 
   const visibleTabs = useMemo(
-    () => filterTabsForActiveWorktree(tabs, currentProject),
+    () => filterTabsForActiveWorkspace(tabs, currentProject),
     [tabs, currentProject]
   )
 
@@ -348,9 +348,9 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   }, [])
 
   if (!bar.visible && !forceVisible) return null
-  // Keep the bar visible even with zero entries — when the active worktree
+  // Keep the bar visible even with zero entries — when the active workspace
   // has no tabs, the lone "+" affordance is what tells the user "you're in
-  // an empty worktree, click here to start one".
+  // an empty workspace, click here to start one".
 
   const isFocused = focusMode === 'terminal-input' || focusMode === 'navigation'
 

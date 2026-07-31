@@ -49,7 +49,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
-        .map('<C-p>', actions.createWorktreeModal, 'Create project')
+        .map('<C-p>', actions.createWorkspaceModal, 'Create project')
         .map('<C-g>', actions.projectPicker, 'Project picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')
@@ -63,8 +63,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-d>', actions.enterGitMode, 'Enter git mode')
         .map('<C-j>', actions.resizeGitPane(-0.05), 'Git pane smaller')
         .map('<C-k>', actions.resizeGitPane(0.05), 'Git pane larger')
-        .map('j', actions.nextSidebarItem, 'Next project/worktree')
-        .map('k', actions.prevSidebarItem, 'Prev project/worktree')
+        .map('j', actions.nextSidebarItem, 'Next project/workspace')
+        .map('k', actions.prevSidebarItem, 'Prev project/workspace')
         .map('l', actions.nextTab, 'Next tab')
         .map('h', actions.prevTab, 'Prev tab')
         .map('L', actions.reorderTab(1), 'Move tab right')
@@ -128,7 +128,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('o', actions.openSelectedGitFileInEditor, 'Open in editor')
         .map('c', actions.gitCommitOpen, 'Commit')
-        .map('m', actions.openWorktreeMove, 'Move worktree')
+        .map('m', actions.openWorkspaceMove, 'Move workspace')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
         .map('b', actions.toggleGitReviewBase, 'Review vs base')
@@ -209,9 +209,9 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: worktree-move
+    // Modal: workspace-move
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-move', (m) =>
+    .mode('modal.workspace-move', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('j', actions.moveModalSelection(1), 'Next')
@@ -220,30 +220,30 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Up>', actions.moveModalSelection(-1))
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
-        .map('d', actions.toggleWorktreeMoveDelete, 'Toggle delete source')
-        .map('<CR>', actions.confirmWorktreeMove, 'Move')
+        .map('d', actions.toggleWorkspaceMoveDelete, 'Toggle delete source')
+        .map('<CR>', actions.confirmWorkspaceMove, 'Move')
     )
 
     // -----------------------------------------------------------------------
-    // Modal: worktree-move recoverable-failure confirmation (stash / conflicts)
+    // Modal: workspace-move recoverable-failure confirmation (stash / conflicts)
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-move-confirm', (m) =>
+    .mode('modal.workspace-move-confirm', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('n', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmWorktreeMoveRetry, 'Confirm')
-        .map('y', actions.confirmWorktreeMoveRetry, 'Confirm')
+        .map('<CR>', actions.confirmWorkspaceMoveRetry, 'Confirm')
+        .map('y', actions.confirmWorkspaceMoveRetry, 'Confirm')
     )
 
     // -----------------------------------------------------------------------
-    // Modal: standalone worktree delete confirmation (sidebar "Remove worktree")
+    // Modal: standalone workspace delete confirmation (sidebar "Remove workspace")
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-delete-confirm', (m) =>
+    .mode('modal.workspace-delete-confirm', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('n', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmWorktreeDeleteModal, 'Delete worktree')
-        .map('y', actions.confirmWorktreeDeleteModal, 'Delete worktree')
+        .map('<CR>', actions.confirmWorkspaceDeleteModal, 'Delete workspace')
+        .map('y', actions.confirmWorkspaceDeleteModal, 'Delete workspace')
     )
 
     // -----------------------------------------------------------------------
@@ -267,12 +267,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: rename-worktree
+    // Modal: rename-workspace
     // -----------------------------------------------------------------------
-    .mode('modal.rename-worktree', (m) =>
+    .mode('modal.rename-workspace', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmRenameWorktree, 'Confirm')
+        .map('<CR>', actions.confirmRenameWorkspace, 'Confirm')
         .passthrough()
     )
 
@@ -338,13 +338,13 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: create-worktree (a project inside the current project)
+    // Modal: create-workspace (a project inside the current project)
     // -----------------------------------------------------------------------
-    .mode('modal.create-worktree', (m) =>
+    .mode('modal.create-workspace', (m) =>
       m
-        .map('<Esc>', actions.createWorktreeEscape, 'Back/Cancel')
-        .map('<Tab>', actions.switchCreateWorktreeField, 'Next field')
-        .map('<CR>', actions.confirmCreateWorktree, 'Create')
+        .map('<Esc>', actions.createWorkspaceEscape, 'Back/Cancel')
+        .map('<Tab>', actions.switchCreateWorkspaceField, 'Next field')
+        .map('<CR>', actions.confirmCreateWorkspace, 'Create')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

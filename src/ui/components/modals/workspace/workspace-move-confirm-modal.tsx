@@ -2,7 +2,7 @@ import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form } from '../shared/form'
 
-interface WorktreeMoveConfirmModalProps {
+interface WorkspaceMoveConfirmModalProps {
   variant: 'stash-target' | 'keep-conflicts'
   files: string[]
   sourceLabel: string
@@ -12,17 +12,17 @@ interface WorktreeMoveConfirmModalProps {
 const MAX_LISTED_FILES = 8
 
 /**
- * Confirmation dialog after a recoverable move failure. Both worktrees are
+ * Confirmation dialog after a recoverable move failure. Both workspaces are
  * already back in their original state; confirming re-runs the move with the
  * flag matching the variant (stash the target's changes / keep the conflict
  * markers in the target).
  */
-export function WorktreeMoveConfirmModal({
+export function WorkspaceMoveConfirmModal({
   files,
   sourceLabel,
   targetLabel,
   variant,
-}: WorktreeMoveConfirmModalProps) {
+}: WorkspaceMoveConfirmModalProps) {
   const t = useTheme()
   const listed = files.slice(0, MAX_LISTED_FILES)
   const remaining = files.length - listed.length
@@ -30,7 +30,7 @@ export function WorktreeMoveConfirmModal({
   return (
     <Form
       title={isStash ? 'Target has conflicting changes' : 'Move hit conflicts'}
-      keybindsModeId="modal.worktree-move-confirm"
+      keybindsModeId="modal.workspace-move-confirm"
       width={uiTokens.modalWidth.md}
       footer={
         <text fg={t.textMuted}>

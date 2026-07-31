@@ -199,7 +199,7 @@ async function annotateUntrackedCounts(cwd: string, files: GitFileEntry[]): Prom
 
 interface CollectOptions {
   headOffset?: number
-  // Explicit ref to diff the working tree against (e.g. a worktree's fork
+  // Explicit ref to diff the working tree against (e.g. a workspace's fork
   // point). Takes precedence over headOffset when set.
   compareRef?: string
 }
@@ -266,7 +266,7 @@ async function collectAgainstHistorical(
 }
 
 // Diffs the working tree against an arbitrary ref (a HEAD~N commit, or a
-// worktree's fork point for review-vs-base), surfacing changed files as a
+// workspace's fork point for review-vs-base), surfacing changed files as a
 // single `historical` section plus any untracked files.
 async function collectAgainstRef(cwd: string, ref: string): Promise<GitCollectResult> {
   const [statusResult, nameStatus, numstat, untrackedStatus] = await Promise.all([

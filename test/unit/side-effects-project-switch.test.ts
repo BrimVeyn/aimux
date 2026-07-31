@@ -46,17 +46,17 @@ test('switch-project-by-index exits git mode when clicking the active project', 
   expect(dispatched).toEqual([{ type: 'exit-git-mode' }])
 })
 
-test('launch-selected-assistant puts the new tab in the active worktree', () => {
+test('launch-selected-assistant puts the new tab in the active workspace', () => {
   const now = '2024-01-01T00:00:00.000Z'
   const project = {
-    activeWorktreeId: 'wt-feature',
+    activeWorkspaceId: 'wt-feature',
     createdAt: now,
     id: 'project-1',
     lastOpenedAt: now,
     name: 'Main',
     projectPath: '/repo/feature',
     updatedAt: now,
-    worktrees: [
+    workspaces: [
       {
         createdAt: now,
         createdByAimux: false,
@@ -81,7 +81,7 @@ test('launch-selected-assistant puts the new tab in the active worktree', () => 
   }
   const base = { ...createInitialState({}, [project]), currentProjectId: 'project-1' }
   const state = { ...base, modal: appReducer(base, { type: 'open-new-tab-modal' }).modal }
-  const dispatched: { type: string; tab?: { worktreeId?: string } }[] = []
+  const dispatched: { type: string; tab?: { workspaceId?: string } }[] = []
 
   executeSideEffect(
     { type: 'launch-selected-assistant' },
@@ -91,7 +91,7 @@ test('launch-selected-assistant puts the new tab in the active worktree', () => 
       clearIdleTimer: () => {},
       clearStartupGrace: () => {},
       dispatch: (action) => {
-        dispatched.push(action as { type: string; tab?: { worktreeId?: string } })
+        dispatched.push(action as { type: string; tab?: { workspaceId?: string } })
       },
       getCurrentProjectProjectPath: () => '/repo/feature',
       getState: () => state,
@@ -104,5 +104,5 @@ test('launch-selected-assistant puts the new tab in the active worktree', () => 
   )
 
   const added = dispatched.find((action) => action.type === 'add-tab')
-  expect(added?.tab?.worktreeId).toBe('wt-feature')
+  expect(added?.tab?.workspaceId).toBe('wt-feature')
 })

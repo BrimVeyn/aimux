@@ -62,6 +62,6 @@ export const workerList: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'List named workers with liveness and worktree context',
+  summary: 'List named workers with liveness and workspace context',
   verb: 'list',
 }

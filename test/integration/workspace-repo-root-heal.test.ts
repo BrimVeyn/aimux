@@ -4,9 +4,9 @@ import { existsSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import type { ProjectRecord, WorktreeRecord } from '../../src/state/types'
+import type { ProjectRecord, WorkspaceRecord } from '../../src/state/types'
 
-import { ensureProjectWorktrees } from '../../src/state/project-worktrees'
+import { ensureProjectWorkspaces } from '../../src/state/project-workspaces'
 
 const NOW = '2024-01-02T00:00:00.000Z'
 
@@ -14,7 +14,7 @@ function git(cwd: string, ...args: string[]): void {
   execFileSync('git', args, { cwd, stdio: 'ignore' })
 }
 
-function makeWorktreeRecord(overrides: Partial<WorktreeRecord> & Pick<WorktreeRecord, 'id'>) {
+function makeWorkspaceRecord(overrides: Partial<WorkspaceRecord> & Pick<WorkspaceRecord, 'id'>) {
   return {
     createdAt: NOW,
     createdByAimux: false,
@@ -24,53 +24,53 @@ function makeWorktreeRecord(overrides: Partial<WorktreeRecord> & Pick<WorktreeRe
     source: 'external' as const,
     updatedAt: NOW,
     ...overrides,
-  } satisfies WorktreeRecord
+  } satisfies WorkspaceRecord
 }
 
-describe('worktree repoRoot healing', () => {
+describe('workspace repoRoot healing', () => {
   let base: string
   let mainRepo: string
-  let linkedWorktree: string
+  let linkedWorkspace: string
 
   beforeEach(() => {
     base = realpathSync(mkdtempSync(join(tmpdir(), 'aimux-wt-heal-')))
     mainRepo = join(base, 'main')
-    linkedWorktree = join(base, 'wt-a')
+    linkedWorkspace = join(base, 'wt-a')
     execFileSync('git', ['init', mainRepo], { stdio: 'ignore' })
     git(mainRepo, 'config', 'user.email', 'test@example.com')
     git(mainRepo, 'config', 'user.name', 'Test')
     git(mainRepo, 'commit', '--allow-empty', '-m', 'init')
-    git(mainRepo, 'worktree', 'add', '-b', 'feature', linkedWorktree)
+    git(mainRepo, 'worktree', 'add', '-b', 'feature', linkedWorkspace)
   })
 
   afterEach(() => {
     rmSync(base, { force: true, recursive: true })
   })
 
-  test('repairs a record whose repoRoot points at a since-deleted sibling worktree', () => {
+  test('repairs a record whose repoRoot points at a since-deleted sibling workspace', () => {
     const deletedSibling = join(base, 'deleted-sibling')
     const project: ProjectRecord = {
-      activeWorktreeId: 'wt-linked',
+      activeWorkspaceId: 'wt-linked',
       createdAt: NOW,
       id: 'project-heal',
       lastOpenedAt: NOW,
       name: 'main',
-      projectPath: linkedWorktree,
+      projectPath: linkedWorkspace,
       updatedAt: NOW,
-      worktrees: [
-        makeWorktreeRecord({
+      workspaces: [
+        makeWorkspaceRecord({
           id: 'wt-primary',
           name: 'main',
           path: mainRepo,
           repoRoot: mainRepo,
           source: 'primary',
         }),
-        makeWorktreeRecord({
+        makeWorkspaceRecord({
           branch: 'feature',
           id: 'wt-linked',
           name: 'wt-a',
-          path: linkedWorktree,
-          // The sibling that created this worktree was already deleted, so its
+          path: linkedWorkspace,
+          // The sibling that created this workspace was already deleted, so its
           // path no longer exists — this is the incoherent state to heal.
           repoRoot: deletedSibling,
         }),
@@ -79,54 +79,54 @@ describe('worktree repoRoot healing', () => {
 
     expect(existsSync(deletedSibling)).toBe(false)
 
-    const healed = ensureProjectWorktrees(project, NOW)
-    const linked = healed.worktrees?.find((entry) => entry.id === 'wt-linked')
+    const healed = ensureProjectWorkspaces(project, NOW)
+    const linked = healed.workspaces?.find((entry) => entry.id === 'wt-linked')
 
     expect(linked).toBeDefined()
     expect(linked?.repoRoot).not.toBe(deletedSibling)
     expect(existsSync(linked?.repoRoot ?? '')).toBe(true)
   })
 
-  test('drops a deleted external worktree and prunes its stale git entry', () => {
+  test('drops a deleted external workspace and prunes its stale git entry', () => {
     // Simulate the directory vanishing (e.g. a temp dir cleared on reboot)
-    // while git still tracks it — git marks such worktrees "prunable".
-    rmSync(linkedWorktree, { force: true, recursive: true })
+    // while git still tracks it — git marks such workspaces "prunable".
+    rmSync(linkedWorkspace, { force: true, recursive: true })
 
     const project: ProjectRecord = {
-      activeWorktreeId: 'wt-primary',
+      activeWorkspaceId: 'wt-primary',
       createdAt: NOW,
       id: 'project-prune',
       lastOpenedAt: NOW,
       name: 'main',
       projectPath: mainRepo,
       updatedAt: NOW,
-      worktrees: [
-        makeWorktreeRecord({
+      workspaces: [
+        makeWorkspaceRecord({
           id: 'wt-primary',
           name: 'main',
           path: mainRepo,
           repoRoot: mainRepo,
           source: 'primary',
         }),
-        makeWorktreeRecord({
+        makeWorkspaceRecord({
           branch: 'feature',
           id: 'wt-ghost',
           name: 'wt-a',
-          path: linkedWorktree,
+          path: linkedWorkspace,
           repoRoot: mainRepo,
         }),
       ],
     }
 
-    const reconciled = ensureProjectWorktrees(project, NOW)
+    const reconciled = ensureProjectWorkspaces(project, NOW)
 
-    expect(reconciled.worktrees?.map((entry) => entry.id)).toEqual(['wt-primary'])
-    expect(reconciled.worktrees?.some((entry) => entry.path === linkedWorktree)).toBe(false)
+    expect(reconciled.workspaces?.map((entry) => entry.id)).toEqual(['wt-primary'])
+    expect(reconciled.workspaces?.some((entry) => entry.path === linkedWorkspace)).toBe(false)
 
-    // git no longer reports the prunable worktree once reconciliation runs.
+    // git no longer reports the prunable workspace once reconciliation runs.
     const list = execFileSync('git', ['-C', mainRepo, 'worktree', 'list', '--porcelain'], {
       encoding: 'utf8',
     })
-    expect(list).not.toContain(linkedWorktree)
+    expect(list).not.toContain(linkedWorkspace)
   })
 })

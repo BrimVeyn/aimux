@@ -8,11 +8,11 @@ import { getBranchDivergence } from './divergence'
 
 const INTERVAL_MS = 4000
 
-// Polls per-worktree base divergence for the current project while enabled and
-// dispatches it into worktreeDivergence. Only worktrees that record a baseRef
+// Polls per-workspace base divergence for the current project while enabled and
+// dispatches it into workspaceDivergence. Only workspaces that record a baseRef
 // (the aimux-created ones) are measured; the primary and externally-discovered
-// worktrees have no recorded base and are left out.
-export function useWorktreeDivergencePolling(enabled: boolean): void {
+// workspaces have no recorded base and are left out.
+export function useWorkspaceDivergencePolling(enabled: boolean): void {
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const projects = useAppStore((s) => s.projects)
 
@@ -22,7 +22,7 @@ export function useWorktreeDivergencePolling(enabled: boolean): void {
       currentProjectId != null && currentProjectId !== ''
         ? projects.find((s) => s.id === currentProjectId)
         : undefined
-    const targets = (project?.worktrees ?? []).filter(
+    const targets = (project?.workspaces ?? []).filter(
       (w) => w.baseRef != null && w.baseRef !== '' && w.branch != null && w.branch !== ''
     )
     if (targets.length === 0) return
@@ -32,12 +32,12 @@ export function useWorktreeDivergencePolling(enabled: boolean): void {
 
     const tick = async () => {
       const entries = await Promise.all(
-        targets.map(async (worktree) => {
-          const base = worktree.baseRef
-          const branch = worktree.branch
+        targets.map(async (workspace) => {
+          const base = workspace.baseRef
+          const branch = workspace.branch
           if (base == null || branch == null) return null
-          const divergence = await getBranchDivergence(worktree.repoRoot, base, branch)
-          return divergence != null ? ([worktree.id, divergence] as const) : null
+          const divergence = await getBranchDivergence(workspace.repoRoot, base, branch)
+          return divergence != null ? ([workspace.id, divergence] as const) : null
         })
       )
       if (cancelled) return
@@ -45,7 +45,7 @@ export function useWorktreeDivergencePolling(enabled: boolean): void {
       for (const entry of entries) {
         if (entry != null) next[entry[0]] = entry[1]
       }
-      dispatchGlobal({ divergence: next, type: 'set-worktree-divergence' })
+      dispatchGlobal({ divergence: next, type: 'set-workspace-divergence' })
       timer = setTimeout(() => void tick(), INTERVAL_MS)
     }
 

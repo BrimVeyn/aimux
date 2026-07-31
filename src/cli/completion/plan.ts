@@ -54,7 +54,7 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   project: 'Projects (projects) in the profile catalog',
   tab: 'Drive individual tabs (create, send, snapshot, await)',
   worker: 'Named agent workers — the preferred orchestration surface',
-  worktree: 'Git worktrees attached to the active project',
+  workspace: 'Git workspaces attached to the active project',
 }
 
 function groupCandidates(): CompletionCandidate[] {

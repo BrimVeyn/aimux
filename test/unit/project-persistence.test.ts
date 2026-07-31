@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  pruneSnapshotOfWorktree,
+  pruneSnapshotOfWorkspace,
   restoreProjectState,
   restoreTabsFromProject,
   serializeProject,
@@ -64,30 +64,30 @@ describe('project persistence', () => {
     expect(snapshot.tabs[0]?.status).toBe('running')
   })
 
-  test('persists per-worktree last-tab memory without bumping the version', () => {
+  test('persists per-workspace last-tab memory without bumping the version', () => {
     const state = {
       ...createInitialState(),
-      lastActiveTabByWorktree: { 'wt-feature': 'feature-2', 'wt-main': 'main-2' },
+      lastActiveTabByWorkspace: { 'wt-feature': 'feature-2', 'wt-main': 'main-2' },
     }
 
     const snapshot = serializeProject(state)
     expect(snapshot.version).toBe(1)
-    expect(snapshot.lastActiveTabByWorktree).toEqual({
+    expect(snapshot.lastActiveTabByWorkspace).toEqual({
       'wt-feature': 'feature-2',
       'wt-main': 'main-2',
     })
   })
 
-  test('omits the per-worktree memory when empty', () => {
+  test('omits the per-workspace memory when empty', () => {
     const snapshot = serializeProject(createInitialState())
-    expect(snapshot.lastActiveTabByWorktree).toBeUndefined()
+    expect(snapshot.lastActiveTabByWorkspace).toBeUndefined()
   })
 
-  test('restoring stays dormant: does not surface the persisted per-worktree memory yet', () => {
+  test('restoring stays dormant: does not surface the persisted per-workspace memory yet', () => {
     const state = createInitialState()
     const restored = restoreProjectState(state, {
       activeTabId: null,
-      lastActiveTabByWorktree: { 'wt-main': 'main-2' },
+      lastActiveTabByWorkspace: { 'wt-main': 'main-2' },
       savedAt: new Date().toISOString(),
       sidebar: { visible: true, width: 28 },
       tabs: [],
@@ -95,7 +95,7 @@ describe('project persistence', () => {
     })
     // Gate is off → the key is omitted so spreading the result can't clobber a
     // caller's live in-memory map on a project switch.
-    expect(restored.lastActiveTabByWorktree).toBeUndefined()
+    expect(restored.lastActiveTabByWorkspace).toBeUndefined()
   })
 
   test('restores running tabs as disconnected', () => {
@@ -127,8 +127,8 @@ describe('project persistence', () => {
     expect(tabs[0]?.activity).toBe('idle')
   })
 
-  test('prunes tabs pinned to worktrees the project no longer owns', () => {
-    const mkTab = (id: string, worktreeId?: string) => ({
+  test('prunes tabs pinned to workspaces the project no longer owns', () => {
+    const mkTab = (id: string, workspaceId?: string) => ({
       assistant: 'claude' as const,
       buffer: '',
       command: 'claude',
@@ -142,7 +142,7 @@ describe('project persistence', () => {
         sendFocusMode: false,
       },
       title: 'Claude',
-      worktreeId,
+      workspaceId,
     })
 
     const tabs = restoreTabsFromProject(
@@ -157,15 +157,15 @@ describe('project persistence', () => {
         ],
         version: 1,
       },
-      { validWorktreeIds: new Set(['wt-main']) }
+      { validWorkspaceIds: new Set(['wt-main']) }
     )
 
     // Orphan dropped; live + unbound (legacy) tabs kept.
     expect(tabs.map((t) => t.id)).toEqual(['tab-live', 'tab-unbound'])
   })
 
-  test('keeps all tabs when no valid worktree set is provided', () => {
-    const mkTab = (id: string, worktreeId?: string) => ({
+  test('keeps all tabs when no valid workspace set is provided', () => {
+    const mkTab = (id: string, workspaceId?: string) => ({
       assistant: 'claude' as const,
       buffer: '',
       command: 'claude',
@@ -179,7 +179,7 @@ describe('project persistence', () => {
         sendFocusMode: false,
       },
       title: 'Claude',
-      worktreeId,
+      workspaceId,
     })
 
     const tabs = restoreTabsFromProject({
@@ -318,7 +318,7 @@ describe('project persistence', () => {
     expect(restored.tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-2', 'tab-3', 'tab-4'])
   })
 
-  test('prunes snapshot tabs belonging to a removed worktree', () => {
+  test('prunes snapshot tabs belonging to a removed workspace', () => {
     const terminalModes = {
       alternateScrollMode: false,
       bracketedPasteMode: false,
@@ -361,7 +361,7 @@ describe('project persistence', () => {
           status: 'running' as const,
           terminalModes,
           title: 'Main 1',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         },
         {
           assistant: 'codex' as const,
@@ -371,7 +371,7 @@ describe('project persistence', () => {
           status: 'running' as const,
           terminalModes,
           title: 'Main 2',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         },
         {
           assistant: 'claude' as const,
@@ -381,7 +381,7 @@ describe('project persistence', () => {
           status: 'running' as const,
           terminalModes,
           title: 'Feature 1',
-          worktreeId: 'wt-feature',
+          workspaceId: 'wt-feature',
         },
         {
           assistant: 'opencode' as const,
@@ -391,16 +391,16 @@ describe('project persistence', () => {
           status: 'running' as const,
           terminalModes,
           title: 'Feature 2',
-          worktreeId: 'wt-feature',
+          workspaceId: 'wt-feature',
         },
       ],
       version: 1 as const,
     }
 
-    const pruned = pruneSnapshotOfWorktree(snapshot, 'wt-feature')
+    const pruned = pruneSnapshotOfWorkspace(snapshot, 'wt-feature')
     expect(pruned).toBeDefined()
     expect(pruned?.tabs.map((tab) => tab.id)).toEqual(['main-1', 'main-2'])
-    expect(pruned?.tabs.some((tab) => tab.worktreeId === 'wt-feature')).toBe(false)
+    expect(pruned?.tabs.some((tab) => tab.workspaceId === 'wt-feature')).toBe(false)
     // The group whose leaves were all from wt-feature is gone; the main group survives.
     expect(Object.keys(pruned?.layoutTrees ?? {})).toEqual(['group-2'])
     expect(pruned?.tabGroupMap).toEqual({ 'main-1': 'group-2', 'main-2': 'group-2' })
@@ -408,7 +408,7 @@ describe('project persistence', () => {
     expect(pruned?.activeTabId).toBe('main-1')
   })
 
-  test('returns the same snapshot reference when no tab matches the removed worktree', () => {
+  test('returns the same snapshot reference when no tab matches the removed workspace', () => {
     const snapshot = {
       activeTabId: null,
       savedAt: new Date().toISOString(),
@@ -416,10 +416,10 @@ describe('project persistence', () => {
       tabs: [],
       version: 1 as const,
     }
-    expect(pruneSnapshotOfWorktree(snapshot, 'wt-anything')).toBe(snapshot)
+    expect(pruneSnapshotOfWorkspace(snapshot, 'wt-anything')).toBe(snapshot)
   })
 
   test('returns undefined when snapshot is undefined', () => {
-    expect(pruneSnapshotOfWorktree(undefined, 'wt-x')).toBeUndefined()
+    expect(pruneSnapshotOfWorkspace(undefined, 'wt-x')).toBeUndefined()
   })
 })

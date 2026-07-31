@@ -1,8 +1,8 @@
-import type { ProjectRecord, WorktreeRecord } from '../../../state/types'
+import type { ProjectRecord, WorkspaceRecord } from '../../../state/types'
 import type { DaemonClient } from '../../client/daemon-client'
 
 import { createGitWorktree, removeGitWorktree, resolveGitRef } from '../../../git/worktree'
-import { IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
+import { IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
   assertSafeAimuxWorktreePath,
@@ -11,7 +11,7 @@ import {
   pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
 
-export interface CreateWorktreeParams {
+export interface CreateWorkspaceParams {
   /** Base ref for the branch (callers default to 'HEAD'). */
   base: string
   /** Branch name (callers default to `aimux/<name>`). */
@@ -23,26 +23,28 @@ export interface CreateWorktreeParams {
 
 /**
  * Create a git worktree + its catalog record for a project. Shared by
- * `worktree create` and `tab create --new-worktree`. Checks the daemon
- * capability BEFORE touching disk, and rolls back the on-disk worktree if
+ * `workspace create` and `tab create --new-workspace`. Checks the daemon
+ * capability BEFORE touching disk, and rolls back the on-disk workspace if
  * catalog registration fails (so `worktree list` never surfaces an orphan).
  * Throws on any failure; returns the registered record on success.
  */
-export async function createProjectWorktree(params: CreateWorktreeParams): Promise<WorktreeRecord> {
+export async function createProjectWorkspace(
+  params: CreateWorkspaceParams
+): Promise<WorkspaceRecord> {
   const { base, branch, daemon, name, project } = params
 
-  const primary = project.worktrees?.find((w) => w.source === 'primary')
+  const primary = project.workspaces?.find((w) => w.source === 'primary')
   if (!primary) {
     throw new Error(
-      `project "${project.name}" has no primary worktree — set --project when creating it`
+      `project "${project.name}" has no primary workspace — set --project when creating it`
     )
   }
 
   // Check the daemon's capability BEFORE mutating disk — otherwise a capability
   // mismatch would leave a git worktree on disk with no catalog record.
-  if (!daemon.hasCapability(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)) {
+  if (!daemon.hasCapability(IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS)) {
     throw new Error(
-      'daemon predates worktreeLifecycleEvents capability — restart aimux to pick up the new daemon'
+      'daemon predates workspaceLifecycleEvents capability — restart aimux to pick up the new daemon'
     )
   }
 
@@ -57,11 +59,11 @@ export async function createProjectWorktree(params: CreateWorktreeParams): Promi
     )
   }
 
-  const worktreeId = createPrefixedId('worktree')
+  const workspaceId = createPrefixedId('workspace')
   const targetPath = makeWorktreePath({
     repoRoot: primary.repoRoot,
-    worktreeId,
-    worktreeName: name,
+    workspaceId,
+    workspaceName: name,
   })
   await ensureAimuxWorktreeRoot()
   await assertSafeAimuxWorktreePath(targetPath)
@@ -81,12 +83,12 @@ export async function createProjectWorktree(params: CreateWorktreeParams): Promi
   }
 
   const now = new Date().toISOString()
-  const record: WorktreeRecord = {
+  const record: WorkspaceRecord = {
     baseRef: base,
     branch,
     createdAt: now,
     createdByAimux: true,
-    id: worktreeId,
+    id: workspaceId,
     name,
     path: targetPath,
     repoRoot: primary.repoRoot,
@@ -95,16 +97,16 @@ export async function createProjectWorktree(params: CreateWorktreeParams): Promi
   }
 
   try {
-    await daemon.expectOk('addWorktreeRecord', { projectId: project.id, worktree: record })
+    await daemon.expectOk('addWorkspaceRecord', { projectId: project.id, workspace: record })
   } catch (error) {
-    // Catalog registration failed — roll back the on-disk worktree so
+    // Catalog registration failed — roll back the on-disk workspace so
     // `worktree list` doesn't perpetually surface an orphan. Swallow rollback
     // errors: report the original failure, the real problem to surface.
     try {
       await removeGitWorktree({ force: true, repoPath: primary.repoRoot, targetPath })
       await pruneEmptyWorktreeParent(targetPath)
     } catch {
-      // Best-effort rollback; leave the git-side worktree if it can't be removed
+      // Best-effort rollback; leave the git-side workspace if it can't be removed
       // cleanly. `worktree list` will flag it as gitTracked with no catalog.
     }
     throw error

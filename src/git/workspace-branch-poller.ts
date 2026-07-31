@@ -6,15 +6,15 @@ import { getCurrentBranch } from '../ui/git-branch'
 
 const INTERVAL_MS = 4000
 
-// Single source of truth for "what git branch is each worktree on right now".
-// Polls every known worktree's path and dispatches update-worktree-record
+// Single source of truth for "what git branch is each workspace on right now".
+// Polls every known workspace's path and dispatches update-workspace-record
 // when the live branch differs from the stored one. Components read
-// `worktree.branch` from state — no per-component polling, no flickers.
+// `workspace.branch` from state — no per-component polling, no flickers.
 //
 // Runs once when enabled; reads projects from the store on each tick so
 // project updates do NOT re-create the effect (which would otherwise feedback
 // off our own dispatches).
-export function useWorktreeBranchPolling(enabled: boolean): void {
+export function useWorkspaceBranchPolling(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return
 
@@ -25,16 +25,16 @@ export function useWorktreeBranchPolling(enabled: boolean): void {
       const projects = appStore.getState().projects
       await Promise.all(
         projects.flatMap((project) =>
-          (project.worktrees ?? []).map(async (worktree) => {
-            if (worktree.path == null || worktree.path === '') return
-            const branch = await getCurrentBranch(worktree.path)
+          (project.workspaces ?? []).map(async (workspace) => {
+            if (workspace.path == null || workspace.path === '') return
+            const branch = await getCurrentBranch(workspace.path)
             if (cancelled) return
-            if (branch != null && branch !== worktree.branch) {
+            if (branch != null && branch !== workspace.branch) {
               dispatchGlobal({
                 patch: { branch },
                 projectId: project.id,
-                type: 'update-worktree-record',
-                worktreeId: worktree.id,
+                type: 'update-workspace-record',
+                workspaceId: workspace.id,
               })
             }
           })

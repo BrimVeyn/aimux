@@ -201,9 +201,9 @@ export function moveModalSelectionWithPreview(
 
 export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
 
-export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceDeleteModal: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  if (modal.type !== 'worktree-delete-confirm') return null
+  if (modal.type !== 'workspace-delete-confirm') return null
   return r(
     [{ type: 'close-modal' }],
     [
@@ -211,8 +211,8 @@ export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
         closeTabs: modal.closeTabs,
         force: modal.force,
         projectId: modal.projectId,
-        type: 'delete-worktree',
-        worktreeId: modal.worktreeId,
+        type: 'delete-workspace',
+        workspaceId: modal.workspaceId,
       },
     ],
     'navigation'
@@ -230,20 +230,20 @@ export const openCreateProjectModal: KeyResult = r(
   'modal.create-project'
 )
 
-export const createWorktreeModal: KeyResult = r(
-  [{ type: 'open-create-worktree-modal' }],
-  [{ type: 'load-create-worktree-base-branches' }],
-  'modal.create-worktree'
+export const createWorkspaceModal: KeyResult = r(
+  [{ type: 'open-create-workspace-modal' }],
+  [{ type: 'load-create-workspace-base-branches' }],
+  'modal.create-workspace'
 )
 
-export const switchCreateWorktreeField: KeyResult = r([{ type: 'switch-create-worktree-field' }])
+export const switchCreateWorkspaceField: KeyResult = r([{ type: 'switch-create-workspace-field' }])
 
-export const confirmCreateWorktree: KeyResult = r([], [{ type: 'create-worktree' }])
+export const confirmCreateWorkspace: KeyResult = r([], [{ type: 'create-workspace' }])
 
 /** Esc backs out of the template step to the form; from the form it closes. */
-export const createWorktreeEscape: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'create-worktree' && ctx.state.modal.step === 'template') {
-    return r([{ step: 'form', type: 'set-create-worktree-step' }])
+export const createWorkspaceEscape: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'create-workspace' && ctx.state.modal.step === 'template') {
+    return r([{ step: 'form', type: 'set-create-workspace-step' }])
   }
   return r([{ type: 'close-modal' }], [], 'navigation')
 }
@@ -361,10 +361,10 @@ export const confirmUpdateSelection: KeyResult = r(
 )
 
 // ---------------------------------------------------------------------------
-// Worktree-move modal
+// Workspace-move modal
 // ---------------------------------------------------------------------------
 
-export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
+export const openWorkspaceMove: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.gitMode.headOffset > 0) {
     return r([
       {
@@ -374,34 +374,34 @@ export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
     ])
   }
   const project = ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
-  const worktrees = project?.worktrees ?? []
-  // From git mode, the source is the active worktree (the one being reviewed).
-  const source = worktrees.find((w) => w.id === project?.activeWorktreeId) ?? worktrees[0]
+  const workspaces = project?.workspaces ?? []
+  // From git mode, the source is the active workspace (the one being reviewed).
+  const source = workspaces.find((w) => w.id === project?.activeWorkspaceId) ?? workspaces[0]
   const hasBranch = source != null && source.branch != null && source.branch !== ''
-  const others = worktrees.filter((w) => w.id !== source?.id)
+  const others = workspaces.filter((w) => w.id !== source?.id)
   if (!hasBranch || source == null || others.length < 1) {
-    return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
+    return r([{ message: 'no other workspace to move into', type: 'git-mode-set-message' }])
   }
   // Overlay: no mode transition — deriveModeId routes input to the picker and
   // focusMode stays 'git' so the git view remains mounted underneath.
   return r(
-    [{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }],
-    [{ type: 'load-worktree-move-stats' }]
+    [{ sourceWorkspaceId: source.id, type: 'open-workspace-move-modal' }],
+    [{ type: 'load-workspace-move-stats' }]
   )
 }
 
-export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
+export const toggleWorkspaceMoveDelete: KeyResult = r([{ type: 'toggle-workspace-move-delete' }])
 
-export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceMove: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
   const project = ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
-  const worktrees = project?.worktrees ?? []
-  const sourceId = modal.type === 'worktree-move' ? modal.sourceWorktreeId : undefined
-  const source = worktrees.find((w) => w.id === sourceId)
-  const targets = worktrees.filter((w) => w.id !== sourceId)
-  const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
+  const workspaces = project?.workspaces ?? []
+  const sourceId = modal.type === 'workspace-move' ? modal.sourceWorkspaceId : undefined
+  const source = workspaces.find((w) => w.id === sourceId)
+  const targets = workspaces.filter((w) => w.id !== sourceId)
+  const selectedIndex = modal.type === 'workspace-move' ? modal.selectedIndex : 0
   const target = targets[selectedIndex]
-  if (!target || !project || !source || modal.type !== 'worktree-move') {
+  if (!target || !project || !source || modal.type !== 'workspace-move') {
     return r([{ type: 'close-modal' }])
   }
   // Overlay close keeps focusMode 'git' (see close-modal reducer), so the move
@@ -412,9 +412,9 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
       {
         deleteSource: modal.deleteSource,
         projectId: project.id,
-        sourceWorktreeId: source.id,
-        targetWorktreeId: target.id,
-        type: 'move-worktree',
+        sourceWorkspaceId: source.id,
+        targetWorkspaceId: target.id,
+        type: 'move-workspace',
       },
     ]
   )
@@ -422,18 +422,18 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
 
 // Confirms the dialog opened after a recoverable move failure: re-runs the
 // move with the flag matching the failure (stash the target / keep conflicts).
-export const confirmWorktreeMoveRetry: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceMoveRetry: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  if (modal.type !== 'worktree-move-confirm') return null
+  if (modal.type !== 'workspace-move-confirm') return null
   return r(
     [{ type: 'close-modal' }],
     [
       {
         deleteSource: modal.deleteSource,
         projectId: modal.projectId,
-        sourceWorktreeId: modal.sourceWorktreeId,
-        targetWorktreeId: modal.targetWorktreeId,
-        type: 'move-worktree',
+        sourceWorkspaceId: modal.sourceWorkspaceId,
+        targetWorkspaceId: modal.targetWorkspaceId,
+        type: 'move-workspace',
         ...(modal.variant === 'stash-target' ? { stashTarget: true } : { keepConflicts: true }),
       },
     ],
@@ -509,19 +509,25 @@ export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   return r(actions, effects, 'navigation')
 }
 
-// Rename worktree modal
-export const confirmRenameWorktree: ActionFn = (ctx: ModeContext) => {
+// Rename workspace modal
+export const confirmRenameWorkspace: ActionFn = (ctx: ModeContext) => {
   const { modal } = ctx.state
   const trimmed = (modal.editBuffer ?? '').trim()
-  const worktreeId = modal.projectTargetId
-  const projectId = modal.type === 'rename-worktree' ? modal.worktreeProjectId : null
+  const workspaceId = modal.projectTargetId
+  const projectId = modal.type === 'rename-workspace' ? modal.workspaceProjectId : null
   const actions: KeyResult['actions'] = []
-  if (trimmed && worktreeId != null && worktreeId !== '' && projectId != null && projectId !== '') {
+  if (
+    trimmed &&
+    workspaceId != null &&
+    workspaceId !== '' &&
+    projectId != null &&
+    projectId !== ''
+  ) {
     actions.push({
       patch: { name: trimmed },
       projectId,
-      type: 'update-worktree-record',
-      worktreeId,
+      type: 'update-workspace-record',
+      workspaceId,
     })
   }
   actions.push({ type: 'close-modal' })

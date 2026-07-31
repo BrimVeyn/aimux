@@ -16,13 +16,13 @@ export function createEmptyProjectSnapshot(): ProjectSnapshotV1 {
 }
 
 /**
- * The per-worktree last-tab memory is serialized into every snapshot now so the
+ * The per-workspace last-tab memory is serialized into every snapshot now so the
  * data accrues across projects, but restoring it at startup stays dormant until
  * a future (non-breaking) change is ready to consume it. Flipping this to true
- * makes restart restore the last-viewed tab per worktree; until then restart
+ * makes restart restore the last-viewed tab per workspace; until then restart
  * behavior is unchanged and the live in-memory map is never clobbered on switch.
  */
-const RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE: boolean = false
+const RESTORE_LAST_ACTIVE_TAB_BY_WORKSPACE: boolean = false
 
 function getDisconnectedStatus(status: TabStatus): TabStatus {
   if (status === 'running' || status === 'starting') {
@@ -35,9 +35,9 @@ function getDisconnectedStatus(status: TabStatus): TabStatus {
 export function serializeProject(state: AppState): ProjectSnapshotV1 {
   return {
     activeTabId: state.activeTabId,
-    lastActiveTabByWorktree:
-      Object.keys(state.lastActiveTabByWorktree).length > 0
-        ? state.lastActiveTabByWorktree
+    lastActiveTabByWorkspace:
+      Object.keys(state.lastActiveTabByWorkspace).length > 0
+        ? state.lastActiveTabByWorkspace
         : undefined,
     layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
     layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
@@ -62,7 +62,7 @@ export function serializeProject(state: AppState): ProjectSnapshotV1 {
       title: tab.title,
       viewport: tab.viewport,
       workerName: tab.workerName,
-      worktreeId: tab.worktreeId,
+      workspaceId: tab.workspaceId,
     })),
     version: 1,
   }
@@ -76,26 +76,27 @@ export interface RestoreOptions {
   // will overwrite the status with daemon truth — leaving the flag on would
   // briefly flash the "Restored snapshot" hint on every j/k cycle.
   forceDisconnected?: boolean
-  // When provided, drop tabs pinned to a worktree id that the project no
-  // longer owns. Some delete paths (notably the sidebar's "Remove worktree")
-  // historically removed the worktree record without closing its tabs, leaving
+  // When provided, drop tabs pinned to a workspace id that the project no
+  // longer owns. Some delete paths (notably the sidebar's "Remove workspace")
+  // historically removed the workspace record without closing its tabs, leaving
   // orphans bound to a vanished id. Those orphans are invisible (filtered out
-  // by the active-worktree filter) yet keep a worktree id that a *future*
-  // delete can collide with — exactly what closes "another worktree's" tabs.
+  // by the active-workspace filter) yet keep a workspace id that a *future*
+  // delete can collide with — exactly what closes "another workspace's" tabs.
   // Pruning them on restore both repairs corrupted catalogs and prevents the
-  // collision. Tabs with no worktree id (legacy/unbound) are always kept.
-  validWorktreeIds?: ReadonlySet<string>
+  // collision. Tabs with no workspace id (legacy/unbound) are always kept.
+  validWorkspaceIds?: ReadonlySet<string>
 }
 
-// Drop tabs bound to a worktree id the project no longer owns. Unbound tabs
-// (no worktreeId) are kept — they surface under the primary worktree.
+// Drop tabs bound to a workspace id the project no longer owns. Unbound tabs
+// (no workspaceId) are kept — they surface under the primary workspace.
 function pruneOrphanedTabs(
   tabs: TabSession[],
-  validWorktreeIds: ReadonlySet<string> | undefined
+  validWorkspaceIds: ReadonlySet<string> | undefined
 ): TabSession[] {
-  if (!validWorktreeIds) return tabs
+  if (!validWorkspaceIds) return tabs
   return tabs.filter(
-    (tab) => tab.worktreeId == null || tab.worktreeId === '' || validWorktreeIds.has(tab.worktreeId)
+    (tab) =>
+      tab.workspaceId == null || tab.workspaceId === '' || validWorkspaceIds.has(tab.workspaceId)
   )
 }
 
@@ -128,9 +129,9 @@ export function restoreTabsFromProject(
       title: tab.title,
       viewport: tab.viewport,
       workerName: tab.workerName,
-      worktreeId: tab.worktreeId,
+      workspaceId: tab.workspaceId,
     }))
-  return pruneOrphanedTabs(restored, options.validWorktreeIds)
+  return pruneOrphanedTabs(restored, options.validWorkspaceIds)
 }
 
 export function restoreLayoutTrees(
@@ -167,16 +168,16 @@ export function restoreLayoutTrees(
   return { layoutTrees, tabGroupMap }
 }
 
-// When a worktree is removed, its tabs are killed live via disposeWorktreeTabs
+// When a workspace is removed, its tabs are killed live via disposeWorkspaceTabs
 // — but the project's persisted projectSnapshot still references them by
-// worktreeId. Without this pruning, a subsequent load-project (project switch
+// workspaceId. Without this pruning, a subsequent load-project (project switch
 // or restart) resurrects the dead tabs and they reappear in h-l navigation.
-export function pruneSnapshotOfWorktree(
+export function pruneSnapshotOfWorkspace(
   snapshot: ProjectSnapshotV1 | undefined,
-  worktreeId: string
+  workspaceId: string
 ): ProjectSnapshotV1 | undefined {
   if (!snapshot) return snapshot
-  const keptTabs = snapshot.tabs.filter((tab) => tab.worktreeId !== worktreeId)
+  const keptTabs = snapshot.tabs.filter((tab) => tab.workspaceId !== workspaceId)
   if (keptTabs.length === snapshot.tabs.length) return snapshot
   const validTabIds = new Set(keptTabs.map((tab) => tab.id))
 
@@ -280,7 +281,7 @@ export function restoreProjectState(
   projectSnapshot: ProjectSnapshotV1 | undefined,
   options: RestoreOptions = {}
 ): Pick<AppState, 'tabs' | 'activeTabId' | 'focusMode' | 'layoutTrees' | 'tabGroupMap'> &
-  Partial<Pick<AppState, 'lastActiveTabByWorktree'>> {
+  Partial<Pick<AppState, 'lastActiveTabByWorkspace'>> {
   const tabs = restoreTabsFromProject(projectSnapshot, options)
   const activeTabId =
     projectSnapshot?.activeTabId != null &&
@@ -292,12 +293,12 @@ export function restoreProjectState(
   const { layoutTrees, tabGroupMap } = restoreLayoutTrees(projectSnapshot, tabs)
   const orderedTabs = normalizeGroupedTabOrder(tabs, layoutTrees, tabGroupMap)
 
-  // Dormant until the gate flips: merge the persisted per-worktree memory over
+  // Dormant until the gate flips: merge the persisted per-workspace memory over
   // the live in-memory map. While off, the key is omitted entirely so callers
   // that spread the result never overwrite their existing map on a switch.
   const persistedLastActiveTab =
-    RESTORE_LAST_ACTIVE_TAB_BY_WORKTREE && projectSnapshot?.lastActiveTabByWorktree
-      ? { ...state.lastActiveTabByWorktree, ...projectSnapshot.lastActiveTabByWorktree }
+    RESTORE_LAST_ACTIVE_TAB_BY_WORKSPACE && projectSnapshot?.lastActiveTabByWorkspace
+      ? { ...state.lastActiveTabByWorkspace, ...projectSnapshot.lastActiveTabByWorkspace }
       : undefined
 
   return {
@@ -306,6 +307,6 @@ export function restoreProjectState(
     layoutTrees,
     tabGroupMap,
     tabs: orderedTabs,
-    ...(persistedLastActiveTab ? { lastActiveTabByWorktree: persistedLastActiveTab } : {}),
+    ...(persistedLastActiveTab ? { lastActiveTabByWorkspace: persistedLastActiveTab } : {}),
   }
 }

@@ -8,10 +8,10 @@ import type {
   TabStatus,
   TerminalModeState,
   TerminalSnapshot,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 
-import { isProjectSnapshotV1, isWorktreeRecord } from '../state/validation'
+import { isProjectSnapshotV1, isWorkspaceRecord } from '../state/validation'
 
 // v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
@@ -28,7 +28,7 @@ import { isProjectSnapshotV1, isWorktreeRecord } from '../state/validation'
 //
 // v12: additive — project lifecycle requests (`createProject`,
 // `switchProject`, `closeProject`, `announceProjectSwitched`) and
-// worktree record requests (`addWorktreeRecord`, `removeWorktreeRecord`),
+// workspace record requests (`addWorkspaceRecord`, `removeWorkspaceRecord`),
 // plus matching broadcast events. All capability-gated; MIN stays at 10.
 //
 // v13: additive — agent-orchestration signals. Two new broadcast events,
@@ -88,12 +88,12 @@ export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
 export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
 
 /**
- * Capability gating the optional `worktreeId` on `createTab` payloads. With
- * it, the CLI can spawn a tab inside a specific worktree of the active
+ * Capability gating the optional `workspaceId` on `createTab` payloads. With
+ * it, the CLI can spawn a tab inside a specific workspace of the active
  * project so the UI groups it correctly. Older daemons ignore the field
  * (the parser accepts it but the TM has no knob for it pre-bump).
  */
-export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
+export const IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID = 'createTabWorkspaceId'
 
 /**
  * v12 — capability gating headless project lifecycle requests
@@ -107,11 +107,11 @@ export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
 export const IPC_CAPABILITY_PROJECT_LIFECYCLE = 'projectLifecycle'
 
 /**
- * v12 — capability gating `addWorktreeRecord` / `removeWorktreeRecord` and
- * their `worktreeAdded` / `worktreeRemoved` broadcasts. Same UI-vs-headless
+ * v12 — capability gating `addWorkspaceRecord` / `removeWorkspaceRecord` and
+ * their `workspaceAdded` / `workspaceRemoved` broadcasts. Same UI-vs-headless
  * fanout as projectLifecycle.
  */
-export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents'
+export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS = 'workspaceLifecycleEvents'
 export const IPC_CAPABILITY_WORKER_METADATA = 'workerMetadata'
 
 /**
@@ -166,9 +166,9 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
-  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
+  IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID,
   IPC_CAPABILITY_PROJECT_LIFECYCLE,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_TAB_TAIL,
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_CAPABILITY_QUESTION_EVENTS,
@@ -238,7 +238,7 @@ export interface TabSessionSummary {
   status: TabStatus
   activity?: TabActivity
   command: string
-  worktreeId?: string
+  workspaceId?: string
   workerName?: string
   /**
    * v13 / capability `listTabsLastLine`. The tab's last non-blank rendered
@@ -282,13 +282,13 @@ export type ClientRequest =
         rows: number
         cwd?: string
         /**
-         * v11 / capability `createTabWorktreeId`. Lets the CLI spawn a tab
-         * inside a specific worktree so the UI groups it correctly. The
+         * v11 / capability `createTabWorkspaceId`. Lets the CLI spawn a tab
+         * inside a specific workspace so the UI groups it correctly. The
          * field is parsed unconditionally — older daemons accepted no such
          * field, so this is a true additive on the wire — but the daemon
          * only forwards it to the TM when its own capability is in play.
          */
-        worktreeId?: string
+        workspaceId?: string
         /** v15 / capability `workerMetadata`: stable project-scoped handle. */
         workerName?: string
         /** True only when the creator did not provide an explicit title. */
@@ -348,21 +348,21 @@ export type ClientRequest =
   // `handleSwitchProjectEffect` has finished; the daemon relays as a
   // `projectSwitched` broadcast so a `--wait`ing CLI can exit.
   | { id: string; type: 'announceProjectSwitched'; payload: { projectId: string } }
-  // v12 / capability `worktreeLifecycleEvents`. Append a worktree record to
-  // a project in the catalog. UI-attached path relays as `worktreeAdded`;
+  // v12 / capability `workspaceLifecycleEvents`. Append a workspace record to
+  // a project in the catalog. UI-attached path relays as `workspaceAdded`;
   // headless path writes the catalog directly.
   | {
       id: string
-      type: 'addWorktreeRecord'
-      payload: { projectId: string; worktree: WorktreeRecord }
+      type: 'addWorkspaceRecord'
+      payload: { projectId: string; workspace: WorkspaceRecord }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Remove a worktree record.
-  // UI-attached path relays as `worktreeRemoved`; headless path writes the
+  // v12 / capability `workspaceLifecycleEvents`. Remove a workspace record.
+  // UI-attached path relays as `workspaceRemoved`; headless path writes the
   // catalog directly.
   | {
       id: string
-      type: 'removeWorktreeRecord'
-      payload: { projectId: string; worktreeId: string }
+      type: 'removeWorkspaceRecord'
+      payload: { projectId: string; workspaceId: string }
     }
 
 export type ServerResponse =
@@ -457,20 +457,20 @@ export type ServerEvent =
       type: 'projectSwitched'
       payload: { projectId: string }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
-  // `addWorktreeRecord` while a UI is attached; the UI reducer appends the
+  // v12 / capability `workspaceLifecycleEvents`. Broadcast after a CLI
+  // `addWorkspaceRecord` while a UI is attached; the UI reducer appends the
   // record and persists the catalog.
   | {
-      type: 'worktreeAdded'
-      payload: { projectId: string; worktree: WorktreeRecord }
+      type: 'workspaceAdded'
+      payload: { projectId: string; workspace: WorkspaceRecord }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
-  // `removeWorktreeRecord` while a UI is attached; the UI reducer removes
+  // v12 / capability `workspaceLifecycleEvents`. Broadcast after a CLI
+  // `removeWorkspaceRecord` while a UI is attached; the UI reducer removes
   // the record (and closes any tabs pinned to it via the existing
-  // worktree-removal side-effect).
+  // workspace-removal side-effect).
   | {
-      type: 'worktreeRemoved'
-      payload: { projectId: string; worktreeId: string }
+      type: 'workspaceRemoved'
+      payload: { projectId: string; workspaceId: string }
     }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
@@ -608,7 +608,7 @@ function isTabSessionSummary(value: unknown): value is TabSessionSummary {
       value.activity === 'waiting-input' ||
       value.activity === 'idle') &&
     isString(value.command) &&
-    (value.worktreeId === undefined || isString(value.worktreeId)) &&
+    (value.workspaceId === undefined || isString(value.workspaceId)) &&
     (value.workerName === undefined || isString(value.workerName)) &&
     (value.lastLine === undefined || isString(value.lastLine))
   )
@@ -652,7 +652,7 @@ function isTabSession(value: unknown): value is TabSession {
     (value.viewport === undefined || isTerminalSnapshot(value.viewport)) &&
     (value.errorMessage === undefined || isString(value.errorMessage)) &&
     (value.exitCode === undefined || isFiniteNumber(value.exitCode)) &&
-    (value.worktreeId === undefined || isString(value.worktreeId))
+    (value.workspaceId === undefined || isString(value.workspaceId))
   )
 }
 
@@ -752,8 +752,8 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'createTab.cwd must be a string'
       )
       assert(
-        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
-        'createTab.worktreeId must be a string when present'
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'createTab.workspaceId must be a string when present'
       )
       assert(
         value.payload.workerName === undefined || isString(value.payload.workerName),
@@ -839,16 +839,19 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'announceProjectSwitched.projectId must be a string'
       )
       return value as ClientRequest
-    case 'addWorktreeRecord':
-      assert(isString(value.payload.projectId), 'addWorktreeRecord.projectId must be a string')
+    case 'addWorkspaceRecord':
+      assert(isString(value.payload.projectId), 'addWorkspaceRecord.projectId must be a string')
       assert(
-        isWorktreeRecord(value.payload.worktree),
-        'addWorktreeRecord.worktree must be a WorktreeRecord'
+        isWorkspaceRecord(value.payload.workspace),
+        'addWorkspaceRecord.workspace must be a WorkspaceRecord'
       )
       return value as ClientRequest
-    case 'removeWorktreeRecord':
-      assert(isString(value.payload.projectId), 'removeWorktreeRecord.projectId must be a string')
-      assert(isString(value.payload.worktreeId), 'removeWorktreeRecord.worktreeId must be a string')
+    case 'removeWorkspaceRecord':
+      assert(isString(value.payload.projectId), 'removeWorkspaceRecord.projectId must be a string')
+      assert(
+        isString(value.payload.workspaceId),
+        'removeWorkspaceRecord.workspaceId must be a string'
+      )
       return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
@@ -976,16 +979,16 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
     case 'projectSwitched':
       assert(isString(value.payload.projectId), 'projectSwitched.projectId must be a string')
       return value as ServerEvent
-    case 'worktreeAdded':
-      assert(isString(value.payload.projectId), 'worktreeAdded.projectId must be a string')
+    case 'workspaceAdded':
+      assert(isString(value.payload.projectId), 'workspaceAdded.projectId must be a string')
       assert(
-        isWorktreeRecord(value.payload.worktree),
-        'worktreeAdded.worktree must be a WorktreeRecord'
+        isWorkspaceRecord(value.payload.workspace),
+        'workspaceAdded.workspace must be a WorkspaceRecord'
       )
       return value as ServerEvent
-    case 'worktreeRemoved':
-      assert(isString(value.payload.projectId), 'worktreeRemoved.projectId must be a string')
-      assert(isString(value.payload.worktreeId), 'worktreeRemoved.worktreeId must be a string')
+    case 'workspaceRemoved':
+      assert(isString(value.payload.projectId), 'workspaceRemoved.projectId must be a string')
+      assert(isString(value.payload.workspaceId), 'workspaceRemoved.workspaceId must be a string')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

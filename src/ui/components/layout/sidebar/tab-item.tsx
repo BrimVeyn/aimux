@@ -16,8 +16,8 @@ interface TabItemProps {
   active: boolean
   focused: boolean
   inLayout?: boolean
-  /** When set, this tab's worktree can be moved — adds a "Move worktree" entry. */
-  moveWorktreeId?: string
+  /** When set, this tab's workspace can be moved — adds a "Move workspace" entry. */
+  moveWorkspaceId?: string
   /** 1-based position in the visible tab list — rendered as `[N]` and matches Leader+N. */
   indexLabel?: string
   /** Render the close × unconditionally instead of only on hover. */
@@ -128,7 +128,7 @@ export function TabItem({
   id,
   indexLabel,
   inLayout,
-  moveWorktreeId,
+  moveWorkspaceId,
   tab,
 }: TabItemProps) {
   const t = useTheme()
@@ -167,22 +167,22 @@ export function TabItem({
           dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
         },
       ],
-      ...(moveWorktreeId != null && moveWorktreeId !== ''
+      ...(moveWorkspaceId != null && moveWorkspaceId !== ''
         ? [
             [
-              'Move worktree',
+              'Move workspace',
               () => {
                 dispatchGlobal({
-                  sourceWorktreeId: moveWorktreeId,
-                  type: 'open-worktree-move-modal',
+                  sourceWorkspaceId: moveWorkspaceId,
+                  type: 'open-workspace-move-modal',
                 })
-                runSideEffectGlobal({ type: 'load-worktree-move-stats' })
+                runSideEffectGlobal({ type: 'load-workspace-move-stats' })
               },
             ] as [string, () => void],
           ]
         : []),
     ],
-    [moveWorktreeId, tab.id]
+    [moveWorkspaceId, tab.id]
   )
   const handleMouseOver = useCallback(() => setHovered(true), [])
   const handleMouseOut = useCallback(() => setHovered(false), [])

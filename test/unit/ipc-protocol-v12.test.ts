@@ -3,14 +3,14 @@ import { describe, expect, test } from 'bun:test'
 import {
   IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_TAB_TAIL,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_VERSION,
   parseClientRequest,
   parseServerMessage,
 } from '../../src/ipc/protocol'
 
-const WORKTREE_FIXTURE = {
+const WORKSPACE_FIXTURE = {
   createdAt: '2026-07-01T00:00:00.000Z',
   createdByAimux: true,
   id: 'wt-1',
@@ -28,7 +28,7 @@ describe('ipc protocol v12', () => {
 
   test('advertises every v12 capability', () => {
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_PROJECT_LIFECYCLE)
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_TAIL)
   })
 
@@ -92,32 +92,32 @@ describe('ipc protocol v12', () => {
     ).not.toThrow()
   })
 
-  test('addWorktreeRecord requires a valid WorktreeRecord', () => {
+  test('addWorkspaceRecord requires a valid WorkspaceRecord', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { projectId: 'project-5', worktree: WORKTREE_FIXTURE },
-        type: 'addWorktreeRecord',
+        payload: { projectId: 'project-5', workspace: WORKSPACE_FIXTURE },
+        type: 'addWorkspaceRecord',
       })
     ).not.toThrow()
   })
 
-  test('addWorktreeRecord rejects a malformed worktree', () => {
+  test('addWorkspaceRecord rejects a malformed workspace', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { projectId: 'project-5', worktree: { id: 'wt-1' } },
-        type: 'addWorktreeRecord',
+        payload: { projectId: 'project-5', workspace: { id: 'wt-1' } },
+        type: 'addWorkspaceRecord',
       })
-    ).toThrow('addWorktreeRecord.worktree must be a WorktreeRecord')
+    ).toThrow('addWorkspaceRecord.workspace must be a WorkspaceRecord')
   })
 
-  test('removeWorktreeRecord requires both ids', () => {
+  test('removeWorkspaceRecord requires both ids', () => {
     expect(() =>
       parseClientRequest({
         id: 'r6',
-        payload: { projectId: 'project-6', worktreeId: 'wt-1' },
-        type: 'removeWorktreeRecord',
+        payload: { projectId: 'project-6', workspaceId: 'wt-1' },
+        type: 'removeWorkspaceRecord',
       })
     ).not.toThrow()
   })
@@ -158,29 +158,29 @@ describe('ipc protocol v12', () => {
     ).not.toThrow()
   })
 
-  test('worktreeAdded event round-trips', () => {
+  test('workspaceAdded event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { projectId: 'project-1', worktree: WORKTREE_FIXTURE },
-        type: 'worktreeAdded',
+        payload: { projectId: 'project-1', workspace: WORKSPACE_FIXTURE },
+        type: 'workspaceAdded',
       })
     ).not.toThrow()
   })
 
-  test('worktreeAdded rejects a malformed worktree', () => {
+  test('workspaceAdded rejects a malformed workspace', () => {
     expect(() =>
       parseServerMessage({
-        payload: { projectId: 'project-1', worktree: { id: 'wt-1' } },
-        type: 'worktreeAdded',
+        payload: { projectId: 'project-1', workspace: { id: 'wt-1' } },
+        type: 'workspaceAdded',
       })
-    ).toThrow('worktreeAdded.worktree must be a WorktreeRecord')
+    ).toThrow('workspaceAdded.workspace must be a WorkspaceRecord')
   })
 
-  test('worktreeRemoved event round-trips', () => {
+  test('workspaceRemoved event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { projectId: 'project-1', worktreeId: 'wt-1' },
-        type: 'worktreeRemoved',
+        payload: { projectId: 'project-1', workspaceId: 'wt-1' },
+        type: 'workspaceRemoved',
       })
     ).not.toThrow()
   })

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
-  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
+  IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID,
   IPC_CAPABILITY_HOT_REEXEC,
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
@@ -24,7 +24,7 @@ describe('ipc protocol v11', () => {
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_THIN_ATTACH)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS)
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID)
   })
 
   test('listTabs round-trips with a string projectId', () => {
@@ -114,7 +114,7 @@ describe('ipc protocol v11', () => {
     ).toThrow('listTabsResult.payload is invalid')
   })
 
-  test('createTab.worktreeId parses when present', () => {
+  test('createTab.workspaceId parses when present', () => {
     expect(() =>
       parseClientRequest({
         id: 'r6',
@@ -125,14 +125,14 @@ describe('ipc protocol v11', () => {
           rows: 24,
           tabId: 'tab-1',
           title: 'Claude',
-          worktreeId: 'worktree-abc',
+          workspaceId: 'workspace-abc',
         },
         type: 'createTab',
       })
     ).not.toThrow()
   })
 
-  test('createTab.worktreeId rejects a non-string value', () => {
+  test('createTab.workspaceId rejects a non-string value', () => {
     expect(() =>
       parseClientRequest({
         id: 'r7',
@@ -143,11 +143,11 @@ describe('ipc protocol v11', () => {
           rows: 24,
           tabId: 'tab-1',
           title: 'Claude',
-          worktreeId: 12,
+          workspaceId: 12,
         },
         type: 'createTab',
       })
-    ).toThrow('createTab.worktreeId must be a string when present')
+    ).toThrow('createTab.workspaceId must be a string when present')
   })
 
   test('workerName metadata round-trips on createTab and listTabsResult', () => {
@@ -208,7 +208,7 @@ describe('ipc protocol v11', () => {
               sendFocusMode: false,
             },
             title: 'Claude',
-            worktreeId: 'wt-1',
+            workspaceId: 'wt-1',
           },
         },
         type: 'tabAdded',

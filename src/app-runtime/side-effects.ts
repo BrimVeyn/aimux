@@ -13,13 +13,18 @@ import { dirname, join as joinPath, resolve as resolvePath } from 'node:path'
 
 import type { SideEffect } from '../input/modes/types'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, AssistantId, TabSession, WorktreeRecord } from '../state/types'
+import type { AppAction, AppState, AssistantId, TabSession, WorkspaceRecord } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
-import { loadConfig, saveConfig, type WorktreeTemplate, type WorktreeTemplatePane } from '../config'
+import {
+  loadConfig,
+  saveConfig,
+  type WorkspaceTemplate,
+  type WorkspaceTemplatePane,
+} from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
-import { countDirtyFiles, moveWorktree } from '../git/move-worktree'
+import { countDirtyFiles, moveWorkspace } from '../git/move-workspace'
 import {
   createGitWorktree,
   deleteGitBranch,
@@ -58,14 +63,14 @@ import {
   splitNode,
 } from '../state/layout-tree'
 import { saveProjectCatalog } from '../state/project-catalog'
-import { pruneSnapshotOfWorktree } from '../state/project-persistence'
+import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { saveCurrentProject } from '../state/project-save'
 import {
-  filterTabsForActiveWorktree,
-  getActiveWorktree,
-  getActiveWorktreePath,
-  withActiveWorktree,
-} from '../state/project-worktrees'
+  filterTabsForActiveWorkspace,
+  getActiveWorkspace,
+  getActiveWorkspacePath,
+  withActiveWorkspace,
+} from '../state/project-workspaces'
 import { filterAssistants, filterProjects, filterSnippets } from '../state/selectors'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { appReducer } from '../state/store'
@@ -265,7 +270,7 @@ function confirmSplitSelection(ctx: SideEffectContext): void {
     option.id,
     customCommand,
     state.customCommands,
-    getActiveWorktree(
+    getActiveWorkspace(
       state.currentProjectId != null && state.currentProjectId !== ''
         ? state.projects.find((s) => s.id === state.currentProjectId)
         : undefined
@@ -294,7 +299,7 @@ export function createTabSession(
   assistant: AssistantId,
   customCommand?: string,
   customCommands?: Record<string, string>,
-  worktreeId?: string
+  workspaceId?: string
 ): TabSession {
   const allOptions = getAllAssistantOptions(customCommands ?? {})
   const option = allOptions.find((o) => o.id === assistant) ?? getAssistantOption(0)
@@ -308,7 +313,7 @@ export function createTabSession(
     status: 'starting',
     terminalModes: createDefaultTerminalModes(),
     title: option.label,
-    worktreeId,
+    workspaceId,
   }
 }
 
@@ -317,7 +322,7 @@ export function startTabSession(
   dispatch: (action: AppAction) => void,
   clearStartupGrace: (tabId: string) => void,
   startStartupGrace: (tabId: string) => void,
-  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'worktreeId'>,
+  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'workspaceId'>,
   cols: number,
   rows: number,
   cwd?: string,
@@ -330,7 +335,7 @@ export function startTabSession(
     rows,
     tabId: tab.id,
     title: tab.title,
-    worktreeId: tab.worktreeId ?? null,
+    workspaceId: tab.workspaceId ?? null,
   })
   startStartupGrace(tab.id)
 
@@ -356,14 +361,14 @@ export function startTabSession(
     rows,
     tabId: tab.id,
     title: tab.title,
-    worktreeId: tab.worktreeId,
+    workspaceId: tab.workspaceId,
   })
 }
 
 function launchAssistant(
   ctx: SideEffectContext,
   assistant: AssistantId,
-  worktreeId?: string
+  workspaceId?: string
 ): void {
   const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const customCommand = state.customCommands[assistant]
@@ -371,8 +376,8 @@ function launchAssistant(
     assistant,
     customCommand,
     state.customCommands,
-    worktreeId ??
-      getActiveWorktree(
+    workspaceId ??
+      getActiveWorkspace(
         state.currentProjectId != null && state.currentProjectId !== ''
           ? state.projects.find((s) => s.id === state.currentProjectId)
           : undefined
@@ -398,40 +403,40 @@ function launchAssistant(
 }
 
 /**
- * The `<C-p>` flow: create a worktree in the current project, then hand off.
+ * The `<C-p>` flow: create a workspace in the current project, then hand off.
  * A template already produces tabs, so it wins; otherwise we chain into the
- * new-tab modal rather than leaving the user in an empty worktree.
+ * new-tab modal rather than leaving the user in an empty workspace.
  */
-async function createWorktreeFromModal(
+async function createWorkspaceFromModal(
   ctx: SideEffectContext,
   projectId: string,
   params: {
-    worktreeName: string
+    workspaceName: string
     branchName: string
     baseRef?: string
     templateId?: string
   }
 ): Promise<void> {
-  const worktree = await createAimuxTempWorktree(
+  const workspace = await createAimuxTempWorkspace(
     ctx,
     projectId,
-    params.worktreeName,
+    params.workspaceName,
     params.branchName,
     params.baseRef
   )
   // Undefined means the create was rejected (e.g. branch already checked out);
   // the modal stays open showing the error.
-  if (!worktree) return
+  if (!workspace) return
 
   const template =
     params.templateId != null && params.templateId !== ''
-      ? ctx.state.worktreeTemplates.find((entry) => entry.id === params.templateId)
+      ? ctx.state.workspaceTemplates.find((entry) => entry.id === params.templateId)
       : undefined
 
   ctx.dispatch({ type: 'close-modal' })
 
   if (template) {
-    applyWorktreeTemplate(ctx, template, worktree.id, worktree.path)
+    applyWorkspaceTemplate(ctx, template, workspace.id, workspace.path)
     ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
     return
   }
@@ -439,11 +444,11 @@ async function createWorktreeFromModal(
   ctx.dispatch({ type: 'open-new-tab-modal' })
 }
 
-function applyWorktreeTemplate(
+function applyWorkspaceTemplate(
   ctx: SideEffectContext,
-  template: WorktreeTemplate,
-  worktreeId: string,
-  worktreePath: string
+  template: WorkspaceTemplate,
+  workspaceId: string,
+  workspacePath: string
 ): void {
   let firstTabId: string | null = null
 
@@ -453,7 +458,7 @@ function applyWorktreeTemplate(
     for (let i = 0; i < templateTab.panes.length; i++) {
       const pane = templateTab.panes[i]
       if (!pane) continue
-      const tab = createPaneTab(ctx, pane, worktreeId)
+      const tab = createPaneTab(ctx, pane, workspaceId)
       localToTabId.set(pane.id, tab.id)
 
       if (i === 0) {
@@ -467,7 +472,7 @@ function applyWorktreeTemplate(
           tab,
           ctx.state.layout.terminalCols,
           ctx.state.layout.terminalRows,
-          worktreePath
+          workspacePath
         )
       } else {
         const splitFromId =
@@ -483,7 +488,7 @@ function applyWorktreeTemplate(
           })
           continue
         }
-        splitFromTab(ctx, splitFromId, direction, tab, worktreePath)
+        splitFromTab(ctx, splitFromId, direction, tab, workspacePath)
         if (pane.ratio != null) {
           const sourceRatio = clampSplitRatio(1 - pane.ratio)
           ctx.dispatch({
@@ -514,15 +519,15 @@ function applyWorktreeTemplate(
 
 function createPaneTab(
   ctx: SideEffectContext,
-  pane: WorktreeTemplatePane,
-  worktreeId: string
+  pane: WorkspaceTemplatePane,
+  workspaceId: string
 ): TabSession {
   // Accept `'shell'` as an alias for the registered `'terminal'` assistant so
   // template examples using the more intuitive name don't silently fall back
   // to Claude (createTabSession's unknown-id fallback resolves to index 0).
   const assistantId = (pane.assistant === 'shell' ? 'terminal' : pane.assistant) as AssistantId
   const customCommand = ctx.state.customCommands[assistantId]
-  return createTabSession(assistantId, customCommand, ctx.state.customCommands, worktreeId)
+  return createTabSession(assistantId, customCommand, ctx.state.customCommands, workspaceId)
 }
 
 function splitFromTab(
@@ -561,15 +566,15 @@ function clampSplitRatio(value: number): number {
 
 function getTabProjectPath(
   ctx: SideEffectContext,
-  tab: Pick<TabSession, 'worktreeId'>
+  tab: Pick<TabSession, 'workspaceId'>
 ): string | undefined {
   const project =
     ctx.state.currentProjectId != null && ctx.state.currentProjectId !== ''
       ? ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
       : undefined
-  if (tab.worktreeId != null && tab.worktreeId !== '') {
-    const worktree = project?.worktrees?.find((entry) => entry.id === tab.worktreeId)
-    if (worktree) return worktree.path
+  if (tab.workspaceId != null && tab.workspaceId !== '') {
+    const workspace = project?.workspaces?.find((entry) => entry.id === tab.workspaceId)
+    if (workspace) return workspace.path
   }
   return ctx.getCurrentProjectProjectPath()
 }
@@ -631,8 +636,8 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'launch-selected-assistant': {
-      // The tab lands in the project's active worktree — launchAssistant
-      // resolves that itself. Creating a worktree is `create-worktree`'s job.
+      // The tab lands in the project's active workspace — launchAssistant
+      // resolves that itself. Creating a workspace is `create-workspace`'s job.
       launchAssistant(ctx, getSelectedAssistantOption(state).id)
       return
     }
@@ -641,40 +646,40 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       dispatch({ assistantId: option.id, type: 'open-edit-custom-command' })
       return
     }
-    case 'load-create-worktree-base-branches': {
+    case 'load-create-workspace-base-branches': {
       void (async () => {
         const project = state.projects.find((entry) => entry.id === state.currentProjectId)
-        const sourcePath = getActiveWorktree(project)?.path ?? getActiveWorktreePath(project)
+        const sourcePath = getActiveWorkspace(project)?.path ?? getActiveWorkspacePath(project)
         if (!(sourcePath != null && sourcePath !== '')) return
         const branches = await listLocalBranches(sourcePath)
-        if (ctx.getState().modal.type !== 'create-worktree') return
-        ctx.dispatch({ branches, type: 'set-create-worktree-base-branches' })
+        if (ctx.getState().modal.type !== 'create-workspace') return
+        ctx.dispatch({ branches, type: 'set-create-workspace-base-branches' })
       })()
       return
     }
-    case 'create-worktree': {
-      if (state.modal.type !== 'create-worktree') return
+    case 'create-workspace': {
+      if (state.modal.type !== 'create-workspace') return
       // Templates get their own step: first Enter on the form advances to the
       // picker, the second one (step 'template') actually creates.
-      if (state.modal.step === 'form' && state.worktreeTemplates.length > 0) {
-        dispatch({ step: 'template', type: 'set-create-worktree-step' })
+      if (state.modal.step === 'form' && state.workspaceTemplates.length > 0) {
+        dispatch({ step: 'template', type: 'set-create-workspace-step' })
         return
       }
       const projectId = state.currentProjectId
       if (!(projectId != null && projectId !== '')) return
-      const { baseRef, branchName, worktreeName } = state.modal
+      const { baseRef, branchName, workspaceName } = state.modal
       const templateId =
         state.modal.step === 'template'
-          ? state.worktreeTemplates[state.modal.selectedIndex]?.id
+          ? state.workspaceTemplates[state.modal.selectedIndex]?.id
           : undefined
       void (async () => {
         try {
           await enqueueGitOp(async () =>
-            createWorktreeFromModal(ctx, projectId, {
+            createWorkspaceFromModal(ctx, projectId, {
               baseRef: baseRef !== '' ? baseRef : undefined,
               branchName,
               templateId,
-              worktreeName,
+              workspaceName,
             })
           )
         } catch (error) {
@@ -695,14 +700,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       handleDeleteProjectEffect(state, backend, dispatch, effect.projectId)
       return
     }
-    case 'delete-worktree': {
+    case 'delete-workspace': {
       void (async () => {
         try {
           await enqueueGitOp(async () =>
-            runDeleteWorktree(
+            runDeleteWorkspace(
               { ...ctx, state: ctx.getState() },
               effect.projectId,
-              effect.worktreeId,
+              effect.workspaceId,
               !!(effect.force === true),
               !!(effect.closeTabs === true)
             )
@@ -712,35 +717,35 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           // Real errors surface as a toast. Recoverable failures (dirty tree,
           // active tabs, …) open the standalone confirmation modal so the user
           // can opt into a force-delete.
-          if (!isForceableWorktreeDeleteError(message)) {
-            toast.error(`Could not delete worktree: ${message}`)
+          if (!isForceableWorkspaceDeleteError(message)) {
+            toast.error(`Could not delete workspace: ${message}`)
             return
           }
           const latest = ctx.getState()
           const project = latest.projects.find((entry) => entry.id === effect.projectId)
-          const worktree = project?.worktrees?.find((entry) => entry.id === effect.worktreeId)
+          const workspace = project?.workspaces?.find((entry) => entry.id === effect.workspaceId)
           ctx.dispatch({
             closeTabs: effect.closeTabs === true,
             force: true,
             projectId: effect.projectId,
             reason: message,
-            type: 'open-worktree-delete-confirm',
-            worktreeId: effect.worktreeId,
-            worktreeLabel: worktree?.branch ?? worktree?.name ?? 'this worktree',
+            type: 'open-workspace-delete-confirm',
+            workspaceId: effect.workspaceId,
+            workspaceLabel: workspace?.branch ?? workspace?.name ?? 'this workspace',
           })
         }
       })()
       return
     }
-    case 'move-worktree': {
+    case 'move-workspace': {
       void (async () => {
         try {
           await enqueueGitOp(async () =>
-            runMoveWorktree(
+            runMoveWorkspace(
               { ...ctx, state: ctx.getState() },
               effect.projectId,
-              effect.sourceWorktreeId,
-              effect.targetWorktreeId,
+              effect.sourceWorkspaceId,
+              effect.targetWorkspaceId,
               effect.deleteSource === true,
               effect.stashTarget === true,
               effect.keepConflicts === true
@@ -752,18 +757,18 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       })()
       return
     }
-    case 'load-worktree-move-stats': {
+    case 'load-workspace-move-stats': {
       void (async () => {
         const project = state.projects.find((entry) => entry.id === state.currentProjectId)
-        const worktrees = project?.worktrees ?? []
-        if (worktrees.length === 0) return
+        const workspaces = project?.workspaces ?? []
+        if (workspaces.length === 0) return
         const counts = await Promise.all(
-          worktrees.map(async (worktree) => [worktree.id, await countDirtyFiles(worktree.path)])
+          workspaces.map(async (workspace) => [workspace.id, await countDirtyFiles(workspace.path)])
         )
-        if (ctx.getState().modal.type !== 'worktree-move') return
+        if (ctx.getState().modal.type !== 'workspace-move') return
         ctx.dispatch({
           dirtyFiles: Object.fromEntries(counts),
-          type: 'set-worktree-move-stats',
+          type: 'set-workspace-move-stats',
         })
       })()
       return
@@ -850,7 +855,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         assistant,
         customCommand,
         state.customCommands,
-        sourceTab?.worktreeId
+        sourceTab?.workspaceId
       )
       executeSplitPane(ctx, effect.direction, tab)
       return
@@ -931,7 +936,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'switch-project-by-index': {
-      handleSwitchProjectByIndex(ctx, effect.index, effect.worktreeId)
+      handleSwitchProjectByIndex(ctx, effect.index, effect.workspaceId)
       return
     }
     case 'cycle-sidebar-item': {
@@ -1197,7 +1202,7 @@ async function openEditorInline(
 function handleSwitchProjectByIndex(
   ctx: SideEffectContext,
   index: number,
-  worktreeId?: string
+  workspaceId?: string
 ): void {
   const { backend, dispatch } = ctx
   // Read fresh state. ctx.state is the snapshot from the previous render and
@@ -1212,25 +1217,25 @@ function handleSwitchProjectByIndex(
     return
   }
 
-  // Resolve which worktree to land on. If the caller passed an explicit
-  // `worktreeId` (project-row tap → its primary, worktree-row tap → that
-  // worktree), honor it; otherwise let the target project keep its persisted
-  // activeWorktreeId.
-  const resolvedWorktreeId =
-    worktreeId != null &&
-    worktreeId !== '' &&
-    (target.worktrees?.some((w) => w.id === worktreeId) ?? false)
-      ? worktreeId
+  // Resolve which workspace to land on. If the caller passed an explicit
+  // `workspaceId` (project-row tap → its primary, workspace-row tap → that
+  // workspace), honor it; otherwise let the target project keep its persisted
+  // activeWorkspaceId.
+  const resolvedWorkspaceId =
+    workspaceId != null &&
+    workspaceId !== '' &&
+    (target.workspaces?.some((w) => w.id === workspaceId) ?? false)
+      ? workspaceId
       : undefined
-  const needsWorktreeChange =
-    resolvedWorktreeId != null && resolvedWorktreeId !== target.activeWorktreeId
+  const needsWorkspaceChange =
+    resolvedWorkspaceId != null && resolvedWorkspaceId !== target.activeWorkspaceId
 
   if (target.id === state.currentProjectId) {
-    if (needsWorktreeChange) {
+    if (needsWorkspaceChange) {
       dispatch({
         projectId: target.id,
-        type: 'set-active-worktree',
-        worktreeId: resolvedWorktreeId,
+        type: 'set-active-workspace',
+        workspaceId: resolvedWorkspaceId,
       })
     }
     if (state.focusMode === 'git') {
@@ -1239,15 +1244,15 @@ function handleSwitchProjectByIndex(
     return
   }
 
-  // Cross-project: bundle the worktree change into the project record AND
+  // Cross-project: bundle the workspace change into the project record AND
   // fold set-projects + load-project into a SINGLE setState call. Otherwise
   // any subscriber notification (re-render, useEffect, backend re-attach)
   // between dispatches can re-assert the project's previously-persisted
-  // activeWorktreeId, dropping the user back on the last-visited worktree.
-  const patchedProject = needsWorktreeChange
-    ? withActiveWorktree(target, resolvedWorktreeId)
+  // activeWorkspaceId, dropping the user back on the last-visited workspace.
+  const patchedProject = needsWorkspaceChange
+    ? withActiveWorkspace(target, resolvedWorkspaceId)
     : target
-  const patchedState: AppState = needsWorktreeChange
+  const patchedState: AppState = needsWorkspaceChange
     ? {
         ...state,
         projects: state.projects.map((s) => (s.id === patchedProject.id ? patchedProject : s)),
@@ -1269,7 +1274,7 @@ function handleSwitchProjectByIndex(
 
 interface SidebarItem {
   projectId: string
-  worktreeId: string | null
+  workspaceId: string | null
 }
 
 function buildSidebarItems(state: AppState): SidebarItem[] {
@@ -1278,12 +1283,12 @@ function buildSidebarItems(state: AppState): SidebarItem[] {
   )
   const items: SidebarItem[] = []
   for (const project of ordered) {
-    items.push({ projectId: project.id, worktreeId: null })
-    const worktrees = project.worktrees ?? []
-    const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-    for (const wt of worktrees) {
+    items.push({ projectId: project.id, workspaceId: null })
+    const workspaces = project.workspaces ?? []
+    const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+    for (const wt of workspaces) {
       if (wt.id === primary?.id) continue
-      items.push({ projectId: project.id, worktreeId: wt.id })
+      items.push({ projectId: project.id, workspaceId: wt.id })
     }
   }
   return items
@@ -1293,14 +1298,14 @@ function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
   const projectId = state.currentProjectId
   if (projectId == null || projectId === '') return -1
   const project = state.projects.find((s) => s.id === projectId)
-  const worktrees = project?.worktrees ?? []
-  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-  const activeWtId = project?.activeWorktreeId ?? null
-  // The project row IS the primary worktree (no separate row), so an active
+  const workspaces = project?.workspaces ?? []
+  const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+  const activeWtId = project?.activeWorkspaceId ?? null
+  // The project row IS the primary workspace (no separate row), so an active
   // primary or undefined active maps to the project-item.
-  const targetWorktreeId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
+  const targetWorkspaceId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
   return items.findIndex(
-    (item) => item.projectId === projectId && item.worktreeId === targetWorktreeId
+    (item) => item.projectId === projectId && item.workspaceId === targetWorkspaceId
   )
 }
 
@@ -1327,27 +1332,27 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
   const project = state.projects.find((s) => s.id === target.projectId)
   if (!project) return
 
-  // Determine the worktree to activate. For project-items, that's the
-  // primary; for worktree-items, the specific worktree.
-  const worktrees = project.worktrees ?? []
-  const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
-  const targetWorktreeId = target.worktreeId ?? primary?.id
+  // Determine the workspace to activate. For project-items, that's the
+  // primary; for workspace-items, the specific workspace.
+  const workspaces = project.workspaces ?? []
+  const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
+  const targetWorkspaceId = target.workspaceId ?? primary?.id
 
   const isCrossProject = project.id !== state.currentProjectId
-  const needsWorktreeChange =
-    targetWorktreeId != null && targetWorktreeId !== project.activeWorktreeId
+  const needsWorkspaceChange =
+    targetWorkspaceId != null && targetWorkspaceId !== project.activeWorkspaceId
 
   if (isCrossProject) {
-    // Bundle the worktree change into the project record AND fold the
+    // Bundle the workspace change into the project record AND fold the
     // project switch's two dispatches (set-projects + load-project) into a
     // SINGLE Zustand setState call — otherwise each dispatch fires a
     // separate subscription notification and the @opentui/react reconciler
     // paints an intermediate frame where the new project is current but
-    // the old activeWorktreeId still holds, producing the visible flicker.
-    const patchedProject = needsWorktreeChange
-      ? withActiveWorktree(project, targetWorktreeId)
+    // the old activeWorkspaceId still holds, producing the visible flicker.
+    const patchedProject = needsWorkspaceChange
+      ? withActiveWorkspace(project, targetWorkspaceId)
       : project
-    const patchedState: AppState = needsWorktreeChange
+    const patchedState: AppState = needsWorkspaceChange
       ? {
           ...state,
           projects: state.projects.map((s) => (s.id === patchedProject.id ? patchedProject : s)),
@@ -1371,11 +1376,11 @@ function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1): void
     return
   }
 
-  if (needsWorktreeChange) {
+  if (needsWorkspaceChange) {
     dispatch({
       projectId: project.id,
-      type: 'set-active-worktree',
-      worktreeId: targetWorktreeId,
+      type: 'set-active-workspace',
+      workspaceId: targetWorkspaceId,
     })
   }
 }
@@ -1386,7 +1391,7 @@ function handleSwitchTabByIndex(ctx: SideEffectContext, index: number): void {
     state.currentProjectId != null && state.currentProjectId !== ''
       ? state.projects.find((s) => s.id === state.currentProjectId)
       : undefined
-  const visible = filterTabsForActiveWorktree(state.tabs, currentProject)
+  const visible = filterTabsForActiveWorkspace(state.tabs, currentProject)
   const entries = buildTabEntries(visible, state.layoutTrees, state.tabGroupMap, state.activeTabId)
   const target = entries[index - 1]
   if (!target) {
@@ -1406,13 +1411,17 @@ function replaceProject(
   return state.projects.map((project) => (project.id === projectId ? next(project) : project))
 }
 
-function handleSwitchWorktree(ctx: SideEffectContext, projectId: string, worktreeId: string): void {
+function handleSwitchWorkspace(
+  ctx: SideEffectContext,
+  projectId: string,
+  workspaceId: string
+): void {
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
-  const worktree = project?.worktrees?.find((entry) => entry.id === worktreeId)
-  if (!project || !worktree) return
+  const workspace = project?.workspaces?.find((entry) => entry.id === workspaceId)
+  if (!project || !workspace) return
   const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
-    activeWorktreeId: worktreeId,
+    activeWorkspaceId: workspaceId,
     updatedAt: new Date().toISOString(),
   }))
   saveProjectCatalog(projects)
@@ -1423,28 +1432,29 @@ function normalizeBranchName(branch: string | undefined): string | undefined {
   return branch?.replace(/^refs\/heads\//, '').trim()
 }
 
-async function createAimuxTempWorktree(
+async function createAimuxTempWorkspace(
   ctx: SideEffectContext,
   projectId: string,
   requestedName?: string,
   requestedBranchName?: string,
   requestedBaseRef?: string,
-  sourceWorktreeId?: string
-): Promise<WorktreeRecord | undefined> {
+  sourceWorkspaceId?: string
+): Promise<WorkspaceRecord | undefined> {
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
   const source =
-    project?.worktrees?.find((entry) => entry.id === sourceWorktreeId) ?? getActiveWorktree(project)
-  const sourcePath = source?.path ?? getActiveWorktreePath(project)
+    project?.workspaces?.find((entry) => entry.id === sourceWorkspaceId) ??
+    getActiveWorkspace(project)
+  const sourcePath = source?.path ?? getActiveWorkspacePath(project)
   if (!project || !(sourcePath != null && sourcePath !== '')) return undefined
 
-  // Resolve the *main* repo checkout, never the active linked worktree, so the
-  // record's repoRoot stays valid after sibling worktrees are deleted.
+  // Resolve the *main* repo checkout, never the active linked workspace, so the
+  // record's repoRoot stays valid after sibling workspaces are deleted.
   const repoRoot = (await getMainWorktreeRoot(sourcePath)) ?? source?.repoRoot ?? sourcePath
   const baseBranch = (await getCurrentBranch(sourcePath)) ?? source?.branch ?? 'HEAD'
   const baseRef = requestedBaseRef ?? baseBranch
-  const worktreeId = createPrefixedId('worktree')
+  const workspaceId = createPrefixedId('workspace')
   const trimmedName = requestedName?.trim()
-  const worktreeName =
+  const workspaceName =
     trimmedName != null && trimmedName !== ''
       ? trimmedName
       : `wt-${sanitizePathSegment(project.name, 12)}`
@@ -1452,18 +1462,18 @@ async function createAimuxTempWorktree(
   const branchName =
     trimmedBranch != null && trimmedBranch !== ''
       ? trimmedBranch
-      : `aimux/${sanitizePathSegment(worktreeName, 40)}-${Date.now().toString(36)}`
-  const targetPath = makeWorktreePath({ repoRoot, worktreeId, worktreeName })
+      : `aimux/${sanitizePathSegment(workspaceName, 40)}-${Date.now().toString(36)}`
+  const targetPath = makeWorktreePath({ repoRoot, workspaceId, workspaceName })
 
-  const existingWorktree = (await listGitWorktrees(repoRoot)).find(
+  const existingWorkspace = (await listGitWorktrees(repoRoot)).find(
     (entry) =>
       entry.prunable !== true &&
       normalizeBranchName(entry.branch) === normalizeBranchName(branchName)
   )
-  if (existingWorktree) {
+  if (existingWorkspace) {
     ctx.dispatch({
-      message: `Branch already checked out in another worktree: ${existingWorktree.path}`,
-      type: 'set-create-worktree-branch-error',
+      message: `Branch already checked out in another workspace: ${existingWorkspace.path}`,
+      type: 'set-create-workspace-branch-error',
     })
     return undefined
   }
@@ -1473,14 +1483,14 @@ async function createAimuxTempWorktree(
   await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
   const now = new Date().toISOString()
 
-  const worktree: WorktreeRecord = {
+  const workspace: WorkspaceRecord = {
     baseRef,
     branch: branchName,
     commitSha: await getHeadSha(targetPath),
     createdAt: now,
     createdByAimux: true,
-    id: worktreeId,
-    name: worktreeName,
+    id: workspaceId,
+    name: workspaceName,
     path: targetPath,
     repoRoot,
     source: 'aimux-temp',
@@ -1488,19 +1498,19 @@ async function createAimuxTempWorktree(
   }
   const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
-    activeWorktreeId: worktree.id,
+    activeWorkspaceId: workspace.id,
     updatedAt: now,
-    worktrees: [...(entry.worktrees ?? []), worktree],
+    workspaces: [...(entry.workspaces ?? []), workspace],
   }))
   saveProjectCatalog(projects)
   ctx.dispatch({ projects, type: 'set-projects' })
-  toast.success(`Created worktree ${branchName}`)
-  return worktree
+  toast.success(`Created workspace ${branchName}`)
+  return workspace
 }
 
-// Dispose and close every tab pinned to a worktree (timers, pty project, state).
-function disposeWorktreeTabs(ctx: SideEffectContext, worktreeId: string): void {
-  for (const tab of ctx.state.tabs.filter((entry) => entry.worktreeId === worktreeId)) {
+// Dispose and close every tab pinned to a workspace (timers, pty project, state).
+function disposeWorkspaceTabs(ctx: SideEffectContext, workspaceId: string): void {
+  for (const tab of ctx.state.tabs.filter((entry) => entry.workspaceId === workspaceId)) {
     ctx.clearIdleTimer(tab.id)
     ctx.clearStartupGrace(tab.id)
     ctx.backend.disposeSession(tab.id)
@@ -1508,110 +1518,115 @@ function disposeWorktreeTabs(ctx: SideEffectContext, worktreeId: string): void {
   }
 }
 
-async function runDeleteWorktree(
+async function runDeleteWorkspace(
   ctx: SideEffectContext,
   projectId: string,
-  worktreeId: string,
+  workspaceId: string,
   force: boolean,
   closeTabs = false
 ): Promise<void> {
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
-  const worktree = project?.worktrees?.find((entry) => entry.id === worktreeId)
+  const workspace = project?.workspaces?.find((entry) => entry.id === workspaceId)
   if (!project) throw new Error('project not found')
-  if (!worktree) throw new Error('worktree not found')
-  if ((project.worktrees?.length ?? 0) <= 1) throw new Error('at least one worktree must remain')
-  if (worktree.source === 'primary') throw new Error('root worktree cannot be deleted')
+  if (!workspace) throw new Error('workspace not found')
+  if ((project.workspaces?.length ?? 0) <= 1) throw new Error('at least one workspace must remain')
+  if (workspace.source === 'primary') throw new Error('root workspace cannot be deleted')
 
-  const tabsInWorktree = ctx.state.tabs.filter((tab) => tab.worktreeId === worktreeId)
+  const tabsInWorkspace = ctx.state.tabs.filter((tab) => tab.workspaceId === workspaceId)
   // The active-tabs guard asks the modal user to confirm before closing tabs.
-  // `closeTabs` (the sidebar's "Remove worktree") opts into closing them
-  // directly without forcing the git removal, so dirty temp worktrees are still
+  // `closeTabs` (the sidebar's "Remove workspace") opts into closing them
+  // directly without forcing the git removal, so dirty temp workspaces are still
   // protected by the non-force `git worktree remove`.
-  if (tabsInWorktree.length > 0 && !force && !closeTabs) {
-    throw new ActiveWorktreeTabsError(tabsInWorktree.length)
+  if (tabsInWorkspace.length > 0 && !force && !closeTabs) {
+    throw new ActiveWorkspaceTabsError(tabsInWorkspace.length)
   }
 
-  const repoPath = resolveWorktreeGitDir(project, worktree)
-  const isAimuxTemp = worktree.source === 'aimux-temp' && worktree.createdByAimux
-  // Drop the throwaway aimux branch alongside the worktree so deleted temp
-  // worktrees don't accumulate in the repo or haunt the base picker. Scoped to
+  const repoPath = resolveWorkspaceGitDir(project, workspace)
+  const isAimuxTemp = workspace.source === 'aimux-temp' && workspace.createdByAimux
+  // Drop the throwaway aimux branch alongside the workspace so deleted temp
+  // workspaces don't accumulate in the repo or haunt the base picker. Scoped to
   // the `aimux/` namespace (matches the picker filter); best-effort.
   const cleanupAimuxBranch = async (): Promise<void> => {
-    const branch = worktree.branch
+    const branch = workspace.branch
     if (isAimuxTemp && branch != null && branch !== '' && branch.startsWith('aimux/')) {
       await deleteGitBranch(repoPath, branch)
     }
   }
 
-  // Run git ops FIRST. If any throws (dirty worktree, etc.) the catch in the
-  // delete-worktree side effect handler re-prompts force or toasts the error —
+  // Run git ops FIRST. If any throws (dirty workspace, etc.) the catch in the
+  // delete-workspace side effect handler re-prompts force or toasts the error —
   // tabs stay open and the row stays in the sidebar, so the UI matches reality
-  // instead of leaving tabs closed against a worktree that still exists.
-  if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path) && !existsSync(worktree.path)) {
-    // The dir vanished but git may still pin the branch to a stale worktree entry.
+  // instead of leaving tabs closed against a workspace that still exists.
+  if (isAimuxTemp && isInsideAimuxWorktreeRoot(workspace.path) && !existsSync(workspace.path)) {
+    // The dir vanished but git may still pin the branch to a stale workspace entry.
     await pruneGitWorktrees(repoPath)
-  } else if (isAimuxTemp && isInsideAimuxWorktreeRoot(worktree.path)) {
-    await assertSafeAimuxWorktreePath(worktree.path)
-    await removeGitWorktree({ force, repoPath, targetPath: worktree.path })
-  } else if (worktree.source === 'aimux-temp' || worktree.createdByAimux) {
-    throw new Error(`refusing unsafe worktree delete: ${worktree.path}`)
+  } else if (isAimuxTemp && isInsideAimuxWorktreeRoot(workspace.path)) {
+    await assertSafeAimuxWorktreePath(workspace.path)
+    await removeGitWorktree({ force, repoPath, targetPath: workspace.path })
+  } else if (workspace.source === 'aimux-temp' || workspace.createdByAimux) {
+    throw new Error(`refusing unsafe workspace delete: ${workspace.path}`)
   }
 
   await cleanupAimuxBranch()
 
   // Only after git success: close tabs + retire the record. Re-read state so
   // we don't operate on the snapshot captured before the awaits above.
-  disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, worktreeId)
+  disposeWorkspaceTabs({ ...ctx, state: ctx.getState() }, workspaceId)
   const latest = ctx.getState()
   const latestProject = latest.projects.find((entry) => entry.id === projectId)
   if (latestProject) {
-    removeWorktreeRecordFromProject({ ...ctx, state: latest }, projectId, latestProject, worktreeId)
+    removeWorkspaceRecordFromProject(
+      { ...ctx, state: latest },
+      projectId,
+      latestProject,
+      workspaceId
+    )
   }
 }
 
-// A worktree's stored repoRoot can point at a sibling worktree that was since
-// deleted. Git commands only need *some* existing worktree of the repo (they
+// A workspace's stored repoRoot can point at a sibling workspace that was since
+// deleted. Git commands only need *some* existing workspace of the repo (they
 // share the common git dir), so fall back to the main checkout or any live
-// worktree path rather than letting `git -C` fail on a vanished directory.
-function resolveWorktreeGitDir(
+// workspace path rather than letting `git -C` fail on a vanished directory.
+function resolveWorkspaceGitDir(
   project: NonNullable<SideEffectContext['state']['projects'][number]>,
-  worktree: WorktreeRecord
+  workspace: WorkspaceRecord
 ): string {
   const candidates = [
-    project.worktrees?.find((entry) => entry.source === 'primary')?.path,
-    worktree.repoRoot,
-    ...(project.worktrees ?? [])
-      .filter((entry) => entry.id !== worktree.id)
+    project.workspaces?.find((entry) => entry.source === 'primary')?.path,
+    workspace.repoRoot,
+    ...(project.workspaces ?? [])
+      .filter((entry) => entry.id !== workspace.id)
       .map((entry) => entry.path),
   ]
-  return candidates.find((path) => path !== undefined && existsSync(path)) ?? worktree.repoRoot
+  return candidates.find((path) => path !== undefined && existsSync(path)) ?? workspace.repoRoot
 }
 
-async function runMoveWorktree(
+async function runMoveWorkspace(
   ctx: SideEffectContext,
   projectId: string,
-  sourceWorktreeId: string,
-  targetWorktreeId: string,
+  sourceWorkspaceId: string,
+  targetWorkspaceId: string,
   deleteSource: boolean,
   stashTarget: boolean,
   keepConflicts: boolean
 ): Promise<void> {
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
-  const source = project?.worktrees?.find((entry) => entry.id === sourceWorktreeId)
-  const target = project?.worktrees?.find((entry) => entry.id === targetWorktreeId)
+  const source = project?.workspaces?.find((entry) => entry.id === sourceWorkspaceId)
+  const target = project?.workspaces?.find((entry) => entry.id === targetWorkspaceId)
   if (!project) throw new Error('project not found')
-  if (!source || !target) throw new Error('worktree not found')
-  if (source.id === target.id) throw new Error('source and target are the same worktree')
+  if (!source || !target) throw new Error('workspace not found')
+  if (source.id === target.id) throw new Error('source and target are the same workspace')
   if (source.branch == null || source.branch === '') {
-    throw new Error('source worktree has no branch to move')
+    throw new Error('source workspace has no branch to move')
   }
   if (deleteSource && source.source === 'primary') {
-    throw new Error('the primary worktree cannot be deleted')
+    throw new Error('the primary workspace cannot be deleted')
   }
 
   const sourceLabel = source.branch ?? source.name
   const targetLabel = target.branch ?? target.name
-  const result = await moveWorktree({
+  const result = await moveWorkspace({
     keepConflicts,
     sourceBranch: source.branch,
     sourcePath: source.path,
@@ -1620,18 +1635,18 @@ async function runMoveWorktree(
   })
 
   // Recoverable failures open a confirm dialog carrying retry params; both
-  // worktrees are already back in their original state, so confirming simply
-  // re-dispatches move-worktree with the matching flag.
+  // workspaces are already back in their original state, so confirming simply
+  // re-dispatches move-workspace with the matching flag.
   if (result.kind === 'needs-stash' || result.kind === 'conflict') {
     ctx.dispatch({
       deleteSource,
       files: result.files,
       projectId,
       sourceLabel,
-      sourceWorktreeId,
+      sourceWorkspaceId,
       targetLabel,
-      targetWorktreeId,
-      type: 'open-worktree-move-confirm',
+      targetWorkspaceId,
+      type: 'open-workspace-move-confirm',
       variant: result.kind === 'needs-stash' ? 'stash-target' : 'keep-conflicts',
     })
     return
@@ -1641,7 +1656,7 @@ async function runMoveWorktree(
     // auto-commit driver is safe against this state: git refuses to commit
     // with unmerged index entries, so it fails loudly instead of committing
     // conflict markers.
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
+    handleSwitchWorkspace({ ...ctx, state: ctx.getState() }, projectId, targetWorkspaceId)
     toast.warning(
       `Left conflict markers in ${targetLabel} (${result.files.length} file(s)) — resolve & commit there; ${sourceLabel} kept`
     )
@@ -1655,16 +1670,16 @@ async function runMoveWorktree(
   // Land on the target. When deleting the source, close its terminals and
   // switch to the target up front, synchronously, BEFORE the slow
   // `git worktree remove`. Closing the source's active tab re-syncs the active
-  // worktree to a default tab (withActiveTabWorktree); doing the close+switch in
+  // workspace to a default tab (withActiveTabWorkspace); doing the close+switch in
   // one batch lands on the target with no intermediate render, so the removal
   // runs with the target already active instead of flashing/sticking to a
-  // default worktree. Re-read state each step so we never resurrect the source.
+  // default workspace. Re-read state each step so we never resurrect the source.
   if (deleteSource) {
-    disposeWorktreeTabs({ ...ctx, state: ctx.getState() }, sourceWorktreeId)
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
-    await runDeleteWorktree({ ...ctx, state: ctx.getState() }, projectId, sourceWorktreeId, true)
+    disposeWorkspaceTabs({ ...ctx, state: ctx.getState() }, sourceWorkspaceId)
+    handleSwitchWorkspace({ ...ctx, state: ctx.getState() }, projectId, targetWorkspaceId)
+    await runDeleteWorkspace({ ...ctx, state: ctx.getState() }, projectId, sourceWorkspaceId, true)
   } else {
-    handleSwitchWorktree({ ...ctx, state: ctx.getState() }, projectId, targetWorktreeId)
+    handleSwitchWorkspace({ ...ctx, state: ctx.getState() }, projectId, targetWorkspaceId)
   }
   const stashNote = result.stashedTarget
     ? ` · target's previous changes stashed (recover with git stash pop)`
@@ -1674,36 +1689,36 @@ async function runMoveWorktree(
   )
 }
 
-function removeWorktreeRecordFromProject(
+function removeWorkspaceRecordFromProject(
   ctx: SideEffectContext,
   projectId: string,
   project: NonNullable<SideEffectContext['state']['projects'][number]>,
-  worktreeId: string
+  workspaceId: string
 ): void {
-  const remaining = (project.worktrees ?? []).filter((entry) => entry.id !== worktreeId)
+  const remaining = (project.workspaces ?? []).filter((entry) => entry.id !== workspaceId)
   const nextActive =
-    project.activeWorktreeId === worktreeId ? remaining[0] : getActiveWorktree(project)
+    project.activeWorkspaceId === workspaceId ? remaining[0] : getActiveWorkspace(project)
   const projects = replaceProject(ctx.state, projectId, (entry) => ({
     ...entry,
-    activeWorktreeId: nextActive?.id,
-    projectSnapshot: pruneSnapshotOfWorktree(entry.projectSnapshot, worktreeId),
+    activeWorkspaceId: nextActive?.id,
+    projectSnapshot: pruneSnapshotOfWorkspace(entry.projectSnapshot, workspaceId),
     updatedAt: new Date().toISOString(),
-    worktrees: remaining,
+    workspaces: remaining,
   }))
   saveProjectCatalog(projects)
   ctx.dispatch({ projects, type: 'set-projects' })
 }
 
-function isForceableWorktreeDeleteError(message: string): boolean {
+function isForceableWorkspaceDeleteError(message: string): boolean {
   return /active assistant tabs|dirty|uncommitted|modified|untracked|not clean|contains.*changes/i.test(
     message
   )
 }
 
-class ActiveWorktreeTabsError extends Error {
+class ActiveWorkspaceTabsError extends Error {
   constructor(tabCount: number) {
     super(
-      `active assistant tabs are using this worktree (${tabCount}) — they will be closed if you confirm.`
+      `active assistant tabs are using this workspace (${tabCount}) — they will be closed if you confirm.`
     )
   }
 }

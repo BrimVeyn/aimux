@@ -162,9 +162,9 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
         gitPanel: { ...prev, error: action.kind, files: [] },
       }
     }
-    case 'set-worktree-divergence': {
-      if (sameDivergence(state.worktreeDivergence, action.divergence)) return state
-      return { ...state, worktreeDivergence: action.divergence }
+    case 'set-workspace-divergence': {
+      if (sameDivergence(state.workspaceDivergence, action.divergence)) return state
+      return { ...state, workspaceDivergence: action.divergence }
     }
     case 'git-panel-reset': {
       const prev = state.gitPanel
@@ -179,9 +179,9 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       }
       return {
         ...state,
-        // A reset means the underlying worktree/ref changed, so cached diffs are
+        // A reset means the underlying workspace/ref changed, so cached diffs are
         // stale — drop them (keyed by section:path, they'd otherwise serve a
-        // previous worktree's diff for a same-named file after a move/switch).
+        // previous workspace's diff for a same-named file after a move/switch).
         gitMode: {
           ...state.gitMode,
           diffs: {},

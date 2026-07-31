@@ -38,7 +38,7 @@ import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
 import { findMostRecentProject, loadProjectCatalog } from './state/project-catalog'
-import { getActiveWorktreePath } from './state/project-worktrees'
+import { getActiveWorkspacePath } from './state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
@@ -129,10 +129,10 @@ export function App({
         bars: json.bars,
         gitPane: gitPaneOverrides,
         projectBarVisible,
-        worktreeTemplates:
-          resolvedConfig.worktreeTemplates.length > 0
-            ? resolvedConfig.worktreeTemplates
-            : json.worktreeTemplates,
+        workspaceTemplates:
+          resolvedConfig.workspaceTemplates.length > 0
+            ? resolvedConfig.workspaceTemplates
+            : json.workspaceTemplates,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
@@ -228,16 +228,16 @@ export function App({
   }, [])
 
   useEffect(() => {
-    // One-shot cleanup: prune `aimux/` branches orphaned by temp worktrees that
+    // One-shot cleanup: prune `aimux/` branches orphaned by temp workspaces that
     // were deleted before delete-time branch cleanup existed. Gated by a config
     // flag so it runs once per machine. All git calls are best-effort (nothrow)
-    // and git protects branches still checked out in a live worktree.
+    // and git protects branches still checked out in a live workspace.
     if (loadConfig().prunedOrphanAimuxBranches === true) return
     void (async () => {
       const repoRoots = new Set<string>()
       for (const project of loadProjectCatalog()) {
-        for (const worktree of project.worktrees ?? []) {
-          if (worktree.repoRoot !== '') repoRoots.add(worktree.repoRoot)
+        for (const workspace of project.workspaces ?? []) {
+          if (workspace.repoRoot !== '') repoRoots.add(workspace.repoRoot)
         }
       }
       let removed = 0
@@ -418,7 +418,7 @@ export function App({
     dispatch,
     getCurrentProjectProjectPath: () => {
       if (!(state.currentProjectId != null && state.currentProjectId !== '')) return
-      return getActiveWorktreePath(state.projects.find((s) => s.id === state.currentProjectId))
+      return getActiveWorkspacePath(state.projects.find((s) => s.id === state.currentProjectId))
     },
     // Read straight from the store, not stateRef. stateRef is only refreshed
     // on render, so within a single JS turn (a click handler that dispatches
@@ -488,12 +488,12 @@ export function App({
       dispatch({ tabId: target.tabId, type: 'set-active-tab' })
       return
     }
-    if (target.kind === 'project' || target.kind === 'worktree') {
+    if (target.kind === 'project' || target.kind === 'workspace') {
       executeSideEffect(
         {
           index: target.projectIndex,
           type: 'switch-project-by-index',
-          worktreeId: target.worktreeId,
+          workspaceId: target.workspaceId,
         },
         sideEffectCtx
       )

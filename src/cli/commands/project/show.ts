@@ -10,14 +10,14 @@ export const projectShow: CliCommand = {
   run: async (ctx) => {
     const project = ctx.getProject()
     writeJson({
-      activeWorktreeId: project.activeWorktreeId,
+      activeWorkspaceId: project.activeWorkspaceId,
       createdAt: project.createdAt,
       id: project.id,
       lastOpenedAt: project.lastOpenedAt,
       name: project.name,
       projectPath: project.projectPath,
-      worktrees:
-        project.worktrees?.map((w) => ({
+      workspaces:
+        project.workspaces?.map((w) => ({
           branch: w.branch,
           id: w.id,
           name: w.name,

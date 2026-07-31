@@ -1,6 +1,6 @@
 import type { AppState, FlashJumpTarget, FlashLabel } from '../../state/types'
 
-import { filterTabsForActiveWorktree } from '../../state/project-worktrees'
+import { filterTabsForActiveWorkspace } from '../../state/project-workspaces'
 import { orderProjectsForDisplay } from '../project-ordering'
 import { assignFlashLabels, type FlashTarget } from './assign-labels'
 
@@ -12,8 +12,8 @@ interface PendingTarget {
 
 /**
  * Collect every visible flash-jump target in the same order the UI renders:
- * project rows first (each followed by its non-primary worktrees), then the
- * tabs of the active worktree. Stable ordering keeps the assigned labels
+ * project rows first (each followed by its non-primary workspaces), then the
+ * tabs of the active workspace. Stable ordering keeps the assigned labels
  * predictable across re-opens when nothing changed.
  */
 function collectTargets(state: AppState): PendingTarget[] {
@@ -21,8 +21,8 @@ function collectTargets(state: AppState): PendingTarget[] {
   const ordered = orderProjectsForDisplay(state.projects)
   for (const [index, project] of ordered.entries()) {
     const projectIndex = index + 1
-    const worktrees = project.worktrees ?? []
-    const primary = worktrees.find((w) => w.source === 'primary') ?? worktrees[0]
+    const workspaces = project.workspaces ?? []
+    const primary = workspaces.find((w) => w.source === 'primary') ?? workspaces[0]
     out.push({
       key: `ws:${project.id}`,
       name: project.name,
@@ -30,19 +30,19 @@ function collectTargets(state: AppState): PendingTarget[] {
         kind: 'project',
         projectId: project.id,
         projectIndex,
-        worktreeId: primary?.id,
+        workspaceId: primary?.id,
       },
     })
-    for (const worktree of worktrees) {
-      if (worktree.id === primary?.id) continue
+    for (const workspace of workspaces) {
+      if (workspace.id === primary?.id) continue
       out.push({
-        key: `wt:${worktree.id}`,
-        name: worktree.name,
+        key: `wt:${workspace.id}`,
+        name: workspace.name,
         target: {
-          kind: 'worktree',
+          kind: 'workspace',
           projectId: project.id,
           projectIndex,
-          worktreeId: worktree.id,
+          workspaceId: workspace.id,
         },
       })
     }
@@ -50,7 +50,7 @@ function collectTargets(state: AppState): PendingTarget[] {
 
   const currentProject = state.projects.find((s) => s.id === state.currentProjectId)
   if (currentProject) {
-    const tabs = filterTabsForActiveWorktree(state.tabs, currentProject)
+    const tabs = filterTabsForActiveWorkspace(state.tabs, currentProject)
     for (const tab of tabs) {
       out.push({
         key: `tab:${tab.id}`,

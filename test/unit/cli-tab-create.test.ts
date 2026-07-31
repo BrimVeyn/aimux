@@ -34,7 +34,7 @@ describe('resolveTabCwd', () => {
     expect(resolveTabCwd('rel/dir', undefined)).toBe(resolvePath('rel/dir'))
   })
 
-  test('falls back to the worktree path when --cwd absent', () => {
+  test('falls back to the workspace path when --cwd absent', () => {
     expect(resolveTabCwd(undefined, { path: '/wt/path' })).toBe('/wt/path')
   })
 
@@ -117,28 +117,31 @@ async function runError(ctx: CliContext): Promise<string> {
   return ''
 }
 
-describe('tabCreate --new-worktree validation', () => {
-  test('rejects --new-worktree with --worktree', async () => {
+describe('tabCreate --new-workspace validation', () => {
+  test('rejects --new-workspace with --workspace', async () => {
     const ctx = ctxFor(
-      { 'assistant': 'claude', 'new-worktree': true, 'worktree': 'wt-1' },
+      { 'assistant': 'claude', 'new-workspace': true, 'workspace': 'wt-1' },
       unusedDaemon
     )
-    expect(await runError(ctx)).toContain('use --worktree <id> to co-locate')
+    expect(await runError(ctx)).toContain('use --workspace <id> to co-locate')
   })
 
-  test('rejects --new-worktree with --cwd', async () => {
-    const ctx = ctxFor({ 'assistant': 'claude', 'cwd': '/tmp', 'new-worktree': true }, unusedDaemon)
+  test('rejects --new-workspace with --cwd', async () => {
+    const ctx = ctxFor(
+      { 'assistant': 'claude', 'cwd': '/tmp', 'new-workspace': true },
+      unusedDaemon
+    )
     expect(await runError(ctx)).toContain('drop --cwd')
   })
 
-  test('rejects --base without --new-worktree', async () => {
+  test('rejects --base without --new-workspace', async () => {
     const ctx = ctxFor({ assistant: 'claude', base: 'main' }, unusedDaemon)
-    expect(await runError(ctx)).toContain('require --new-worktree')
+    expect(await runError(ctx)).toContain('require --new-workspace')
   })
 })
 
 describe('tabCreate.run createTab payload', () => {
-  test('cwd defaults to the active worktree path; worktreeId + args flow through', async () => {
+  test('cwd defaults to the active workspace path; workspaceId + args flow through', async () => {
     // Pin an empty profile so loadConfig() finds no customCommands and the test
     // is independent of the machine's real ~/.config/aimux config.
     const prevProfile = process.env.AIMUX_PROFILE
@@ -154,21 +157,21 @@ describe('tabCreate.run createTab payload', () => {
     } as unknown as DaemonClient
 
     const ctx = ctxFor({ assistant: 'claude' }, daemon, {
-      activeWorktreeId: 'wt-1',
-      worktrees: [
+      activeWorkspaceId: 'wt-1',
+      workspaces: [
         { id: 'wt-1', name: 'x', path: '/repo/wt', source: 'aimux-temp' },
-      ] as unknown as ProjectRecord['worktrees'],
+      ] as unknown as ProjectRecord['workspaces'],
     })
 
     try {
       const { json } = await captureJson(async () => await tabCreate.run(ctx))
       expect(captured.cwd).toBe('/repo/wt')
-      expect(captured.worktreeId).toBe('wt-1')
+      expect(captured.workspaceId).toBe('wt-1')
       expect(captured.command).toBe('claude')
       expect(captured.args).toEqual([])
-      // Output echoes the resolved worktree placement.
-      expect((json as { cwd: string; worktreeId: string }).cwd).toBe('/repo/wt')
-      expect((json as { worktreeId: string }).worktreeId).toBe('wt-1')
+      // Output echoes the resolved workspace placement.
+      expect((json as { cwd: string; workspaceId: string }).cwd).toBe('/repo/wt')
+      expect((json as { workspaceId: string }).workspaceId).toBe('wt-1')
     } finally {
       if (prevProfile === undefined) delete process.env.AIMUX_PROFILE
       else process.env.AIMUX_PROFILE = prevProfile

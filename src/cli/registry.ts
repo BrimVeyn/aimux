@@ -23,9 +23,9 @@ import { workerPrompt } from './commands/worker/prompt'
 import { workerRun } from './commands/worker/run'
 import { workerStop } from './commands/worker/stop'
 import { workerSubmit } from './commands/worker/submit'
-import { worktreeCreate } from './commands/worktree/create'
-import { worktreeList } from './commands/worktree/list'
-import { worktreeRemove } from './commands/worktree/remove'
+import { workspaceCreate } from './commands/workspace/create'
+import { workspaceList } from './commands/workspace/list'
+import { workspaceRemove } from './commands/workspace/remove'
 
 export interface CliCommand {
   group: string
@@ -52,9 +52,9 @@ export const COMMANDS: readonly CliCommand[] = [
   projectCreate,
   projectSwitch,
   projectClose,
-  worktreeList,
-  worktreeCreate,
-  worktreeRemove,
+  workspaceList,
+  workspaceCreate,
+  workspaceRemove,
   workerRun,
   workerPrompt,
   workerSubmit,

@@ -7,7 +7,7 @@ import type {
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 
 export interface ProjectBackendEvents {
@@ -39,11 +39,11 @@ export interface ProjectBackendEvents {
   projectCloseRequested: [targetProjectId: string]
   projectSwitched: [projectId: string]
   /**
-   * v12 worktree-lifecycle events. Fired when a CLI issued
-   * `addWorktreeRecord` / `removeWorktreeRecord` and the daemon relays.
+   * v12 workspace-lifecycle events. Fired when a CLI issued
+   * `addWorkspaceRecord` / `removeWorkspaceRecord` and the daemon relays.
    */
-  worktreeAdded: [projectId: string, worktree: WorktreeRecord]
-  worktreeRemoved: [projectId: string, worktreeId: string]
+  workspaceAdded: [projectId: string, workspace: WorkspaceRecord]
+  workspaceRemoved: [projectId: string, workspaceId: string]
 }
 
 export interface ResizeOptions {
@@ -87,10 +87,10 @@ export interface SessionBackend extends EventEmitter<ProjectBackendEvents> {
     cols: number
     rows: number
     cwd?: string
-    /** Worktree the tab belongs to. Passed through to the daemon so its
+    /** Workspace the tab belongs to. Passed through to the daemon so its
      *  registry surfaces the right grouping in `listTabs` for headless
      *  consumers (CLI control plane). */
-    worktreeId?: string
+    workspaceId?: string
     autoRenameCandidate?: boolean
   }): void
   write(tabId: string, input: string): void

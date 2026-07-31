@@ -29,7 +29,7 @@ interface GitPanelProps {
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
   headOffset?: number
-  // When set, the single changed-files section is a worktree fork-point review
+  // When set, the single changed-files section is a workspace fork-point review
   // ("vs <base>") rather than a HEAD~N history walk.
   baseLabel?: string
   compact?: boolean

@@ -9,13 +9,13 @@ export type ModeId =
   | 'git-mode'
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
-  | 'modal.worktree-delete-confirm'
+  | 'modal.workspace-delete-confirm'
   | 'modal.project-picker.filtering'
   | 'modal.project-name'
   | 'modal.create-project'
-  | 'modal.create-worktree'
+  | 'modal.create-workspace'
   | 'modal.rename-tab'
-  | 'modal.rename-worktree'
+  | 'modal.rename-workspace'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -25,8 +25,8 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
-  | 'modal.worktree-move'
-  | 'modal.worktree-move-confirm'
+  | 'modal.workspace-move'
+  | 'modal.workspace-move-confirm'
   | 'modal.ai-usage'
   | 'modal.flash-jump'
 
@@ -38,8 +38,8 @@ export type SideEffect =
   | { type: 'delete-selected-project' }
   | { type: 'open-rename-selected-project' }
   | { type: 'create-project'; name: string; projectPath?: string }
-  | { type: 'create-worktree' }
-  | { type: 'load-create-worktree-base-branches' }
+  | { type: 'create-workspace' }
+  | { type: 'load-create-workspace-base-branches' }
   | { type: 'close-tab'; tabId: string }
   | { type: 'restart-tab'; tab: TabSession }
   | { type: 'paste-selected-snippet' }
@@ -75,33 +75,33 @@ export type SideEffect =
   | { type: 'generate-auto-commit-now'; projectId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
-  | { type: 'switch-project-by-index'; index: number; worktreeId?: string }
+  | { type: 'switch-project-by-index'; index: number; workspaceId?: string }
   | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
   | { type: 'switch-tab-by-index'; index: number }
   | { type: 'delete-project'; projectId: string }
   | {
-      type: 'delete-worktree'
+      type: 'delete-workspace'
       projectId: string
-      worktreeId: string
+      workspaceId: string
       // Force the git worktree removal (discards uncommitted changes in the
-      // worktree). Also implies closing the worktree's tabs.
+      // workspace). Also implies closing the workspace's tabs.
       force?: boolean
-      // Close the worktree's tabs without forcing the git removal. Lets the
-      // sidebar "Remove worktree" clean up tabs (avoiding orphans) while still
-      // refusing to discard uncommitted work in a temp worktree.
+      // Close the workspace's tabs without forcing the git removal. Lets the
+      // sidebar "Remove workspace" clean up tabs (avoiding orphans) while still
+      // refusing to discard uncommitted work in a temp workspace.
       closeTabs?: boolean
     }
   | {
-      type: 'move-worktree'
+      type: 'move-workspace'
       projectId: string
-      sourceWorktreeId: string
-      targetWorktreeId: string
+      sourceWorkspaceId: string
+      targetWorkspaceId: string
       deleteSource?: boolean
-      // Retry flags set by the worktree-move-confirm dialog.
+      // Retry flags set by the workspace-move-confirm dialog.
       stashTarget?: boolean
       keepConflicts?: boolean
     }
-  | { type: 'load-worktree-move-stats' }
+  | { type: 'load-workspace-move-stats' }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }

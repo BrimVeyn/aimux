@@ -7,7 +7,7 @@ import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
-import { getActiveWorktree } from '../project-worktrees'
+import { getActiveWorkspace } from '../project-workspaces'
 import {
   type BaseRefOption,
   buildBaseRefOptions,
@@ -33,32 +33,34 @@ function clampCursor(value: number, max: number): number {
   return Math.max(0, Math.min(max, value))
 }
 
-function getCurrentWorktreeCount(state: AppState): number {
+function getCurrentWorkspaceCount(state: AppState): number {
   if (!(state.currentProjectId != null && state.currentProjectId !== '')) return 0
-  return state.projects.find((entry) => entry.id === state.currentProjectId)?.worktrees?.length ?? 0
+  return (
+    state.projects.find((entry) => entry.id === state.currentProjectId)?.workspaces?.length ?? 0
+  )
 }
 
-function getCreateWorktreeBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
-  if (state.modal.type !== 'create-worktree') return []
-  const worktrees =
-    state.projects.find((entry) => entry.id === state.currentProjectId)?.worktrees ?? []
+function getCreateWorkspaceBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
+  if (state.modal.type !== 'create-workspace') return []
+  const workspaces =
+    state.projects.find((entry) => entry.id === state.currentProjectId)?.workspaces ?? []
   return buildBaseRefOptions(
-    worktrees,
+    workspaces,
     state.modal.baseBranches,
     queryOverride ?? state.modal.baseQuery
   )
 }
 
-const CREATE_WORKTREE_FIELDS = ['name', 'branch', 'base'] as const
+const CREATE_WORKSPACE_FIELDS = ['name', 'branch', 'base'] as const
 
-type CreateWorktreeField = (typeof CREATE_WORKTREE_FIELDS)[number]
+type CreateWorkspaceField = (typeof CREATE_WORKSPACE_FIELDS)[number]
 
-/** The buffer a create-worktree field edits, so cursor math has one source. */
-function getCreateWorktreeFieldValue(
-  modal: { worktreeName: string; branchName: string; baseQuery: string },
-  field: CreateWorktreeField
+/** The buffer a create-workspace field edits, so cursor math has one source. */
+function getCreateWorkspaceFieldValue(
+  modal: { workspaceName: string; branchName: string; baseQuery: string },
+  field: CreateWorkspaceField
 ): string {
-  if (field === 'name') return modal.worktreeName
+  if (field === 'name') return modal.workspaceName
   if (field === 'branch') return modal.branchName
   return modal.baseQuery
 }
@@ -106,7 +108,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'open-worktree-move-modal': {
+    case 'open-workspace-move-modal': {
       // Overlay: keep focusMode (git when opened via `m`, navigation when opened
       // from a tab menu) so the view underneath stays mounted, like the help
       // modal. deriveModeId routes input to the picker while open.
@@ -117,27 +119,27 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: null,
           projectTargetId: null,
           selectedIndex: 0,
-          sourceWorktreeId: action.sourceWorktreeId,
+          sourceWorkspaceId: action.sourceWorkspaceId,
           stats: { kind: 'loading' },
-          type: 'worktree-move',
+          type: 'workspace-move',
         },
       }
     }
-    case 'toggle-worktree-move-delete': {
-      if (state.modal.type !== 'worktree-move') return state
+    case 'toggle-workspace-move-delete': {
+      if (state.modal.type !== 'workspace-move') return state
       return {
         ...state,
         modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
       }
     }
-    case 'set-worktree-move-stats': {
-      if (state.modal.type !== 'worktree-move') return state
+    case 'set-workspace-move-stats': {
+      if (state.modal.type !== 'workspace-move') return state
       return {
         ...state,
         modal: { ...state.modal, stats: { dirtyFiles: action.dirtyFiles, kind: 'ready' } },
       }
     }
-    case 'open-worktree-move-confirm': {
+    case 'open-workspace-move-confirm': {
       return {
         ...state,
         focusMode: 'modal',
@@ -149,15 +151,15 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           projectTargetId: null,
           selectedIndex: 0,
           sourceLabel: action.sourceLabel,
-          sourceWorktreeId: action.sourceWorktreeId,
+          sourceWorkspaceId: action.sourceWorkspaceId,
           targetLabel: action.targetLabel,
-          targetWorktreeId: action.targetWorktreeId,
-          type: 'worktree-move-confirm',
+          targetWorkspaceId: action.targetWorkspaceId,
+          type: 'workspace-move-confirm',
           variant: action.variant,
         },
       }
     }
-    case 'open-worktree-delete-confirm': {
+    case 'open-workspace-delete-confirm': {
       return {
         ...state,
         focusMode: 'modal',
@@ -169,9 +171,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           projectTargetId: null,
           reason: action.reason,
           selectedIndex: 0,
-          type: 'worktree-delete-confirm',
-          worktreeId: action.worktreeId,
-          worktreeLabel: action.worktreeLabel,
+          type: 'workspace-delete-confirm',
+          workspaceId: action.workspaceId,
+          workspaceLabel: action.workspaceLabel,
         },
       }
     }
@@ -287,7 +289,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'open-create-worktree-modal':
+    case 'open-create-workspace-modal':
       return {
         ...state,
         focusMode: 'command-edit',
@@ -295,10 +297,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           activeField: 'name',
           baseBranches: [],
           baseQuery: '',
-          // Default to the active worktree's branch, preserving the previous
+          // Default to the active workspace's branch, preserving the previous
           // always-fork-from-source behaviour until the user picks another base.
           baseRef:
-            getActiveWorktree(state.projects.find((entry) => entry.id === state.currentProjectId))
+            getActiveWorkspace(state.projects.find((entry) => entry.id === state.currentProjectId))
               ?.branch ?? '',
           branchError: null,
           branchName: '',
@@ -307,25 +309,25 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           projectTargetId: null,
           selectedIndex: 0,
           step: 'form',
-          type: 'create-worktree',
-          worktreeName: '',
+          type: 'create-workspace',
+          workspaceName: '',
         },
       }
-    case 'switch-create-worktree-field': {
-      if (state.modal.type !== 'create-worktree') return state
+    case 'switch-create-workspace-field': {
+      if (state.modal.type !== 'create-workspace') return state
       const next =
-        CREATE_WORKTREE_FIELDS[
-          (CREATE_WORKTREE_FIELDS.indexOf(state.modal.activeField) + 1) %
-            CREATE_WORKTREE_FIELDS.length
+        CREATE_WORKSPACE_FIELDS[
+          (CREATE_WORKSPACE_FIELDS.indexOf(state.modal.activeField) + 1) %
+            CREATE_WORKSPACE_FIELDS.length
         ] ?? 'name'
-      const buffer = getCreateWorktreeFieldValue(state.modal, next)
+      const buffer = getCreateWorkspaceFieldValue(state.modal, next)
       // Entering the base field highlights the row matching the resolved ref,
       // so the picker opens on what the form already says it will fork from.
       const baseIndex =
         next === 'base'
           ? Math.max(
               0,
-              getCreateWorktreeBaseOptions(state).findIndex(
+              getCreateWorkspaceBaseOptions(state).findIndex(
                 (option) => option.ref === (state.modal as { baseRef: string }).baseRef
               )
             )
@@ -340,20 +342,20 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'set-create-worktree-base-branches': {
-      if (state.modal.type !== 'create-worktree') return state
+    case 'set-create-workspace-base-branches': {
+      if (state.modal.type !== 'create-workspace') return state
       const modalWithBranches = { ...state.modal, baseBranches: action.branches }
       const withBranches: AppState = { ...state, modal: modalWithBranches }
       // Backfill a default base if none resolved yet (e.g. detached source).
       if (state.modal.baseRef !== '') return withBranches
-      const firstOption = getCreateWorktreeBaseOptions(withBranches)[0]
+      const firstOption = getCreateWorkspaceBaseOptions(withBranches)[0]
       return {
         ...withBranches,
         modal: { ...modalWithBranches, baseRef: firstOption?.ref ?? '' },
       }
     }
-    case 'set-create-worktree-branch-error': {
-      if (state.modal.type !== 'create-worktree') return state
+    case 'set-create-workspace-branch-error': {
+      if (state.modal.type !== 'create-workspace') return state
       return {
         ...state,
         modal: {
@@ -364,14 +366,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'set-create-worktree-step': {
-      if (state.modal.type !== 'create-worktree') return state
+    case 'set-create-workspace-step': {
+      if (state.modal.type !== 'create-workspace') return state
       if (state.modal.step === action.step) return state
       return {
         ...state,
         modal: {
           ...state.modal,
-          cursorPos: action.step === 'form' ? state.modal.worktreeName.length : 0,
+          cursorPos: action.step === 'form' ? state.modal.workspaceName.length : 0,
           // Returning to the form always lands on the name field, so the
           // cursor above matches whatever the user sees.
           ...(action.step === 'form' ? { activeField: 'name' as const } : null),
@@ -595,7 +597,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       // so leave it alone — closing returns to whatever was underneath.
       if (
         closingType === 'help' ||
-        closingType === 'worktree-move' ||
+        closingType === 'workspace-move' ||
         closingType === 'flash-jump'
       ) {
         return { ...state, modal: emptyModal() }
@@ -618,19 +620,19 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-project' &&
-        state.modal.type !== 'create-worktree' &&
+        state.modal.type !== 'create-workspace' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
-        state.modal.type !== 'worktree-move'
+        state.modal.type !== 'workspace-move'
       ) {
         return state
       }
       if (state.modal.type === 'create-project' && state.modal.activeField !== 'directory') {
         return state
       }
-      if (state.modal.type === 'create-worktree') {
+      if (state.modal.type === 'create-workspace') {
         if (state.modal.step === 'template') {
-          const count = state.worktreeTemplates.length
+          const count = state.workspaceTemplates.length
           if (count === 0) return state
           return {
             ...state,
@@ -641,7 +643,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           }
         }
         if (state.modal.activeField !== 'base') return state
-        const options = getCreateWorktreeBaseOptions(state)
+        const options = getCreateWorkspaceBaseOptions(state)
         if (options.length === 0) return state
         const next = (state.modal.selectedIndex + action.delta + options.length) % options.length
         return {
@@ -670,8 +672,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         optionCount = filterThemeIds(state.modal.editBuffer).length
       } else if (state.modal.type === 'update-available') {
         optionCount = 2
-      } else if (state.modal.type === 'worktree-move') {
-        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
+      } else if (state.modal.type === 'workspace-move') {
+        optionCount = Math.max(0, getCurrentWorkspaceCount(state) - 1)
       } else {
         const filtered = filterProjects(state.projects, state.modal.editBuffer)
         optionCount = Math.max(1, filtered.length + 1)
@@ -694,24 +696,24 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
         state.modal.type !== 'create-project' &&
-        state.modal.type !== 'create-worktree' &&
+        state.modal.type !== 'create-workspace' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
-        state.modal.type !== 'worktree-move' &&
+        state.modal.type !== 'workspace-move' &&
         state.modal.type !== 'help'
       ) {
         return state
       }
-      if (state.modal.type === 'create-worktree') {
+      if (state.modal.type === 'create-workspace') {
         if (state.modal.step === 'template') {
-          const count = state.worktreeTemplates.length
+          const count = state.workspaceTemplates.length
           if (count === 0) return state
           const clamped = Math.max(0, Math.min(count - 1, action.index))
           if (clamped === state.modal.selectedIndex) return state
           return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
         }
         if (state.modal.activeField !== 'base') return state
-        const options = getCreateWorktreeBaseOptions(state)
+        const options = getCreateWorkspaceBaseOptions(state)
         if (options.length === 0) return state
         const clamped = Math.max(0, Math.min(options.length - 1, action.index))
         if (clamped === state.modal.selectedIndex) return state
@@ -742,8 +744,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         optionCount = filterThemeIds(state.modal.editBuffer).length
       } else if (state.modal.type === 'update-available') {
         optionCount = 2
-      } else if (state.modal.type === 'worktree-move') {
-        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
+      } else if (state.modal.type === 'workspace-move') {
+        optionCount = Math.max(0, getCurrentWorkspaceCount(state) - 1)
       } else {
         optionCount = Math.max(1, filterProjects(state.projects, state.modal.editBuffer).length + 1)
       }
@@ -801,11 +803,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         }
         return { ...state, modal: { ...state.modal, buffer: nextBuffer, pendingJump: null } }
       }
-      if (state.modal.type === 'create-worktree') {
+      if (state.modal.type === 'create-workspace') {
         // The template step is a pure picker — swallow typed characters.
         if (state.modal.step === 'template') return state
         const field = state.modal.activeField
-        const current = getCreateWorktreeFieldValue(state.modal, field)
+        const current = getCreateWorkspaceFieldValue(state.modal, field)
         const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)
         let text: string
         let pos: number
@@ -818,7 +820,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           pos = at + action.char.length
         }
         if (field === 'name') {
-          return { ...state, modal: { ...state.modal, cursorPos: pos, worktreeName: text } }
+          return { ...state, modal: { ...state.modal, cursorPos: pos, workspaceName: text } }
         }
         if (field === 'branch') {
           return {
@@ -827,7 +829,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           }
         }
         // Re-filter and snap the base to the top match as the query changes.
-        const topOption = getCreateWorktreeBaseOptions(state, text)[0]
+        const topOption = getCreateWorkspaceBaseOptions(state, text)[0]
         return {
           ...state,
           modal: {
@@ -1016,17 +1018,17 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'open-rename-worktree-modal': {
+    case 'open-rename-workspace-modal': {
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           cursorPos: action.initialName.length,
           editBuffer: action.initialName,
-          projectTargetId: action.worktreeId,
+          projectTargetId: action.workspaceId,
           selectedIndex: 0,
-          type: 'rename-worktree',
-          worktreeProjectId: action.projectId,
+          type: 'rename-workspace',
+          workspaceProjectId: action.projectId,
         },
       }
     }

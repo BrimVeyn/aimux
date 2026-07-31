@@ -1,4 +1,4 @@
-import type { WorktreeTemplate } from '../config'
+import type { WorkspaceTemplate } from '../config'
 
 import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
 import { reduceAutoCommit } from './reducers/auto-commit-state'
@@ -30,7 +30,7 @@ export interface InitialStateOverrides {
   gitPane?: Partial<GitPaneState>
   bars?: BarsState
   projectBarVisible?: boolean
-  worktreeTemplates?: WorktreeTemplate[]
+  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -86,7 +86,7 @@ export function createInitialState(
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: { ...DEFAULT_GIT_PANE, ...overrides.gitPane },
     gitPanel: emptyGitPanel(),
-    lastActiveTabByWorktree: {},
+    lastActiveTabByWorkspace: {},
     layout: {
       terminalCols: DEFAULT_TERMINAL_COLS,
       terminalRows: DEFAULT_TERMINAL_ROWS,
@@ -111,8 +111,8 @@ export function createInitialState(
     snippets,
     tabGroupMap: {},
     tabs: [],
-    worktreeDivergence: {},
-    worktreeTemplates: overrides.worktreeTemplates ?? [],
+    workspaceDivergence: {},
+    workspaceTemplates: overrides.workspaceTemplates ?? [],
   }
 }
 

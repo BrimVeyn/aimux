@@ -3,7 +3,7 @@ import type { MouseEvent } from '@opentui/core'
 import { useCallback, useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
-import type { WorktreeTemplate } from '../config'
+import type { WorkspaceTemplate } from '../config'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type {
   BarSide,
@@ -11,11 +11,11 @@ import type {
   ModalState,
   ProjectRecord,
   SnippetRecord,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 import type { ThemeId } from './themes'
 
-import { useWorktreeBranchPolling } from '../git/worktree-branch-poller'
+import { useWorkspaceBranchPolling } from '../git/workspace-branch-poller'
 import { useAppStore } from '../state/app-store'
 import { getBarWidth } from '../state/bars'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
@@ -32,20 +32,20 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
 import { ProjectNameModal } from './components/modals/projects/project-name-modal'
 import { ProjectPickerModal } from './components/modals/projects/project-picker-modal'
-import { WorktreeDeleteConfirm } from './components/modals/shared/worktree-delete-confirm'
+import { WorkspaceDeleteConfirm } from './components/modals/shared/workspace-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
 import { NewTabModal } from './components/modals/tabs/new-tab-modal'
 import { ThemePickerModal } from './components/modals/themes/theme-picker-modal'
-import { CreateWorktreeModal } from './components/modals/worktree/create-worktree-modal'
-import { WorktreeMoveConfirmModal } from './components/modals/worktree/worktree-move-confirm-modal'
-import { WorktreeMoveModal } from './components/modals/worktree/worktree-move-modal'
+import { CreateWorkspaceModal } from './components/modals/workspace/create-workspace-modal'
+import { WorkspaceMoveConfirmModal } from './components/modals/workspace/workspace-move-confirm-modal'
+import { WorkspaceMoveModal } from './components/modals/workspace/workspace-move-modal'
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { useTheme } from './theme'
 
-const EMPTY_WORKTREES: WorktreeRecord[] = []
+const EMPTY_WORKSPACES: WorkspaceRecord[] = []
 
 function getCreateProjectFields(modal: ModalState) {
   if (modal.type !== 'create-project') {
@@ -92,8 +92,8 @@ function renderModal(
     focusMode: FocusMode
     activeAssistant?: string
     autoCommitModel?: string
-    worktreeDivergence: Record<string, { ahead: number; behind: number }>
-    worktreeTemplates: WorktreeTemplate[]
+    workspaceDivergence: Record<string, { ahead: number; behind: number }>
+    workspaceTemplates: WorkspaceTemplate[]
   }
 ) {
   switch (modal.type) {
@@ -109,12 +109,12 @@ function renderModal(
           editBuffer={modal.editBuffer ?? ''}
         />
       )
-    case 'create-worktree':
+    case 'create-workspace':
       return (
-        <CreateWorktreeModal
+        <CreateWorkspaceModal
           activeField={modal.activeField}
           step={modal.step}
-          worktreeName={modal.worktreeName}
+          workspaceName={modal.workspaceName}
           branchName={modal.branchName}
           branchError={modal.branchError}
           baseQuery={modal.baseQuery}
@@ -122,13 +122,13 @@ function renderModal(
           baseBranches={modal.baseBranches}
           cursorPos={modal.cursorPos}
           selectedIndex={modal.selectedIndex}
-          worktrees={
+          workspaces={
             options.currentProjectId != null && options.currentProjectId !== ''
               ? (options.projects.find((project) => project.id === options.currentProjectId)
-                  ?.worktrees ?? EMPTY_WORKTREES)
-              : EMPTY_WORKTREES
+                  ?.workspaces ?? EMPTY_WORKSPACES)
+              : EMPTY_WORKSPACES
           }
-          worktreeTemplates={options.worktreeTemplates}
+          workspaceTemplates={options.workspaceTemplates}
         />
       )
     case 'project-picker':
@@ -155,8 +155,8 @@ function renderModal(
       )
     case 'rename-tab':
       return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
-    case 'rename-worktree':
-      return <ProjectNameModal title="Rename worktree" value={modal.editBuffer ?? ''} />
+    case 'rename-workspace':
+      return <ProjectNameModal title="Rename workspace" value={modal.editBuffer ?? ''} />
     case 'create-project':
       return (
         <CreateProjectModal
@@ -205,25 +205,25 @@ function renderModal(
           latestVersion={modal.latestVersion}
         />
       )
-    case 'worktree-move': {
+    case 'workspace-move': {
       const project =
         options.currentProjectId != null && options.currentProjectId !== ''
           ? options.projects.find((entry) => entry.id === options.currentProjectId)
           : undefined
       return (
-        <WorktreeMoveModal
-          deleteSource={modal.type === 'worktree-move' ? modal.deleteSource : false}
-          divergence={options.worktreeDivergence}
+        <WorkspaceMoveModal
+          deleteSource={modal.type === 'workspace-move' ? modal.deleteSource : false}
+          divergence={options.workspaceDivergence}
           selectedIndex={modal.selectedIndex}
-          sourceWorktreeId={modal.sourceWorktreeId}
+          sourceWorkspaceId={modal.sourceWorkspaceId}
           stats={modal.stats}
-          worktrees={project?.worktrees ?? EMPTY_WORKTREES}
+          workspaces={project?.workspaces ?? EMPTY_WORKSPACES}
         />
       )
     }
-    case 'worktree-move-confirm':
+    case 'workspace-move-confirm':
       return (
-        <WorktreeMoveConfirmModal
+        <WorkspaceMoveConfirmModal
           variant={modal.variant}
           files={modal.files}
           sourceLabel={modal.sourceLabel}
@@ -241,12 +241,12 @@ function renderModal(
       )
     case 'ai-usage':
       return <AIUsageModal />
-    case 'worktree-delete-confirm':
+    case 'workspace-delete-confirm':
       return (
-        <WorktreeDeleteConfirm
-          keybindsModeId="modal.worktree-delete-confirm"
+        <WorkspaceDeleteConfirm
+          keybindsModeId="modal.workspace-delete-confirm"
           reason={modal.reason}
-          worktreeLabel={modal.worktreeLabel}
+          workspaceLabel={modal.workspaceLabel}
         />
       )
     case 'git-commit': {
@@ -336,15 +336,15 @@ export function RootView({
   const customCommands = useAppStore((s) => s.customCommands)
   const projects = useAppStore((s) => s.projects)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
-  const worktreeDivergence = useAppStore((s) => s.worktreeDivergence)
-  const worktreeTemplates = useAppStore((s) => s.worktreeTemplates)
+  const workspaceDivergence = useAppStore((s) => s.workspaceDivergence)
+  const workspaceTemplates = useAppStore((s) => s.workspaceTemplates)
   const leftBarWidth = useAppStore((s) => getBarWidth(s.bars.left))
 
   const splitChrome = PANE_BORDER * 2
 
-  // Keep every worktree's `branch` in state synchronized with the on-disk
+  // Keep every workspace's `branch` in state synchronized with the on-disk
   // HEAD so the sidebar (and divergence calc) never reads a stale value.
-  useWorktreeBranchPolling(true)
+  useWorkspaceBranchPolling(true)
 
   // The terminal's own left edge stays a drag target for the left bar, so the
   // resize gesture works from either side of the seam.
@@ -425,8 +425,8 @@ export function RootView({
           snippetEditorFields,
           snippets,
           themeId,
-          worktreeDivergence,
-          worktreeTemplates,
+          workspaceDivergence,
+          workspaceTemplates,
         })}
         <ToastViewport />
       </box>
@@ -518,8 +518,8 @@ export function RootView({
         snippetEditorFields,
         snippets,
         themeId,
-        worktreeDivergence,
-        worktreeTemplates,
+        workspaceDivergence,
+        workspaceTemplates,
       })}
       <ToastViewport />
     </box>
