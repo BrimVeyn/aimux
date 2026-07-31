@@ -49,7 +49,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
-        .map('<C-p>', actions.createWorkspaceModal, 'Create project')
+        .map('<C-p>', actions.createWorkspaceModal, 'Create workspace')
         .map('<C-g>', actions.projectPicker, 'Project picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')

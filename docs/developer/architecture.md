@@ -91,7 +91,7 @@ state, custom commands, and legacy project data.
 - `src/state/project-persistence.ts`
 - file: `aimux-projects.json`
 
-Stores named projects and per-project project snapshots.
+Stores named projects and their persisted snapshots.
 
 ### Snippet catalog
 

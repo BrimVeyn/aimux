@@ -94,7 +94,7 @@ export function CreateWorkspaceModal({
   if (step === 'template') {
     return (
       <Picker
-        title="New project: pick template"
+        title="New workspace: pick template"
         keybindsModeId="modal.create-workspace"
         width={uiTokens.modalWidth.md}
         gap={1}
@@ -111,14 +111,14 @@ export function CreateWorkspaceModal({
   const baseActive = activeField === 'base'
   return (
     <Form
-      title="New project"
+      title="New workspace"
       keybindsModeId="modal.create-workspace"
       width={uiTokens.modalWidth.xl}
     >
       <box flexDirection="column" gap={1}>
         <TextField
           active={activeField === 'name'}
-          label="Project name"
+          label="Workspace name"
           value={workspaceName}
           cursorPos={activeField === 'name' ? cursorPos : undefined}
           placeholder="my-feature"

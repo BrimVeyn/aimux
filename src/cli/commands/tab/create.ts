@@ -372,6 +372,6 @@ export const tabCreate: CliCommand = {
     writeJson(result)
     return EXIT_OK
   },
-  summary: 'Create a new tab in the active project',
+  summary: 'Create a new tab in the active workspace',
   verb: 'create',
 }

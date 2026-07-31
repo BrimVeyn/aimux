@@ -1899,7 +1899,7 @@ async function runGenerateAutoCommitNow(ctx: SideEffectContext, projectId: strin
   }
   const tab = ctx.activeTab
   if (!tab) {
-    toast.warning('Auto-commit: no active assistant tab — open a claude/codex project first')
+    toast.warning('Auto-commit: no active assistant tab — open a claude/codex tab first')
     ctx.dispatch({ projectId, type: 'auto-commit-clear' })
     return
   }

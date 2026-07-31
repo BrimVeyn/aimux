@@ -78,8 +78,8 @@ start in the same repository or project.
 
 The runtime can search for repositories and workspaces from `$HOME` using `fzf`.
 
-That directory picker is part of the create-project workflow and is what powers
-project-bound projects.
+That directory picker is part of the create-project workflow: the folder you
+choose becomes the project's repository.
 
 ## Project Bar
 

@@ -20,6 +20,6 @@ export const projectList: CliCommand = {
     })
     return EXIT_OK
   },
-  summary: 'List known projects (projects) in the profile catalog',
+  summary: 'List known projects in the profile catalog',
   verb: 'list',
 }
