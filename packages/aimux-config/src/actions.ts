@@ -20,11 +20,12 @@ function r(
 export const nextTab: KeyResult = r([{ delta: 1, type: 'move-active-tab' }])
 export const prevTab: KeyResult = r([{ delta: -1, type: 'move-active-tab' }])
 
-export const newTab: KeyResult = r(
-  [{ type: 'open-new-tab-modal' }],
-  [],
-  'modal.new-tab.command-edit'
-)
+/**
+ * Routed through an effect rather than opening the modal directly: tabs only
+ * exist inside a workspace, and whether the project has one is the app's
+ * business, not the keymap's. The effect opens the picker or explains why not.
+ */
+export const newTab: KeyResult = r([], [{ type: 'open-new-tab' }])
 export const renameTab: KeyResult = r([{ type: 'open-rename-tab-modal' }], [], 'modal.rename-tab')
 export const projectPicker: KeyResult = r(
   [{ type: 'open-project-picker' }],

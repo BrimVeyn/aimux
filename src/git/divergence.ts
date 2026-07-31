@@ -32,6 +32,37 @@ export async function getBranchDivergence(
   return parseDivergenceCount(result.text())
 }
 
+// Parses `git diff --shortstat`, e.g.
+// " 7 files changed, 149 insertions(+), 629 deletions(-)". Either side may be
+// absent (a pure addition reports no deletions line at all).
+export function parseShortstat(output: string): { added: number; removed: number } | undefined {
+  const trimmed = output.trim()
+  if (trimmed === '') return undefined
+  const added = /(\d+) insertions?\(\+\)/.exec(trimmed)
+  const removed = /(\d+) deletions?\(-\)/.exec(trimmed)
+  if (!added && !removed) return undefined
+  return {
+    added: Number.parseInt(added?.[1] ?? '0', 10),
+    removed: Number.parseInt(removed?.[1] ?? '0', 10),
+  }
+}
+
+/**
+ * Lines a workspace has changed since it forked, measured from the merge base
+ * to the *working tree* — so commits, staged and unstaged work all count. That
+ * is the number the sidebar shows, and it is what a squash-move would land.
+ */
+export async function getWorkspaceDiffStat(
+  workspacePath: string,
+  baseRef: string
+): Promise<{ added: number; removed: number } | undefined> {
+  const mergeBase = await getMergeBase(workspacePath, baseRef)
+  if (mergeBase == null) return undefined
+  const result = await $`git -C ${workspacePath} diff --shortstat ${mergeBase}`.quiet().nothrow()
+  if (result.exitCode !== 0) return undefined
+  return parseShortstat(result.text())
+}
+
 // Fork point: the most recent commit shared by baseRef and ref. Diffing the
 // working tree against this shows everything the workspace changed since it
 // branched off (commits + staged + unstaged) — i.e. what a squash-move lands.

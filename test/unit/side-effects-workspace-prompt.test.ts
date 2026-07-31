@@ -116,3 +116,48 @@ test('a plain new tab sends nothing', async () => {
 
   expect(writes).toEqual([])
 })
+
+test('<C-n> is refused while the project sits on its primary checkout', () => {
+  const base = seed()
+  const project = base.projects[0]
+  if (!project) throw new Error('expected a seeded project')
+  const onPrimary: AppState = {
+    ...base,
+    modal: { cursorPos: 0, editBuffer: null, projectTargetId: null, selectedIndex: 0, type: null },
+    projects: [
+      {
+        ...project,
+        activeWorkspaceId: 'workspace-primary',
+        workspaces: [
+          {
+            createdAt: NOW,
+            createdByAimux: false,
+            id: 'workspace-primary',
+            name: 'repo',
+            path: '/repo',
+            repoRoot: '/repo',
+            source: 'primary',
+            updatedAt: NOW,
+          },
+        ],
+      },
+    ],
+  }
+  const { ctx } = harness(onPrimary)
+
+  executeSideEffect({ type: 'open-new-tab' }, ctx)
+
+  // Nothing opens: tabs live in workspaces, and `<C-p>` is the way out.
+  expect(ctx.getState().modal.type).toBeNull()
+})
+
+test('<C-n> opens the picker once a real workspace is active', () => {
+  const { ctx } = harness({
+    ...seed(),
+    modal: { cursorPos: 0, editBuffer: null, projectTargetId: null, selectedIndex: 0, type: null },
+  })
+
+  executeSideEffect({ type: 'open-new-tab' }, ctx)
+
+  expect(ctx.getState().modal.type).toBe('new-tab')
+})

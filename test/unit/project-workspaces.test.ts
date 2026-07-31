@@ -13,6 +13,7 @@ import {
   pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
 import {
+  acceptsTabs,
   ensureProjectWorkspaces,
   getActiveWorkspacePath,
   withActiveWorkspace,
@@ -38,6 +39,84 @@ describe('project workspaces', () => {
     expect(project.workspaces?.[0]?.source).toBe('primary')
     expect(project.workspaces?.[0]?.createdByAimux).toBe(false)
     expect(project.activeWorkspaceId).toBe(project.workspaces?.[0]?.id)
+  })
+
+  test('an unresolved active workspace lands on a worktree, never the repo', () => {
+    const now = '2024-01-02T00:00:00.000Z'
+    const project = ensureProjectWorkspaces(
+      {
+        ...makeProject(),
+        // Points at a workspace that no longer exists — a deleted one, or a
+        // catalog written by another machine.
+        activeWorkspaceId: 'gone',
+        workspaces: [
+          {
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-primary',
+            name: 'repo',
+            path: '/repo/main',
+            repoRoot: '/repo/main',
+            source: 'primary',
+            updatedAt: now,
+          },
+          {
+            // External, not aimux-temp: a temp workspace whose directory is
+            // gone gets pruned before this rule is reached.
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-feature',
+            name: 'Feature',
+            path: '/repo/feature',
+            repoRoot: '/repo/main',
+            source: 'external',
+            updatedAt: now,
+          },
+        ],
+      },
+      now
+    )
+
+    expect(project.activeWorkspaceId).toBe('wt-feature')
+  })
+
+  test('an explicit primary selection is honoured', () => {
+    const now = '2024-01-02T00:00:00.000Z'
+    const project = ensureProjectWorkspaces(
+      {
+        ...makeProject(),
+        activeWorkspaceId: 'wt-primary',
+        workspaces: [
+          {
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-primary',
+            name: 'repo',
+            path: '/repo/main',
+            repoRoot: '/repo/main',
+            source: 'primary',
+            updatedAt: now,
+          },
+          {
+            // External, not aimux-temp: a temp workspace whose directory is
+            // gone gets pruned before this rule is reached.
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-feature',
+            name: 'Feature',
+            path: '/repo/feature',
+            repoRoot: '/repo/main',
+            source: 'external',
+            updatedAt: now,
+          },
+        ],
+      },
+      now
+    )
+
+    // Sitting on main to read the git panel stays possible; only opening tabs
+    // there is refused.
+    expect(project.activeWorkspaceId).toBe('wt-primary')
   })
 
   test('switching the active workspace leaves projectPath pinned to the repo', () => {
@@ -177,5 +256,40 @@ describe('project workspaces', () => {
       else process.env.AIMUX_WORKTREE_ROOT = previousRoot
       await rm(root, { force: true, recursive: true })
     }
+  })
+
+  test('a project sitting on its primary checkout accepts no tabs', () => {
+    const project = ensureProjectWorkspaces(makeProject())
+
+    // The only workspace is the repo itself, so `<C-n>`, the "+" and the empty
+    // pane must all agree there is nowhere to put a tab yet.
+    expect(project.workspaces?.[0]?.source).toBe('primary')
+    expect(acceptsTabs(project)).toBe(false)
+    expect(acceptsTabs(undefined)).toBe(false)
+  })
+
+  test('a project on a worktree accepts tabs', () => {
+    const now = '2024-01-02T00:00:00.000Z'
+    const project = ensureProjectWorkspaces(
+      {
+        ...makeProject(),
+        activeWorkspaceId: 'wt-feature',
+        workspaces: [
+          {
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-feature',
+            name: 'Feature',
+            path: '/repo/feature',
+            repoRoot: '/repo/main',
+            source: 'external',
+            updatedAt: now,
+          },
+        ],
+      },
+      now
+    )
+
+    expect(acceptsTabs(project)).toBe(true)
   })
 })

@@ -861,6 +861,9 @@ export interface GitRefreshPayload {
 export interface BranchDivergence {
   ahead: number
   behind: number
+  /** Lines changed since the fork point, working tree included. */
+  added?: number
+  removed?: number
 }
 
 export type GitPanelAction =

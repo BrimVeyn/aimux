@@ -170,7 +170,7 @@ Document your own configs accordingly.
 - `i` - focus terminal
 - `r` - rename tab
 - `dd` - close tab
-- `Ctrl+N` - new tab (in the active workspace)
+- `Ctrl+N` - new tab (in the active workspace; refused on the primary checkout)
 - `Ctrl+P` - create workspace (asks what you want to work on, then names it)
 - `Ctrl+R` - restart tab
 - `Ctrl+G` - project picker

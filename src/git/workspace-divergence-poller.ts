@@ -4,7 +4,7 @@ import type { BranchDivergence } from '../state/types'
 
 import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
-import { getBranchDivergence } from './divergence'
+import { getBranchDivergence, getWorkspaceDiffStat } from './divergence'
 
 const INTERVAL_MS = 4000
 
@@ -36,8 +36,14 @@ export function useWorkspaceDivergencePolling(enabled: boolean): void {
           const base = workspace.baseRef
           const branch = workspace.branch
           if (base == null || branch == null) return null
-          const divergence = await getBranchDivergence(workspace.repoRoot, base, branch)
-          return divergence != null ? ([workspace.id, divergence] as const) : null
+          // Commits come from the repo root (comparing two refs); lines come
+          // from the workspace itself, so uncommitted work is counted too.
+          const [divergence, stat] = await Promise.all([
+            getBranchDivergence(workspace.repoRoot, base, branch),
+            getWorkspaceDiffStat(workspace.path, base),
+          ])
+          if (divergence == null) return null
+          return [workspace.id, { ...divergence, ...stat }] as const
         })
       )
       if (cancelled) return

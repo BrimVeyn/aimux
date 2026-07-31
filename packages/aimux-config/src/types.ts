@@ -727,6 +727,9 @@ export interface GitRefreshPayload {
 export interface BranchDivergence {
   ahead: number
   behind: number
+  /** Lines changed since the fork point, working tree included. */
+  added?: number
+  removed?: number
 }
 
 export interface WorkspaceTemplatePane {
@@ -836,6 +839,7 @@ export type AppAction =
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
+  | { type: 'open-new-tab' }
   | { type: 'launch-selected-assistant' }
   | { type: 'edit-selected-assistant' }
   | { type: 'confirm-selected-project' }

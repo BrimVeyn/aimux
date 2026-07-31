@@ -6,11 +6,10 @@ import type {
 
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { ProjectRecord, ProjectStatus, WorkspaceRecord } from '../../../../state/types'
+import type { ProjectRecord, ProjectStatus } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_PROJECT_STATUS } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
@@ -214,8 +213,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 project={project}
                 isActiveItem={projectIsActiveItem}
                 inCurrentGroup={isCurrentProject}
-                primaryWorkspace={primaryWorkspace}
-                hasExtraWorkspaces={extraWorkspaces.length > 0}
+                projectIndex={projectIndex}
                 status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
@@ -227,7 +225,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 onDragCancel={cancelDrag}
               />
             )
-            for (const [wtIdx, workspace] of extraWorkspaces.entries()) {
+            for (const workspace of extraWorkspaces) {
               rows.push(
                 <WorkspaceRow
                   key={`wt:${workspace.id}`}
@@ -236,7 +234,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                   projectIndex={projectIndex}
                   isActiveItem={isCurrentProject && workspace.id === project.activeWorkspaceId}
                   inCurrentGroup={isCurrentProject}
-                  isLast={wtIdx === extraWorkspaces.length - 1}
+                  contentWidth={contentWidth}
                 />
               )
             }
@@ -266,10 +264,8 @@ interface ProjectRowProps {
   isActiveItem: boolean
   /** True when this row belongs to the current project (selection scope). */
   inCurrentGroup: boolean
-  /** The project's primary workspace — its git branch is shown as the project's anchor identity. */
-  primaryWorkspace: WorkspaceRecord | undefined
-  /** True when at least one non-primary workspace follows — used to draw the tree continuator. */
-  hasExtraWorkspaces: boolean
+  /** 1-based index in the visible order, so the "+" can switch projects first. */
+  projectIndex: number
   status: ProjectStatus
   dragging: boolean
   contentWidth: number
@@ -285,7 +281,6 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
-  hasExtraWorkspaces,
   inCurrentGroup,
   isActiveItem,
   marginTop,
@@ -293,8 +288,8 @@ const ProjectRow = memo(function ProjectRow({
   onDragCancel,
   onDragStart,
   onDrop,
-  primaryWorkspace,
   project,
+  projectIndex,
   setRowRef,
   status,
 }: ProjectRowProps) {
@@ -313,9 +308,7 @@ const ProjectRow = memo(function ProjectRow({
   }
   const workingColor = t.primary
   const waitingColor = t.warning
-  const divergence = useAppStore((s) =>
-    primaryWorkspace ? s.workspaceDivergence[primaryWorkspace.id] : undefined
-  )
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
 
   const handleRef = useCallback(
     (r: BoxRenderable | null) => setRowRef(project.id, r),
@@ -335,6 +328,21 @@ const ProjectRow = memo(function ProjectRow({
       onDrop()
     },
     [onDrop]
+  )
+  const handleNewWorkspace = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      // The modal always targets the current project, so make this one current
+      // first. Both run through the store synchronously, so the branch load
+      // below already sees the switch.
+      if (project.id !== currentProjectId) {
+        runSideEffectGlobal({ index: projectIndex, type: 'switch-project-by-index' })
+      }
+      dispatchGlobal({ type: 'open-create-workspace-modal' })
+      runSideEffectGlobal({ type: 'load-create-workspace-base-branches' })
+    },
+    [currentProjectId, project.id, projectIndex]
   )
   const rightClickMenu = useMemo<[string, () => void][]>(
     () => [
@@ -368,14 +376,9 @@ const ProjectRow = memo(function ProjectRow({
     leadingColor = workingColor
   }
 
-  const branchText = primaryWorkspace?.branch ?? ''
-  const divergenceText = formatDivergence(divergence)
-  const showBranch = branchText !== ''
-  const nameLabel = truncate(project.name, Math.max(0, contentWidth - 4))
-  const branchLabel = truncate(
-    branchText,
-    Math.max(0, contentWidth - 5 - (divergenceText.length + 1))
-  )
+  // No branch line: the repo checkout is not somewhere aimux works, so naming
+  // it under every project only ever read as "you are on main".
+  const nameLabel = truncate(project.name, Math.max(0, contentWidth - 6))
 
   return (
     <ContextMenuBox
@@ -404,16 +407,11 @@ const ProjectRow = memo(function ProjectRow({
         <text fg={t.text} selectable={false} wrapMode="none">
           {nameLabel}
         </text>
+        <box flexGrow={1} flexShrink={1} />
+        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleNewWorkspace}>
+          +
+        </text>
       </box>
-      {showBranch ? (
-        <box flexDirection="row">
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {hasExtraWorkspaces ? '│ ' : '  '}
-            {'\u{e702}'} {branchLabel}
-            {divergenceText !== '' ? ` ${divergenceText}` : ''}
-          </text>
-        </box>
-      ) : null}
     </ContextMenuBox>
   )
 })

@@ -32,6 +32,7 @@ export type ModeId =
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
+  | { type: 'open-new-tab' }
   | { type: 'launch-selected-assistant' }
   | { type: 'edit-selected-assistant' }
   | { type: 'confirm-selected-project' }

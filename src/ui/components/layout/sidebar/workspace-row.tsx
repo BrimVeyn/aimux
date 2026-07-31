@@ -6,7 +6,7 @@ import type { ProjectRecord, WorkspaceRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDivergence } from '../../../../state/project-workspaces'
+import { formatDiffStat } from '../../../../state/project-workspaces'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
@@ -20,14 +20,20 @@ interface WorkspaceRowProps {
   isActiveItem: boolean
   /** True when this row's project is the current project (selection scope). */
   inCurrentGroup: boolean
-  /** True when this is the last non-primary workspace of its project. Drives └─ vs ├─. */
-  isLast: boolean
+  contentWidth: number
+}
+
+function truncate(label: string, max: number): string {
+  if (max <= 0) return ''
+  if (label.length <= max) return label
+  if (max === 1) return '…'
+  return `${label.slice(0, max - 1)}…`
 }
 
 export const WorkspaceRow = memo(function WorkspaceRow({
+  contentWidth,
   inCurrentGroup,
   isActiveItem,
-  isLast,
   project,
   projectIndex,
   workspace,
@@ -109,16 +115,20 @@ export const WorkspaceRow = memo(function WorkspaceRow({
     bgColor = base.backgroundPanel
   }
 
-  const connector = isLast ? '└─' : '├─'
-  const branchCont = isLast ? '   ' : '│  '
-  const branchText = workspace.branch ?? ''
-  const showBranch = branchText !== ''
-  const divergenceText = formatDivergence(divergence)
+  // The branch is not shown: it is derived from this name, so printing both
+  // says the same thing twice and costs the row the width the churn needs.
+  const { added, removed } = formatDiffStat(divergence)
+  const statWidth = added.length + removed.length + (added !== '' && removed !== '' ? 1 : 0)
+  const nameLabel = truncate(
+    workspace.name,
+    Math.max(0, contentWidth - 5 - (statWidth > 0 ? statWidth + 1 : 0))
+  )
 
   return (
     <ContextMenuBox
       id={`sidebar-wt-${workspace.id}`}
-      flexDirection="column"
+      flexDirection="row"
+      alignItems="center"
       flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
@@ -126,23 +136,29 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
-      <box flexDirection="row" alignItems="center">
+      <text fg={t.textMuted} selectable={false} wrapMode="none">
+        {'  '}
+        {'\u{e702}'}{' '}
+      </text>
+      <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
+      <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        {nameLabel}
+      </text>
+      <box flexGrow={1} flexShrink={1} />
+      {added !== '' ? (
+        <text fg={t.success} selectable={false} wrapMode="none">
+          {added}
+        </text>
+      ) : null}
+      {added !== '' && removed !== '' ? (
         <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {connector}{' '}
+          {' '}
         </text>
-        <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
-        <text fg={t.text} selectable={false} wrapMode="none">
-          {workspace.name}
+      ) : null}
+      {removed !== '' ? (
+        <text fg={t.error} selectable={false} wrapMode="none">
+          {removed}
         </text>
-      </box>
-      {showBranch ? (
-        <box flexDirection="row">
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {branchCont}
-            {'\u{e702}'} {branchText}
-            {divergenceText !== '' ? ` ${divergenceText}` : ''}
-          </text>
-        </box>
       ) : null}
     </ContextMenuBox>
   )

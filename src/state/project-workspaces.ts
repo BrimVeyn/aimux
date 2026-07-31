@@ -16,6 +16,38 @@ export function formatDivergence(divergence: BranchDivergence | undefined): stri
   return parts.join(' ')
 }
 
+/**
+ * Whether tabs can be opened where the project currently sits. aimux works in
+ * worktrees, so the repo checkout — and a project that has nothing else — is
+ * not somewhere a tab can live. One predicate so the `<C-n>` guard and the
+ * empty-state advice can never tell the user two different stories.
+ */
+export function acceptsTabs(project: ProjectRecord | undefined): boolean {
+  const workspace = getActiveWorkspace(project)
+  return workspace != null && workspace.source !== 'primary'
+}
+
+/** `4823` -> `4.8k`, so a churn number never widens the sidebar row. */
+export function formatDiffCount(value: number): string {
+  if (value < 1_000) return String(value)
+  const thousands = value / 1_000
+  if (thousands < 10) return `${thousands.toFixed(1).replace(/\.0$/, '')}k`
+  return `${Math.round(thousands)}k`
+}
+
+/** `+149 -629` — lines the workspace changed since it forked. Empty when clean. */
+export function formatDiffStat(divergence: BranchDivergence | undefined): {
+  added: string
+  removed: string
+} {
+  const added = divergence?.added ?? 0
+  const removed = divergence?.removed ?? 0
+  return {
+    added: added > 0 ? `+${formatDiffCount(added)}` : '',
+    removed: removed > 0 ? `-${formatDiffCount(removed)}` : '',
+  }
+}
+
 export function createPrimaryWorkspace(projectPath: string, now: string): WorkspaceRecord {
   const id = createPrefixedId('workspace')
   return {
@@ -43,9 +75,12 @@ export function ensureProjectWorkspaces(
       const workspace = createPrimaryWorkspace(project.projectPath, now)
       return { ...project, activeWorkspaceId: workspace.id, workspaces: [workspace] }
     }
+    // Never *default* to the primary checkout: aimux works in worktrees, and
+    // tabs cannot be opened on the repo itself. An explicit selection is still
+    // honoured — the user may want to sit on main to read the git panel.
     const activeWorkspaceId = workspaces.some((w) => w.id === project.activeWorkspaceId)
       ? project.activeWorkspaceId
-      : workspaces[0]?.id
+      : (workspaces.find((w) => w.source !== 'primary') ?? workspaces[0])?.id
     return {
       ...project,
       activeWorkspaceId,
@@ -62,10 +97,12 @@ export function ensureProjectWorkspaces(
 
   const workspace = createPrimaryWorkspace(project.projectPath, now)
   const workspaces = mergeExistingGitWorktrees([workspace], now)
+  // Same rule as above: an adopted worktree wins over the repo checkout. A
+  // project with nothing but its primary lands there and stays inert until
+  // `<C-p>`, which is the intended funnel.
   return {
     ...project,
-    activeWorkspaceId:
-      workspaces.find((entry) => entry.path === project.projectPath)?.id ?? workspace.id,
+    activeWorkspaceId: (workspaces.find((entry) => entry.source !== 'primary') ?? workspace).id,
     workspaces,
   }
 }

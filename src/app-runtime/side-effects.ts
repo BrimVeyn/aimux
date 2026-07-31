@@ -74,6 +74,7 @@ import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { saveCurrentProject } from '../state/project-save'
 import {
+  acceptsTabs,
   filterTabsForActiveWorkspace,
   getActiveWorkspace,
   getActiveWorkspacePath,
@@ -690,6 +691,21 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       void backend.destroy(true)
       ctx.renderer.destroy()
       process.exit(0)
+      return
+    }
+    case 'open-new-tab': {
+      // aimux never works on the primary checkout: tabs belong to a workspace,
+      // so a project with none is a dead end until `<C-p>` creates one.
+      const project = state.projects.find((entry) => entry.id === state.currentProjectId)
+      if (!project) {
+        toast.error('Open a project first — <C-g>')
+        return
+      }
+      if (!acceptsTabs(project)) {
+        toast.error('No workspace yet — <C-p> to create one. aimux never opens tabs on the repo.')
+        return
+      }
+      dispatch({ type: 'open-new-tab-modal' })
       return
     }
     case 'launch-selected-assistant': {

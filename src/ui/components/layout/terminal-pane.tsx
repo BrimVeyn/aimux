@@ -17,6 +17,7 @@ import { type MeasuredPaneRect, usePaneSizeReport } from '../../../app-runtime/u
 import { logInputDebug } from '../../../debug/input-log'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
+import { acceptsTabs } from '../../../state/project-workspaces'
 import { type ContextMenuItem, openContextMenu } from '../../context-menu/controller'
 import { resolvePaletteIndex } from '../../host-palette'
 import { getCurrentTheme, useTheme } from '../../theme'
@@ -48,15 +49,16 @@ function getTitle(
   tab: TabSession | undefined,
   isActive: boolean,
   focusMode: TerminalPaneProps['focusMode'],
-  emptyContext: { projectName: string; workspaceName: string }
+  emptyContext: { projectName: string; workspaceName: string; acceptsTabs: boolean }
 ): string {
   if (!tab) {
-    const { projectName, workspaceName } = emptyContext
+    const { acceptsTabs: tabbable, projectName, workspaceName } = emptyContext
+    const suffix = tabbable ? 'no tabs' : 'no workspace'
     if (projectName === '' && workspaceName === '') return 'No active project'
     if (workspaceName === '' || workspaceName === projectName) {
-      return `${projectName} · no tabs`
+      return `${projectName} · ${suffix}`
     }
-    return `${projectName} / ${workspaceName} · no tabs`
+    return `${projectName} / ${workspaceName} · ${suffix}`
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -286,6 +288,12 @@ export function TerminalPane({
     if (id == null || id === '') return ''
     return s.projects.find((sess) => sess.id === id)?.name ?? ''
   })
+  // Whether `<C-n>` would even work from here. The empty state is the screen
+  // that tells the user what to press, so it has to ask the same question the
+  // guard asks rather than assume a tab is one keystroke away.
+  const emptyAcceptsTabs = useAppStore((s) =>
+    acceptsTabs(s.projects.find((entry) => entry.id === s.currentProjectId))
+  )
   const emptyWorkspaceName = useAppStore((s) => {
     const id = s.currentProjectId
     if (id == null || id === '') return ''
@@ -508,10 +516,18 @@ export function TerminalPane({
       onTerminalScrollEvent,
     ]
   )
-  const handleNoTabMouseDown = useCallback((event: OtuiMouseEvent) => {
-    event.stopPropagation()
-    dispatchGlobal({ type: 'open-new-tab-modal' })
-  }, [])
+  const handleNoTabMouseDown = useCallback(
+    (event: OtuiMouseEvent) => {
+      event.stopPropagation()
+      if (emptyAcceptsTabs) {
+        runSideEffectGlobal({ type: 'open-new-tab' })
+        return
+      }
+      dispatchGlobal({ type: 'open-create-workspace-modal' })
+      runSideEffectGlobal({ type: 'load-create-workspace-base-branches' })
+    },
+    [emptyAcceptsTabs]
+  )
   const handleContentMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
       e.stopPropagation()
@@ -525,6 +541,7 @@ export function TerminalPane({
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
         title={getTitle(tab, paneIsActive, focusMode, {
+          acceptsTabs: emptyAcceptsTabs,
           projectName: emptyProjectName,
           workspaceName: emptyWorkspaceName,
         })}
@@ -553,12 +570,17 @@ export function TerminalPane({
                 ) : null}
               </box>
             ) : null}
-            <text fg={t.textMuted}>has no tabs</text>
+            <text fg={t.textMuted}>{emptyAcceptsTabs ? 'has no tabs' : 'has no workspace'}</text>
             <text fg={t.textMuted}> </text>
+            {/* Row count stays fixed whichever branch renders: adding a line
+                shifts everything under a centred column, and the vacated cells
+                are not repainted — the old text bleeds through the new spaces. */}
             <box flexDirection="row">
               <text fg={t.textMuted}>Press </text>
-              <text fg={t.primary}>Ctrl+n</text>
-              <text fg={t.textMuted}> to launch an assistant</text>
+              <text fg={t.primary}>{emptyAcceptsTabs ? 'Ctrl+n' : 'Ctrl+p'}</text>
+              <text fg={t.textMuted}>
+                {emptyAcceptsTabs ? ' to launch an assistant' : ' to create a workspace'}
+              </text>
             </box>
             <box
               flexDirection="row"
@@ -568,7 +590,7 @@ export function TerminalPane({
               backgroundColor={t.backgroundPanel}
               onMouseDown={handleNoTabMouseDown}
             >
-              <text fg={t.text}>New assistant</text>
+              <text fg={t.text}>{emptyAcceptsTabs ? 'New assistant' : 'New workspace'}</text>
             </box>
           </box>
         ) : (

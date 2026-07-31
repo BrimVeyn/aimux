@@ -61,6 +61,19 @@ name derived from what you asked for.
 `Ctrl+N` never creates a workspace — it only opens a tab in the workspace you
 are already in.
 
+## aimux never works on the repo itself
+
+The **primary** workspace is the repository checkout, and aimux does not open
+tabs there. `Ctrl+N` is refused while it is the active workspace and tells you
+to press `Ctrl+P` instead.
+
+The rule follows from what a workspace is for: work happens on a branch in a
+worktree, so nothing you start is ever left sitting on `main`.
+
+Opening a project selects one of its worktrees, falling back to the primary
+only when the project has none. Selecting the primary yourself still works —
+useful for reading the git panel against the repo — it just cannot host tabs.
+
 ## Templates
 
 A **workspace template** is a reusable layout — one or more tabs, each with
@@ -96,25 +109,11 @@ export default defineConfig({
 They can also live in `aimux.json` under the same key (JSON form, same
 schema) — the TS config wins when both define `workspaceTemplates`.
 
-When at least one template is loaded, the new-tab flow gains a final
-**Step 4/4 — choose template** step after workspace-create. Pick `None` to
-keep the single-pane behaviour (the assistant you picked at Step 1 becomes
-the workspace's only pane); pick a template to spawn its full layout.
-
-### Skipping the assistant pick
-
-When you're going to use a template, the assistant chosen at Step 1 is
-irrelevant — the template defines its own panes. The bottom of the
-Step 1 assistant picker therefore shows an extra entry:
-
-```
-Workspace from template…
-  Create a workspace and pick a template — no assistant step
-```
-
-Pick it (or click it) to jump straight to the workspace-name form, then to
-the template picker. `None` is hidden in that picker because no assistant
-was chosen as a fallback.
+When at least one template is loaded, `Ctrl+P` inserts a template picker
+between the prompt and creation. The template spawns its own tabs, so the
+assistant picker is skipped — and with it the prompt hand-off and the
+model-generated name: a templated workspace keeps the name derived locally
+from your prompt.
 
 ### Schema
 

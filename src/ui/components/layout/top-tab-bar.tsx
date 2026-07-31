@@ -12,7 +12,7 @@ import { useWorkspaceDivergencePolling } from '../../../git/workspace-divergence
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
+import { acceptsTabs, filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
 import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
@@ -198,6 +198,9 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const bar = useAppStore((s) => s.projectBar)
+  const canOpenTabs = useAppStore((s) =>
+    acceptsTabs(s.projects.find((entry) => entry.id === s.currentProjectId))
+  )
   const leftBarVisible = useAppStore((s) => getBarWidth(s.bars.left) > 0)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const projects = useAppStore((s) => s.projects)
@@ -342,10 +345,21 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
     return dragOrder.map((id) => byId.get(id)).filter((e): e is TabEntry => e != null)
   }, [dragOrder, entries])
 
-  const handleNewTab = useCallback((e: OtuiMouseEvent) => {
-    e.stopPropagation()
-    dispatchGlobal({ type: 'open-new-tab-modal' })
-  }, [])
+  const handleNewTab = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.stopPropagation()
+      // Same fallback as the empty pane: with no workspace there is nothing to
+      // add a tab to, so "+" offers the thing that is actually missing rather
+      // than erroring every time it is clicked.
+      if (canOpenTabs) {
+        runSideEffectGlobal({ type: 'open-new-tab' })
+        return
+      }
+      dispatchGlobal({ type: 'open-create-workspace-modal' })
+      runSideEffectGlobal({ type: 'load-create-workspace-base-branches' })
+    },
+    [canOpenTabs]
+  )
 
   if (!bar.visible && !forceVisible) return null
   // Keep the bar visible even with zero entries — when the active workspace
