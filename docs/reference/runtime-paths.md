@@ -33,6 +33,13 @@ Active profile directory:
 | `aimux.json`          | app-managed runtime preferences       |
 | `aimux-projects.json` | project catalog and project snapshots |
 | `aimux-snippets.json` | snippet catalog                       |
+| `sounds/`             | your own notification sounds          |
+
+Any audio file dropped in `sounds/` (`.wav`, `.m4a`, `.mp3`, `.aiff`, `.ogg`,
+`.flac`) is offered alongside the shipped ones under **Settings → Notifications
+→ Sound**, listed by its filename without the extension. The directory is read
+at launch, so a file added while aimux is running shows up the next time it
+starts.
 
 ## Per-Project Data
 

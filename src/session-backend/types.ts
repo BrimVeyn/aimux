@@ -15,7 +15,18 @@ export interface ProjectBackendEvents {
   exit: [tabId: string, exitCode: number]
   error: [tabId: string, message: string]
   projectActivity: [projectId: string, status: ProjectStatus]
-  tabActivity: [tabId: string, activity: TabActivity]
+  /**
+   * `workspaceId` is present when the backend knows which workspace the tab
+   * belongs to. The UI holds tabs for the attached project only, so this is
+   * what lets a *foreign* project's workspace row show a status glyph.
+   */
+  tabActivity: [tabId: string, activity: TabActivity, workspaceId?: string]
+  /**
+   * A tab's turn ended: its `idle` held for the daemon's settle window. Edge
+   * triggered, once per turn — the honest "the agent has finished" signal,
+   * unlike a raw `idle` which flickers between tool calls.
+   */
+  tabTurnComplete: [tabId: string, projectId: string, workspaceId?: string]
   /**
    * Fired when a tab was added by a sibling client (e.g. the CLI control
    * plane creating a tab in the same project). The UI subscribes and

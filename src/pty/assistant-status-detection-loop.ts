@@ -50,13 +50,22 @@ export interface LoopTabView {
   assistant: AssistantId
   command: string
   viewport?: TerminalSnapshot
+  /** The workspace this tab belongs to, when its owner knows one. Passed
+   *  straight through to the status callbacks so a client can group tabs it
+   *  does not itself hold — see the `workspaceId` note in `src/ipc/protocol.ts`. */
+  workspaceId?: string
 }
 
 export interface StatusDetectionLoopOptions {
   listProjects: () => string[]
   listTabs: (projectId: string) => LoopTabView[]
   /** Emitted when a tab's status changes. */
-  onTabStatus: (tabId: string, status: TabActivity, projectId: string) => void
+  onTabStatus: (
+    tabId: string,
+    status: TabActivity,
+    projectId: string,
+    workspaceId: string | undefined
+  ) => void
   /** Emitted when either flag on a project changes. */
   onProjectStatus: (projectId: string, status: ProjectStatus) => void
   /**
@@ -65,7 +74,12 @@ export interface StatusDetectionLoopOptions {
    * `idle`, so a driver receives exactly one signal per turn. `idleMs` is how
    * long idle had held when the signal fired.
    */
-  onTurnComplete?: (tabId: string, projectId: string, idleMs: number) => void
+  onTurnComplete?: (
+    tabId: string,
+    projectId: string,
+    idleMs: number,
+    workspaceId: string | undefined
+  ) => void
   /**
    * Emitted when a tab transitions into `waiting-input`. Edge-triggered: fires
    * once per transition, carrying the captured prompt text and any parsed
@@ -117,7 +131,10 @@ export function runStatusDetectionLoop(
   const now = options.nowFn ?? Date.now
   const detector = new AssistantStatusDetector()
   const arbiter = new AssistantStatusArbiter()
-  const lastTabStatus = new Map<string, { status: TabActivity; projectId: string }>()
+  const lastTabStatus = new Map<
+    string,
+    { status: TabActivity; projectId: string; workspaceId?: string }
+  >()
   const lastProjectStatus = new Map<string, ProjectStatus>()
   // Timestamp when a tab most recently entered `idle`. Cleared when it leaves
   // idle. `turnEmitted` guards against re-firing `onTurnComplete` within the
@@ -172,8 +189,8 @@ export function runStatusDetectionLoop(
         tailPreview: tailPreview(tab.viewport),
       })
       if (changed) {
-        lastTabStatus.set(tab.id, { projectId, status })
-        options.onTabStatus(tab.id, status, projectId)
+        lastTabStatus.set(tab.id, { projectId, status, workspaceId: tab.workspaceId })
+        options.onTabStatus(tab.id, status, projectId, tab.workspaceId)
       }
 
       // Turn-complete bookkeeping. The emission itself is gated to `tick` so a
@@ -189,7 +206,7 @@ export function runStatusDetectionLoop(
         }
         if (source === 'tick' && !turnEmitted.has(tab.id) && now - since >= turnSettleMs) {
           turnEmitted.add(tab.id)
-          options.onTurnComplete?.(tab.id, projectId, now - since)
+          options.onTurnComplete?.(tab.id, projectId, now - since, tab.workspaceId)
         }
       } else {
         idleSince.delete(tab.id)
@@ -237,13 +254,20 @@ export function runStatusDetectionLoop(
       classifySession(projectId, options.listTabs(projectId), ts, 'tick', seenTabs)
     }
 
-    for (const tabId of lastTabStatus.keys()) {
+    for (const [tabId, entry] of lastTabStatus) {
       if (!seenTabs.has(tabId)) {
         detector.forget(tabId)
         arbiter.forget(tabId)
         lastTabStatus.delete(tabId)
         idleSince.delete(tabId)
         turnEmitted.delete(tabId)
+        // A gone tab is no longer working or waiting on anyone. Only clients
+        // attached to its project hear its `tabExit`, so without this last
+        // word a tab that died mid-turn leaves every other client holding a
+        // status that will never be corrected.
+        if (entry.status !== 'idle') {
+          options.onTabStatus(tabId, 'idle', entry.projectId, entry.workspaceId)
+        }
       }
     }
     for (const projectId of lastProjectStatus.keys()) {

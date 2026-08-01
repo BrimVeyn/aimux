@@ -44,6 +44,24 @@ export interface ProjectStatus {
 
 export const IDLE_PROJECT_STATUS: ProjectStatus = { waiting: false, working: false }
 
+/**
+ * A workspace's status, as the sidebar draws it. `working`/`waiting` mirror
+ * `ProjectStatus` one level down; `done` is a latch — an assistant here
+ * finished a turn and nobody has looked yet — cleared when the workspace is
+ * entered or when it goes back to work.
+ */
+export interface WorkspaceActivity {
+  working: boolean
+  waiting: boolean
+  done: boolean
+}
+
+export const IDLE_WORKSPACE_ACTIVITY: WorkspaceActivity = {
+  done: false,
+  waiting: false,
+  working: false,
+}
+
 export type FocusMode =
   | 'navigation'
   | 'terminal-input'
@@ -218,6 +236,14 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   workspaceId?: string
+  /**
+   * This tab is the one that rang: it finished a turn while you were looking
+   * elsewhere. Set alongside the workspace's own tick and cleared the moment
+   * the tab is opened or goes back to work, so the notification points at
+   * something rather than just happening. Ephemeral — never persisted, never
+   * on the wire.
+   */
+  unseen?: boolean
   /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
@@ -730,6 +756,13 @@ export interface AppState {
    * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.
    */
   workspaceDivergence: Record<string, BranchDivergence>
+  /**
+   * What each workspace's assistants are doing, keyed by workspace id. Covers
+   * every project the daemon knows, not just the current one — see
+   * `src/app-runtime/workspace-activity.ts`, which owns the aggregation.
+   * Ephemeral; not persisted to the catalog.
+   */
+  workspaceActivity: Record<string, WorkspaceActivity>
   /**
    * Last active tab a user viewed within each workspace, keyed by workspace id.
    * Lets switching back to a workspace restore its last-viewed tab instead of

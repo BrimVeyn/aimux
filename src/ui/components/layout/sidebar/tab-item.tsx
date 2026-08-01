@@ -104,11 +104,24 @@ function ActivityGlyph({ tab }: { tab: TabSession }) {
     return <WaitingGlyph />
   }
 
-  if (tab.activity === 'idle') {
+  // The tab that rang. There is deliberately no glyph for a plain idle tab:
+  // "not busy" is the resting state of every tab you are not watching, and a
+  // dot that is always on cannot also mean "read this one".
+  if (tab.unseen === true) {
     return (
       <text fg={t.success} selectable={false}>
         {' '}
         ●
+      </text>
+    )
+  }
+
+  if (tab.activity === 'idle') {
+    // Blank, but the same width as every other state — a tab must not resize
+    // when its agent stops.
+    return (
+      <text fg={t.textMuted} selectable={false}>
+        {'  '}
       </text>
     )
   }

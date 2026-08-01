@@ -3,8 +3,14 @@ import type { AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
 import { restoreProjectState } from '../project-persistence'
-import { filterTabsForActiveWorkspace, withActiveWorkspace } from '../project-workspaces'
+import {
+  clearWorkspaceDone,
+  filterTabsForActiveWorkspace,
+  withActiveWorkspace,
+} from '../project-workspaces'
 import { filterProjects } from '../selectors'
+// eslint-disable-next-line no-duplicate-imports
+import { IDLE_WORKSPACE_ACTIVITY } from '../types'
 
 const CLOSED_MODAL = {
   editBuffer: null,
@@ -70,6 +76,12 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
                 updatedAt: new Date().toISOString(),
               }
             : entry
+        ),
+        // Landing on a project lands on its active workspace — same rule as
+        // `set-active-workspace`: you have seen it, so the tick goes.
+        workspaceActivity: clearWorkspaceDone(
+          state.workspaceActivity,
+          loadedProject?.activeWorkspaceId
         ),
       }
     }
@@ -179,6 +191,37 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
         projectStatuses: { ...state.projectStatuses, [action.projectId]: action.status },
       }
     }
+    case 'set-workspace-activity': {
+      const prev = state.workspaceActivity[action.workspaceId] ?? IDLE_WORKSPACE_ACTIVITY
+      // Going back to work is the other way a "finished, unseen" tick clears:
+      // the workspace has something newer to say than "it ended a turn once".
+      const done = action.working || action.waiting ? false : prev.done
+      if (
+        prev.working === action.working &&
+        prev.waiting === action.waiting &&
+        prev.done === done
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        workspaceActivity: {
+          ...state.workspaceActivity,
+          [action.workspaceId]: { done, waiting: action.waiting, working: action.working },
+        },
+      }
+    }
+    case 'mark-workspace-done': {
+      const prev = state.workspaceActivity[action.workspaceId] ?? IDLE_WORKSPACE_ACTIVITY
+      if (prev.done) return state
+      return {
+        ...state,
+        workspaceActivity: {
+          ...state.workspaceActivity,
+          [action.workspaceId]: { ...prev, done: true },
+        },
+      }
+    }
     case 'add-workspace-record':
       return {
         ...state,
@@ -203,6 +246,7 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
       // Remember the tab we're leaving so coming back to this workspace later
       // restores it instead of snapping to the first tab. Keyed by the
       // workspace we're departing (the current project's active one).
+      const workspaceActivity = clearWorkspaceDone(state.workspaceActivity, action.workspaceId)
       const leavingProject = state.projects.find((s) => s.id === action.projectId)
       const leavingWorkspaceId = leavingProject?.activeWorkspaceId
       const lastActiveTabByWorkspace =
@@ -216,7 +260,7 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
       // Changing the workspace of a non-current project has no effect on
       // which tab the user is looking at — leave activeTabId alone.
       if (action.projectId !== state.currentProjectId) {
-        return { ...state, lastActiveTabByWorkspace, projects }
+        return { ...state, lastActiveTabByWorkspace, projects, workspaceActivity }
       }
       // For the current project: if the existing activeTabId belongs to
       // the new workspace, keep it. Otherwise restore the last tab we viewed
@@ -230,14 +274,20 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
         state.activeTabId !== '' &&
         visible.some((t) => t.id === state.activeTabId)
       if (currentStillVisible) {
-        return { ...state, lastActiveTabByWorkspace, projects }
+        return { ...state, lastActiveTabByWorkspace, projects, workspaceActivity }
       }
       const remembered = lastActiveTabByWorkspace[action.workspaceId]
       const nextActiveTabId =
         remembered != null && remembered !== '' && visible.some((t) => t.id === remembered)
           ? remembered
           : (visible[0]?.id ?? null)
-      return { ...state, activeTabId: nextActiveTabId, lastActiveTabByWorkspace, projects }
+      return {
+        ...state,
+        activeTabId: nextActiveTabId,
+        lastActiveTabByWorkspace,
+        projects,
+        workspaceActivity,
+      }
     }
     case 'update-workspace-record':
       return {

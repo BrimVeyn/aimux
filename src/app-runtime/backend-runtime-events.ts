@@ -21,6 +21,7 @@ import {
   handleSwitchProjectEffect,
 } from './project-actions'
 import { recordSetupExit } from './setup-actions'
+import { forgetTabActivity, recordTabStatus, recordTurnComplete } from './workspace-activity'
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend
@@ -36,6 +37,7 @@ function clearTabRuntimeState(
 ): void {
   timeouts.clearIdleTimer(tabId)
   timeouts.clearStartupGrace(tabId)
+  forgetTabActivity(tabId)
 }
 
 export function bindBackendRuntimeEvents({
@@ -97,9 +99,17 @@ export function bindBackendRuntimeEvents({
     dispatch({ projectId, status, type: 'set-project-status' })
   }
 
-  const handleTabActivity = (tabId: string, activity: TabActivity) => {
-    logInputDebug('app.backend.event.tabActivity', { activity, tabId })
+  const handleTabActivity = (tabId: string, activity: TabActivity, workspaceId?: string) => {
+    logInputDebug('app.backend.event.tabActivity', { activity, tabId, workspaceId })
+    // Every project's tabs land here, including ones this client doesn't hold —
+    // the workspace aggregation wants them, the store ignores them.
+    recordTabStatus(tabId, activity, workspaceId)
     dispatch({ activity, tabId, type: 'set-tab-activity' })
+  }
+
+  const handleTabTurnComplete = (tabId: string, projectId: string, workspaceId?: string) => {
+    logInputDebug('app.backend.event.tabTurnComplete', { projectId, tabId, workspaceId })
+    recordTurnComplete(tabId, workspaceId)
   }
 
   // Serialise project lifecycle handlers behind a small FIFO so back-to-back
@@ -279,6 +289,7 @@ export function bindBackendRuntimeEvents({
   backend.on('error', handleError)
   backend.on('projectActivity', handleProjectActivity)
   backend.on('tabActivity', handleTabActivity)
+  backend.on('tabTurnComplete', handleTabTurnComplete)
   backend.on('tabAdded', handleTabAdded)
   backend.on('tabMetadataUpdated', handleTabMetadataUpdated)
   backend.on('projectCreateRequested', handleProjectCreateRequested)
@@ -295,6 +306,7 @@ export function bindBackendRuntimeEvents({
     backend.off('error', handleError)
     backend.off('projectActivity', handleProjectActivity)
     backend.off('tabActivity', handleTabActivity)
+    backend.off('tabTurnComplete', handleTabTurnComplete)
     backend.off('tabAdded', handleTabAdded)
     backend.off('tabMetadataUpdated', handleTabMetadataUpdated)
     backend.off('projectCreateRequested', handleProjectCreateRequested)

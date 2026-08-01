@@ -17,6 +17,7 @@ import {
 } from '../layout-tree'
 import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
+  clearWorkspaceDone,
   filterTabsForActiveWorkspace,
   orderTabsByWorkspace,
   withActiveWorkspace,
@@ -209,34 +210,48 @@ function withActiveTabWorkspace(
   tabId: string | null,
   opts?: { onlyIfMissing?: boolean }
 ): AppState {
-  if (
-    tabId == null ||
-    tabId === '' ||
-    !(state.currentProjectId != null && state.currentProjectId !== '')
-  )
-    return state
-  const tab = state.tabs.find((entry) => entry.id === tabId)
-  if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return state
+  if (tabId == null || tabId === '') return state
+  // Opening the tab is reading its notification, whatever else this helper
+  // decides about the workspace. Every path that makes a tab the active one
+  // goes through here.
+  const seen = { ...state, tabs: clearTabUnseen(state.tabs, tabId) }
+  if (!(seen.currentProjectId != null && seen.currentProjectId !== '')) return seen
+  const tab = seen.tabs.find((entry) => entry.id === tabId)
+  if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return seen
   const workspaceId = tab.workspaceId
+  // Opening one of a workspace's tabs is seeing that workspace, so it drops the
+  // finished-a-turn tick — otherwise a background tab finishing in the workspace
+  // you are already in leaves a ✓ that only a workspace switch could clear.
+  const workspaceActivity = clearWorkspaceDone(seen.workspaceActivity, workspaceId)
   // When `onlyIfMissing` is set, we leave the project's workspace alone if it
   // already points at a known workspace. Used by `hydrate-project` so that
   // a backend re-attach after a user-initiated workspace switch (j/k cycling)
   // doesn't clobber the freshly chosen workspace by re-syncing from the
   // restored active tab.
   if (opts?.onlyIfMissing === true) {
-    const project = state.projects.find((entry) => entry.id === state.currentProjectId)
+    const project = seen.projects.find((entry) => entry.id === seen.currentProjectId)
     const hasValidWorkspace =
       project?.activeWorkspaceId != null &&
       project.activeWorkspaceId !== '' &&
       (project.workspaces?.some((w) => w.id === project.activeWorkspaceId) ?? false)
-    if (hasValidWorkspace) return state
+    if (hasValidWorkspace) return { ...seen, workspaceActivity }
   }
   return {
-    ...state,
-    projects: state.projects.map((project) =>
-      project.id === state.currentProjectId ? withActiveWorkspace(project, workspaceId) : project
+    ...seen,
+    projects: seen.projects.map((project) =>
+      project.id === seen.currentProjectId ? withActiveWorkspace(project, workspaceId) : project
     ),
+    workspaceActivity,
   }
+}
+
+/**
+ * Drop one tab's unseen mark. Returns the same array when it holds none, so a
+ * caller can run it on every activation without re-rendering the tab list.
+ */
+function clearTabUnseen(tabs: TabSession[], tabId: string): TabSession[] {
+  if (!tabs.some((tab) => tab.id === tabId && tab.unseen === true)) return tabs
+  return tabs.map((tab) => (tab.id === tabId ? { ...tab, unseen: undefined } : tab))
 }
 
 function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
@@ -545,7 +560,20 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
     case 'set-tab-activity':
       return {
         ...state,
-        tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, activity: action.activity })),
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          activity: action.activity,
+          // Back to work: whatever it wanted to tell you is out of date.
+          unseen:
+            action.activity === 'working' || action.activity === 'waiting-input'
+              ? undefined
+              : tab.unseen,
+        })),
+      }
+    case 'mark-tab-unseen':
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({ ...tab, unseen: true })),
       }
     case 'set-tab-error':
       return {

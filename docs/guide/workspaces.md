@@ -152,14 +152,39 @@ on the right.
 
 ```
 • aimux                                    +
-    root
-      main
-    scroll drift fix                 +142 -37
-      aimux/scroll-drift-fix
+  root
+    main
+? scroll drift fix                   +142 -37
+    aimux/scroll-drift-fix
 ```
 
 The heading is not a place the cursor stops. `j` / `k` move between workspace
 rows; clicking a heading takes you to that project's **root**.
+
+The column on the left of each row says what that workspace's assistants are
+doing, for every project rather than only the one you are in:
+
+| Glyph   | Meaning                                                 |
+| ------- | ------------------------------------------------------- |
+| `?`     | an assistant is waiting on an answer                    |
+| spinner | an assistant is working                                 |
+| `●`     | an assistant finished a turn and you haven't looked yet |
+
+The `●` clears when you enter the workspace, open one of its tabs, or its
+assistants go back to work. A sound plays on the first two — see **Settings →
+Notifications**, where `off` turns it off.
+
+The project heading stays out of it: it could only ever say "somewhere below",
+and the rows underneath say which one. It falls back to `?` / spinner for its
+whole project in the one case where the rows cannot speak — a daemon still
+running a protocol older than the app, which does not send the tab's workspace.
+Restart it with `aimux restart-daemon`.
+
+The tab that rang carries the same `●` in the tab bar, next to its name, so the
+sound points at one tab rather than just happening; it clears when you open that
+tab or when it goes back to work. A tab that is merely idle shows nothing —
+every tab you are not watching is idle, so a dot that is always on could not
+also mean "this one wants you".
 
 The churn counts come from a fork point, which only aimux-created workspaces
 record — **root** and externally-discovered workspaces show none.

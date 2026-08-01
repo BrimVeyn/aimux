@@ -309,4 +309,88 @@ describe('runStatusDetectionLoop', () => {
       h.loop.stop()
     }
   })
+
+  test('a tab that disappears gets one last idle, so no client is left holding a spinner', async () => {
+    // Only clients attached to its project hear a tab's `tabExit`; everyone
+    // else would keep drawing whatever it was doing when it died.
+    const events: { tabId: string; status: TabActivity; workspaceId: string | undefined }[] = []
+    let alive = true
+    const loop = runStatusDetectionLoop({
+      listProjects: () => ['sess-A'],
+      listTabs: (): LoopTabView[] =>
+        alive
+          ? [
+              {
+                assistant: 'claude',
+                command: 'claude',
+                id: 'tab-1',
+                viewport: snapshot('✱ Thinking…', '  esc to interrupt'),
+                workspaceId: 'wt-1',
+              },
+            ]
+          : [],
+      onProjectStatus: () => {},
+      onTabStatus: (tabId, status, _projectId, workspaceId) => {
+        events.push({ status, tabId, workspaceId })
+      },
+      tickMs: 5,
+    })
+    const waitFor = async (predicate: () => boolean): Promise<void> => {
+      const deadline = Date.now() + 1000
+      while (!predicate() && Date.now() < deadline) await Bun.sleep(5)
+    }
+    try {
+      await waitFor(() => events.at(-1)?.status === 'working')
+      alive = false
+      await waitFor(() => events.at(-1)?.status === 'idle')
+      // With its workspace, so the client can retire it from the right row.
+      expect(events.at(-1)).toEqual({ status: 'idle', tabId: 'tab-1', workspaceId: 'wt-1' })
+      expect(loop.getTabStatus('tab-1')).toBeUndefined()
+    } finally {
+      loop.stop()
+    }
+  })
+
+  test("a tab's workspace reaches both status callbacks", async () => {
+    // The client holds tabs for the project it is attached to only, so this id
+    // is the only way a *foreign* project's workspace row learns anything.
+    let clock = 0
+    const statusEvents: { tabId: string; workspaceId: string | undefined }[] = []
+    const turnEvents: { tabId: string; workspaceId: string | undefined }[] = []
+    const loop = runStatusDetectionLoop({
+      listProjects: () => ['sess-A'],
+      listTabs: (): LoopTabView[] => [
+        {
+          assistant: 'claude',
+          command: 'claude',
+          id: 'tab-1',
+          viewport: snapshot('❯ ', ''),
+          workspaceId: 'wt-9',
+        },
+      ],
+      nowFn: () => clock,
+      onProjectStatus: () => {},
+      onTabStatus: (tabId, _status, _projectId, workspaceId) => {
+        statusEvents.push({ tabId, workspaceId })
+      },
+      onTurnComplete: (tabId, _projectId, _idleMs, workspaceId) => {
+        turnEvents.push({ tabId, workspaceId })
+      },
+      tickMs: 5,
+      turnSettleMs: 100,
+    })
+    const waitFor = async (predicate: () => boolean): Promise<void> => {
+      const deadline = Date.now() + 1000
+      while (!predicate() && Date.now() < deadline) await Bun.sleep(5)
+    }
+    try {
+      await waitFor(() => statusEvents.length > 0)
+      expect(statusEvents[0]).toEqual({ tabId: 'tab-1', workspaceId: 'wt-9' })
+      clock = 250
+      await waitFor(() => turnEvents.length > 0)
+      expect(turnEvents[0]).toEqual({ tabId: 'tab-1', workspaceId: 'wt-9' })
+    } finally {
+      loop.stop()
+    }
+  })
 })

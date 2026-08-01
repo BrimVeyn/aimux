@@ -46,8 +46,14 @@ import { isProjectSnapshotV1, isWorkspaceRecord } from '../state/validation'
 //
 // v16: breaking release boundary — the agent-first worker control plane and
 // its metadata guarantees are now required. Old app/daemon pairs must not mix.
+//
+// v18: additive — an optional `workspaceId` on the `tabStatus` and
+// `tabTurnComplete` broadcasts. It needs no capability: a client that receives
+// it attributes the tab to a workspace row, and one that doesn't (or a v17
+// daemon that never sends it) simply has no workspace-level indicator. MIN
+// stays at 17 so a running v17 daemon keeps serving until it is restarted.
 export const IPC_PROTOCOL_MIN_VERSION = 17
-export const IPC_PROTOCOL_VERSION = 17
+export const IPC_PROTOCOL_VERSION = 18
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -390,13 +396,22 @@ export type ServerEvent =
     }
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
-  | { type: 'tabStatus'; payload: { projectId: string; tabId: string; status: TabActivity } }
+  // v18: `workspaceId` is the tab's workspace when the daemon knows one. A
+  // client only holds tabs for the project it is attached to, so this is the
+  // only way it can attribute a *foreign* project's tab to a workspace row.
+  | {
+      type: 'tabStatus'
+      payload: { projectId: string; tabId: string; status: TabActivity; workspaceId?: string }
+    }
   // v13 / capability `turnLifecycle`. Authoritative end-of-turn: broadcast
   // once a tab's `idle` activity has held continuously for the settle window.
   // Edge-triggered — re-armed only after the tab leaves `idle` again — so a
   // driver gets exactly one per turn. `idleMs` is how long idle had held when
   // the event fired.
-  | { type: 'tabTurnComplete'; payload: { projectId: string; tabId: string; idleMs: number } }
+  | {
+      type: 'tabTurnComplete'
+      payload: { projectId: string; tabId: string; idleMs: number; workspaceId?: string }
+    }
   // v13 / capability `questionEvents`. Broadcast when a tab transitions into
   // `waiting-input`. `prompt` is the captured tail text (authoritative);
   // `options` is a best-effort per-CLI parse of the choice list and may be
@@ -912,11 +927,19 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.projectId), 'tabStatus.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
       assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
+      assert(
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'tabStatus.workspaceId must be a string when present'
+      )
       return value as ServerEvent
     case 'tabTurnComplete':
       assert(isString(value.payload.projectId), 'tabTurnComplete.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabTurnComplete.tabId must be a string')
       assert(isFiniteNumber(value.payload.idleMs), 'tabTurnComplete.idleMs must be a number')
+      assert(
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'tabTurnComplete.workspaceId must be a string when present'
+      )
       return value as ServerEvent
     case 'tabQuestion':
       assert(isString(value.payload.projectId), 'tabQuestion.projectId must be a string')
