@@ -115,6 +115,11 @@ export type ProjectAction =
   | { type: 'reorder-projects'; orderedIds: string[] }
   | { type: 'reorder-active-project'; delta: number }
   | { type: 'set-project-status'; projectId: string; status: ProjectStatus }
+  /** What a workspace's assistants are doing. `done` is owned by the reducer,
+   *  so this carries only the two flags derived from tab statuses. */
+  | { type: 'set-workspace-activity'; workspaceId: string; working: boolean; waiting: boolean }
+  /** An assistant in this workspace finished a turn and nobody has looked yet. */
+  | { type: 'mark-workspace-done'; workspaceId: string }
   | {
       type: 'add-workspace-record'
       projectId: string

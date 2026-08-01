@@ -50,13 +50,22 @@ export interface LoopTabView {
   assistant: AssistantId
   command: string
   viewport?: TerminalSnapshot
+  /** The workspace this tab belongs to, when its owner knows one. Passed
+   *  straight through to the status callbacks so a client can group tabs it
+   *  does not itself hold — see the `workspaceId` note in `src/ipc/protocol.ts`. */
+  workspaceId?: string
 }
 
 export interface StatusDetectionLoopOptions {
   listProjects: () => string[]
   listTabs: (projectId: string) => LoopTabView[]
   /** Emitted when a tab's status changes. */
-  onTabStatus: (tabId: string, status: TabActivity, projectId: string) => void
+  onTabStatus: (
+    tabId: string,
+    status: TabActivity,
+    projectId: string,
+    workspaceId: string | undefined
+  ) => void
   /** Emitted when either flag on a project changes. */
   onProjectStatus: (projectId: string, status: ProjectStatus) => void
   /**
@@ -65,7 +74,12 @@ export interface StatusDetectionLoopOptions {
    * `idle`, so a driver receives exactly one signal per turn. `idleMs` is how
    * long idle had held when the signal fired.
    */
-  onTurnComplete?: (tabId: string, projectId: string, idleMs: number) => void
+  onTurnComplete?: (
+    tabId: string,
+    projectId: string,
+    idleMs: number,
+    workspaceId: string | undefined
+  ) => void
   /**
    * Emitted when a tab transitions into `waiting-input`. Edge-triggered: fires
    * once per transition, carrying the captured prompt text and any parsed
@@ -173,7 +187,7 @@ export function runStatusDetectionLoop(
       })
       if (changed) {
         lastTabStatus.set(tab.id, { projectId, status })
-        options.onTabStatus(tab.id, status, projectId)
+        options.onTabStatus(tab.id, status, projectId, tab.workspaceId)
       }
 
       // Turn-complete bookkeeping. The emission itself is gated to `tick` so a
@@ -189,7 +203,7 @@ export function runStatusDetectionLoop(
         }
         if (source === 'tick' && !turnEmitted.has(tab.id) && now - since >= turnSettleMs) {
           turnEmitted.add(tab.id)
-          options.onTurnComplete?.(tab.id, projectId, now - since)
+          options.onTurnComplete?.(tab.id, projectId, now - since, tab.workspaceId)
         }
       } else {
         idleSince.delete(tab.id)

@@ -61,6 +61,11 @@ export interface ProjectStatus {
   working: boolean
   waiting: boolean
 }
+export interface WorkspaceActivity {
+  working: boolean
+  waiting: boolean
+  done: boolean
+}
 export type FocusMode =
   | 'navigation'
   | 'terminal-input'
@@ -599,6 +604,7 @@ export interface AppState {
   multiRepo: MultiRepoState
   settings: SettingsUIState
   workspaceDivergence: Record<string, BranchDivergence>
+  workspaceActivity: Record<string, WorkspaceActivity>
   lastActiveTabByWorkspace: Record<string, string>
   pendingChords: string[] | null
 }
@@ -683,6 +689,8 @@ export type ProjectAction =
   | { type: 'reorder-projects'; orderedIds: string[] }
   | { type: 'reorder-active-project'; delta: number }
   | { type: 'set-project-status'; projectId: string; status: ProjectStatus }
+  | { type: 'set-workspace-activity'; workspaceId: string; working: boolean; waiting: boolean }
+  | { type: 'mark-workspace-done'; workspaceId: string }
   | {
       type: 'add-workspace-record'
       projectId: string

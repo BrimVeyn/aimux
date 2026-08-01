@@ -320,6 +320,11 @@ const ProjectRow = memo(function ProjectRow({
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
+  // A project is "finished, unseen" when any of its workspaces is. Derived
+  // rather than stored: the workspace rows own that latch.
+  const showDone = useAppStore((s) =>
+    (project.workspaces ?? []).some((workspace) => s.workspaceActivity[workspace.id]?.done === true)
+  )
   // Only the drag highlight is "selected"-strength here. A heading that lights
   // up like a cursor row is what made the project look like a workspace.
   let bgColor: string | undefined
@@ -396,6 +401,9 @@ const ProjectRow = memo(function ProjectRow({
   } else if (showSpinner) {
     leadingGlyph = spinner
     leadingColor = workingColor
+  } else if (showDone) {
+    leadingGlyph = '✓'
+    leadingColor = t.success
   }
 
   // No branch line: the repo checkout is not somewhere aimux works, so naming

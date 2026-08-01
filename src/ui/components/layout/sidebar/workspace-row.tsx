@@ -7,6 +7,9 @@ import type { ProjectRecord, WorkspaceRecord } from '../../../../state/types'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDiffStat } from '../../../../state/project-workspaces'
+// eslint-disable-next-line no-duplicate-imports
+import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
+import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
@@ -38,6 +41,9 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const isCurrentProject = project.id === currentProjectId
   const divergence = useAppStore((s) => s.workspaceDivergence[workspace.id])
+  const activity = useAppStore((s) => s.workspaceActivity[workspace.id]) ?? IDLE_WORKSPACE_ACTIVITY
+  // Only the working case animates, so the timer is off for every other row.
+  const spinner = useBusySpinner(activity.working)
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -123,6 +129,23 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       ? null
       : truncate(workspace.branch, Math.max(0, contentWidth - 6))
 
+  // Same vocabulary as the project heading one level up, in the same priority:
+  // a question outranks work in progress, which outranks "it finished and you
+  // haven't looked". A space when there is nothing to say — the row keeps its
+  // width either way, so nothing shifts.
+  let statusGlyph = ' '
+  let statusColor = t.textMuted
+  if (activity.waiting) {
+    statusGlyph = '?'
+    statusColor = t.warning
+  } else if (activity.working) {
+    statusGlyph = spinner
+    statusColor = t.primary
+  } else if (activity.done) {
+    statusGlyph = '✓'
+    statusColor = t.success
+  }
+
   return (
     <ContextMenuBox
       id={`sidebar-wt-${workspace.id}`}
@@ -135,8 +158,10 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       onMouseDown={handleMouseDown}
     >
       <box flexDirection="row" alignItems="center">
+        <text fg={statusColor} selectable={false} wrapMode="none">
+          {statusGlyph}{' '}
+        </text>
         <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {'  '}
           {'\u{e702}'}{' '}
         </text>
         <FlashLabelBadge rowKey={`wt:${workspace.id}`} />

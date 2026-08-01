@@ -141,6 +141,7 @@ export function createInitialState(
     snippets,
     tabGroupMap: {},
     tabs: [],
+    workspaceActivity: {},
     workspaceDivergence: {},
   }
 }

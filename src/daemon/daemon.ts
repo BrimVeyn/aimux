@@ -449,6 +449,7 @@ export async function runDaemon(): Promise<void> {
         command: entry.command,
         id: tabId,
         viewport: entry.viewport,
+        workspaceId: entry.workspaceId,
       })
     }
     return result
@@ -479,21 +480,24 @@ export async function runDaemon(): Promise<void> {
         type: 'tabQuestion',
       })
     },
-    onTabStatus: (tabId, status, projectId) => {
+    onTabStatus: (tabId, status, projectId, workspaceId) => {
       logDebug('daemon.status.tab', { projectId, status, tabId })
       // Broadcast to every client. Clients silently ignore events for tabIds
       // they don't know about, so there's no UI impact — this costs one
       // extra socket write per tab per change, which is trivial, and
       // removes a race where in-flight tab events could be dropped when a
       // client tears down its socket to switch projects.
-      broadcastAll({ payload: { projectId, status, tabId }, type: 'tabStatus' })
+      broadcastAll({ payload: { projectId, status, tabId, workspaceId }, type: 'tabStatus' })
     },
-    onTurnComplete: (tabId, projectId, idleMs) => {
+    onTurnComplete: (tabId, projectId, idleMs, workspaceId) => {
       logDebug('daemon.status.turnComplete', { idleMs, projectId, tabId })
       // v13 / capability `turnLifecycle`. Gate at send time — pre-v13 parsers
       // throw on unknown event types and would drop the connection. MIN stays
       // at 10, so we fan this only to peers that negotiated at least v13.
-      broadcastAllVersioned(13, { payload: { idleMs, projectId, tabId }, type: 'tabTurnComplete' })
+      broadcastAllVersioned(13, {
+        payload: { idleMs, projectId, tabId, workspaceId },
+        type: 'tabTurnComplete',
+      })
     },
     turnSettleMs: turnCompleteSettleMs(),
   })

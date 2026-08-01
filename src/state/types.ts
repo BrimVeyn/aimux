@@ -44,6 +44,24 @@ export interface ProjectStatus {
 
 export const IDLE_PROJECT_STATUS: ProjectStatus = { waiting: false, working: false }
 
+/**
+ * A workspace's status, as the sidebar draws it. `working`/`waiting` mirror
+ * `ProjectStatus` one level down; `done` is a latch — an assistant here
+ * finished a turn and nobody has looked yet — cleared when the workspace is
+ * entered or when it goes back to work.
+ */
+export interface WorkspaceActivity {
+  working: boolean
+  waiting: boolean
+  done: boolean
+}
+
+export const IDLE_WORKSPACE_ACTIVITY: WorkspaceActivity = {
+  done: false,
+  waiting: false,
+  working: false,
+}
+
 export type FocusMode =
   | 'navigation'
   | 'terminal-input'
@@ -730,6 +748,13 @@ export interface AppState {
    * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.
    */
   workspaceDivergence: Record<string, BranchDivergence>
+  /**
+   * What each workspace's assistants are doing, keyed by workspace id. Covers
+   * every project the daemon knows, not just the current one — see
+   * `src/app-runtime/workspace-activity.ts`, which owns the aggregation.
+   * Ephemeral; not persisted to the catalog.
+   */
+  workspaceActivity: Record<string, WorkspaceActivity>
   /**
    * Last active tab a user viewed within each workspace, keyed by workspace id.
    * Lets switching back to a workspace restore its last-viewed tab instead of

@@ -147,6 +147,8 @@ const FROZEN_ROW_IDS = [
   'layout.rightBarWidth',
   'multiRepo.enabled',
   'multiRepo.maxDepth',
+  'notifications.sound',
+  'notifications.test',
   'snippets.manage',
   'snippets.triggerChar',
   'statusBar.aiUsage.enabled',

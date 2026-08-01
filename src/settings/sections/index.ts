@@ -10,6 +10,7 @@ import { EXPERIMENTAL_SECTION } from './experimental'
 import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
+import { NOTIFICATIONS_SECTION } from './notifications'
 import { SETUP_SECTION } from './setup'
 import { STATUS_BAR_SECTION } from './status-bar'
 
@@ -21,6 +22,7 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
   APPEARANCE_SECTION,
   LAYOUT_SECTION,
   AUTOMATION_SECTION,
+  NOTIFICATIONS_SECTION,
   SETUP_SECTION,
   GIT_SECTION,
   COMMANDS_SECTION,

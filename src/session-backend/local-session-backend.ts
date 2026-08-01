@@ -89,10 +89,13 @@ export class LocalSessionBackend
       onProjectStatus: (projectId, status) => {
         this.emit('projectActivity', projectId, status)
       },
-      onTabStatus: (tabId, status, projectId) => {
+      onTabStatus: (tabId, status, projectId, workspaceId) => {
         if (projectId === this.currentProjectId) {
-          this.emit('tabActivity', tabId, status)
+          this.emit('tabActivity', tabId, status, workspaceId)
         }
+      },
+      onTurnComplete: (tabId, projectId, _idleMs, workspaceId) => {
+        this.emit('tabTurnComplete', tabId, projectId, workspaceId)
       },
     })
   }
