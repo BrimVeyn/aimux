@@ -88,6 +88,57 @@ describe('AssistantStatusDetector', () => {
     expect(s).toBe('working')
   })
 
+  // Ctrl+T todo overlay: the spinner line lands on row 11 counting from the
+  // bottom, just outside the 10-line tail, and Claude drops `esc to interrupt`
+  // from the status line while the overlay is up.
+  test('claude: working survives the Ctrl+T todo overlay', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot([
+        '● 4 tâches créées (#1 à #4). Ctrl+T devrait te les afficher.',
+        '',
+        '✳ Sautéed for 10s',
+        '',
+        '❯ travaille pendant 10 secondes',
+        '',
+        '✳ Flowing… (3s · thinking with high effort)',
+        '  └ ☐ Test todo 1',
+        '    ☐ Test todo 2',
+        '    ☐ Test todo 3',
+        '    ☐ Test todo 4',
+        '',
+        '',
+        '❯ ',
+        '',
+        '  Opus 5 (1M context) | Context: 5% | Branch: main | Dir: rainhub',
+        '  ▶▶ auto mode on (shift+tab to cycle) · ⌥+⏎ agent',
+      ]),
+    })
+    expect(s).toBe('working')
+  })
+
+  test('claude: finished status lines in the transcript stay idle', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot([
+        '✳ Sautéed for 10s',
+        '',
+        '● Voilà, c’est fait.',
+        '  └ ☒ Test todo 1',
+        '    ☒ Test todo 2',
+        '',
+        '❯ ',
+        '',
+        '  Opus 5 (1M context) | Context: 5% | Branch: main | Dir: rainhub',
+      ]),
+    })
+    expect(s).toBe('idle')
+  })
+
   test('codex: detects working and waiting-input', () => {
     const d = new AssistantStatusDetector()
     expect(

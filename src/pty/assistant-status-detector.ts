@@ -51,6 +51,13 @@ export class AssistantStatusDetector {
     if (!viewport) return this.remember(tabId, '', now, 'idle')
 
     const tail = extractTailText(viewport, TAIL_LINE_COUNT)
+    // Whole visible screen. Claude's Ctrl+T todo overlay pushes the spinner
+    // status line above the 10-line tail, so "is it working" has to look at
+    // the full frame. "Is it waiting on me" stays tail-scoped.
+    // ponytail: a scrolled-away pane falls back to `viewport.tailLines`, capped
+    // at SNAPSHOT_TAIL_LINE_COUNT (10) — the overlay still hides the spinner
+    // there. Raise that constant if it bites; it grows every render payload.
+    const screen = extractTailText(viewport, viewport.lines.length)
     const prev = this.entries.get(tabId)
     const changedAt = prev && prev.tail === tail ? prev.changedAt : now
     const haystack = tail.toLowerCase()
@@ -59,7 +66,7 @@ export class AssistantStatusDetector {
       return this.remember(tabId, tail, changedAt, 'idle')
     }
 
-    const perCli = classifyBuiltin(assistant, haystack, tail)
+    const perCli = classifyBuiltin(assistant, haystack, tail, screen)
     if (perCli) return this.remember(tabId, tail, changedAt, perCli)
 
     const generic = classifyGeneric(haystack, changedAt, now)
@@ -129,11 +136,12 @@ function extractTailText(viewport: TerminalSnapshot, lineCount: number): string 
 function classifyBuiltin(
   assistant: AssistantId,
   haystack: string,
-  rawTail: string
+  rawTail: string,
+  rawScreen: string
 ): TabActivity | null {
   switch (assistant) {
     case 'claude':
-      return classifyClaude(haystack, rawTail)
+      return classifyClaude(haystack, rawScreen)
     case 'codex':
       return classifyCodex(haystack)
     case 'opencode':
@@ -147,7 +155,15 @@ function classifyBuiltin(
   }
 }
 
-function classifyClaude(haystack: string, rawTail: string): TabActivity {
+/**
+ * `haystack` is the lowercased 10-line tail, `rawScreen` the whole visible
+ * frame. Prompts always land at the bottom, so waiting-input stays on the tail
+ * — widening it would let a "Do you want…" from the transcript above fake a
+ * pending question. Working markers get the full frame: with the Ctrl+T todo
+ * overlay open, Claude drops the `esc to interrupt` hint entirely and the
+ * spinner line sits above however many todos are listed.
+ */
+function classifyClaude(haystack: string, rawScreen: string): TabActivity {
   if (
     haystack.includes('do you want') ||
     haystack.includes('would you like') ||
@@ -157,15 +173,16 @@ function classifyClaude(haystack: string, rawTail: string): TabActivity {
   ) {
     return 'waiting-input'
   }
+  const screen = rawScreen.toLowerCase()
   if (
-    haystack.includes('esc/ctrl+c to interrupt') ||
-    haystack.includes('esc to interrupt') ||
-    haystack.includes('ctrl+c to interrupt') ||
-    haystack.includes('esc interrupt')
+    screen.includes('esc/ctrl+c to interrupt') ||
+    screen.includes('esc to interrupt') ||
+    screen.includes('ctrl+c to interrupt') ||
+    screen.includes('esc interrupt')
   ) {
     return 'working'
   }
-  if (hasClaudeSpinner(rawTail)) return 'working'
+  if (hasClaudeSpinner(rawScreen)) return 'working'
   return 'idle'
 }
 
@@ -174,8 +191,16 @@ function classifyClaude(haystack: string, rawTail: string): TabActivity {
 // separators Claude scatters mid-line through its header/footer (e.g.
 // `Opus 4.7 … · Claude Max`, `… · ← for agents`), which would otherwise pair
 // with a stray `...` placeholder and mark an idle home screen as working.
-function hasClaudeSpinner(rawTail: string): boolean {
-  for (const line of rawTail.split('\n')) {
+//
+// The ellipsis is also what separates a live status line (`✱ Flowing… (3s · …)`)
+// from a finished one left in the transcript (`✱ Sautéed for 10s`) — that's why
+// scanning the whole screen instead of the tail doesn't resurrect past turns.
+// ponytail: a spinner line frozen mid-`…` (interrupted turn) would pin the pane
+// to `working` until it scrolls off. Chosen failure direction — a false
+// `working` notifies nobody, a false `idle` fires a turn-complete. Cross-check
+// against screen-text velocity (the `(3s` timer ticks) if it ever shows up.
+function hasClaudeSpinner(rawText: string): boolean {
+  for (const line of rawText.split('\n')) {
     const trimmed = line.trimStart()
     const first = trimmed[0]
     if (first == null || !CLAUDE_SPINNER_GLYPH_SET.has(first)) continue
