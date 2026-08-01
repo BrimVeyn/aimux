@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   ASSISTANT_OPTIONS,
+  assistantAcceptsPromptArg,
   buildAssistantModelArgs,
   getAssistantOption,
   parseCommand,
@@ -79,6 +80,29 @@ describe('parseCommand', () => {
       args: ["it's fine"],
       executable: 'echo',
     })
+  })
+})
+
+describe('assistantAcceptsPromptArg', () => {
+  test('true for the CLIs that take an interactive positional prompt', () => {
+    expect(assistantAcceptsPromptArg('claude', {})).toBe(true)
+    expect(assistantAcceptsPromptArg('codex', {})).toBe(true)
+  })
+
+  test('false where the positional means something else, or is unknown', () => {
+    // `opencode [project]` is a path, and its `run` subcommand is not
+    // interactive — so it stays on the paste fallback.
+    expect(assistantAcceptsPromptArg('opencode', {})).toBe(false)
+    expect(assistantAcceptsPromptArg('terminal', {})).toBe(false)
+  })
+
+  test('a custom command keeps the vendor capability', () => {
+    // Still the same CLI, just with the user's own flags.
+    expect(assistantAcceptsPromptArg('claude', { claude: 'claude --model opus' })).toBe(true)
+  })
+
+  test('false for an unknown assistant id', () => {
+    expect(assistantAcceptsPromptArg('nope', { nope: 'nope' })).toBe(false)
   })
 })
 

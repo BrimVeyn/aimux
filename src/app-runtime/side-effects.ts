@@ -9,6 +9,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getDefaultBranch, listLocalBranches } from '../git/worktree'
+import { assistantAcceptsPromptArg } from '../pty/command-registry'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -202,30 +203,39 @@ function applyThemeEffect(
 }
 
 /**
+ * Setup runs concurrently with the agent by design, so say so rather than
+ * letting the agent run tests against a half-installed tree and draw the wrong
+ * conclusion. Only prefixed when a setup is actually live.
+ */
+function buildWorkspacePrompt(ctx: SideEffectContext, pending: PendingWorkspaceLaunch): string {
+  const setupRunning = findSetupTab(ctx.getState().tabs, pending.workspaceId)?.status === 'running'
+  if (!setupRunning) return pending.prompt
+  return `Note: a setup script is currently installing this workspace's dependencies in the background. Wait for it to finish before running builds, tests, or anything that reads installed dependencies.\n\n${pending.prompt}`
+}
+
+/**
  * Second half of the `<C-p>` flow, once the assistant is known: hand it the
  * prompt and rename the workspace after what the prompt describes. Both are
  * background work that must never block or fail the launch itself.
+ *
+ * The rename always uses `pending.prompt`, never the setup-annotated variant —
+ * the note is guidance for the agent, not part of what the user asked for.
  */
 function startPendingWorkspaceLaunch(
   ctx: SideEffectContext,
   pending: PendingWorkspaceLaunch,
   assistant: AssistantId,
-  tabId: string
+  tabId: string,
+  promptDeliveredAtSpawn: boolean
 ): void {
-  // Setup runs concurrently with the agent by design, so say so rather than
-  // letting the agent run tests against a half-installed tree and draw the
-  // wrong conclusion. Only prefixed when a setup is actually live.
-  const setupRunning = findSetupTab(ctx.getState().tabs, pending.workspaceId)?.status === 'running'
-  const prompt = setupRunning
-    ? `Note: a setup script is currently installing this workspace's dependencies in the background. Wait for it to finish before running builds, tests, or anything that reads installed dependencies.\n\n${pending.prompt}`
-    : pending.prompt
-
-  void injectPromptWhenReady({
-    backend: ctx.backend,
-    getState: ctx.getState,
-    prompt,
-    tabId,
-  })
+  if (!promptDeliveredAtSpawn) {
+    void injectPromptWhenReady({
+      backend: ctx.backend,
+      getState: ctx.getState,
+      prompt: buildWorkspacePrompt(ctx, pending),
+      tabId,
+    })
+  }
 
   const workspace = ctx
     .getState()
@@ -324,20 +334,38 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // Otherwise the tab lands in the project's active workspace, which
       // launchAssistant resolves itself.
       const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
-      const pendingPrompt = state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined
+      const barePrompt = state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined
+      const prompt = pending ? buildWorkspacePrompt(ctx, pending) : barePrompt
+
+      // Hand the prompt to the CLI at spawn where the CLI takes one. Pasting it
+      // into a live TUI works — it is what this flow did — but it means polling
+      // for readiness, probing the screen, and retrying. An argv slot has none of
+      // those failure modes.
+      const atSpawn =
+        prompt != null &&
+        prompt !== '' &&
+        assistantAcceptsPromptArg(assistant, state.customCommands)
       logInputDebug('app.launchSelectedAssistant', {
         assistant,
         chained: pending != null,
         modal: state.modal.type,
+        promptAtSpawn: atSpawn,
+        promptLength: prompt?.length ?? 0,
       })
-      const tabId = launchAssistant(ctx, assistant, pending?.workspaceId)
-      if (pending) startPendingWorkspaceLaunch(ctx, pending, assistant, tabId)
-      // A bare prompt with none of the workspace pinning/rename behaviour.
-      else if (pendingPrompt != null && pendingPrompt !== '') {
+
+      const tabId = launchAssistant(
+        ctx,
+        assistant,
+        pending?.workspaceId,
+        atSpawn && prompt != null ? [prompt] : undefined
+      )
+      if (pending) {
+        startPendingWorkspaceLaunch(ctx, pending, assistant, tabId, atSpawn)
+      } else if (!atSpawn && prompt != null && prompt !== '') {
         void injectPromptWhenReady({
           backend: ctx.backend,
           getState: ctx.getState,
-          prompt: pendingPrompt,
+          prompt,
           tabId,
         })
       }

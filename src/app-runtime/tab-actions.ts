@@ -170,7 +170,14 @@ export function startTabSession(
   cols: number,
   rows: number,
   cwd?: string,
-  autoRenameCandidate = true
+  autoRenameCandidate = true,
+  /**
+   * Appended after the command's own args. Kept out of `tab.command` on purpose:
+   * an initial prompt is up to a few thousand characters, and `command` is what
+   * the UI shows, what the snapshot persists, and what the custom-command editor
+   * round-trips.
+   */
+  extraArgs?: string[]
 ): void {
   logInputDebug('app.tab.start.request', {
     cols,
@@ -196,7 +203,7 @@ export function startTabSession(
   }
 
   backend.createSession({
-    args,
+    args: extraArgs && extraArgs.length > 0 ? [...args, ...extraArgs] : args,
     assistant: tab.assistant,
     autoRenameCandidate,
     cols,
@@ -209,11 +216,18 @@ export function startTabSession(
   })
 }
 
-/** Returns the id of the tab it created, so a caller can write into it. */
+/**
+ * Returns the id of the tab it created, so a caller can write into it.
+ *
+ * `initialPromptArgs` hands the prompt to the CLI at spawn — see
+ * `assistantAcceptsPromptArg`. Callers pass it only for assistants that support
+ * it, and fall back to `injectPromptWhenReady` otherwise.
+ */
 export function launchAssistant(
   ctx: SideEffectContext,
   assistant: AssistantId,
-  workspaceId?: string
+  workspaceId?: string,
+  initialPromptArgs?: string[]
 ): string {
   const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
   const customCommand = state.customCommands[assistant]
@@ -243,7 +257,9 @@ export function launchAssistant(
     tab,
     state.layout.terminalCols,
     state.layout.terminalRows,
-    getTabProjectPath(ctx, tab)
+    getTabProjectPath(ctx, tab),
+    true,
+    initialPromptArgs
   )
   return tab.id
 }

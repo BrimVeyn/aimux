@@ -22,6 +22,21 @@ export interface AssistantOption {
   command: string
   description: string
   model?: AssistantModelSpec
+  /**
+   * The CLI starts an interactive session with a positional prompt argument
+   * (`claude "…"`, `codex "…"`). When it does, handing the prompt over at spawn
+   * beats pasting it into the running TUI afterwards: no readiness poll, no
+   * screen probe, no retries.
+   *
+   * Absent means "unknown or not supported" and the caller falls back to
+   * `injectPromptWhenReady`. `opencode`'s positional is a project path and its
+   * `run` subcommand is non-interactive, so it stays on the fallback.
+   *
+   * ponytail: a boolean, because both CLIs that support it are positional.
+   * Promote to a builder — as `AssistantModelSpec` already does for flags — when
+   * a `--prompt <x>`-shaped one shows up.
+   */
+  acceptsPromptArg?: boolean
 }
 
 const DEFAULT_SHELL =
@@ -30,6 +45,7 @@ const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
 
 export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
+    acceptsPromptArg: true,
     command: 'claude',
     description: 'Anthropic Claude CLI',
     id: 'claude',
@@ -40,6 +56,7 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    acceptsPromptArg: true,
     command: 'codex',
     description: 'OpenAI Codex CLI',
     id: 'codex',
@@ -114,6 +131,19 @@ export function getAllAssistantOptions(customCommands: Record<string, string>): 
       label: id.charAt(0).toUpperCase() + id.slice(1),
     }))
   return [...ASSISTANT_OPTIONS, ...customOptions]
+}
+
+/**
+ * Whether this assistant can take the initial prompt as a spawn argument. A
+ * custom command still counts: it is the same vendor CLI with the user's own
+ * flags, not a different program.
+ */
+export function assistantAcceptsPromptArg(
+  assistant: AssistantId,
+  customCommands: Record<string, string>
+): boolean {
+  const all = getAllAssistantOptions(customCommands)
+  return all.find((option) => option.id === assistant)?.acceptsPromptArg === true
 }
 
 export function isCommandAvailable(command: string): boolean {
