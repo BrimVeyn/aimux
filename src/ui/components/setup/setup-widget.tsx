@@ -118,21 +118,16 @@ export const SetupWidget = memo(function SetupWidget() {
         </text>
       </box>
 
+      {/* Only Run depends on a script existing. Edit and Agent must not vanish
+          the moment one does, or writing a stub and closing the editor leaves no
+          way to ask an agent to fill it in — and no way out. */}
       <box flexDirection="row" flexShrink={0} gap={1} paddingTop={1} paddingBottom={1}>
-        {scriptExists ? (
-          <>
-            <Button effect={running ? STOP : RUN} label={runLabel} />
-            <Button effect={CONFIGURE} label="Edit" />
-            {/* A failing setup means reading a stack trace, which a bar this
-                narrow cannot do. This is the way out. */}
-            {setupTab ? <Button effect={PROMOTE} label="↗" /> : null}
-          </>
-        ) : (
-          <>
-            <Button effect={CONFIGURE} label="Configure" />
-            <Button effect={ASK_AGENT} label="Ask an agent" />
-          </>
-        )}
+        {scriptExists ? <Button effect={running ? STOP : RUN} label={runLabel} /> : null}
+        <Button effect={CONFIGURE} label={scriptExists ? 'Edit' : 'Create'} />
+        <Button effect={ASK_AGENT} label="Agent" />
+        {/* A failing setup means reading a stack trace, which a bar this narrow
+            cannot do. This is the way out. */}
+        {setupTab ? <Button effect={PROMOTE} label="↗" /> : null}
       </box>
 
       {setupTab ? (
