@@ -18,15 +18,17 @@ here](#what-is-not-here)) — but it is no longer the price of admission.
 
 Two columns: the sections on the left, that section's settings on the right.
 
-| Key               | Does                                                                         |
-| ----------------- | ---------------------------------------------------------------------------- |
-| `h` / `←`         | Go to the section list                                                       |
-| `l` / `→`         | Go to the settings of the current section                                    |
-| `j` / `k`         | Move down / up, in whichever column has the cursor                           |
-| `Space` / `Enter` | Change the setting: flip a checkbox, take the next option, open a text field |
-| `-` / `+`         | Step a number down / up                                                      |
-| `Esc`             | Close the screen                                                             |
-| `?`               | The keybindings for this screen                                              |
+| Key               | Does                                                                           |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `/`               | Search every setting, whatever section it is in                                |
+| `h` / `←`         | Go to the section list                                                         |
+| `l` / `→`         | Go to the settings of the current section                                      |
+| `j` / `k`         | Move down / up, in whichever column has the cursor                             |
+| `Space` / `Enter` | Change it: flip a checkbox, take the next option, ask for a number or a string |
+| `-` / `+`         | Step a number down / up                                                        |
+| `r`               | Put the setting back to its default                                            |
+| `Esc`             | Close the screen                                                               |
+| `?`               | The keybindings for this screen                                                |
 
 `h` and `l` always change column, never the value — a number row would otherwise
 make them ambiguous.
@@ -39,9 +41,23 @@ All of it works with the mouse. Clicking a section selects it; clicking a settin
 selects **and** changes it, because a checkbox you have to select first and click
 again is not a checkbox.
 
-`Space`/`Enter` on a number steps it up and wraps round at the maximum, so the key
-always does something visible. `-` and `+` name a direction, so they stop at the
-ends instead of wrapping.
+On a number, `-` and `+` step by one increment and stop at the ends;
+`Space`/`Enter` asks for the number instead, because stepping to the far end of a
+wide range takes dozens of presses. A number outside the range is clamped rather
+than refused, and says so.
+
+## Searching, and going back
+
+`/` opens a list of every setting, filtered as you type — by label, by what it
+does, by the section it is in, or by the key it has in `aimux.json`. `Enter` takes
+the screen to it.
+
+`r` puts a setting back to what it would be if this screen had never touched it:
+its value in your config file if that file declares one, else the built-in
+default. A setting this screen has a value for is marked `•` — so `•` means "you
+set this, `r` undoes it" and `*` means "your config file owns this". Settings that
+are a view over something else (bar widths, the theme, the launch commands) have
+no `•` and nothing to reset: their value lives with the thing that owns it.
 
 ## Where a setting ends up
 
@@ -84,6 +100,9 @@ the file.
 This is what the `initial*` field names in the config have always described:
 a startup value, reapplied on each launch.
 
+If a save fails — a read-only config directory, a full disk — you get a toast
+saying so, rather than a key that silently does nothing.
+
 **One exception:** the theme id. `Ctrl+T` picks a theme several times in a
 session, and having it revert on every restart would be absurd, so the last theme
 you picked wins over `theme.initialId`. Every other setting follows the rule
@@ -115,9 +134,10 @@ Settings whose value is a list or a function have no row, and stay in
 
 - `keymaps` — a function, and a screen of its own later
 - `hooks` — a function
-- `backends`, `sidebar.widgets`, `snippets` — lists
+- `backends`, `sidebar.widgets` — lists
 - `externalEditor.args` and `externalEditor.terminal` — argv templates
 - `statusBar.aiUsage.tools` — a list
 
-Snippets have their own editor (`Ctrl+S`) and themes their own picker (`Ctrl+T`);
-the settings screen points at both rather than reproducing them badly.
+Snippets and themes each have a picker that does the job better than a list of rows
+would — filtering as you type, previewing as you move. The screen opens those
+rather than reproducing them, and they come back to it when they close.

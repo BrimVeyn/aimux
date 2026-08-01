@@ -7,6 +7,7 @@ import type { SettingCtx, SettingRow, SettingValue, StoredSettings } from './typ
 
 import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
+import { toast } from '../state/toast-store'
 
 export interface SettingsState {
   /** Bumped by every write. Rows whose value lives in a file have no other way
@@ -19,6 +20,12 @@ export interface SettingsState {
    * file at every launch, so an edit made here is good for this session only.
    */
   fromConfigFile: ReadonlySet<string>
+  /**
+   * Rows this screen has a value written for. Not the same as "differs from the
+   * default" — someone may have set a row back to its default value — but it is
+   * what "reset" removes, so it is what the marker has to mean.
+   */
+  touched: ReadonlySet<string>
 }
 
 const EMPTY_FROM_CONFIG: ReadonlySet<string> = new Set()
@@ -26,6 +33,7 @@ const EMPTY_FROM_CONFIG: ReadonlySet<string> = new Set()
 export const settingsStore = createStore<SettingsState>(() => ({
   fromConfigFile: EMPTY_FROM_CONFIG,
   revision: 0,
+  touched: EMPTY_FROM_CONFIG,
   values: {},
 }))
 
@@ -42,7 +50,15 @@ export function useSettingsStore<T>(selector: (state: SettingsState) => T): T {
  * The schema is a parameter rather than an import so this module stays downstream
  * of the sections, which read from it.
  */
+/**
+ * The config file as loaded at startup. Kept because resetting a row has to know
+ * what that file said — the file is read once per launch, and re-reading it here
+ * would be reading a different file than the one the rest of the app resolved.
+ */
+let LAST_USER_CONFIG: AimuxUserConfig = {}
+
 export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUserConfig): void {
+  LAST_USER_CONFIG = userConfig
   const stored = loadConfig().settings ?? {}
   const values: StoredSettings = {}
   const fromConfigFile = new Set<string>()
@@ -59,7 +75,12 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
     row.apply?.(value)
   }
 
-  settingsStore.setState((state) => ({ fromConfigFile, revision: state.revision + 1, values }))
+  settingsStore.setState((state) => ({
+    fromConfigFile,
+    revision: state.revision + 1,
+    touched: new Set(Object.keys(stored)),
+    values,
+  }))
 }
 
 /**
@@ -68,11 +89,16 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
  * that came from `aimux.config.ts` into the JSON, where it would outlive the
  * config-file line it came from.
  */
-function persist(id: string, value: SettingValue): boolean {
+function persist(id: string, value: SettingValue | undefined): boolean {
   const config = loadConfig()
-  const settings: StoredSettings = { ...config.settings, [id]: value }
+  const settings: StoredSettings = { ...config.settings }
+  if (value === undefined) delete settings[id]
+  else settings[id] = value
   if (saveConfig({ ...config, settings })) return true
+  // Loud, not just logged: a read-only config directory or a full disk otherwise
+  // shows up as a key that does nothing, with no explanation anywhere.
   logDebug('settings.write.failed', { id })
+  toast.error('Could not save that setting — see `aimux doctor`')
   return false
 }
 
@@ -99,8 +125,29 @@ export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx):
   if (!persist(row.id, value)) return
   settingsStore.setState((state) => ({
     revision: state.revision + 1,
+    touched: new Set(state.touched).add(row.id),
     values: { ...state.values, [row.id]: value },
   }))
+  row.apply?.(value)
+}
+
+/**
+ * Forget what this screen wrote for a row and go back to what the row would have
+ * been without it: the config file's value if it declares one, else the built-in
+ * default. Only the rows this screen owns — an `app` row's value has its own home
+ * and its own idea of a default.
+ */
+export function resetRow(row: SettingRow): void {
+  if (row.kind === 'info' || row.kind === 'action' || row.storage !== 'settings') return
+  if (!settingsStore.getState().touched.has(row.id)) return
+  if (!persist(row.id, undefined)) return
+
+  const value = row.fromConfig?.(LAST_USER_CONFIG) ?? row.fallback
+  settingsStore.setState((state) => {
+    const touched = new Set(state.touched)
+    touched.delete(row.id)
+    return { revision: state.revision + 1, touched, values: { ...state.values, [row.id]: value } }
+  })
   row.apply?.(value)
 }
 

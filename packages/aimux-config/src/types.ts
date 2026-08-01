@@ -22,6 +22,7 @@ export type ModeId =
   | 'modal.rename-tab'
   | 'modal.rename-workspace'
   | 'modal.setting-text'
+  | 'modal.settings-search.filtering'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -327,6 +328,13 @@ interface ModalBase {
   editBuffer: string | null
   projectTargetId: string | null
   cursorPos?: number
+  /**
+   * Where the focus goes when this modal closes, when it is not back to the
+   * panes. Set by whoever opened it, because that is who knows what is behind it
+   * — the settings screen opens five different modals, and none of them should
+   * have to grow a case in the reducer to find their way home.
+   */
+  returnTo?: FocusMode
 }
 
 export interface ModalClosed extends ModalBase {
@@ -357,6 +365,10 @@ export interface ModalProjectName extends ModalBase {
 }
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
+}
+/** Fuzzy-ish search across every setting, from inside the settings screen. */
+export interface ModalSettingsSearch extends ModalBase {
+  type: 'settings-search'
 }
 export interface ModalSettingText extends ModalBase {
   type: 'setting-text'
@@ -514,6 +526,7 @@ export type ModalState =
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
   | ModalSettingText
+  | ModalSettingsSearch
 
 export interface LayoutState {
   terminalCols: number
@@ -626,11 +639,11 @@ export type ModalAction =
       workspaceId: string
       initialName: string
     }
-  | { type: 'open-snippet-picker' }
+  | { type: 'open-snippet-picker'; returnTo?: FocusMode }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
-  | { type: 'open-theme-picker' }
+  | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
@@ -756,6 +769,7 @@ export type SettingsAction =
   | { type: 'settings-move-selection'; delta: -1 | 1 }
   | { type: 'settings-select-section'; sectionId: string }
   | { type: 'settings-select-row'; rowIndex: number }
+  | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
 
 export interface GitRefreshPayload {
@@ -941,6 +955,8 @@ export type SideEffect =
   | { type: 'promote-setup-tab' }
   | { type: 'activate-settings-row' }
   | { type: 'adjust-settings-row'; delta: 1 | -1 }
+  | { type: 'reset-settings-row' }
+  | { type: 'confirm-settings-search' }
   | { type: 'commit-setting-text'; settingId: string; value: string }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────

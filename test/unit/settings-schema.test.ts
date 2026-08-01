@@ -133,6 +133,7 @@ const FROZEN_ROW_IDS = [
   'layout.rightBarWidth',
   'multiRepo.enabled',
   'multiRepo.maxDepth',
+  'snippets.manage',
   'snippets.triggerChar',
   'statusBar.aiUsage.enabled',
   'statusBar.aiUsage.pollSeconds',

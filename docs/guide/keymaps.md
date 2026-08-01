@@ -68,6 +68,7 @@ The runtime also defines modal modes such as:
 - `modal.workspace-move`
 - `modal.rename-tab`
 - `modal.setting-text`
+- `modal.settings-search.filtering`
 - `modal.snippet-picker`
 - `modal.snippet-picker.filtering`
 - `modal.snippet-editor`
@@ -227,6 +228,8 @@ Enter with `Leader+,` from `navigation` or `terminal-input`.
 - `j` / `k` - move within the focused column
 - `Space` / `Enter` - change the setting under the cursor
 - `-` / `+` - step a number
+- `/` - search every setting
+- `r` - put the setting back to its default
 - `Esc` - close
 
 Fully documented in [`settings.md`](settings.md).

@@ -31,6 +31,7 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
 import { ProjectNameModal } from './components/modals/projects/project-name-modal'
 import { ProjectPickerModal } from './components/modals/projects/project-picker-modal'
+import { SettingsSearchModal } from './components/modals/settings/settings-search-modal'
 import { WorkspaceDeleteConfirm } from './components/modals/shared/workspace-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
@@ -154,6 +155,14 @@ function renderModal(
       return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
     case 'setting-text':
       return <ProjectNameModal title={modal.settingLabel} value={modal.editBuffer ?? ''} />
+    case 'settings-search':
+      return (
+        <SettingsSearchModal
+          filter={modal.editBuffer}
+          selectedIndex={modal.selectedIndex}
+          cursorPos={modal.cursorPos}
+        />
+      )
     case 'rename-workspace':
       return <ProjectNameModal title="Rename workspace" value={modal.editBuffer ?? ''} />
     case 'create-project':
@@ -410,7 +419,9 @@ export function RootView({
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
   // A settings row's text field flips focusMode to command-edit, the same way the
   // commit modal does in git mode — the screen behind it has to stay mounted.
-  const inSettings = focusMode === 'settings' || modal.type === 'setting-text'
+  // Every modal the settings screen opens says it will return there, which is
+  // also exactly the condition for keeping the screen drawn behind it.
+  const inSettings = focusMode === 'settings' || modal.returnTo === 'settings'
   let replacesPanes: ReactNode = null
   if (inGitMode) replacesPanes = <GitView themeId={themeId} />
   else if (inSettings) replacesPanes = <SettingsView />

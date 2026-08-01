@@ -6,6 +6,7 @@ import type { AppState } from '../types'
 import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
+import { filterSettingRows } from '../../settings/search'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
 import {
@@ -75,6 +76,8 @@ function getModalOptionCount(state: AppState): number {
       // `+1` for the "create a project" row the picker appends, and at least
       // that row exists even when nothing matches the filter.
       return Math.max(1, filterProjects(state.projects, modal.editBuffer).length + 1)
+    case 'settings-search':
+      return filterSettingRows(state.projects, modal.editBuffer).length
     case 'snippet-picker':
       return filterSnippets(state.snippets, modal.editBuffer).length
     case 'split-picker':
@@ -420,6 +423,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
           type: 'snippet-picker',
         },
@@ -460,6 +464,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           entryCount: 0,
           projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
           type: 'theme-picker',
         },
@@ -631,11 +636,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       ) {
         return { ...state, modal: emptyModal() }
       }
-      // A text field opened from the settings screen returns to it, the way the
-      // commit modal returns to git mode — the screen is still behind it.
-      let nextFocus: AppState['focusMode'] = 'navigation'
-      if (closingType === 'git-commit') nextFocus = 'git'
-      else if (closingType === 'setting-text') nextFocus = 'settings'
+      // Whoever opened it said where to go back to — the settings screen does,
+      // because it is still drawn behind. The commit modal predates that and
+      // still names git mode itself.
+      const nextFocus: AppState['focusMode'] =
+        state.modal.returnTo ?? (closingType === 'git-commit' ? 'git' : 'navigation')
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {
@@ -964,6 +969,19 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-settings-search':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: 0,
+          editBuffer: '',
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          type: 'settings-search',
+        },
+      }
     case 'open-setting-text-modal':
       return {
         ...state,
@@ -972,6 +990,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: action.value.length,
           editBuffer: action.value,
           projectTargetId: null,
+          returnTo: 'settings',
           selectedIndex: 0,
           settingId: action.settingId,
           settingLabel: action.label,

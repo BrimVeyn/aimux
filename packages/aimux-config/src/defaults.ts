@@ -181,6 +181,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-p>', actions.moveSettingsSelection(-1))
         .map('+', actions.adjustSettingsRow(1), 'Increase', { repeatable: true })
         .map('-', actions.adjustSettingsRow(-1), 'Decrease', { repeatable: true })
+        .map('r', actions.resetSettingsRow, 'Reset to default')
+        .map('/', actions.openSettingsSearch, 'Search settings')
         .map('?', actions.helpModal('settings'), 'Help')
     )
 
@@ -292,6 +294,20 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('<CR>', actions.confirmRenameTab, 'Confirm')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: search every setting (always filtering, like the other pickers)
+    // -----------------------------------------------------------------------
+    .mode('modal.settings-search.filtering', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Close')
+        .map('<CR>', actions.confirmSettingsSearch, 'Go to setting')
+        .map('<C-n>', actions.moveModalSelection(1), 'Next')
+        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
         .passthrough()
     )
 

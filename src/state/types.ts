@@ -73,6 +73,7 @@ export type ModalType =
   | 'workspace-delete-confirm'
   | 'flash-jump'
   | 'setting-text'
+  | 'settings-search'
   | null
 
 export interface TerminalSpan {
@@ -389,6 +390,13 @@ interface ModalBase {
   editBuffer: string | null
   projectTargetId: string | null
   cursorPos?: number
+  /**
+   * Where the focus goes when this modal closes, when it is not back to the
+   * panes. Set by whoever opened it, because that is who knows what is behind it
+   * — the settings screen opens five different modals, and none of them should
+   * have to grow a case in the reducer to find their way home.
+   */
+  returnTo?: FocusMode
 }
 
 export interface ModalClosed extends ModalBase {
@@ -443,6 +451,10 @@ export interface ModalRenameTab extends ModalBase {
  * writes back to the right one, and closing returns to the settings screen rather
  * than to the panes.
  */
+/** Fuzzy-ish search across every setting, from inside the settings screen. */
+export interface ModalSettingsSearch extends ModalBase {
+  type: 'settings-search'
+}
 export interface ModalSettingText extends ModalBase {
   type: 'setting-text'
   settingId: string
@@ -646,6 +658,7 @@ export type ModalState =
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
   | ModalSettingText
+  | ModalSettingsSearch
 
 export interface LayoutState {
   terminalCols: number

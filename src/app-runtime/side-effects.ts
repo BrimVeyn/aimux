@@ -41,7 +41,12 @@ import {
 } from './project-actions'
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
-import { changeSelectedSetting, commitSettingText } from './settings-actions'
+import {
+  changeSelectedSetting,
+  commitSettingText,
+  confirmSettingsSearch,
+  resetSelectedSetting,
+} from './settings-actions'
 import {
   findSetupTab,
   handleAskAgentForSetupScriptEffect,
@@ -687,6 +692,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'adjust-settings-row': {
       changeSelectedSetting(ctx, effect.delta)
+      return
+    }
+    case 'confirm-settings-search': {
+      confirmSettingsSearch(ctx)
+      return
+    }
+    case 'reset-settings-row': {
+      resetSelectedSetting(ctx)
       return
     }
     case 'commit-setting-text': {

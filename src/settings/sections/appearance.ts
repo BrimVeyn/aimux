@@ -1,6 +1,6 @@
 import type { SettingSection } from '../types'
 
-import { runSideEffectGlobal } from '../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 import { getCurrentMode, getCurrentThemeId, getTransparent } from '../../ui/theme'
 
 /**
@@ -14,14 +14,18 @@ export const APPEARANCE_SECTION: SettingSection = {
   label: 'Appearance',
   rows: [
     {
-      // Not editable here on purpose: the theme picker filters 30-odd themes as
-      // you type and previews each one, which no amount of stepping through a
-      // list on this screen would improve on.
-      description: 'Pick one with the theme picker (Ctrl+T).',
+      // Hands over to the picker rather than being a list of 30-odd options on
+      // this screen: it filters as you type and previews each theme as you move.
+      // It comes back here when it closes, which is what `returnTo` is for.
+      description: 'Filters as you type, and previews as you move.',
       id: 'appearance.theme',
-      kind: 'info',
+      kind: 'action',
       label: 'Theme',
-      value: () => getCurrentThemeId(),
+      run: () => {
+        dispatchGlobal({ returnTo: 'settings', type: 'open-theme-picker' })
+        runSideEffectGlobal({ action: 'open', type: 'apply-theme' })
+      },
+      value: () => `${getCurrentThemeId()} ›`,
     },
     {
       id: 'appearance.mode',

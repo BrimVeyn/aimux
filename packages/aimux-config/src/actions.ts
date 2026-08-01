@@ -973,6 +973,21 @@ export function adjustSettingsRow(delta: 1 | -1): KeyResult {
   return r([], [{ delta, type: 'adjust-settings-row' }])
 }
 
+export const resetSettingsRow: KeyResult = r([], [{ type: 'reset-settings-row' }])
+
+export const openSettingsSearch: KeyResult = r(
+  [{ type: 'open-settings-search' }],
+  [],
+  'modal.settings-search.filtering'
+)
+
+/** Jumps the screen to the highlighted setting, wherever it lives. */
+export const confirmSettingsSearch: KeyResult = r(
+  [],
+  [{ type: 'confirm-settings-search' }],
+  'settings'
+)
+
 /**
  * The value is carried in the effect rather than read from the store by it: the
  * `close-modal` action runs first and clears the buffer it would have read.

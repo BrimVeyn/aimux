@@ -57,6 +57,7 @@ export const SettingsRow = memo(function SettingsRow({
   // `tabs` re-runs this selector, gets the same value, and renders nothing.
   const value = useAppStore((s) => readRow(row, { state: s, values }))
   const fromConfigFile = useSettingsStore((s) => s.fromConfigFile.has(row.id))
+  const touched = useSettingsStore((s) => s.touched.has(row.id))
   const editable = row.kind !== 'info'
 
   // Always, never only on the focused row: a row that grows a line when you land
@@ -78,7 +79,9 @@ export const SettingsRow = memo(function SettingsRow({
       subtitle={notes.length > 0 ? <text fg={t.textMuted}>{notes.join(' · ')}</text> : undefined}
       trailing={
         <box flexDirection="row">
+          {/* `*` the config file owns it, `•` this screen wrote it (r resets). */}
           {fromConfigFile ? <text fg={t.warning}>* </text> : null}
+          {!fromConfigFile && touched ? <text fg={t.secondary}>• </text> : null}
           <text fg={editable ? t.primary : t.textMuted}>{formatValue(row, value)}</text>
         </box>
       }

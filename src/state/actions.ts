@@ -67,11 +67,11 @@ export type ModalAction =
       workspaceId: string
       initialName: string
     }
-  | { type: 'open-snippet-picker' }
+  | { type: 'open-snippet-picker'; returnTo?: FocusMode }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
-  | { type: 'open-theme-picker' }
+  | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
@@ -216,6 +216,7 @@ export type SettingsAction =
   | { type: 'settings-move-selection'; delta: -1 | 1 }
   | { type: 'settings-select-section'; sectionId: string }
   | { type: 'settings-select-row'; rowIndex: number }
+  | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
 
 export type GitPanelAction =
