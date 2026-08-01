@@ -17,6 +17,7 @@ import type {
   FocusMode,
   GitFileSection,
   GitPanelError,
+  GitPaneState,
   GitRefreshPayload,
   PendingWorkspaceLaunch,
   ProjectRecord,
@@ -221,6 +222,7 @@ export type GitPanelAction =
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
   | { type: 'set-workspace-divergence'; divergence: Record<string, BranchDivergence> }
+  | { type: 'set-git-pane'; patch: Partial<GitPaneState> }
 
 export type AutoCommitAction =
   | {
