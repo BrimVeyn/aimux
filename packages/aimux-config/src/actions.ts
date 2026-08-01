@@ -975,6 +975,13 @@ export function adjustSettingsRow(delta: 1 | -1): KeyResult {
 
 export const resetSettingsRow: KeyResult = r([], [{ type: 'reset-settings-row' }])
 
+/**
+ * Closing a modal the settings screen opened. `closeModal` declares `navigation`,
+ * which is where every other modal goes and is not where these go — the screen is
+ * still drawn behind them, and `returnTo` puts the focus back on it.
+ */
+export const closeSettingsModal: KeyResult = r([{ type: 'close-modal' }], [], 'settings')
+
 export const openSettingsSearch: KeyResult = r(
   [{ type: 'open-settings-search' }],
   [],

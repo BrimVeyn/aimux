@@ -302,7 +302,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.settings-search.filtering', (m) =>
       m
-        .map('<Esc>', actions.closeModal, 'Close')
+        .map('<Esc>', actions.closeSettingsModal, 'Close')
         .map('<CR>', actions.confirmSettingsSearch, 'Go to setting')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
@@ -316,7 +316,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     .mode('modal.setting-text', (m) =>
       m
-        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<Esc>', actions.closeSettingsModal, 'Cancel')
         .map('<CR>', actions.confirmSettingText, 'Confirm')
         .passthrough()
     )
