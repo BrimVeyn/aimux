@@ -167,26 +167,23 @@ export function handleStopSetupEffect(ctx: SideEffectContext): void {
  * Without it, the current project's active workspace is the target.
  */
 export function handleConfigureSetupScriptEffect(ctx: SideEffectContext, projectId?: string): void {
-  const onError = (message: string) => toast.error(`editor: ${message}`)
-
-  if (projectId != null && projectId !== '') {
-    const project = ctx.getState().projects.find((entry) => entry.id === projectId)
-    if (!project) return
-    // The editor's working directory: this project's active workspace if it has
-    // one, else wherever the project itself lives, else the script's own home —
-    // a GUI editor ignores it, a TUI one needs somewhere to be.
-    const cwd =
-      getActiveWorkspacePath(project) ?? project.projectPath ?? getProjectDataDir(project.id)
-    launchEditorOnFile(ctx, ensureSetupScriptStub(project.id), cwd, onError)
-    return
-  }
-
-  const target = resolveTarget(ctx)
-  if (!target) {
+  const state = ctx.getState()
+  const project =
+    projectId != null && projectId !== ''
+      ? state.projects.find((entry) => entry.id === projectId)
+      : getCurrentProject(state)
+  if (!project) {
     toast.error('Open a project first')
     return
   }
-  launchEditorOnFile(ctx, ensureSetupScriptStub(target.project.id), target.workspace.path, onError)
+  // The editor's working directory: this project's active workspace if it has
+  // one, else wherever the project itself lives, else the script's own home —
+  // a GUI editor ignores it, a TUI one needs somewhere to be.
+  const cwd =
+    getActiveWorkspacePath(project) ?? project.projectPath ?? getProjectDataDir(project.id)
+  launchEditorOnFile(ctx, ensureSetupScriptStub(project.id), cwd, (message) =>
+    toast.error(`editor: ${message}`)
+  )
 }
 
 /**

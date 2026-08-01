@@ -1,4 +1,4 @@
-import type { SettingRow, SettingValue } from '../settings/types'
+import type { SettingCtx, SettingRow, SettingValue } from '../settings/types'
 import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
@@ -50,7 +50,7 @@ function openField(row: SettingRow, current: SettingValue): void {
   })
 }
 
-function readCtx(state: AppState): { state: AppState; values: Record<string, SettingValue> } {
+function readCtx(state: AppState): SettingCtx {
   return { state, values: settingsStore.getState().values }
 }
 
