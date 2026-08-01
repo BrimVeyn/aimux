@@ -5,9 +5,10 @@ description: The in-app settings screen — how to open it, how to move around i
 
 # Settings
 
-`<Leader>,` opens the settings screen. It replaces the whole centre of the window,
-the way git mode does — the tab bar and the status bar stay where they are, and
-`Esc` puts you back where you were.
+`<Leader>,` opens the settings screen — or the `⚙` in the header of the Projects
+list, next to the `+`. It replaces the whole centre of the window, the way git
+mode does: the tab bar and the status bar stay where they are, and `Esc` (or the
+`Close` button) puts you back where you were.
 
 Nothing here needs `aimux.config.ts`. That file still works, still wins, and is
 still the only way to set a few things (see [What is not
