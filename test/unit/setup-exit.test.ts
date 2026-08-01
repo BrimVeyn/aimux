@@ -94,14 +94,25 @@ test('a hidden setup tab survives its exit and stamps the workspace', () => {
   })
 })
 
-test('a promoted setup tab survives its exit without overwriting the result', () => {
+test('a promoted setup tab survives its exit and still reports the failure', () => {
   // ↗ clears `hidden`. Before `role` existed this tab was indistinguishable from
   // an ordinary one, so its exit closed it — losing the stack trace the user
-  // promoted it to read.
+  // promoted it to read. And reporting cannot hang off `hidden` either, or
+  // promoting a setup to watch it fail means watching it fail in silence.
   const actions = seed(setupTab({ hidden: false }))
 
   expect(recordSetupExit('tab-setup', 1, (action) => void actions.push(action))).toBe(true)
-  // The widget-owned run is the only writer, so a re-run's result stands.
+  expect(actions).toHaveLength(1)
+  expect(actions[0]).toMatchObject({ patch: { setupExitCode: 1 }, workspaceId: 'ws-1' })
+})
+
+test('a promoted tab superseded by a newer run does not overwrite its result', () => {
+  const actions = seed(setupTab({ hidden: false, id: 'tab-old' }))
+  const state = appStore.getState()
+  // Re-run started while the old one was still promoted and alive.
+  appStore.setState({ ...state, tabs: [...state.tabs, setupTab({ id: 'tab-new' })] })
+
+  expect(recordSetupExit('tab-old', 1, (action) => void actions.push(action))).toBe(true)
   expect(actions).toEqual([])
 })
 

@@ -53,13 +53,15 @@ export function recordSetupExit(
   const { projects, tabs } = appStore.getState()
   const tab = tabs.find((entry) => entry.id === tabId)
   if (tab?.role !== 'setup') return false
-  // A promoted tab stays open — that is the whole point of promoting one — but
-  // the run the widget owns is the one that gets to write the result, so a
-  // promoted tab dying after a re-run cannot overwrite the newer outcome.
-  if (tab.hidden !== true) return true
 
+  // A promoted tab is no longer the one the widget owns, but its exit is still
+  // the latest thing that happened to this workspace — unless a newer run has
+  // started since, which is the only case where this result is stale news.
+  // Reporting is not optional: without it, promoting a setup to watch it fail
+  // means watching it fail in silence.
+  const superseded = tab.hidden !== true && findSetupTab(tabs, tab.workspaceId) !== undefined
   const found = findWorkspace(projects, tab.workspaceId)
-  if (!found) return true
+  if (superseded || !found) return true
   const { project, workspace } = found
 
   dispatch({
