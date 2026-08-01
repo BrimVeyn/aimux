@@ -38,6 +38,7 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
+import { useAutoCommitConfig } from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -370,10 +371,14 @@ export function App({
     syntaxOverlayEnabled,
   })
 
+  const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
+
   useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
   useAutoCommitDriver({
-    config: resolvedConfig.autoCommit,
+    // Through the settings screen, so a change lands without a restart. The
+    // resolved config is the baseline it falls back to.
+    config: autoCommitConfig,
     dispatch,
     getProfileConfigRoot: getProfileConfigDir,
     state,

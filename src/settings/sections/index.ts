@@ -2,6 +2,7 @@ import type { SettingRow, SettingSection } from '../types'
 
 import { ABOUT_SECTION } from './about'
 import { APPEARANCE_SECTION } from './appearance'
+import { AUTOMATION_SECTION } from './automation'
 import { LAYOUT_SECTION } from './layout'
 
 /**
@@ -11,6 +12,7 @@ import { LAYOUT_SECTION } from './layout'
 export const SETTING_SECTIONS: readonly SettingSection[] = [
   APPEARANCE_SECTION,
   LAYOUT_SECTION,
+  AUTOMATION_SECTION,
   ABOUT_SECTION,
 ]
 

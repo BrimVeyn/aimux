@@ -47,8 +47,14 @@ interface StoredRow {
    * edit then lasts until the next launch, and the row says so.
    */
   fromConfig?: (config: AimuxUserConfig) => SettingValue | undefined
-  /** Hands a new value to the running app. Absent → the row needs a restart. */
+  /**
+   * Hands a new value to whatever owns it in the running app. Not every live row
+   * needs one — a value whose only reader subscribes to this store is live on its
+   * own, which is why "needs a restart" is declared rather than inferred.
+   */
   apply?: (value: SettingValue) => void
+  /** The running app won't see the new value; the row says so. */
+  restart?: true
 }
 
 /**

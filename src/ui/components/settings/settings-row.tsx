@@ -28,7 +28,7 @@ function formatValue(row: SettingRow, value: SettingValue): string {
 
 /** True when changing this row writes a value the running app won't pick up. */
 function needsRestart(row: SettingRow): boolean {
-  return row.kind !== 'info' && row.storage === 'settings' && row.apply === undefined
+  return row.kind !== 'info' && row.storage === 'settings' && row.restart === true
 }
 
 interface SettingsRowProps {
