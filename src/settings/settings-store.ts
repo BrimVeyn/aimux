@@ -3,7 +3,13 @@ import type { AimuxUserConfig } from '@brimveyn/aimux-config'
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { SettingCtx, SettingRow, SettingValue, StoredSettings } from './types'
+import type {
+  SettingCtx,
+  SettingRow,
+  SettingValue,
+  StoredSettingRow,
+  StoredSettings,
+} from './types'
 
 import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
@@ -65,16 +71,17 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
   const fromConfigFile = new Set<string>()
 
   for (const row of rows) {
-    if (row.kind === 'info' || row.kind === 'action' || row.storage !== 'settings') continue
-    const declared = row.fromConfig?.(userConfig)
-    if (declared !== undefined) fromConfigFile.add(row.id)
-    defaults[row.id] = declared ?? row.fallback
-    const value = declared ?? stored[row.id] ?? row.fallback
-    values[row.id] = value
+    const owned = storedRow(row)
+    if (!owned) continue
+    const declared = owned.fromConfig?.(userConfig)
+    if (declared !== undefined) fromConfigFile.add(owned.id)
+    defaults[owned.id] = declared ?? owned.fallback
+    const value = declared ?? stored[owned.id] ?? owned.fallback
+    values[owned.id] = value
     // Unconditional: the caller has already applied the config file's own values
     // (they are the baseline), and re-applying the same value is a no-op. What
     // matters is that a value coming from `stored` reaches the running app.
-    row.apply?.(value)
+    owned.apply?.(value)
   }
 
   settingsStore.setState((state) => ({
@@ -103,6 +110,17 @@ function persist(id: string, value: SettingValue | undefined): boolean {
   logDebug('settings.write.failed', { id })
   toast.error('Could not save that setting — see `aimux doctor`')
   return false
+}
+
+/**
+ * The row as something with a key of its own, or nothing. Every operation that
+ * touches the `settings` block — hydrating it, resetting a key, saying a value
+ * needs a restart — asks this rather than narrowing the union by hand for the
+ * fourth time.
+ */
+export function storedRow(row: SettingRow): StoredSettingRow | null {
+  if (row.kind === 'info' || row.kind === 'action') return null
+  return row.storage === 'settings' ? row : null
 }
 
 export function readRow(row: SettingRow, ctx: SettingCtx): SettingValue {
@@ -141,17 +159,18 @@ export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx):
  * and its own idea of a default.
  */
 export function resetRow(row: SettingRow): void {
-  if (row.kind === 'info' || row.kind === 'action' || row.storage !== 'settings') return
-  if (!settingsStore.getState().touched.has(row.id)) return
-  if (!persist(row.id, undefined)) return
+  const owned = storedRow(row)
+  if (!owned) return
+  if (!settingsStore.getState().touched.has(owned.id)) return
+  if (!persist(owned.id, undefined)) return
 
-  const value = settingsStore.getState().defaults[row.id] ?? row.fallback
+  const value = settingsStore.getState().defaults[owned.id] ?? owned.fallback
   settingsStore.setState((state) => {
     const touched = new Set(state.touched)
-    touched.delete(row.id)
-    return { revision: state.revision + 1, touched, values: { ...state.values, [row.id]: value } }
+    touched.delete(owned.id)
+    return { revision: state.revision + 1, touched, values: { ...state.values, [owned.id]: value } }
   })
-  row.apply?.(value)
+  owned.apply?.(value)
 }
 
 /**

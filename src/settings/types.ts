@@ -71,8 +71,11 @@ interface DerivedRow {
   write: (value: SettingValue, ctx: SettingCtx) => void
 }
 
+/** A row whose value lives in the `settings` block of `aimux.json`. */
+export type StoredSettingRow = SettingRowBase & SettingKind & StoredRow
+
 export type SettingRow =
-  | (SettingRowBase & SettingKind & StoredRow)
+  | StoredSettingRow
   | (SettingRowBase & SettingKind & DerivedRow)
   | (SettingRowBase & { kind: 'info'; value: (ctx: SettingCtx) => string })
   /**

@@ -2,7 +2,7 @@ import { memo } from 'react'
 
 import type { SettingRow } from '../../../settings/types'
 
-import { useSettingsStore } from '../../../settings/settings-store'
+import { storedRow, useSettingsStore } from '../../../settings/settings-store'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { describeValue, RowValue } from './row-value'
@@ -10,12 +10,6 @@ import { describeValue, RowValue } from './row-value'
 /** Where the value comes from, on the left, out of the value column's way. */
 const CONFIG_FILE_MARK = '*'
 const TOUCHED_MARK = '~'
-
-/** True when changing this row writes a value the running app won't pick up. */
-function needsRestart(row: SettingRow): boolean {
-  if (row.kind === 'info' || row.kind === 'action') return false
-  return row.storage === 'settings' && row.restart === true
-}
 
 interface SettingsRowProps {
   row: SettingRow
@@ -48,7 +42,7 @@ export const SettingsRow = memo(function SettingsRow({
   const notes: string[] = []
   if (row.description != null && row.description !== '') notes.push(row.description)
   if (fromConfigFile) notes.push('set in aimux.config.ts — comes back on restart')
-  else if (needsRestart(row)) notes.push('applies on restart')
+  else if (storedRow(row)?.restart === true) notes.push('applies on restart')
   // Right-aligned on the same line rather than tacked onto the end of the
   // description: it is about the row, not about what the setting does, and the
   // value column above it is on that edge too. Only once the row has been
