@@ -418,7 +418,7 @@ export function RootView({
   const center =
     replacesPanes !== null ? (
       <>
-        <TopTabBar forceVisible />
+        <TopTabBar panesReplaced />
         {replacesPanes}
       </>
     ) : (
