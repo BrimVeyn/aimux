@@ -16,6 +16,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.project-picker.filtering': ['navigation', 'modal.project-name', 'modal.create-project'],
   'modal.rename-tab': ['navigation'],
   'modal.rename-workspace': ['navigation'],
+  'modal.setting-text': ['settings'],
   'modal.snippet-editor': ['navigation', 'modal.snippet-picker.filtering'],
   'modal.snippet-picker.filtering': ['navigation', 'modal.snippet-editor'],
   'modal.split-picker': ['navigation', 'terminal-input'],
@@ -45,7 +46,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   ],
   // The help overlay opens over settings without a transition (it leaves
   // focusMode alone), so leaving is the only move this mode makes.
-  'settings': ['navigation'],
+  'settings': ['navigation', 'modal.setting-text'],
   'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage', 'settings'],
 }
 

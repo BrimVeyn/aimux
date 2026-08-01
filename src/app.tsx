@@ -38,7 +38,12 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
-import { useAIUsageConfig, useAutoCommitConfig, useHarmonizeClaudeTheme } from './settings/live'
+import {
+  useAIUsageConfig,
+  useAutoCommitConfig,
+  useHarmonizeClaudeTheme,
+  useSnippetTriggerChar,
+} from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -168,6 +173,7 @@ export function App({
   const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
     resolvedConfig.theme?.beta?.harmonizeClaudeTheme
   )
+  const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
@@ -311,8 +317,8 @@ export function App({
   snippetsRef.current = state.snippets
   const branchRef = useRef(state.gitPanel.branch)
   branchRef.current = state.gitPanel.branch
-  const triggerCharRef = useRef(resolvedConfig.snippetTriggerChar)
-  triggerCharRef.current = resolvedConfig.snippetTriggerChar
+  const triggerCharRef = useRef(snippetTriggerChar)
+  triggerCharRef.current = snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentProjectProjectSnapshot = currentProject?.projectSnapshot

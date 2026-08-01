@@ -973,6 +973,20 @@ export function adjustSettingsRow(delta: 1 | -1): KeyResult {
   return r([], [{ delta, type: 'adjust-settings-row' }])
 }
 
+/**
+ * The value is carried in the effect rather than read from the store by it: the
+ * `close-modal` action runs first and clears the buffer it would have read.
+ */
+export const confirmSettingText: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'setting-text') return r([{ type: 'close-modal' }], [], 'settings')
+  return r(
+    [{ type: 'close-modal' }],
+    [{ settingId: modal.settingId, type: 'commit-setting-text', value: modal.editBuffer ?? '' }],
+    'settings'
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Deprecated aliases — 0.8.x names kept working for one release.
 //

@@ -3,6 +3,7 @@ import type { AIUsageToolConfig, AutoCommitConfig } from '@brimveyn/aimux-config
 import { useMemo } from 'react'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
+import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
 import { HARMONIZE_CLAUDE_THEME } from './sections/integrations'
 import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
@@ -18,13 +19,30 @@ import { useSettingsStore } from './settings-store'
 export function useAutoCommitConfig(fromConfigFile: AutoCommitConfig): AutoCommitConfig {
   const values = useSettingsStore((s) => s.values)
   const timeoutMs = values[AUTO_COMMIT_TIMEOUT]
+  const models = { ...fromConfigFile.models }
+  for (const [id, value] of Object.entries(values)) {
+    if (!id.startsWith(AUTO_COMMIT_MODEL_PREFIX)) continue
+    // An empty row means "leave the default alone", not "use no model".
+    if (typeof value === 'string' && value !== '') {
+      models[id.slice(AUTO_COMMIT_MODEL_PREFIX.length)] = value
+    }
+  }
   return {
     enabled: values[AUTO_COMMIT_ENABLED] === true,
-    // `models` stays config-file only: it is a model name per assistant, and the
-    // screen has no text field yet.
-    models: fromConfigFile.models,
+    models,
     timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : fromConfigFile.timeoutMs,
   }
+}
+
+/**
+ * The character that opens an inline snippet trigger. Clamped to one character,
+ * the same rule the config resolver applies — a two-character value would simply
+ * never match.
+ */
+export function useSnippetTriggerChar(fromConfigFile: string): string {
+  const stored = useSettingsStore((s) => s.values[SNIPPET_TRIGGER_CHAR])
+  if (typeof stored === 'string' && stored.length === 1) return stored
+  return fromConfigFile
 }
 
 /**

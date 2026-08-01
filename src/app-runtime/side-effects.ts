@@ -41,7 +41,7 @@ import {
 } from './project-actions'
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
-import { changeSelectedSetting } from './settings-actions'
+import { changeSelectedSetting, commitSettingText } from './settings-actions'
 import {
   findSetupTab,
   handleAskAgentForSetupScriptEffect,
@@ -687,6 +687,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'adjust-settings-row': {
       changeSelectedSetting(ctx, effect.delta)
+      return
+    }
+    case 'commit-setting-text': {
+      commitSettingText(ctx, effect.settingId, effect.value)
       return
     }
     default:

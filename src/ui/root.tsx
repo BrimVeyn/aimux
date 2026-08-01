@@ -152,6 +152,8 @@ function renderModal(
       )
     case 'rename-tab':
       return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
+    case 'setting-text':
+      return <ProjectNameModal title={modal.settingLabel} value={modal.editBuffer ?? ''} />
     case 'rename-workspace':
       return <ProjectNameModal title="Rename workspace" value={modal.editBuffer ?? ''} />
     case 'create-project':
@@ -406,9 +408,12 @@ export function RootView({
   // same either way, so only the center is a branch: a return per view would
   // mean maintaining the chrome three times.
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
+  // A settings row's text field flips focusMode to command-edit, the same way the
+  // commit modal does in git mode — the screen behind it has to stay mounted.
+  const inSettings = focusMode === 'settings' || modal.type === 'setting-text'
   let replacesPanes: ReactNode = null
   if (inGitMode) replacesPanes = <GitView themeId={themeId} />
-  else if (focusMode === 'settings') replacesPanes = <SettingsView />
+  else if (inSettings) replacesPanes = <SettingsView />
 
   const center =
     replacesPanes !== null ? (

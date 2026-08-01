@@ -72,6 +72,7 @@ export type ModalType =
   | 'workspace-move-confirm'
   | 'workspace-delete-confirm'
   | 'flash-jump'
+  | 'setting-text'
   | null
 
 export interface TerminalSpan {
@@ -437,6 +438,16 @@ export interface ModalProjectName extends ModalBase {
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
 }
+/**
+ * One text field over a settings row. Carries the row it belongs to so confirming
+ * writes back to the right one, and closing returns to the settings screen rather
+ * than to the panes.
+ */
+export interface ModalSettingText extends ModalBase {
+  type: 'setting-text'
+  settingId: string
+  settingLabel: string
+}
 
 export interface ModalRenameWorkspace extends ModalBase {
   type: 'rename-workspace'
@@ -634,6 +645,7 @@ export type ModalState =
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
+  | ModalSettingText
 
 export interface LayoutState {
   terminalCols: number

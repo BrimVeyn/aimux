@@ -25,6 +25,8 @@ type SettingKind =
   | { kind: 'toggle' }
   | { kind: 'select'; options: readonly SettingOption[] }
   | { kind: 'number'; min: number; max: number; step: number }
+  /** Activating it opens a one-field modal. Empty means "unset", not "empty string". */
+  | { kind: 'text'; placeholder?: string }
 
 interface SettingRowBase {
   id: string
@@ -65,7 +67,8 @@ interface StoredRow {
 interface DerivedRow {
   storage: 'app'
   read: (ctx: SettingCtx) => SettingValue
-  write: (value: SettingValue) => void
+  /** Same context `read` gets, so a write that has to merge into a record can. */
+  write: (value: SettingValue, ctx: SettingCtx) => void
 }
 
 export type SettingRow =

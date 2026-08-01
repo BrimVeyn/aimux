@@ -88,7 +88,7 @@ export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx):
   if (row.kind === 'info') return
   if (readRow(row, ctx) === value) return
   if (row.storage === 'app') {
-    row.write(value)
+    row.write(value, ctx)
     return
   }
   if (!persist(row.id, value)) return

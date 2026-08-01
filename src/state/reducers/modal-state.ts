@@ -631,7 +631,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       ) {
         return { ...state, modal: emptyModal() }
       }
-      const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
+      // A text field opened from the settings screen returns to it, the way the
+      // commit modal returns to git mode — the screen is still behind it.
+      let nextFocus: AppState['focusMode'] = 'navigation'
+      if (closingType === 'git-commit') nextFocus = 'git'
+      else if (closingType === 'setting-text') nextFocus = 'settings'
       return { ...state, focusMode: nextFocus, modal: emptyModal() }
     }
     case 'move-modal-selection': {
@@ -960,6 +964,20 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-setting-text-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: action.value.length,
+          editBuffer: action.value,
+          projectTargetId: null,
+          selectedIndex: 0,
+          settingId: action.settingId,
+          settingLabel: action.label,
+          type: 'setting-text',
+        },
+      }
     case 'open-rename-tab-modal': {
       const activeTab =
         state.activeTabId != null && state.activeTabId !== ''

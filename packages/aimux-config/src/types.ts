@@ -21,6 +21,7 @@ export type ModeId =
   | 'modal.create-workspace'
   | 'modal.rename-tab'
   | 'modal.rename-workspace'
+  | 'modal.setting-text'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -357,6 +358,11 @@ export interface ModalProjectName extends ModalBase {
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
 }
+export interface ModalSettingText extends ModalBase {
+  type: 'setting-text'
+  settingId: string
+  settingLabel: string
+}
 export interface ModalRenameWorkspace extends ModalBase {
   type: 'rename-workspace'
   workspaceProjectId: string
@@ -507,6 +513,7 @@ export type ModalState =
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
+  | ModalSettingText
 
 export interface LayoutState {
   terminalCols: number
@@ -749,6 +756,7 @@ export type SettingsAction =
   | { type: 'settings-move-selection'; delta: -1 | 1 }
   | { type: 'settings-select-section'; sectionId: string }
   | { type: 'settings-select-row'; rowIndex: number }
+  | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
 
 export interface GitRefreshPayload {
   branch: string | null
@@ -933,6 +941,7 @@ export type SideEffect =
   | { type: 'promote-setup-tab' }
   | { type: 'activate-settings-row' }
   | { type: 'adjust-settings-row'; delta: 1 | -1 }
+  | { type: 'commit-setting-text'; settingId: string; value: string }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

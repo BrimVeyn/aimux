@@ -296,6 +296,16 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: one text field over a settings row
+    // -----------------------------------------------------------------------
+    .mode('modal.setting-text', (m) =>
+      m
+        .map('<Esc>', actions.closeModal, 'Cancel')
+        .map('<CR>', actions.confirmSettingText, 'Confirm')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
     // Modal: rename-workspace
     // -----------------------------------------------------------------------
     .mode('modal.rename-workspace', (m) =>

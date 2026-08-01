@@ -1,8 +1,10 @@
 import type { SettingRow, SettingValue } from '../settings/types'
+import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
-import { getSectionRows } from '../settings/sections'
+import { ALL_SETTING_ROWS, getSectionRows } from '../settings/sections'
 import { readRow, settingsStore, writeRow } from '../settings/settings-store'
+import { dispatchGlobal } from '../state/dispatch-ref'
 
 type SettingsContext = Pick<SideEffectContext, 'getState'>
 
@@ -41,10 +43,14 @@ function nextNumberValue(
   return next
 }
 
+function readCtx(state: AppState): { state: AppState; values: Record<string, SettingValue> } {
+  return { state, values: settingsStore.getState().values }
+}
+
 /**
  * One entry point for every kind of row. `delta` is the direction asked for
  * (`-`/`+`); without it the row advances the way activating it should — a toggle
- * flips, an enum steps forward, a number steps up.
+ * flips, an enum steps forward, a number steps up, a text field opens.
  */
 export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1): void {
   const state = runtime.getState()
@@ -53,7 +59,7 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
   const row = getSectionRows(state.settings.sectionId)[state.settings.rowIndex]
   if (!row || row.kind === 'info') return
 
-  const ctx = { state, values: settingsStore.getState().values }
+  const ctx = readCtx(state)
   const current = readRow(row, ctx)
 
   switch (row.kind) {
@@ -70,7 +76,30 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
     case 'number':
       writeRow(row, nextNumberValue(row, current, delta ?? 1, delta === undefined), ctx)
       return
+    case 'text':
+      // Text is the one kind a keystroke can't advance, so activating it hands
+      // over to a field. `-`/`+` have nothing to do on one.
+      if (delta === undefined) {
+        dispatchGlobal({
+          label: row.label,
+          settingId: row.id,
+          type: 'open-setting-text-modal',
+          value: String(current),
+        })
+      }
+      return
     default:
       row satisfies never
   }
+}
+
+/** Applies what the text field was holding when it was confirmed. */
+export function commitSettingText(
+  runtime: SettingsContext,
+  settingId: string,
+  value: string
+): void {
+  const row = ALL_SETTING_ROWS.find((entry) => entry.id === settingId)
+  if (!row || row.kind !== 'text') return
+  writeRow(row, value.trim(), readCtx(runtime.getState()))
 }

@@ -3,6 +3,8 @@ import type { SettingRow, SettingSection } from '../types'
 import { ABOUT_SECTION } from './about'
 import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
+import { COMMANDS_SECTION } from './commands'
+import { EDITOR_SECTION } from './editor'
 import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
@@ -17,6 +19,8 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
   LAYOUT_SECTION,
   AUTOMATION_SECTION,
   GIT_SECTION,
+  COMMANDS_SECTION,
+  EDITOR_SECTION,
   STATUS_BAR_SECTION,
   INTEGRATIONS_SECTION,
   ABOUT_SECTION,

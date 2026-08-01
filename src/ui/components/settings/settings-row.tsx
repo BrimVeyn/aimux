@@ -18,6 +18,10 @@ function formatValue(row: SettingRow, value: SettingValue): string {
     }
     case 'number':
       return String(value)
+    case 'text': {
+      const text = String(value)
+      return text === '' ? (row.placeholder ?? 'not set') : text
+    }
     case 'info':
       return String(value)
     default:
