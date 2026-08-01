@@ -1,9 +1,13 @@
 import { getMultiRepoConfig, setMultiRepoConfig } from '@brimveyn/aimux-config'
 
 import type { GitFileListMode } from '../../state/types'
-import type { SettingSection } from '../types'
+import type { SettingSection, SettingValue } from '../types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
+
+function isFileListMode(value: SettingValue): value is GitFileListMode {
+  return value === 'tree' || value === 'flat'
+}
 
 /**
  * The file list and diff preferences already live in `AppState` and have their own
@@ -26,9 +30,15 @@ export const GIT_SECTION: SettingSection = {
       ],
       read: (ctx) => ctx.state.gitPane.fileListMode,
       storage: 'app',
+      // Flips rather than sets, because flipping is what also reconciles the git
+      // view's selected entry with the new shape of the list. Safe because
+      // `writeRow` never hands a row the value it already holds — with two
+      // options, flipping and setting agree. A third would need the action to
+      // take a target first; `settings-schema.test.ts` holds that line.
       write: (value) => {
+        if (!isFileListMode(value)) return
         dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
-        runSideEffectGlobal({ mode: value as GitFileListMode, type: 'persist-git-file-list-mode' })
+        runSideEffectGlobal({ mode: value, type: 'persist-git-file-list-mode' })
       },
     },
     {

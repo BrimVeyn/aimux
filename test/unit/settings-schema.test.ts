@@ -69,6 +69,20 @@ test('a select row defaults to one of its own options', () => {
   }
 })
 
+test('a select row whose value lives elsewhere has exactly two options', () => {
+  for (const row of ALL_SETTING_ROWS) {
+    if (row.kind !== 'select' || row.storage !== 'app') continue
+
+    // These delegate to the action behind the keybinding, and those actions flip
+    // rather than set — flipping is what also reconciles whatever depended on the
+    // old value (the git view's selected entry, for one). Flipping and setting
+    // agree on two options and part company on three, silently: the row would
+    // move to a value nobody asked for. A third option means teaching the action
+    // to take a target first.
+    expect(row.options.length, `${row.id} delegates to a flip`).toBe(2)
+  }
+})
+
 test('a number row has a usable range and a default inside it', () => {
   for (const row of ALL_SETTING_ROWS) {
     if (row.kind !== 'number') continue
