@@ -159,3 +159,17 @@ test('writing to a project that has no data directory yet creates one', () => {
 
   expect(readSetupScriptLines('p3')).toEqual(['echo hi'])
 })
+
+test('a write is visible to the next read, even one that had already read', () => {
+  withProjects()
+  writeSetupCommand('p4', 'echo first')
+  expect(readSetupScriptLines('p4')).toEqual(['echo first'])
+
+  writeSetupCommand('p4', 'echo second')
+
+  // Reads are cached against the file's mtime, because the search filter runs
+  // this for every project on every keystroke. A write and the read after it can
+  // land in the same millisecond, so the write drops the entry itself — without
+  // that, this returns `echo first`.
+  expect(readSetupScriptLines('p4')).toEqual(['echo second'])
+})
