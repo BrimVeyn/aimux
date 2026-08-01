@@ -18,7 +18,7 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { getActiveWorkspace } from '../state/project-workspaces'
+import { getActiveWorkspace, getCurrentProject } from '../state/project-workspaces'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { getSelectedAssistantOption } from './selection'
 
@@ -37,11 +37,7 @@ export function confirmSplitSelection(ctx: SideEffectContext): void {
     option.id,
     customCommand,
     state.customCommands,
-    getActiveWorkspace(
-      state.currentProjectId != null && state.currentProjectId !== ''
-        ? state.projects.find((s) => s.id === state.currentProjectId)
-        : undefined
-    )?.id
+    getActiveWorkspace(getCurrentProject(state))?.id
   )
   dispatch({ type: 'close-modal' })
   executeSplitPane(ctx, direction, tab)
@@ -157,12 +153,7 @@ export function launchAssistant(
     assistant,
     customCommand,
     state.customCommands,
-    workspaceId ??
-      getActiveWorkspace(
-        state.currentProjectId != null && state.currentProjectId !== ''
-          ? state.projects.find((s) => s.id === state.currentProjectId)
-          : undefined
-      )?.id
+    workspaceId ?? getActiveWorkspace(getCurrentProject(state))?.id
   )
   logInputDebug('app.launchAssistant', {
     assistant,
@@ -184,14 +175,11 @@ export function getTabProjectPath(
   ctx: SideEffectContext,
   tab: Pick<TabSession, 'workspaceId'>
 ): string | undefined {
-  const project =
-    ctx.state.currentProjectId != null && ctx.state.currentProjectId !== ''
-      ? ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
-      : undefined
-  if (tab.workspaceId != null && tab.workspaceId !== '') {
-    const workspace = project?.workspaces?.find((entry) => entry.id === tab.workspaceId)
-    if (workspace) return workspace.path
-  }
+  // Scoped to the current project on purpose: a tab pinned to a workspace of
+  // some other project gets the current project's path, not that project's.
+  const project = getCurrentProject(ctx.state)
+  const workspace = project?.workspaces?.find((entry) => entry.id === tab.workspaceId)
+  if (workspace) return workspace.path
   return ctx.getCurrentProjectProjectPath()
 }
 

@@ -260,6 +260,33 @@ function pruneMissingAimuxTempWorkspaces(workspaces: WorkspaceRecord[]): Workspa
   })
 }
 
+/**
+ * The project the user is in. `currentProjectId` is a nullable string that is
+ * also meaningfully empty, so open-coding this lookup means repeating both
+ * checks; there is one home for it instead.
+ */
+export function getCurrentProject(state: {
+  currentProjectId?: string | null
+  projects: ProjectRecord[]
+}): ProjectRecord | undefined {
+  const id = state.currentProjectId
+  if (id == null || id === '') return undefined
+  return state.projects.find((project) => project.id === id)
+}
+
+/** The project that owns a workspace, and the workspace itself. */
+export function findWorkspace(
+  projects: ProjectRecord[],
+  workspaceId: string | undefined
+): { project: ProjectRecord; workspace: WorkspaceRecord } | undefined {
+  if (workspaceId == null || workspaceId === '') return undefined
+  for (const project of projects) {
+    const workspace = project.workspaces?.find((entry) => entry.id === workspaceId)
+    if (workspace) return { project, workspace }
+  }
+  return undefined
+}
+
 export function getActiveWorkspace(
   project: ProjectRecord | undefined
 ): WorkspaceRecord | undefined {

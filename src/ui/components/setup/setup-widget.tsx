@@ -8,7 +8,7 @@ import { usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { useAppStore } from '../../../state/app-store'
 import { runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { hasSetupScript } from '../../../state/project-data'
-import { getActiveWorkspace } from '../../../state/project-workspaces'
+import { getActiveWorkspace, getCurrentProject } from '../../../state/project-workspaces'
 import { useTheme, useTransparent } from '../../theme'
 import { TerminalViewport } from '../layout/terminal-pane'
 
@@ -53,10 +53,7 @@ export const SetupWidget = memo(function SetupWidget() {
   const projects = useAppStore((s) => s.projects)
   const tabs = useAppStore((s) => s.tabs)
 
-  const project =
-    currentProjectId != null && currentProjectId !== ''
-      ? projects.find((entry) => entry.id === currentProjectId)
-      : undefined
+  const project = getCurrentProject({ currentProjectId, projects })
   const workspace = getActiveWorkspace(project)
   const setupTab = findSetupTab(tabs, workspace?.id)
 

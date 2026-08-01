@@ -7,7 +7,7 @@ import { shellQuote } from '../pty/command-registry'
 import { appStore } from '../state/app-store'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { ensureSetupScriptStub, getSetupScriptPath } from '../state/project-data'
-import { getActiveWorkspace } from '../state/project-workspaces'
+import { findWorkspace, getActiveWorkspace, getCurrentProject } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
 import { launchEditorOnFile } from './editor-actions'
 import { createTabSession, startTabSession } from './tab-actions'
@@ -58,22 +58,23 @@ export function recordSetupExit(
   // promoted tab dying after a re-run cannot overwrite the newer outcome.
   if (tab.hidden !== true) return true
 
-  const workspaceId = tab.workspaceId
-  const project =
-    workspaceId != null && workspaceId !== ''
-      ? projects.find((entry) => entry.workspaces?.some((w) => w.id === workspaceId) === true)
-      : undefined
-  const workspace = project?.workspaces?.find((w) => w.id === workspaceId)
-  if (!project || !workspace || workspaceId == null) return true
+  const found = findWorkspace(projects, tab.workspaceId)
+  if (!found) return true
+  const { project, workspace } = found
 
   dispatch({
     patch: { setupExitCode: exitCode, setupRanAt: new Date().toISOString() },
     projectId: project.id,
     type: 'update-workspace-record',
-    workspaceId,
+    workspaceId: workspace.id,
   })
   saveProjectCatalog(appStore.getState().projects)
-  logInputDebug('setup.exit', { exitCode, projectId: project.id, tabId, workspaceId })
+  logInputDebug('setup.exit', {
+    exitCode,
+    projectId: project.id,
+    tabId,
+    workspaceId: workspace.id,
+  })
 
   // The widget is opt-in, so a failure has to reach a user who never added it.
   // Success stays quiet.
@@ -86,14 +87,9 @@ export function recordSetupExit(
 function resolveTarget(
   ctx: SideEffectContext
 ): { project: ProjectRecord; workspace: WorkspaceRecord } | undefined {
-  const { currentProjectId, projects } = ctx.getState()
-  const project =
-    currentProjectId != null && currentProjectId !== ''
-      ? projects.find((entry) => entry.id === currentProjectId)
-      : undefined
-  if (!project) return undefined
+  const project = getCurrentProject(ctx.getState())
   const workspace = getActiveWorkspace(project)
-  if (!workspace) return undefined
+  if (!project || !workspace) return undefined
   return { project, workspace }
 }
 
