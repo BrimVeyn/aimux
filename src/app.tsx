@@ -83,15 +83,6 @@ export function App({
   setExternalEditorConfig(resolvedConfig.externalEditor)
   setStatusBarSeparator(resolvedConfig.statusBar?.separator)
 
-  // Runs after the setters above and for the same reason — they are the config
-  // file's baseline, and this replays what the settings screen has written on
-  // top of it. Lazy initializer, not a bare call: it reads a file, and this
-  // component re-renders on every dispatch.
-  useState(() => {
-    hydrateSettings(ALL_SETTING_ROWS, userConfig)
-    return null
-  })
-
   const keymapHandlers = useMemo(
     () => {
       setActiveKeymap(resolvedConfig.keymaps)
@@ -176,6 +167,18 @@ export function App({
       setActiveSideEffectRunner(null)
     }
   }, [dispatch])
+
+  // Replays what the settings screen has written on top of the config file (the
+  // setters at the top of this component are its baseline). Deliberately after
+  // the effect above and never during render: a row applies its value through
+  // whatever owns it, and some of those owners are reached by dispatching.
+  // Layout effect, so it lands before the first paint.
+  useLayoutEffect(() => {
+    hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    // Once per launch: the config file is read at startup and does not change
+    // under us, and every later write goes through `writeRow`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!(resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true)) return

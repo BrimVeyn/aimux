@@ -72,6 +72,24 @@ test('j and k stop at the ends of the section list too', () => {
   expect(state.settings.sectionId).toBe(FIRST_SECTION.id)
 })
 
+test('changing section resets the row cursor', () => {
+  const other = SETTING_SECTIONS[1]
+  if (!other) throw new Error('this test needs a second section')
+
+  const state = apply(
+    open(),
+    { pane: 'rows', type: 'settings-focus-pane' },
+    { delta: 1, type: 'settings-move-selection' },
+    { pane: 'nav', type: 'settings-focus-pane' },
+    { sectionId: other.id, type: 'settings-select-section' }
+  )
+
+  // The row cursor pointed into the previous section's list; carrying it over
+  // lands on an unrelated row, or past the end of a shorter section.
+  expect(state.settings.sectionId).toBe(other.id)
+  expect(state.settings.rowIndex).toBe(0)
+})
+
 test('j moves rows, not sections, once the focus is on the rows', () => {
   const state = apply(
     open(),
