@@ -61,18 +61,24 @@ name derived from what you asked for.
 `Ctrl+N` never creates a workspace — it only opens a tab in the workspace you
 are already in.
 
-## aimux never works on the repo itself
+## Working in the repo checkout
 
-The **primary** workspace is the repository checkout, and aimux does not open
-tabs there. `Ctrl+N` is refused while it is the active workspace and tells you
-to press `Ctrl+P` instead.
+The **primary** workspace is the repository checkout, and it hosts tabs like
+any other. `Ctrl+N` there opens an assistant in the repo directory itself.
 
-The rule follows from what a workspace is for: work happens on a branch in a
-worktree, so nothing you start is ever left sitting on `main`.
+That is deliberate, because a worktree is not free. `git worktree add` checks
+out the _tracked_ files and nothing else: no `.env`, no `node_modules`, no
+`.venv`, no build cache, no local database. A setup step can regenerate some of
+that and can never regenerate a secret. On plenty of repos the isolation buys
+less than it costs, and those repos should not have to pay for it.
+
+So `Ctrl+P` is an offer, not a toll gate: it is the short path to an isolated
+branch when you want one — one keystroke, worktree created, assistant started
+on your prompt — and the default that keeps parallel agents from colliding.
+It is not the only way in.
 
 Opening a project selects one of its workspaces, falling back to the primary
-only when the project has none. Selecting the primary yourself still works —
-useful for reading the git panel against the repo — it just cannot host tabs.
+only when the project has none.
 
 ## Templates
 
@@ -168,17 +174,24 @@ the rest of the config keeps loading. Validation rejects:
 
 ## In the sidebar
 
-Tabs are grouped by workspace. Each group has a colored header showing the
-workspace's branch/name, and — for aimux-created workspaces — its divergence from
-the branch it forked off:
+Each project is a heading, and every one of its workspaces gets a row beneath
+it — the repo checkout included, listed as **root**. A row is two lines: the
+workspace's name, with its branch under it, and the churn since its fork point
+on the right.
 
 ```
-┃ aimux/feature-x  ↑3 ↓1  ─────────
+• aimux                                    +
+    root
+      main
+    scroll drift fix                 +142 -37
+      aimux/scroll-drift-fix
 ```
 
-`↑` is commits ahead of the fork point, `↓` is commits behind. The primary and
-externally-discovered workspaces don't record a fork point, so they show no
-counts.
+The heading is not a place the cursor stops. `j` / `k` move between workspace
+rows; clicking a heading takes you to that project's **root**.
+
+The churn counts come from a fork point, which only aimux-created workspaces
+record — **root** and externally-discovered workspaces show none.
 
 ## Reviewing a workspace against its base
 

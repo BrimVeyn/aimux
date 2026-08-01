@@ -86,9 +86,15 @@ export function handleSwitchProjectByIndex(
   })
 }
 
+/**
+ * One stop for `j`/`k`, and it is always a workspace — the project's own row is
+ * a heading, not a destination. Every project owns a primary (every path into
+ * the catalog runs `ensureProjectWorkspaces`), so no project can be skipped by
+ * having nothing to land on.
+ */
 interface SidebarItem {
   projectId: string
-  workspaceId: string | null
+  workspaceId: string
 }
 
 function buildSidebarItems(state: AppState): SidebarItem[] {
@@ -97,12 +103,8 @@ function buildSidebarItems(state: AppState): SidebarItem[] {
   )
   const items: SidebarItem[] = []
   for (const project of ordered) {
-    items.push({ projectId: project.id, workspaceId: null })
-    const workspaces = project.workspaces ?? []
-    const primary = getPrimaryWorkspace(workspaces)
-    for (const wt of workspaces) {
-      if (wt.id === primary?.id) continue
-      items.push({ projectId: project.id, workspaceId: wt.id })
+    for (const workspace of project.workspaces ?? []) {
+      items.push({ projectId: project.id, workspaceId: workspace.id })
     }
   }
   return items
@@ -112,14 +114,13 @@ function findCurrentSidebarItem(state: AppState, items: SidebarItem[]): number {
   const projectId = state.currentProjectId
   if (projectId == null || projectId === '') return -1
   const project = state.projects.find((s) => s.id === projectId)
-  const workspaces = project?.workspaces ?? []
-  const primary = getPrimaryWorkspace(workspaces)
-  const activeWtId = project?.activeWorkspaceId ?? null
-  // The project row IS the primary workspace (no separate row), so an active
-  // primary or undefined active maps to the project-item.
-  const targetWorkspaceId = activeWtId == null || activeWtId === primary?.id ? null : activeWtId
+  // An unset active workspace means the project sits on its checkout, which now
+  // has a row of its own to land on.
+  const activeWorkspaceId =
+    project?.activeWorkspaceId ?? getPrimaryWorkspace(project?.workspaces)?.id
+  if (activeWorkspaceId == null || activeWorkspaceId === '') return -1
   return items.findIndex(
-    (item) => item.projectId === projectId && item.workspaceId === targetWorkspaceId
+    (item) => item.projectId === projectId && item.workspaceId === activeWorkspaceId
   )
 }
 
@@ -146,15 +147,9 @@ export function handleCycleSidebarItem(ctx: SideEffectContext, direction: 1 | -1
   const project = state.projects.find((s) => s.id === target.projectId)
   if (!project) return
 
-  // Determine the workspace to activate. For project-items, that's the
-  // primary; for workspace-items, the specific workspace.
-  const workspaces = project.workspaces ?? []
-  const primary = getPrimaryWorkspace(workspaces)
-  const targetWorkspaceId = target.workspaceId ?? primary?.id
-
+  const targetWorkspaceId = target.workspaceId
   const isCrossProject = project.id !== state.currentProjectId
-  const needsWorkspaceChange =
-    targetWorkspaceId != null && targetWorkspaceId !== project.activeWorkspaceId
+  const needsWorkspaceChange = targetWorkspaceId !== project.activeWorkspaceId
 
   if (isCrossProject) {
     // Bundle the workspace change into the project record AND fold the

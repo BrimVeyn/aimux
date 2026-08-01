@@ -11,11 +11,7 @@ import { countDirtyFiles } from '../git/move-workspace'
 import { getDefaultBranch, listLocalBranches } from '../git/worktree'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
-import {
-  acceptsTabs,
-  getActiveWorkspace,
-  getActiveWorkspacePath,
-} from '../state/project-workspaces'
+import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
@@ -293,21 +289,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'open-new-tab': {
-      // aimux never works on the primary checkout: tabs belong to a workspace,
-      // so asking for one where there is no workspace asks for the workspace
-      // instead. Every entry point — `<C-n>`, the tab bar's `+`, the empty pane
-      // — routes here, so none of them has to know the rule.
-      const project = state.projects.find((entry) => entry.id === state.currentProjectId)
-      if (!project) {
+      // A tab opens wherever the project currently sits, the repo checkout
+      // included: a worktree is not free — it starts without `.env`,
+      // `node_modules` or anything else untracked — so plenty of repos never
+      // want one. `<C-p>` remains the short path to an isolated branch; it is
+      // an offer, not a toll gate.
+      if (!state.projects.some((entry) => entry.id === state.currentProjectId)) {
         toast.error('Open a project first — <C-g>')
         return
       }
-      if (acceptsTabs(project)) {
-        dispatch({ type: 'open-new-tab-modal' })
-        return
-      }
-      dispatch({ type: 'open-create-workspace-modal' })
-      executeSideEffect({ type: 'load-create-workspace-base-branches' }, ctx)
+      dispatch({ type: 'open-new-tab-modal' })
       return
     }
     case 'launch-selected-assistant': {

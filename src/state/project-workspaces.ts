@@ -32,17 +32,6 @@ export function getPrimaryWorkspace(
   return workspaces.find((workspace) => workspace.source === 'primary') ?? workspaces[0]
 }
 
-/**
- * Whether tabs can be opened where the project currently sits. aimux works in
- * worktrees, so the repo checkout — and a project that has nothing else — is
- * not somewhere a tab can live. One predicate so the `<C-n>` guard and the
- * empty-state advice can never tell the user two different stories.
- */
-export function acceptsTabs(project: ProjectRecord | undefined): boolean {
-  const workspace = getActiveWorkspace(project)
-  return workspace != null && workspace.source !== 'primary'
-}
-
 /** `4823` -> `4.8k`, so a churn number never widens the sidebar row. */
 export function formatDiffCount(value: number): string {
   if (value < 1_000) return String(value)
@@ -64,13 +53,23 @@ export function formatDiffStat(divergence: BranchDivergence | undefined): {
   }
 }
 
+/**
+ * What the repo checkout is called in the sidebar.
+ *
+ * Not the directory name: the project heading directly above it already says
+ * that, and a row repeating its own parent is what made the two look like the
+ * same thing. "root" names its role instead — the checkout the worktrees hang
+ * off — and the branch under it says which one it is.
+ */
+export const PRIMARY_WORKSPACE_NAME = 'root'
+
 export function createPrimaryWorkspace(projectPath: string, now: string): WorkspaceRecord {
   const id = createPrefixedId('workspace')
   return {
     createdAt: now,
     createdByAimux: false,
     id,
-    name: basename(projectPath) || projectPath,
+    name: PRIMARY_WORKSPACE_NAME,
     path: projectPath,
     repoRoot: projectPath,
     source: 'primary',
@@ -78,22 +77,37 @@ export function createPrimaryWorkspace(projectPath: string, now: string): Worksp
   }
 }
 
+/**
+ * Retire the old primary name — the directory's own basename — for `root`.
+ *
+ * Catalogs written before the checkout had a row of its own carry it, and there
+ * it duplicates the project heading it now sits under. Only that exact name is
+ * replaced: anything else is a name the user chose, and it stays.
+ */
+function renamePrimaryFromDirectoryName(workspaces: WorkspaceRecord[]): WorkspaceRecord[] {
+  return workspaces.map((workspace) =>
+    workspace.source === 'primary' && workspace.name === basename(workspace.path)
+      ? { ...workspace, name: PRIMARY_WORKSPACE_NAME }
+      : workspace
+  )
+}
+
 export function ensureProjectWorkspaces(
   project: ProjectRecord,
   now = new Date().toISOString()
 ): ProjectRecord {
   if (project.workspaces?.length != null && project.workspaces?.length !== 0) {
-    const workspaces = mergeExistingGitWorktrees(
-      pruneMissingAimuxTempWorkspaces(project.workspaces),
-      now
+    const workspaces = renamePrimaryFromDirectoryName(
+      mergeExistingGitWorktrees(pruneMissingAimuxTempWorkspaces(project.workspaces), now)
     )
     if (workspaces.length === 0 && project.projectPath != null && project.projectPath !== '') {
       const workspace = createPrimaryWorkspace(project.projectPath, now)
       return { ...project, activeWorkspaceId: workspace.id, workspaces: [workspace] }
     }
-    // Never *default* to the primary checkout: aimux works in worktrees, and
-    // tabs cannot be opened on the repo itself. An explicit selection is still
-    // honoured — the user may want to sit on main to read the git panel.
+    // Prefer a worktree when the stored selection is gone: coming back to a
+    // project, the branch you were on is a better guess than the trunk. Not a
+    // restriction — the checkout hosts tabs like any other workspace — just
+    // which one to open on. An explicit selection always wins.
     const activeWorkspaceId = workspaces.some((w) => w.id === project.activeWorkspaceId)
       ? project.activeWorkspaceId
       : (workspaces.find((w) => w.source !== 'primary') ?? workspaces[0])?.id

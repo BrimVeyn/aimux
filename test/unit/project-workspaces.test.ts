@@ -13,7 +13,6 @@ import {
   pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
 import {
-  acceptsTabs,
   ensureProjectWorkspaces,
   getActiveWorkspacePath,
   withActiveWorkspace,
@@ -258,31 +257,37 @@ describe('project workspaces', () => {
     }
   })
 
-  test('a project sitting on its primary checkout accepts no tabs', () => {
+  test('a fresh project sits on its repo checkout, which is a place tabs can run', () => {
     const project = ensureProjectWorkspaces(makeProject())
 
-    // The only workspace is the repo itself, so `<C-n>`, the "+" and the empty
-    // pane must all agree there is nowhere to put a tab yet.
     expect(project.workspaces?.[0]?.source).toBe('primary')
-    expect(acceptsTabs(project)).toBe(false)
-    expect(acceptsTabs(undefined)).toBe(false)
+    // A worktree is not free — it starts without anything untracked — so the
+    // checkout has to be usable as-is, not a waiting room for one.
+    expect(getActiveWorkspacePath(project)).toBe('/repo/main')
   })
 
-  test('a project on a worktree accepts tabs', () => {
+  test('the checkout is called root, not the directory the project already names', () => {
+    const project = ensureProjectWorkspaces(makeProject())
+
+    expect(project.workspaces?.[0]?.name).toBe('root')
+  })
+
+  test('a catalog naming the checkout after its directory is healed on load', () => {
     const now = '2024-01-02T00:00:00.000Z'
     const project = ensureProjectWorkspaces(
       {
         ...makeProject(),
-        activeWorkspaceId: 'wt-feature',
         workspaces: [
           {
             createdAt: now,
             createdByAimux: false,
-            id: 'wt-feature',
-            name: 'Feature',
-            path: '/repo/feature',
+            id: 'wt-main',
+            // What every catalog written before the checkout had its own row
+            // carries: `basename('/repo/main')`.
+            name: 'main',
+            path: '/repo/main',
             repoRoot: '/repo/main',
-            source: 'external',
+            source: 'primary',
             updatedAt: now,
           },
         ],
@@ -290,6 +295,32 @@ describe('project workspaces', () => {
       now
     )
 
-    expect(acceptsTabs(project)).toBe(true)
+    expect(project.workspaces?.[0]?.name).toBe('root')
+    // Ids are what tabs and snapshots are pinned by; only the label moves.
+    expect(project.workspaces?.[0]?.id).toBe('wt-main')
+  })
+
+  test('a checkout the user named themselves is left alone', () => {
+    const now = '2024-01-02T00:00:00.000Z'
+    const project = ensureProjectWorkspaces(
+      {
+        ...makeProject(),
+        workspaces: [
+          {
+            createdAt: now,
+            createdByAimux: false,
+            id: 'wt-main',
+            name: 'my checkout',
+            path: '/repo/main',
+            repoRoot: '/repo/main',
+            source: 'primary',
+            updatedAt: now,
+          },
+        ],
+      },
+      now
+    )
+
+    expect(project.workspaces?.[0]?.name).toBe('my checkout')
   })
 })

@@ -61,23 +61,16 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
         : undefined,
     [currentProjectId, projects]
   )
-  // The active row can be either a workspace row OR the project row
-  // (when the primary workspace is active). Both must scroll into view —
-  // otherwise the cursor visually "disappears" off-screen when crossing
-  // a project boundary on a key press.
-  const currentWorkspaces = currentProject?.workspaces ?? []
-  const currentPrimary = getPrimaryWorkspace(currentWorkspaces)
+  // The cursor is always on a workspace row now, so there is one id to scroll
+  // to instead of two — otherwise it visually "disappears" off-screen when a
+  // key press crosses a project boundary.
   const rawActiveWorkspaceId = currentProject?.activeWorkspaceId
-  const activeOnNonPrimary =
-    rawActiveWorkspaceId != null &&
-    rawActiveWorkspaceId !== '' &&
-    rawActiveWorkspaceId !== currentPrimary?.id
-  let activeRowId: string | null = null
-  if (activeOnNonPrimary) {
-    activeRowId = `sidebar-wt-${rawActiveWorkspaceId}`
-  } else if (currentProjectId != null && currentProjectId !== '') {
-    activeRowId = `sidebar-ws-${currentProjectId}`
-  }
+  const activeWorkspaceId =
+    rawActiveWorkspaceId != null && rawActiveWorkspaceId !== ''
+      ? rawActiveWorkspaceId
+      : getPrimaryWorkspace(currentProject?.workspaces)?.id
+  const activeRowId =
+    activeWorkspaceId != null && activeWorkspaceId !== '' ? `sidebar-wt-${activeWorkspaceId}` : null
 
   useSidebarAutoScroll({
     activeRowId,
@@ -142,9 +135,9 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
 
     const idx = baselineOrder.indexOf(source)
     if (idx >= 0) {
-      // The project row stands for the project itself, not for whichever
-      // workspace was last active in it. Clicking it lands on the primary —
-      // same semantics as j/k cycling onto a project item.
+      // The heading stands for the project itself, not for whichever workspace
+      // was last active in it, so clicking it lands on the checkout — the one
+      // workspace every project is guaranteed to have.
       const sourceProject = ordered.find((s) => s.id === source)
       const sourceWorkspaces = sourceProject?.workspaces ?? []
       const sourcePrimaryId = getPrimaryWorkspace(sourceWorkspaces)?.id
@@ -201,26 +194,26 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
         contentOptions={COLUMN_CONTENT_OPTIONS}
       >
         {(() => {
-          // Build a single flat list of items — project rows interleaved
-          // with their non-primary workspaces. One map, one React keypath per
-          // visible row; transitions are a single atomic reconciliation.
+          // Build a single flat list — each project's heading followed by every
+          // one of its workspaces. One map, one React keypath per visible row;
+          // transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
           for (const project of visibleProjects) {
             const projectIndex = baselineOrder.indexOf(project.id) + 1
             const isCurrentProject = project.id === currentProjectId
             const workspaces = project.workspaces ?? []
-            const primaryWorkspace = getPrimaryWorkspace(workspaces)
-            const extraWorkspaces = workspaces.filter((w) => w.id !== primaryWorkspace?.id)
-            const projectIsActiveItem =
-              isCurrentProject &&
-              (project.activeWorkspaceId == null ||
-                project.activeWorkspaceId === '' ||
-                project.activeWorkspaceId === primaryWorkspace?.id)
+            // Every workspace gets a row, the checkout included. Folding it into
+            // the project row made one row mean two things — a project you
+            // switch to and a workspace you run tabs in — and left the checkout
+            // the only workspace with no branch and no churn on screen.
+            const activeWorkspaceId =
+              project.activeWorkspaceId != null && project.activeWorkspaceId !== ''
+                ? project.activeWorkspaceId
+                : getPrimaryWorkspace(workspaces)?.id
             rows.push(
               <ProjectRow
                 key={`ws:${project.id}`}
                 project={project}
-                isActiveItem={projectIsActiveItem}
                 inCurrentGroup={isCurrentProject}
                 projectIndex={projectIndex}
                 status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
@@ -237,14 +230,14 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 onDragCancel={cancelDrag}
               />
             )
-            for (const workspace of extraWorkspaces) {
+            for (const workspace of workspaces) {
               rows.push(
                 <WorkspaceRow
                   key={`wt:${workspace.id}`}
                   project={project}
                   workspace={workspace}
                   projectIndex={projectIndex}
-                  isActiveItem={isCurrentProject && workspace.id === project.activeWorkspaceId}
+                  isActiveItem={isCurrentProject && workspace.id === activeWorkspaceId}
                   inCurrentGroup={isCurrentProject}
                   contentWidth={contentWidth}
                 />
@@ -260,9 +253,12 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
 
 interface ProjectRowProps {
   project: ProjectRecord
-  /** True when this row is the active cursor item (project's primary active). */
-  isActiveItem: boolean
-  /** True when this row belongs to the current project (selection scope). */
+  /**
+   * True when this row belongs to the current project (selection scope).
+   *
+   * There is deliberately no `isActiveItem`: the cursor lives on workspace
+   * rows, and this row is the heading they sit under.
+   */
   inCurrentGroup: boolean
   /** 1-based index in the visible order, so the "+" can switch projects first. */
   projectIndex: number
@@ -282,7 +278,6 @@ const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
   inCurrentGroup,
-  isActiveItem,
   marginTop,
   onDrag,
   onDragCancel,
@@ -300,8 +295,10 @@ const ProjectRow = memo(function ProjectRow({
   const showSpinner = status.working
   const showWaiting = status.waiting
   const spinner = useBusySpinner(showSpinner)
+  // Only the drag highlight is "selected"-strength here. A heading that lights
+  // up like a cursor row is what made the project look like a workspace.
   let bgColor: string | undefined
-  if (dragging || isActiveItem) {
+  if (dragging) {
     bgColor = base.backgroundElement
   } else if (inCurrentGroup) {
     bgColor = base.backgroundPanel

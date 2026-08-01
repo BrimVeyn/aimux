@@ -139,7 +139,7 @@ test('a plain new tab sends nothing', async () => {
   expect(writes).toEqual([])
 })
 
-test('<C-n> asks for a workspace while the project sits on its primary checkout', () => {
+test('<C-n> opens the picker on the repo checkout too, without asking for a worktree', () => {
   const base = seed()
   const project = base.projects[0]
   if (!project) throw new Error('expected a seeded project')
@@ -169,9 +169,16 @@ test('<C-n> asks for a workspace while the project sits on its primary checkout'
 
   executeSideEffect({ type: 'open-new-tab' }, ctx)
 
-  // No new-tab picker: tabs live in workspaces, so the ask is redirected to
-  // the one thing that would make a tab possible.
-  expect(ctx.getState().modal.type).toBe('create-workspace')
+  // The primary is a workspace like any other as far as tabs go: a worktree
+  // costs a checkout with no `.env` and no `node_modules`, so plenty of repos
+  // never want one. `<C-p>` is the offer, not the toll gate.
+  expect(ctx.getState().modal.type).toBe('new-tab')
+
+  executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+
+  // Pinned to the checkout, not left unbound: an unowned tab surfaces under
+  // whichever workspace happens to be primary, which is only right by accident.
+  expect(ctx.getState().tabs[0]?.workspaceId).toBe('workspace-primary')
 })
 
 test('<C-n> opens the picker once a real workspace is active', () => {
