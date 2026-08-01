@@ -31,6 +31,10 @@ Two columns: the sections on the left, that section's settings on the right.
 `h` and `l` always change column, never the value — a number row would otherwise
 make them ambiguous.
 
+Every setting carries its explanation under its label, at all times rather than
+only when selected: a row that grows a line when you land on it shifts everything
+below, and the list moves under the cursor the whole way down.
+
 All of it works with the mouse. Clicking a section selects it; clicking a setting
 selects **and** changes it, because a checkbox you have to select first and click
 again is not a checkbox.
@@ -71,11 +75,11 @@ in your editor shows its new state when you come back to it.
 
 `aimux.config.ts` is read at every launch, and it wins.
 
-So a setting your config file declares shows a `*`, and the row says
-"set in aimux.config.ts — comes back on restart" when you land on it. You can
-still change it here and the change takes effect immediately; the next launch
-reads your config file again and puts its value back. If you want the change to
-last, change it in the file.
+So a setting your config file declares shows a `*`, and says "set in
+aimux.config.ts — comes back on restart" under its label. You can still change it
+here and the change takes effect immediately; the next launch reads your config
+file again and puts its value back. If you want the change to last, change it in
+the file.
 
 This is what the `initial*` field names in the config have always described:
 a startup value, reapplied on each launch.

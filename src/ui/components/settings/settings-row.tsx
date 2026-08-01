@@ -59,14 +59,14 @@ export const SettingsRow = memo(function SettingsRow({
   const fromConfigFile = useSettingsStore((s) => s.fromConfigFile.has(row.id))
   const editable = row.kind !== 'info'
 
-  // Only the focused row explains itself: a description under every row would
-  // treble the height of the list and bury the values.
+  // Always, never only on the focused row: a row that grows a line when you land
+  // on it shifts everything under it, so the list moves under the cursor the
+  // whole way down. A taller list that holds still reads better than a compact
+  // one that does not.
   const notes: string[] = []
-  if (active) {
-    if (row.description != null && row.description !== '') notes.push(row.description)
-    if (fromConfigFile) notes.push('set in aimux.config.ts — comes back on restart')
-    else if (needsRestart(row)) notes.push('applies on restart')
-  }
+  if (row.description != null && row.description !== '') notes.push(row.description)
+  if (fromConfigFile) notes.push('set in aimux.config.ts — comes back on restart')
+  else if (needsRestart(row)) notes.push('applies on restart')
 
   return (
     <ListItem
