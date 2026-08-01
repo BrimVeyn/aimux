@@ -402,7 +402,7 @@ const ProjectRow = memo(function ProjectRow({
     leadingGlyph = spinner
     leadingColor = workingColor
   } else if (showDone) {
-    leadingGlyph = '✓'
+    leadingGlyph = '●'
     leadingColor = t.success
   }
 

@@ -142,7 +142,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
     statusGlyph = spinner
     statusColor = t.primary
   } else if (activity.done) {
-    statusGlyph = '✓'
+    statusGlyph = '●'
     statusColor = t.success
   }
 

@@ -168,17 +168,18 @@ doing, for every project rather than only the one you are in:
 | ------- | ------------------------------------------------------- |
 | `?`     | an assistant is waiting on an answer                    |
 | spinner | an assistant is working                                 |
-| `✓`     | an assistant finished a turn and you haven't looked yet |
+| `●`     | an assistant finished a turn and you haven't looked yet |
 
-The `✓` clears when you enter the workspace, open one of its tabs, or its
+The `●` clears when you enter the workspace, open one of its tabs, or its
 assistants go back to work. The project heading shows the same glyphs for
 whatever its workspaces add up to. A sound plays on the first two — see
 **Settings → Notifications**, where `off` turns it off.
 
-The tab that rang carries its own `✓` in the tab bar, next to its name, so the
-sound points at one tab rather than just happening. It clears when you open
-that tab or when it goes back to work — unlike the plain `●`, which only says
-the session is alive and idle.
+The tab that rang carries the same `●` in the tab bar, next to its name, so the
+sound points at one tab rather than just happening; it clears when you open that
+tab or when it goes back to work. A tab that is merely idle shows nothing —
+every tab you are not watching is idle, so a dot that is always on could not
+also mean "this one wants you".
 
 The churn counts come from a fork point, which only aimux-created workspaces
 record — **root** and externally-discovered workspaces show none.
