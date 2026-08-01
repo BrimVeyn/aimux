@@ -190,6 +190,29 @@ test('a stored number outside the row range is pulled into it', () => {
   expect(values()['git.prefetchRadius']).toBe(50)
 })
 
+test('a stored option that is not on the list falls back to the default', () => {
+  withConfig({ settings: { 'statusBar.separator': 'wavy' } })
+  const select: SettingRow = {
+    fallback: 'arrow',
+    id: 'statusBar.separator',
+    kind: 'select',
+    label: 'Separator',
+    options: [
+      { label: 'arrow', value: 'arrow' },
+      { label: 'none', value: 'none' },
+    ],
+    storage: 'settings',
+  }
+
+  hydrateSettings([select], {})
+
+  // No ordering to clamp an enum along, so the default is the only value in the
+  // set that means anything. Unsanitized, the row rendered `wavy` as its value and
+  // took two presses to leave — and whatever read it got `wavy` as well.
+  expect(values()['statusBar.separator']).toBe('arrow')
+  expect(settingsStore.getState().defaults['statusBar.separator']).toBe('arrow')
+})
+
 test('a config-file number outside the row range is pulled into it too', () => {
   withConfig({})
   // `UNCLAIMED` has no `fromConfig` on purpose, so it needs a row the config file

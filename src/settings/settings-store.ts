@@ -56,6 +56,30 @@ export function useSettingsStore<T>(selector: (state: SettingsState) => T): T {
 }
 
 /**
+ * A value a row publishes is one that row can actually hold, wherever it came
+ * from. Everything the screen writes is already in range; `aimux.config.ts` and a
+ * hand-edited (or older) `aimux.json` are not, and an unchecked one shows the row
+ * saying 60 while the code reading it uses its own floor of 180 — or shows a raw
+ * `wavy` where a separator name belongs.
+ *
+ * A number is clamped to its range. An option outside the list has no ordering to
+ * be clamped along, so the only value in the set that means anything is the row's
+ * own default, which `settings-schema.test.ts` keeps inside it.
+ *
+ * The range is the envelope for a setting this screen owns. The config file keeps
+ * its full reach over everything the screen has no row for.
+ */
+function withinRowDomain(row: StoredSettingRow, value: SettingValue): SettingValue {
+  if (row.kind === 'number' && typeof value === 'number') {
+    return Math.min(row.max, Math.max(row.min, value))
+  }
+  if (row.kind === 'select' && !row.options.some((option) => option.value === value)) {
+    return row.fallback
+  }
+  return value
+}
+
+/**
  * Resolve every stored row and publish the result: the config file wins, then
  * whatever the settings screen last wrote, then the built-in default. The config
  * file is re-read at every launch, which is what makes its value the one that
@@ -64,19 +88,6 @@ export function useSettingsStore<T>(selector: (state: SettingsState) => T): T {
  * The schema is a parameter rather than an import so this module stays downstream
  * of the sections, which read from it.
  */
-/**
- * A number a row publishes is inside that row's range, wherever it came from.
- * Everything the screen writes is already clamped; `aimux.config.ts` and a
- * hand-edited (or older) `aimux.json` are not, and an unclamped one shows the row
- * saying 60 while the code that reads it uses its own floor of 180. The range is
- * the envelope for a setting this screen owns — the config file keeps its full
- * reach over everything the screen has no row for.
- */
-function clampToRow(row: StoredSettingRow, value: SettingValue): SettingValue {
-  if (row.kind !== 'number' || typeof value !== 'number') return value
-  return Math.min(row.max, Math.max(row.min, value))
-}
-
 export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUserConfig): void {
   const stored = loadConfig().settings ?? {}
   const values: StoredSettings = {}
@@ -88,8 +99,8 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
     if (!owned) continue
     const declared = owned.fromConfig?.(userConfig)
     if (declared !== undefined) fromConfigFile.add(owned.id)
-    defaults[owned.id] = clampToRow(owned, declared ?? owned.fallback)
-    const value = clampToRow(owned, declared ?? stored[owned.id] ?? owned.fallback)
+    defaults[owned.id] = withinRowDomain(owned, declared ?? owned.fallback)
+    const value = withinRowDomain(owned, declared ?? stored[owned.id] ?? owned.fallback)
     values[owned.id] = value
     // Unconditional: the caller has already applied the config file's own values
     // (they are the baseline), and re-applying the same value is a no-op. What

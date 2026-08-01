@@ -20,9 +20,10 @@ function nextOptionValue(
   current: SettingValue,
   delta: 1 | -1
 ): SettingValue | undefined {
-  // -1 when the stored value isn't one of the options any more (a renamed option,
-  // a hand-edited config): stepping forward from there lands on the first, which
-  // is how the row heals itself.
+  // -1 when the current value isn't one of the options. Hydration keeps that from
+  // happening to a row this screen stores, so what is left is a row reading a
+  // value that lives elsewhere; stepping forward from -1 lands on the first
+  // option, which is how it heals.
   const index = options.findIndex((option) => option.value === current)
   const size = options.length
   if (size === 0) return undefined
