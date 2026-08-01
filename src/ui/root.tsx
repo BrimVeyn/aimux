@@ -1,6 +1,6 @@
 import type { MouseEvent } from '@opentui/core'
 
-import { useCallback, useMemo } from 'react'
+import { type ReactNode, useCallback, useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
@@ -15,6 +15,7 @@ import type {
 import type { ThemeId } from './themes'
 
 import { useWorkspaceBranchPolling } from '../git/workspace-branch-poller'
+import { useAutoCommitModel } from '../settings/live'
 import { useAppStore } from '../state/app-store'
 import { getBarWidth } from '../state/bars'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
@@ -31,6 +32,7 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
 import { ProjectNameModal } from './components/modals/projects/project-name-modal'
 import { ProjectPickerModal } from './components/modals/projects/project-picker-modal'
+import { SettingsSearchModal } from './components/modals/settings/settings-search-modal'
 import { WorkspaceDeleteConfirm } from './components/modals/shared/workspace-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
 import { SnippetPickerModal } from './components/modals/snippets/snippet-picker-modal'
@@ -42,6 +44,7 @@ import { WorkspaceMoveModal } from './components/modals/workspace/workspace-move
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
+import { SettingsView } from './components/settings/settings-view'
 import { useTheme } from './theme'
 
 const EMPTY_WORKSPACES: WorkspaceRecord[] = []
@@ -151,6 +154,16 @@ function renderModal(
       )
     case 'rename-tab':
       return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
+    case 'setting-text':
+      return <ProjectNameModal title={modal.settingLabel} value={modal.editBuffer ?? ''} />
+    case 'settings-search':
+      return (
+        <SettingsSearchModal
+          filter={modal.editBuffer}
+          selectedIndex={modal.selectedIndex}
+          cursorPos={modal.cursorPos}
+        />
+      )
     case 'rename-workspace':
       return <ProjectNameModal title="Rename workspace" value={modal.editBuffer ?? ''} />
     case 'create-project':
@@ -393,6 +406,9 @@ export function RootView({
   )
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
+  // The generating overlay has always been able to name the model, and nothing
+  // ever passed it one.
+  const autoCommitModel = useAutoCommitModel(activeTab?.assistant)
   const activeTree =
     activeTabId != null && activeTabId !== ''
       ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
@@ -400,42 +416,32 @@ export function RootView({
   const createProjectFields = getCreateProjectFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
 
+  // Git mode and settings each swap the pane tree for one full-width view.
+  // Everything else on screen — status bar, overlays, modal, toasts — is the
+  // same either way, so only the center is a branch: a return per view would
+  // mean maintaining the chrome three times.
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
-  if (inGitMode) {
-    return (
-      <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
-        <TopTabBar forceVisible />
-        <GitView themeId={themeId} />
-        <StatusBar />
-        <PendingChordOverlay />
-        <ContextMenuOverlay />
-        {renderModal(modal, {
-          activeAssistant: activeTab?.assistant,
-          createProjectFields,
-          currentProjectId,
-          currentTabCount: tabs.length,
-          customCommands,
-          focusMode,
-          projects,
-          snippetEditorFields,
-          snippets,
-          themeId,
-          workspaceDivergence,
-        })}
-        <ToastViewport />
-      </box>
-    )
-  }
+  // A settings row's text field flips focusMode to command-edit, the same way the
+  // commit modal does in git mode, so the screen behind it has to stay mounted:
+  // those two modals belong to the screen and are read against it.
+  //
+  // Not `returnTo === 'settings'`, which is where focus goes and not what is
+  // behind: the theme picker also returns here, and it previews each theme as you
+  // move. Previewing it on the settings screen is not the answer to "how does this
+  // theme look" — so it gets the panes, and closing still comes back here.
+  const inSettings =
+    focusMode === 'settings' || modal.type === 'setting-text' || modal.type === 'settings-search'
+  let replacesPanes: ReactNode = null
+  if (inGitMode) replacesPanes = <GitView themeId={themeId} />
+  else if (inSettings) replacesPanes = <SettingsView />
 
-  return (
-    <box
-      flexDirection="column"
-      width="100%"
-      height="100%"
-      backgroundColor={editorBg}
-      onMouseDrag={handleRootMouseDrag}
-      onMouseUp={handleRootMouseUp}
-    >
+  const center =
+    replacesPanes !== null ? (
+      <>
+        <TopTabBar panesReplaced />
+        {replacesPanes}
+      </>
+    ) : (
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Bar
           side="left"
@@ -499,10 +505,27 @@ export function RootView({
           onResizeDragEnd={onSeparatorDragEnd}
         />
       </box>
+    )
+
+  return (
+    <box
+      flexDirection="column"
+      width="100%"
+      height="100%"
+      backgroundColor={editorBg}
+      // Both drag handlers no-op unless a gesture is in flight, so the full-width
+      // views inherit them harmlessly — and a drag that was in flight when one
+      // opened gets finalised instead of stranded.
+      onMouseDrag={handleRootMouseDrag}
+      onMouseUp={handleRootMouseUp}
+    >
+      {center}
       <StatusBar />
       <PendingChordOverlay />
       <ContextMenuOverlay />
       {renderModal(modal, {
+        activeAssistant: activeTab?.assistant,
+        autoCommitModel,
         createProjectFields,
         currentProjectId,
         currentTabCount: tabs.length,

@@ -6,6 +6,7 @@ type SupportedModalType = Exclude<ModalType, null>
 const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
   'git': 'git-mode',
   'navigation': 'navigation',
+  'settings': 'settings',
   'terminal-input': 'terminal-input',
 }
 
@@ -19,6 +20,8 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'project-picker': 'modal.project-picker.filtering',
   'rename-tab': 'modal.rename-tab',
   'rename-workspace': 'modal.rename-workspace',
+  'setting-text': 'modal.setting-text',
+  'settings-search': 'modal.settings-search.filtering',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
   'split-picker': 'modal.split-picker',

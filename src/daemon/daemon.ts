@@ -221,7 +221,7 @@ async function ensureTerminalManagerReady(manager: TerminalManagerClient): Promi
 }
 
 export async function runDaemon(): Promise<void> {
-  const resolvedConfig = await loadUserConfig()
+  const { resolved: resolvedConfig } = await loadUserConfig()
   const socketPath = getIpcDaemonSocketPath()
   // A handoff file means we were spawned to take over from a predecessor
   // daemon that already drained and renamed its socket away. Consume the

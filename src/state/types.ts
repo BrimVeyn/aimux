@@ -44,7 +44,13 @@ export interface ProjectStatus {
 
 export const IDLE_PROJECT_STATUS: ProjectStatus = { waiting: false, working: false }
 
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
 
 export type ModalType =
   | 'new-tab'
@@ -66,6 +72,8 @@ export type ModalType =
   | 'workspace-move-confirm'
   | 'workspace-delete-confirm'
   | 'flash-jump'
+  | 'setting-text'
+  | 'settings-search'
   | null
 
 export interface TerminalSpan {
@@ -382,6 +390,13 @@ interface ModalBase {
   editBuffer: string | null
   projectTargetId: string | null
   cursorPos?: number
+  /**
+   * Where the focus goes when this modal closes, when it is not back to the
+   * panes. Set by whoever opened it, because that is who knows what is behind it
+   * — the settings screen opens five different modals, and none of them should
+   * have to grow a case in the reducer to find their way home.
+   */
+  returnTo?: FocusMode
 }
 
 export interface ModalClosed extends ModalBase {
@@ -430,6 +445,20 @@ export interface ModalProjectName extends ModalBase {
 
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
+}
+/**
+ * One text field over a settings row. Carries the row it belongs to so confirming
+ * writes back to the right one, and closing returns to the settings screen rather
+ * than to the panes.
+ */
+/** Fuzzy-ish search across every setting, from inside the settings screen. */
+export interface ModalSettingsSearch extends ModalBase {
+  type: 'settings-search'
+}
+export interface ModalSettingText extends ModalBase {
+  type: 'setting-text'
+  settingId: string
+  settingLabel: string
 }
 
 export interface ModalRenameWorkspace extends ModalBase {
@@ -628,6 +657,8 @@ export type ModalState =
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
+  | ModalSettingText
+  | ModalSettingsSearch
 
 export interface LayoutState {
   terminalCols: number
@@ -660,6 +691,19 @@ export interface MultiRepoState {
 
 export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] }
 
+/**
+ * Where the cursor is in the settings screen. Only the cursor: the values being
+ * edited live in `src/settings/settings-store.ts`, or already have a home in
+ * this state (`gitPane`, `customCommands`, …). Duplicating them here would make
+ * two of them.
+ */
+export interface SettingsUIState {
+  sectionId: string
+  /** Which of the two columns has the keyboard: the section list, or its rows. */
+  pane: 'nav' | 'rows'
+  rowIndex: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -680,6 +724,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  settings: SettingsUIState
   /**
    * Commits each workspace's branch is ahead/behind the ref it forked from,
    * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.

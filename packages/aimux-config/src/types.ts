@@ -21,6 +21,8 @@ export type ModeId =
   | 'modal.create-workspace'
   | 'modal.rename-tab'
   | 'modal.rename-workspace'
+  | 'modal.setting-text'
+  | 'modal.settings-search.filtering'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -34,6 +36,7 @@ export type ModeId =
   | 'modal.workspace-move-confirm'
   | 'modal.ai-usage'
   | 'modal.flash-jump'
+  | 'settings'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -58,7 +61,13 @@ export interface ProjectStatus {
   working: boolean
   waiting: boolean
 }
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────
@@ -319,6 +328,13 @@ interface ModalBase {
   editBuffer: string | null
   projectTargetId: string | null
   cursorPos?: number
+  /**
+   * Where the focus goes when this modal closes, when it is not back to the
+   * panes. Set by whoever opened it, because that is who knows what is behind it
+   * — the settings screen opens five different modals, and none of them should
+   * have to grow a case in the reducer to find their way home.
+   */
+  returnTo?: FocusMode
 }
 
 export interface ModalClosed extends ModalBase {
@@ -349,6 +365,15 @@ export interface ModalProjectName extends ModalBase {
 }
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
+}
+/** Fuzzy-ish search across every setting, from inside the settings screen. */
+export interface ModalSettingsSearch extends ModalBase {
+  type: 'settings-search'
+}
+export interface ModalSettingText extends ModalBase {
+  type: 'setting-text'
+  settingId: string
+  settingLabel: string
 }
 export interface ModalRenameWorkspace extends ModalBase {
   type: 'rename-workspace'
@@ -500,6 +525,8 @@ export type ModalState =
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
+  | ModalSettingText
+  | ModalSettingsSearch
 
 export interface LayoutState {
   terminalCols: number
@@ -543,6 +570,13 @@ export interface MultiRepoState {
   prefixes: Record<string, string>
 }
 
+/** Where the cursor is in the settings screen — the cursor only, not the values. */
+export interface SettingsUIState {
+  sectionId: string
+  pane: 'nav' | 'rows'
+  rowIndex: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -563,6 +597,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  settings: SettingsUIState
   workspaceDivergence: Record<string, BranchDivergence>
   lastActiveTabByWorkspace: Record<string, string>
   pendingChords: string[] | null
@@ -604,11 +639,11 @@ export type ModalAction =
       workspaceId: string
       initialName: string
     }
-  | { type: 'open-snippet-picker' }
+  | { type: 'open-snippet-picker'; returnTo?: FocusMode }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
-  | { type: 'open-theme-picker' }
+  | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
@@ -727,6 +762,16 @@ export type UIAction =
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-project-bar' }
 
+export type SettingsAction =
+  | { type: 'enter-settings' }
+  | { type: 'exit-settings' }
+  | { type: 'settings-focus-pane'; pane: 'nav' | 'rows' }
+  | { type: 'settings-move-selection'; delta: -1 | 1 }
+  | { type: 'settings-select-section'; sectionId: string }
+  | { type: 'settings-select-row'; rowIndex: number }
+  | { type: 'open-settings-search' }
+  | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
+
 export interface GitRefreshPayload {
   branch: string | null
   ahead: number
@@ -748,6 +793,7 @@ export type GitPanelAction =
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
   | { type: 'set-workspace-divergence'; divergence: Record<string, BranchDivergence> }
+  | { type: 'set-git-pane'; patch: Partial<GitPaneState> }
 
 export type GitModeAction =
   | { type: 'enter-git-mode' }
@@ -821,6 +867,7 @@ export type AppAction =
   | TabAction
   | LayoutAction
   | UIAction
+  | SettingsAction
   | DataAction
   | GitPanelAction
   | GitModeAction
@@ -903,9 +950,14 @@ export type SideEffect =
   | { type: 'open-selected-snippet-source-in-editor' }
   | { type: 'run-setup' }
   | { type: 'stop-setup' }
-  | { type: 'configure-setup-script' }
+  | { type: 'configure-setup-script'; projectId?: string }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
+  | { type: 'activate-settings-row' }
+  | { type: 'adjust-settings-row'; delta: 1 | -1 }
+  | { type: 'reset-settings-row' }
+  | { type: 'confirm-settings-search' }
+  | { type: 'commit-setting-text'; settingId: string; value: string }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

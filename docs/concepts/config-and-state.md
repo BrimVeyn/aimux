@@ -64,6 +64,10 @@ Today it is used for values such as:
 - `projectBarVisible`
 - `projectSnapshot` for legacy migration
 - `skippedUpdateVersion`
+- `settings` — what the in-app settings screen has written, keyed by row id. Only
+  the rows the user actually touched appear; a key this build does not recognise
+  is preserved on write, so a downgrade does not erase what a newer one wrote.
+  See `guide/settings.md`.
 
 Legacy top-level keys `gitPanelVisible` / `gitPanelRatio` are still read on
 load for backward compatibility. A file with no `bars` key is upgraded from the
@@ -78,6 +82,12 @@ to author behavior.
 If a typed config field is wired into startup, it acts as a startup override:
 the value is re-applied on every launch, and runtime UI interactions do not
 write back into `aimux.config.ts`.
+
+That is also the rule the settings screen follows: it writes to `aimux.json`, its
+change applies immediately, and a field your `aimux.config.ts` declares comes back
+from that file on the next launch. The row says so while you are on it. The one
+exception is `themeId`, which is a choice made interactively many times a session
+and so outranks `theme.initialId`.
 
 ## `aimux-projects.json`
 

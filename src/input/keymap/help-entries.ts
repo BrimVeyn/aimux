@@ -11,6 +11,7 @@ export const HELP_MODE_LABELS: { modeId: ModeId; label: string }[] = [
   { label: 'Navigation', modeId: 'navigation' },
   { label: 'Terminal input', modeId: 'terminal-input' },
   { label: 'Git mode', modeId: 'git-mode' },
+  { label: 'Settings', modeId: 'settings' },
   { label: 'Git commit', modeId: 'modal.git-commit' },
   { label: 'New tab', modeId: 'modal.new-tab.command-edit' },
   { label: 'New tab — command', modeId: 'modal.new-tab.command-edit' },

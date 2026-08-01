@@ -44,7 +44,7 @@ export default defineConfig({
   statusBar: {
     aiUsage: {
       enabled: true,
-      pollSeconds: 60,
+      pollSeconds: 180,
       tools: ['claude', 'codex'],
     },
   },
@@ -67,13 +67,13 @@ statusBar: {
 
 ## Fields
 
-| Field              | Type                                   | Default               | Notes                                                                                                                             |
-| ------------------ | -------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `enabled`          | `boolean`                              | `false`               | Master switch. When `false`, no polling happens.                                                                                  |
-| `tools`            | `Array<'claude' \| 'codex'>`           | `['claude', 'codex']` | Which tools to poll and render.                                                                                                   |
-| `pollSeconds`      | `number`                               | `60`                  | Polling interval. Clamped to a minimum of 5.                                                                                      |
-| `claudePlan`       | `'auto' \| 'pro' \| 'max5' \| 'max20'` | `'auto'`              | Reserved for future use; the current Claude adapter ignores this because the OAuth endpoint returns the true percentage directly. |
-| `codexWeeklyLimit` | `number`                               | —                     | Reserved for future use; the current Codex adapter uses the OAuth endpoint.                                                       |
+| Field              | Type                                   | Default               | Notes                                                                                                                                                              |
+| ------------------ | -------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`          | `boolean`                              | `false`               | Master switch. When `false`, no polling happens.                                                                                                                   |
+| `tools`            | `Array<'claude' \| 'codex'>`           | `['claude', 'codex']` | Which tools to poll and render.                                                                                                                                    |
+| `pollSeconds`      | `number`                               | `180`                 | Polling interval. Clamped to a minimum of 180 — Claude's OAuth endpoint rate-limits anything faster, and the symptom is an indicator that silently stops updating. |
+| `claudePlan`       | `'auto' \| 'pro' \| 'max5' \| 'max20'` | `'auto'`              | Reserved for future use; the current Claude adapter ignores this because the OAuth endpoint returns the true percentage directly.                                  |
+| `codexWeeklyLimit` | `number`                               | —                     | Reserved for future use; the current Codex adapter uses the OAuth endpoint.                                                                                        |
 
 ## How It Works
 

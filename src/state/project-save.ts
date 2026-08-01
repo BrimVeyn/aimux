@@ -28,6 +28,9 @@ export function saveCurrentProject(state: AppState): void {
     gitPane: {
       diffModeRatio: state.gitPane.diffModeRatio,
       fileListMode: state.gitPane.fileListMode,
+      // Was missing, so every autosave dropped it and `t`/`T` in git mode never
+      // survived a restart — this write replaces the whole `gitPane` block.
+      treeCompaction: state.gitPane.treeCompaction,
     },
     projectBarVisible: state.projectBar.visible,
     // Legacy mirror of the left bar: lets an older build (and the project

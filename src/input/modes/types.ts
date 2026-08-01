@@ -17,6 +17,8 @@ export type ModeId =
   | 'modal.create-workspace'
   | 'modal.rename-tab'
   | 'modal.rename-workspace'
+  | 'modal.setting-text'
+  | 'modal.settings-search.filtering'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -30,6 +32,7 @@ export type ModeId =
   | 'modal.workspace-move-confirm'
   | 'modal.ai-usage'
   | 'modal.flash-jump'
+  | 'settings'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -110,9 +113,15 @@ export type SideEffect =
   | { type: 'open-selected-snippet-source-in-editor' }
   | { type: 'run-setup' }
   | { type: 'stop-setup' }
-  | { type: 'configure-setup-script' }
+  | { type: 'configure-setup-script'; projectId?: string }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
+  /** Toggle a checkbox, cycle an enum, run a row's action — whatever the row is. */
+  | { type: 'activate-settings-row' }
+  | { type: 'adjust-settings-row'; delta: 1 | -1 }
+  | { type: 'reset-settings-row' }
+  | { type: 'confirm-settings-search' }
+  | { type: 'commit-setting-text'; settingId: string; value: string }
 
 export interface KeyResult {
   actions: AppAction[]

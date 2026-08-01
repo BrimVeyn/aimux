@@ -42,6 +42,12 @@ import {
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
 import {
+  changeSelectedSetting,
+  commitSettingText,
+  confirmSettingsSearch,
+  resetSelectedSetting,
+} from './settings-actions'
+import {
   findSetupTab,
   handleAskAgentForSetupScriptEffect,
   handleConfigureSetupScriptEffect,
@@ -669,7 +675,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'configure-setup-script': {
-      handleConfigureSetupScriptEffect(ctx)
+      handleConfigureSetupScriptEffect(ctx, effect.projectId)
       return
     }
     case 'ask-agent-for-setup-script': {
@@ -678,6 +684,26 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'promote-setup-tab': {
       handlePromoteSetupTabEffect(ctx)
+      return
+    }
+    case 'activate-settings-row': {
+      changeSelectedSetting(ctx)
+      return
+    }
+    case 'adjust-settings-row': {
+      changeSelectedSetting(ctx, effect.delta)
+      return
+    }
+    case 'confirm-settings-search': {
+      confirmSettingsSearch(ctx)
+      return
+    }
+    case 'reset-settings-row': {
+      resetSelectedSetting(ctx)
+      return
+    }
+    case 'commit-setting-text': {
+      commitSettingText(ctx, effect.settingId, effect.value)
       return
     }
     default:

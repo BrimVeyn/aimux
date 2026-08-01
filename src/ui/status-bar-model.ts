@@ -36,6 +36,12 @@ function projectSegments(
 }
 
 const STAGING_DESCRIPTIONS = ['Stage', 'Unstage/delete', 'Commit', 'Push']
+/**
+ * Moving around a two-column screen is the one thing you can see from the screen,
+ * so the bar spends its six slots on what you cannot: searching, resetting, and
+ * how to change the thing under the cursor.
+ */
+const SETTINGS_OBVIOUS_DESCRIPTIONS = ['Sections', 'Settings of the section', 'Next', 'Prev']
 
 function hintForMode(config: ResolvedKeymapConfig, modeId: ModeId): string {
   return buildHintText(config, modeId, HINT_LIMIT, { excludeDescriptions: [HELP_DESCRIPTION] })
@@ -97,6 +103,14 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
         right: hintForGitMode(config, headOffset),
       }
     }
+    case 'settings':
+      return {
+        help: helpHintForMode(config, 'settings'),
+        projectSegments: projectSegs,
+        right: buildHintText(config, 'settings', HINT_LIMIT, {
+          excludeDescriptions: [HELP_DESCRIPTION, ...SETTINGS_OBVIOUS_DESCRIPTIONS],
+        }),
+      }
     case 'command-edit': {
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {

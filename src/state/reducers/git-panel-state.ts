@@ -110,6 +110,10 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       if (nextRatio === state.gitPane.diffModeRatio) return state
       return { ...state, gitPane: { ...state.gitPane, diffModeRatio: nextRatio } }
     }
+    // The preferences with no toggle of their own: the settings screen sets them
+    // outright rather than each one growing its own action.
+    case 'set-git-pane':
+      return { ...state, gitPane: { ...state.gitPane, ...action.patch } }
     case 'git-refresh-success': {
       const prev = state.gitPanel
       const next = action.payload

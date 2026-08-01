@@ -16,10 +16,14 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.project-picker.filtering': ['navigation', 'modal.project-name', 'modal.create-project'],
   'modal.rename-tab': ['navigation'],
   'modal.rename-workspace': ['navigation'],
+  'modal.setting-text': ['settings'],
+  'modal.settings-search.filtering': ['settings'],
   'modal.snippet-editor': ['navigation', 'modal.snippet-picker.filtering'],
-  'modal.snippet-picker.filtering': ['navigation', 'modal.snippet-editor'],
+  // Both pickers are reachable from the settings screen as well as from the
+  // panes, and `returnTo` sends each one back where it came from.
+  'modal.snippet-picker.filtering': ['navigation', 'settings', 'modal.snippet-editor'],
   'modal.split-picker': ['navigation', 'terminal-input'],
-  'modal.theme-picker.filtering': ['navigation'],
+  'modal.theme-picker.filtering': ['navigation', 'settings'],
   'modal.update-available': ['navigation'],
   'modal.workspace-delete-confirm': ['navigation'],
   'modal.workspace-move': ['git-mode', 'navigation'],
@@ -41,8 +45,20 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.workspace-move-confirm',
     'modal.flash-jump',
     'git-mode',
+    'settings',
   ],
-  'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage'],
+  // The help overlay opens over settings without a transition (it leaves
+  // focusMode alone). The two pickers an action row hands over to are dispatched
+  // directly rather than through a KeyResult, but they are listed because that is
+  // what this table is for: saying where a mode can go.
+  'settings': [
+    'navigation',
+    'modal.setting-text',
+    'modal.settings-search.filtering',
+    'modal.theme-picker.filtering',
+    'modal.snippet-picker.filtering',
+  ],
+  'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage', 'settings'],
 }
 
 export function isValidTransition(from: ModeId, to: ModeId): boolean {

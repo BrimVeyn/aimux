@@ -945,6 +945,71 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
 }
 
 // ---------------------------------------------------------------------------
+// Settings screen
+// ---------------------------------------------------------------------------
+
+export const enterSettings: KeyResult = r([{ type: 'enter-settings' }], [], 'settings')
+export const exitSettings: KeyResult = r([{ type: 'exit-settings' }], [], 'navigation')
+
+export function focusSettingsPane(pane: 'nav' | 'rows'): KeyResult {
+  return r([{ pane, type: 'settings-focus-pane' }])
+}
+
+export function moveSettingsSelection(delta: -1 | 1): KeyResult {
+  return r([{ delta, type: 'settings-move-selection' }])
+}
+
+/**
+ * One key for every kind of row: it toggles a checkbox, advances an enum, or runs
+ * whatever the row does. Which one is the row's business, not the keymap's — so
+ * there is no per-kind binding to keep in sync with the schema.
+ */
+export const activateSettingsRow: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.settings.pane !== 'rows') return r([{ pane: 'rows', type: 'settings-focus-pane' }])
+  return r([], [{ type: 'activate-settings-row' }])
+}
+
+export function adjustSettingsRow(delta: 1 | -1): KeyResult {
+  return r([], [{ delta, type: 'adjust-settings-row' }])
+}
+
+export const resetSettingsRow: KeyResult = r([], [{ type: 'reset-settings-row' }])
+
+/**
+ * Closing a modal the settings screen opened. `closeModal` declares `navigation`,
+ * which is where every other modal goes and is not where these go — the screen is
+ * still drawn behind them, and `returnTo` puts the focus back on it.
+ */
+export const closeSettingsModal: KeyResult = r([{ type: 'close-modal' }], [], 'settings')
+
+export const openSettingsSearch: KeyResult = r(
+  [{ type: 'open-settings-search' }],
+  [],
+  'modal.settings-search.filtering'
+)
+
+/** Jumps the screen to the highlighted setting, wherever it lives. */
+export const confirmSettingsSearch: KeyResult = r(
+  [],
+  [{ type: 'confirm-settings-search' }],
+  'settings'
+)
+
+/**
+ * The value is carried in the effect rather than read from the store by it: the
+ * `close-modal` action runs first and clears the buffer it would have read.
+ */
+export const confirmSettingText: ActionFn = (ctx: ModeContext) => {
+  const modal = ctx.state.modal
+  if (modal.type !== 'setting-text') return r([{ type: 'close-modal' }], [], 'settings')
+  return r(
+    [{ type: 'close-modal' }],
+    [{ settingId: modal.settingId, type: 'commit-setting-text', value: modal.editBuffer ?? '' }],
+    'settings'
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Deprecated aliases — 0.8.x names kept working for one release.
 //
 // The project/workspace/worktree rename moved every one of these. Aliases only

@@ -105,6 +105,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Leader>b', actions.toggleProjectBar, 'Toggle project bar')
         .map('<Leader>B', actions.toggleBar('right'), 'Toggle right bar')
         .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
+        .map('<Leader>,', actions.enterSettings, 'Settings')
         .map('<Leader>1', actions.switchTabByIndex(1), 'Tab 1')
         .map('<Leader>2', actions.switchTabByIndex(2), 'Tab 2')
         .map('<Leader>3', actions.switchTabByIndex(3), 'Tab 3')
@@ -153,6 +154,36 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Right>', actions.expandGitSelection, 'Expand folder')
         .map('<Down>', actions.scrollGitDiff(1), 'Scroll down')
         .map('<Up>', actions.scrollGitDiff(-1), 'Scroll up')
+    )
+
+    // -----------------------------------------------------------------------
+    // Settings screen
+    //
+    // `h`/`l` always mean "change column", never "change value": a number row
+    // would otherwise make them ambiguous. Values move on <Space>/<CR> (toggle,
+    // next option) and on -/+ (step a number).
+    // -----------------------------------------------------------------------
+    .mode('settings', (m) =>
+      m
+        .map('<Esc>', actions.exitSettings, 'Close settings')
+        .map('<Leader>,', actions.exitSettings, 'Close settings')
+        .map('h', actions.focusSettingsPane('nav'), 'Sections')
+        .map('<Left>', actions.focusSettingsPane('nav'))
+        .map('l', actions.activateSettingsRow, 'Settings of the section')
+        .map('<Right>', actions.activateSettingsRow)
+        .map('<CR>', actions.activateSettingsRow, 'Change')
+        .map('<Space>', actions.activateSettingsRow, 'Change')
+        .map('j', actions.moveSettingsSelection(1), 'Next', { repeatable: true })
+        .map('k', actions.moveSettingsSelection(-1), 'Prev', { repeatable: true })
+        .map('<Down>', actions.moveSettingsSelection(1), undefined, { repeatable: true })
+        .map('<Up>', actions.moveSettingsSelection(-1), undefined, { repeatable: true })
+        .map('<C-n>', actions.moveSettingsSelection(1))
+        .map('<C-p>', actions.moveSettingsSelection(-1))
+        .map('+', actions.adjustSettingsRow(1), 'Increase', { repeatable: true })
+        .map('-', actions.adjustSettingsRow(-1), 'Decrease', { repeatable: true })
+        .map('r', actions.resetSettingsRow, 'Reset to default')
+        .map('/', actions.openSettingsSearch, 'Search settings')
+        .map('?', actions.helpModal('settings'), 'Help')
     )
 
     // -----------------------------------------------------------------------
@@ -263,6 +294,30 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('<CR>', actions.confirmRenameTab, 'Confirm')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: search every setting (always filtering, like the other pickers)
+    // -----------------------------------------------------------------------
+    .mode('modal.settings-search.filtering', (m) =>
+      m
+        .map('<Esc>', actions.closeSettingsModal, 'Close')
+        .map('<CR>', actions.confirmSettingsSearch, 'Go to setting')
+        .map('<C-n>', actions.moveModalSelection(1), 'Next')
+        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: one text field over a settings row
+    // -----------------------------------------------------------------------
+    .mode('modal.setting-text', (m) =>
+      m
+        .map('<Esc>', actions.closeSettingsModal, 'Cancel')
+        .map('<CR>', actions.confirmSettingText, 'Confirm')
         .passthrough()
     )
 

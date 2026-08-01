@@ -1,4 +1,5 @@
 import {
+  type AimuxUserConfig,
   type ResolvedConfig,
   setAutoCommitEnabled,
   setExternalEditorConfig,
@@ -37,6 +38,14 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
+import {
+  useAIUsageConfig,
+  useAutoCommitConfig,
+  useHarmonizeClaudeTheme,
+  useSnippetTriggerChar,
+} from './settings/live'
+import { ALL_SETTING_ROWS } from './settings/sections'
+import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
@@ -67,9 +76,11 @@ const PROJECT_SAVE_DEBOUNCE_MS = 250
 export function App({
   backend,
   resolvedConfig,
+  userConfig,
 }: {
   backend: SessionBackend
   resolvedConfig: ResolvedConfig
+  userConfig: AimuxUserConfig
 }) {
   // Publish the auto-commit enabled flag before any children render so
   // actions (which live outside React) can read it synchronously.
@@ -155,6 +166,15 @@ export function App({
   const state = useAppStore((s) => s)
   const dispatch = state.dispatch
 
+  // Config the settings screen can change under us. The resolved config file is
+  // the baseline each of these falls back to.
+  const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
+  const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
+  const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
+    resolvedConfig.theme?.beta?.harmonizeClaudeTheme
+  )
+  const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
+
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
     return () => {
@@ -163,14 +183,26 @@ export function App({
     }
   }, [dispatch])
 
+  // Replays what the settings screen has written on top of the config file (the
+  // setters at the top of this component are its baseline). Deliberately after
+  // the effect above and never during render: a row applies its value through
+  // whatever owns it, and some of those owners are reached by dispatching.
+  // Layout effect, so it lands before the first paint.
+  useLayoutEffect(() => {
+    hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    // Once per launch: the config file is read at startup and does not change
+    // under us, and every later write goes through `writeRow`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
-    if (!(resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true)) return
+    if (!harmonizeClaudeTheme) return
     ensureClaudeSettingsThemePref()
     syncClaudeTheme(getCurrentTheme(), getCurrentMode())
     return subscribeThemeChanges((resolved, mode) => {
       syncClaudeTheme(resolved, mode)
     })
-  }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
+  }, [harmonizeClaudeTheme])
 
   useEffect(() => {
     // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,
@@ -183,13 +215,12 @@ export function App({
   }, [resolvedConfig.integrations.claudeHooks])
 
   useEffect(() => {
-    const aiUsage = resolvedConfig.statusBar?.aiUsage
-    if (!(aiUsage?.enabled === true)) {
+    if (!(aiUsageConfig.enabled === true)) {
       aiUsageStore.getState().setEnabled(false)
       return
     }
     aiUsageStore.getState().setEnabled(true)
-    const handle = startAIUsageService(aiUsage, (snap) => {
+    const handle = startAIUsageService(aiUsageConfig, (snap) => {
       aiUsageStore.getState().setSnapshot(snap)
     })
     return () => {
@@ -197,7 +228,9 @@ export function App({
       aiUsageStore.getState().clear()
       aiUsageStore.getState().setEnabled(false)
     }
-  }, [resolvedConfig.statusBar?.aiUsage])
+    // Memoized by `useAIUsageConfig`, so toggling the indicator restarts the
+    // service and nothing else does.
+  }, [aiUsageConfig])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return
@@ -284,8 +317,8 @@ export function App({
   snippetsRef.current = state.snippets
   const branchRef = useRef(state.gitPanel.branch)
   branchRef.current = state.gitPanel.branch
-  const triggerCharRef = useRef(resolvedConfig.snippetTriggerChar)
-  triggerCharRef.current = resolvedConfig.snippetTriggerChar
+  const triggerCharRef = useRef(snippetTriggerChar)
+  triggerCharRef.current = snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
   const currentProjectProjectSnapshot = currentProject?.projectSnapshot
@@ -356,7 +389,9 @@ export function App({
   useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
   useAutoCommitDriver({
-    config: resolvedConfig.autoCommit,
+    // Through the settings screen, so a change lands without a restart. The
+    // resolved config is the baseline it falls back to.
+    config: autoCommitConfig,
     dispatch,
     getProfileConfigRoot: getProfileConfigDir,
     state,

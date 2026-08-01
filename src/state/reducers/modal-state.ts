@@ -6,6 +6,7 @@ import type { AppState } from '../types'
 import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
+import { filterSettingRows } from '../../settings/search'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
 import {
@@ -15,7 +16,7 @@ import {
   filterSnippets,
   getNewTabAssistantOptions,
 } from '../selectors'
-import { reduceAutoCommitState } from './auto-commit-state'
+import { reduceGitCommitModalState } from './git-commit-modal-state'
 
 function emptyModal() {
   return {
@@ -75,6 +76,8 @@ function getModalOptionCount(state: AppState): number {
       // `+1` for the "create a project" row the picker appends, and at least
       // that row exists even when nothing matches the filter.
       return Math.max(1, filterProjects(state.projects, modal.editBuffer).length + 1)
+    case 'settings-search':
+      return filterSettingRows(state.projects, modal.editBuffer).length
     case 'snippet-picker':
       return filterSnippets(state.snippets, modal.editBuffer).length
     case 'split-picker':
@@ -104,6 +107,10 @@ function getCreateWorkspaceFieldValue(
 }
 
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
+  // The one modal with a stage machine of its own, in its own file.
+  const gitCommit = reduceGitCommitModalState(state, action)
+  if (gitCommit) return gitCommit
+
   switch (action.type) {
     case 'open-new-tab-modal': {
       return {
@@ -420,6 +427,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
           type: 'snippet-picker',
         },
@@ -460,6 +468,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           entryCount: 0,
           projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
           type: 'theme-picker',
         },
@@ -478,123 +487,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'update-available',
         },
       }
-    case 'open-git-commit-modal': {
-      const projectId = action.projectId
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: {
-          activeField: 'title',
-          contentBuffer: '',
-          cursorPos: 0,
-          editBuffer: '',
-          projectTargetId: projectId ?? null,
-          selectedIndex: 0,
-          stage: 'edit',
-          type: 'git-commit',
-        },
-      }
-    }
-    case 'git-commit-enter-confirm': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'confirm' },
-      }
-    }
-    case 'git-commit-leave-confirm': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
-    case 'git-commit-enter-generating': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'modal',
-        modal: { ...state.modal, projectTargetId: action.projectId, stage: 'generating' },
-      }
-    }
-    case 'git-commit-leave-generating': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
-    case 'auto-commit-generation-ready': {
-      if (
-        state.modal.type !== 'git-commit' ||
-        state.modal.stage !== 'generating' ||
-        state.modal.projectTargetId !== action.projectId
-      ) {
-        return null
-      }
-      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
-      if (!nextAutoCommit) {
-        // Stale result (hash mismatch or slice was cleared mid-flight): don't
-        // strand the modal in `generating` — flip back to edit so the user
-        // isn't stuck staring at a spinner that will never resolve.
-        return {
-          ...state,
-          focusMode: 'command-edit',
-          modal: { ...state.modal, stage: 'edit' },
-        }
-      }
-      return {
-        ...state,
-        autoCommit: nextAutoCommit,
-        focusMode: 'command-edit',
-        modal: {
-          ...state.modal,
-          activeField: 'title',
-          contentBuffer: action.body,
-          cursorPos: action.title.length,
-          editBuffer: action.title,
-          stage: 'confirm',
-        },
-      }
-    }
-    case 'git-commit-use-background-suggestion': {
-      if (state.modal.type !== 'git-commit' || state.modal.projectTargetId !== action.projectId) {
-        return null
-      }
-      const suggestion = state.autoCommit.byProject[action.projectId]
-      if (!suggestion || suggestion.kind !== 'ready') return null
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: {
-          ...state.modal,
-          activeField: 'title',
-          contentBuffer: suggestion.body,
-          cursorPos: suggestion.title.length,
-          editBuffer: suggestion.title,
-          stage: 'confirm',
-        },
-      }
-    }
-    case 'auto-commit-clear': {
-      if (
-        state.modal.type !== 'git-commit' ||
-        state.modal.stage !== 'generating' ||
-        state.modal.projectTargetId !== action.projectId
-      ) {
-        return null
-      }
-      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
-      return {
-        ...state,
-        autoCommit: nextAutoCommit ?? state.autoCommit,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
     case 'set-help-entry-count': {
       if (state.modal.type !== 'help') return state
       if (state.modal.entryCount === action.count) {
@@ -631,8 +523,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       ) {
         return { ...state, modal: emptyModal() }
       }
-      const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
-      return { ...state, focusMode: nextFocus, modal: emptyModal() }
+      // Whoever opened it said where to go back to, because that is who knows
+      // what is drawn behind it. Everything else came from the panes.
+      return { ...state, focusMode: state.modal.returnTo ?? 'navigation', modal: emptyModal() }
     }
     case 'move-modal-selection': {
       if (state.modal.type === 'help') {
@@ -686,20 +579,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'set-modal-selection-index': {
-      if (
-        state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'project-picker' &&
-        state.modal.type !== 'snippet-picker' &&
-        state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-project' &&
-        state.modal.type !== 'create-workspace' &&
-        state.modal.type !== 'split-picker' &&
-        state.modal.type !== 'update-available' &&
-        state.modal.type !== 'workspace-move' &&
-        state.modal.type !== 'help'
-      ) {
-        return state
-      }
+      // Which modals have an indexed list is `getModalOptionCount`'s question,
+      // and it answers 0 for the ones that don't. It used to be asked twice —
+      // here as a list of types to keep in step by hand, which the settings
+      // search promptly wasn't on, leaving its rows unhoverable.
       if (state.modal.type === 'create-workspace') {
         if (state.modal.activeField !== 'base') return state
         const options = getCreateWorkspaceBaseOptions(state)
@@ -960,6 +843,34 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-settings-search':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: 0,
+          editBuffer: '',
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          type: 'settings-search',
+        },
+      }
+    case 'open-setting-text-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: action.value.length,
+          editBuffer: action.value,
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          settingId: action.settingId,
+          settingLabel: action.label,
+          type: 'setting-text',
+        },
+      }
     case 'open-rename-tab-modal': {
       const activeTab =
         state.activeTabId != null && state.activeTabId !== ''

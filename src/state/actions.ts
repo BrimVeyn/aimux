@@ -17,6 +17,7 @@ import type {
   FocusMode,
   GitFileSection,
   GitPanelError,
+  GitPaneState,
   GitRefreshPayload,
   PendingWorkspaceLaunch,
   ProjectRecord,
@@ -66,11 +67,11 @@ export type ModalAction =
       workspaceId: string
       initialName: string
     }
-  | { type: 'open-snippet-picker' }
+  | { type: 'open-snippet-picker'; returnTo?: FocusMode }
   | { type: 'open-snippet-editor'; snippetId?: string }
   | { type: 'set-help-entry-count'; count: number }
   | { type: 'set-theme-entry-count'; count: number }
-  | { type: 'open-theme-picker' }
+  | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-ai-usage-modal' }
@@ -208,11 +209,22 @@ export type UIAction =
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-project-bar' }
 
+export type SettingsAction =
+  | { type: 'enter-settings' }
+  | { type: 'exit-settings' }
+  | { type: 'settings-focus-pane'; pane: 'nav' | 'rows' }
+  | { type: 'settings-move-selection'; delta: -1 | 1 }
+  | { type: 'settings-select-section'; sectionId: string }
+  | { type: 'settings-select-row'; rowIndex: number }
+  | { type: 'open-settings-search' }
+  | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
   | { type: 'git-panel-reset' }
   | { type: 'set-workspace-divergence'; divergence: Record<string, BranchDivergence> }
+  | { type: 'set-git-pane'; patch: Partial<GitPaneState> }
 
 export type AutoCommitAction =
   | {
@@ -315,6 +327,7 @@ export type AppAction =
   | TabAction
   | LayoutAction
   | UIAction
+  | SettingsAction
   | DataAction
   | GitPanelAction
   | GitModeAction

@@ -57,6 +57,11 @@ defineConfig({
 
 ## Support Matrix
 
+Most of these fields also have a row in the in-app settings screen (`<Leader>,`),
+which writes to `aimux.json`. This file is read at every launch and wins over it:
+a field declared here comes back on the next start, and the row says so. See
+`../guide/settings.md`.
+
 | Field                | Status             | Notes                                                                                                                   |
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `keymaps`            | Supported          | Fully resolved and registered by the app                                                                                |
@@ -530,7 +535,7 @@ interface StatusBarConfig {
 interface AIUsageToolConfig {
   enabled?: boolean // default false
   tools?: Array<'claude' | 'codex'> // default ['claude', 'codex']
-  pollSeconds?: number // default 60; clamped to a minimum of 5
+  pollSeconds?: number // default 180; clamped to a minimum of 180 (Claude's endpoint rate-limits faster callers)
   claudePlan?: 'auto' | 'pro' | 'max5' | 'max20' // default 'auto'; reserved
   codexWeeklyLimit?: number // reserved
 }
@@ -574,7 +579,7 @@ export default defineConfig({
     separator: 'round',
     aiUsage: {
       enabled: true,
-      pollSeconds: 60,
+      pollSeconds: 180,
       tools: ['claude', 'codex'],
     },
   },

@@ -7,6 +7,7 @@ import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
 import { reduceProjectState } from './reducers/project-state'
+import { emptySettingsUI, reduceSettingsState } from './reducers/settings-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
@@ -136,6 +137,7 @@ export function createInitialState(
     },
     projects,
     projectStatuses: {},
+    settings: emptySettingsUI(),
     snippets,
     tabGroupMap: {},
     tabs: [],
@@ -167,6 +169,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const multiRepoState = reduceMultiRepoState(state, action)
   if (multiRepoState) return multiRepoState
+
+  const settingsState = reduceSettingsState(state, action)
+  if (settingsState) return settingsState
 
   switch (action.type) {
     case 'set-snippets':

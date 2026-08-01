@@ -23,6 +23,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 
 ## Guides
 
+- `guide/settings.md` - the in-app settings screen: navigation, which file each
+  setting lands in, and how it interacts with `aimux.config.ts`
 - `guide/projects.md` - project picker, project creation, persistence,
   reordering, and reconnect behavior
 - `guide/keymaps.md` - key notation, modes, leader keys, multi-key sequences,

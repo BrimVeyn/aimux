@@ -14,15 +14,20 @@ import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
+import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
 import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { TabItem } from './sidebar/tab-item'
-import { useTopTabBarAutoScroll } from './sidebar/use-top-tab-bar-auto-scroll'
 
 interface TopTabBarProps {
-  forceVisible?: boolean
+  /**
+   * A full-screen view has replaced the pane tree (git mode, settings). The strip
+   * shows regardless of the user's own preference — it is the only orientation
+   * left — but it shows as a strip to read, not to act on.
+   */
+  panesReplaced?: boolean
 }
 
 const ROW_CONTENT_OPTIONS = {
@@ -192,7 +197,7 @@ function entryTabIds(entry: TabEntry): string[] {
   return entry.kind === 'single' ? [entry.tab.id] : entry.tabs.map((tab) => tab.id)
 }
 
-export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
+export function TopTabBar({ panesReplaced = false }: TopTabBarProps) {
   const t = useTheme()
   const headerBg = t.backgroundPanel
   const tabs = useAppStore((s) => s.tabs)
@@ -207,7 +212,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
 
   // Sidebar now also shows workspace chips with divergence — poll whenever
   // either surface is visible.
-  useWorkspaceDivergencePolling(bar.visible || leftBarVisible || forceVisible)
+  useWorkspaceDivergencePolling(bar.visible || leftBarVisible || panesReplaced)
 
   const currentProject = useMemo(
     () =>
@@ -239,11 +244,11 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   }, [entries, activeTabId])
 
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
-  useTopTabBarAutoScroll({
-    activeTabId: activeEntryId,
+  useScrollActiveIntoView({
+    activeId: activeEntryId,
     idPrefix: 'top-tab-',
     scrollRef,
-    visible: bar.visible || forceVisible,
+    visible: bar.visible || panesReplaced,
   })
 
   const handleEntryActivate = useCallback(
@@ -347,7 +352,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
     runSideEffectGlobal({ type: 'open-new-tab' })
   }, [])
 
-  if (!bar.visible && !forceVisible) return null
+  if (!bar.visible && !panesReplaced) return null
   // Keep the bar visible even with zero entries — when the active workspace
   // has no tabs, the lone "+" affordance is what tells the user "you're in
   // an empty workspace, click here to start one".
@@ -426,17 +431,22 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
             </TopTabCell>
           )
         })}
-        <box
-          flexDirection="row"
-          flexShrink={0}
-          paddingLeft={1}
-          paddingRight={1}
-          onMouseDown={handleNewTab}
-        >
-          <text fg={t.textMuted} selectable={false}>
-            +
-          </text>
-        </box>
+        {/* Not while a full-screen view is up: a `+` that quietly starts a tab
+            and drops you out of the screen you were reading is noise, and on the
+            settings screen it is not even about anything on it. */}
+        {panesReplaced ? null : (
+          <box
+            flexDirection="row"
+            flexShrink={0}
+            paddingLeft={1}
+            paddingRight={1}
+            onMouseDown={handleNewTab}
+          >
+            <text fg={t.textMuted} selectable={false}>
+              +
+            </text>
+          </box>
+        )}
       </scrollbox>
     </box>
   )

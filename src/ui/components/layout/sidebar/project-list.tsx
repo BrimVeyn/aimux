@@ -30,6 +30,12 @@ const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
 const RULE = '─'
 const HEADER_TITLE = 'Projects'
+/**
+ * U+2699, not the nerd-font gear: its Emoji_Presentation is No, so a conforming
+ * terminal draws it text-style in one cell and no font has to be installed for
+ * the one button that opens the settings.
+ */
+const SETTINGS_GLYPH = '⚙'
 
 function arraysEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false
@@ -161,6 +167,15 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     dispatchGlobal({ returnToProjectPicker: false, type: 'open-create-project-modal' })
   }, [])
 
+  // The settings screen's only mouse-reachable way in. It lives here because this
+  // header is on screen whenever the left bar is, and because the `+` beside it
+  // already taught the same gesture.
+  const handleOpenSettings = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    dispatchGlobal({ type: 'enter-settings' })
+  }, [])
+
   const visibleProjects =
     dragOrder !== null
       ? dragOrder
@@ -247,6 +262,16 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           return rows
         })()}
       </scrollbox>
+      <box flexShrink={0}>
+        <text fg={t.border} selectable={false} wrapMode="none">
+          {rule}
+        </text>
+      </box>
+      <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
+        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
+          {`${SETTINGS_GLYPH} Settings`}
+        </text>
+      </box>
     </box>
   )
 }
