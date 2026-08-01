@@ -54,7 +54,8 @@ the screen to it.
 
 `r` puts a setting back to what it would be if this screen had never touched it:
 its value in your config file if that file declares one, else the built-in
-default. The mark to the left of a label says where its value comes from — `~`
+default. A setting you have changed says which value that is, so `r` is not a key
+you press to find out what it does. The mark to the left of a label says where its value comes from — `~`
 means "you set this here, `r` undoes it", `*` means "your config file owns this".
 Settings that are a view over something else (bar widths, the theme, the launch
 commands) have neither mark and nothing to reset: their value lives with the thing

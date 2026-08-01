@@ -34,6 +34,23 @@ export function formatValue(row: SettingRow, value: SettingValue): string {
   }
 }
 
+/**
+ * The same value in prose, for the line under the label. The column wants a glyph
+ * you can scan; a sentence wants a word — `default: ●` is not a sentence.
+ */
+export function describeValue(row: SettingRow, value: SettingValue): string {
+  switch (row.kind) {
+    case 'toggle':
+      return value === true ? 'on' : 'off'
+    case 'select':
+      return row.options.find((entry) => entry.value === value)?.label ?? String(value)
+    case 'text':
+      return String(value) === '' ? 'empty' : String(value)
+    default:
+      return String(value)
+  }
+}
+
 function valueColor(row: SettingRow, value: SettingValue, t: ResolvedTuiTheme): string {
   // A toggle is read at a glance or not at all, so its state is the colour as much
   // as the glyph: lit when on, as quiet as the rest of the row when off.

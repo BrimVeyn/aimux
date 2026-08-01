@@ -26,11 +26,19 @@ export interface SettingsState {
    * what "reset" removes, so it is what the marker has to mean.
    */
   touched: ReadonlySet<string>
+  /**
+   * What each row would hold if this screen had never touched it: the config
+   * file's value where it declares one, else the built-in default. Resolved once,
+   * at hydration, because that is when the config file was read — recomputing it
+   * later would read a file the rest of the app has not.
+   */
+  defaults: StoredSettings
 }
 
 const EMPTY_FROM_CONFIG: ReadonlySet<string> = new Set()
 
 export const settingsStore = createStore<SettingsState>(() => ({
+  defaults: {},
   fromConfigFile: EMPTY_FROM_CONFIG,
   revision: 0,
   touched: EMPTY_FROM_CONFIG,
@@ -50,23 +58,17 @@ export function useSettingsStore<T>(selector: (state: SettingsState) => T): T {
  * The schema is a parameter rather than an import so this module stays downstream
  * of the sections, which read from it.
  */
-/**
- * The config file as loaded at startup. Kept because resetting a row has to know
- * what that file said — the file is read once per launch, and re-reading it here
- * would be reading a different file than the one the rest of the app resolved.
- */
-let LAST_USER_CONFIG: AimuxUserConfig = {}
-
 export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUserConfig): void {
-  LAST_USER_CONFIG = userConfig
   const stored = loadConfig().settings ?? {}
   const values: StoredSettings = {}
+  const defaults: StoredSettings = {}
   const fromConfigFile = new Set<string>()
 
   for (const row of rows) {
     if (row.kind === 'info' || row.kind === 'action' || row.storage !== 'settings') continue
     const declared = row.fromConfig?.(userConfig)
     if (declared !== undefined) fromConfigFile.add(row.id)
+    defaults[row.id] = declared ?? row.fallback
     const value = declared ?? stored[row.id] ?? row.fallback
     values[row.id] = value
     // Unconditional: the caller has already applied the config file's own values
@@ -76,6 +78,7 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
   }
 
   settingsStore.setState((state) => ({
+    defaults,
     fromConfigFile,
     revision: state.revision + 1,
     touched: new Set(Object.keys(stored)),
@@ -142,7 +145,7 @@ export function resetRow(row: SettingRow): void {
   if (!settingsStore.getState().touched.has(row.id)) return
   if (!persist(row.id, undefined)) return
 
-  const value = row.fromConfig?.(LAST_USER_CONFIG) ?? row.fallback
+  const value = settingsStore.getState().defaults[row.id] ?? row.fallback
   settingsStore.setState((state) => {
     const touched = new Set(state.touched)
     touched.delete(row.id)

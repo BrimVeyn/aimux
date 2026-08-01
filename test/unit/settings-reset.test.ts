@@ -68,7 +68,13 @@ afterEach(() => {
   if (originalProfile === undefined) delete process.env.AIMUX_PROFILE
   else process.env.AIMUX_PROFILE = originalProfile
   applied.length = 0
-  settingsStore.setState({ fromConfigFile: new Set(), revision: 0, touched: new Set(), values: {} })
+  settingsStore.setState({
+    defaults: {},
+    fromConfigFile: new Set(),
+    revision: 0,
+    touched: new Set(),
+    values: {},
+  })
   for (const dir of dirs.splice(0)) rmSync(dir, { force: true, recursive: true })
 })
 
@@ -95,6 +101,23 @@ test('writing marks it, resetting unmarks it', () => {
   // touched", which is what the marker and the next launch both read.
   expect(settingsStore.getState().touched.has(TOGGLE.id)).toBe(false)
   expect(storedKeys(path)).toEqual([])
+})
+
+test('the default a row would reset to is resolved up front', () => {
+  withConfig({ settings: { 'autoCommit.enabled': true } })
+
+  hydrateSettings([TOGGLE], {})
+
+  // Shown on the row, so `r` is not a key you press to find out what it does.
+  expect(settingsStore.getState().defaults[TOGGLE.id]).toBe(false)
+})
+
+test('the default of a row the config file declares is what that file says', () => {
+  withConfig({})
+
+  hydrateSettings([TOGGLE], { autoCommit: { enabled: true } })
+
+  expect(settingsStore.getState().defaults[TOGGLE.id]).toBe(true)
 })
 
 test('resetting goes back to the default, and applies it', () => {

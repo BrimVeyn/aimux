@@ -5,7 +5,7 @@ import type { SettingRow } from '../../../settings/types'
 import { useSettingsStore } from '../../../settings/settings-store'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
-import { RowValue } from './row-value'
+import { describeValue, RowValue } from './row-value'
 
 /** Where the value comes from, on the left, out of the value column's way. */
 const CONFIG_FILE_MARK = '*'
@@ -33,6 +33,7 @@ export const SettingsRow = memo(function SettingsRow({
   const t = useTheme()
   const fromConfigFile = useSettingsStore((s) => s.fromConfigFile.has(row.id))
   const touched = useSettingsStore((s) => s.touched.has(row.id))
+  const defaultValue = useSettingsStore((s) => s.defaults[row.id])
   const editable = row.kind !== 'info'
   // A blank when neither applies, never nothing: a marker that comes and goes
   // would shift the label of every row it is missing from.
@@ -48,6 +49,11 @@ export const SettingsRow = memo(function SettingsRow({
   if (row.description != null && row.description !== '') notes.push(row.description)
   if (fromConfigFile) notes.push('set in aimux.config.ts — comes back on restart')
   else if (needsRestart(row)) notes.push('applies on restart')
+  // Only once it has been changed, and only then: `r` is otherwise a key you
+  // press to find out what it does, and the default is what it does.
+  if (touched && defaultValue !== undefined) {
+    notes.push(`r resets to ${describeValue(row, defaultValue)}`)
+  }
 
   return (
     <ListItem
