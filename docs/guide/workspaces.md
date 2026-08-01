@@ -152,10 +152,10 @@ on the right.
 
 ```
 • aimux                                    +
-    root
-      main
-  ? scroll drift fix                 +142 -37
-      aimux/scroll-drift-fix
+  root
+    main
+? scroll drift fix                   +142 -37
+    aimux/scroll-drift-fix
 ```
 
 The heading is not a place the cursor stops. `j` / `k` move between workspace

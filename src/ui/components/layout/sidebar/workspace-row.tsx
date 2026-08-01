@@ -119,11 +119,12 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   const statWidth = added.length + removed.length + (added !== '' && removed !== '' ? 1 : 0)
   const nameLabel = truncate(
     workspace.name,
-    Math.max(0, contentWidth - 5 - (statWidth > 0 ? statWidth + 1 : 0))
+    Math.max(0, contentWidth - 3 - (statWidth > 0 ? statWidth + 1 : 0))
   )
-  // Second line, aligned under the name (2 padding + the 4-cell glyph run).
-  // Only workspaces that own a branch get one — an external checkout without
-  // one would otherwise be a row of a different height for no information.
+  // Second line, indented under the name, and where the branch glyph lives —
+  // it labels the branch, not the workspace. Only workspaces that own a branch
+  // get one — an external checkout without one would otherwise be a row of a
+  // different height for no information.
   const branchLabel =
     workspace.branch == null || workspace.branch === ''
       ? null
@@ -161,9 +162,6 @@ export const WorkspaceRow = memo(function WorkspaceRow({
         <text fg={statusColor} selectable={false} wrapMode="none">
           {statusGlyph}{' '}
         </text>
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {'\u{e702}'}{' '}
-        </text>
         <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
         <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
           {nameLabel}
@@ -187,8 +185,8 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       </box>
       {branchLabel == null ? null : (
         <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {'    '}
-          {branchLabel}
+          {'  '}
+          {'\u{e702}'} {branchLabel}
         </text>
       )}
     </ContextMenuBox>
