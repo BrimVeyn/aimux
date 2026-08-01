@@ -222,6 +222,21 @@ test('auto-commit-generation-ready for a different project does not touch the mo
   expect(result).toBeNull()
 })
 
+test('closing the commit modal goes back to git mode', () => {
+  const opened = reduceModalState(createInitialState(), {
+    projectId: PROJECT,
+    type: 'open-git-commit-modal',
+  } as AppAction) as AppState
+  // Carried on the modal rather than special-cased in `close-modal`: that reducer
+  // now has one rule — go where whoever opened this said to go.
+  expect(opened.modal.returnTo).toBe('git')
+
+  const closed = reduceModalState(opened, { type: 'close-modal' } as AppAction) as AppState
+
+  expect(closed.focusMode).toBe('git')
+  expect(closed.modal.type).toBeNull()
+})
+
 test('switch-create-project-field swaps buffers on the git-commit modal', () => {
   const base = createInitialState()
   const opened = reduceModalState(base, {
