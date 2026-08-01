@@ -32,7 +32,11 @@ import type {
 
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
-  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
+  | {
+      type: 'open-new-tab-modal'
+      pendingWorkspace?: PendingWorkspaceLaunch
+      pendingPrompt?: string
+    }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
@@ -153,6 +157,8 @@ export type TabAction =
       tabId: string
       title?: string
       autoRenameStatus?: 'eligible' | 'attempted'
+      /** Set to false to promote a hidden tab into the normal tab strip. */
+      hidden?: boolean
     }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }
   | {

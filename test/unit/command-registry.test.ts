@@ -5,6 +5,7 @@ import {
   buildAssistantModelArgs,
   getAssistantOption,
   parseCommand,
+  shellQuote,
 } from '../../src/pty/command-registry'
 
 function option(id: string) {
@@ -60,6 +61,17 @@ describe('parseCommand', () => {
       args: ['/Users/a b/setup.sh'],
       executable: 'bash',
     })
+  })
+
+  test('round-trips a shellQuote-d path back to one argument', () => {
+    // The setup runner builds `bash <quoted script path>`; $HOME can hold both a
+    // space and an apostrophe.
+    for (const path of ['/Users/a b/setup.sh', "/Users/O'Brien/My Stuff/setup.sh"]) {
+      expect(parseCommand(`bash ${shellQuote(path)}`)).toEqual({
+        args: [path],
+        executable: 'bash',
+      })
+    }
   })
 
   test('treats a quote inside the other quote style as a literal', () => {

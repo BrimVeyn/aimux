@@ -573,6 +573,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         tabs: updateTab(state.tabs, action.tabId, (tab) => ({
           ...tab,
           autoRenameStatus: action.autoRenameStatus ?? tab.autoRenameStatus,
+          hidden: action.hidden ?? tab.hidden,
           title: action.title ?? tab.title,
         })),
       }

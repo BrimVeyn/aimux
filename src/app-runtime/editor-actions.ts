@@ -10,7 +10,7 @@ import type { SideEffectContext } from './side-effect-context'
 
 import { logInputDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
-import { isCommandAvailable, shellSplit } from '../pty/command-registry'
+import { isCommandAvailable, shellQuote, shellSplit } from '../pty/command-registry'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { getSelectedSnippet } from './selection'
 
@@ -56,7 +56,7 @@ export function openFileInEditor(ctx: SideEffectContext, relPath: string): void 
   )
 }
 
-function launchEditorOnFile(
+export function launchEditorOnFile(
   ctx: SideEffectContext,
   absolutePath: string,
   cwd: string,
@@ -136,10 +136,6 @@ function substituteEditorArgs(template: string[], file: string, line?: string): 
     out.push(arg.replaceAll(/[:+]\{line\}/g, '').replaceAll('{file}', file))
   }
   return out
-}
-
-function shellQuote(s: string): string {
-  return `'${s.replaceAll("'", `'\\''`)}'`
 }
 
 function buildShellCmd(cwd: string, executable: string, args: string[]): string {

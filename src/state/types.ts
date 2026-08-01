@@ -175,6 +175,10 @@ export interface WorkspaceRecord {
   color?: string
   createdAt: string
   updatedAt: string
+  /** Last setup-script run for this workspace. Display only — the auto-run gate
+   *  is "this session has not seen this workspace id before". */
+  setupRanAt?: string
+  setupExitCode?: number
 }
 
 export interface ProjectRecord {
@@ -391,6 +395,12 @@ export interface ModalNewTab extends ModalBase {
    * escaping the picker cannot leak a stale prompt into a later tab.
    */
   pendingWorkspace?: PendingWorkspaceLaunch
+  /**
+   * A prompt to hand the picked assistant, with none of `pendingWorkspace`'s
+   * other behaviour: no workspace pinning, no rename. Used by "Ask an agent" in
+   * the setup widget.
+   */
+  pendingPrompt?: string
 }
 
 export interface PendingWorkspaceLaunch {

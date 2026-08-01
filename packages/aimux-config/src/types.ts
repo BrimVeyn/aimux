@@ -161,6 +161,10 @@ export interface WorkspaceRecord {
   color?: string
   createdAt: string
   updatedAt: string
+  /** Last setup-script run for this workspace. Display only — the auto-run gate
+   *  is "this session has not seen this workspace id before". */
+  setupRanAt?: string
+  setupExitCode?: number
 }
 
 export interface ProjectRecord {
@@ -326,6 +330,8 @@ export interface ModalNewTab extends ModalBase {
   editingCommand: AssistantId | null
   /** Set when `create-workspace` chained into this picker. */
   pendingWorkspace?: PendingWorkspaceLaunch
+  /** A prompt for the picked assistant, without the workspace pinning/rename. */
+  pendingPrompt?: string
 }
 export interface PendingWorkspaceLaunch {
   projectId: string
@@ -565,7 +571,11 @@ export interface AppState {
 // ─── AppAction union ──────────────────────────────────────────────────────────
 
 export type ModalAction =
-  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
+  | {
+      type: 'open-new-tab-modal'
+      pendingWorkspace?: PendingWorkspaceLaunch
+      pendingPrompt?: string
+    }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-project-picker' }
@@ -912,6 +922,11 @@ export type SideEffect =
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
   | { type: 'open-selected-snippet-source-in-editor' }
+  | { type: 'run-setup' }
+  | { type: 'stop-setup' }
+  | { type: 'configure-setup-script' }
+  | { type: 'ask-agent-for-setup-script' }
+  | { type: 'promote-setup-tab' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

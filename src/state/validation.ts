@@ -121,7 +121,9 @@ export function isWorkspaceRecord(value: unknown): value is WorkspaceRecord {
     isBoolean(value.createdByAimux) &&
     (value.color === undefined || isString(value.color)) &&
     isString(value.createdAt) &&
-    isString(value.updatedAt)
+    isString(value.updatedAt) &&
+    (value.setupRanAt === undefined || isString(value.setupRanAt)) &&
+    (value.setupExitCode === undefined || isFiniteNumber(value.setupExitCode))
   )
 }
 

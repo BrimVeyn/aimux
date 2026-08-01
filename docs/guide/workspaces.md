@@ -80,6 +80,57 @@ It is not the only way in.
 Opening a project selects one of its workspaces, falling back to the primary
 only when the project has none.
 
+## Setup script
+
+The setup step above is a real thing, one script per project:
+
+```text
+~/.config/aimux/<profile>/projects/<projectId>/setup.sh
+```
+
+It lives outside the repository on purpose. A file at the repo root would only
+reach a worktree if it were committed, and a setup script is usually the kind of
+thing you do not want to commit. Living in aimux's own directory, one script
+serves every workspace of the project — and it runs with the working directory
+set to the workspace, so it must use relative paths.
+
+It runs automatically when a workspace is **created**, and never otherwise. Not
+when a workspace is merely selected: `j`/`k` cycles workspaces, and a rule keyed
+on selection would fire an install in every workspace you scrolled past. The
+primary workspace is also excluded — it is your real checkout, and a script that
+does `cp .env.example .env` has no business running over it.
+
+Both creation paths are covered, the TUI's `Ctrl+P` and `aimux workspace create`.
+A workspace created by the CLI while aimux is closed is the one gap; run it by
+hand from the widget.
+
+Write it so it can be run twice in a row, and so it never blocks on a human. A
+non-zero exit is reported as a toast and recorded on the workspace.
+
+### The setup widget
+
+The **Setup** widget is where the script lives in the UI. It ships hidden —
+right-click a bar and pick "Show Setup" to place it.
+
+With no script yet, it offers two buttons. **Configure** creates an executable
+stub and opens it in your `$EDITOR` (the same editor path the git pane and
+snippet picker use). **Ask an agent** creates the stub, then opens the assistant
+picker with a prompt describing what the script has to do; the assistant you
+pick inspects the repo and writes it.
+
+Once a script exists, the widget shows the run state for the current workspace —
+`running…`, `✓ setup ok`, or `✗ exit N` — with the live output underneath, plus
+**Run** / **Re-run**, **Edit**, and **↗**.
+
+That last one matters. The setup PTY is a real tab, but a hidden one: it is not
+in the tab bar, `Ctrl+Tab` skips it, and it is never restored from a snapshot.
+**↗** promotes it into a normal tab in the main pane, because reading a stack
+trace in a bar thirty columns wide is not reading.
+
+A `Ctrl+P` workspace runs its setup and its assistant at the same time. The
+assistant's prompt is prefixed with a note saying so, so it knows to wait before
+running builds or tests.
+
 ## Templates
 
 A **workspace template** is a reusable layout — one or more tabs, each with

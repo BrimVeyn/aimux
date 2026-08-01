@@ -152,7 +152,10 @@ export function useTerminalResize({
   const handledBySyncRef = useRef(false)
   const sidebarMountedRef = useRef(false)
 
-  const currentTabIds = state.tabs.map((t) => t.id)
+  // Hidden tabs are excluded from the open-loop cascade: their host (the setup
+  // widget) measures its own box, and the cascade would overwrite that with the
+  // main terminal area's size on every terminal or bar resize.
+  const currentTabIds = state.tabs.filter((t) => t.hidden !== true).map((t) => t.id)
   const tabIdsChanged =
     currentTabIds.length !== tabIdsRef.current.length ||
     currentTabIds.some((id, i) => id !== tabIdsRef.current[i])

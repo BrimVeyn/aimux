@@ -108,6 +108,11 @@ export type SideEffect =
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
   | { type: 'open-selected-snippet-source-in-editor' }
+  | { type: 'run-setup' }
+  | { type: 'stop-setup' }
+  | { type: 'configure-setup-script' }
+  | { type: 'ask-agent-for-setup-script' }
+  | { type: 'promote-setup-tab' }
 
 export interface KeyResult {
   actions: AppAction[]

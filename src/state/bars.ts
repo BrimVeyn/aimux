@@ -4,7 +4,7 @@ export const BAR_MIN_WIDTH = 18
 export const BAR_MAX_WIDTH = 80
 
 /** Widget ids the app knows how to render. Unknown ids are pruned on load. */
-export const KNOWN_WIDGET_IDS = ['projects', 'git'] as const
+export const KNOWN_WIDGET_IDS = ['projects', 'git', 'setup'] as const
 
 /** Smallest share of a bar a single widget may shrink to, as a fraction. */
 const MIN_WIDGET_SHARE = 0.1

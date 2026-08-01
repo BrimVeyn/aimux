@@ -113,6 +113,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
+          pendingPrompt: action.pendingPrompt,
           pendingWorkspace: action.pendingWorkspace,
           projectTargetId: null,
           selectedIndex: 0,

@@ -9,13 +9,20 @@ function seedState(): AppState {
   return createInitialState()
 }
 
+/**
+ * Only the visible widgets: boundary and resize math operates on those alone, so
+ * a hidden widget (`setup` ships hidden) keeping its grow untouched is the
+ * expected behaviour, not something these assertions should restate.
+ */
 function grows(state: AppState, side: 'left' | 'right'): Record<string, number> {
-  return Object.fromEntries(state.bars[side].widgets.map((w) => [w.id, w.grow]))
+  return Object.fromEntries(visibleWidgets(state.bars[side]).map((w) => [w.id, w.grow]))
 }
 
-test('default layout puts both widgets in the left bar, right bar collapsed', () => {
+test('default layout puts every widget in the left bar, right bar collapsed', () => {
   const s = seedState()
-  expect(s.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'git'])
+  expect(s.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'git', 'setup'])
+  // `setup` is opt-in, so only two of the three show by default.
+  expect(visibleWidgets(s.bars.left).map((w) => w.id)).toEqual(['projects', 'git'])
   expect(getBarWidth(s.bars.left)).toBe(28)
   expect(getBarWidth(s.bars.right)).toBe(0)
 })
@@ -40,7 +47,7 @@ test('move-widget across bars preserves grow and reveals the target bar', () => 
   const s0 = seedState()
   const gitGrow = grows(s0, 'left').git
   const s1 = appReducer(s0, { index: 0, side: 'right', type: 'move-widget', widgetId: 'git' })
-  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['projects'])
+  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'setup'])
   expect(s1.bars.right.widgets.map((w) => w.id)).toEqual(['git'])
   expect(grows(s1, 'right').git).toBe(gitGrow)
   expect(s1.bars.right.visible).toBe(true)
@@ -56,7 +63,8 @@ test('emptying a bar collapses it to zero width', () => {
     type: 'move-widget',
     widgetId: 'projects',
   })
-  expect(s2.bars.left.widgets).toHaveLength(0)
+  // `setup` stays behind but is hidden, so the bar is empty as far as layout goes.
+  expect(visibleWidgets(s2.bars.left)).toHaveLength(0)
   expect(getBarWidth(s2.bars.left)).toBe(0)
   expect(s2.bars.right.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
 })
@@ -68,7 +76,7 @@ test('move-widget within a bar reorders it', () => {
     type: 'move-widget',
     widgetId: 'git',
   })
-  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
+  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects', 'setup'])
 })
 
 test('toggle-widget hides a widget, then re-showing it reveals a hidden bar', () => {

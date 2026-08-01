@@ -34,6 +34,21 @@ Active profile directory:
 | `aimux-projects.json` | project catalog and project snapshots |
 | `aimux-snippets.json` | snippet catalog                       |
 
+## Per-Project Data
+
+Data that belongs to one project rather than to the whole profile:
+
+```text
+~/.config/aimux/<profile>/projects/<projectId>/
+```
+
+| Path       | Purpose                                                      |
+| ---------- | ------------------------------------------------------------ |
+| `setup.sh` | executable setup script, run in each newly created workspace |
+
+Keyed by project id rather than name, so renaming a project keeps its data. See
+[../guide/workspaces.md](../guide/workspaces.md) for the setup script itself.
+
 ## Config Loader Search Order
 
 The user config loader checks these files in order:

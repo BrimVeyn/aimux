@@ -41,6 +41,14 @@ import {
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
 import {
+  findSetupTab,
+  handleAskAgentForSetupScriptEffect,
+  handleConfigureSetupScriptEffect,
+  handlePromoteSetupTabEffect,
+  handleRunSetupEffect,
+  handleStopSetupEffect,
+} from './setup-actions'
+import {
   handleDeleteSnippetEffect,
   handleSaveSnippetEditorEffect,
   pasteSnippetToTab,
@@ -204,10 +212,18 @@ function startPendingWorkspaceLaunch(
   assistant: AssistantId,
   tabId: string
 ): void {
+  // Setup runs concurrently with the agent by design, so say so rather than
+  // letting the agent run tests against a half-installed tree and draw the
+  // wrong conclusion. Only prefixed when a setup is actually live.
+  const setupRunning = findSetupTab(ctx.getState().tabs, pending.workspaceId)?.status === 'running'
+  const prompt = setupRunning
+    ? `Note: a setup script is currently installing this workspace's dependencies in the background. Wait for it to finish before running builds, tests, or anything that reads installed dependencies.\n\n${pending.prompt}`
+    : pending.prompt
+
   void injectPromptWhenReady({
     backend: ctx.backend,
     getState: ctx.getState,
-    prompt: pending.prompt,
+    prompt,
     tabId,
   })
 
@@ -308,6 +324,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // Otherwise the tab lands in the project's active workspace, which
       // launchAssistant resolves itself.
       const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
+      const pendingPrompt = state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined
       logInputDebug('app.launchSelectedAssistant', {
         assistant,
         chained: pending != null,
@@ -315,6 +332,15 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       })
       const tabId = launchAssistant(ctx, assistant, pending?.workspaceId)
       if (pending) startPendingWorkspaceLaunch(ctx, pending, assistant, tabId)
+      // A bare prompt with none of the workspace pinning/rename behaviour.
+      else if (pendingPrompt != null && pendingPrompt !== '') {
+        void injectPromptWhenReady({
+          backend: ctx.backend,
+          getState: ctx.getState,
+          prompt: pendingPrompt,
+          tabId,
+        })
+      }
       return
     }
     case 'edit-selected-assistant': {
@@ -643,6 +669,26 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'open-selected-snippet-source-in-editor': {
       openSelectedSnippetSourceInEditor(ctx)
+      return
+    }
+    case 'run-setup': {
+      handleRunSetupEffect(ctx)
+      return
+    }
+    case 'stop-setup': {
+      handleStopSetupEffect(ctx)
+      return
+    }
+    case 'configure-setup-script': {
+      handleConfigureSetupScriptEffect(ctx)
+      return
+    }
+    case 'ask-agent-for-setup-script': {
+      handleAskAgentForSetupScriptEffect(ctx)
+      return
+    }
+    case 'promote-setup-tab': {
+      handlePromoteSetupTabEffect(ctx)
       return
     }
     default:

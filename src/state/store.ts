@@ -48,6 +48,9 @@ export const DEFAULT_BARS: BarsState = {
     widgets: [
       { grow: 50, id: 'projects', visible: true },
       { grow: 50, id: 'git', visible: true },
+      // Opt-in: reachable via the bar's right-click menu ("Show Setup"). Present
+      // here so sanitizeBars places it rather than treating it as corruption.
+      { grow: 50, id: 'setup', visible: false },
     ],
     width: 28,
   },

@@ -157,6 +157,11 @@ export function shellSplit(input: string): string[] {
   return out
 }
 
+/** Wrap a value so `shellSplit` (and a real shell) return it as one word. */
+export function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`
+}
+
 export function parseCommand(commandString: string): { executable: string; args: string[] } {
   const parts = shellSplit(commandString.trim())
   return { args: parts.slice(1), executable: parts[0] ?? '' }
