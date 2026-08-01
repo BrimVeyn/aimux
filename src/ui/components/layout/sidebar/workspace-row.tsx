@@ -10,7 +10,7 @@ import { formatDiffStat } from '../../../../state/project-workspaces'
 import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { useBaseTheme, useTheme } from '../../../theme'
-import { truncate, truncateStart } from '../../../truncate'
+import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -129,13 +129,13 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // labels the branch, not the workspace. Only workspaces that own a branch get
   // one — an external checkout without one would otherwise be a row of a
   // different height for no information.
-  //
-  // Cut from the front: these are `owner/feat/what-it-does`, so the end is the
-  // part that tells two of them apart in a narrow bar.
+  // The glyph starts where the name above it starts, so the branch hangs one
+  // glyph-width in from it — the row reads as a title with a labelled line
+  // under it, not as two columns.
   const branchLabel =
     workspace.branch == null || workspace.branch === ''
       ? null
-      : truncateStart(workspace.branch, Math.max(0, contentWidth - 7))
+      : truncate(workspace.branch, Math.max(0, contentWidth - 6))
 
   // Same vocabulary as the project heading one level up, in the same priority:
   // a question outranks work in progress, which outranks "it finished and you
@@ -206,7 +206,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
             {cursorGlyph}
           </text>
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'   '}
+            {'  '}
             {'\u{e702}'} {branchLabel}
           </text>
         </box>
