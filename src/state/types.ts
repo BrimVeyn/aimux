@@ -210,6 +210,13 @@ export interface TabSession {
   /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
+  /**
+   * A real PTY tab that no chrome enumerates: absent from the top tab bar, from
+   * tab navigation, from `activeTabId` picks, and from the persisted snapshot.
+   * Rendered by whatever created it — today only the setup widget.
+   * `filterTabsForActiveWorkspace` is the single guard the UI paths share.
+   */
+  hidden?: boolean
 }
 
 export type BarSide = 'left' | 'right'

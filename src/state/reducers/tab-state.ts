@@ -263,7 +263,12 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
           getAdjacentLeaf(groupTree, closingTabId, 'down') ??
           getAdjacentLeaf(groupTree, closingTabId, 'up'))
         : null
-    nextActiveTabId = layoutNeighbor ?? tabs[indexToClose]?.id ?? tabs[indexToClose - 1]?.id ?? null
+    // Positional fallbacks must skip hidden tabs: landing `activeTabId` on one
+    // would render a pane the user cannot see in any tab bar.
+    const positional = [tabs[indexToClose], tabs[indexToClose - 1]].find(
+      (tab) => tab !== undefined && tab.hidden !== true
+    )
+    nextActiveTabId = layoutNeighbor ?? positional?.id ?? null
   } else {
     nextActiveTabId = tabs.find((tab) => tab.id === state.activeTabId)?.id ?? null
   }
@@ -310,6 +315,12 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
   switch (action.type) {
     case 'add-tab': {
       const newTab = { ...action.tab, activity: action.tab.activity ?? 'idle' }
+      // A hidden tab is chrome-invisible, so adding it must be invisible too:
+      // no focus steal, no modal dismissal, and — critically — no workspace
+      // re-sync, which would teleport a user sitting on another workspace.
+      if (newTab.hidden === true) {
+        return { ...state, tabs: [...state.tabs, newTab] }
+      }
       return withActiveTabWorkspace(
         {
           ...state,
@@ -437,8 +448,14 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         return { ...state, tabs }
       }
 
-      // Standalone tab reorder
-      const nextIndex = activeIndex + action.delta
+      // Standalone tab reorder. Step over hidden tabs rather than swapping with
+      // one: the swap would look like a dead keypress and shuffle the hidden
+      // tab out of its append-order slot.
+      let nextIndex = activeIndex + action.delta
+      const step = action.delta < 0 ? -1 : 1
+      while (state.tabs[nextIndex]?.hidden === true) {
+        nextIndex += step
+      }
       if (nextIndex < 0 || nextIndex >= state.tabs.length) {
         return state
       }

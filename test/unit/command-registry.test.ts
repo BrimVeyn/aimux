@@ -4,6 +4,7 @@ import {
   ASSISTANT_OPTIONS,
   buildAssistantModelArgs,
   getAssistantOption,
+  parseCommand,
 } from '../../src/pty/command-registry'
 
 function option(id: string) {
@@ -27,6 +28,45 @@ describe('command registry', () => {
 
   test('falls back to the first assistant for out-of-range indexes', () => {
     expect(getAssistantOption(99).id).toBe('claude')
+  })
+})
+
+describe('parseCommand', () => {
+  test('splits plain commands on whitespace', () => {
+    expect(parseCommand('claude')).toEqual({ args: [], executable: 'claude' })
+    expect(parseCommand('  codex   --model  gpt-5  ')).toEqual({
+      args: ['--model', 'gpt-5'],
+      executable: 'codex',
+    })
+    expect(parseCommand('')).toEqual({ args: [], executable: '' })
+  })
+
+  test('keeps double-quoted segments whole', () => {
+    expect(parseCommand('code --user-data-dir "/tmp/foo bar"')).toEqual({
+      args: ['--user-data-dir', '/tmp/foo bar'],
+      executable: 'code',
+    })
+  })
+
+  test('keeps single-quoted segments whole, including the executable', () => {
+    expect(parseCommand("'/Applications/My Editor/bin/code' --wait")).toEqual({
+      args: ['--wait'],
+      executable: '/Applications/My Editor/bin/code',
+    })
+  })
+
+  test('honours backslash-escaped spaces', () => {
+    expect(parseCommand('bash /Users/a\\ b/setup.sh')).toEqual({
+      args: ['/Users/a b/setup.sh'],
+      executable: 'bash',
+    })
+  })
+
+  test('treats a quote inside the other quote style as a literal', () => {
+    expect(parseCommand(`echo "it's fine"`)).toEqual({
+      args: ["it's fine"],
+      executable: 'echo',
+    })
   })
 })
 

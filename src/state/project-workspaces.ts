@@ -295,17 +295,24 @@ export function getRenderedTabWorkspaceId(
   return tab.workspaceId ?? workspaces[0]?.id ?? '__main__'
 }
 
+/**
+ * The one gate every "which tabs does the user see" path shares: the top tab
+ * bar, Leader+1..9, Ctrl+Tab, the three `activeTabId` re-picks, and flash-jump
+ * labels. Hidden tabs are dropped here rather than at each caller — including
+ * on the no-project / no-active-workspace paths, which must not become a hole.
+ */
 export function filterTabsForActiveWorkspace(
   tabs: TabSession[],
   project: ProjectRecord | undefined
 ): TabSession[] {
-  if (!project) return tabs
+  const visible = tabs.filter((tab) => tab.hidden !== true)
+  if (!project) return visible
   const activeWorkspaceId = project.activeWorkspaceId
-  if (activeWorkspaceId == null || activeWorkspaceId === '') return tabs
+  if (activeWorkspaceId == null || activeWorkspaceId === '') return visible
   const workspaces = project.workspaces ?? []
   const primaryId = workspaces[0]?.id
   const activeIsPrimary = primaryId != null && primaryId === activeWorkspaceId
-  return tabs.filter((tab) => {
+  return visible.filter((tab) => {
     const owned = tab.workspaceId != null && tab.workspaceId !== ''
     if (owned) return tab.workspaceId === activeWorkspaceId
     // Unbound (legacy) tabs surface only under the primary workspace.

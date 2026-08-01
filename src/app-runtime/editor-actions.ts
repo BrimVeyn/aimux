@@ -10,7 +10,7 @@ import type { SideEffectContext } from './side-effect-context'
 
 import { logInputDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
-import { isCommandAvailable } from '../pty/command-registry'
+import { isCommandAvailable, shellSplit } from '../pty/command-registry'
 import { getSnippetsCatalogPath, isConfigSnippetId } from '../state/snippet-catalog'
 import { getSelectedSnippet } from './selection'
 
@@ -140,43 +140,6 @@ function substituteEditorArgs(template: string[], file: string, line?: string): 
 
 function shellQuote(s: string): string {
   return `'${s.replaceAll("'", `'\\''`)}'`
-}
-
-/**
- * Minimal POSIX shell-word splitter — respects single/double quotes and
- * backslash escapes so values like `EDITOR='/Applications/My Editor/bin/code'`
- * or `EDITOR="code --user-data-dir \"/tmp/foo bar\""` tokenize correctly.
- * Does not expand variables or globs.
- */
-function shellSplit(input: string): string[] {
-  const out: string[] = []
-  let current = ''
-  let inSingle = false
-  let inDouble = false
-  let hasToken = false
-  for (let i = 0; i < input.length; i++) {
-    const c = input[i] ?? ''
-    if (!inSingle && !inDouble && /\s/.test(c)) {
-      if (hasToken) {
-        out.push(current)
-        current = ''
-        hasToken = false
-      }
-      continue
-    }
-    hasToken = true
-    if (c === "'" && !inDouble) {
-      inSingle = !inSingle
-    } else if (c === '"' && !inSingle) {
-      inDouble = !inDouble
-    } else if (c === '\\' && !inSingle && i + 1 < input.length) {
-      current += input[++i]
-    } else {
-      current += c
-    }
-  }
-  if (hasToken) out.push(current)
-  return out
 }
 
 function buildShellCmd(cwd: string, executable: string, args: string[]): string {

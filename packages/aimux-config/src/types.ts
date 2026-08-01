@@ -190,6 +190,8 @@ export interface TabSession {
   exitCode?: number
   workspaceId?: string
   autoRenameStatus?: 'eligible' | 'attempted'
+  /** Real PTY tab that no chrome enumerates. See `src/state/types.ts`. */
+  hidden?: boolean
 }
 
 export interface SnippetRecord {

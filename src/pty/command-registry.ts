@@ -120,8 +120,45 @@ export function isCommandAvailable(command: string): boolean {
   return Bun.which(command) !== null
 }
 
+/**
+ * Minimal POSIX shell-word splitter — respects single/double quotes and
+ * backslash escapes so values like `code --user-data-dir "/tmp/foo bar"` or a
+ * script path under a `$HOME` containing a space tokenize correctly.
+ * Does not expand variables or globs.
+ */
+export function shellSplit(input: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let inSingle = false
+  let inDouble = false
+  let hasToken = false
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i] ?? ''
+    if (!inSingle && !inDouble && /\s/.test(c)) {
+      if (hasToken) {
+        out.push(current)
+        current = ''
+        hasToken = false
+      }
+      continue
+    }
+    hasToken = true
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle
+    } else if (c === '"' && !inSingle) {
+      inDouble = !inDouble
+    } else if (c === '\\' && !inSingle && i + 1 < input.length) {
+      current += input[++i]
+    } else {
+      current += c
+    }
+  }
+  if (hasToken) out.push(current)
+  return out
+}
+
 export function parseCommand(commandString: string): { executable: string; args: string[] } {
-  const parts = commandString.trim().split(/\s+/).filter(Boolean)
+  const parts = shellSplit(commandString.trim())
   return { args: parts.slice(1), executable: parts[0] ?? '' }
 }
 
