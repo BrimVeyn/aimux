@@ -1,3 +1,5 @@
+import { basename } from 'node:path'
+
 import type { AssistantId } from '../state/types'
 
 /**
@@ -134,16 +136,22 @@ export function getAllAssistantOptions(customCommands: Record<string, string>): 
 }
 
 /**
- * Whether this assistant can take the initial prompt as a spawn argument. A
- * custom command still counts: it is the same vendor CLI with the user's own
- * flags, not a different program.
+ * Whether this assistant can take the initial prompt as a spawn argument.
+ *
+ * A custom command counts only while it still runs the same program — extra
+ * flags are fine, a wrapper is not. A wrapper that forgets `"$@"` would swallow
+ * the prompt with no error anywhere, and pasting works for any command, so the
+ * unrecognised executable falls back rather than gambling.
  */
 export function assistantAcceptsPromptArg(
   assistant: AssistantId,
   customCommands: Record<string, string>
 ): boolean {
-  const all = getAllAssistantOptions(customCommands)
-  return all.find((option) => option.id === assistant)?.acceptsPromptArg === true
+  const option = getAllAssistantOptions(customCommands).find((entry) => entry.id === assistant)
+  if (option?.acceptsPromptArg !== true) return false
+  const custom = customCommands[assistant]
+  if (custom == null || custom === '') return true
+  return basename(parseCommand(custom).executable) === option.command
 }
 
 export function isCommandAvailable(command: string): boolean {

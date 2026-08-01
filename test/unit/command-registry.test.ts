@@ -97,8 +97,17 @@ describe('assistantAcceptsPromptArg', () => {
   })
 
   test('a custom command keeps the vendor capability', () => {
-    // Still the same CLI, just with the user's own flags.
+    // Still the same CLI, just with the user's own flags — or an absolute path
+    // to it.
     expect(assistantAcceptsPromptArg('claude', { claude: 'claude --model opus' })).toBe(true)
+    expect(assistantAcceptsPromptArg('claude', { claude: '/usr/local/bin/claude' })).toBe(true)
+  })
+
+  test('a wrapper falls back to pasting', () => {
+    // A wrapper that forgets `"$@"` would swallow the prompt with no error
+    // anywhere, and pasting works for any command.
+    expect(assistantAcceptsPromptArg('claude', { claude: 'my-wrapper.sh' })).toBe(false)
+    expect(assistantAcceptsPromptArg('claude', { claude: 'npx claude' })).toBe(false)
   })
 
   test('false for an unknown assistant id', () => {

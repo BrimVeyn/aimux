@@ -1,4 +1,7 @@
-import { expect, test } from 'bun:test'
+import { afterAll, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import type { AppAction } from '../../src/state/actions'
 import type { AppState } from '../../src/state/types'
@@ -15,10 +18,16 @@ const NOW = '2026-07-31T00:00:00.000Z'
  * `claude` happens to be installed, and reports "the prompt was never sent" on
  * a machine that simply lacks it.
  *
- * The id still decides how the prompt is delivered: `claude` takes it as a spawn
- * argument, `opencode` does not and falls back to pasting.
+ * The stand-in has to be *named* `claude`: `assistantAcceptsPromptArg` only
+ * hands the prompt to argv when the custom command still runs the vendor's own
+ * program, so a bare `/bin/cat` would exercise the paste path instead.
+ * `opencode` has no prompt argument either way.
  */
-const AVAILABLE_COMMANDS = { claude: '/bin/cat', opencode: '/bin/cat' }
+const FAKE_BIN = mkdtempSync(join(tmpdir(), 'aimux-prompt-bin-'))
+symlinkSync('/bin/cat', join(FAKE_BIN, 'claude'))
+const AVAILABLE_COMMANDS = { claude: join(FAKE_BIN, 'claude'), opencode: '/bin/cat' }
+
+afterAll(() => rmSync(FAKE_BIN, { force: true, recursive: true }))
 
 /** Index of `opencode` in `ASSISTANT_OPTIONS`. */
 const OPENCODE_INDEX = 2
@@ -117,7 +126,7 @@ test('the chained launch pins the tab and hands the prompt over at spawn', async
 
   // The prompt must not leak into `command`: that string is shown in the UI,
   // persisted in the snapshot, and round-tripped by the custom-command editor.
-  expect(tab.command).toBe('/bin/cat')
+  expect(tab.command).toBe(AVAILABLE_COMMANDS.claude)
 
   await Bun.sleep(300)
   expect(writes).toEqual([])
