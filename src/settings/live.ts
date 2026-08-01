@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
-import { HARMONIZE_CLAUDE_THEME } from './sections/integrations'
+import { HARMONIZE_CLAUDE_THEME } from './sections/experimental'
 import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 

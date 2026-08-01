@@ -85,6 +85,12 @@ session, and having it revert on every restart would be absurd, so the last them
 you picked wins over `theme.initialId`. Every other setting follows the rule
 above.
 
+## Experimental
+
+The **Experimental** section holds the config's `theme.beta.*` flags. They are
+unfinished: they can change behaviour or go away in any release, which is why they
+are grouped under that label rather than filed by what they touch.
+
 ## Applies on restart
 
 A few rows say so, because the thing that reads them is set up before this screen

@@ -84,6 +84,8 @@ export type SettingRow =
 export interface SettingSection {
   id: string
   label: string
+  /** Shown once under the section's title, for a caveat that covers every row. */
+  description?: string
   /**
    * A function when the rows depend on state — one row per project, say. It is
    * called during render and while handling a key, so it must stay cheap.

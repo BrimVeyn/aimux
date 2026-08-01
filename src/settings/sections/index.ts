@@ -6,6 +6,7 @@ import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
 import { COMMANDS_SECTION } from './commands'
 import { EDITOR_SECTION } from './editor'
+import { EXPERIMENTAL_SECTION } from './experimental'
 import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
@@ -26,6 +27,7 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
   EDITOR_SECTION,
   STATUS_BAR_SECTION,
   INTEGRATIONS_SECTION,
+  EXPERIMENTAL_SECTION,
   ABOUT_SECTION,
 ]
 

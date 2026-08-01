@@ -5,13 +5,13 @@ import { memo, useCallback, useMemo, useRef } from 'react'
 import { getSectionRows, SETTING_SECTIONS } from '../../../settings/sections'
 import { useSettingsStore } from '../../../settings/settings-store'
 import { appStore, useAppStore } from '../../../state/app-store'
+import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { SettingsRow } from './settings-row'
 
-const NAV_WIDTH = 20
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
 export const SettingsView = memo(function SettingsView() {
@@ -19,6 +19,10 @@ export const SettingsView = memo(function SettingsView() {
   // The cursor is all this component needs from the app state. Rows read their
   // own values, so nothing here re-renders at the rate the terminals print.
   const settings = useAppStore((s) => s.settings)
+  // The section list stands exactly where the left bar stands, so opening the
+  // screen does not shift the column under the cursor. Its configured width, not
+  // `getBarWidth`: a hidden bar still says how wide the sidebar is.
+  const navWidth = useAppStore((s) => clampBarWidth(s.bars.left.width))
   // Which rows exist can depend on state — Setup has one per project — and the
   // Setup rows read their value from a file when they are built. So the list is
   // rebuilt when the cursor moves, when the projects change, and after any write
@@ -59,79 +63,87 @@ export const SettingsView = memo(function SettingsView() {
     dispatchGlobal({ type: 'exit-settings' })
   }, [])
 
+  const section = SETTING_SECTIONS.find((s) => s.id === settings.sectionId)
+  const sectionLabel = section?.label ?? 'Settings'
+  const sectionNote = section?.description
+  // Same 1-cell seam the bar draws between itself and the terminal, so the two
+  // views line up to the column.
+  const navContentWidth = Math.max(1, navWidth - 1)
+
   return (
-    <box flexDirection="column" flexGrow={1} overflow="hidden">
-      <box flexDirection="row" flexGrow={1}>
-        <box
-          width={NAV_WIDTH}
-          flexDirection="column"
-          backgroundColor={t.backgroundPanel}
-          overflow="hidden"
-        >
+    <box flexDirection="row" flexGrow={1} overflow="hidden">
+      <box width={navWidth} flexDirection="row" overflow="hidden" backgroundColor={t.background}>
+        <box width={navContentWidth} flexDirection="column" overflow="hidden">
           <box paddingLeft={1} paddingRight={1}>
             <text fg={t.textMuted}>Settings</text>
           </box>
-          {SETTING_SECTIONS.map((section, index) => (
-            <ListItem
-              key={section.id}
-              active={section.id === settings.sectionId}
-              index={index}
-              onClickIndex={handleSectionClick}
-              title={
-                <text fg={section.id === settings.sectionId ? t.text : t.textMuted}>
-                  {section.label}
-                </text>
-              }
-              trailing={
-                section.id === settings.sectionId && settings.pane === 'nav' ? (
-                  <text fg={t.primary}>›</text>
-                ) : undefined
-              }
-            />
-          ))}
-        </box>
-        <box flexDirection="column" flexGrow={1} overflow="hidden">
-          <box flexDirection="row" alignItems="center" paddingLeft={1} paddingRight={1}>
-            <box flexGrow={1}>
-              <text fg={t.text}>
-                {SETTING_SECTIONS.find((s) => s.id === settings.sectionId)?.label ?? ''}
-              </text>
-            </box>
-            <box
-              paddingLeft={1}
-              paddingRight={1}
-              backgroundColor={t.backgroundElement}
-              onMouseDown={handleClose}
-            >
-              <text fg={t.text}>
-                <strong>Close</strong>
-              </text>
-            </box>
+          <box flexGrow={1} flexShrink={1} flexDirection="column" overflow="hidden">
+            {SETTING_SECTIONS.map((section, index) => (
+              <ListItem
+                key={section.id}
+                active={section.id === settings.sectionId}
+                index={index}
+                onClickIndex={handleSectionClick}
+                title={
+                  <text fg={section.id === settings.sectionId ? t.text : t.textMuted}>
+                    {section.label}
+                  </text>
+                }
+                trailing={
+                  section.id === settings.sectionId && settings.pane === 'nav' ? (
+                    <text fg={t.primary}>›</text>
+                  ) : undefined
+                }
+              />
+            ))}
           </box>
-          <scrollbox
-            ref={scrollRef}
-            scrollY
-            flexGrow={1}
-            flexShrink={1}
-            contentOptions={COLUMN_CONTENT_OPTIONS}
-          >
-            {rows.length === 0 ? (
-              <box paddingLeft={1}>
-                <text fg={t.textMuted}>Nothing to configure here yet.</text>
-              </box>
-            ) : (
-              rows.map((row, index) => (
-                <SettingsRow
-                  key={row.id}
-                  row={row}
-                  index={index}
-                  active={settings.pane === 'rows' && index === settings.rowIndex}
-                  onSelect={handleRowClick}
-                />
-              ))
-            )}
-          </scrollbox>
+          <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
+            <text fg={t.textMuted} onMouseDown={handleClose}>
+              ‹ Close
+            </text>
+          </box>
         </box>
+        <box width={1} flexShrink={0} backgroundColor={t.border} />
+      </box>
+      {/* The pane the terminal would be in, with the same border — the content
+          keeps the inset it had, instead of jumping to the edge of the screen. */}
+      <box
+        border
+        borderColor={settings.pane === 'rows' ? t.borderActive : t.border}
+        title={sectionLabel}
+        padding={0}
+        flexDirection="column"
+        flexGrow={1}
+        backgroundColor={t.background}
+      >
+        {sectionNote != null && sectionNote !== '' ? (
+          <box flexShrink={0} paddingLeft={1} paddingRight={1}>
+            <text fg={t.textMuted}>{sectionNote}</text>
+          </box>
+        ) : null}
+        <scrollbox
+          ref={scrollRef}
+          scrollY
+          flexGrow={1}
+          flexShrink={1}
+          contentOptions={COLUMN_CONTENT_OPTIONS}
+        >
+          {rows.length === 0 ? (
+            <box paddingLeft={1}>
+              <text fg={t.textMuted}>Nothing to configure here yet.</text>
+            </box>
+          ) : (
+            rows.map((row, index) => (
+              <SettingsRow
+                key={row.id}
+                row={row}
+                index={index}
+                active={settings.pane === 'rows' && index === settings.rowIndex}
+                onSelect={handleRowClick}
+              />
+            ))
+          )}
+        </scrollbox>
       </box>
     </box>
   )
