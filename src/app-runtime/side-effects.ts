@@ -9,6 +9,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getDefaultBranch, listLocalBranches } from '../git/worktree'
+import { assistantAcceptsPromptArg } from '../pty/command-registry'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -41,12 +42,19 @@ import {
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
 import {
+  findSetupTab,
+  handleAskAgentForSetupScriptEffect,
+  handleConfigureSetupScriptEffect,
+  handlePromoteSetupTabEffect,
+  handleRunSetupEffect,
+  handleStopSetupEffect,
+} from './setup-actions'
+import {
   handleDeleteSnippetEffect,
   handleSaveSnippetEditorEffect,
   pasteSnippetToTab,
 } from './snippet-actions'
 import {
-  applyWorkspaceTemplate,
   confirmSplitSelection,
   createTabSession,
   executeSplitPane,
@@ -194,23 +202,28 @@ function applyThemeEffect(
 }
 
 /**
- * Second half of the `<C-p>` flow, once the assistant is known: hand it the
- * prompt and rename the workspace after what the prompt describes. Both are
- * background work that must never block or fail the launch itself.
+ * Setup runs concurrently with the agent by design, so say so rather than
+ * letting the agent run tests against a half-installed tree and draw the wrong
+ * conclusion. Only prefixed when a setup is actually live.
  */
-function startPendingWorkspaceLaunch(
+function buildWorkspacePrompt(ctx: SideEffectContext, pending: PendingWorkspaceLaunch): string {
+  const setupRunning = findSetupTab(ctx.getState().tabs, pending.workspaceId)?.status === 'running'
+  if (!setupRunning) return pending.prompt
+  return `Note: a setup script is currently installing this workspace's dependencies in the background. Wait for it to finish before running builds, tests, or anything that reads installed dependencies.\n\n${pending.prompt}`
+}
+
+/**
+ * Name the workspace after what its prompt describes, using the assistant the
+ * user just picked. Background work that must never block or fail the launch.
+ *
+ * Always `pending.prompt`, never the setup-annotated variant built for the
+ * agent — the note is guidance, not part of what the user asked for.
+ */
+function renameWorkspaceFromLaunch(
   ctx: SideEffectContext,
   pending: PendingWorkspaceLaunch,
-  assistant: AssistantId,
-  tabId: string
+  assistant: AssistantId
 ): void {
-  void injectPromptWhenReady({
-    backend: ctx.backend,
-    getState: ctx.getState,
-    prompt: pending.prompt,
-    tabId,
-  })
-
   const workspace = ctx
     .getState()
     .projects.find((entry) => entry.id === pending.projectId)
@@ -227,9 +240,8 @@ function startPendingWorkspaceLaunch(
 }
 
 /**
- * The `<C-p>` flow: create a workspace in the current project, then hand off.
- * A template already produces tabs, so it wins; otherwise we chain into the
- * new-tab modal rather than leaving the user in an empty workspace.
+ * The `<C-p>` flow: create a workspace in the current project, then chain into
+ * the new-tab modal rather than leaving the user in an empty workspace.
  */
 async function createWorkspaceFromModal(
   ctx: SideEffectContext,
@@ -237,7 +249,6 @@ async function createWorkspaceFromModal(
   params: {
     prompt: string
     baseRef?: string
-    templateId?: string
   }
 ): Promise<void> {
   // A name derived locally from the prompt, so the sidebar reads right from the
@@ -256,21 +267,7 @@ async function createWorkspaceFromModal(
   // the modal stays open showing the error.
   if (!workspace) return
 
-  const template =
-    params.templateId != null && params.templateId !== ''
-      ? ctx.state.workspaceTemplates.find((entry) => entry.id === params.templateId)
-      : undefined
-
   ctx.dispatch({ type: 'close-modal' })
-
-  if (template) {
-    // A template picks its own assistants, so there is nobody to hand the
-    // prompt to and no provider to name with: the local name is the final one.
-    applyWorkspaceTemplate(ctx, template, workspace.id, workspace.path)
-    ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
-    return
-  }
-
   ctx.dispatch({
     pendingWorkspace: { projectId, prompt: params.prompt, workspaceId: workspace.id },
     type: 'open-new-tab-modal',
@@ -308,13 +305,42 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // Otherwise the tab lands in the project's active workspace, which
       // launchAssistant resolves itself.
       const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
+      // Normalized to '' so "is there a prompt" is one comparison rather than a
+      // null check repeated at each decision below.
+      const prompt = pending
+        ? buildWorkspacePrompt(ctx, pending)
+        : ((state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined) ?? '')
+
+      // Hand the prompt to the CLI at spawn where the CLI takes one. Pasting it
+      // into a live TUI works — it is what this flow did — but it means polling
+      // for readiness, probing the screen, and retrying. An argv slot has none of
+      // those failure modes.
+      const atSpawn = prompt !== '' && assistantAcceptsPromptArg(assistant, state.customCommands)
       logInputDebug('app.launchSelectedAssistant', {
         assistant,
         chained: pending != null,
         modal: state.modal.type,
+        promptAtSpawn: atSpawn,
+        promptLength: prompt.length,
       })
-      const tabId = launchAssistant(ctx, assistant, pending?.workspaceId)
-      if (pending) startPendingWorkspaceLaunch(ctx, pending, assistant, tabId)
+
+      const tabId = launchAssistant(
+        ctx,
+        assistant,
+        pending?.workspaceId,
+        atSpawn ? [prompt] : undefined
+      )
+      // Delivery is decided and done here, chained or not: two call sites meant
+      // the prompt could be built twice, from two different reads of the store.
+      if (prompt !== '' && !atSpawn) {
+        void injectPromptWhenReady({
+          backend: ctx.backend,
+          getState: ctx.getState,
+          prompt,
+          tabId,
+        })
+      }
+      if (pending) renameWorkspaceFromLaunch(ctx, pending, assistant)
       return
     }
     case 'edit-selected-assistant': {
@@ -338,26 +364,15 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'create-workspace': {
       if (state.modal.type !== 'create-workspace') return
-      // Templates get their own step: first Enter on the form advances to the
-      // picker, the second one (step 'template') actually creates.
-      if (state.modal.step === 'form' && state.workspaceTemplates.length > 0) {
-        dispatch({ step: 'template', type: 'set-create-workspace-step' })
-        return
-      }
       const projectId = state.currentProjectId
       if (!(projectId != null && projectId !== '')) return
       const { baseRef, prompt } = state.modal
-      const templateId =
-        state.modal.step === 'template'
-          ? state.workspaceTemplates[state.modal.selectedIndex]?.id
-          : undefined
       void (async () => {
         try {
           await enqueueGitOp(async () =>
             createWorkspaceFromModal(ctx, projectId, {
               baseRef: baseRef !== '' ? baseRef : undefined,
               prompt,
-              templateId,
             })
           )
         } catch (error) {
@@ -643,6 +658,26 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'open-selected-snippet-source-in-editor': {
       openSelectedSnippetSourceInEditor(ctx)
+      return
+    }
+    case 'run-setup': {
+      handleRunSetupEffect(ctx)
+      return
+    }
+    case 'stop-setup': {
+      handleStopSetupEffect(ctx)
+      return
+    }
+    case 'configure-setup-script': {
+      handleConfigureSetupScriptEffect(ctx)
+      return
+    }
+    case 'ask-agent-for-setup-script': {
+      handleAskAgentForSetupScriptEffect(ctx)
+      return
+    }
+    case 'promote-setup-tab': {
+      handlePromoteSetupTabEffect(ctx)
       return
     }
     default:

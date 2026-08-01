@@ -65,20 +65,47 @@ test('the last visible widget cannot be hidden', () => {
   expect(menu.map(([label]) => label)).toEqual(['Move to right bar'])
 })
 
+const withHidden = bars({
+  left: {
+    visible: true,
+    widgets: [
+      { grow: 50, id: 'projects', visible: true },
+      { grow: 50, id: 'git', visible: false },
+      { grow: 50, id: 'setup', visible: false },
+    ],
+    width: 28,
+  },
+})
+
 test('the bar menu offers a way back for each hidden widget', () => {
-  const withHidden = bars({
-    left: {
-      visible: true,
-      widgets: [
-        { grow: 50, id: 'projects', visible: true },
-        { grow: 50, id: 'git', visible: false },
-      ],
-      width: 28,
-    },
-  })
   const menu = buildBarContextMenu(withHidden, 'left')
-  expect(menu.map(([label]) => label)).toEqual(['Hide left bar', 'Show Git'])
+  expect(menu.map(([label]) => label)).toEqual(['Hide left bar', 'Show Git', 'Show Setup'])
 
   const actions = capture(() => menu[1]?.[1]())
   expect(actions).toEqual([{ type: 'toggle-widget', widgetId: 'git' }])
+})
+
+test('a widget menu also offers a way back for each hidden widget', () => {
+  // The bar's own menu is unreachable — widget slots cover the whole body and
+  // stop right-click propagation — so without these entries, hiding a widget is
+  // a one-way door for a mouse user, and a widget that ships hidden (`setup`) is
+  // undiscoverable.
+  const menu = buildWidgetContextMenu(withHidden, 'left', 'projects')
+  expect(menu.map(([label]) => label)).toEqual([
+    'Move to right bar',
+    'Move down',
+    'Show Git',
+    'Show Setup',
+  ])
+
+  const actions = capture(() => menu[3]?.[1]())
+  expect(actions).toEqual([{ type: 'toggle-widget', widgetId: 'setup' }])
+})
+
+test('a hidden widget in the other bar is still offered', () => {
+  const rightHidden = bars({
+    right: { visible: false, widgets: [{ grow: 100, id: 'setup', visible: false }], width: 40 },
+  })
+  const menu = buildWidgetContextMenu(rightHidden, 'left', 'git')
+  expect(menu.map(([label]) => label)).toContain('Show Setup')
 })

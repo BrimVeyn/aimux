@@ -1,3 +1,5 @@
+import { basename } from 'node:path'
+
 import type { AssistantId } from '../state/types'
 
 /**
@@ -22,6 +24,21 @@ export interface AssistantOption {
   command: string
   description: string
   model?: AssistantModelSpec
+  /**
+   * The CLI starts an interactive session with a positional prompt argument
+   * (`claude "…"`, `codex "…"`). When it does, handing the prompt over at spawn
+   * beats pasting it into the running TUI afterwards: no readiness poll, no
+   * screen probe, no retries.
+   *
+   * Absent means "unknown or not supported" and the caller falls back to
+   * `injectPromptWhenReady`. `opencode`'s positional is a project path and its
+   * `run` subcommand is non-interactive, so it stays on the fallback.
+   *
+   * ponytail: a boolean, because both CLIs that support it are positional.
+   * Promote to a builder — as `AssistantModelSpec` already does for flags — when
+   * a `--prompt <x>`-shaped one shows up.
+   */
+  acceptsPromptArg?: boolean
 }
 
 const DEFAULT_SHELL =
@@ -30,6 +47,7 @@ const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
 
 export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
+    acceptsPromptArg: true,
     command: 'claude',
     description: 'Anthropic Claude CLI',
     id: 'claude',
@@ -40,6 +58,7 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    acceptsPromptArg: true,
     command: 'codex',
     description: 'OpenAI Codex CLI',
     id: 'codex',
@@ -116,12 +135,73 @@ export function getAllAssistantOptions(customCommands: Record<string, string>): 
   return [...ASSISTANT_OPTIONS, ...customOptions]
 }
 
+/**
+ * Whether this assistant can take the initial prompt as a spawn argument.
+ *
+ * A custom command counts only while it still runs the same program — extra
+ * flags are fine, a wrapper is not. A wrapper that forgets `"$@"` would swallow
+ * the prompt with no error anywhere, and pasting works for any command, so the
+ * unrecognised executable falls back rather than gambling.
+ */
+export function assistantAcceptsPromptArg(
+  assistant: AssistantId,
+  customCommands: Record<string, string>
+): boolean {
+  const option = getAllAssistantOptions(customCommands).find((entry) => entry.id === assistant)
+  if (option?.acceptsPromptArg !== true) return false
+  const custom = customCommands[assistant]
+  if (custom == null || custom === '') return true
+  return basename(parseCommand(custom).executable) === option.command
+}
+
 export function isCommandAvailable(command: string): boolean {
   return Bun.which(command) !== null
 }
 
+/**
+ * Minimal POSIX shell-word splitter — respects single/double quotes and
+ * backslash escapes so values like `code --user-data-dir "/tmp/foo bar"` or a
+ * script path under a `$HOME` containing a space tokenize correctly.
+ * Does not expand variables or globs.
+ */
+export function shellSplit(input: string): string[] {
+  const out: string[] = []
+  let current = ''
+  let inSingle = false
+  let inDouble = false
+  let hasToken = false
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i] ?? ''
+    if (!inSingle && !inDouble && /\s/.test(c)) {
+      if (hasToken) {
+        out.push(current)
+        current = ''
+        hasToken = false
+      }
+      continue
+    }
+    hasToken = true
+    if (c === "'" && !inDouble) {
+      inSingle = !inSingle
+    } else if (c === '"' && !inSingle) {
+      inDouble = !inDouble
+    } else if (c === '\\' && !inSingle && i + 1 < input.length) {
+      current += input[++i]
+    } else {
+      current += c
+    }
+  }
+  if (hasToken) out.push(current)
+  return out
+}
+
+/** Wrap a value so `shellSplit` (and a real shell) return it as one word. */
+export function shellQuote(value: string): string {
+  return `'${value.replaceAll("'", `'\\''`)}'`
+}
+
 export function parseCommand(commandString: string): { executable: string; args: string[] } {
-  const parts = commandString.trim().split(/\s+/).filter(Boolean)
+  const parts = shellSplit(commandString.trim())
   return { args: parts.slice(1), executable: parts[0] ?? '' }
 }
 

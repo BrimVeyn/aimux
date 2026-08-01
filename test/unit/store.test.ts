@@ -20,9 +20,9 @@ describe('initial state', () => {
 
     expect(state.bars.left.visible).toBe(false)
     expect(state.bars.left.width).toBe(33)
-    // `projects` was in neither bar, so it is restored — see the widget
-    // integrity test below.
-    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
+    // `projects` and `setup` were in neither bar, so both are restored — see the
+    // widget integrity test below.
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects', 'setup'])
   })
 
   test('clamps persisted bar width and drops unknown widget ids', () => {
@@ -50,7 +50,7 @@ describe('initial state', () => {
       },
     })
 
-    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['projects'])
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'setup'])
     // git was already placed by the user; it must not be duplicated.
     expect(state.bars.right.widgets.map((w) => w.id)).toEqual(['git'])
   })
@@ -68,7 +68,11 @@ describe('initial state', () => {
     })
 
     // Renamed in place, keeping the user's grow/visible and bar placement.
-    expect(state.bars.left.widgets).toEqual([{ grow: 50, id: 'projects', visible: true }])
+    // `setup` is appended by the self-heal, hidden, as it ships.
+    expect(state.bars.left.widgets).toEqual([
+      { grow: 50, id: 'projects', visible: true },
+      { grow: 50, id: 'setup', visible: false },
+    ])
   })
 
   test('a hidden widget stays in place and is not treated as missing', () => {
@@ -89,6 +93,7 @@ describe('initial state', () => {
     expect(state.bars.left.widgets).toEqual([
       { grow: 50, id: 'projects', visible: false },
       { grow: 50, id: 'git', visible: true },
+      { grow: 50, id: 'setup', visible: false },
     ])
   })
 })

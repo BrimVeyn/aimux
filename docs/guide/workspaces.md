@@ -33,13 +33,15 @@ _What do you want to work on?_ — and derives the rest from your answer:
 1. Describe the work. The base defaults to the repository's default branch
    (`origin/HEAD`, falling back to `main` or `master`); `Tab` switches to it if
    you want to fork from somewhere else.
-2. Press `Enter`. If the project declares [templates](#templates) you pick one
-   first; otherwise the workspace is created straight away.
-3. Without a template, the assistant picker opens on the new workspace.
-   `Terminal` is not offered there — a shell cannot take your prompt. With a
-   template, its tabs start instead.
-4. Your prompt is pasted into the assistant and submitted as soon as it is
-   ready, so the workspace starts working on its own.
+2. Press `Enter`. The workspace is created straight away.
+3. The assistant picker opens on the new workspace. `Terminal` is not offered
+   there — a shell cannot take your prompt.
+4. Your prompt reaches the assistant on its own, so the workspace starts working
+   without you typing anything. Where the CLI takes a prompt as an argument
+   (Claude, Codex) it is handed over at launch; elsewhere it is pasted and
+   submitted once the assistant is ready. A prompt passed as an argument is
+   visible in `ps` to anything running as you — the price of a delivery path with
+   no readiness guessing in it.
 
 aimux confirms with a **Created workspace** toast.
 
@@ -80,97 +82,60 @@ It is not the only way in.
 Opening a project selects one of its workspaces, falling back to the primary
 only when the project has none.
 
-## Templates
+## Setup script
 
-A **workspace template** is a reusable layout — one or more tabs, each with
-one or more split panes, and optional commands typed into each pane — that
-spawns automatically when you create a workspace. Use them to stamp out the
-same dev environment (assistant + lint watcher + dev server + …) every time
-you start work on a new branch.
+The setup step above is a real thing, one script per project:
 
-Templates are declared in `aimux.config.ts`:
-
-```ts
-import { defineConfig } from '@brimveyn/aimux-config'
-
-export default defineConfig({
-  workspaceTemplates: [
-    {
-      id: 'rainpath',
-      name: 'Rainpath',
-      description: 'Claude + a shell with git status',
-      tabs: [
-        {
-          panes: [{ id: 'main', assistant: 'claude' }],
-        },
-        {
-          panes: [{ id: 'shell', assistant: 'terminal', send: 'git status' }],
-        },
-      ],
-    },
-  ],
-})
+```text
+~/.config/aimux/<profile>/projects/<projectId>/setup.sh
 ```
 
-They can also live in `aimux.json` under the same key (JSON form, same
-schema) — the TS config wins when both define `workspaceTemplates`.
+It lives outside the repository on purpose. A file at the repo root would only
+reach a worktree if it were committed, and a setup script is usually the kind of
+thing you do not want to commit. Living in aimux's own directory, one script
+serves every workspace of the project — and it runs with the working directory
+set to the workspace, so it must use relative paths.
 
-When at least one template is loaded, `Ctrl+P` inserts a template picker
-between the prompt and creation. The template spawns its own tabs, so the
-assistant picker is skipped — and with it the prompt hand-off and the
-model-generated name: a templated workspace keeps the name derived locally
-from your prompt.
+It runs automatically when a workspace is **created**, and never otherwise. Not
+when a workspace is merely selected: `j`/`k` cycles workspaces, and a rule keyed
+on selection would fire an install in every workspace you scrolled past. The
+primary workspace is also excluded — it is your real checkout, and a script that
+does `cp .env.example .env` has no business running over it.
 
-### Schema
+Both creation paths are covered, the TUI's `Ctrl+P` and `aimux workspace create`.
+A workspace created by the CLI while aimux is closed is the one gap; run it by
+hand from the widget.
 
-A template is a top-level object plus an ordered list of tabs:
+Write it so it can be run twice in a row, and so it never blocks on a human. A
+non-zero exit is reported as a toast and recorded on the workspace.
 
-| Field         | Required | Notes                               |
-| ------------- | -------- | ----------------------------------- |
-| `id`          | yes      | unique among templates              |
-| `name`        | yes      | label shown in the picker           |
-| `description` | no       | subtitle shown in the picker        |
-| `tabs[]`      | yes      | ≥ 1 tab; each becomes a top-bar tab |
+### The setup widget
 
-Each tab is just `{ panes: WorkspaceTemplatePane[] }` with ≥ 1 pane. The
-first pane of a tab is its root (the visible pane); subsequent panes are
-splits of a previous pane in the same tab.
+The **Setup** widget is where the script lives in the UI. It ships hidden —
+right-click any widget already in a bar and pick "Show Setup" to place it.
 
-| Pane field  | Required        | Notes                                                                                                       |
-| ----------- | --------------- | ----------------------------------------------------------------------------------------------------------- |
-| `id`        | yes             | unique within its tab; referenced by `splitFrom`                                                            |
-| `assistant` | yes             | `claude`, `codex`, `opencode`, `grok`, `kimi`, `antigravity`, `terminal`, `shell`, or any custom command id |
-| `splitFrom` | only after root | id of an earlier pane in the **same** tab                                                                   |
-| `direction` | only after root | `horizontal` (side-by-side) or `vertical` (top/bottom)                                                      |
-| `ratio`     | no              | fraction of space taken by the **new** pane, between 0.15 and 0.85                                          |
-| `send`      | no              | initial input typed into the pane shortly after spawn; newline appended automatically                       |
+**Create** writes an executable stub and opens it in your `$EDITOR` (the same
+editor path the git pane and snippet picker use). **Agent** opens the assistant
+picker with a prompt describing what the script has to do; the assistant you pick
+inspects the repo and writes it. Both stay available once a script exists — as
+**Edit** and **Agent** — so a stub you closed without touching is never a dead
+end.
 
-`'shell'` is accepted as an alias for the built-in `'terminal'` assistant
-(which spawns `$SHELL`).
+With a script in place the widget shows the run state for the current
+workspace — `running…`, `✓ setup ok`, or `✗ exit N` — with the live output
+underneath, plus **Run** / **Re-run** and **↗**.
 
-### Validation
+That last one matters. The setup PTY is a real tab, but a hidden one: it is not
+in the tab bar, `Ctrl+Tab` skips it, and it is never restored from a snapshot.
+**↗** promotes it into a normal tab in the main pane, because reading a stack
+trace in a bar thirty columns wide is not reading. A promoted tab keeps its last
+frame when the script exits instead of closing like an ordinary tab would —
+otherwise promoting a failing setup would destroy the output you promoted it to
+read.
 
-Every template is parsed through the same checks at load time. Invalid
-entries are dropped individually and logged via the [doctor](../reference/cli.md);
-the rest of the config keeps loading. Validation rejects:
-
-- empty `id`, `name`, or `tabs[]`
-- empty `panes[]` inside a tab
-- a root pane that declares `splitFrom`, `direction`, or `ratio`
-- a non-root pane missing `splitFrom`/`direction`, or referencing a pane
-  in another tab (or itself)
-- duplicate pane `id`s within the same tab
-- `direction` other than `horizontal` or `vertical`
-- `ratio` outside `(0.15, 0.85)`
-- duplicate template `id`s (the second occurrence is dropped)
-
-### Caveats
-
-- `send` is fired ~600 ms after the pane is spawned. That's enough for
-  shells (which print a prompt within ~100 ms) but can race with slower
-  AI CLIs — prefer `send` on terminal panes.
-- Templates only fire on new-workspace creation, not when aimux restarts
-  or reattaches to an existing workspace.
+A `Ctrl+P` workspace runs its setup and its assistant at the same time. The
+assistant's prompt is prefixed with a note saying so, so it knows to wait before
+running builds or tests.
 
 ## In the sidebar
 

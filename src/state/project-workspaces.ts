@@ -260,6 +260,33 @@ function pruneMissingAimuxTempWorkspaces(workspaces: WorkspaceRecord[]): Workspa
   })
 }
 
+/**
+ * The project the user is in. `currentProjectId` is a nullable string that is
+ * also meaningfully empty, so open-coding this lookup means repeating both
+ * checks; there is one home for it instead.
+ */
+export function getCurrentProject(state: {
+  currentProjectId?: string | null
+  projects: ProjectRecord[]
+}): ProjectRecord | undefined {
+  const id = state.currentProjectId
+  if (id == null || id === '') return undefined
+  return state.projects.find((project) => project.id === id)
+}
+
+/** The project that owns a workspace, and the workspace itself. */
+export function findWorkspace(
+  projects: ProjectRecord[],
+  workspaceId: string | undefined
+): { project: ProjectRecord; workspace: WorkspaceRecord } | undefined {
+  if (workspaceId == null || workspaceId === '') return undefined
+  for (const project of projects) {
+    const workspace = project.workspaces?.find((entry) => entry.id === workspaceId)
+    if (workspace) return { project, workspace }
+  }
+  return undefined
+}
+
 export function getActiveWorkspace(
   project: ProjectRecord | undefined
 ): WorkspaceRecord | undefined {
@@ -295,17 +322,24 @@ export function getRenderedTabWorkspaceId(
   return tab.workspaceId ?? workspaces[0]?.id ?? '__main__'
 }
 
+/**
+ * The one gate every "which tabs does the user see" path shares: the top tab
+ * bar, Leader+1..9, Ctrl+Tab, the three `activeTabId` re-picks, and flash-jump
+ * labels. Hidden tabs are dropped here rather than at each caller — including
+ * on the no-project / no-active-workspace paths, which must not become a hole.
+ */
 export function filterTabsForActiveWorkspace(
   tabs: TabSession[],
   project: ProjectRecord | undefined
 ): TabSession[] {
-  if (!project) return tabs
+  const visible = tabs.filter((tab) => tab.hidden !== true)
+  if (!project) return visible
   const activeWorkspaceId = project.activeWorkspaceId
-  if (activeWorkspaceId == null || activeWorkspaceId === '') return tabs
+  if (activeWorkspaceId == null || activeWorkspaceId === '') return visible
   const workspaces = project.workspaces ?? []
   const primaryId = workspaces[0]?.id
   const activeIsPrimary = primaryId != null && primaryId === activeWorkspaceId
-  return tabs.filter((tab) => {
+  return visible.filter((tab) => {
     const owned = tab.workspaceId != null && tab.workspaceId !== ''
     if (owned) return tab.workspaceId === activeWorkspaceId
     // Unbound (legacy) tabs surface only under the primary workspace.

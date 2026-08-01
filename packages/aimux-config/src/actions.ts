@@ -256,18 +256,12 @@ export const confirmCreateWorkspace: ActionFn = (ctx: ModeContext) => {
  */
 export const createWorkspaceNewline: ActionFn = (ctx: ModeContext) => {
   const { modal } = ctx.state
-  if (modal.type !== 'create-workspace' || modal.step !== 'form') return r([])
+  if (modal.type !== 'create-workspace') return r([])
   if (modal.activeField !== 'prompt') return r([])
   return r([{ char: '\n', type: 'update-command-edit' }])
 }
 
-/** Esc backs out of the template step to the form; from the form it closes. */
-export const createWorkspaceEscape: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'create-workspace' && ctx.state.modal.step === 'template') {
-    return r([{ step: 'form', type: 'set-create-workspace-step' }])
-  }
-  return r([{ type: 'close-modal' }], [], 'navigation')
-}
+export const createWorkspaceEscape: KeyResult = r([{ type: 'close-modal' }], [], 'navigation')
 
 export const openRenameSelectedProject: KeyResult = r(
   [],

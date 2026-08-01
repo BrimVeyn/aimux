@@ -52,7 +52,6 @@ defineConfig({
   autoRename?: Partial<AutoRenameConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
-  workspaceTemplates?: WorkspaceTemplate[]
 })
 ```
 
@@ -73,7 +72,7 @@ defineConfig({
 | `autoRename`         | Supported          | Renames new assistant tabs from their first prompt. Enabled by default; see `../guide/projects.md#automatic-tab-names`  |
 | `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-projects`      |
 | `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
-| `workspaceTemplates` | Supported          | Multi-tab / multi-pane layouts spawned at workspace creation. See `../guide/projects.md#templates`                      |
+| `workspaceTemplates` | Removed            | Superseded by the per-project setup script. See `../guide/workspaces.md#setup-script`                                   |
 
 ## `defineConfig`
 
@@ -582,68 +581,22 @@ export default defineConfig({
 })
 ```
 
-## `workspaceTemplates`
+## `workspaceTemplates` — removed
 
-A list of reusable layouts spawned when the user creates a new workspace.
-Each template appears in a picker at the end of the new-workspace flow; the
-chosen template's tabs and panes are created, sized, and (optionally)
-prefilled with an initial command.
+Workspace templates spawned a fixed set of tabs and split panes at workspace
+creation, each pane optionally prefilled with a command. They are gone.
 
-See `../guide/projects.md#templates` for the full walkthrough, including
-the picker UX, the "Workspace from template…" shortcut entry, and validation
-rules.
+Their provisioning half — `send: 'bun install'` fired on a timer, with no exit
+code and no per-project scoping — is now a per-project **setup script**, which
+runs with the workspace as its working directory and reports its exit code. See
+`../guide/workspaces.md#setup-script`.
 
-```ts
-workspaceTemplates: [
-  {
-    id: 'lint-watch',
-    name: 'Claude + lint watch',
-    description: 'Claude on the left, bun lint --watch on the right',
-    tabs: [
-      {
-        panes: [
-          { id: 'main', assistant: 'claude' },
-          {
-            id: 'lint',
-            assistant: 'terminal',
-            splitFrom: 'main',
-            direction: 'horizontal',
-            ratio: 0.35,
-            send: 'bun lint --watch',
-          },
-        ],
-      },
-    ],
-  },
-]
-```
+Their layout half has no replacement: open the tabs and splits you want, or ask
+an assistant to.
 
-Types:
-
-```ts
-interface WorkspaceTemplate {
-  id: string
-  name: string
-  description?: string
-  tabs: WorkspaceTemplateTab[]
-}
-
-interface WorkspaceTemplateTab {
-  panes: WorkspaceTemplatePane[]
-}
-
-interface WorkspaceTemplatePane {
-  id: string
-  assistant: string
-  splitFrom?: string
-  direction?: 'horizontal' | 'vertical'
-  ratio?: number
-  send?: string
-}
-```
-
-`workspaceTemplates` can also be set in `aimux.json` under the same key
-(JSON form, same schema). The TS config wins when both are present.
+A config that still declares `workspaceTemplates` (or the older
+`worktreeTemplates`) does nothing. `aimux doctor` reports it, because an unknown
+key otherwise parses silently.
 
 ## Actions
 

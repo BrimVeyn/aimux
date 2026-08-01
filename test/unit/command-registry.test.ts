@@ -2,8 +2,11 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   ASSISTANT_OPTIONS,
+  assistantAcceptsPromptArg,
   buildAssistantModelArgs,
   getAssistantOption,
+  parseCommand,
+  shellQuote,
 } from '../../src/pty/command-registry'
 
 function option(id: string) {
@@ -27,6 +30,88 @@ describe('command registry', () => {
 
   test('falls back to the first assistant for out-of-range indexes', () => {
     expect(getAssistantOption(99).id).toBe('claude')
+  })
+})
+
+describe('parseCommand', () => {
+  test('splits plain commands on whitespace', () => {
+    expect(parseCommand('claude')).toEqual({ args: [], executable: 'claude' })
+    expect(parseCommand('  codex   --model  gpt-5  ')).toEqual({
+      args: ['--model', 'gpt-5'],
+      executable: 'codex',
+    })
+    expect(parseCommand('')).toEqual({ args: [], executable: '' })
+  })
+
+  test('keeps double-quoted segments whole', () => {
+    expect(parseCommand('code --user-data-dir "/tmp/foo bar"')).toEqual({
+      args: ['--user-data-dir', '/tmp/foo bar'],
+      executable: 'code',
+    })
+  })
+
+  test('keeps single-quoted segments whole, including the executable', () => {
+    expect(parseCommand("'/Applications/My Editor/bin/code' --wait")).toEqual({
+      args: ['--wait'],
+      executable: '/Applications/My Editor/bin/code',
+    })
+  })
+
+  test('honours backslash-escaped spaces', () => {
+    expect(parseCommand('bash /Users/a\\ b/setup.sh')).toEqual({
+      args: ['/Users/a b/setup.sh'],
+      executable: 'bash',
+    })
+  })
+
+  test('round-trips a shellQuote-d path back to one argument', () => {
+    // The setup runner builds `bash <quoted script path>`; $HOME can hold both a
+    // space and an apostrophe.
+    for (const path of ['/Users/a b/setup.sh', "/Users/O'Brien/My Stuff/setup.sh"]) {
+      expect(parseCommand(`bash ${shellQuote(path)}`)).toEqual({
+        args: [path],
+        executable: 'bash',
+      })
+    }
+  })
+
+  test('treats a quote inside the other quote style as a literal', () => {
+    expect(parseCommand(`echo "it's fine"`)).toEqual({
+      args: ["it's fine"],
+      executable: 'echo',
+    })
+  })
+})
+
+describe('assistantAcceptsPromptArg', () => {
+  test('true for the CLIs that take an interactive positional prompt', () => {
+    expect(assistantAcceptsPromptArg('claude', {})).toBe(true)
+    expect(assistantAcceptsPromptArg('codex', {})).toBe(true)
+  })
+
+  test('false where the positional means something else, or is unknown', () => {
+    // `opencode [project]` is a path, and its `run` subcommand is not
+    // interactive — so it stays on the paste fallback.
+    expect(assistantAcceptsPromptArg('opencode', {})).toBe(false)
+    expect(assistantAcceptsPromptArg('terminal', {})).toBe(false)
+  })
+
+  test('a custom command keeps the vendor capability', () => {
+    // Still the same CLI, just with the user's own flags — or an absolute path
+    // to it.
+    expect(assistantAcceptsPromptArg('claude', { claude: 'claude --model opus' })).toBe(true)
+    expect(assistantAcceptsPromptArg('claude', { claude: '/usr/local/bin/claude' })).toBe(true)
+  })
+
+  test('a wrapper falls back to pasting', () => {
+    // A wrapper that forgets `"$@"` would swallow the prompt with no error
+    // anywhere, and pasting works for any command.
+    expect(assistantAcceptsPromptArg('claude', { claude: 'my-wrapper.sh' })).toBe(false)
+    expect(assistantAcceptsPromptArg('claude', { claude: 'npx claude' })).toBe(false)
+  })
+
+  test('false for an unknown assistant id', () => {
+    expect(assistantAcceptsPromptArg('nope', { nope: 'nope' })).toBe(false)
   })
 })
 

@@ -161,6 +161,10 @@ export interface WorkspaceRecord {
   color?: string
   createdAt: string
   updatedAt: string
+  /** Last setup-script run for this workspace. Display only — the auto-run gate
+   *  is "this session has not seen this workspace id before". */
+  setupRanAt?: string
+  setupExitCode?: number
 }
 
 export interface ProjectRecord {
@@ -190,6 +194,10 @@ export interface TabSession {
   exitCode?: number
   workspaceId?: string
   autoRenameStatus?: 'eligible' | 'attempted'
+  /** Real PTY tab that no chrome enumerates. See `src/state/types.ts`. */
+  hidden?: boolean
+  /** Who owns this tab, independent of visibility. See `src/state/types.ts`. */
+  role?: 'setup'
 }
 
 export interface SnippetRecord {
@@ -324,6 +332,8 @@ export interface ModalNewTab extends ModalBase {
   editingCommand: AssistantId | null
   /** Set when `create-workspace` chained into this picker. */
   pendingWorkspace?: PendingWorkspaceLaunch
+  /** A prompt for the picked assistant, without the workspace pinning/rename. */
+  pendingPrompt?: string
 }
 export interface PendingWorkspaceLaunch {
   projectId: string
@@ -372,7 +382,6 @@ export interface ModalCreateProject extends ModalBase {
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
   activeField: 'prompt' | 'base'
-  step: 'form' | 'template'
   /** "What do you want to work on?" — names the workspace and its branch. */
   prompt: string
   branchError: string | null
@@ -557,13 +566,16 @@ export interface AppState {
   workspaceDivergence: Record<string, BranchDivergence>
   lastActiveTabByWorkspace: Record<string, string>
   pendingChords: string[] | null
-  workspaceTemplates: WorkspaceTemplate[]
 }
 
 // ─── AppAction union ──────────────────────────────────────────────────────────
 
 export type ModalAction =
-  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
+  | {
+      type: 'open-new-tab-modal'
+      pendingWorkspace?: PendingWorkspaceLaunch
+      pendingPrompt?: string
+    }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
   | { type: 'open-project-picker' }
@@ -581,7 +593,6 @@ export type ModalAction =
   | { type: 'open-create-workspace-modal' }
   | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
-  | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-project-field' }
@@ -730,26 +741,6 @@ export interface BranchDivergence {
   /** Lines changed since the fork point, working tree included. */
   added?: number
   removed?: number
-}
-
-export interface WorkspaceTemplatePane {
-  id: string
-  assistant: string
-  splitFrom?: string
-  direction?: SplitDirection
-  ratio?: number
-  send?: string
-}
-
-export interface WorkspaceTemplateTab {
-  panes: WorkspaceTemplatePane[]
-}
-
-export interface WorkspaceTemplate {
-  id: string
-  name: string
-  description?: string
-  tabs: WorkspaceTemplateTab[]
 }
 
 export type GitPanelAction =
@@ -910,6 +901,11 @@ export type SideEffect =
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
   | { type: 'open-selected-snippet-source-in-editor' }
+  | { type: 'run-setup' }
+  | { type: 'stop-setup' }
+  | { type: 'configure-setup-script' }
+  | { type: 'ask-agent-for-setup-script' }
+  | { type: 'promote-setup-tab' }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 
@@ -1242,12 +1238,14 @@ export interface AimuxUserConfig {
   externalEditor?: ExternalEditorConfig
   integrations?: AimuxIntegrationsConfig
   /**
-   * Workspace templates: layouts (multi-pane + initial commands) applied at
-   * workspace creation. Selected from a picker in the new-tab modal.
+   * @deprecated Removed. Workspace provisioning is a per-project setup script
+   * now — see `docs/guide/workspaces.md#setup`. Declared here only so the strike
+   * -through shows up in your editor: an unknown key parses silently, so without
+   * it the setting would just vanish with no signal at all.
    */
-  workspaceTemplates?: WorkspaceTemplate[]
-  /** @deprecated renamed to `workspaceTemplates`. Still read in 0.9.0. */
-  worktreeTemplates?: WorkspaceTemplate[]
+  workspaceTemplates?: never
+  /** @deprecated Removed. See `workspaceTemplates`. */
+  worktreeTemplates?: never
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -1313,5 +1311,4 @@ export interface ResolvedConfig {
   integrations: {
     claudeHooks: boolean
   }
-  workspaceTemplates: WorkspaceTemplate[]
 }

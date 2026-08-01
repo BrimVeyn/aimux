@@ -3,7 +3,6 @@ import type { MouseEvent } from '@opentui/core'
 import { useCallback, useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
-import type { WorkspaceTemplate } from '../config'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type {
   BarSide,
@@ -93,7 +92,6 @@ function renderModal(
     activeAssistant?: string
     autoCommitModel?: string
     workspaceDivergence: Record<string, { ahead: number; behind: number }>
-    workspaceTemplates: WorkspaceTemplate[]
   }
 ) {
   switch (modal.type) {
@@ -114,7 +112,6 @@ function renderModal(
       return (
         <CreateWorkspaceModal
           activeField={modal.activeField}
-          step={modal.step}
           prompt={modal.prompt}
           branchError={modal.branchError}
           baseQuery={modal.baseQuery}
@@ -128,7 +125,6 @@ function renderModal(
                   ?.workspaces ?? EMPTY_WORKSPACES)
               : EMPTY_WORKSPACES
           }
-          workspaceTemplates={options.workspaceTemplates}
         />
       )
     case 'project-picker':
@@ -337,7 +333,6 @@ export function RootView({
   const projects = useAppStore((s) => s.projects)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const workspaceDivergence = useAppStore((s) => s.workspaceDivergence)
-  const workspaceTemplates = useAppStore((s) => s.workspaceTemplates)
   const leftBarWidth = useAppStore((s) => getBarWidth(s.bars.left))
 
   const splitChrome = PANE_BORDER * 2
@@ -426,7 +421,6 @@ export function RootView({
           snippets,
           themeId,
           workspaceDivergence,
-          workspaceTemplates,
         })}
         <ToastViewport />
       </box>
@@ -519,7 +513,6 @@ export function RootView({
         snippets,
         themeId,
         workspaceDivergence,
-        workspaceTemplates,
       })}
       <ToastViewport />
     </box>

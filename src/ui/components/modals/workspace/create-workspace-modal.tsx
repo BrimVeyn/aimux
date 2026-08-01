@@ -1,21 +1,18 @@
 import { useCallback, useMemo } from 'react'
 
-import type { WorkspaceTemplate } from '../../../../config'
 import type { WorkspaceRecord } from '../../../../state/types'
 
-import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
+import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { buildBaseRefOptions } from '../../../../state/selectors'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
-import { Picker, type PickerItem } from '../shared/picker'
 
 /** The box is this tall from the start: a one-line slot asks for a one-line task. */
 const PROMPT_LINES = 5
 
 interface CreateWorkspaceModalProps {
   activeField: 'prompt' | 'base'
-  step: 'form' | 'template'
   prompt: string
   branchError: string | null
   baseQuery: string
@@ -24,7 +21,6 @@ interface CreateWorkspaceModalProps {
   cursorPos?: number
   selectedIndex: number
   workspaces: WorkspaceRecord[]
-  workspaceTemplates: WorkspaceTemplate[]
 }
 
 export function CreateWorkspaceModal({
@@ -36,9 +32,7 @@ export function CreateWorkspaceModal({
   cursorPos,
   prompt,
   selectedIndex,
-  step,
   workspaces,
-  workspaceTemplates,
 }: CreateWorkspaceModalProps) {
   const t = useTheme()
 
@@ -64,50 +58,6 @@ export function CreateWorkspaceModal({
       })),
     [baseBranches, baseQuery, t, workspaces]
   )
-
-  const templateItems = useMemo<PickerItem[]>(
-    () =>
-      workspaceTemplates.map((template, index) => {
-        const active = index === selectedIndex
-        const tabCount = template.tabs.length
-        const paneCount = template.tabs.reduce((sum, tab) => sum + tab.panes.length, 0)
-        return {
-          key: template.id,
-          onClick: () => {
-            dispatchGlobal({ index, type: 'set-modal-selection-index' })
-            runSideEffectGlobal({ type: 'create-workspace' })
-          },
-          subtitle:
-            template.description != null && template.description !== '' ? (
-              <text fg={t.textMuted}>{template.description}</text>
-            ) : (
-              <text fg={t.textMuted}>
-                {tabCount} tab{tabCount === 1 ? '' : 's'}, {paneCount} pane
-                {paneCount === 1 ? '' : 's'}
-              </text>
-            ),
-          title: <text fg={active ? t.text : t.textMuted}>{template.name}</text>,
-        }
-      }),
-    [selectedIndex, t, workspaceTemplates]
-  )
-
-  if (step === 'template') {
-    return (
-      <Picker
-        title="New workspace: pick template"
-        keybindsModeId="modal.create-workspace"
-        width={uiTokens.modalWidth.md}
-        gap={1}
-        filter={null}
-        items={templateItems}
-        selectedIndex={selectedIndex}
-        emptyState={<text fg={t.textMuted}>No templates configured.</text>}
-        onHover={handleHover}
-        footer={<text fg={t.textMuted}>Enter creates, Esc returns to the form</text>}
-      />
-    )
-  }
 
   const baseActive = activeField === 'base'
   return (

@@ -5,9 +5,30 @@ import { visibleWidgets } from '../../state/bars'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { WIDGET_LABELS } from './registry'
 
+/** `Show <label>` for every hidden widget in either bar. */
+function showHiddenItems(bars: BarsState): ContextMenuItem[] {
+  const items: ContextMenuItem[] = []
+  for (const side of ['left', 'right'] as const) {
+    for (const widget of bars[side].widgets) {
+      if (widget.visible) continue
+      items.push([
+        `Show ${WIDGET_LABELS[widget.id] ?? widget.id}`,
+        () => dispatchGlobal({ type: 'toggle-widget', widgetId: widget.id }),
+      ])
+    }
+  }
+  return items
+}
+
 /**
  * Right-click menu for a widget hosted in a bar: move it across, reorder it
- * within its bar, or hide it. Generic — a new widget gets this for free.
+ * within its bar, hide it, or bring back one that is hidden. Generic — a new
+ * widget gets this for free.
+ *
+ * The unhide entries live here and not only on the bar's own menu because the
+ * bar's menu is unreachable: widget slots cover the whole body and stop
+ * right-click propagation, and the edge and boundary handles swallow every
+ * button. Without this, hiding a widget is a one-way door for a mouse user.
  */
 export function buildWidgetContextMenu(
   bars: BarsState,
@@ -50,20 +71,15 @@ export function buildWidgetContextMenu(
   if (visibleWidgets(bars[side]).length > 1) {
     items.push(['Hide', () => dispatchGlobal({ type: 'toggle-widget', widgetId })])
   }
+
+  items.push(...showHiddenItems(bars))
   return items
 }
 
 /** Menu for the bar itself. Offers a way back for every hidden widget. */
 export function buildBarContextMenu(bars: BarsState, side: BarSide): ContextMenuItem[] {
-  const items: ContextMenuItem[] = [
+  return [
     [`Hide ${side} bar`, () => dispatchGlobal({ side, type: 'toggle-bar' })],
+    ...showHiddenItems(bars),
   ]
-  for (const widget of bars[side].widgets) {
-    if (widget.visible) continue
-    items.push([
-      `Show ${WIDGET_LABELS[widget.id] ?? widget.id}`,
-      () => dispatchGlobal({ type: 'toggle-widget', widgetId: widget.id }),
-    ])
-  }
-  return items
 }

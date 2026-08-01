@@ -32,7 +32,11 @@ import type {
 
 export type ModalAction =
   | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
-  | { type: 'open-new-tab-modal'; pendingWorkspace?: PendingWorkspaceLaunch }
+  | {
+      type: 'open-new-tab-modal'
+      pendingWorkspace?: PendingWorkspaceLaunch
+      pendingPrompt?: string
+    }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-help-modal'; scope?: ModeId }
   | { type: 'open-split-picker'; direction: SplitDirection }
@@ -51,7 +55,6 @@ export type ModalAction =
   | { type: 'open-create-workspace-modal' }
   | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
-  | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-project-field' }
@@ -153,6 +156,8 @@ export type TabAction =
       tabId: string
       title?: string
       autoRenameStatus?: 'eligible' | 'attempted'
+      /** Set to false to promote a hidden tab into the normal tab strip. */
+      hidden?: boolean
     }
   | { type: 'append-tab-buffer'; tabId: string; chunk: string }
   | {

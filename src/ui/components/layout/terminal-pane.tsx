@@ -115,7 +115,7 @@ function renderSpan(span: TerminalSpan, key: string, softCursor: boolean): React
   )
 }
 
-interface TerminalViewportProps {
+export interface TerminalViewportProps {
   viewport: TerminalSnapshot | undefined
   buffer: string
   softCursor: boolean
@@ -215,7 +215,7 @@ const pinTerminalScroll = (node: TextRenderable | null): void => {
   if (node.scrollY !== 0) node.scrollY = 0
 }
 
-const TerminalViewport = memo(function TerminalViewport({
+export const TerminalViewport = memo(function TerminalViewport({
   buffer,
   softCursor,
   viewport,

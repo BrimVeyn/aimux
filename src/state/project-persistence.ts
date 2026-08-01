@@ -49,21 +49,26 @@ export function serializeProject(state: AppState): ProjectSnapshotV1 {
       width: state.bars.left.width,
     },
     tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
-    tabs: state.tabs.map((tab) => ({
-      assistant: tab.assistant,
-      autoRenameStatus: tab.autoRenameStatus,
-      buffer: tab.buffer,
-      command: tab.command,
-      errorMessage: tab.errorMessage,
-      exitCode: tab.exitCode,
-      id: tab.id,
-      status: tab.status === 'disconnected' ? 'running' : tab.status,
-      terminalModes: tab.terminalModes,
-      title: tab.title,
-      viewport: tab.viewport,
-      workerName: tab.workerName,
-      workspaceId: tab.workspaceId,
-    })),
+    // Hidden tabs (the setup runner's PTY) are session-scoped on purpose: the
+    // durable record of a setup run is `WorkspaceRecord.setupRanAt`, and keeping
+    // them out here is what lets `hidden` stay off the ipc/daemon wire.
+    tabs: state.tabs
+      .filter((tab) => tab.hidden !== true)
+      .map((tab) => ({
+        assistant: tab.assistant,
+        autoRenameStatus: tab.autoRenameStatus,
+        buffer: tab.buffer,
+        command: tab.command,
+        errorMessage: tab.errorMessage,
+        exitCode: tab.exitCode,
+        id: tab.id,
+        status: tab.status === 'disconnected' ? 'running' : tab.status,
+        terminalModes: tab.terminalModes,
+        title: tab.title,
+        viewport: tab.viewport,
+        workerName: tab.workerName,
+        workspaceId: tab.workspaceId,
+      })),
     version: 1,
   }
 }

@@ -113,6 +113,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
+          pendingPrompt: action.pendingPrompt,
           pendingWorkspace: action.pendingWorkspace,
           projectTargetId: null,
           selectedIndex: 0,
@@ -346,7 +347,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           projectTargetId: null,
           prompt: '',
           selectedIndex: 0,
-          step: 'form',
           type: 'create-workspace',
         },
       }
@@ -408,22 +408,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           activeField: 'prompt',
           branchError: action.message,
           cursorPos: state.modal.prompt.length,
-        },
-      }
-    }
-    case 'set-create-workspace-step': {
-      if (state.modal.type !== 'create-workspace') return state
-      if (state.modal.step === action.step) return state
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          cursorPos: action.step === 'form' ? state.modal.prompt.length : 0,
-          // Returning to the form always lands on the prompt field, so the
-          // cursor above matches whatever the user sees.
-          ...(action.step === 'form' ? { activeField: 'prompt' as const } : null),
-          selectedIndex: 0,
-          step: action.step,
         },
       }
     }
@@ -676,17 +660,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return state
       }
       if (state.modal.type === 'create-workspace') {
-        if (state.modal.step === 'template') {
-          const count = state.workspaceTemplates.length
-          if (count === 0) return state
-          return {
-            ...state,
-            modal: {
-              ...state.modal,
-              selectedIndex: (state.modal.selectedIndex + action.delta + count) % count,
-            },
-          }
-        }
         if (state.modal.activeField !== 'base') return state
         const options = getCreateWorkspaceBaseOptions(state)
         if (options.length === 0) return state
@@ -728,13 +701,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return state
       }
       if (state.modal.type === 'create-workspace') {
-        if (state.modal.step === 'template') {
-          const count = state.workspaceTemplates.length
-          if (count === 0) return state
-          const clamped = Math.max(0, Math.min(count - 1, action.index))
-          if (clamped === state.modal.selectedIndex) return state
-          return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
-        }
         if (state.modal.activeField !== 'base') return state
         const options = getCreateWorkspaceBaseOptions(state)
         if (options.length === 0) return state
@@ -805,8 +771,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return { ...state, modal: { ...state.modal, buffer: nextBuffer, pendingJump: null } }
       }
       if (state.modal.type === 'create-workspace') {
-        // The template step is a pure picker — swallow typed characters.
-        if (state.modal.step === 'template') return state
         const field = state.modal.activeField
         const current = getCreateWorkspaceFieldValue(state.modal, field)
         const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)

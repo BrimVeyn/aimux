@@ -15,6 +15,7 @@ import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { TerminalContentOrigin } from './input/raw-input-handler'
 import type { SessionBackend } from './session-backend/types'
 
+import { setActiveMeasure } from './app-runtime/measure-ref'
 import { executeSideEffect } from './app-runtime/side-effects'
 import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
@@ -22,6 +23,7 @@ import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
 import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
+import { useSetupRunner } from './app-runtime/use-setup-runner'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
@@ -130,10 +132,6 @@ export function App({
         bars: json.bars,
         gitPane: gitPaneOverrides,
         projectBarVisible,
-        workspaceTemplates:
-          resolvedConfig.workspaceTemplates.length > 0
-            ? resolvedConfig.workspaceTemplates
-            : json.workspaceTemplates,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
@@ -304,6 +302,15 @@ export function App({
   })
   layoutRef.current = { terminalCols: terminalSize.cols, terminalRows: terminalSize.rows }
 
+  // Reaches the setup widget, which hosts its own PTY outside root.tsx's pane
+  // tree and so never sees the onMeasure prop chain.
+  useLayoutEffect(() => {
+    setActiveMeasure(terminalSize.onMeasure)
+    return () => {
+      setActiveMeasure(null)
+    }
+  }, [terminalSize.onMeasure])
+
   const syntaxOverlayFlag = resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true
   const syntaxOverlayFlagRef = useRef(syntaxOverlayFlag)
   syntaxOverlayFlagRef.current = syntaxOverlayFlag
@@ -432,6 +439,8 @@ export function App({
     state,
     themeId,
   }
+
+  useSetupRunner(state, sideEffectCtx)
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
     for (const action of result.actions) {

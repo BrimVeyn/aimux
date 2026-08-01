@@ -1,4 +1,3 @@
-import type { WorkspaceTemplate } from '../config'
 import type { AppAction } from './actions'
 
 import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
@@ -30,7 +29,6 @@ export interface InitialStateOverrides {
   gitPane?: Partial<GitPaneState>
   bars?: BarsState
   projectBarVisible?: boolean
-  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -48,6 +46,9 @@ export const DEFAULT_BARS: BarsState = {
     widgets: [
       { grow: 50, id: 'projects', visible: true },
       { grow: 50, id: 'git', visible: true },
+      // Opt-in: reachable via the bar's right-click menu ("Show Setup"). Present
+      // here so sanitizeBars places it rather than treating it as corruption.
+      { grow: 50, id: 'setup', visible: false },
     ],
     width: 28,
   },
@@ -139,7 +140,6 @@ export function createInitialState(
     tabGroupMap: {},
     tabs: [],
     workspaceDivergence: {},
-    workspaceTemplates: overrides.workspaceTemplates ?? [],
   }
 }
 

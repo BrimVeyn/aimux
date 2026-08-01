@@ -1,4 +1,7 @@
-import { expect, test } from 'bun:test'
+import { afterAll, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import type { AppAction } from '../../src/state/actions'
 import type { AppState } from '../../src/state/types'
@@ -9,13 +12,25 @@ import { appReducer, createInitialState } from '../../src/state/store'
 const NOW = '2026-07-31T00:00:00.000Z'
 
 /**
- * Point the assistant at a binary every machine has. `startTabSession` marks a
+ * Point the assistants at a binary every machine has. `startTabSession` marks a
  * tab as errored when its executable is not on PATH, and the injector rightly
  * abandons an errored tab — so without this the test silently passes only where
  * `claude` happens to be installed, and reports "the prompt was never sent" on
  * a machine that simply lacks it.
+ *
+ * The stand-in has to be *named* `claude`: `assistantAcceptsPromptArg` only
+ * hands the prompt to argv when the custom command still runs the vendor's own
+ * program, so a bare `/bin/cat` would exercise the paste path instead.
+ * `opencode` has no prompt argument either way.
  */
-const AVAILABLE_COMMANDS = { claude: '/bin/cat' }
+const FAKE_BIN = mkdtempSync(join(tmpdir(), 'aimux-prompt-bin-'))
+symlinkSync('/bin/cat', join(FAKE_BIN, 'claude'))
+const AVAILABLE_COMMANDS = { claude: join(FAKE_BIN, 'claude'), opencode: '/bin/cat' }
+
+afterAll(() => rmSync(FAKE_BIN, { force: true, recursive: true }))
+
+/** Index of `opencode` in `ASSISTANT_OPTIONS`. */
+const OPENCODE_INDEX = 2
 
 function seed(): AppState {
   const base = createInitialState(AVAILABLE_COMMANDS, [
@@ -67,9 +82,9 @@ async function until(done: () => boolean, timeoutMs = 10_000): Promise<void> {
 function harness(initial: AppState) {
   let state = initial
   const writes: { tabId: string; input: string }[] = []
-  const started: string[] = []
+  const started: { command: string; args: string[] }[] = []
   const backend = {
-    createSession: (tabId: string) => void started.push(tabId),
+    createSession: (params: { command: string; args: string[] }) => void started.push(params),
     resizeTab: () => {},
     scrollViewportToBottom: () => {},
     write: (tabId: string, input: string) => void writes.push({ input, tabId }),
@@ -95,14 +110,40 @@ function harness(initial: AppState) {
   return { ctx, started, writes }
 }
 
-test('the chained launch pins the tab to the new workspace and sends the prompt', async () => {
-  const { ctx, writes } = harness(seed())
+test('the chained launch pins the tab and hands the prompt over at spawn', async () => {
+  const { ctx, started, writes } = harness(seed())
 
   executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
 
   const tab = ctx.getState().tabs[0]
   if (!tab) throw new Error('expected the launch to create a tab')
   expect(tab.workspaceId).toBe('workspace-new')
+
+  // `claude` takes an interactive positional prompt, so it arrives in argv. No
+  // readiness poll, no screen probe, no retries — and nothing typed into the pty.
+  expect(started).toHaveLength(1)
+  expect(started[0]?.args).toEqual(['fix the scroll drift'])
+
+  // The prompt must not leak into `command`: that string is shown in the UI,
+  // persisted in the snapshot, and round-tripped by the custom-command editor.
+  expect(tab.command).toBe(AVAILABLE_COMMANDS.claude)
+
+  await Bun.sleep(300)
+  expect(writes).toEqual([])
+})
+
+test('an assistant without a prompt argument still gets the prompt pasted', async () => {
+  const { ctx, started, writes } = harness(
+    appReducer(seed(), { index: OPENCODE_INDEX, type: 'set-modal-selection-index' })
+  )
+
+  executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+
+  const tab = ctx.getState().tabs[0]
+  if (!tab) throw new Error('expected the launch to create a tab')
+  expect(tab.assistant).toBe('opencode')
+  // `opencode`'s positional is a project path, so argv must stay clean.
+  expect(started[0]?.args).toEqual([])
 
   // The assistant enables bracketed paste and echoes what it was handed.
   ctx.dispatch({
@@ -125,7 +166,6 @@ test('the chained launch pins the tab to the new workspace and sends the prompt'
 
   const sent = writes.map((entry) => entry.input).join('')
   expect(sent).toContain('fix the scroll drift')
-  expect(writes.at(-1)?.input).toBe('\r')
   expect(writes.every((entry) => entry.tabId === tab.id)).toBe(true)
 })
 

@@ -64,7 +64,6 @@ Today it is used for values such as:
 - `projectBarVisible`
 - `projectSnapshot` for legacy migration
 - `skippedUpdateVersion`
-- `workspaceTemplates` (fallback when `aimux.config.ts` does not declare them)
 
 Legacy top-level keys `gitPanelVisible` / `gitPanelRatio` are still read on
 load for backward compatibility. A file with no `bars` key is upgraded from the

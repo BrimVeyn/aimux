@@ -63,9 +63,17 @@ Mode ids are not aliased; `.mode('modal.create-session', …)` throws.
 
 ### Renamed config keys
 
-`worktreeTemplates` is now `workspaceTemplates`, and `sessionBar` is now
-`projectBar`. Both old keys are still read in 0.9.0; rename them. (An unknown
-key parses silently, so without the fallback the setting would just vanish.)
+`sessionBar` is now `projectBar`. The old key is still read; rename it. (An
+unknown key parses silently, so without the fallback the setting would just
+vanish.)
+
+### Removed config keys
+
+`workspaceTemplates` (and its pre-rename spelling `worktreeTemplates`) is
+removed. Workspace provisioning is a per-project setup script now — see
+`docs/guide/workspaces.md#setup-script`. Both keys are still declared as
+`never` so your editor strikes them through, and `aimux doctor` reports them if
+they are still in `aimux.json`.
 
 ## What This Package Does
 

@@ -60,15 +60,14 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
-    // ponytail: `sessionBar` / `worktreeTemplates` are the pre-rename keys.
-    // Unknown keys parse silently, so without these the setting just vanishes.
+    // ponytail: `sessionBar` is the pre-rename key. Unknown keys parse
+    // silently, so without the fallback the setting just vanishes.
     projectBar: resolveProjectBar(userConfig.projectBar ?? userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
-    workspaceTemplates: userConfig.workspaceTemplates ?? userConfig.worktreeTemplates ?? [],
   }
 }
 

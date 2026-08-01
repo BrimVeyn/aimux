@@ -1,7 +1,6 @@
 import type { ModeId, SnippetVar } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
-import type { WorkspaceTemplate } from '../config'
 import type { LayoutNode, SplitDirection } from './layout-tree'
 
 export type BuiltinAssistantId =
@@ -175,6 +174,10 @@ export interface WorkspaceRecord {
   color?: string
   createdAt: string
   updatedAt: string
+  /** Last setup-script run for this workspace. Display only — the auto-run gate
+   *  is "this session has not seen this workspace id before". */
+  setupRanAt?: string
+  setupExitCode?: number
 }
 
 export interface ProjectRecord {
@@ -210,6 +213,24 @@ export interface TabSession {
   /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
+  /**
+   * A real PTY tab that no chrome enumerates: absent from the top tab bar, from
+   * tab navigation, from `activeTabId` picks, and from the persisted snapshot.
+   * Rendered by whatever created it — today only the setup widget.
+   * `filterTabsForActiveWorkspace` is the single guard the UI paths share.
+   */
+  hidden?: boolean
+  /**
+   * Who owns this tab. Separate from `hidden` on purpose: promoting a setup tab
+   * into the main pane clears `hidden` but must not turn it back into an
+   * ordinary tab, or the PTY exit would close it and take the failure output
+   * with it — which is the one thing the promotion exists to read.
+   *
+   * ponytail: not on the ipc wire nor in the snapshot, so a promoted setup tab
+   * comes back from a restart as a plain tab running `bash …/setup.sh`. Add it
+   * to `TabSessionSummary` if that ever matters.
+   */
+  role?: 'setup'
 }
 
 export type BarSide = 'left' | 'right'
@@ -384,6 +405,12 @@ export interface ModalNewTab extends ModalBase {
    * escaping the picker cannot leak a stale prompt into a later tab.
    */
   pendingWorkspace?: PendingWorkspaceLaunch
+  /**
+   * A prompt to hand the picked assistant, with none of `pendingWorkspace`'s
+   * other behaviour: no workspace pinning, no rename. Used by "Ask an agent" in
+   * the setup widget.
+   */
+  pendingPrompt?: string
 }
 
 export interface PendingWorkspaceLaunch {
@@ -459,7 +486,6 @@ export interface ModalCreateProject extends ModalBase {
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
   activeField: 'prompt' | 'base'
-  step: 'form' | 'template'
   /**
    * "What do you want to work on?" — the only thing the user types. It is sent
    * to the assistant, and it names both the workspace and its branch.
@@ -667,8 +693,6 @@ export interface AppState {
   lastActiveTabByWorkspace: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
-  /** User-defined templates applied at workspace creation. Loaded from aimux.json. */
-  workspaceTemplates: WorkspaceTemplate[]
 }
 
 // -- Git panel payloads --
