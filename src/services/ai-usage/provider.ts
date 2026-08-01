@@ -6,7 +6,14 @@ import { fetchClaudeUsage } from './adapters/claude'
 import { fetchCodexUsage } from './adapters/codex'
 import { loadCachedSnapshot, saveCachedSnapshot } from './cache'
 
-const DEFAULT_POLL_SECONDS = 60
+/**
+ * Claude's OAuth usage endpoint drops a caller polling faster than this into a
+ * punitive rate-limit bucket, which shows up as an indicator that stops updating
+ * rather than as an error. So it is the floor as well as the default, and it is
+ * not per-tool: one interval drives every tool in the list, and a Codex-only
+ * setup loses nothing measurable by refreshing a quota bar every three minutes.
+ */
+const MIN_POLL_SECONDS = 180
 const DEFAULT_TOOLS: AIUsageTool[] = ['claude', 'codex']
 
 export interface AIUsageServiceHandle {
@@ -28,7 +35,7 @@ export function startAIUsageService(
   onUpdate: (snap: UsageSnapshot) => void
 ): AIUsageServiceHandle {
   const tools = config.tools && config.tools.length > 0 ? config.tools : DEFAULT_TOOLS
-  const pollMs = Math.max(5, config.pollSeconds ?? DEFAULT_POLL_SECONDS) * 1000
+  const pollMs = Math.max(MIN_POLL_SECONDS, config.pollSeconds ?? MIN_POLL_SECONDS) * 1000
 
   let stopped = false
   let timer: ReturnType<typeof setTimeout> | null = null

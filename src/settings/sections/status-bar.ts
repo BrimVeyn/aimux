@@ -44,14 +44,18 @@ export const STATUS_BAR_SECTION: SettingSection = {
       storage: 'settings',
     },
     {
-      description: "Seconds between checks. Under 180, Claude's endpoint starts rate-limiting.",
-      fallback: 60,
+      // The floor is 180 rather than a warning at 180: Claude's endpoint answers
+      // a faster caller with a rate limit, and the symptom is an indicator that
+      // quietly stops updating. A setting whose own description tells you not to
+      // use half its range should not have that half.
+      description: "Seconds between checks. Claude's endpoint rate-limits anything faster.",
+      fallback: 180,
       fromConfig: (config) => config.statusBar?.aiUsage?.pollSeconds,
       id: AI_USAGE_POLL_SECONDS,
       kind: 'number',
       label: 'Refresh interval',
       max: 3_600,
-      min: 60,
+      min: 180,
       step: 60,
       storage: 'settings',
     },
