@@ -74,11 +74,16 @@ export function recordTabStatus(
 ): void {
   const previous = entries.get(tabId)
   const armed = status === 'working' || status === 'waiting-input' || (previous?.armed ?? false)
-  entries.set(tabId, { armed, status, workspaceId })
+  // An event that carries no workspace does not mean the tab lost one. A tab
+  // created before the daemon recorded workspaces has none in its registry,
+  // but the client's own snapshot does — and the attach seeded us with it, so
+  // keep it rather than blanking the row on the next status change.
+  const known = workspaceId ?? previous?.workspaceId
+  entries.set(tabId, { armed, status, workspaceId: known })
   // A tab can be reassigned to another workspace (workspace move); the one it
   // left has one tab fewer and has to be recomputed too.
-  if (previous && previous.workspaceId !== workspaceId) publish(previous.workspaceId)
-  publish(workspaceId)
+  if (previous && previous.workspaceId !== known) publish(previous.workspaceId)
+  publish(known)
 
   if (
     options?.silent !== true &&

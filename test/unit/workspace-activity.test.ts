@@ -86,6 +86,20 @@ describe('recordTabStatus', () => {
     expect(seen).toEqual([])
   })
 
+  test('an event with no workspace keeps the one we already knew', () => {
+    // A daemon that never recorded this tab's workspace still reports its
+    // status; the attach seeded the workspace, and losing it would blank the
+    // row on the next transition.
+    const seen = collectDispatches()
+    seedTabActivity([{ activity: 'idle', id: 't1', workspaceId: 'w1' }])
+    seen.length = 0
+    recordTabStatus('t1', 'working', undefined)
+
+    expect(seen).toEqual([
+      { type: 'set-workspace-activity', waiting: false, working: true, workspaceId: 'w1' },
+    ])
+  })
+
   test('forgetting a tab republishes what is left', () => {
     const seen = collectDispatches()
     recordTabStatus('t1', 'waiting-input', 'w1')
