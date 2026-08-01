@@ -47,7 +47,7 @@ export function ensureSetupScriptStub(projectId: string): string {
   return path
 }
 
-const EMPTY_LINES: string[] = []
+const EMPTY_LINES: readonly string[] = []
 
 /**
  * Keyed by path, not project id: the path depends on the active profile, which is
@@ -85,8 +85,11 @@ function parseSetupScript(source: string): string[] {
  * project is a syscall; a read-and-parse per project per keystroke is a habit
  * that gets worse with every project the user adds. An edit made outside aimux
  * still lands — that is what the mtime is for.
+ *
+ * `readonly` because the array it hands back is the cached one, not a copy: a
+ * caller that sorted or spliced it would be editing every later caller's answer.
  */
-export function readSetupScriptLines(projectId: string): string[] {
+export function readSetupScriptLines(projectId: string): readonly string[] {
   const path = getSetupScriptPath(projectId)
   try {
     const { mtimeMs } = statSync(path)
