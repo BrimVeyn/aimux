@@ -178,3 +178,28 @@ test('reading a stored row with no value at all yields its default', () => {
 
   expect(readRow(UNCLAIMED, { state: STATE, values: {} })).toBe(5)
 })
+
+test('a stored number outside the row range is pulled into it', () => {
+  withConfig({ settings: { 'git.prefetchRadius': 900 } })
+
+  hydrateSettings(ROWS, {})
+
+  // Nothing the screen writes can land out of range, but a hand-edited
+  // `aimux.json` — or one an older build wrote with a wider range — can. An
+  // unclamped value shows the row saying 900 while its reader uses its own cap.
+  expect(values()['git.prefetchRadius']).toBe(50)
+})
+
+test('a config-file number outside the row range is pulled into it too', () => {
+  withConfig({})
+  // `UNCLAIMED` has no `fromConfig` on purpose, so it needs a row the config file
+  // can actually reach.
+  const claimed: SettingRow = { ...UNCLAIMED, fromConfig: (c) => c.gitPane?.prefetchRadius }
+
+  hydrateSettings([claimed], { gitPane: { prefetchRadius: -4 } })
+
+  expect(values()['git.prefetchRadius']).toBe(0)
+  // The default `r` goes back to is the clamped one, so the row does not offer to
+  // reset to a value it would refuse to hold.
+  expect(settingsStore.getState().defaults['git.prefetchRadius']).toBe(0)
+})
