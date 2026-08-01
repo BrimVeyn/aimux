@@ -49,11 +49,12 @@ export const SettingsRow = memo(function SettingsRow({
   if (row.description != null && row.description !== '') notes.push(row.description)
   if (fromConfigFile) notes.push('set in aimux.config.ts — comes back on restart')
   else if (needsRestart(row)) notes.push('applies on restart')
-  // Only once it has been changed, and only then: `r` is otherwise a key you
-  // press to find out what it does, and the default is what it does.
-  if (touched && defaultValue !== undefined) {
-    notes.push(`r resets to ${describeValue(row, defaultValue)}`)
-  }
+  // Right-aligned on the same line rather than tacked onto the end of the
+  // description: it is about the row, not about what the setting does, and the
+  // value column above it is on that edge too. Only once the row has been
+  // changed — `r` is otherwise a key you press to find out what it does.
+  const resetHint =
+    touched && defaultValue !== undefined ? `r resets to ${describeValue(row, defaultValue)}` : null
 
   return (
     <ListItem
@@ -63,7 +64,20 @@ export const SettingsRow = memo(function SettingsRow({
       onClickIndex={onSelect}
       leading={<text fg={fromConfigFile ? t.warning : t.secondary}>{mark}</text>}
       title={<text fg={editable ? t.text : t.textMuted}>{row.label}</text>}
-      subtitle={notes.length > 0 ? <text fg={t.textMuted}>{notes.join(' · ')}</text> : undefined}
+      subtitle={
+        notes.length > 0 || resetHint != null ? (
+          <box flexDirection="row">
+            <box flexGrow={1} flexShrink={1}>
+              <text fg={t.textMuted}>{notes.join(' · ')}</text>
+            </box>
+            {resetHint != null ? (
+              <text fg={t.textMuted} wrapMode="none">
+                {resetHint}
+              </text>
+            ) : null}
+          </box>
+        ) : undefined
+      }
       trailing={<RowValue row={row} />}
     />
   )
