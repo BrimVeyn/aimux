@@ -56,7 +56,7 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
   const state = runtime.getState()
   if (state.focusMode !== 'settings' || state.settings.pane !== 'rows') return
 
-  const row = getSectionRows(state.settings.sectionId, state)[state.settings.rowIndex]
+  const row = getSectionRows(state.settings.sectionId, state.projects)[state.settings.rowIndex]
   if (!row || row.kind === 'info') return
 
   const ctx = readCtx(state)
@@ -106,7 +106,7 @@ export function commitSettingText(
   const state = runtime.getState()
   // Dynamic rows included: a per-project setup command is a text row that exists
   // only while its project does.
-  const row = findSettingRow(settingId, state)
+  const row = findSettingRow(settingId, state.projects)
   if (!row || row.kind !== 'text') return
   writeRow(row, value.trim(), readCtx(state))
 }

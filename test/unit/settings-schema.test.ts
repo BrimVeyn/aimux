@@ -1,10 +1,23 @@
 import { expect, test } from 'bun:test'
 
-import { ALL_SETTING_ROWS, sectionRows, SETTING_SECTIONS } from '../../src/settings/sections'
+import type { ProjectRecord } from '../../src/state/types'
+
+import {
+  ALL_SETTING_ROWS,
+  sectionRowCount,
+  sectionRows,
+  SETTING_SECTIONS,
+} from '../../src/settings/sections'
 import { readRow } from '../../src/settings/settings-store'
 import { createInitialState } from '../../src/state/store'
 
 const STATE = createInitialState()
+const NOW = '2026-08-01T00:00:00.000Z'
+/** Two projects, so the sections that build a row per project build some. */
+const PROJECTS: ProjectRecord[] = [
+  { createdAt: NOW, id: 'p1', lastOpenedAt: NOW, name: 'one', updatedAt: NOW },
+  { createdAt: NOW, id: 'p2', lastOpenedAt: NOW, name: 'two', updatedAt: NOW },
+]
 
 /**
  * Adding a setting is one entry in one data file, which is the point — and it
@@ -26,7 +39,7 @@ test('every section has a label, and static ones have rows', () => {
     // `section.rows.length` would be a function's arity for the dynamic ones —
     // 1, always, which is how this assertion once passed without looking at a
     // single row.
-    const rows = sectionRows(section, STATE)
+    const rows = sectionRows(section, STATE.projects)
     expect(Array.isArray(rows), `${section.id} rows`).toBe(true)
     if (Array.isArray(section.rows)) {
       expect(rows.length, `${section.id} has no rows`).toBeGreaterThan(0)
@@ -72,5 +85,89 @@ test('a toggle defaults to a boolean, not a truthy string', () => {
   for (const row of ALL_SETTING_ROWS) {
     if (row.kind !== 'toggle' || row.storage !== 'settings') continue
     expect(typeof row.fallback, `${row.id} default`).toBe('boolean')
+  }
+})
+
+/**
+ * Every row id, frozen. A row id is also its key in the `settings` block of
+ * `aimux.json`, so renaming one orphans whatever the user had set — silently, and
+ * with no migration to fall back on. There is deliberately no rename mechanism;
+ * this list is the substitute. Changing it is fine, but it has to be on purpose.
+ */
+const FROZEN_ROW_IDS = [
+  'about.configDir',
+  'about.configFile',
+  'about.fromConfigFile',
+  'about.profile',
+  'about.version',
+  'appearance.mode',
+  'appearance.theme',
+  'appearance.transparent',
+  'autoCommit.enabled',
+  'autoCommit.models.claude',
+  'autoCommit.models.codex',
+  'autoCommit.timeoutMs',
+  'autoRename.enabled',
+  'autoRename.maxAttempts',
+  'autoRename.minPromptWords',
+  'autoRename.settleMs',
+  'autoRename.timeoutMs',
+  'customCommands.antigravity',
+  'customCommands.claude',
+  'customCommands.codex',
+  'customCommands.grok',
+  'customCommands.kimi',
+  'customCommands.opencode',
+  'customCommands.terminal',
+  'externalEditor.command',
+  'externalEditor.kind',
+  'git.diffCount',
+  'git.fileListMode',
+  'git.prefetchRadius',
+  'git.treeCompaction',
+  'integrations.claudeHooks',
+  'layout.leftBar',
+  'layout.leftBarWidth',
+  'layout.projectBar',
+  'layout.rightBar',
+  'layout.rightBarWidth',
+  'multiRepo.enabled',
+  'multiRepo.maxDepth',
+  'snippets.triggerChar',
+  'statusBar.aiUsage.enabled',
+  'statusBar.aiUsage.pollSeconds',
+  'statusBar.separator',
+  'theme.beta.experimentalSyntaxHighlight',
+  'theme.beta.harmonizeClaudeTheme',
+]
+
+test('no row id changes by accident', () => {
+  expect(ALL_SETTING_ROWS.map((row) => row.id).sort()).toEqual([...FROZEN_ROW_IDS].sort())
+})
+
+test('a section that builds its rows counts them without building them', () => {
+  for (const section of SETTING_SECTIONS) {
+    // The reducer clamps the cursor with `rowCount` precisely so it never builds
+    // rows — building a Setup row reads a file. A count that disagrees with the
+    // list is a cursor that stops one row short of the end, or one past it.
+    expect(sectionRowCount(section, PROJECTS), `${section.id} miscounts its rows`).toBe(
+      sectionRows(section, PROJECTS).length
+    )
+    if (!Array.isArray(section.rows)) {
+      expect(section.rowCount, `${section.id} builds rows to count them`).toBeDefined()
+    }
+  }
+})
+
+test('a row built from state never claims the settings file owns its value', () => {
+  for (const section of SETTING_SECTIONS) {
+    if (Array.isArray(section.rows)) continue
+    for (const row of sectionRows(section, PROJECTS)) {
+      // Hydration only walks the static rows, so a dynamic `storage: 'settings'`
+      // row would never resolve its config-file value nor report that the file
+      // owns it — while writes to it persisted quite happily.
+      if (row.kind === 'info' || row.kind === 'action') continue
+      expect(row.storage, `${row.id} is dynamic and stored`).toBe('app')
+    }
   }
 })

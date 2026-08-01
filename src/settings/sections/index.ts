@@ -1,4 +1,4 @@
-import type { AppState } from '../../state/types'
+import type { ProjectRecord } from '../../state/types'
 import type { SettingRow, SettingSection } from '../types'
 
 import { ABOUT_SECTION } from './about'
@@ -46,20 +46,47 @@ export function getSection(sectionId: string): SettingSection | undefined {
   return SETTING_SECTIONS.find((section) => section.id === sectionId)
 }
 
-export function sectionRows(section: SettingSection, state: AppState): readonly SettingRow[] {
-  return Array.isArray(section.rows) ? section.rows : section.rows(state)
+export function sectionRows(
+  section: SettingSection,
+  projects: readonly ProjectRecord[]
+): readonly SettingRow[] {
+  return Array.isArray(section.rows) ? section.rows : section.rows(projects)
+}
+
+/**
+ * How many rows a section has, without building them. The reducer clamps the
+ * cursor with this, which is why it exists: building a Setup row reads a script
+ * off disk, and a reducer has no business doing that.
+ */
+export function sectionRowCount(
+  section: SettingSection,
+  projects: readonly ProjectRecord[]
+): number {
+  if (section.rowCount) return section.rowCount(projects)
+  return Array.isArray(section.rows) ? section.rows.length : section.rows(projects).length
 }
 
 /** Rows of the given section, or an empty list when the id is unknown. */
-export function getSectionRows(sectionId: string, state: AppState): readonly SettingRow[] {
+export function getSectionRows(
+  sectionId: string,
+  projects: readonly ProjectRecord[]
+): readonly SettingRow[] {
   const section = getSection(sectionId)
-  return section ? sectionRows(section, state) : []
+  return section ? sectionRows(section, projects) : []
+}
+
+export function getSectionRowCount(sectionId: string, projects: readonly ProjectRecord[]): number {
+  const section = getSection(sectionId)
+  return section ? sectionRowCount(section, projects) : 0
 }
 
 /** The row with this id, dynamic ones included. */
-export function findSettingRow(id: string, state: AppState): SettingRow | undefined {
+export function findSettingRow(
+  id: string,
+  projects: readonly ProjectRecord[]
+): SettingRow | undefined {
   for (const section of SETTING_SECTIONS) {
-    const row = sectionRows(section, state).find((entry) => entry.id === id)
+    const row = sectionRows(section, projects).find((entry) => entry.id === id)
     if (row) return row
   }
   return undefined

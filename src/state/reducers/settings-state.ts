@@ -1,7 +1,7 @@
 import type { AppAction } from '../actions'
 import type { AppState, SettingsUIState } from '../types'
 
-import { DEFAULT_SECTION_ID, getSectionRows, SETTING_SECTIONS } from '../../settings/sections'
+import { DEFAULT_SECTION_ID, getSectionRowCount, SETTING_SECTIONS } from '../../settings/sections'
 
 export function emptySettingsUI(): SettingsUIState {
   return { pane: 'nav', rowIndex: 0, sectionId: DEFAULT_SECTION_ID }
@@ -30,7 +30,7 @@ function moveSelection(state: AppState, delta: -1 | 1): AppState {
   }
 
   return withSettings(state, {
-    rowIndex: clamp(rowIndex + delta, getSectionRows(sectionId, state).length - 1),
+    rowIndex: clamp(rowIndex + delta, getSectionRowCount(sectionId, state.projects) - 1),
   })
 }
 
@@ -51,7 +51,10 @@ export function reduceSettingsState(state: AppState, action: AppAction): AppStat
     case 'settings-focus-pane': {
       // A section with no rows has nothing to focus, so `l` stays put rather
       // than parking the cursor in an empty column.
-      if (action.pane === 'rows' && getSectionRows(state.settings.sectionId, state).length === 0) {
+      if (
+        action.pane === 'rows' &&
+        getSectionRowCount(state.settings.sectionId, state.projects) === 0
+      ) {
         return state
       }
       return withSettings(state, { pane: action.pane })
@@ -68,7 +71,7 @@ export function reduceSettingsState(state: AppState, action: AppAction): AppStat
         pane: 'rows',
         rowIndex: clamp(
           action.rowIndex,
-          getSectionRows(state.settings.sectionId, state).length - 1
+          getSectionRowCount(state.settings.sectionId, state.projects) - 1
         ),
       })
     default:

@@ -18,8 +18,10 @@ const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
 const STATE = createInitialState()
-const SEPARATOR_ROW = getSectionRows('statusBar', STATE).find((row) => row.id === SEPARATOR_ID)
-const SEPARATOR_INDEX = getSectionRows('statusBar', STATE).findIndex(
+const SEPARATOR_ROW = getSectionRows('statusBar', STATE.projects).find(
+  (row) => row.id === SEPARATOR_ID
+)
+const SEPARATOR_INDEX = getSectionRows('statusBar', STATE.projects).findIndex(
   (row) => row.id === SEPARATOR_ID
 )
 if (!SEPARATOR_ROW || SEPARATOR_ROW.kind !== 'select') {
@@ -95,7 +97,7 @@ test('nothing changes while the focus is on the section list', () => {
 })
 
 test('an info row is not a setting and is left alone', () => {
-  const rows = getSectionRows('about', STATE)
+  const rows = getSectionRows('about', STATE.projects)
   const state = {
     ...onSeparatorRow(),
     settings: { pane: 'rows' as const, rowIndex: 0, sectionId: 'about' },

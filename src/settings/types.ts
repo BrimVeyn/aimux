@@ -1,6 +1,6 @@
 import type { AimuxUserConfig } from '@brimveyn/aimux-config'
 
-import type { AppState } from '../state/types'
+import type { AppState, ProjectRecord } from '../state/types'
 
 export type SettingValue = boolean | number | string
 
@@ -87,8 +87,19 @@ export interface SettingSection {
   /** Shown once under the section's title, for a caveat that covers every row. */
   description?: string
   /**
-   * A function when the rows depend on state — one row per project, say. It is
-   * called during render and while handling a key, so it must stay cheap.
+   * A function when the rows depend on the projects — one row per project, say.
+   * The projects and nothing else: a builder handed the whole state would be free
+   * to depend on anything in it, and every caller would have to have all of it.
+   *
+   * Building a row may cost something (Setup reads a script off disk), so anything
+   * that only needs to know *how many* rows there are asks `rowCount` instead.
    */
-  rows: SettingRow[] | ((state: AppState) => SettingRow[])
+  rows: SettingRow[] | ((projects: readonly ProjectRecord[]) => SettingRow[])
+  /**
+   * How many rows there will be, without building them. Required alongside a
+   * dynamic `rows`, and kept honest by `settings-schema.test.ts`: the reducer
+   * clamps the cursor with this, and a count that disagrees with the list is a
+   * cursor that stops one row short of the end, or one past it.
+   */
+  rowCount?: (projects: readonly ProjectRecord[]) => number
 }

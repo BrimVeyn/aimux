@@ -4,7 +4,7 @@ import { memo, useCallback, useMemo, useRef } from 'react'
 
 import { getSectionRows, SETTING_SECTIONS } from '../../../settings/sections'
 import { useSettingsStore } from '../../../settings/settings-store'
-import { appStore, useAppStore } from '../../../state/app-store'
+import { useAppStore } from '../../../state/app-store'
 import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
@@ -23,19 +23,19 @@ export const SettingsView = memo(function SettingsView() {
   // screen does not shift the column under the cursor. Its configured width, not
   // `getBarWidth`: a hidden bar still says how wide the sidebar is.
   const navWidth = useAppStore((s) => clampBarWidth(s.bars.left.width))
-  // Which rows exist can depend on state — Setup has one per project — and the
-  // Setup rows read their value from a file when they are built. So the list is
-  // rebuilt when the cursor moves, when the projects change, and after any write
-  // (that is what `revision` is for), and not on every render: a rebuild reads
-  // files, and this component would otherwise do it at the rate the store changes.
-  const projectIds = useAppStore((s) => s.projects.map((project) => project.id).join(','))
+  // Which rows exist can depend on the projects — Setup has one per project — and
+  // building a Setup row reads its script off disk. So the list is rebuilt when
+  // the section changes, when the projects change, and after any write; not on
+  // every render, which at the rate this store changes would mean reading files
+  // at the rate the terminals print.
+  const projects = useAppStore((s) => s.projects)
   const revision = useSettingsStore((s) => s.revision)
   const rows = useMemo(
-    () => getSectionRows(settings.sectionId, appStore.getState()),
-    // Invalidation keys rather than inputs: the builder reads the store and, for
-    // Setup, the file system. These are what say the answer may have changed.
+    () => getSectionRows(settings.sectionId, projects),
+    // `revision` is an invalidation key, not an input: it says a value the builder
+    // read from disk may have changed under it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings, projectIds, revision]
+    [settings.sectionId, projects, revision]
   )
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 

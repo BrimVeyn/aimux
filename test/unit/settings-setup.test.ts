@@ -47,7 +47,7 @@ function withProjects(): AppState {
 function rowsFor(state: AppState) {
   const section = getSection('setup')
   if (!section) throw new Error('no setup section')
-  return sectionRows(section, state)
+  return sectionRows(section, state.projects)
 }
 
 function ctxFor(state: AppState) {

@@ -1,4 +1,4 @@
-import type { AppState } from '../../state/types'
+import type { ProjectRecord } from '../../state/types'
 import type { SettingRow, SettingSection } from '../types'
 
 import { runSideEffectGlobal } from '../../state/dispatch-ref'
@@ -45,12 +45,10 @@ function setupRow(projectId: string, projectName: string): SettingRow {
   }
 }
 
-function buildSetupRows(state: AppState): SettingRow[] {
-  return state.projects.map((project) => setupRow(project.id, project.name))
-}
-
 export const SETUP_SECTION: SettingSection = {
   id: 'setup',
   label: 'Setup',
-  rows: buildSetupRows,
+  rowCount: (projects) => projects.length,
+  rows: (projects: readonly ProjectRecord[]) =>
+    projects.map((project) => setupRow(project.id, project.name)),
 }

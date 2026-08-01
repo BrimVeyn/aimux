@@ -21,7 +21,7 @@ const FIRST_SECTION = SETTING_SECTIONS[0]
 const LAST_SECTION = SETTING_SECTIONS.at(-1)
 if (!FIRST_SECTION || !LAST_SECTION) throw new Error('the settings screen has no sections')
 
-const FIRST_ROW_COUNT = getSectionRows(FIRST_SECTION.id, STATE).length
+const FIRST_ROW_COUNT = getSectionRows(FIRST_SECTION.id, STATE.projects).length
 
 test('opening lands in the section list, at the top of it', () => {
   const state = open()
@@ -107,6 +107,27 @@ test('clicking a row selects it and takes the focus with it', () => {
 
   expect(state.settings.pane).toBe('rows')
   expect(state.settings.rowIndex).toBe(2)
+})
+
+test('the cursor is clamped in a section whose rows come from the projects', () => {
+  const NOW = '2026-08-01T00:00:00.000Z'
+  const withProjects: AppState = {
+    ...open(),
+    projects: [
+      { createdAt: NOW, id: 'p1', lastOpenedAt: NOW, name: 'one', updatedAt: NOW },
+      { createdAt: NOW, id: 'p2', lastOpenedAt: NOW, name: 'two', updatedAt: NOW },
+    ],
+    settings: { pane: 'rows', rowIndex: 0, sectionId: 'setup' },
+  }
+
+  let state = withProjects
+  for (let i = 0; i < 6; i++) {
+    state = appReducer(state, { delta: 1, type: 'settings-move-selection' })
+  }
+
+  // Two projects, two rows — and the count came from `rowCount`, so nothing was
+  // built and no script was read to work it out.
+  expect(state.settings.rowIndex).toBe(1)
 })
 
 test('clicking past the end of the list clamps instead of pointing at nothing', () => {
