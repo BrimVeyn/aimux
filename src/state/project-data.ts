@@ -55,17 +55,22 @@ const EMPTY_LINES: string[] = []
  */
 const setupLinesCache = new Map<string, { mtimeMs: number; lines: string[] }>()
 
+/** A line that does something, as opposed to a shebang, an option or a comment. */
+function isWorkLine(line: string): boolean {
+  const trimmed = line.trim()
+  return (
+    trimmed !== '' &&
+    !trimmed.startsWith('#') &&
+    !/^set\s+-[a-zA-Z]/.test(trimmed) &&
+    !/^set\s+-o\s/.test(trimmed)
+  )
+}
+
 function parseSetupScript(source: string): string[] {
   return source
     .split('\n')
+    .filter((line) => isWorkLine(line))
     .map((line) => line.trim())
-    .filter(
-      (line) =>
-        line !== '' &&
-        !line.startsWith('#') &&
-        !/^set\s+-[a-zA-Z]/.test(line) &&
-        !/^set\s+-o\s/.test(line)
-    )
 }
 
 /**
@@ -99,16 +104,37 @@ export function readSetupScriptLines(projectId: string): string[] {
 }
 
 /**
- * Replace the script with this one command, keeping the header that makes it a
- * bash script that stops on the first failure. Round-trips with
- * `readSetupScriptLines`.
+ * Put this one command in the script, replacing the work line that was there.
+ * Round-trips with `readSetupScriptLines`.
+ *
+ * Everything that is not that line survives: the shebang, the `set -e…`, and any
+ * comments. Rewriting the file from a fixed header was simpler and quietly threw
+ * away whatever the user had written around their one command — a field that
+ * deletes the notes next to what it edits is not an editor.
  */
 export function writeSetupCommand(projectId: string, command: string): void {
   mkdirSync(getProjectDataDir(projectId), { recursive: true })
   const path = getSetupScriptPath(projectId)
-  writeFileSync(path, `${SETUP_HEADER}${command.trim()}\n`)
+  writeFileSync(path, nextSetupSource(path, command.trim()))
   chmodSync(path, 0o755)
   // Not left to the mtime: a write and the read that follows it can land in the
   // same millisecond, and the cache would hand back what was there before.
   setupLinesCache.delete(path)
+}
+
+function nextSetupSource(path: string, command: string): string {
+  let existing: string
+  try {
+    existing = readFileSync(path, 'utf8')
+  } catch {
+    // No script yet (or none we can read): the template is all there is to keep.
+    return `${SETUP_HEADER}${command}\n`
+  }
+
+  const lines = existing.split('\n')
+  const first = lines.findIndex((line) => isWorkLine(line))
+  // Nothing to replace — the stub, or comments only. Append rather than drop them.
+  if (first === -1) return `${existing.replace(/\n*$/, '')}\n\n${command}\n`
+  lines[first] = command
+  return lines.join('\n')
 }

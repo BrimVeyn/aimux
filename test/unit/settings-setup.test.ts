@@ -160,6 +160,39 @@ test('writing to a project that has no data directory yet creates one', () => {
   expect(readSetupScriptLines('p3')).toEqual(['echo hi'])
 })
 
+test('rewriting the command keeps the comments around it', () => {
+  withProjects()
+  const path = getSetupScriptPath('p1')
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(
+    path,
+    '#!/usr/bin/env bash\nset -euo pipefail\n\n# needs the vault token in the env\nbun install\n'
+  )
+
+  writeSetupCommand('p1', 'bun install --frozen-lockfile')
+
+  const contents = readFileSync(path, 'utf8')
+  // The work line is replaced in place. Rewriting the file from a fixed header
+  // was simpler and threw this comment away without a word.
+  expect(contents).toContain('# needs the vault token in the env')
+  expect(contents).toContain('bun install --frozen-lockfile')
+  expect(readSetupScriptLines('p1')).toEqual(['bun install --frozen-lockfile'])
+})
+
+test('a command written into a script with no work line joins it', () => {
+  withProjects()
+  const path = getSetupScriptPath('p1')
+  mkdirSync(dirname(path), { recursive: true })
+  writeFileSync(path, '#!/usr/bin/env bash\nset -euo pipefail\n\n# nothing yet\n')
+
+  writeSetupCommand('p1', 'bun install')
+
+  // Appended, not substituted for the file: there is no line to replace, and the
+  // comments are still someone's.
+  expect(readFileSync(path, 'utf8')).toContain('# nothing yet')
+  expect(readSetupScriptLines('p1')).toEqual(['bun install'])
+})
+
 test('a write is visible to the next read, even one that had already read', () => {
   withProjects()
   writeSetupCommand('p4', 'echo first')
