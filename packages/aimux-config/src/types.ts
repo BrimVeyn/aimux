@@ -196,6 +196,8 @@ export interface TabSession {
   autoRenameStatus?: 'eligible' | 'attempted'
   /** Real PTY tab that no chrome enumerates. See `src/state/types.ts`. */
   hidden?: boolean
+  /** Who owns this tab, independent of visibility. See `src/state/types.ts`. */
+  role?: 'setup'
 }
 
 export interface SnippetRecord {

@@ -24,11 +24,20 @@ const BOOTSTRAP_ROWS = 24
 
 const STARTUP_GRACE_MS = 5_000
 
-export function findSetupTab(tabs: TabSession[], workspaceId: string): TabSession | undefined {
-  // ponytail: setup is the only producer of hidden tabs. If a second one
-  // appears, give TabSession a `role` discriminator rather than a second
-  // heuristic here.
-  return tabs.find((tab) => tab.hidden === true && tab.workspaceId === workspaceId)
+/**
+ * The setup tab the widget owns for this workspace. Hidden is part of the
+ * predicate: a promoted tab is a normal tab in the main pane, so the widget must
+ * stop rendering and sizing it — two hosts reporting a measurement for one PTY
+ * never settle on a size.
+ */
+export function findSetupTab(
+  tabs: TabSession[],
+  workspaceId: string | undefined
+): TabSession | undefined {
+  if (workspaceId == null || workspaceId === '') return undefined
+  return tabs.find(
+    (tab) => tab.role === 'setup' && tab.hidden === true && tab.workspaceId === workspaceId
+  )
 }
 
 /**
@@ -38,14 +47,18 @@ export function findSetupTab(tabs: TabSession[], workspaceId: string): TabSessio
  * The workspace record — not the tab — is what tells the widget a run finished,
  * so no new TabStatus is needed for "exited but still on screen".
  */
-export function recordSetupExitIfHidden(
+export function recordSetupExit(
   tabId: string,
   exitCode: number,
   dispatch: (action: AppAction) => void
 ): boolean {
   const { projects, tabs } = appStore.getState()
   const tab = tabs.find((entry) => entry.id === tabId)
-  if (tab?.hidden !== true) return false
+  if (tab?.role !== 'setup') return false
+  // A promoted tab stays open — that is the whole point of promoting one — but
+  // the run the widget owns is the one that gets to write the result, so a
+  // promoted tab dying after a re-run cannot overwrite the newer outcome.
+  if (tab.hidden !== true) return true
 
   const workspaceId = tab.workspaceId
   const project =
@@ -104,6 +117,7 @@ export function runSetup(ctx: SideEffectContext, projectId: string, workspace: W
     // space or an apostrophe.
     ...createTabSession('terminal', `bash ${shellQuote(scriptPath)}`, {}, workspace.id),
     hidden: true,
+    role: 'setup',
     title: 'Setup',
   }
 

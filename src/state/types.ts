@@ -221,6 +221,17 @@ export interface TabSession {
    * `filterTabsForActiveWorkspace` is the single guard the UI paths share.
    */
   hidden?: boolean
+  /**
+   * Who owns this tab. Separate from `hidden` on purpose: promoting a setup tab
+   * into the main pane clears `hidden` but must not turn it back into an
+   * ordinary tab, or the PTY exit would close it and take the failure output
+   * with it — which is the one thing the promotion exists to read.
+   *
+   * ponytail: not on the ipc wire nor in the snapshot, so a promoted setup tab
+   * comes back from a restart as a plain tab running `bash …/setup.sh`. Add it
+   * to `TabSessionSummary` if that ever matters.
+   */
+  role?: 'setup'
 }
 
 export type BarSide = 'left' | 'right'

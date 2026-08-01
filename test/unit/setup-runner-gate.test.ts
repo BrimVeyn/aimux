@@ -35,6 +35,7 @@ function setupTab(workspaceId: string): TabSession {
     command: 'bash',
     hidden: true,
     id: 'setup-tab',
+    role: 'setup',
     status: 'running',
     terminalModes: {
       alternateScrollMode: false,

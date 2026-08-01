@@ -20,7 +20,7 @@ import {
   handleDeleteProjectEffect,
   handleSwitchProjectEffect,
 } from './project-actions'
-import { recordSetupExitIfHidden } from './setup-actions'
+import { recordSetupExit } from './setup-actions'
 
 interface BindBackendRuntimeEventsOptions {
   backend: SessionBackend
@@ -77,11 +77,11 @@ export function bindBackendRuntimeEvents({
     logInputDebug('app.backend.event.exit', { exitCode, tabId })
     clearTabRuntimeState(timeouts, tabId)
     clearTabSyntaxState(tabId)
-    // A hidden tab is the setup runner's. Closing it would erase the output at
+    // A setup tab is never closed on exit. Closing it would erase the output at
     // the exact moment it matters — a failed setup is what the user needs to
     // read. Record the outcome and leave the dead tab holding its last frame;
     // a re-run, a workspace removal, or a project switch clears it.
-    if (recordSetupExitIfHidden(tabId, exitCode, dispatch)) return
+    if (recordSetupExit(tabId, exitCode, dispatch)) return
     dispatch({ tabId, type: 'close-tab' })
   }
 

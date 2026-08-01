@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import type { SideEffect } from '../../../input/modes/types'
 
 import { measureGlobal } from '../../../app-runtime/measure-ref'
+import { findSetupTab } from '../../../app-runtime/setup-actions'
 import { usePaneSizeReport } from '../../../app-runtime/use-pane-size-report'
 import { useAppStore } from '../../../state/app-store'
 import { runSideEffectGlobal } from '../../../state/dispatch-ref'
@@ -57,7 +58,7 @@ export const SetupWidget = memo(function SetupWidget() {
       ? projects.find((entry) => entry.id === currentProjectId)
       : undefined
   const workspace = getActiveWorkspace(project)
-  const setupTab = tabs.find((tab) => tab.hidden === true && tab.workspaceId === workspace?.id)
+  const setupTab = findSetupTab(tabs, workspace?.id)
 
   const [scriptExists, setScriptExists] = useState(false)
   useEffect(() => {
