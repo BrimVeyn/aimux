@@ -1,7 +1,6 @@
 import type { ModeId, SnippetVar } from '@brimveyn/aimux-config'
 import type { ThemedToken } from 'shiki'
 
-import type { WorkspaceTemplate } from '../config'
 import type { LayoutNode, SplitDirection } from './layout-tree'
 
 export type BuiltinAssistantId =
@@ -487,7 +486,6 @@ export interface ModalCreateProject extends ModalBase {
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
   activeField: 'prompt' | 'base'
-  step: 'form' | 'template'
   /**
    * "What do you want to work on?" — the only thing the user types. It is sent
    * to the assistant, and it names both the workspace and its branch.
@@ -695,8 +693,6 @@ export interface AppState {
   lastActiveTabByWorkspace: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
-  /** User-defined templates applied at workspace creation. Loaded from aimux.json. */
-  workspaceTemplates: WorkspaceTemplate[]
 }
 
 // -- Git panel payloads --

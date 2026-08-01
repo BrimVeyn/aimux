@@ -55,7 +55,6 @@ export type ModalAction =
   | { type: 'open-create-workspace-modal' }
   | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
-  | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-project-field' }

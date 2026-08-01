@@ -55,7 +55,6 @@ import {
   pasteSnippetToTab,
 } from './snippet-actions'
 import {
-  applyWorkspaceTemplate,
   confirmSplitSelection,
   createTabSession,
   executeSplitPane,
@@ -253,9 +252,8 @@ function startPendingWorkspaceLaunch(
 }
 
 /**
- * The `<C-p>` flow: create a workspace in the current project, then hand off.
- * A template already produces tabs, so it wins; otherwise we chain into the
- * new-tab modal rather than leaving the user in an empty workspace.
+ * The `<C-p>` flow: create a workspace in the current project, then chain into
+ * the new-tab modal rather than leaving the user in an empty workspace.
  */
 async function createWorkspaceFromModal(
   ctx: SideEffectContext,
@@ -263,7 +261,6 @@ async function createWorkspaceFromModal(
   params: {
     prompt: string
     baseRef?: string
-    templateId?: string
   }
 ): Promise<void> {
   // A name derived locally from the prompt, so the sidebar reads right from the
@@ -282,21 +279,7 @@ async function createWorkspaceFromModal(
   // the modal stays open showing the error.
   if (!workspace) return
 
-  const template =
-    params.templateId != null && params.templateId !== ''
-      ? ctx.state.workspaceTemplates.find((entry) => entry.id === params.templateId)
-      : undefined
-
   ctx.dispatch({ type: 'close-modal' })
-
-  if (template) {
-    // A template picks its own assistants, so there is nobody to hand the
-    // prompt to and no provider to name with: the local name is the final one.
-    applyWorkspaceTemplate(ctx, template, workspace.id, workspace.path)
-    ctx.dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
-    return
-  }
-
   ctx.dispatch({
     pendingWorkspace: { projectId, prompt: params.prompt, workspaceId: workspace.id },
     type: 'open-new-tab-modal',
@@ -392,26 +375,15 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'create-workspace': {
       if (state.modal.type !== 'create-workspace') return
-      // Templates get their own step: first Enter on the form advances to the
-      // picker, the second one (step 'template') actually creates.
-      if (state.modal.step === 'form' && state.workspaceTemplates.length > 0) {
-        dispatch({ step: 'template', type: 'set-create-workspace-step' })
-        return
-      }
       const projectId = state.currentProjectId
       if (!(projectId != null && projectId !== '')) return
       const { baseRef, prompt } = state.modal
-      const templateId =
-        state.modal.step === 'template'
-          ? state.workspaceTemplates[state.modal.selectedIndex]?.id
-          : undefined
       void (async () => {
         try {
           await enqueueGitOp(async () =>
             createWorkspaceFromModal(ctx, projectId, {
               baseRef: baseRef !== '' ? baseRef : undefined,
               prompt,
-              templateId,
             })
           )
         } catch (error) {

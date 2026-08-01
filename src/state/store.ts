@@ -1,4 +1,3 @@
-import type { WorkspaceTemplate } from '../config'
 import type { AppAction } from './actions'
 
 import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
@@ -30,7 +29,6 @@ export interface InitialStateOverrides {
   gitPane?: Partial<GitPaneState>
   bars?: BarsState
   projectBarVisible?: boolean
-  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -142,7 +140,6 @@ export function createInitialState(
     tabGroupMap: {},
     tabs: [],
     workspaceDivergence: {},
-    workspaceTemplates: overrides.workspaceTemplates ?? [],
   }
 }
 

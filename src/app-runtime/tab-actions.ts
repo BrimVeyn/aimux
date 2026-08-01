@@ -1,4 +1,3 @@
-import type { WorkspaceTemplate, WorkspaceTemplatePane } from '../config'
 import type { SessionBackend } from '../session-backend/types'
 import type { AppAction } from '../state/actions'
 import type { AssistantId, TabSession } from '../state/types'
@@ -23,7 +22,6 @@ import {
 } from '../state/layout-tree'
 import { getActiveWorkspace } from '../state/project-workspaces'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
-import { writeToTab } from './pty-write'
 import { getSelectedAssistantOption } from './selection'
 
 /**
@@ -31,89 +29,6 @@ import { getSelectedAssistantOption } from './selection'
  * tab stops being treated as "still starting up".
  */
 const STARTUP_GRACE_MS = 5_000
-
-/**
- * Delay before injecting a template pane's `send` payload into its PTY.
- * Short enough that shells (which print a prompt within ~100 ms) receive the
- * command after their prompt is drawn; long enough to clear most PTY init
- * races. Not tied to STARTUP_GRACE_MS because that is the assistant timeout,
- * not a readiness signal. See review note: a `tab.status === 'running'`
- * subscription would be more robust and is the planned follow-up.
- */
-const TEMPLATE_SEND_DELAY_MS = 600
-
-export function applyWorkspaceTemplate(
-  ctx: SideEffectContext,
-  template: WorkspaceTemplate,
-  workspaceId: string,
-  workspacePath: string
-): void {
-  let firstTabId: string | null = null
-
-  for (const templateTab of template.tabs) {
-    const localToTabId = new Map<string, string>()
-
-    for (let i = 0; i < templateTab.panes.length; i++) {
-      const pane = templateTab.panes[i]
-      if (!pane) continue
-      const tab = createPaneTab(ctx, pane, workspaceId)
-      localToTabId.set(pane.id, tab.id)
-
-      if (i === 0) {
-        if (firstTabId == null) firstTabId = tab.id
-        ctx.dispatch({ tab, type: 'add-tab' })
-        startTabSession(
-          ctx.backend,
-          ctx.dispatch,
-          ctx.clearStartupGrace,
-          (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
-          tab,
-          ctx.state.layout.terminalCols,
-          ctx.state.layout.terminalRows,
-          workspacePath
-        )
-      } else {
-        const splitFromId =
-          pane.splitFrom != null && pane.splitFrom !== ''
-            ? localToTabId.get(pane.splitFrom)
-            : undefined
-        const direction: SplitDirection = pane.direction ?? 'vertical'
-        if (splitFromId == null || splitFromId === '') {
-          logInputDebug('template.splitFrom.unresolved', {
-            paneId: pane.id,
-            splitFrom: pane.splitFrom ?? null,
-            templateId: template.id,
-          })
-          continue
-        }
-        splitFromTab(ctx, splitFromId, direction, tab, workspacePath)
-        if (pane.ratio != null) {
-          const sourceRatio = clampSplitRatio(1 - pane.ratio)
-          ctx.dispatch({
-            axis: direction,
-            ratio: sourceRatio,
-            tabId: tab.id,
-            type: 'set-split-ratio',
-          })
-        }
-      }
-
-      if (pane.send != null && pane.send !== '') {
-        const payload = `${pane.send}\n`
-        const targetTabId = tab.id
-        setTimeout(() => {
-          const latest = ctx.getState()
-          const latestTab = latest.tabs.find((entry) => entry.id === targetTabId)
-          writeToTab(ctx.backend, targetTabId, latestTab, payload)
-        }, TEMPLATE_SEND_DELAY_MS)
-      }
-    }
-  }
-
-  if (firstTabId != null) {
-    ctx.dispatch({ tabId: firstTabId, type: 'set-active-tab' })
-  }
-}
 
 export function confirmSplitSelection(ctx: SideEffectContext): void {
   const { dispatch, state } = ctx
@@ -262,53 +177,6 @@ export function launchAssistant(
     initialPromptArgs
   )
   return tab.id
-}
-
-export function createPaneTab(
-  ctx: SideEffectContext,
-  pane: WorkspaceTemplatePane,
-  workspaceId: string
-): TabSession {
-  // Accept `'shell'` as an alias for the registered `'terminal'` assistant so
-  // template examples using the more intuitive name don't silently fall back
-  // to Claude (createTabSession's unknown-id fallback resolves to index 0).
-  const assistantId = (pane.assistant === 'shell' ? 'terminal' : pane.assistant) as AssistantId
-  const customCommand = ctx.state.customCommands[assistantId]
-  return createTabSession(assistantId, customCommand, ctx.state.customCommands, workspaceId)
-}
-
-function splitFromTab(
-  ctx: SideEffectContext,
-  baseTabId: string,
-  direction: SplitDirection,
-  newTab: TabSession,
-  cwd?: string
-): void {
-  ctx.dispatch({ tabId: baseTabId, type: 'set-active-tab' })
-
-  const latest = ctx.getState()
-  const existingTree = getTreeForTab(latest.layoutTrees, latest.tabGroupMap, baseTabId)
-  const baseTree = existingTree ?? createLeaf(baseTabId)
-  const newTree = splitNode(baseTree, baseTabId, direction, newTab.id)
-  const bounds = createTerminalBounds(latest.layout.terminalCols, latest.layout.terminalRows)
-  const paneRect = computePaneRects(newTree, bounds).get(newTab.id)
-
-  ctx.dispatch({ direction, newTab, type: 'split-pane' })
-  startTabSession(
-    ctx.backend,
-    ctx.dispatch,
-    ctx.clearStartupGrace,
-    (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
-    newTab,
-    Math.max(1, (paneRect?.cols ?? latest.layout.terminalCols) - PANE_BORDER * 2),
-    Math.max(1, (paneRect?.rows ?? latest.layout.terminalRows) - PANE_BORDER * 2),
-    cwd
-  )
-}
-
-function clampSplitRatio(value: number): number {
-  if (!Number.isFinite(value)) return 0.5
-  return Math.min(0.85, Math.max(0.15, value))
 }
 
 export function getTabProjectPath(

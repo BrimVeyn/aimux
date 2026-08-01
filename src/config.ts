@@ -1,6 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-import type { SplitDirection } from './state/layout-tree'
 import type { GitFileListMode, ProjectSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
@@ -64,26 +63,6 @@ export interface PersistedBars {
   right: PersistedBar
 }
 
-export interface WorkspaceTemplatePane {
-  id: string
-  assistant: string
-  splitFrom?: string
-  direction?: SplitDirection
-  ratio?: number
-  send?: string
-}
-
-export interface WorkspaceTemplateTab {
-  panes: WorkspaceTemplatePane[]
-}
-
-export interface WorkspaceTemplate {
-  id: string
-  name: string
-  description?: string
-  tabs: WorkspaceTemplateTab[]
-}
-
 export interface AimuxConfig {
   version: 2
   customCommands: Record<string, string>
@@ -98,7 +77,6 @@ export interface AimuxConfig {
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
   prunedOrphanAimuxBranches?: boolean
-  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
@@ -219,77 +197,6 @@ export function deriveBarsFromLegacy(
   return { left, right }
 }
 
-function isRatioValid(value: unknown): boolean {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0.15 && value < 0.85
-}
-
-function isWorkspaceTemplateTab(value: unknown): value is WorkspaceTemplateTab {
-  if (typeof value !== 'object' || value === null) return false
-  const v = value as Record<string, unknown>
-  if (!Array.isArray(v.panes) || v.panes.length === 0) return false
-  const seenIds = new Set<string>()
-  for (let i = 0; i < v.panes.length; i++) {
-    const rawPane = v.panes[i]
-    if (typeof rawPane !== 'object' || rawPane === null) return false
-    const pane = rawPane as Record<string, unknown>
-    if (typeof pane.id !== 'string' || pane.id.length === 0) return false
-    if (seenIds.has(pane.id)) return false
-    seenIds.add(pane.id)
-    if (typeof pane.assistant !== 'string' || pane.assistant.length === 0) return false
-    if (i === 0) {
-      if (pane.splitFrom !== undefined) return false
-      if (pane.direction !== undefined) return false
-      if (pane.ratio !== undefined) return false
-    } else {
-      if (typeof pane.splitFrom !== 'string' || !seenIds.has(pane.splitFrom)) return false
-      if (pane.splitFrom === pane.id) return false
-      if (pane.direction !== 'horizontal' && pane.direction !== 'vertical') return false
-      if (pane.ratio !== undefined && !isRatioValid(pane.ratio)) return false
-    }
-    if (pane.send !== undefined && typeof pane.send !== 'string') return false
-  }
-  return true
-}
-
-export function isWorkspaceTemplate(value: unknown): value is WorkspaceTemplate {
-  if (typeof value !== 'object' || value === null) return false
-  const v = value as Record<string, unknown>
-  if (typeof v.id !== 'string' || v.id.length === 0) return false
-  if (typeof v.name !== 'string' || v.name.length === 0) return false
-  if (v.description !== undefined && typeof v.description !== 'string') return false
-  if (!Array.isArray(v.tabs) || v.tabs.length === 0) return false
-  for (const tab of v.tabs) {
-    if (!isWorkspaceTemplateTab(tab)) return false
-  }
-  return true
-}
-
-export function parseWorkspaceTemplates(
-  value: unknown,
-  issues: string[]
-): WorkspaceTemplate[] | undefined {
-  if (value === undefined) return undefined
-  if (!Array.isArray(value)) {
-    issues.push('ignored invalid workspaceTemplates (not an array)')
-    return undefined
-  }
-  const seen = new Set<string>()
-  const valid: WorkspaceTemplate[] = []
-  for (const entry of value) {
-    if (!isWorkspaceTemplate(entry)) {
-      issues.push('ignored invalid workspaceTemplate entry')
-      continue
-    }
-    if (seen.has(entry.id)) {
-      issues.push(`ignored duplicate workspaceTemplate id "${entry.id}"`)
-      continue
-    }
-    seen.add(entry.id)
-    valid.push(entry)
-  }
-  return valid.length > 0 ? valid : undefined
-}
-
 function isPersistedSidebar(value: unknown): value is PersistedSidebar {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
@@ -352,8 +259,8 @@ export function loadConfigResult(): ConfigLoadResult {
       projectSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
+      /** Removed; still detected so the doctor can say so. */
       workspaceTemplates?: unknown
-      /** ponytail: pre-rename spelling, honoured for one release. */
       worktreeTemplates?: unknown
     }
 
@@ -444,16 +351,12 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid skippedUpdateVersion')
     }
 
-    // `worktreeTemplates` was the pre-rename key. Accepting it for one release
-    // matters more than usual: an unknown key parses fine and the templates
-    // just silently vanish, with no error for the user to act on.
-    if (parsed.workspaceTemplates === undefined && parsed.worktreeTemplates !== undefined) {
-      issues.push('worktreeTemplates is deprecated — rename it to workspaceTemplates')
+    // Templates are gone, and an unknown key parses fine — so a config that
+    // still declares them would silently stop doing anything. The doctor is the
+    // only place that can say so.
+    if (parsed.workspaceTemplates !== undefined || parsed.worktreeTemplates !== undefined) {
+      issues.push('workspaceTemplates was removed — use a per-project setup script instead')
     }
-    const validWorkspaceTemplates = parseWorkspaceTemplates(
-      parsed.workspaceTemplates ?? parsed.worktreeTemplates,
-      issues
-    )
 
     if (issues.length > 0) {
       logDebug('config.load.validationIssue', { issues, path: configPath })
@@ -475,7 +378,6 @@ export function loadConfigResult(): ConfigLoadResult {
         themeMode: validThemeMode,
         themeTransparent: validThemeTransparent,
         version: 2,
-        workspaceTemplates: validWorkspaceTemplates,
       },
       issues,
       source: 'file',

@@ -52,7 +52,6 @@ test('open-create-workspace-modal opens on an empty prompt with no base resolved
   const s = open()
   if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s.focusMode).toBe('command-edit')
-  expect(s.modal.step).toBe('form')
   expect(s.modal.activeField).toBe('prompt')
   expect(s.modal.prompt).toBe('')
   // Left for the async default-branch lookup to fill; seeding the active
@@ -131,27 +130,4 @@ test('set-create-workspace-base-branches leaves a base the user already chose', 
   })
   if (s.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
   expect(s.modal.baseRef).toBe('develop')
-})
-
-test('set-create-workspace-step round-trips form <-> template and lands back on the prompt', () => {
-  const s1 = appReducer(type(open(), 'wt'), { step: 'template', type: 'set-create-workspace-step' })
-  if (s1.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s1.modal.step).toBe('template')
-  expect(s1.modal.selectedIndex).toBe(0)
-
-  const s2 = appReducer(s1, { step: 'form', type: 'set-create-workspace-step' })
-  if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s2.modal.step).toBe('form')
-  expect(s2.modal.activeField).toBe('prompt')
-  // The typed prompt survives the round trip — Esc from the template step must
-  // not discard the form.
-  expect(s2.modal.prompt).toBe('wt')
-  expect(s2.modal.cursorPos).toBe(2)
-})
-
-test('the template step swallows typed characters instead of editing a field', () => {
-  const s1 = appReducer(type(open(), 'wt'), { step: 'template', type: 'set-create-workspace-step' })
-  const s2 = type(s1, 'xyz')
-  if (s2.modal.type !== 'create-workspace') throw new Error('expected create-workspace modal')
-  expect(s2.modal.prompt).toBe('wt')
 })

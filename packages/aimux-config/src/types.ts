@@ -382,7 +382,6 @@ export interface ModalCreateProject extends ModalBase {
 export interface ModalCreateWorkspace extends ModalBase {
   type: 'create-workspace'
   activeField: 'prompt' | 'base'
-  step: 'form' | 'template'
   /** "What do you want to work on?" — names the workspace and its branch. */
   prompt: string
   branchError: string | null
@@ -567,7 +566,6 @@ export interface AppState {
   workspaceDivergence: Record<string, BranchDivergence>
   lastActiveTabByWorkspace: Record<string, string>
   pendingChords: string[] | null
-  workspaceTemplates: WorkspaceTemplate[]
 }
 
 // ─── AppAction union ──────────────────────────────────────────────────────────
@@ -595,7 +593,6 @@ export type ModalAction =
   | { type: 'open-create-workspace-modal' }
   | { type: 'set-create-workspace-base-branches'; branches: string[]; defaultBranch?: string }
   | { type: 'set-create-workspace-branch-error'; message: string | null }
-  | { type: 'set-create-workspace-step'; step: 'form' | 'template' }
   | { type: 'switch-create-workspace-field' }
   | { type: 'set-directory-results'; results: DirectoryResult[] }
   | { type: 'switch-create-project-field' }
@@ -744,26 +741,6 @@ export interface BranchDivergence {
   /** Lines changed since the fork point, working tree included. */
   added?: number
   removed?: number
-}
-
-export interface WorkspaceTemplatePane {
-  id: string
-  assistant: string
-  splitFrom?: string
-  direction?: SplitDirection
-  ratio?: number
-  send?: string
-}
-
-export interface WorkspaceTemplateTab {
-  panes: WorkspaceTemplatePane[]
-}
-
-export interface WorkspaceTemplate {
-  id: string
-  name: string
-  description?: string
-  tabs: WorkspaceTemplateTab[]
 }
 
 export type GitPanelAction =
@@ -1261,12 +1238,14 @@ export interface AimuxUserConfig {
   externalEditor?: ExternalEditorConfig
   integrations?: AimuxIntegrationsConfig
   /**
-   * Workspace templates: layouts (multi-pane + initial commands) applied at
-   * workspace creation. Selected from a picker in the new-tab modal.
+   * @deprecated Removed. Workspace provisioning is a per-project setup script
+   * now — see `docs/guide/workspaces.md#setup`. Declared here only so the strike
+   * -through shows up in your editor: an unknown key parses silently, so without
+   * it the setting would just vanish with no signal at all.
    */
-  workspaceTemplates?: WorkspaceTemplate[]
-  /** @deprecated renamed to `workspaceTemplates`. Still read in 0.9.0. */
-  worktreeTemplates?: WorkspaceTemplate[]
+  workspaceTemplates?: never
+  /** @deprecated Removed. See `workspaceTemplates`. */
+  worktreeTemplates?: never
 }
 
 // ─── Resolved config (internal) ───────────────────────────────────────────────
@@ -1332,5 +1311,4 @@ export interface ResolvedConfig {
   integrations: {
     claudeHooks: boolean
   }
-  workspaceTemplates: WorkspaceTemplate[]
 }

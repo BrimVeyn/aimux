@@ -132,10 +132,6 @@ export function App({
         bars: json.bars,
         gitPane: gitPaneOverrides,
         projectBarVisible,
-        workspaceTemplates:
-          resolvedConfig.workspaceTemplates.length > 0
-            ? resolvedConfig.workspaceTemplates
-            : json.workspaceTemplates,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
