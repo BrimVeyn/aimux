@@ -422,10 +422,15 @@ export function RootView({
   // mean maintaining the chrome three times.
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
   // A settings row's text field flips focusMode to command-edit, the same way the
-  // commit modal does in git mode — the screen behind it has to stay mounted.
-  // Every modal the settings screen opens says it will return there, which is
-  // also exactly the condition for keeping the screen drawn behind it.
-  const inSettings = focusMode === 'settings' || modal.returnTo === 'settings'
+  // commit modal does in git mode, so the screen behind it has to stay mounted:
+  // those two modals belong to the screen and are read against it.
+  //
+  // Not `returnTo === 'settings'`, which is where focus goes and not what is
+  // behind: the theme picker also returns here, and it previews each theme as you
+  // move. Previewing it on the settings screen is not the answer to "how does this
+  // theme look" — so it gets the panes, and closing still comes back here.
+  const inSettings =
+    focusMode === 'settings' || modal.type === 'setting-text' || modal.type === 'settings-search'
   let replacesPanes: ReactNode = null
   if (inGitMode) replacesPanes = <GitView themeId={themeId} />
   else if (inSettings) replacesPanes = <SettingsView />
