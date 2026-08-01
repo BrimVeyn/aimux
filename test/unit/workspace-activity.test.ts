@@ -102,12 +102,15 @@ describe('recordTabStatus', () => {
 })
 
 describe('recordTurnComplete', () => {
-  test('latches the workspace as finished-unseen', () => {
+  test('marks the workspace and the tab that rang', () => {
     const seen = collectDispatches()
     recordTabStatus('t1', 'working', 'w1')
     seen.length = 0
     recordTurnComplete('t1', 'w1')
-    expect(seen).toEqual([{ type: 'mark-workspace-done', workspaceId: 'w1' }])
+    expect(seen).toEqual([
+      { type: 'mark-workspace-done', workspaceId: 'w1' },
+      { tabId: 't1', type: 'mark-tab-unseen' },
+    ])
   })
 
   test('a turn we never saw start is ignored', () => {
@@ -130,7 +133,10 @@ describe('recordTurnComplete', () => {
     seen.length = 0
     recordTurnComplete('t1', 'w1')
     recordTurnComplete('t1', 'w1')
-    expect(seen).toEqual([{ type: 'mark-workspace-done', workspaceId: 'w1' }])
+    expect(seen).toEqual([
+      { type: 'mark-workspace-done', workspaceId: 'w1' },
+      { tabId: 't1', type: 'mark-tab-unseen' },
+    ])
   })
 
   test('the tab on screen neither ticks nor rings', () => {
@@ -240,10 +246,8 @@ describe('the workspaceActivity reducer', () => {
     expect(visited.workspaceActivity.w1?.done).toBe(false)
   })
 
-  test('opening one of its tabs clears the tick', () => {
-    // A background tab finishing in the workspace you are already in ticks the
-    // row you are looking at; switching to that tab has to be enough to clear it.
-    const base: AppState = {
+  function stateWithTab(): AppState {
+    return {
       ...stateWithWorkspace(),
       tabs: [
         {
@@ -258,7 +262,27 @@ describe('the workspaceActivity reducer', () => {
         },
       ],
     }
-    const done = reduce(base, { type: 'mark-workspace-done', workspaceId: 'w1' })
+  }
+
+  test('the tab that rang is marked, and opening it is what clears the mark', () => {
+    const base = stateWithTab()
+    const rang = reduce(base, { tabId: 't1', type: 'mark-tab-unseen' })
+    expect(rang.tabs[0]?.unseen).toBe(true)
+
+    const opened = reduce(rang, { tabId: 't1', type: 'set-active-tab' })
+    expect(opened.tabs[0]?.unseen).toBeUndefined()
+  })
+
+  test('a tab going back to work drops its mark on its own', () => {
+    const rang = reduce(stateWithTab(), { tabId: 't1', type: 'mark-tab-unseen' })
+    const busy = reduce(rang, { activity: 'working', tabId: 't1', type: 'set-tab-activity' })
+    expect(busy.tabs[0]?.unseen).toBeUndefined()
+  })
+
+  test('opening one of its tabs clears the tick', () => {
+    // A background tab finishing in the workspace you are already in ticks the
+    // row you are looking at; switching to that tab has to be enough to clear it.
+    const done = reduce(stateWithTab(), { type: 'mark-workspace-done', workspaceId: 'w1' })
     const opened = reduce(done, { tabId: 't1', type: 'set-active-tab' })
     expect(opened.workspaceActivity.w1?.done).toBe(false)
   })

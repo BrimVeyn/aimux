@@ -207,6 +207,8 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   workspaceId?: string
+  /** This tab finished a turn while you were elsewhere. See `src/state/types.ts`. */
+  unseen?: boolean
   autoRenameStatus?: 'eligible' | 'attempted'
   /** Real PTY tab that no chrome enumerates. See `src/state/types.ts`. */
   hidden?: boolean

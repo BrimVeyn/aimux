@@ -236,6 +236,14 @@ export interface TabSession {
   errorMessage?: string
   exitCode?: number
   workspaceId?: string
+  /**
+   * This tab is the one that rang: it finished a turn while you were looking
+   * elsewhere. Set alongside the workspace's own tick and cleared the moment
+   * the tab is opened or goes back to work, so the notification points at
+   * something rather than just happening. Ephemeral — never persisted, never
+   * on the wire.
+   */
+  unseen?: boolean
   /** Stable project-scoped name assigned by the headless worker facade. */
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'

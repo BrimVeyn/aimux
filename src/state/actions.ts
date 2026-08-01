@@ -120,6 +120,8 @@ export type ProjectAction =
   | { type: 'set-workspace-activity'; workspaceId: string; working: boolean; waiting: boolean }
   /** An assistant in this workspace finished a turn and nobody has looked yet. */
   | { type: 'mark-workspace-done'; workspaceId: string }
+  /** The tab that rang: it finished a turn while the user was elsewhere. */
+  | { type: 'mark-tab-unseen'; tabId: string }
   | {
       type: 'add-workspace-record'
       projectId: string

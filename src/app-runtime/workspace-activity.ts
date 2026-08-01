@@ -114,6 +114,9 @@ export function recordTurnComplete(tabId: string, workspaceId: string | undefine
   if (workspaceId != null && workspaceId !== '') {
     dispatchGlobal({ type: 'mark-workspace-done', workspaceId })
   }
+  // The workspace tick says where to look; this says which tab rang. A no-op
+  // for a tab this client doesn't hold — its workspace row is the answer there.
+  dispatchGlobal({ tabId, type: 'mark-tab-unseen' })
   playNotificationSound()
 }
 

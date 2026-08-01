@@ -175,6 +175,11 @@ assistants go back to work. The project heading shows the same glyphs for
 whatever its workspaces add up to. A sound plays on the first two — see
 **Settings → Notifications**, where `off` turns it off.
 
+The tab that rang carries its own `✓` in the tab bar, next to its name, so the
+sound points at one tab rather than just happening. It clears when you open
+that tab or when it goes back to work — unlike the plain `●`, which only says
+the session is alive and idle.
+
 The churn counts come from a fork point, which only aimux-created workspaces
 record — **root** and externally-discovered workspaces show none.
 

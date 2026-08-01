@@ -104,6 +104,18 @@ function ActivityGlyph({ tab }: { tab: TabSession }) {
     return <WaitingGlyph />
   }
 
+  // The tab that rang. Louder than the plain idle dot below on purpose: that
+  // one only says the session is alive, this one says something happened here
+  // and you haven't read it. Opening the tab clears it.
+  if (tab.unseen === true) {
+    return (
+      <text fg={t.warning} selectable={false}>
+        {' '}
+        ✓
+      </text>
+    )
+  }
+
   if (tab.activity === 'idle') {
     return (
       <text fg={t.success} selectable={false}>
