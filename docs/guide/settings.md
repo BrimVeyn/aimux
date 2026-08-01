@@ -50,7 +50,7 @@ than refused, and says so.
 
 `/` opens a list of every setting, filtered as you type — by label, by what it
 does, by the section it is in, or by the key it has in `aimux.json`. `Enter` takes
-the screen to it.
+the screen to it, and so does clicking one.
 
 `r` puts a setting back to what it would be if this screen had never touched it:
 its value in your config file if that file declares one, else the built-in

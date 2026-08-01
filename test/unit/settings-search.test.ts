@@ -70,3 +70,18 @@ test('rows built from the projects are searchable too', () => {
 
   expect(hits.map((hit) => hit.row.id)).toContain('setup.script.p1')
 })
+
+test('the mouse can move the selection through the results', () => {
+  const state = { ...createInitialState(), projects: PROJECTS }
+  const searching = appReducer(appReducer(state, { type: 'enter-settings' }), {
+    type: 'open-settings-search',
+  })
+
+  // What hovering a row dispatches. `set-modal-selection-index` used to consult a
+  // hand-kept list of modal types that this one was not on, so every result in
+  // this picker was unhoverable — and the click that follows acts on the
+  // selection, so the mouse did nothing at all here.
+  const hovered = appReducer(searching, { index: 3, type: 'set-modal-selection-index' })
+
+  expect(hovered.modal.selectedIndex).toBe(3)
+})

@@ -579,20 +579,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
     }
     case 'set-modal-selection-index': {
-      if (
-        state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'project-picker' &&
-        state.modal.type !== 'snippet-picker' &&
-        state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-project' &&
-        state.modal.type !== 'create-workspace' &&
-        state.modal.type !== 'split-picker' &&
-        state.modal.type !== 'update-available' &&
-        state.modal.type !== 'workspace-move' &&
-        state.modal.type !== 'help'
-      ) {
-        return state
-      }
+      // Which modals have an indexed list is `getModalOptionCount`'s question,
+      // and it answers 0 for the ones that don't. It used to be asked twice —
+      // here as a list of types to keep in step by hand, which the settings
+      // search promptly wasn't on, leaving its rows unhoverable.
       if (state.modal.type === 'create-workspace') {
         if (state.modal.activeField !== 'base') return state
         const options = getCreateWorkspaceBaseOptions(state)

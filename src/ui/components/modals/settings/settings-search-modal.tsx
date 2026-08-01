@@ -2,7 +2,7 @@ import { useCallback, useMemo } from 'react'
 
 import { filterSettingRows } from '../../../../settings/search'
 import { useAppStore } from '../../../../state/app-store'
-import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { RowValue } from '../../settings/row-value'
@@ -36,6 +36,9 @@ export function SettingsSearchModal({
       hits.map((hit) => ({
         group: hit.sectionLabel,
         key: hit.row.id,
+        // Acts on the selection, which the hover just set — the same two-step
+        // every other picker's rows use.
+        onClick: () => runSideEffectGlobal({ type: 'confirm-settings-search' }),
         subtitle:
           hit.row.description != null && hit.row.description !== '' ? (
             <text fg={t.textMuted}>{hit.row.description}</text>
