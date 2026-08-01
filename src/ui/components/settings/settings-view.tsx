@@ -13,6 +13,12 @@ import { ListItem } from '../primitives/list-item'
 import { SettingsRow } from './settings-row'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+/**
+ * Columns the settings themselves are allowed. Without a cap the value sits on
+ * the far edge of a wide terminal, a hundred columns from the label it belongs
+ * to, and the pair stops reading as a pair.
+ */
+const CONTENT_MAX_WIDTH = 72
 
 export const SettingsView = memo(function SettingsView() {
   const t = useTheme()
@@ -116,34 +122,36 @@ export const SettingsView = memo(function SettingsView() {
         flexGrow={1}
         backgroundColor={t.background}
       >
-        {sectionNote != null && sectionNote !== '' ? (
-          <box flexShrink={0} paddingLeft={1} paddingRight={1}>
-            <text fg={t.textMuted}>{sectionNote}</text>
-          </box>
-        ) : null}
-        <scrollbox
-          ref={scrollRef}
-          scrollY
-          flexGrow={1}
-          flexShrink={1}
-          contentOptions={COLUMN_CONTENT_OPTIONS}
-        >
-          {rows.length === 0 ? (
-            <box paddingLeft={1}>
-              <text fg={t.textMuted}>Nothing to configure here yet.</text>
+        <box flexDirection="column" flexGrow={1} flexShrink={1} maxWidth={CONTENT_MAX_WIDTH}>
+          {sectionNote != null && sectionNote !== '' ? (
+            <box flexShrink={0} paddingLeft={1} paddingRight={1}>
+              <text fg={t.textMuted}>{sectionNote}</text>
             </box>
-          ) : (
-            rows.map((row, index) => (
-              <SettingsRow
-                key={row.id}
-                row={row}
-                index={index}
-                active={settings.pane === 'rows' && index === settings.rowIndex}
-                onSelect={handleRowClick}
-              />
-            ))
-          )}
-        </scrollbox>
+          ) : null}
+          <scrollbox
+            ref={scrollRef}
+            scrollY
+            flexGrow={1}
+            flexShrink={1}
+            contentOptions={COLUMN_CONTENT_OPTIONS}
+          >
+            {rows.length === 0 ? (
+              <box paddingLeft={1}>
+                <text fg={t.textMuted}>Nothing to configure here yet.</text>
+              </box>
+            ) : (
+              rows.map((row, index) => (
+                <SettingsRow
+                  key={row.id}
+                  row={row}
+                  index={index}
+                  active={settings.pane === 'rows' && index === settings.rowIndex}
+                  onSelect={handleRowClick}
+                />
+              ))
+            )}
+          </scrollbox>
+        </box>
       </box>
     </box>
   )

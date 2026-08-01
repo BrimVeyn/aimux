@@ -7,6 +7,10 @@ import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { RowValue } from './row-value'
 
+/** Where the value comes from, on the left, out of the value column's way. */
+const CONFIG_FILE_MARK = '*'
+const TOUCHED_MARK = '~'
+
 /** True when changing this row writes a value the running app won't pick up. */
 function needsRestart(row: SettingRow): boolean {
   if (row.kind === 'info' || row.kind === 'action') return false
@@ -30,6 +34,11 @@ export const SettingsRow = memo(function SettingsRow({
   const fromConfigFile = useSettingsStore((s) => s.fromConfigFile.has(row.id))
   const touched = useSettingsStore((s) => s.touched.has(row.id))
   const editable = row.kind !== 'info'
+  // A blank when neither applies, never nothing: a marker that comes and goes
+  // would shift the label of every row it is missing from.
+  let mark = ' '
+  if (fromConfigFile) mark = CONFIG_FILE_MARK
+  else if (touched) mark = TOUCHED_MARK
 
   // Always, never only on the focused row: a row that grows a line when you land
   // on it shifts everything under it, so the list moves under the cursor the
@@ -46,16 +55,10 @@ export const SettingsRow = memo(function SettingsRow({
       active={active}
       index={index}
       onClickIndex={onSelect}
+      leading={<text fg={fromConfigFile ? t.warning : t.secondary}>{mark}</text>}
       title={<text fg={editable ? t.text : t.textMuted}>{row.label}</text>}
       subtitle={notes.length > 0 ? <text fg={t.textMuted}>{notes.join(' · ')}</text> : undefined}
-      trailing={
-        <box flexDirection="row">
-          {/* `*` the config file owns it, `•` this screen wrote it (r resets). */}
-          {fromConfigFile ? <text fg={t.warning}>* </text> : null}
-          {!fromConfigFile && touched ? <text fg={t.secondary}>• </text> : null}
-          <RowValue row={row} />
-        </box>
-      }
+      trailing={<RowValue row={row} />}
     />
   )
 })

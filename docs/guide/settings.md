@@ -54,10 +54,14 @@ the screen to it.
 
 `r` puts a setting back to what it would be if this screen had never touched it:
 its value in your config file if that file declares one, else the built-in
-default. A setting this screen has a value for is marked `•` — so `•` means "you
-set this, `r` undoes it" and `*` means "your config file owns this". Settings that
-are a view over something else (bar widths, the theme, the launch commands) have
-no `•` and nothing to reset: their value lives with the thing that owns it.
+default. The mark to the left of a label says where its value comes from — `~`
+means "you set this here, `r` undoes it", `*` means "your config file owns this".
+Settings that are a view over something else (bar widths, the theme, the launch
+commands) have neither mark and nothing to reset: their value lives with the thing
+that owns it.
+
+A toggle reads `●` when it is on and `○` when it is off, lit or muted to match.
+Both are one cell wide in a Latin-width terminal.
 
 ## Where a setting ends up
 

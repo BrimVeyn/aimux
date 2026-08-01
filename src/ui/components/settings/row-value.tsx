@@ -4,13 +4,17 @@ import type { SettingRow, SettingValue } from '../../../settings/types'
 
 import { readRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
-import { useTheme } from '../../theme'
+import { type ResolvedTuiTheme, useTheme } from '../../theme'
+
+/** Filled means on. Both are one cell wide in a Latin-width terminal. */
+const ON = '●'
+const OFF = '○'
 
 /** What a row shows on its right edge, per kind. */
 export function formatValue(row: SettingRow, value: SettingValue): string {
   switch (row.kind) {
     case 'toggle':
-      return value === true ? '[x]' : '[ ]'
+      return value === true ? ON : OFF
     case 'select': {
       const option = row.options.find((entry) => entry.value === value)
       return `${option?.label ?? String(value)} ›`
@@ -30,6 +34,13 @@ export function formatValue(row: SettingRow, value: SettingValue): string {
   }
 }
 
+function valueColor(row: SettingRow, value: SettingValue, t: ResolvedTuiTheme): string {
+  // A toggle is read at a glance or not at all, so its state is the colour as much
+  // as the glyph: lit when on, as quiet as the rest of the row when off.
+  if (row.kind === 'toggle') return value === true ? t.success : t.textMuted
+  return row.kind === 'info' ? t.textMuted : t.primary
+}
+
 /**
  * A row's current value, read by the row itself.
  *
@@ -42,5 +53,5 @@ export const RowValue = memo(function RowValue({ row }: { row: SettingRow }) {
   const t = useTheme()
   const values = useSettingsStore((s) => s.values)
   const value = useAppStore((s) => readRow(row, { state: s, values }))
-  return <text fg={row.kind === 'info' ? t.textMuted : t.primary}>{formatValue(row, value)}</text>
+  return <text fg={valueColor(row, value, t)}>{formatValue(row, value)}</text>
 })
