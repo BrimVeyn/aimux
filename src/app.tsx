@@ -38,7 +38,7 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
-import { useAIUsageConfig, useAutoCommitConfig } from './settings/live'
+import { useAIUsageConfig, useAutoCommitConfig, useHarmonizeClaudeTheme } from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -165,6 +165,9 @@ export function App({
   // the baseline each of these falls back to.
   const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
   const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
+  const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
+    resolvedConfig.theme?.beta?.harmonizeClaudeTheme
+  )
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
@@ -187,13 +190,13 @@ export function App({
   }, [])
 
   useEffect(() => {
-    if (!(resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true)) return
+    if (!harmonizeClaudeTheme) return
     ensureClaudeSettingsThemePref()
     syncClaudeTheme(getCurrentTheme(), getCurrentMode())
     return subscribeThemeChanges((resolved, mode) => {
       syncClaudeTheme(resolved, mode)
     })
-  }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
+  }, [harmonizeClaudeTheme])
 
   useEffect(() => {
     // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,

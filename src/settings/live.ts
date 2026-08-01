@@ -3,6 +3,7 @@ import type { AIUsageToolConfig, AutoCommitConfig } from '@brimveyn/aimux-config
 import { useMemo } from 'react'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
+import { HARMONIZE_CLAUDE_THEME } from './sections/integrations'
 import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 
@@ -39,4 +40,10 @@ export function useAIUsageConfig(fromConfigFile: AIUsageToolConfig | undefined):
     () => ({ ...fromConfigFile, enabled, pollSeconds }),
     [enabled, fromConfigFile, pollSeconds]
   )
+}
+
+/** Whether to keep Claude Code's theme in step with the active aimux theme. */
+export function useHarmonizeClaudeTheme(fromConfigFile: boolean | undefined): boolean {
+  const stored = useSettingsStore((s) => s.values[HARMONIZE_CLAUDE_THEME])
+  return typeof stored === 'boolean' ? stored : fromConfigFile === true
 }
