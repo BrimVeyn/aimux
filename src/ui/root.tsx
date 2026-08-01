@@ -15,6 +15,7 @@ import type {
 import type { ThemeId } from './themes'
 
 import { useWorkspaceBranchPolling } from '../git/workspace-branch-poller'
+import { useAutoCommitModel } from '../settings/live'
 import { useAppStore } from '../state/app-store'
 import { getBarWidth } from '../state/bars'
 import { getTreeForTab, PANE_BORDER, type SplitDirection } from '../state/layout-tree'
@@ -405,6 +406,9 @@ export function RootView({
   )
 
   const activeTab = tabs.find((tab) => tab.id === activeTabId)
+  // The generating overlay has always been able to name the model, and nothing
+  // ever passed it one.
+  const autoCommitModel = useAutoCommitModel(activeTab?.assistant)
   const activeTree =
     activeTabId != null && activeTabId !== ''
       ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
@@ -516,6 +520,7 @@ export function RootView({
       <ContextMenuOverlay />
       {renderModal(modal, {
         activeAssistant: activeTab?.assistant,
+        autoCommitModel,
         createProjectFields,
         currentProjectId,
         currentTabCount: tabs.length,

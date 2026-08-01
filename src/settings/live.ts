@@ -60,6 +60,20 @@ export function useAIUsageConfig(fromConfigFile: AIUsageToolConfig | undefined):
   )
 }
 
+/**
+ * The model that would write the commit message for this assistant, or undefined
+ * when nothing overrides the built-in default. The generating overlay names it, so
+ * an override set on the settings screen is visible where it applies.
+ */
+export function useAutoCommitModel(assistant: string | undefined): string | undefined {
+  const stored = useSettingsStore((s) =>
+    assistant == null || assistant === ''
+      ? undefined
+      : s.values[`${AUTO_COMMIT_MODEL_PREFIX}${assistant}`]
+  )
+  return typeof stored === 'string' && stored !== '' ? stored : undefined
+}
+
 /** Whether to keep Claude Code's theme in step with the active aimux theme. */
 export function useHarmonizeClaudeTheme(fromConfigFile: boolean | undefined): boolean {
   const stored = useSettingsStore((s) => s.values[HARMONIZE_CLAUDE_THEME])
