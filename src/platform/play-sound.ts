@@ -28,6 +28,13 @@ const SOUND_EXTENSIONS = new Set(['.wav', '.m4a', '.mp3', '.aiff', '.aif', '.ogg
 /** No more than one sound per window, however many tabs finish at once. */
 const THROTTLE_MS = 700
 
+/**
+ * Percent of the file's own level. These are notifications for someone sitting
+ * in front of the terminal, not an alarm across the room, and the shipped three
+ * are loud at their own scale — hence a default well under full.
+ */
+export const DEFAULT_VOLUME = 35
+
 /** Where a user drops their own sounds. Named in the settings row. */
 export function getCustomSoundsDir(): string {
   return join(getProfileConfigDir(), 'sounds')
@@ -81,10 +88,20 @@ export function resolveSoundPath(id: string): string | null {
 }
 
 /**
- * How to invoke one player on one file. `bin` is whichever player was found;
- * the caller does the looking, so this stays pure.
+ * How to invoke one player on one file, at `volume` percent. `bin` is whichever
+ * player was found; the caller does the looking, so this stays pure.
+ *
+ * Every player spells volume differently, and two of them cannot say it at all
+ * — `aplay` and PowerShell's `SoundPlayer` play at the system level whatever we
+ * ask, which the setting's description admits rather than pretending otherwise.
  */
-export function soundPlayerArgv(platform: string, bin: string, path: string): string[] {
+export function soundPlayerArgv(
+  platform: string,
+  bin: string,
+  path: string,
+  volume: number
+): string[] {
+  const percent = Math.min(100, Math.max(0, Math.round(volume)))
   if (platform === 'win32') {
     // The path is a filename the user chose. PowerShell escapes a quote inside
     // a single-quoted string by doubling it; without this a name containing one
@@ -98,8 +115,12 @@ export function soundPlayerArgv(platform: string, bin: string, path: string): st
       `(New-Object Media.SoundPlayer '${quoted}').PlaySync()`,
     ]
   }
-  if (bin.endsWith('ffplay')) return [bin, '-nodisp', '-autoexit', '-loglevel', 'quiet', path]
-  if (bin.endsWith('mpv')) return [bin, '--no-video', '--really-quiet', path]
+  if (bin.endsWith('afplay')) return [bin, '-v', String(percent / 100), path]
+  if (bin.endsWith('paplay')) return [bin, `--volume=${Math.round((percent / 100) * 65_536)}`, path]
+  if (bin.endsWith('ffplay')) {
+    return [bin, '-nodisp', '-autoexit', '-loglevel', 'quiet', '-volume', String(percent), path]
+  }
+  if (bin.endsWith('mpv')) return [bin, '--no-video', '--really-quiet', `--volume=${percent}`, path]
   return [bin, path]
 }
 
@@ -133,7 +154,10 @@ export function shouldPlayNow(now: number, previous: number): boolean {
  * Play a sound file. Returns whether a player was actually spawned, which is
  * what the settings screen's "Test sound" row reports.
  */
-export function playSoundFile(path: string, options?: { ignoreThrottle?: boolean }): boolean {
+export function playSoundFile(
+  path: string,
+  options?: { ignoreThrottle?: boolean; volume?: number }
+): boolean {
   const now = Date.now()
   const throttled = options?.ignoreThrottle !== true
   if (throttled && !shouldPlayNow(now, lastPlayedAt)) return false
@@ -143,7 +167,7 @@ export function playSoundFile(path: string, options?: { ignoreThrottle?: boolean
     logDebug('platform.playSound.noPlayer', { platform })
     return false
   }
-  const argv = soundPlayerArgv(platform, bin, path)
+  const argv = soundPlayerArgv(platform, bin, path, options?.volume ?? DEFAULT_VOLUME)
   try {
     Bun.spawn(argv, { stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
     // A test press does not start the window: it would swallow a real

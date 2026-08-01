@@ -24,18 +24,38 @@ describe('notification sound', () => {
   })
 
   test('each player gets the arguments it needs', () => {
-    expect(soundPlayerArgv('darwin', '/usr/bin/afplay', '/s.wav')).toEqual([
-      '/usr/bin/afplay',
-      '/s.wav',
-    ])
-    expect(soundPlayerArgv('linux', '/usr/bin/paplay', '/s.wav')).toEqual([
-      '/usr/bin/paplay',
-      '/s.wav',
-    ])
     // ffplay and mpv open a window and keep running without these.
-    expect(soundPlayerArgv('linux', '/usr/bin/ffplay', '/s.wav')).toContain('-autoexit')
-    expect(soundPlayerArgv('linux', '/usr/bin/mpv', '/s.wav')).toContain('--no-video')
-    expect(soundPlayerArgv('win32', 'powershell.exe', 'C:\\s.wav')).toContain('-NonInteractive')
+    expect(soundPlayerArgv('linux', '/usr/bin/ffplay', '/s.wav', 50)).toContain('-autoexit')
+    expect(soundPlayerArgv('linux', '/usr/bin/mpv', '/s.wav', 50)).toContain('--no-video')
+    expect(soundPlayerArgv('win32', 'powershell.exe', 'C:\\s.wav', 50)).toContain('-NonInteractive')
+    // No volume flag exists for aplay; it plays, quietly ignoring the setting.
+    expect(soundPlayerArgv('linux', '/usr/bin/aplay', '/s.wav', 50)).toEqual([
+      '/usr/bin/aplay',
+      '/s.wav',
+    ])
+  })
+
+  test('volume is spelled in each player own units', () => {
+    expect(soundPlayerArgv('darwin', '/usr/bin/afplay', '/s.wav', 35)).toEqual([
+      '/usr/bin/afplay',
+      '-v',
+      '0.35',
+      '/s.wav',
+    ])
+    expect(soundPlayerArgv('linux', '/usr/bin/paplay', '/s.wav', 50)).toEqual([
+      '/usr/bin/paplay',
+      '--volume=32768',
+      '/s.wav',
+    ])
+    expect(soundPlayerArgv('linux', '/usr/bin/ffplay', '/s.wav', 35)).toContain('35')
+    expect(soundPlayerArgv('linux', '/usr/bin/mpv', '/s.wav', 35)).toContain('--volume=35')
+  })
+
+  test('a volume outside the range is clamped, not passed on', () => {
+    // The row cannot produce these, a hand-edited aimux.json can — and
+    // `afplay -v 4` is four times as loud as the file, in the ear.
+    expect(soundPlayerArgv('darwin', 'afplay', '/s.wav', 400)).toContain('1')
+    expect(soundPlayerArgv('darwin', 'afplay', '/s.wav', -10)).toContain('0')
   })
 
   test('the throttle collapses a burst into one sound', () => {

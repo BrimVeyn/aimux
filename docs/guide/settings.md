@@ -100,9 +100,12 @@ in your editor shows its new state when you come back to it.
 
 The **Notifications** section has one **Sound**, played when an assistant asks
 you something and when one finishes a turn — never for the tab you are looking
-at. `off` is one of its values, so that row is also the off switch. **Test
-sound** plays whatever is selected, which is how you find out this machine has
-no audio player before a notification you cared about goes silent.
+at. `off` is one of its values, so that row is also the off switch. **Volume**
+is a percentage of the file's own level, defaulting well under full because
+this plays a foot from your ears; `aplay` and Windows ignore it and use the
+system volume. **Test sound** plays the current selection at the current
+volume, which is how you find out this machine has no audio player before a
+notification you cared about goes silent.
 
 Beside the three shipped sounds, the row lists every audio file in
 `~/.config/aimux/<profile>/sounds/` by its filename — drop yours in there and it

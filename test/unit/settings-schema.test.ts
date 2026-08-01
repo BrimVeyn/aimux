@@ -149,6 +149,7 @@ const FROZEN_ROW_IDS = [
   'multiRepo.maxDepth',
   'notifications.sound',
   'notifications.test',
+  'notifications.volume',
   'snippets.manage',
   'snippets.triggerChar',
   'statusBar.aiUsage.enabled',

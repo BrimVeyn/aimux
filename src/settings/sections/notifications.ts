@@ -2,6 +2,7 @@ import type { SettingOption, SettingSection } from '../types'
 
 import {
   BUILTIN_SOUND_IDS,
+  DEFAULT_VOLUME,
   getCustomSoundsDir,
   listCustomSoundIds,
   playSoundFile,
@@ -11,8 +12,9 @@ import {
 import { toast } from '../../state/toast-store'
 import { settingsStore } from '../settings-store'
 
-/** Spelled once, here, next to the row that owns it. */
+/** Spelled once, here, next to the rows that own them. */
 const NOTIFICATION_SOUND = 'notifications.sound'
+const NOTIFICATION_VOLUME = 'notifications.volume'
 
 /**
  * `off` plus the shipped three plus whatever is in the drop-in directory. Built
@@ -33,6 +35,11 @@ function selectedSoundId(): string {
   return typeof value === 'string' ? value : SOUND_OFF
 }
 
+function selectedVolume(): number {
+  const value = settingsStore.getState().values[NOTIFICATION_VOLUME]
+  return typeof value === 'number' ? value : DEFAULT_VOLUME
+}
+
 /**
  * Play the configured notification sound, if any. Silent — and cheap — when the
  * user has set the row to `off`, which is what makes it safe to call on every
@@ -41,7 +48,7 @@ function selectedSoundId(): string {
 export function playNotificationSound(options?: { ignoreThrottle?: boolean }): boolean {
   const path = resolveSoundPath(selectedSoundId())
   if (path == null) return false
-  return playSoundFile(path, options)
+  return playSoundFile(path, { ...options, volume: selectedVolume() })
 }
 
 export const NOTIFICATIONS_SECTION: SettingSection = {
@@ -56,6 +63,18 @@ export const NOTIFICATIONS_SECTION: SettingSection = {
       kind: 'select',
       label: 'Sound',
       options: SOUND_OPTIONS,
+      storage: 'settings',
+    },
+    {
+      description:
+        "Percent of the file's own level. Ignored by `aplay` and by Windows, which play at the system volume.",
+      fallback: DEFAULT_VOLUME,
+      id: NOTIFICATION_VOLUME,
+      kind: 'number',
+      label: 'Volume',
+      max: 100,
+      min: 0,
+      step: 5,
       storage: 'settings',
     },
     {
