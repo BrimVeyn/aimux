@@ -5,6 +5,7 @@ import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
+import { RowValue } from '../../settings/row-value'
 import { Picker, type PickerItem } from '../shared/picker'
 
 interface SettingsSearchModalProps {
@@ -14,8 +15,12 @@ interface SettingsSearchModalProps {
 }
 
 /**
- * Every setting in one list, grouped by section. The same filter the reducer
- * counts with, so the cursor and the list never disagree.
+ * Every setting in one list, grouped by section and laid out the way the screen
+ * lays them out — label and value on one line, what it does underneath. A result
+ * you cannot read the current value of is a result you have to go and check.
+ *
+ * The filter is the one `getModalOptionCount` counts with, so the list and the
+ * cursor moving through it never disagree.
  */
 export function SettingsSearchModal({
   cursorPos,
@@ -31,12 +36,12 @@ export function SettingsSearchModal({
       hits.map((hit) => ({
         group: hit.sectionLabel,
         key: hit.row.id,
-        title: <text wrapMode="none">{hit.row.label}</text>,
-        trailing: (
-          <text fg={t.textMuted} wrapMode="none">
-            {hit.row.description ?? ''}
-          </text>
-        ),
+        subtitle:
+          hit.row.description != null && hit.row.description !== '' ? (
+            <text fg={t.textMuted}>{hit.row.description}</text>
+          ) : undefined,
+        title: <text fg={t.text}>{hit.row.label}</text>,
+        trailing: <RowValue row={hit.row} />,
       })),
     [hits, t]
   )
@@ -50,7 +55,7 @@ export function SettingsSearchModal({
     <Picker
       title="Search settings"
       keybindsModeId="modal.settings-search.filtering"
-      width={uiTokens.modalWidth.lg}
+      width={uiTokens.modalWidth.xl}
       filter={filter}
       cursorPos={cursorPos}
       items={items}
