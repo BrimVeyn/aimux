@@ -1,5 +1,4 @@
-import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
-
+import { type MouseEvent as OtuiMouseEvent, TextAttributes } from '@opentui/core'
 import { memo, useCallback, useMemo } from 'react'
 
 import type { ProjectRecord, WorkspaceRecord } from '../../../../state/types'
@@ -11,7 +10,7 @@ import { formatDiffStat } from '../../../../state/project-workspaces'
 import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { useBaseTheme, useTheme } from '../../../theme'
-import { truncate } from '../../../truncate'
+import { truncate, truncateStart } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
@@ -114,21 +113,29 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   } else if (inCurrentGroup) {
     bgColor = base.backgroundPanel
   }
+  // The cursor: a full-height accent bar down the left of the row, both lines
+  // of it. The background alone is one step of grey and gets lost among rows
+  // that carry colour of their own; a bar the height of the row is found
+  // without reading anything.
+  const cursorGlyph = isActiveItem ? '▌' : ' '
 
   const { added, removed } = formatDiffStat(divergence)
   const statWidth = added.length + removed.length + (added !== '' && removed !== '' ? 1 : 0)
   const nameLabel = truncate(
     workspace.name,
-    Math.max(0, contentWidth - 3 - (statWidth > 0 ? statWidth + 1 : 0))
+    Math.max(0, contentWidth - 4 - (statWidth > 0 ? statWidth + 1 : 0))
   )
-  // Second line, indented under the name, and where the branch glyph lives —
-  // it labels the branch, not the workspace. Only workspaces that own a branch
-  // get one — an external checkout without one would otherwise be a row of a
+  // Second line, hanging under the name, and where the branch glyph lives — it
+  // labels the branch, not the workspace. Only workspaces that own a branch get
+  // one — an external checkout without one would otherwise be a row of a
   // different height for no information.
+  //
+  // Cut from the front: these are `owner/feat/what-it-does`, so the end is the
+  // part that tells two of them apart in a narrow bar.
   const branchLabel =
     workspace.branch == null || workspace.branch === ''
       ? null
-      : truncate(workspace.branch, Math.max(0, contentWidth - 6))
+      : truncateStart(workspace.branch, Math.max(0, contentWidth - 7))
 
   // Same vocabulary as the project heading one level up, in the same priority:
   // a question outranks work in progress, which outranks "it finished and you
@@ -152,18 +159,28 @@ export const WorkspaceRow = memo(function WorkspaceRow({
       id={`sidebar-wt-${workspace.id}`}
       flexDirection="column"
       flexShrink={0}
-      paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
     >
       <box flexDirection="row" alignItems="center">
+        <text fg={t.primary} selectable={false} wrapMode="none">
+          {cursorGlyph}
+        </text>
         <text fg={statusColor} selectable={false} wrapMode="none">
           {statusGlyph}{' '}
         </text>
         <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
-        <text fg={isActiveItem ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        {/* Full strength only under the cursor. Every name at full strength
+            reads as a wall of white; every name muted leaves the selected row
+            with nothing but a shade of grey to say so. */}
+        <text
+          fg={isActiveItem ? t.text : t.textMuted}
+          attributes={isActiveItem ? TextAttributes.BOLD : undefined}
+          selectable={false}
+          wrapMode="none"
+        >
           {nameLabel}
         </text>
         <box flexGrow={1} flexShrink={1} />
@@ -184,10 +201,15 @@ export const WorkspaceRow = memo(function WorkspaceRow({
         ) : null}
       </box>
       {branchLabel == null ? null : (
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {'  '}
-          {'\u{e702}'} {branchLabel}
-        </text>
+        <box flexDirection="row" alignItems="center">
+          <text fg={t.primary} selectable={false} wrapMode="none">
+            {cursorGlyph}
+          </text>
+          <text fg={t.textMuted} selectable={false} wrapMode="none">
+            {'   '}
+            {'\u{e702}'} {branchLabel}
+          </text>
+        </box>
       )}
     </ContextMenuBox>
   )

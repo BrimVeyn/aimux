@@ -317,14 +317,21 @@ const ProjectRow = memo(function ProjectRow({
   // Selection highlight must stay opaque in transparent mode — otherwise the
   // cursor row visually disappears against the see-through chrome.
   const base = useBaseTheme()
-  const showSpinner = status.working
-  const showWaiting = status.waiting
-  const spinner = useBusySpinner(showSpinner)
-  // A project is "finished, unseen" when any of its workspaces is. Derived
-  // rather than stored: the workspace rows own that latch.
-  const showDone = useAppStore((s) =>
-    (project.workspaces ?? []).some((workspace) => s.workspaceActivity[workspace.id]?.done === true)
+  // State belongs on the workspace rows: they say *which* one is working or
+  // waiting, and this heading can only say "somewhere below". So the heading
+  // speaks only when none of its workspaces can — a tab whose workspace this
+  // client doesn't know, which today means a daemon still running a pre-v18
+  // protocol. Without that fallback the sidebar would go silent instead of
+  // degrading.
+  const workspacesSpeak = useAppStore((s) =>
+    (project.workspaces ?? []).some((workspace) => {
+      const activity = s.workspaceActivity[workspace.id]
+      return activity !== undefined && (activity.working || activity.waiting || activity.done)
+    })
   )
+  const showSpinner = status.working && !workspacesSpeak
+  const showWaiting = status.waiting && !workspacesSpeak
+  const spinner = useBusySpinner(showSpinner)
   // Only the drag highlight is "selected"-strength here. A heading that lights
   // up like a cursor row is what made the project look like a workspace.
   let bgColor: string | undefined
@@ -401,9 +408,6 @@ const ProjectRow = memo(function ProjectRow({
   } else if (showSpinner) {
     leadingGlyph = spinner
     leadingColor = workingColor
-  } else if (showDone) {
-    leadingGlyph = '●'
-    leadingColor = t.success
   }
 
   // No branch line: the repo checkout is not somewhere aimux works, so naming

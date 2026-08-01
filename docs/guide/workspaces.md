@@ -171,9 +171,14 @@ doing, for every project rather than only the one you are in:
 | `●`     | an assistant finished a turn and you haven't looked yet |
 
 The `●` clears when you enter the workspace, open one of its tabs, or its
-assistants go back to work. The project heading shows the same glyphs for
-whatever its workspaces add up to. A sound plays on the first two — see
-**Settings → Notifications**, where `off` turns it off.
+assistants go back to work. A sound plays on the first two — see **Settings →
+Notifications**, where `off` turns it off.
+
+The project heading stays out of it: it could only ever say "somewhere below",
+and the rows underneath say which one. It falls back to `?` / spinner for its
+whole project in the one case where the rows cannot speak — a daemon still
+running a protocol older than the app, which does not send the tab's workspace.
+Restart it with `aimux restart-daemon`.
 
 The tab that rang carries the same `●` in the tab bar, next to its name, so the
 sound points at one tab rather than just happening; it clears when you open that
