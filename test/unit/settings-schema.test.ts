@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test'
 
-import { ALL_SETTING_ROWS, SETTING_SECTIONS } from '../../src/settings/sections'
+import { ALL_SETTING_ROWS, sectionRows, SETTING_SECTIONS } from '../../src/settings/sections'
 import { readRow } from '../../src/settings/settings-store'
 import { createInitialState } from '../../src/state/store'
+
+const STATE = createInitialState()
 
 /**
  * Adding a setting is one entry in one data file, which is the point — and it
@@ -18,15 +20,22 @@ test('every row id is unique', () => {
   expect(new Set(ids).size).toBe(ids.length)
 })
 
-test('every section has a label and at least one row', () => {
+test('every section has a label, and static ones have rows', () => {
   for (const section of SETTING_SECTIONS) {
     expect(section.label.length).toBeGreaterThan(0)
-    expect(section.rows.length).toBeGreaterThan(0)
+    // `section.rows.length` would be a function's arity for the dynamic ones —
+    // 1, always, which is how this assertion once passed without looking at a
+    // single row.
+    const rows = sectionRows(section, STATE)
+    expect(Array.isArray(rows), `${section.id} rows`).toBe(true)
+    if (Array.isArray(section.rows)) {
+      expect(rows.length, `${section.id} has no rows`).toBeGreaterThan(0)
+    }
   }
 })
 
 test('every row reads a value from a fresh state without throwing', () => {
-  const ctx = { state: createInitialState(), values: {} }
+  const ctx = { state: STATE, values: {} }
 
   for (const row of ALL_SETTING_ROWS) {
     // No try/catch: a row that throws here throws on the first paint of its

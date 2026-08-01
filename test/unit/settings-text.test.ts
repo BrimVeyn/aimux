@@ -18,7 +18,8 @@ const originalHome = process.env.HOME
 const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
-const ROW_INDEX = getSectionRows('commands').findIndex((row) => row.id === TRIGGER_ID)
+const STATE = createInitialState()
+const ROW_INDEX = getSectionRows('commands', STATE).findIndex((row) => row.id === TRIGGER_ID)
 if (ROW_INDEX === -1) throw new Error('expected a snippet trigger row in the commands section')
 
 /** A state parked on the snippet trigger row, with a redirected config file. */

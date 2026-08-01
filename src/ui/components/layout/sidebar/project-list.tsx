@@ -200,12 +200,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
         <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleNewProject}>
           +
         </text>
-        <text fg={t.textMuted} selectable={false} wrapMode="none">
-          {'  '}
-        </text>
-        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
-          {SETTINGS_GLYPH}
-        </text>
       </box>
       <scrollbox
         ref={scrollRef}
@@ -268,6 +262,16 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           return rows
         })()}
       </scrollbox>
+      <box flexShrink={0}>
+        <text fg={t.border} selectable={false} wrapMode="none">
+          {rule}
+        </text>
+      </box>
+      <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
+        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
+          {`${SETTINGS_GLYPH} Settings`}
+        </text>
+      </box>
     </box>
   )
 }

@@ -670,7 +670,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'configure-setup-script': {
-      handleConfigureSetupScriptEffect(ctx)
+      handleConfigureSetupScriptEffect(ctx, effect.projectId)
       return
     }
     case 'ask-agent-for-setup-script': {

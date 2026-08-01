@@ -9,6 +9,9 @@ import { loadConfig, saveConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 
 export interface SettingsState {
+  /** Bumped by every write. Rows whose value lives in a file have no other way
+   *  to tell the screen to look again. */
+  revision: number
   /** Effective value per row id, for the rows the settings screen owns. */
   values: StoredSettings
   /**
@@ -22,6 +25,7 @@ const EMPTY_FROM_CONFIG: ReadonlySet<string> = new Set()
 
 export const settingsStore = createStore<SettingsState>(() => ({
   fromConfigFile: EMPTY_FROM_CONFIG,
+  revision: 0,
   values: {},
 }))
 
@@ -44,7 +48,7 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
   const fromConfigFile = new Set<string>()
 
   for (const row of rows) {
-    if (row.kind === 'info' || row.storage !== 'settings') continue
+    if (row.kind === 'info' || row.kind === 'action' || row.storage !== 'settings') continue
     const declared = row.fromConfig?.(userConfig)
     if (declared !== undefined) fromConfigFile.add(row.id)
     const value = declared ?? stored[row.id] ?? row.fallback
@@ -55,7 +59,7 @@ export function hydrateSettings(rows: readonly SettingRow[], userConfig: AimuxUs
     row.apply?.(value)
   }
 
-  settingsStore.setState({ fromConfigFile, values })
+  settingsStore.setState((state) => ({ fromConfigFile, revision: state.revision + 1, values }))
 }
 
 /**
@@ -73,7 +77,7 @@ function persist(id: string, value: SettingValue): boolean {
 }
 
 export function readRow(row: SettingRow, ctx: SettingCtx): SettingValue {
-  if (row.kind === 'info') return row.value(ctx)
+  if (row.kind === 'info' || row.kind === 'action') return row.value(ctx)
   if (row.storage === 'app') return row.read(ctx)
   return ctx.values[row.id] ?? row.fallback
 }
@@ -85,13 +89,26 @@ export function readRow(row: SettingRow, ctx: SettingCtx): SettingValue {
  * holds would flip it the wrong way. One rule here beats a guard per row.
  */
 export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx): void {
-  if (row.kind === 'info') return
+  if (row.kind === 'info' || row.kind === 'action') return
   if (readRow(row, ctx) === value) return
   if (row.storage === 'app') {
     row.write(value, ctx)
+    bumpRevision()
     return
   }
   if (!persist(row.id, value)) return
-  settingsStore.setState((state) => ({ values: { ...state.values, [row.id]: value } }))
+  settingsStore.setState((state) => ({
+    revision: state.revision + 1,
+    values: { ...state.values, [row.id]: value },
+  }))
   row.apply?.(value)
+}
+
+/**
+ * Tells the screen that what it is showing may be out of date. Needed because a
+ * row's value can live outside both stores — the setup script is a file — and
+ * nothing else would make the list read it again.
+ */
+function bumpRevision(): void {
+  settingsStore.setState((state) => ({ revision: state.revision + 1 }))
 }

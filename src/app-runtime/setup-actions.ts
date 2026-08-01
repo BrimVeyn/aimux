@@ -6,8 +6,13 @@ import { logInputDebug } from '../debug/input-log'
 import { shellQuote } from '../pty/command-registry'
 import { appStore } from '../state/app-store'
 import { saveProjectCatalog } from '../state/project-catalog'
-import { ensureSetupScriptStub, getSetupScriptPath } from '../state/project-data'
-import { findWorkspace, getActiveWorkspace, getCurrentProject } from '../state/project-workspaces'
+import { ensureSetupScriptStub, getProjectDataDir, getSetupScriptPath } from '../state/project-data'
+import {
+  findWorkspace,
+  getActiveWorkspace,
+  getActiveWorkspacePath,
+  getCurrentProject,
+} from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
 import { launchEditorOnFile } from './editor-actions'
 import { createTabSession, startTabSession } from './tab-actions'
@@ -156,16 +161,32 @@ export function handleStopSetupEffect(ctx: SideEffectContext): void {
   ctx.dispatch({ tabId: tab.id, type: 'close-tab' })
 }
 
-export function handleConfigureSetupScriptEffect(ctx: SideEffectContext): void {
+/**
+ * `projectId` names a project other than the current one — the settings screen
+ * lists every project, and a script too long for one field hands over to here.
+ * Without it, the current project's active workspace is the target.
+ */
+export function handleConfigureSetupScriptEffect(ctx: SideEffectContext, projectId?: string): void {
+  const onError = (message: string) => toast.error(`editor: ${message}`)
+
+  if (projectId != null && projectId !== '') {
+    const project = ctx.getState().projects.find((entry) => entry.id === projectId)
+    if (!project) return
+    // The editor's working directory: this project's active workspace if it has
+    // one, else wherever the project itself lives, else the script's own home —
+    // a GUI editor ignores it, a TUI one needs somewhere to be.
+    const cwd =
+      getActiveWorkspacePath(project) ?? project.projectPath ?? getProjectDataDir(project.id)
+    launchEditorOnFile(ctx, ensureSetupScriptStub(project.id), cwd, onError)
+    return
+  }
+
   const target = resolveTarget(ctx)
   if (!target) {
     toast.error('Open a project first')
     return
   }
-  const path = ensureSetupScriptStub(target.project.id)
-  launchEditorOnFile(ctx, path, target.workspace.path, (message) =>
-    toast.error(`editor: ${message}`)
-  )
+  launchEditorOnFile(ctx, ensureSetupScriptStub(target.project.id), target.workspace.path, onError)
 }
 
 /**

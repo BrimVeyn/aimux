@@ -17,8 +17,11 @@ const originalHome = process.env.HOME
 const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
-const SEPARATOR_ROW = getSectionRows('statusBar').find((row) => row.id === SEPARATOR_ID)
-const SEPARATOR_INDEX = getSectionRows('statusBar').findIndex((row) => row.id === SEPARATOR_ID)
+const STATE = createInitialState()
+const SEPARATOR_ROW = getSectionRows('statusBar', STATE).find((row) => row.id === SEPARATOR_ID)
+const SEPARATOR_INDEX = getSectionRows('statusBar', STATE).findIndex(
+  (row) => row.id === SEPARATOR_ID
+)
 if (!SEPARATOR_ROW || SEPARATOR_ROW.kind !== 'select') {
   throw new Error('expected a select row for the status bar separator')
 }
@@ -92,7 +95,7 @@ test('nothing changes while the focus is on the section list', () => {
 })
 
 test('an info row is not a setting and is left alone', () => {
-  const rows = getSectionRows('about')
+  const rows = getSectionRows('about', STATE)
   const state = {
     ...onSeparatorRow(),
     settings: { pane: 'rows' as const, rowIndex: 0, sectionId: 'about' },

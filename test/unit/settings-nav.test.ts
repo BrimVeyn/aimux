@@ -16,11 +16,12 @@ function apply(state: AppState, ...actions: AppAction[]): AppState {
   return next
 }
 
+const STATE = createInitialState()
 const FIRST_SECTION = SETTING_SECTIONS[0]
 const LAST_SECTION = SETTING_SECTIONS.at(-1)
 if (!FIRST_SECTION || !LAST_SECTION) throw new Error('the settings screen has no sections')
 
-const FIRST_ROW_COUNT = getSectionRows(FIRST_SECTION.id).length
+const FIRST_ROW_COUNT = getSectionRows(FIRST_SECTION.id, STATE).length
 
 test('opening lands in the section list, at the top of it', () => {
   const state = open()

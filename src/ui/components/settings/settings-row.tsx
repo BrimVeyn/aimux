@@ -23,6 +23,7 @@ function formatValue(row: SettingRow, value: SettingValue): string {
       return text === '' ? (row.placeholder ?? 'not set') : text
     }
     case 'info':
+    case 'action':
       return String(value)
     default:
       row satisfies never
@@ -32,7 +33,8 @@ function formatValue(row: SettingRow, value: SettingValue): string {
 
 /** True when changing this row writes a value the running app won't pick up. */
 function needsRestart(row: SettingRow): boolean {
-  return row.kind !== 'info' && row.storage === 'settings' && row.restart === true
+  if (row.kind === 'info' || row.kind === 'action') return false
+  return row.storage === 'settings' && row.restart === true
 }
 
 interface SettingsRowProps {

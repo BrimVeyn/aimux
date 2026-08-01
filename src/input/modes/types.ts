@@ -112,7 +112,7 @@ export type SideEffect =
   | { type: 'open-selected-snippet-source-in-editor' }
   | { type: 'run-setup' }
   | { type: 'stop-setup' }
-  | { type: 'configure-setup-script' }
+  | { type: 'configure-setup-script'; projectId?: string }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
   /** Toggle a checkbox, cycle an enum, run a row's action — whatever the row is. */

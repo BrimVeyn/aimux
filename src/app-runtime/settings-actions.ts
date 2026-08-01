@@ -2,7 +2,7 @@ import type { SettingRow, SettingValue } from '../settings/types'
 import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
-import { ALL_SETTING_ROWS, getSectionRows } from '../settings/sections'
+import { findSettingRow, getSectionRows } from '../settings/sections'
 import { readRow, settingsStore, writeRow } from '../settings/settings-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 
@@ -56,7 +56,7 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
   const state = runtime.getState()
   if (state.focusMode !== 'settings' || state.settings.pane !== 'rows') return
 
-  const row = getSectionRows(state.settings.sectionId)[state.settings.rowIndex]
+  const row = getSectionRows(state.settings.sectionId, state)[state.settings.rowIndex]
   if (!row || row.kind === 'info') return
 
   const ctx = readCtx(state)
@@ -88,6 +88,10 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
         })
       }
       return
+    case 'action':
+      // Not a value, so a direction means nothing to it either.
+      if (delta === undefined) row.run()
+      return
     default:
       row satisfies never
   }
@@ -99,7 +103,10 @@ export function commitSettingText(
   settingId: string,
   value: string
 ): void {
-  const row = ALL_SETTING_ROWS.find((entry) => entry.id === settingId)
+  const state = runtime.getState()
+  // Dynamic rows included: a per-project setup command is a text row that exists
+  // only while its project does.
+  const row = findSettingRow(settingId, state)
   if (!row || row.kind !== 'text') return
-  writeRow(row, value.trim(), readCtx(runtime.getState()))
+  writeRow(row, value.trim(), readCtx(state))
 }

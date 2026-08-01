@@ -75,9 +75,18 @@ export type SettingRow =
   | (SettingRowBase & SettingKind & StoredRow)
   | (SettingRowBase & SettingKind & DerivedRow)
   | (SettingRowBase & { kind: 'info'; value: (ctx: SettingCtx) => string })
+  /**
+   * Not a setting: a button. For the things a row cannot hold — a multi-line
+   * script, a list — where the honest move is to hand over to whatever can.
+   */
+  | (SettingRowBase & { kind: 'action'; value: (ctx: SettingCtx) => string; run: () => void })
 
 export interface SettingSection {
   id: string
   label: string
-  rows: SettingRow[]
+  /**
+   * A function when the rows depend on state — one row per project, say. It is
+   * called during render and while handling a key, so it must stay cheap.
+   */
+  rows: SettingRow[] | ((state: AppState) => SettingRow[])
 }

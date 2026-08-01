@@ -5,9 +5,9 @@ description: The in-app settings screen — how to open it, how to move around i
 
 # Settings
 
-`<Leader>,` opens the settings screen — or the `⚙` in the header of the Projects
-list, next to the `+`. It replaces the whole centre of the window, the way git
-mode does: the tab bar and the status bar stay where they are, and `Esc` (or the
+`<Leader>,` opens the settings screen — or the `⚙ Settings` button at the bottom
+of the Projects list. It replaces the whole centre of the window, the way git mode
+does: the tab bar and the status bar stay where they are, and `Esc` (or the
 `Close` button) puts you back where you were.
 
 Nothing here needs `aimux.config.ts`. That file still works, still wins, and is
@@ -48,6 +48,24 @@ Two files, and which one gets written depends on the setting:
 - Some are a view over a value the app already owns and persists elsewhere — bar
   widths, the theme mode, the launch command per assistant. Changing one of those
   from this screen is exactly the same as changing it with its keybinding.
+
+## Setup scripts
+
+The **Setup** section has one row per project, over that project's setup script
+(`~/.config/aimux/<profile>/projects/<id>/setup.sh`, the script that runs once in
+each new workspace — see [`workspaces.md`](workspaces.md#setup-script)).
+
+Most setup is one command, so most rows are a text field: type
+`bun install && cp .env.example .env` and the script is written for you, with the
+shebang and `set -euo pipefail` on top and the executable bit set.
+
+A script whose work runs to more than one line is shown but not editable — it
+reads `3 lines ›`, and activating it opens your editor. A one-line field cannot
+hold a real script, and offering to edit one would mean truncating it the moment
+you confirm.
+
+The row re-reads the file as you move around the screen, so a script you changed
+in your editor shows its new state when you come back to it.
 
 ## When `aimux.config.ts` also sets it
 

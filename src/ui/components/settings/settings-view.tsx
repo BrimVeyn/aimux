@@ -1,9 +1,10 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
-import { memo, useCallback, useRef } from 'react'
+import { memo, useCallback, useMemo, useRef } from 'react'
 
 import { getSectionRows, SETTING_SECTIONS } from '../../../settings/sections'
-import { useAppStore } from '../../../state/app-store'
+import { useSettingsStore } from '../../../settings/settings-store'
+import { appStore, useAppStore } from '../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { useTheme } from '../../theme'
@@ -18,7 +19,20 @@ export const SettingsView = memo(function SettingsView() {
   // The cursor is all this component needs from the app state. Rows read their
   // own values, so nothing here re-renders at the rate the terminals print.
   const settings = useAppStore((s) => s.settings)
-  const rows = getSectionRows(settings.sectionId)
+  // Which rows exist can depend on state — Setup has one per project — and the
+  // Setup rows read their value from a file when they are built. So the list is
+  // rebuilt when the cursor moves, when the projects change, and after any write
+  // (that is what `revision` is for), and not on every render: a rebuild reads
+  // files, and this component would otherwise do it at the rate the store changes.
+  const projectIds = useAppStore((s) => s.projects.map((project) => project.id).join(','))
+  const revision = useSettingsStore((s) => s.revision)
+  const rows = useMemo(
+    () => getSectionRows(settings.sectionId, appStore.getState()),
+    // Invalidation keys rather than inputs: the builder reads the store and, for
+    // Setup, the file system. These are what say the answer may have changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [settings, projectIds, revision]
+  )
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 
   useScrollActiveIntoView({

@@ -109,6 +109,12 @@ hand from the widget.
 Write it so it can be run twice in a row, and so it never blocks on a human. A
 non-zero exit is reported as a toast and recorded on the workspace.
 
+Two ways to write one. The **Setup** section of the settings screen
+(`<Leader>,`) lists every project and lets you type the command straight in,
+which is enough when setup is one command; a script that grows past that opens in
+your editor. From the widget below, **Create**/**Edit** always goes to the editor,
+and **Agent** hands the job to an assistant.
+
 ### The setup widget
 
 The **Setup** widget is where the script lives in the UI. It ships hidden —
