@@ -22,8 +22,6 @@ import { createTabSession, startTabSession } from './tab-actions'
 const BOOTSTRAP_COLS = 80
 const BOOTSTRAP_ROWS = 24
 
-const STARTUP_GRACE_MS = 5_000
-
 /**
  * The setup tab the widget owns for this workspace. Hidden is part of the
  * predicate: a promoted tab is a normal tab in the main pane, so the widget must
@@ -128,17 +126,12 @@ export function runSetup(ctx: SideEffectContext, projectId: string, workspace: W
     workspaceId: workspace.id,
   })
   ctx.dispatch({ tab, type: 'add-tab' })
-  startTabSession(
-    ctx.backend,
-    ctx.dispatch,
-    ctx.clearStartupGrace,
-    (tabId) => ctx.startStartupGrace(tabId, STARTUP_GRACE_MS),
-    tab,
-    BOOTSTRAP_COLS,
-    BOOTSTRAP_ROWS,
-    workspace.path,
-    false
-  )
+  startTabSession(ctx, tab, {
+    autoRenameCandidate: false,
+    cols: BOOTSTRAP_COLS,
+    cwd: workspace.path,
+    rows: BOOTSTRAP_ROWS,
+  })
   // Lifts the render gate immediately — see BOOTSTRAP_COLS.
   ctx.backend.resizeTab(tab.id, BOOTSTRAP_COLS, BOOTSTRAP_ROWS, {
     confirmedFromMeasurement: true,

@@ -1,5 +1,3 @@
-import type { SessionBackend } from '../session-backend/types'
-import type { AppAction } from '../state/actions'
 import type { AssistantId, TabSession } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
@@ -76,16 +74,18 @@ export function createTabSession(
   }
 }
 
-export function startTabSession(
-  backend: SessionBackend,
-  dispatch: (action: AppAction) => void,
-  clearStartupGrace: (tabId: string) => void,
-  startStartupGrace: (tabId: string) => void,
-  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'workspaceId'>,
-  cols: number,
-  rows: number,
-  cwd?: string,
-  autoRenameCandidate = true,
+/** Everything `startTabSession` needs from the side-effect context. */
+type StartTabSessionContext = Pick<
+  SideEffectContext,
+  'backend' | 'clearStartupGrace' | 'dispatch' | 'startStartupGrace'
+>
+
+export interface StartTabSessionOptions {
+  cols: number
+  rows: number
+  cwd?: string
+  /** Default true: only a tab the user did not just ask for opts out. */
+  autoRenameCandidate?: boolean
   /**
    * Appended after the command's own args. Kept out of `tab.command` on purpose:
    * an initial prompt is up to a few thousand characters, and `command` is what
@@ -93,7 +93,14 @@ export function startTabSession(
    * round-trips.
    */
   extraArgs?: string[]
+}
+
+export function startTabSession(
+  ctx: StartTabSessionContext,
+  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'workspaceId'>,
+  { autoRenameCandidate = true, cols, cwd, extraArgs, rows }: StartTabSessionOptions
 ): void {
+  const { backend, clearStartupGrace, dispatch } = ctx
   logInputDebug('app.tab.start.request', {
     cols,
     command: tab.command,
@@ -103,7 +110,7 @@ export function startTabSession(
     title: tab.title,
     workspaceId: tab.workspaceId ?? null,
   })
-  startStartupGrace(tab.id)
+  ctx.startStartupGrace(tab.id, STARTUP_GRACE_MS)
 
   const { args, executable } = parseCommand(tab.command)
 
@@ -144,7 +151,7 @@ export function launchAssistant(
   workspaceId?: string,
   initialPromptArgs?: string[]
 ): string {
-  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
+  const { dispatch, state } = ctx
   const customCommand = state.customCommands[assistant]
   const tab = createTabSession(
     assistant,
@@ -164,18 +171,12 @@ export function launchAssistant(
   })
   dispatch({ tab, type: 'add-tab' })
   dispatch({ focusMode: 'terminal-input', type: 'set-focus-mode' })
-  startTabSession(
-    backend,
-    dispatch,
-    clearStartupGrace,
-    (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-    tab,
-    state.layout.terminalCols,
-    state.layout.terminalRows,
-    getTabProjectPath(ctx, tab),
-    true,
-    initialPromptArgs
-  )
+  startTabSession(ctx, tab, {
+    cols: state.layout.terminalCols,
+    cwd: getTabProjectPath(ctx, tab),
+    extraArgs: initialPromptArgs,
+    rows: state.layout.terminalRows,
+  })
   return tab.id
 }
 
@@ -195,18 +196,12 @@ export function getTabProjectPath(
 }
 
 export function startExistingTab(ctx: SideEffectContext, tab: TabSession): void {
-  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
-  startTabSession(
-    backend,
-    dispatch,
-    clearStartupGrace,
-    (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-    tab,
-    state.layout.terminalCols,
-    state.layout.terminalRows,
-    getTabProjectPath(ctx, tab),
-    false
-  )
+  startTabSession(ctx, tab, {
+    autoRenameCandidate: false,
+    cols: ctx.state.layout.terminalCols,
+    cwd: getTabProjectPath(ctx, tab),
+    rows: ctx.state.layout.terminalRows,
+  })
 }
 
 export function executeSplitPane(
@@ -214,7 +209,7 @@ export function executeSplitPane(
   direction: SplitDirection,
   tab: TabSession
 ): void {
-  const { backend, clearStartupGrace, dispatch, startStartupGrace, state } = ctx
+  const { dispatch, state } = ctx
   const activeTabId = state.activeTabId
   if (!(activeTabId != null && activeTabId !== '')) {
     return
@@ -227,14 +222,9 @@ export function executeSplitPane(
   const paneRect = computePaneRects(newTree, bounds).get(tab.id)
 
   dispatch({ direction, newTab: tab, type: 'split-pane' })
-  startTabSession(
-    backend,
-    dispatch,
-    clearStartupGrace,
-    (tabId) => startStartupGrace(tabId, STARTUP_GRACE_MS),
-    tab,
-    Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
-    Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
-    getTabProjectPath(ctx, tab)
-  )
+  startTabSession(ctx, tab, {
+    cols: Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
+    cwd: getTabProjectPath(ctx, tab),
+    rows: Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
+  })
 }
