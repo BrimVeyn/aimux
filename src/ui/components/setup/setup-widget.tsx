@@ -51,11 +51,15 @@ export const SetupWidget = memo(function SetupWidget() {
   const t = useTheme()
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const projects = useAppStore((s) => s.projects)
-  const tabs = useAppStore((s) => s.tabs)
 
   const project = getCurrentProject({ currentProjectId, projects })
   const workspace = getActiveWorkspace(project)
-  const setupTab = findSetupTab(tabs, workspace?.id)
+
+  // Selecting the tab rather than the whole `tabs` array: that array gets a new
+  // identity on every viewport frame of every terminal, so subscribing to it
+  // re-renders this widget at the rate the other PTYs print. The found tab keeps
+  // its identity until it changes, which is exactly when a redraw is due.
+  const setupTab = useAppStore((s) => findSetupTab(s.tabs, workspace?.id))
 
   const [scriptExists, setScriptExists] = useState(false)
   useEffect(() => {
