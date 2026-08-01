@@ -14,7 +14,7 @@ export const tabClose: CliCommand = {
       throw new Error('tabId is required')
     }
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
 
     if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
@@ -22,12 +22,12 @@ export const tabClose: CliCommand = {
         'daemon predates thinAttach capability — restart aimux to pick up the new daemon'
       )
     }
-    await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
     await daemon.expectOk('closeTab', { tabId })
 
     writeJson({ ok: true })
     return EXIT_OK
   },
-  summary: 'Close a tab in the workspace',
+  summary: 'Close a tab in the project',
   verb: 'close',
 }

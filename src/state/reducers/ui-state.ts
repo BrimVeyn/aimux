@@ -1,4 +1,5 @@
-import type { AppAction, AppState, BarSide, BarState, BarWidget } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState, BarSide, BarState, BarWidget } from '../types'
 
 import {
   boundaryDeltaFromRatio,
@@ -99,10 +100,10 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
         return state
       }
       return { ...state, pendingChords: action.chords }
-    case 'toggle-session-bar':
+    case 'toggle-project-bar':
       return {
         ...state,
-        sessionBar: { ...state.sessionBar, visible: !state.sessionBar.visible },
+        projectBar: { ...state.projectBar, visible: !state.projectBar.visible },
       }
     default:
       return null

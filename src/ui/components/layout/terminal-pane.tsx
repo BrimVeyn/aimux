@@ -48,15 +48,15 @@ function getTitle(
   tab: TabSession | undefined,
   isActive: boolean,
   focusMode: TerminalPaneProps['focusMode'],
-  emptyContext: { workspaceName: string; worktreeName: string }
+  emptyContext: { projectName: string; workspaceName: string }
 ): string {
   if (!tab) {
-    const { workspaceName, worktreeName } = emptyContext
-    if (workspaceName === '' && worktreeName === '') return 'No active workspace'
-    if (worktreeName === '' || worktreeName === workspaceName) {
-      return `${workspaceName} · no tabs`
+    const { projectName, workspaceName } = emptyContext
+    if (projectName === '' && workspaceName === '') return 'No active project'
+    if (workspaceName === '' || workspaceName === projectName) {
+      return `${projectName} · no tabs`
     }
-    return `${workspaceName} / ${worktreeName} · no tabs`
+    return `${projectName} / ${workspaceName} · no tabs`
   }
 
   if (isActive && focusMode === 'terminal-input') {
@@ -179,7 +179,7 @@ function useHardwareCursor(
     // Cursor state only reaches the terminal with the next rendered frame
     // (same reason opentui's editor calls requestRender() in focus/blur).
     // Without it, a hide issued while the UI is static — e.g. switching to
-    // a workspace with no live PTY — never flushes and the host cursor
+    // a project with no live PTY — never flushes and the host cursor
     // stays stranded at its old position.
     renderer.requestRender()
     // React runs all cleanups in a commit before all effects, so when focus
@@ -239,7 +239,7 @@ const TerminalViewport = memo(function TerminalViewport({
 
   return (
     <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
-      {buffer.length > 0 ? buffer : 'Waiting for workspace output...'}
+      {buffer.length > 0 ? buffer : 'Waiting for project output...'}
     </text>
   )
 })
@@ -279,24 +279,24 @@ export function TerminalPane({
     paneIsActive && focusMode === 'terminal-input' && tab?.status === 'running'
   )
   // These are only used when this pane is rendered without a tab (the
-  // top-level pane on a worktree with zero tabs). Selectors return plain
+  // top-level pane on a workspace with zero tabs). Selectors return plain
   // strings so re-renders are cheap and bounded to actual name changes.
-  const emptyWorkspaceName = useAppStore((s) => {
-    const id = s.currentSessionId
+  const emptyProjectName = useAppStore((s) => {
+    const id = s.currentProjectId
     if (id == null || id === '') return ''
-    return s.sessions.find((sess) => sess.id === id)?.name ?? ''
+    return s.projects.find((sess) => sess.id === id)?.name ?? ''
   })
-  const emptyWorktreeName = useAppStore((s) => {
-    const id = s.currentSessionId
+  const emptyWorkspaceName = useAppStore((s) => {
+    const id = s.currentProjectId
     if (id == null || id === '') return ''
-    const session = s.sessions.find((sess) => sess.id === id)
-    if (!session) return ''
+    const project = s.projects.find((sess) => sess.id === id)
+    if (!project) return ''
     const activeId =
-      session.activeWorktreeId != null && session.activeWorktreeId !== ''
-        ? session.activeWorktreeId
-        : session.worktrees?.[0]?.id
+      project.activeWorkspaceId != null && project.activeWorkspaceId !== ''
+        ? project.activeWorkspaceId
+        : project.workspaces?.[0]?.id
     if (activeId == null || activeId === '') return ''
-    return session.worktrees?.find((w) => w.id === activeId)?.name ?? ''
+    return project.workspaces?.find((w) => w.id === activeId)?.name ?? ''
   })
   const canForwardMouse = focusMode === 'terminal-input' && !!tab && mouseForwardingEnabled
   const canUseLocalScrollback = focusMode === 'terminal-input' && !!tab && localScrollbackEnabled
@@ -510,7 +510,9 @@ export function TerminalPane({
   )
   const handleNoTabMouseDown = useCallback((event: OtuiMouseEvent) => {
     event.stopPropagation()
-    dispatchGlobal({ type: 'open-new-tab-modal' })
+    // Opens the picker, or the create-workspace modal when there is no
+    // workspace to put a tab in — the effect owns that rule.
+    runSideEffectGlobal({ type: 'open-new-tab' })
   }, [])
   const handleContentMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
@@ -525,8 +527,8 @@ export function TerminalPane({
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
         title={getTitle(tab, paneIsActive, focusMode, {
+          projectName: emptyProjectName,
           workspaceName: emptyWorkspaceName,
-          worktreeName: emptyWorktreeName,
         })}
         padding={0}
         flexDirection="column"
@@ -542,19 +544,22 @@ export function TerminalPane({
           <box flexGrow={1} justifyContent="center" alignItems="center" flexDirection="column">
             <text fg={t.textMuted}>· · ·</text>
             <text fg={t.textMuted}> </text>
-            {emptyWorkspaceName !== '' ? (
+            {emptyProjectName !== '' ? (
               <box flexDirection="row">
-                <text fg={t.text}>{emptyWorkspaceName}</text>
-                {emptyWorktreeName !== '' && emptyWorktreeName !== emptyWorkspaceName ? (
+                <text fg={t.text}>{emptyProjectName}</text>
+                {emptyWorkspaceName !== '' && emptyWorkspaceName !== emptyProjectName ? (
                   <>
                     <text fg={t.textMuted}> / </text>
-                    <text fg={t.text}>{emptyWorktreeName}</text>
+                    <text fg={t.text}>{emptyWorkspaceName}</text>
                   </>
                 ) : null}
               </box>
             ) : null}
             <text fg={t.textMuted}>has no tabs</text>
             <text fg={t.textMuted}> </text>
+            {/* Keep this at a fixed row count: adding a line shifts everything
+                under a centred column, and the vacated cells are not repainted
+                — the old text bleeds through the new spaces. */}
             <box flexDirection="row">
               <text fg={t.textMuted}>Press </text>
               <text fg={t.primary}>Ctrl+n</text>
@@ -598,7 +603,7 @@ export function TerminalPane({
         // re-introducing the shifted-content / dead-row bug.
         <box position="absolute" bottom={0} left={0} backgroundColor={editorBg}>
           {tab?.status === 'disconnected' ? (
-            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this workspace.</text>
+            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this project.</text>
           ) : null}
           {tab?.errorMessage != null && tab?.errorMessage !== '' ? (
             <text fg={t.error}>{tab.errorMessage}</text>

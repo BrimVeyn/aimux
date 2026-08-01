@@ -20,16 +20,17 @@ function r(
 export const nextTab: KeyResult = r([{ delta: 1, type: 'move-active-tab' }])
 export const prevTab: KeyResult = r([{ delta: -1, type: 'move-active-tab' }])
 
-export const newTab: KeyResult = r(
-  [{ type: 'open-new-tab-modal' }],
-  [],
-  'modal.new-tab.command-edit'
-)
+/**
+ * Routed through an effect rather than opening the modal directly: tabs only
+ * exist inside a workspace, and whether the project has one is the app's
+ * business, not the keymap's. The effect opens the picker or explains why not.
+ */
+export const newTab: KeyResult = r([], [{ type: 'open-new-tab' }])
 export const renameTab: KeyResult = r([{ type: 'open-rename-tab-modal' }], [], 'modal.rename-tab')
-export const sessionPicker: KeyResult = r(
-  [{ type: 'open-session-picker' }],
+export const projectPicker: KeyResult = r(
+  [{ type: 'open-project-picker' }],
   [],
-  'modal.session-picker.filtering'
+  'modal.project-picker.filtering'
 )
 export const snippetPicker: KeyResult = r(
   [{ type: 'open-snippet-picker' }],
@@ -59,7 +60,7 @@ export function toggleWidget(widgetId: string): KeyResult {
   return r([{ type: 'toggle-widget', widgetId }])
 }
 export const toggleGitPane: KeyResult = toggleWidget('git')
-export const toggleSessionBar: KeyResult = r([{ type: 'toggle-session-bar' }])
+export const toggleProjectBar: KeyResult = r([{ type: 'toggle-project-bar' }])
 export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.modal.type === 'ai-usage') {
     return r([{ type: 'close-modal' }], [], 'navigation')
@@ -69,8 +70,8 @@ export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
 
 export const enterGitMode: KeyResult = r([{ type: 'enter-git-mode' }], [], 'git-mode')
 
-export function switchSessionByIndex(index: number): KeyResult {
-  return r([], [{ index, type: 'switch-session-by-index' }])
+export function switchProjectByIndex(index: number): KeyResult {
+  return r([], [{ index, type: 'switch-project-by-index' }])
 }
 
 export function switchTabByIndex(index: number): KeyResult {
@@ -134,8 +135,8 @@ export function reorderTab(delta: number): KeyResult {
   return r([{ delta, type: 'reorder-active-tab' }])
 }
 
-export function reorderSession(delta: number): KeyResult {
-  return r([{ delta, type: 'reorder-active-session' }])
+export function reorderProject(delta: number): KeyResult {
+  return r([{ delta, type: 'reorder-active-project' }])
 }
 
 export function resizeBar(side: 'left' | 'right', delta: number): KeyResult {
@@ -199,70 +200,20 @@ export function moveModalSelectionWithPreview(
 // Modal-specific actions
 // ---------------------------------------------------------------------------
 
-export const launchSelectedAssistant: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'new-tab' && ctx.state.modal.step === 'assistant') {
-    return r([{ type: 'select-new-tab-assistant' }])
-  }
-  if (
-    ctx.state.modal.type === 'new-tab' &&
-    ctx.state.modal.step === 'worktree' &&
-    ctx.state.modal.createWorktree
-  ) {
-    return r([{ type: 'enter-new-tab-worktree-create' }], [{ type: 'load-new-tab-base-branches' }])
-  }
-  return r([], [{ type: 'launch-selected-assistant' }])
-}
+export const launchSelectedAssistant: KeyResult = r([], [{ type: 'launch-selected-assistant' }])
 
-export const toggleNewTabWorktree: KeyResult = r([{ type: 'toggle-new-tab-worktree' }])
-
-export const deleteSelectedWorktree: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceDeleteModal: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  const sessionId = ctx.state.currentSessionId
-  if (modal.type !== 'new-tab' || modal.step !== 'worktree' || modal.createWorktree) return null
-  if (!(sessionId != null && sessionId !== '')) return null
-  const session = ctx.state.sessions.find((entry) => entry.id === sessionId)
-  const worktree = session?.worktrees?.[modal.selectedIndex]
-  if (!worktree) return null
-  // First attempt is never forced — a recoverable failure opens the confirm
-  // dialog (see set-new-tab-worktree-delete-prompt), where confirmDeleteWorktree
-  // retries with force.
-  return r(
-    [{ index: modal.selectedIndex, type: 'set-modal-selection-index' }],
-    [{ force: false, sessionId, type: 'delete-worktree', worktreeId: worktree.id }]
-  )
-}
-
-export const confirmDeleteWorktree: ActionFn = (ctx: ModeContext) => {
-  const modal = ctx.state.modal
-  const sessionId = ctx.state.currentSessionId
-  if (modal.type !== 'new-tab' || modal.worktreeDeletePrompt == null) return null
-  if (!(sessionId != null && sessionId !== '')) return null
-  const { worktreeId } = modal.worktreeDeletePrompt
-  return r(
-    [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
-    [{ force: true, sessionId, type: 'delete-worktree', worktreeId }],
-    'modal.new-tab.command-edit'
-  )
-}
-
-export const cancelDeleteWorktree: KeyResult = r(
-  [{ prompt: null, type: 'set-new-tab-worktree-delete-prompt' }],
-  [],
-  'modal.new-tab.command-edit'
-)
-
-export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
-  const modal = ctx.state.modal
-  if (modal.type !== 'worktree-delete-confirm') return null
+  if (modal.type !== 'workspace-delete-confirm') return null
   return r(
     [{ type: 'close-modal' }],
     [
       {
         closeTabs: modal.closeTabs,
         force: modal.force,
-        sessionId: modal.sessionId,
-        type: 'delete-worktree',
-        worktreeId: modal.worktreeId,
+        projectId: modal.projectId,
+        type: 'delete-workspace',
+        workspaceId: modal.workspaceId,
       },
     ],
     'navigation'
@@ -272,20 +223,58 @@ export const confirmWorktreeDeleteModal: ActionFn = (ctx: ModeContext) => {
 export const cancelCommandEdit = (returnTo: KeyResult['transition']): KeyResult =>
   r([{ type: 'cancel-command-edit' }], [], returnTo)
 
-export const confirmSelectedSession: KeyResult = r([], [{ type: 'confirm-selected-session' }])
+export const confirmSelectedProject: KeyResult = r([], [{ type: 'confirm-selected-project' }])
 
-export const openCreateSessionModal: KeyResult = r(
-  [{ returnToSessionPicker: true, type: 'open-create-session-modal' }],
+export const openCreateProjectModal: KeyResult = r(
+  [{ returnToProjectPicker: true, type: 'open-create-project-modal' }],
   [],
-  'modal.create-session'
+  'modal.create-project'
 )
 
-export const openRenameSelectedSession: KeyResult = r(
-  [],
-  [{ type: 'open-rename-selected-session' }]
+export const createWorkspaceModal: KeyResult = r(
+  [{ type: 'open-create-workspace-modal' }],
+  [{ type: 'load-create-workspace-base-branches' }],
+  'modal.create-workspace'
 )
 
-export const deleteSelectedSession: KeyResult = r([], [{ type: 'delete-selected-session' }])
+export const switchCreateWorkspaceField: KeyResult = r([{ type: 'switch-create-workspace-field' }])
+
+/**
+ * An empty prompt is not a workspace: it names nothing, branches nothing and
+ * gives the assistant nothing to do, so Enter is simply inert until it is typed.
+ */
+export const confirmCreateWorkspace: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  if (modal.type === 'create-workspace' && modal.prompt.trim() === '') return r([])
+  return r([], [{ type: 'create-workspace' }])
+}
+
+/**
+ * `Enter` creates, so the prompt needs another way to break a line. Inverted
+ * from the commit modal on purpose: there the body is the whole point, here
+ * most prompts are one line and creating must stay the cheapest keystroke.
+ */
+export const createWorkspaceNewline: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  if (modal.type !== 'create-workspace' || modal.step !== 'form') return r([])
+  if (modal.activeField !== 'prompt') return r([])
+  return r([{ char: '\n', type: 'update-command-edit' }])
+}
+
+/** Esc backs out of the template step to the form; from the form it closes. */
+export const createWorkspaceEscape: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'create-workspace' && ctx.state.modal.step === 'template') {
+    return r([{ step: 'form', type: 'set-create-workspace-step' }])
+  }
+  return r([{ type: 'close-modal' }], [], 'navigation')
+}
+
+export const openRenameSelectedProject: KeyResult = r(
+  [],
+  [{ type: 'open-rename-selected-project' }]
+)
+
+export const deleteSelectedProject: KeyResult = r([], [{ type: 'delete-selected-project' }])
 
 export const openSnippetEditor: KeyResult = r(
   [{ type: 'open-snippet-editor' }],
@@ -336,20 +325,20 @@ export function previewTheme(delta: 1 | -1): KeyResult {
 export const toggleTransparent: KeyResult = r([], [{ type: 'toggle-transparent' }])
 export const toggleMode: KeyResult = r([], [{ type: 'toggle-mode' }])
 
-export const switchField: KeyResult = r([{ type: 'switch-create-session-field' }])
+export const switchField: KeyResult = r([{ type: 'switch-create-project-field' }])
 export const selectDirectory: KeyResult = r([{ type: 'select-directory' }])
 
-export const backToSessionPicker: KeyResult = r(
-  [{ type: 'open-session-picker' }],
+export const backToProjectPicker: KeyResult = r(
+  [{ type: 'open-project-picker' }],
   [],
-  'modal.session-picker.filtering'
+  'modal.project-picker.filtering'
 )
 
-export const createSessionEscape: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'create-session' && !ctx.state.modal.returnToSessionPicker) {
+export const createProjectEscape: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.modal.type === 'create-project' && !ctx.state.modal.returnToProjectPicker) {
     return r([{ type: 'close-modal' }], [], 'navigation')
   }
-  return r([{ type: 'open-session-picker' }], [], 'modal.session-picker.filtering')
+  return r([{ type: 'open-project-picker' }], [], 'modal.project-picker.filtering')
 }
 
 export const backToSnippetPicker: KeyResult = r(
@@ -393,10 +382,10 @@ export const confirmUpdateSelection: KeyResult = r(
 )
 
 // ---------------------------------------------------------------------------
-// Worktree-move modal
+// Workspace-move modal
 // ---------------------------------------------------------------------------
 
-export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
+export const openWorkspaceMove: ActionFn = (ctx: ModeContext) => {
   if (ctx.state.gitMode.headOffset > 0) {
     return r([
       {
@@ -405,35 +394,35 @@ export const openWorktreeMove: ActionFn = (ctx: ModeContext) => {
       },
     ])
   }
-  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
-  const worktrees = session?.worktrees ?? []
-  // From git mode, the source is the active worktree (the one being reviewed).
-  const source = worktrees.find((w) => w.id === session?.activeWorktreeId) ?? worktrees[0]
+  const project = ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
+  const workspaces = project?.workspaces ?? []
+  // From git mode, the source is the active workspace (the one being reviewed).
+  const source = workspaces.find((w) => w.id === project?.activeWorkspaceId) ?? workspaces[0]
   const hasBranch = source != null && source.branch != null && source.branch !== ''
-  const others = worktrees.filter((w) => w.id !== source?.id)
+  const others = workspaces.filter((w) => w.id !== source?.id)
   if (!hasBranch || source == null || others.length < 1) {
-    return r([{ message: 'no other worktree to move into', type: 'git-mode-set-message' }])
+    return r([{ message: 'no other workspace to move into', type: 'git-mode-set-message' }])
   }
   // Overlay: no mode transition — deriveModeId routes input to the picker and
   // focusMode stays 'git' so the git view remains mounted underneath.
   return r(
-    [{ sourceWorktreeId: source.id, type: 'open-worktree-move-modal' }],
-    [{ type: 'load-worktree-move-stats' }]
+    [{ sourceWorkspaceId: source.id, type: 'open-workspace-move-modal' }],
+    [{ type: 'load-workspace-move-stats' }]
   )
 }
 
-export const toggleWorktreeMoveDelete: KeyResult = r([{ type: 'toggle-worktree-move-delete' }])
+export const toggleWorkspaceMoveDelete: KeyResult = r([{ type: 'toggle-workspace-move-delete' }])
 
-export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceMove: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  const session = ctx.state.sessions.find((entry) => entry.id === ctx.state.currentSessionId)
-  const worktrees = session?.worktrees ?? []
-  const sourceId = modal.type === 'worktree-move' ? modal.sourceWorktreeId : undefined
-  const source = worktrees.find((w) => w.id === sourceId)
-  const targets = worktrees.filter((w) => w.id !== sourceId)
-  const selectedIndex = modal.type === 'worktree-move' ? modal.selectedIndex : 0
+  const project = ctx.state.projects.find((entry) => entry.id === ctx.state.currentProjectId)
+  const workspaces = project?.workspaces ?? []
+  const sourceId = modal.type === 'workspace-move' ? modal.sourceWorkspaceId : undefined
+  const source = workspaces.find((w) => w.id === sourceId)
+  const targets = workspaces.filter((w) => w.id !== sourceId)
+  const selectedIndex = modal.type === 'workspace-move' ? modal.selectedIndex : 0
   const target = targets[selectedIndex]
-  if (!target || !session || !source || modal.type !== 'worktree-move') {
+  if (!target || !project || !source || modal.type !== 'workspace-move') {
     return r([{ type: 'close-modal' }])
   }
   // Overlay close keeps focusMode 'git' (see close-modal reducer), so the move
@@ -443,10 +432,10 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
     [
       {
         deleteSource: modal.deleteSource,
-        sessionId: session.id,
-        sourceWorktreeId: source.id,
-        targetWorktreeId: target.id,
-        type: 'move-worktree',
+        projectId: project.id,
+        sourceWorkspaceId: source.id,
+        targetWorkspaceId: target.id,
+        type: 'move-workspace',
       },
     ]
   )
@@ -454,18 +443,18 @@ export const confirmWorktreeMove: ActionFn = (ctx: ModeContext) => {
 
 // Confirms the dialog opened after a recoverable move failure: re-runs the
 // move with the flag matching the failure (stash the target / keep conflicts).
-export const confirmWorktreeMoveRetry: ActionFn = (ctx: ModeContext) => {
+export const confirmWorkspaceMoveRetry: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal
-  if (modal.type !== 'worktree-move-confirm') return null
+  if (modal.type !== 'workspace-move-confirm') return null
   return r(
     [{ type: 'close-modal' }],
     [
       {
         deleteSource: modal.deleteSource,
-        sessionId: modal.sessionId,
-        sourceWorktreeId: modal.sourceWorktreeId,
-        targetWorktreeId: modal.targetWorktreeId,
-        type: 'move-worktree',
+        projectId: modal.projectId,
+        sourceWorkspaceId: modal.sourceWorkspaceId,
+        targetWorkspaceId: modal.targetWorkspaceId,
+        type: 'move-workspace',
         ...(modal.variant === 'stash-target' ? { stashTarget: true } : { keepConflicts: true }),
       },
     ],
@@ -487,9 +476,9 @@ export const closePane: ActionFn = (ctx: ModeContext) => {
 }
 
 // Navigation-specific dynamic actions
-// Reveals whichever bar hosts the workspace list — it is not pinned to the left.
+// Reveals whichever bar hosts the project list — it is not pinned to the left.
 export const ctrlZSidebar: ActionFn = (ctx: ModeContext) => {
-  const side = ctx.state.bars.left.widgets.some((w) => w.id === 'workspaces') ? 'left' : 'right'
+  const side = ctx.state.bars.left.widgets.some((w) => w.id === 'projects') ? 'left' : 'right'
   if (!ctx.state.bars[side].visible) {
     return r([{ side, type: 'toggle-bar' }])
   }
@@ -509,21 +498,21 @@ export const leaveTerminalInput: KeyResult = r(
 
 export const toggleSidebarFromInput: KeyResult = toggleBar('left')
 
-// Session name modal
-export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {
+// Project name modal
+export const confirmProjectRename: ActionFn = (ctx: ModeContext) => {
   const trimmed = (ctx.state.modal.editBuffer ?? '').trim()
-  const sessionId = ctx.state.modal.sessionTargetId
+  const projectId = ctx.state.modal.projectTargetId
   const returnToPicker =
-    ctx.state.modal.type === 'session-name' ? ctx.state.modal.returnToSessionPicker : true
+    ctx.state.modal.type === 'project-name' ? ctx.state.modal.returnToProjectPicker : true
   const closeAction: AppAction = returnToPicker
-    ? { type: 'open-session-picker' }
+    ? { type: 'open-project-picker' }
     : { type: 'close-modal' }
   const transition: KeyResult['transition'] = returnToPicker
-    ? 'modal.session-picker.filtering'
+    ? 'modal.project-picker.filtering'
     : 'navigation'
   const effects: KeyResult['effects'] =
-    trimmed && sessionId != null && sessionId !== ''
-      ? [{ name: trimmed, sessionId, type: 'rename-session' }]
+    trimmed && projectId != null && projectId !== ''
+      ? [{ name: trimmed, projectId, type: 'rename-project' }]
       : []
   return r([closeAction], effects, transition)
 }
@@ -531,7 +520,7 @@ export const confirmSessionRename: ActionFn = (ctx: ModeContext) => {
 // Rename tab modal
 export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   const trimmed = (ctx.state.modal.editBuffer ?? '').trim()
-  const tabId = ctx.state.modal.sessionTargetId
+  const tabId = ctx.state.modal.projectTargetId
   const actions: KeyResult['actions'] = []
   const effects: KeyResult['effects'] = []
   if (trimmed && tabId != null && tabId !== '') {
@@ -541,27 +530,33 @@ export const confirmRenameTab: ActionFn = (ctx: ModeContext) => {
   return r(actions, effects, 'navigation')
 }
 
-// Rename worktree modal
-export const confirmRenameWorktree: ActionFn = (ctx: ModeContext) => {
+// Rename workspace modal
+export const confirmRenameWorkspace: ActionFn = (ctx: ModeContext) => {
   const { modal } = ctx.state
   const trimmed = (modal.editBuffer ?? '').trim()
-  const worktreeId = modal.sessionTargetId
-  const sessionId = modal.type === 'rename-worktree' ? modal.worktreeSessionId : null
+  const workspaceId = modal.projectTargetId
+  const projectId = modal.type === 'rename-workspace' ? modal.workspaceProjectId : null
   const actions: KeyResult['actions'] = []
-  if (trimmed && worktreeId != null && worktreeId !== '' && sessionId != null && sessionId !== '') {
+  if (
+    trimmed &&
+    workspaceId != null &&
+    workspaceId !== '' &&
+    projectId != null &&
+    projectId !== ''
+  ) {
     actions.push({
       patch: { name: trimmed },
-      sessionId,
-      type: 'update-worktree-record',
-      worktreeId,
+      projectId,
+      type: 'update-workspace-record',
+      workspaceId,
     })
   }
   actions.push({ type: 'close-modal' })
   return r(actions, [], 'navigation')
 }
 
-// Create session modal
-export const confirmCreateSession: ActionFn = (ctx: ModeContext) => {
+// Create project modal
+export const confirmCreateProject: ActionFn = (ctx: ModeContext) => {
   const modal = ctx.state.modal as {
     activeField?: string
     editBuffer?: string
@@ -574,26 +569,26 @@ export const confirmCreateSession: ActionFn = (ctx: ModeContext) => {
 
   const trimmed = (modal.editBuffer ?? '').trim()
   const projectPath = modal.pendingProjectPath ?? undefined
-  const sessionName = trimmed || getDefaultSessionName(projectPath)
-  if (sessionName) {
+  const projectName = trimmed || getDefaultProjectName(projectPath)
+  if (projectName) {
     return r(
       [{ type: 'close-modal' }],
-      [{ name: sessionName, projectPath, type: 'create-session' }],
+      [{ name: projectName, projectPath, type: 'create-project' }],
       'navigation'
     )
   }
   return r([{ type: 'close-modal' }], [], 'navigation')
 }
 
-function getDefaultSessionName(projectPath?: string): string {
+function getDefaultProjectName(projectPath?: string): string {
   if (!(projectPath != null && projectPath !== '')) return ''
   const segments = projectPath.split('/').filter(Boolean)
   return segments.at(-1) ?? ''
 }
 
-// Session picker escape (conditional)
-export const sessionPickerEscape: ActionFn = (ctx: ModeContext) => {
-  if (!(ctx.state.currentSessionId != null && ctx.state.currentSessionId !== '')) return null
+// Project picker escape (conditional)
+export const projectPickerEscape: ActionFn = (ctx: ModeContext) => {
+  if (!(ctx.state.currentProjectId != null && ctx.state.currentProjectId !== '')) return null
   return r([{ type: 'close-modal' }], [], 'navigation')
 }
 
@@ -833,9 +828,9 @@ export const gitCommitOpen: ActionFn = (ctx: ModeContext) => {
       },
     ])
   }
-  const sessionId = ctx.state.currentSessionId ?? undefined
+  const projectId = ctx.state.currentProjectId ?? undefined
   return r(
-    [...clearPendingDelete(ctx), { sessionId, type: 'open-git-commit-modal' }],
+    [...clearPendingDelete(ctx), { projectId, type: 'open-git-commit-modal' }],
     [],
     'modal.git-commit'
   )
@@ -894,13 +889,13 @@ export const gitCommitEnterConfirm: ActionFn = (ctx: ModeContext) => {
   if (hasTitle) {
     return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
   }
-  const sessionId = ctx.state.currentSessionId
-  if (!(sessionId != null && sessionId !== '')) {
+  const projectId = ctx.state.currentProjectId
+  if (!(projectId != null && projectId !== '')) {
     return r([{ type: 'git-commit-enter-confirm' }], [], 'modal.git-commit.confirm')
   }
   return r(
-    [{ sessionId, type: 'git-commit-enter-generating' }],
-    [{ sessionId, type: 'generate-auto-commit-now' }],
+    [{ projectId, type: 'git-commit-enter-generating' }],
+    [{ projectId, type: 'generate-auto-commit-now' }],
     'modal.git-commit.generating'
   )
 }
@@ -912,10 +907,10 @@ export const gitCommitLeaveConfirm: KeyResult = r(
 )
 
 export const gitCommitLeaveGenerating: ActionFn = (ctx: ModeContext) => {
-  const sessionId = ctx.state.currentSessionId
+  const projectId = ctx.state.currentProjectId
   const actionsList: AppAction[] = [{ type: 'git-commit-leave-generating' }]
-  if (sessionId != null && sessionId !== '') {
-    actionsList.push({ sessionId, type: 'auto-commit-clear' })
+  if (projectId != null && projectId !== '') {
+    actionsList.push({ projectId, type: 'auto-commit-clear' })
   }
   return r(actionsList, [], 'modal.git-commit')
 }
@@ -952,5 +947,40 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
   if (modal.type === 'git-commit' && modal.activeField === 'body') {
     return r([{ char: '\n', type: 'update-command-edit' }])
   }
-  return r([{ type: 'switch-create-session-field' }])
+  return r([{ type: 'switch-create-project-field' }])
 }
+
+// ---------------------------------------------------------------------------
+// Deprecated aliases — 0.8.x names kept working for one release.
+//
+// The project/workspace/worktree rename moved every one of these. Aliases only
+// exist where the old name still has a target: `toggleNewTabWorktree`,
+// `deleteSelectedWorktree` and `confirmDeleteWorktree` were deleted outright
+// when <C-n> stopped creating worktrees, so a config referencing them is a
+// compile error on purpose.
+//
+// ponytail: drop these with the other rename shims.
+// ---------------------------------------------------------------------------
+
+/** @deprecated renamed to `projectPicker`. */
+export const sessionPicker = projectPicker
+/** @deprecated renamed to `openCreateProjectModal`. */
+export const openCreateSessionModal = openCreateProjectModal
+/** @deprecated renamed to `createProjectEscape`. */
+export const createSessionEscape = createProjectEscape
+/** @deprecated renamed to `confirmCreateProject`. */
+export const confirmCreateSession = confirmCreateProject
+/** @deprecated renamed to `reorderProject`. */
+export const reorderSession = reorderProject
+/** @deprecated renamed to `switchProjectByIndex`. */
+export const switchSessionByIndex = switchProjectByIndex
+/** @deprecated renamed to `toggleProjectBar`. */
+export const toggleSessionBar = toggleProjectBar
+/** @deprecated renamed to `openWorkspaceMove`. */
+export const openWorktreeMove = openWorkspaceMove
+/** @deprecated renamed to `toggleWorkspaceMoveDelete`. */
+export const toggleWorktreeMoveDelete = toggleWorkspaceMoveDelete
+/** @deprecated renamed to `confirmWorkspaceMove`. */
+export const confirmWorktreeMove = confirmWorkspaceMove
+/** @deprecated renamed to `confirmWorkspaceDeleteModal`. */
+export const confirmWorktreeDeleteModal = confirmWorkspaceDeleteModal

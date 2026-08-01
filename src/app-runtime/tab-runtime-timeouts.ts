@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react'
 
-import type { AppAction } from '../state/types'
+import type { AppAction } from '../state/actions'
 
 export interface TabRuntimeTimeouts {
   clearIdleTimer: (tabId: string) => void

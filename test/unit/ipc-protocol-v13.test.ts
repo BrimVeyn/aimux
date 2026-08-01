@@ -22,7 +22,7 @@ describe('ipc protocol v13', () => {
 
   test('tabTurnComplete event round-trips', () => {
     const parsed = parseServerMessage({
-      payload: { idleMs: 1500, sessionId: 'session-1', tabId: 'tab-1' },
+      payload: { idleMs: 1500, projectId: 'project-1', tabId: 'tab-1' },
       type: 'tabTurnComplete',
     })
     expect(parsed.type).toBe('tabTurnComplete')
@@ -31,7 +31,7 @@ describe('ipc protocol v13', () => {
   test('tabTurnComplete rejects a non-numeric idleMs', () => {
     expect(() =>
       parseServerMessage({
-        payload: { idleMs: 'soon', sessionId: 'session-1', tabId: 'tab-1' },
+        payload: { idleMs: 'soon', projectId: 'project-1', tabId: 'tab-1' },
         type: 'tabTurnComplete',
       })
     ).toThrow('tabTurnComplete.idleMs must be a number')
@@ -42,8 +42,8 @@ describe('ipc protocol v13', () => {
       payload: {
         kind: 'question',
         options: ['1. Yes', '2. No'],
+        projectId: 'project-1',
         prompt: 'Do you want to proceed?',
-        sessionId: 'session-1',
         tabId: 'tab-1',
       },
       type: 'tabQuestion',
@@ -56,8 +56,8 @@ describe('ipc protocol v13', () => {
       parseServerMessage({
         payload: {
           kind: 'permission',
+          projectId: 'project-1',
           prompt: 'Allow bash command?',
-          sessionId: 'session-1',
           tabId: 'tab-1',
         },
         type: 'tabQuestion',
@@ -68,7 +68,7 @@ describe('ipc protocol v13', () => {
   test('tabQuestion rejects an invalid kind', () => {
     expect(() =>
       parseServerMessage({
-        payload: { kind: 'maybe', prompt: 'x', sessionId: 's', tabId: 't' },
+        payload: { kind: 'maybe', projectId: 's', prompt: 'x', tabId: 't' },
         type: 'tabQuestion',
       })
     ).toThrow('tabQuestion.kind is invalid')
@@ -77,7 +77,7 @@ describe('ipc protocol v13', () => {
   test('tabQuestion rejects non-string options', () => {
     expect(() =>
       parseServerMessage({
-        payload: { kind: 'question', options: [1, 2], prompt: 'x', sessionId: 's', tabId: 't' },
+        payload: { kind: 'question', options: [1, 2], projectId: 's', prompt: 'x', tabId: 't' },
         type: 'tabQuestion',
       })
     ).toThrow('tabQuestion.options must be a string array when present')

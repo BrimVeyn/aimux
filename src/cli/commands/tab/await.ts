@@ -45,7 +45,7 @@ export const tabAwait: CliCommand = {
     const timeoutMs =
       typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     if (
       !daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH) ||
@@ -57,7 +57,7 @@ export const tabAwait: CliCommand = {
       )
     }
 
-    const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
     const tab = attach.tabs.find((t) => t.id === tabId)
     if (!tab) {
       // Exit 3 (runtime) via runCli — NOT 4, which is reserved for

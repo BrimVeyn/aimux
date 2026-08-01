@@ -5,7 +5,7 @@ import { useEffect } from 'react'
 interface Options {
   scrollRef: React.RefObject<ScrollBoxRenderable | null>
   visible: boolean
-  /** Full id of the active row to bring into view (workspace OR worktree). */
+  /** Full id of the active row to bring into view (project OR workspace). */
   activeRowId: string | null
 }
 

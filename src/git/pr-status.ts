@@ -213,7 +213,7 @@ export async function collectPrStatus(cwd: string): Promise<PrStatusResult> {
   if (!result.ok) {
     // `gh` exits non-zero for every "there is simply nothing to show" case too:
     // no PR on the branch, no GitHub remote, or a directory that isn't a repo
-    // at all (aimux sessions can point anywhere). None of those is an error.
+    // at all (aimux projects can point anywhere). None of those is an error.
     const stderr = result.stderr.toLowerCase()
     if (NOT_AN_ERROR.some((needle) => stderr.includes(needle))) return { kind: 'no-pr' }
     return { kind: 'error', message: (result.error ?? 'gh failed').slice(0, 200) }

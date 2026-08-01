@@ -20,9 +20,18 @@ describe('runShellVar', () => {
     expect(out).toBe('')
   })
 
-  test('returns empty string on timeout', async () => {
+  test('returns empty string on timeout, and returns when it says it will', async () => {
+    const started = performance.now()
     const out = await runShellVar('slow', { sh: 'sleep 5', timeout: 80 })
+    const elapsed = performance.now() - started
+
     expect(out).toBe('')
+    // The empty string alone does not prove the timeout worked — waiting out
+    // the full `sleep 5` also yields ''. A shell that forks rather than execs
+    // keeps the stdout pipe open past the kill, which is what used to make
+    // this take five seconds on Linux. Generous bound: this asserts "the
+    // deadline is honoured", not a latency budget.
+    expect(elapsed).toBeLessThan(2_000)
   })
 
   test('does not trim when trim: false', async () => {

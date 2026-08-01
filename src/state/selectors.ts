@@ -1,38 +1,39 @@
-import type { AssistantOption } from '../pty/command-registry'
-import type { AssistantId, SessionRecord, SnippetRecord, WorktreeRecord } from './types'
+import type { ProjectRecord, SnippetRecord, WorkspaceRecord } from './types'
+
+import { type AssistantOption, getAllAssistantOptions } from '../pty/command-registry'
 
 export interface BaseRefOption {
-  /** Git ref the new worktree is forked from. */
+  /** Git ref the new workspace is forked from. */
   ref: string
   label: string
-  kind: 'worktree' | 'branch'
-  /** Worktree name, for the 'worktree' kind. */
+  kind: 'workspace' | 'branch'
+  /** Workspace name, for the 'workspace' kind. */
   detail?: string
 }
 
 /**
- * Ordered, filtered base-ref candidates for the worktree-create "Base" picker:
- * branches checked out in the session's worktrees first (labelled with the
- * worktree name), then the remaining local branches. A branch already surfaced
- * via a worktree is not repeated. Throwaway `aimux/` branches are skipped unless
- * a live worktree is on them — `git worktree remove` leaves the branch behind,
- * so deleted temp worktrees would otherwise haunt the list as orphan branches.
+ * Ordered, filtered base-ref candidates for the workspace-create "Base" picker:
+ * branches checked out in the project's workspaces first (labelled with the
+ * workspace name), then the remaining local branches. A branch already surfaced
+ * via a workspace is not repeated. Throwaway `aimux/` branches are skipped unless
+ * a live workspace is on them — `git worktree remove` leaves the branch behind,
+ * so deleted temp workspaces would otherwise haunt the list as orphan branches.
  */
 export function buildBaseRefOptions(
-  worktrees: WorktreeRecord[],
+  workspaces: WorkspaceRecord[],
   localBranches: string[],
   query: string
 ): BaseRefOption[] {
   const seen = new Set<string>()
   const options: BaseRefOption[] = []
-  for (const worktree of worktrees) {
-    if (worktree.branch == null || worktree.branch === '' || seen.has(worktree.branch)) continue
-    seen.add(worktree.branch)
+  for (const workspace of workspaces) {
+    if (workspace.branch == null || workspace.branch === '' || seen.has(workspace.branch)) continue
+    seen.add(workspace.branch)
     options.push({
-      detail: worktree.name,
-      kind: 'worktree',
-      label: worktree.branch,
-      ref: worktree.branch,
+      detail: workspace.name,
+      kind: 'workspace',
+      label: workspace.branch,
+      ref: workspace.branch,
     })
   }
   for (const branch of localBranches) {
@@ -43,16 +44,6 @@ export function buildBaseRefOptions(
   const trimmed = query.trim().toLowerCase()
   if (trimmed === '') return options
   return options.filter((option) => option.label.toLowerCase().includes(trimmed))
-}
-
-/**
- * 0 when the template picker should NOT show the "None" fallback (no assistant
- * was picked — typical for the template shortcut path), 1 otherwise. Shared
- * by the modal reducer, the side-effect that resolves templateId, and the
- * picker UI so the three stay in sync.
- */
-export function getTemplateNoneOffset(selectedAssistantId: AssistantId | null): 0 | 1 {
-  return selectedAssistantId == null ? 0 : 1
 }
 
 export function filterAssistants(
@@ -66,18 +57,39 @@ export function filterAssistants(
   )
 }
 
-export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
+/**
+ * Assistants offered by the new-tab picker. One source of truth on purpose: the
+ * modal renders this list while `launch-selected-assistant` indexes into it, so
+ * a divergence launches the row above or below the one the user highlighted.
+ *
+ * Chained from `<C-p>`, the prompt is pasted into the assistant and drives the
+ * workspace's name — neither of which a plain shell can do — so Terminal is not
+ * offered there. A bare `<C-n>` still lists it.
+ */
+export function getNewTabAssistantOptions(
+  customCommands: Record<string, string>,
+  filter: string | null,
+  excludeTerminal: boolean
+): AssistantOption[] {
+  const all = getAllAssistantOptions(customCommands)
+  return filterAssistants(
+    excludeTerminal ? all.filter((option) => option.id !== 'terminal') : all,
+    filter
+  )
+}
+
+export function filterProjects(projects: ProjectRecord[], filter: string | null): ProjectRecord[] {
   if (!(filter != null && filter !== '')) {
-    return sessions
+    return projects
   }
 
   const lower = filter.toLowerCase()
-  return sessions.filter(
-    (session) =>
-      session.name.toLowerCase().includes(lower) ||
-      (session.projectPath != null &&
-        session.projectPath !== '' &&
-        session.projectPath.toLowerCase().includes(lower))
+  return projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(lower) ||
+      (project.projectPath != null &&
+        project.projectPath !== '' &&
+        project.projectPath.toLowerCase().includes(lower))
   )
 }
 

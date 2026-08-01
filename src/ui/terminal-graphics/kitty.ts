@@ -16,7 +16,7 @@ let nextId = 0x100000
 
 export function nextImageId(): number {
   const id = nextId++
-  // Wrap at 24-bit; we don't expect to leak more than ~16M IDs per session but
+  // Wrap at 24-bit; we don't expect to leak more than ~16M IDs per project but
   // be safe in case of a long-running daemon.
   if (nextId > 0xffffff) nextId = 0x100000
   return id

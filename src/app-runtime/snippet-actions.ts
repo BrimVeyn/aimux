@@ -1,5 +1,6 @@
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState, SnippetRecord, TabSession } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, SnippetRecord, TabSession } from '../state/types'
 
 import { createPrefixedId } from '../platform/id'
 import { isConfigSnippetId, saveSnippetCatalog } from '../state/snippet-catalog'
@@ -40,7 +41,7 @@ export function saveSnippetEditorState(state: AppState): SnippetRecord[] | null 
     return null
   }
 
-  const snippetId = state.modal.sessionTargetId
+  const snippetId = state.modal.projectTargetId
   // Config-pinned snippets are sticky and read-only in the UI.
   if (snippetId != null && snippetId !== '' && isConfigSnippetId(snippetId)) {
     return null

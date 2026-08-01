@@ -20,7 +20,9 @@ describe('initial state', () => {
 
     expect(state.bars.left.visible).toBe(false)
     expect(state.bars.left.width).toBe(33)
-    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git'])
+    // `projects` was in neither bar, so it is restored — see the widget
+    // integrity test below.
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
   })
 
   test('clamps persisted bar width and drops unknown widget ids', () => {
@@ -32,8 +34,62 @@ describe('initial state', () => {
     })
 
     expect(state.bars.left.width).toBe(18)
-    expect(state.bars.left.widgets).toEqual([])
     expect(state.bars.right.width).toBe(80)
+    expect(state.bars.left.widgets.map((w) => w.id)).not.toContain('nope')
+  })
+
+  test('restores a widget that is in neither bar', () => {
+    // A widget can only be moved between bars or hidden, never deleted, so an
+    // id present nowhere means the persisted layout was corrupted. This is the
+    // state the pre-rename `workspaces` id left behind: it was pruned as
+    // unknown, the sidebar rendered empty, and the emptiness was saved back.
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: { visible: true, widgets: [], width: 33 },
+        right: { visible: true, widgets: [{ grow: 50, id: 'git', visible: true }], width: 40 },
+      },
+    })
+
+    expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['projects'])
+    // git was already placed by the user; it must not be duplicated.
+    expect(state.bars.right.widgets.map((w) => w.id)).toEqual(['git'])
+  })
+
+  test('migrates the pre-rename `workspaces` widget id to `projects`', () => {
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: {
+          visible: true,
+          widgets: [{ grow: 50, id: 'workspaces', visible: true }],
+          width: 33,
+        },
+        right: { visible: true, widgets: [{ grow: 50, id: 'git', visible: true }], width: 40 },
+      },
+    })
+
+    // Renamed in place, keeping the user's grow/visible and bar placement.
+    expect(state.bars.left.widgets).toEqual([{ grow: 50, id: 'projects', visible: true }])
+  })
+
+  test('a hidden widget stays in place and is not treated as missing', () => {
+    const state = createInitialState({}, [], [], false, {
+      bars: {
+        left: {
+          visible: true,
+          widgets: [
+            { grow: 50, id: 'projects', visible: false },
+            { grow: 50, id: 'git', visible: true },
+          ],
+          width: 33,
+        },
+        right: { visible: false, widgets: [], width: 40 },
+      },
+    })
+
+    expect(state.bars.left.widgets).toEqual([
+      { grow: 50, id: 'projects', visible: false },
+      { grow: 50, id: 'git', visible: true },
+    ])
   })
 })
 
@@ -60,24 +116,23 @@ function createTab(
 }
 
 describe('appReducer', () => {
-  test('opens session picker from navigation', () => {
+  test('opens project picker from navigation', () => {
     const initial = createInitialState()
-    const next = appReducer(initial, { type: 'open-session-picker' })
+    const next = appReducer(initial, { type: 'open-project-picker' })
 
-    expect(next.modal.type).toBe('session-picker')
+    expect(next.modal.type).toBe('project-picker')
     expect(next.focusMode).toBe('command-edit')
   })
 
-  test('loads selected session and marks it current', () => {
+  test('loads selected project and marks it current', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
-          updatedAt: '2024-01-01T00:00:00.000Z',
-          workspaceSnapshot: {
+          projectSnapshot: {
             activeTabId: 'tab-1',
             savedAt: '2024-01-01T00:00:00.000Z',
             sidebar: { visible: false, width: 22 },
@@ -100,39 +155,40 @@ describe('appReducer', () => {
             ],
             version: 1,
           },
+          updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       focusMode: 'modal' as const,
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
-        type: 'session-picker' as const,
+        type: 'project-picker' as const,
       },
     }
 
-    const next = appReducer(initial, { sessionId: 'session-1', type: 'load-session' })
-    expect(next.currentSessionId).toBe('session-1')
+    const next = appReducer(initial, { projectId: 'project-1', type: 'load-project' })
+    expect(next.currentProjectId).toBe('project-1')
     expect(next.activeTabId).toBe('tab-1')
     expect(next.tabs[0]?.status).toBe('disconnected')
     expect(next.focusMode).toBe('navigation')
   })
 
-  test('activating a tab switches active session worktree', () => {
+  test('activating a tab switches active project workspace', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-1',
+            activeWorkspaceId: 'wt-1',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -160,7 +216,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -168,7 +224,7 @@ describe('appReducer', () => {
           id: 'tab-1',
           status: 'running',
           title: 'Claude',
-          worktreeId: 'wt-1',
+          workspaceId: 'wt-1',
         }),
         createTab({
           assistant: 'codex',
@@ -176,33 +232,34 @@ describe('appReducer', () => {
           id: 'tab-2',
           status: 'running',
           title: 'Codex',
-          worktreeId: 'wt-2',
+          workspaceId: 'wt-2',
         }),
       ],
     }
 
     const next = appReducer(initial, { tabId: 'tab-2', type: 'set-active-tab' })
-    const session = next.sessions.find((entry) => entry.id === 'session-1')
+    const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(session?.activeWorktreeId).toBe('wt-2')
-    expect(session?.projectPath).toBe('/repo/feature')
+    expect(project?.activeWorkspaceId).toBe('wt-2')
+    // Only the active workspace moves — projectPath keeps naming the repo.
+    expect(project?.projectPath).toBe('/repo/main')
   })
 
-  test('activating a legacy tab leaves active worktree unchanged', () => {
+  test('activating a legacy tab leaves active workspace unchanged', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-1',
+            activeWorkspaceId: 'wt-1',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -220,7 +277,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -233,26 +290,26 @@ describe('appReducer', () => {
     }
 
     const next = appReducer(initial, { tabId: 'tab-1', type: 'set-active-tab' })
-    const session = next.sessions.find((entry) => entry.id === 'session-1')
+    const project = next.projects.find((entry) => entry.id === 'project-1')
 
-    expect(session?.activeWorktreeId).toBe('wt-1')
-    expect(session?.projectPath).toBe('/repo/main')
+    expect(project?.activeWorkspaceId).toBe('wt-1')
+    expect(project?.projectPath).toBe('/repo/main')
   })
 
-  test('new assistant flow chooses assistant before worktree', () => {
+  test('the new-tab modal is an assistant picker and nothing else', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = createInitialState(
       {},
       [
         {
-          activeWorktreeId: 'wt-feature',
+          activeWorkspaceId: 'wt-feature',
           createdAt: now,
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: now,
           name: 'Main',
           projectPath: '/repo/feature',
           updatedAt: now,
-          worktrees: [
+          workspaces: [
             {
               createdAt: now,
               createdByAimux: false,
@@ -280,53 +337,45 @@ describe('appReducer', () => {
       false
     )
     const opened = appReducer(
-      { ...initial, currentSessionId: 'session-1' },
+      { ...initial, currentProjectId: 'project-1' },
       { type: 'open-new-tab-modal' }
     )
-    expect(opened.modal.type).toBe('new-tab')
     if (opened.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(opened.modal.step).toBe('assistant')
-    expect(opened.modal.targetWorktreeIndex).toBe(1)
+    expect(opened.modal.selectedIndex).toBe(0)
+    expect(opened.modal.editingCommand).toBeNull()
 
-    const selected = appReducer(opened, { type: 'select-new-tab-assistant' })
-    expect(selected.modal.type).toBe('new-tab')
-    if (selected.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(selected.modal.step).toBe('worktree')
-    expect(selected.modal.selectedIndex).toBe(1)
-    expect(selected.modal.createWorktree).toBe(false)
-
-    const createNew = appReducer(selected, { delta: 1, type: 'move-modal-selection' })
-    expect(createNew.modal.type).toBe('new-tab')
-    if (createNew.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
-    expect(createNew.modal.selectedIndex).toBe(2)
-    expect(createNew.modal.createWorktree).toBe(true)
-    expect(createNew.modal.targetWorktreeIndex).toBe(1)
+    // Moving the selection walks the assistant list — there is no workspace step
+    // to fall into, and no trailing "create workspace" row.
+    const moved = appReducer(opened, { delta: 1, type: 'move-modal-selection' })
+    if (moved.modal.type !== 'new-tab') throw new Error('expected new-tab modal')
+    expect(moved.modal.selectedIndex).toBe(1)
+    expect(moved.modal.type).toBe('new-tab')
   })
 
-  test('deleting a non-current session keeps the current workspace and modal state', () => {
+  test('deleting a non-current project keeps the current project and modal state', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-2',
+          id: 'project-2',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Other',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       focusMode: 'navigation' as const,
-      sessionStatuses: {
-        'session-1': { waiting: false, working: false },
-        'session-2': { waiting: true, working: false },
+      projectStatuses: {
+        'project-1': { waiting: false, working: false },
+        'project-2': { waiting: true, working: false },
       },
       tabs: [
         createTab({
@@ -339,29 +388,29 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { sessionId: 'session-2', type: 'delete-session-record' })
-    expect(next.sessions.map((session) => session.id)).toEqual(['session-1'])
-    expect(next.currentSessionId).toBe('session-1')
+    const next = appReducer(initial, { projectId: 'project-2', type: 'delete-project-record' })
+    expect(next.projects.map((project) => project.id)).toEqual(['project-1'])
+    expect(next.currentProjectId).toBe('project-1')
     expect(next.activeTabId).toBe('tab-1')
     expect(next.tabs).toHaveLength(1)
     expect(next.focusMode).toBe('navigation')
     expect(next.modal.type).toBeNull()
-    expect(next.sessionStatuses['session-2']).toBeUndefined()
+    expect(next.projectStatuses['project-2']).toBeUndefined()
   })
 
-  test('deleting active session from the session bar does not open the picker', () => {
+  test('deleting active project from the project bar does not open the picker', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -373,34 +422,34 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { sessionId: 'session-1', type: 'delete-session-record' })
-    expect(next.sessions).toHaveLength(0)
-    expect(next.currentSessionId).toBeNull()
+    const next = appReducer(initial, { projectId: 'project-1', type: 'delete-project-record' })
+    expect(next.projects).toHaveLength(0)
+    expect(next.currentProjectId).toBeNull()
     expect(next.activeTabId).toBeNull()
     expect(next.tabs).toHaveLength(0)
     expect(next.focusMode).toBe('navigation')
     expect(next.modal.type).toBeNull()
   })
 
-  test('deleting active session from the picker keeps the picker open', () => {
+  test('deleting active project from the picker keeps the picker open', () => {
     const initial = {
       ...createInitialState({}, [
         {
           createdAt: '2024-01-01T00:00:00.000Z',
-          id: 'session-1',
+          id: 'project-1',
           lastOpenedAt: '2024-01-01T00:00:00.000Z',
           name: 'Main',
           updatedAt: '2024-01-01T00:00:00.000Z',
         },
       ]),
       activeTabId: 'tab-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       focusMode: 'modal' as const,
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
-        type: 'session-picker' as const,
+        type: 'project-picker' as const,
       },
       tabs: [
         createTab({
@@ -414,14 +463,14 @@ describe('appReducer', () => {
     }
 
     const next = appReducer(initial, {
-      openSessionPicker: true,
-      sessionId: 'session-1',
-      type: 'delete-session-record',
+      openProjectPicker: true,
+      projectId: 'project-1',
+      type: 'delete-project-record',
     })
-    expect(next.sessions).toHaveLength(0)
-    expect(next.currentSessionId).toBeNull()
+    expect(next.projects).toHaveLength(0)
+    expect(next.currentProjectId).toBeNull()
     expect(next.tabs).toHaveLength(0)
-    expect(next.modal.type).toBe('session-picker')
+    expect(next.modal.type).toBe('project-picker')
     expect(next.focusMode).toBe('modal')
   })
 
@@ -481,21 +530,21 @@ describe('appReducer', () => {
     expect(next.activeTabId).toBe('2')
   })
 
-  test('moves active tab by grouped sidebar worktree order', () => {
+  test('moves active tab by grouped sidebar workspace order', () => {
     const now = '2024-01-01T00:00:00.000Z'
     const initial = {
       ...createInitialState(
         {},
         [
           {
-            activeWorktreeId: 'wt-main',
+            activeWorkspaceId: 'wt-main',
             createdAt: now,
-            id: 'session-1',
+            id: 'project-1',
             lastOpenedAt: now,
             name: 'Main',
             projectPath: '/repo/main',
             updatedAt: now,
-            worktrees: [
+            workspaces: [
               {
                 createdAt: now,
                 createdByAimux: false,
@@ -523,7 +572,7 @@ describe('appReducer', () => {
         false
       ),
       activeTabId: 'main-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs: [
         createTab({
           assistant: 'claude',
@@ -531,7 +580,7 @@ describe('appReducer', () => {
           id: 'main-1',
           status: 'running',
           title: 'Main 1',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         }),
         createTab({
           assistant: 'codex',
@@ -539,7 +588,7 @@ describe('appReducer', () => {
           id: 'feature-1',
           status: 'running',
           title: 'Feature 1',
-          worktreeId: 'wt-feature',
+          workspaceId: 'wt-feature',
         }),
         createTab({
           assistant: 'opencode',
@@ -547,7 +596,7 @@ describe('appReducer', () => {
           id: 'main-2',
           status: 'running',
           title: 'Main 2',
-          worktreeId: 'wt-main',
+          workspaceId: 'wt-main',
         }),
       ],
     }
@@ -556,17 +605,17 @@ describe('appReducer', () => {
     expect(next.activeTabId).toBe('main-2')
   })
 
-  test('cycles only within the active worktree (does not cross worktrees)', () => {
+  test('cycles only within the active workspace (does not cross workspaces)', () => {
     const now = '2024-01-01T00:00:00.000Z'
-    const sessionWithTwoWorktrees = {
-      activeWorktreeId: 'wt-main',
+    const projectWithTwoWorkspaces = {
+      activeWorkspaceId: 'wt-main',
       createdAt: now,
-      id: 'session-1',
+      id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
       projectPath: '/repo/main',
       updatedAt: now,
-      worktrees: [
+      workspaces: [
         {
           createdAt: now,
           createdByAimux: false,
@@ -596,7 +645,7 @@ describe('appReducer', () => {
         id: 'main-1',
         status: 'running' as const,
         title: 'Main 1',
-        worktreeId: 'wt-main',
+        workspaceId: 'wt-main',
       }),
       createTab({
         assistant: 'codex',
@@ -604,7 +653,7 @@ describe('appReducer', () => {
         id: 'main-2',
         status: 'running' as const,
         title: 'Main 2',
-        worktreeId: 'wt-main',
+        workspaceId: 'wt-main',
       }),
       createTab({
         assistant: 'opencode',
@@ -612,7 +661,7 @@ describe('appReducer', () => {
         id: 'feature-1',
         status: 'running' as const,
         title: 'Feature 1',
-        worktreeId: 'wt-feature',
+        workspaceId: 'wt-feature',
       }),
       createTab({
         assistant: 'terminal',
@@ -620,31 +669,31 @@ describe('appReducer', () => {
         id: 'feature-2',
         status: 'running' as const,
         title: 'Feature 2',
-        worktreeId: 'wt-feature',
+        workspaceId: 'wt-feature',
       }),
     ]
 
-    // From last tab of active worktree, +1 wraps to FIRST of same worktree
+    // From last tab of active workspace, +1 wraps to FIRST of same workspace
     // (must not cross to feature-1).
     const fromLastOfActive = {
-      ...createInitialState({}, [sessionWithTwoWorktrees], [], false),
+      ...createInitialState({}, [projectWithTwoWorkspaces], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
     const wrapped = appReducer(fromLastOfActive, { delta: 1, type: 'move-active-tab' })
     expect(wrapped.activeTabId).toBe('main-1')
 
-    // Switching the active worktree to wt-feature scopes h/l to its tabs.
+    // Switching the active workspace to wt-feature scopes h/l to its tabs.
     const onFeature = {
       ...createInitialState(
         {},
-        [{ ...sessionWithTwoWorktrees, activeWorktreeId: 'wt-feature' }],
+        [{ ...projectWithTwoWorkspaces, activeWorkspaceId: 'wt-feature' }],
         [],
         false
       ),
       activeTabId: 'feature-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
     const nextOnFeature = appReducer(onFeature, { delta: 1, type: 'move-active-tab' })
@@ -938,7 +987,7 @@ describe('appReducer', () => {
     expect(larger.bars.left.width).toBe(BAR_MAX_WIDTH)
   })
 
-  test('reset-tab-session keeps tab but clears runtime state', () => {
+  test('reset-tab-project keeps tab but clears runtime state', () => {
     const initial = {
       ...createInitialState(),
       activeTabId: '1',
@@ -966,7 +1015,7 @@ describe('appReducer', () => {
       ],
     }
 
-    const next = appReducer(initial, { tabId: '1', type: 'reset-tab-session' })
+    const next = appReducer(initial, { tabId: '1', type: 'reset-tab-project' })
     expect(next.activeTabId).toBe('1')
     expect(next.focusMode).toBe('navigation')
     expect(next.tabs[0]).toMatchObject({
@@ -987,19 +1036,19 @@ describe('appReducer', () => {
   })
 })
 
-describe('set-active-worktree remembers the last viewed tab per worktree', () => {
+describe('set-active-workspace remembers the last viewed tab per workspace', () => {
   const now = '2024-01-01T00:00:00.000Z'
 
-  function twoWorktreeSession(activeWorktreeId: 'wt-main' | 'wt-feature') {
+  function twoWorkspaceProject(activeWorkspaceId: 'wt-main' | 'wt-feature') {
     return {
-      activeWorktreeId,
+      activeWorkspaceId,
       createdAt: now,
-      id: 'session-1',
+      id: 'project-1',
       lastOpenedAt: now,
       name: 'Main',
-      projectPath: activeWorktreeId === 'wt-main' ? '/repo/main' : '/repo/feature',
+      projectPath: activeWorkspaceId === 'wt-main' ? '/repo/main' : '/repo/feature',
       updatedAt: now,
-      worktrees: [
+      workspaces: [
         {
           createdAt: now,
           createdByAimux: false,
@@ -1031,7 +1080,7 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'main-1',
       status: 'running',
       title: 'Main 1',
-      worktreeId: 'wt-main',
+      workspaceId: 'wt-main',
     }),
     createTab({
       assistant: 'codex',
@@ -1039,7 +1088,7 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'main-2',
       status: 'running',
       title: 'Main 2',
-      worktreeId: 'wt-main',
+      workspaceId: 'wt-main',
     }),
     createTab({
       assistant: 'opencode',
@@ -1047,66 +1096,66 @@ describe('set-active-worktree remembers the last viewed tab per worktree', () =>
       id: 'feature-1',
       status: 'running',
       title: 'Feature 1',
-      worktreeId: 'wt-feature',
+      workspaceId: 'wt-feature',
     }),
   ]
 
-  test('restores the last viewed tab when switching back to a worktree', () => {
+  test('restores the last viewed tab when switching back to a workspace', () => {
     // On wt-main viewing main-2 (the second tab, not the first).
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
 
     // Switch to wt-feature → lands on its first tab and remembers main-2.
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      projectId: 'project-1',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     expect(onFeature.activeTabId).toBe('feature-1')
-    expect(onFeature.lastActiveTabByWorktree['wt-main']).toBe('main-2')
+    expect(onFeature.lastActiveTabByWorkspace['wt-main']).toBe('main-2')
 
     // Switch back to wt-main → restores main-2 instead of snapping to main-1.
     const backOnMain = appReducer(onFeature, {
-      sessionId: 'session-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-main',
+      projectId: 'project-1',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-main',
     })
     expect(backOnMain.activeTabId).toBe('main-2')
   })
 
   test('falls back to the first visible tab when no tab is remembered', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-1',
-      currentSessionId: 'session-1',
+      currentProjectId: 'project-1',
       tabs,
     }
 
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      projectId: 'project-1',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     expect(onFeature.activeTabId).toBe('feature-1')
   })
 
   test('falls back to the first visible tab when the remembered tab is gone', () => {
     const onMain = {
-      ...createInitialState({}, [twoWorktreeSession('wt-main')], [], false),
+      ...createInitialState({}, [twoWorkspaceProject('wt-main')], [], false),
       activeTabId: 'main-2',
-      currentSessionId: 'session-1',
-      lastActiveTabByWorktree: { 'wt-feature': 'feature-removed' },
+      currentProjectId: 'project-1',
+      lastActiveTabByWorkspace: { 'wt-feature': 'feature-removed' },
       tabs,
     }
 
     const onFeature = appReducer(onMain, {
-      sessionId: 'session-1',
-      type: 'set-active-worktree',
-      worktreeId: 'wt-feature',
+      projectId: 'project-1',
+      type: 'set-active-workspace',
+      workspaceId: 'wt-feature',
     })
     // Remembered feature tab no longer exists → first visible feature tab.
     expect(onFeature.activeTabId).toBe('feature-1')

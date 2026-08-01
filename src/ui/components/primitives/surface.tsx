@@ -26,6 +26,7 @@ interface SurfaceProps {
   children: ReactNode
   flexDirection?: 'row' | 'column'
   gap?: number
+  minHeight?: number
   padding?: number
   paddingLeft?: number
   paddingRight?: number
@@ -39,6 +40,7 @@ export function Surface({
   children,
   flexDirection = 'column',
   gap = 0,
+  minHeight,
   padding,
   paddingBottom,
   paddingLeft,
@@ -53,6 +55,7 @@ export function Surface({
       backgroundColor={t[toneToToken(tone)]}
       flexDirection={flexDirection}
       gap={gap}
+      minHeight={minHeight}
       padding={padding}
       paddingBottom={paddingBottom}
       paddingLeft={paddingLeft}

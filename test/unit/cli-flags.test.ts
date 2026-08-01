@@ -5,10 +5,10 @@ import { CliUsageError, parseArgs, SHARED_FLAGS } from '../../src/cli/flags'
 describe('cli flag parser', () => {
   test('parses --flag value and --flag=value identically', () => {
     const spec = [...SHARED_FLAGS]
-    const a = parseArgs(['--workspace', 'main'], spec, [])
-    const b = parseArgs(['--workspace=main'], spec, [])
-    expect(a.flags.workspace).toBe('main')
-    expect(b.flags.workspace).toBe('main')
+    const a = parseArgs(['--project', 'main'], spec, [])
+    const b = parseArgs(['--project=main'], spec, [])
+    expect(a.flags.project).toBe('main')
+    expect(b.flags.project).toBe('main')
   })
 
   test('treats --json as a boolean', () => {
@@ -21,9 +21,9 @@ describe('cli flag parser', () => {
   })
 
   test('positionals after -- are not parsed as flags', () => {
-    const parsed = parseArgs(['--workspace', 'main', '--', '--workspace'], SHARED_FLAGS, [])
-    expect(parsed.flags.workspace).toBe('main')
-    expect(parsed.positionals).toEqual(['--workspace'])
+    const parsed = parseArgs(['--project', 'main', '--', '--project'], SHARED_FLAGS, [])
+    expect(parsed.flags.project).toBe('main')
+    expect(parsed.positionals).toEqual(['--project'])
   })
 
   test('unknown flags surface as usage errors', () => {
@@ -43,26 +43,50 @@ describe('cli flag parser', () => {
   })
 
   describe('optional-string kind', () => {
-    const spec = [{ kind: 'optional-string', name: 'new-worktree' } as const]
+    const spec = [{ kind: 'optional-string', name: 'new-workspace' } as const]
 
     test('bare flag parses as boolean true', () => {
-      expect(parseArgs(['--new-worktree'], spec, []).flags['new-worktree']).toBe(true)
+      expect(parseArgs(['--new-workspace'], spec, []).flags['new-workspace']).toBe(true)
     })
 
     test('=form binds the value', () => {
-      expect(parseArgs(['--new-worktree=fix-auth'], spec, []).flags['new-worktree']).toBe(
+      expect(parseArgs(['--new-workspace=fix-auth'], spec, []).flags['new-workspace']).toBe(
         'fix-auth'
       )
     })
 
     test('=form binds an empty value', () => {
-      expect(parseArgs(['--new-worktree='], spec, []).flags['new-worktree']).toBe('')
+      expect(parseArgs(['--new-workspace='], spec, []).flags['new-workspace']).toBe('')
     })
 
     test('bare flag does NOT swallow the following positional', () => {
-      const parsed = parseArgs(['--new-worktree', 'tab-123'], spec, [{ name: 'tabId' }])
-      expect(parsed.flags['new-worktree']).toBe(true)
+      const parsed = parseArgs(['--new-workspace', 'tab-123'], spec, [{ name: 'tabId' }])
+      expect(parsed.flags['new-workspace']).toBe(true)
       expect(parsed.positionals).toEqual(['tab-123'])
     })
+  })
+})
+
+describe('deprecated flag aliases from the project/workspace rename', () => {
+  test('--workspace still resolves a project, keyed under the new name', () => {
+    const parsed = parseArgs(['--workspace', 'main'], SHARED_FLAGS, [])
+    expect(parsed.flags.project).toBe('main')
+    // The old spelling must not leak into the result.
+    expect(parsed.flags.workspace).toBeUndefined()
+  })
+
+  test('the alias works in the --flag=value form too', () => {
+    expect(parseArgs(['--workspace=main'], SHARED_FLAGS, []).flags.project).toBe('main')
+  })
+
+  test('--worktree resolves to the workspace flag when a command declares one', () => {
+    const spec = [{ description: 'target workspace', kind: 'string', name: 'workspace' }] as const
+    const parsed = parseArgs(['--worktree', 'wt-1'], spec, [])
+    expect(parsed.flags.workspace).toBe('wt-1')
+    expect(parsed.flags.worktree).toBeUndefined()
+  })
+
+  test('an alias is ignored when the command has no such current flag', () => {
+    expect(() => parseArgs(['--worktree', 'x'], SHARED_FLAGS, [])).toThrow(CliUsageError)
   })
 })

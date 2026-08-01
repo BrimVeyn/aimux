@@ -23,18 +23,20 @@ function shortHash(input: string, length = 8): string {
   return createHash('sha1').update(input).digest('hex').slice(0, length)
 }
 
+// Params speak the app's vocabulary (a workspace); the directory layout keeps
+// git's, so existing worktrees on disk stay exactly where they are.
 export function makeWorktreePath({
   repoRoot,
-  worktreeId,
-  worktreeName,
+  workspaceId,
+  workspaceName,
 }: {
   repoRoot: string
-  worktreeName: string
-  worktreeId: string
+  workspaceName: string
+  workspaceId: string
 }): string {
   const repoKey = `r-${shortHash(resolve(repoRoot))}`
-  const idSuffix = shortHash(worktreeId, 5)
-  const slug = `${sanitizePathSegment(worktreeName)}-${idSuffix}`
+  const idSuffix = shortHash(workspaceId, 5)
+  const slug = `${sanitizePathSegment(workspaceName)}-${idSuffix}`
   return join(getAimuxWorktreeRoot(), repoKey, slug)
 }
 

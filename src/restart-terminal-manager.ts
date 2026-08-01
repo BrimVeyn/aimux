@@ -21,7 +21,7 @@ export async function runRestartTerminalManager(): Promise<number> {
   const managerPid = await findTerminalManagerPid()
   if (managerPid !== null) {
     process.stdout.write(
-      `WARNING: killing terminal-manager (pid ${managerPid}) will kill live sessions.\n`
+      `WARNING: killing terminal-manager (pid ${managerPid}) will kill live projects.\n`
     )
     await killProcess(managerPid)
     process.stdout.write('Terminal-manager stopped.\n')

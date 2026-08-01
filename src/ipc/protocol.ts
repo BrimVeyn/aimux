@@ -1,17 +1,17 @@
 import type {
   AssistantId,
+  ProjectSnapshotV1,
+  ProjectStatus,
   QuestionKind,
-  SessionStatus,
   TabActivity,
   TabSession,
   TabStatus,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 
-import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
+import { isProjectSnapshotV1, isWorkspaceRecord } from '../state/validation'
 
 // v9: scroll position is owned entirely by the backend emulator. Dropped the
 // per-tab scroll `intent`/`intents` from resize messages and removed the
@@ -22,13 +22,13 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // v11: additive — exposes `listTabs` (read-only enumeration without `attach`),
 // `attach.thin` (skip server-side resize so a headless CLI can attach
 // alongside a UI without resizing PTYs), and `createTab` cols/rows=0 fallback
-// to the session's last attached size. All three are gated behind
+// to the project's last attached size. All three are gated behind
 // capabilities; MIN stays at 10 so a v10 UI keeps talking to a v11 daemon
 // (and vice-versa).
 //
-// v12: additive — workspace lifecycle requests (`createWorkspace`,
-// `switchWorkspace`, `closeWorkspace`, `announceWorkspaceSwitched`) and
-// worktree record requests (`addWorktreeRecord`, `removeWorktreeRecord`),
+// v12: additive — project lifecycle requests (`createProject`,
+// `switchProject`, `closeProject`, `announceProjectSwitched`) and
+// workspace record requests (`addWorkspaceRecord`, `removeWorkspaceRecord`),
 // plus matching broadcast events. All capability-gated; MIN stays at 10.
 //
 // v13: additive — agent-orchestration signals. Two new broadcast events,
@@ -41,13 +41,13 @@ import { isWorkspaceSnapshotV1, isWorktreeRecord } from '../state/validation'
 // v14: additive — tab metadata synchronization for manual and automatic
 // renames. The new request/event are capability-gated; MIN stays at 10.
 //
-// v15: additive — workspace-scoped `workerName` metadata on create, attach,
+// v15: additive — project-scoped `workerName` metadata on create, attach,
 // and list results. This powers stable name-or-id orchestration selectors.
 //
 // v16: breaking release boundary — the agent-first worker control plane and
 // its metadata guarantees are now required. Old app/daemon pairs must not mix.
-export const IPC_PROTOCOL_MIN_VERSION = 16
-export const IPC_PROTOCOL_VERSION = 16
+export const IPC_PROTOCOL_MIN_VERSION = 17
+export const IPC_PROTOCOL_VERSION = 17
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -72,7 +72,7 @@ export const IPC_CAPABILITY_THIN_ATTACH = 'thinAttach'
 
 /**
  * Capability gating `createTab` with `cols: 0` or `rows: 0` meaning "use the
- * session's last attached size". Older daemons would propagate 0 straight to
+ * project's last attached size". Older daemons would propagate 0 straight to
  * the TM and spawn a zero-sized PTY, so the client only sends zeroes when
  * this capability is advertised.
  */
@@ -80,7 +80,7 @@ export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
 
 /**
  * Capability gating the `tabAdded` server event. When advertised, the daemon
- * fans a `tabAdded` event out to every socket attached to the session after
+ * fans a `tabAdded` event out to every socket attached to the project after
  * a successful `createTab` — that's how a UI process learns about tabs
  * created by a sibling CLI invocation. Pre-cap UIs simply never see the
  * event and continue to discover tabs only via the next `attachResult`.
@@ -88,30 +88,30 @@ export const IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK = 'createTabSizeFallback'
 export const IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS = 'tabLifecycleEvents'
 
 /**
- * Capability gating the optional `worktreeId` on `createTab` payloads. With
- * it, the CLI can spawn a tab inside a specific worktree of the active
- * session so the UI groups it correctly. Older daemons ignore the field
+ * Capability gating the optional `workspaceId` on `createTab` payloads. With
+ * it, the CLI can spawn a tab inside a specific workspace of the active
+ * project so the UI groups it correctly. Older daemons ignore the field
  * (the parser accepts it but the TM has no knob for it pre-bump).
  */
-export const IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID = 'createTabWorktreeId'
+export const IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID = 'createTabWorkspaceId'
 
 /**
- * v12 — capability gating headless workspace lifecycle requests
- * (`createWorkspace`, `switchWorkspace`, `closeWorkspace`,
- * `announceWorkspaceSwitched`) and their `workspace*Requested` /
- * `workspaceSwitched` broadcasts. When a UI is attached the daemon relays
+ * v12 — capability gating headless project lifecycle requests
+ * (`createProject`, `switchProject`, `closeProject`,
+ * `announceProjectSwitched`) and their `project*Requested` /
+ * `projectSwitched` broadcasts. When a UI is attached the daemon relays
  * the request as an event so the UI's reducer stays authoritative for the
- * live workspace snapshot; when no UI is attached the daemon mutates the
+ * live project snapshot; when no UI is attached the daemon mutates the
  * catalog directly.
  */
-export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE = 'workspaceLifecycle'
+export const IPC_CAPABILITY_PROJECT_LIFECYCLE = 'projectLifecycle'
 
 /**
- * v12 — capability gating `addWorktreeRecord` / `removeWorktreeRecord` and
- * their `worktreeAdded` / `worktreeRemoved` broadcasts. Same UI-vs-headless
- * fanout as workspaceLifecycle.
+ * v12 — capability gating `addWorkspaceRecord` / `removeWorkspaceRecord` and
+ * their `workspaceAdded` / `workspaceRemoved` broadcasts. Same UI-vs-headless
+ * fanout as projectLifecycle.
  */
-export const IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS = 'worktreeLifecycleEvents'
+export const IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS = 'workspaceLifecycleEvents'
 export const IPC_CAPABILITY_WORKER_METADATA = 'workerMetadata'
 
 /**
@@ -166,9 +166,9 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_THIN_ATTACH,
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
-  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
-  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID,
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
   IPC_CAPABILITY_TAB_TAIL,
   IPC_CAPABILITY_TURN_LIFECYCLE,
   IPC_CAPABILITY_QUESTION_EVENTS,
@@ -209,15 +209,15 @@ export interface ProtocolHelloResult {
 
 export interface AttachRequest {
   protocolVersion: number
-  sessionId: string
+  projectId: string
   cols: number
   rows: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
   /**
    * v11 / capability `thinAttach`. When true, the daemon does not call
-   * `manager.resize` on the session — the headless attacher (CLI) does not
+   * `manager.resize` on the project — the headless attacher (CLI) does not
    * own a viewport, so it must not clobber the dimensions a UI process is
-   * driving for the same session.
+   * driving for the same project.
    *
    * Pre-v11 daemons ignore the field; the gate exists so the client knows
    * to fall through to a full attach (with a sentinel size) when the daemon
@@ -229,7 +229,7 @@ export interface AttachRequest {
 /**
  * Slim per-tab summary returned by `listTabs`. Subset of {@link TabSession}
  * with the buffer/viewport/terminalModes intentionally omitted so the request
- * stays cheap even on sessions with many tabs.
+ * stays cheap even on projects with many tabs.
  */
 export interface TabSessionSummary {
   id: string
@@ -238,7 +238,7 @@ export interface TabSessionSummary {
   status: TabStatus
   activity?: TabActivity
   command: string
-  worktreeId?: string
+  workspaceId?: string
   workerName?: string
   /**
    * v13 / capability `listTabsLastLine`. The tab's last non-blank rendered
@@ -258,12 +258,12 @@ export interface AttachResult {
   tabs: TabSession[]
   activeTabId: string | null
   /**
-   * Snapshot of every known session's status at attach time. Applied by
-   * the client atomically with `hydrate-workspace` so chips render the
+   * Snapshot of every known project's status at attach time. Applied by
+   * the client atomically with `hydrate-project` so chips render the
    * right state immediately, without the per-event race where a separate
-   * `sessionStatus` event could arrive before the session was in state.
+   * `projectStatus` event could arrive before the project was in state.
    */
-  initialSessionStatuses: { sessionId: string; status: SessionStatus }[]
+  initialProjectStatuses: { projectId: string; status: ProjectStatus }[]
 }
 
 export type ClientRequest =
@@ -282,14 +282,14 @@ export type ClientRequest =
         rows: number
         cwd?: string
         /**
-         * v11 / capability `createTabWorktreeId`. Lets the CLI spawn a tab
-         * inside a specific worktree so the UI groups it correctly. The
+         * v11 / capability `createTabWorkspaceId`. Lets the CLI spawn a tab
+         * inside a specific workspace so the UI groups it correctly. The
          * field is parsed unconditionally — older daemons accepted no such
          * field, so this is a true additive on the wire — but the daemon
          * only forwards it to the TM when its own capability is in play.
          */
-        worktreeId?: string
-        /** v15 / capability `workerMetadata`: stable workspace-scoped handle. */
+        workspaceId?: string
+        /** v15 / capability `workerMetadata`: stable project-scoped handle. */
         workerName?: string
         /** True only when the creator did not provide an explicit title. */
         autoRenameCandidate?: boolean
@@ -318,51 +318,51 @@ export type ClientRequest =
   // spawned successor binary can bind the canonical socket path while the
   // terminal-manager (and every PTY) keeps running.
   | { id: string; type: 'prepareReexec'; payload: { reason?: string } }
-  // Capability-gated on `listTabs`. Read-only enumeration of a session's
-  // tabs — does NOT attach. Lets a headless CLI inspect a session without
+  // Capability-gated on `listTabs`. Read-only enumeration of a project's
+  // tabs — does NOT attach. Lets a headless CLI inspect a project without
   // implicit `manager.resize` or `setBroadcastEnabled` side effects.
-  | { id: string; type: 'listTabs'; payload: { sessionId: string } }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to create a new
-  // workspace in the catalog. When any UI socket is attached the daemon
-  // broadcasts `workspaceCreateRequested` so the UI's reducer performs the
-  // create (owning the live workspace snapshot); when no UI is attached the
+  | { id: string; type: 'listTabs'; payload: { projectId: string } }
+  // v12 / capability `projectLifecycle`. Ask the daemon to create a new
+  // project in the catalog. When any UI socket is attached the daemon
+  // broadcasts `projectCreateRequested` so the UI's reducer performs the
+  // create (owning the live project snapshot); when no UI is attached the
   // daemon writes the catalog directly.
   | {
       id: string
-      type: 'createWorkspace'
+      type: 'createProject'
       payload: { name: string; projectPath?: string; switch?: boolean }
     }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to switch to
-  // another workspace. Broadcast → `workspaceSwitchRequested`; headless
+  // v12 / capability `projectLifecycle`. Ask the daemon to switch to
+  // another project. Broadcast → `projectSwitchRequested`; headless
   // path bumps `lastOpenedAt` on the target so the next UI boot picks it.
-  | { id: string; type: 'switchWorkspace'; payload: { targetSessionId: string } }
-  // v12 / capability `workspaceLifecycle`. Ask the daemon to remove a
-  // workspace. Broadcast → `workspaceCloseRequested`; headless deletes the
+  | { id: string; type: 'switchProject'; payload: { targetProjectId: string } }
+  // v12 / capability `projectLifecycle`. Ask the daemon to remove a
+  // project. Broadcast → `projectCloseRequested`; headless deletes the
   // catalog entry directly.
   | {
       id: string
-      type: 'closeWorkspace'
-      payload: { targetSessionId: string }
+      type: 'closeProject'
+      payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. UI announces that its own
-  // `handleSwitchSessionEffect` has finished; the daemon relays as a
-  // `workspaceSwitched` broadcast so a `--wait`ing CLI can exit.
-  | { id: string; type: 'announceWorkspaceSwitched'; payload: { sessionId: string } }
-  // v12 / capability `worktreeLifecycleEvents`. Append a worktree record to
-  // a session in the catalog. UI-attached path relays as `worktreeAdded`;
+  // v12 / capability `projectLifecycle`. UI announces that its own
+  // `handleSwitchProjectEffect` has finished; the daemon relays as a
+  // `projectSwitched` broadcast so a `--wait`ing CLI can exit.
+  | { id: string; type: 'announceProjectSwitched'; payload: { projectId: string } }
+  // v12 / capability `workspaceLifecycleEvents`. Append a workspace record to
+  // a project in the catalog. UI-attached path relays as `workspaceAdded`;
   // headless path writes the catalog directly.
   | {
       id: string
-      type: 'addWorktreeRecord'
-      payload: { sessionId: string; worktree: WorktreeRecord }
+      type: 'addWorkspaceRecord'
+      payload: { projectId: string; workspace: WorkspaceRecord }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Remove a worktree record.
-  // UI-attached path relays as `worktreeRemoved`; headless path writes the
+  // v12 / capability `workspaceLifecycleEvents`. Remove a workspace record.
+  // UI-attached path relays as `workspaceRemoved`; headless path writes the
   // catalog directly.
   | {
       id: string
-      type: 'removeWorktreeRecord'
-      payload: { sessionId: string; worktreeId: string }
+      type: 'removeWorkspaceRecord'
+      payload: { projectId: string; workspaceId: string }
     }
 
 export type ServerResponse =
@@ -390,13 +390,13 @@ export type ServerEvent =
     }
   | { type: 'tabExit'; payload: { tabId: string; exitCode: number } }
   | { type: 'tabError'; payload: { tabId: string; message: string } }
-  | { type: 'tabStatus'; payload: { sessionId: string; tabId: string; status: TabActivity } }
+  | { type: 'tabStatus'; payload: { projectId: string; tabId: string; status: TabActivity } }
   // v13 / capability `turnLifecycle`. Authoritative end-of-turn: broadcast
   // once a tab's `idle` activity has held continuously for the settle window.
   // Edge-triggered — re-armed only after the tab leaves `idle` again — so a
   // driver gets exactly one per turn. `idleMs` is how long idle had held when
   // the event fired.
-  | { type: 'tabTurnComplete'; payload: { sessionId: string; tabId: string; idleMs: number } }
+  | { type: 'tabTurnComplete'; payload: { projectId: string; tabId: string; idleMs: number } }
   // v13 / capability `questionEvents`. Broadcast when a tab transitions into
   // `waiting-input`. `prompt` is the captured tail text (authoritative);
   // `options` is a best-effort per-CLI parse of the choice list and may be
@@ -404,73 +404,73 @@ export type ServerEvent =
   | {
       type: 'tabQuestion'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         kind: QuestionKind
         prompt: string
         options?: string[]
       }
     }
-  | { type: 'sessionStatus'; payload: { sessionId: string; status: SessionStatus } }
+  | { type: 'projectStatus'; payload: { projectId: string; status: ProjectStatus } }
   // Capability-gated on `tabLifecycleEvents`. Broadcast after a successful
-  // `createTab` so every UI/CLI client attached to the same session learns
+  // `createTab` so every UI/CLI client attached to the same project learns
   // about the new tab without having to re-attach. The tab's `viewport` is
   // intentionally omitted — the very next `tabRender` event carries it.
   | {
       type: 'tabAdded'
-      payload: { sessionId: string; tab: TabSession }
+      payload: { projectId: string; tab: TabSession }
     }
   | {
       type: 'tabMetadataUpdated'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         title?: string
         autoRenameStatus?: 'eligible' | 'attempted'
       }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast to every socket when a
-  // CLI issues `createWorkspace` while a UI is attached — the UI runs its
-  // create-session handler so the live workspace snapshot is preserved.
-  // Broadcast is NOT session-scoped; the UI may be attached to a different
-  // session than the one being created.
+  // v12 / capability `projectLifecycle`. Broadcast to every socket when a
+  // CLI issues `createProject` while a UI is attached — the UI runs its
+  // create-project handler so the live project snapshot is preserved.
+  // Broadcast is NOT project-scoped; the UI may be attached to a different
+  // project than the one being created.
   | {
-      type: 'workspaceCreateRequested'
+      type: 'projectCreateRequested'
       payload: { name: string; projectPath?: string; switch?: boolean }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
-  // `switchWorkspace`; UI runs `handleSwitchSessionEffect` and then emits
-  // `announceWorkspaceSwitched` when done.
+  // v12 / capability `projectLifecycle`. Broadcast when a CLI issues
+  // `switchProject`; UI runs `handleSwitchProjectEffect` and then emits
+  // `announceProjectSwitched` when done.
   | {
-      type: 'workspaceSwitchRequested'
-      payload: { targetSessionId: string }
+      type: 'projectSwitchRequested'
+      payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. Broadcast when a CLI issues
-  // `closeWorkspace`; UI runs `handleDeleteSessionEffect`.
+  // v12 / capability `projectLifecycle`. Broadcast when a CLI issues
+  // `closeProject`; UI runs `handleDeleteProjectEffect`.
   | {
-      type: 'workspaceCloseRequested'
-      payload: { targetSessionId: string }
+      type: 'projectCloseRequested'
+      payload: { targetProjectId: string }
     }
-  // v12 / capability `workspaceLifecycle`. Daemon relay of the UI's
-  // `announceWorkspaceSwitched` so a `--wait`ing CLI can exit.
+  // v12 / capability `projectLifecycle`. Daemon relay of the UI's
+  // `announceProjectSwitched` so a `--wait`ing CLI can exit.
   | {
-      type: 'workspaceSwitched'
-      payload: { sessionId: string }
+      type: 'projectSwitched'
+      payload: { projectId: string }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
-  // `addWorktreeRecord` while a UI is attached; the UI reducer appends the
+  // v12 / capability `workspaceLifecycleEvents`. Broadcast after a CLI
+  // `addWorkspaceRecord` while a UI is attached; the UI reducer appends the
   // record and persists the catalog.
   | {
-      type: 'worktreeAdded'
-      payload: { sessionId: string; worktree: WorktreeRecord }
+      type: 'workspaceAdded'
+      payload: { projectId: string; workspace: WorkspaceRecord }
     }
-  // v12 / capability `worktreeLifecycleEvents`. Broadcast after a CLI
-  // `removeWorktreeRecord` while a UI is attached; the UI reducer removes
+  // v12 / capability `workspaceLifecycleEvents`. Broadcast after a CLI
+  // `removeWorkspaceRecord` while a UI is attached; the UI reducer removes
   // the record (and closes any tabs pinned to it via the existing
-  // worktree-removal side-effect).
+  // workspace-removal side-effect).
   | {
-      type: 'worktreeRemoved'
-      payload: { sessionId: string; worktreeId: string }
+      type: 'workspaceRemoved'
+      payload: { projectId: string; workspaceId: string }
     }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
@@ -516,7 +516,7 @@ function isTabActivity(value: unknown): value is TabActivity {
   return value === 'working' || value === 'waiting-input' || value === 'idle'
 }
 
-function isSessionStatus(value: unknown): value is SessionStatus {
+function isProjectStatus(value: unknown): value is ProjectStatus {
   return (
     isObjectRecord(value) &&
     typeof value.working === 'boolean' &&
@@ -608,7 +608,7 @@ function isTabSessionSummary(value: unknown): value is TabSessionSummary {
       value.activity === 'waiting-input' ||
       value.activity === 'idle') &&
     isString(value.command) &&
-    (value.worktreeId === undefined || isString(value.worktreeId)) &&
+    (value.workspaceId === undefined || isString(value.workspaceId)) &&
     (value.workerName === undefined || isString(value.workerName)) &&
     (value.lastLine === undefined || isString(value.lastLine))
   )
@@ -652,7 +652,7 @@ function isTabSession(value: unknown): value is TabSession {
     (value.viewport === undefined || isTerminalSnapshot(value.viewport)) &&
     (value.errorMessage === undefined || isString(value.errorMessage)) &&
     (value.exitCode === undefined || isFiniteNumber(value.exitCode)) &&
-    (value.worktreeId === undefined || isString(value.worktreeId))
+    (value.workspaceId === undefined || isString(value.workspaceId))
   )
 }
 
@@ -663,9 +663,9 @@ function isAttachResult(value: unknown): value is AttachResult {
     Array.isArray(value.tabs) &&
     value.tabs.every(isTabSession) &&
     isNullableString(value.activeTabId) &&
-    Array.isArray(value.initialSessionStatuses) &&
-    value.initialSessionStatuses.every(
-      (entry) => isObjectRecord(entry) && isString(entry.sessionId) && isSessionStatus(entry.status)
+    Array.isArray(value.initialProjectStatuses) &&
+    value.initialProjectStatuses.every(
+      (entry) => isObjectRecord(entry) && isString(entry.projectId) && isProjectStatus(entry.status)
     )
   )
 }
@@ -717,13 +717,13 @@ export function parseClientRequest(value: unknown): ClientRequest {
         isFiniteNumber(value.payload.protocolVersion),
         'attach.protocolVersion must be a number'
       )
-      assert(isString(value.payload.sessionId), 'attach.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'attach.projectId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'attach.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'attach.rows must be a number')
       assert(
-        value.payload.workspaceSnapshot === undefined ||
-          isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
-        'attach.workspaceSnapshot must be a valid workspace snapshot'
+        value.payload.projectSnapshot === undefined ||
+          isProjectSnapshotV1(value.payload.projectSnapshot),
+        'attach.projectSnapshot must be a valid project snapshot'
       )
       assert(
         value.payload.thin === undefined || typeof value.payload.thin === 'boolean',
@@ -731,7 +731,7 @@ export function parseClientRequest(value: unknown): ClientRequest {
       )
       return value as ClientRequest
     case 'listTabs':
-      assert(isString(value.payload.sessionId), 'listTabs.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'listTabs.projectId must be a string')
       return value as ClientRequest
     case 'createTab':
       assert(isString(value.payload.tabId), 'createTab.tabId must be a string')
@@ -752,8 +752,8 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'createTab.cwd must be a string'
       )
       assert(
-        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
-        'createTab.worktreeId must be a string when present'
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'createTab.workspaceId must be a string when present'
       )
       assert(
         value.payload.workerName === undefined || isString(value.payload.workerName),
@@ -807,48 +807,51 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'prepareReexec.reason must be a string when present'
       )
       return value as ClientRequest
-    case 'createWorkspace':
+    case 'createProject':
       assert(
         isString(value.payload.name) && value.payload.name.length > 0,
-        'createWorkspace.name must be a non-empty string'
+        'createProject.name must be a non-empty string'
       )
       assert(
         value.payload.projectPath === undefined || isString(value.payload.projectPath),
-        'createWorkspace.projectPath must be a string when present'
+        'createProject.projectPath must be a string when present'
       )
       assert(
         value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
-        'createWorkspace.switch must be a boolean when present'
+        'createProject.switch must be a boolean when present'
       )
       return value as ClientRequest
-    case 'switchWorkspace':
+    case 'switchProject':
       assert(
-        isString(value.payload.targetSessionId),
-        'switchWorkspace.targetSessionId must be a string'
+        isString(value.payload.targetProjectId),
+        'switchProject.targetProjectId must be a string'
       )
       return value as ClientRequest
-    case 'closeWorkspace':
+    case 'closeProject':
       assert(
-        isString(value.payload.targetSessionId),
-        'closeWorkspace.targetSessionId must be a string'
+        isString(value.payload.targetProjectId),
+        'closeProject.targetProjectId must be a string'
       )
       return value as ClientRequest
-    case 'announceWorkspaceSwitched':
+    case 'announceProjectSwitched':
       assert(
-        isString(value.payload.sessionId),
-        'announceWorkspaceSwitched.sessionId must be a string'
+        isString(value.payload.projectId),
+        'announceProjectSwitched.projectId must be a string'
       )
       return value as ClientRequest
-    case 'addWorktreeRecord':
-      assert(isString(value.payload.sessionId), 'addWorktreeRecord.sessionId must be a string')
+    case 'addWorkspaceRecord':
+      assert(isString(value.payload.projectId), 'addWorkspaceRecord.projectId must be a string')
       assert(
-        isWorktreeRecord(value.payload.worktree),
-        'addWorktreeRecord.worktree must be a WorktreeRecord'
+        isWorkspaceRecord(value.payload.workspace),
+        'addWorkspaceRecord.workspace must be a WorkspaceRecord'
       )
       return value as ClientRequest
-    case 'removeWorktreeRecord':
-      assert(isString(value.payload.sessionId), 'removeWorktreeRecord.sessionId must be a string')
-      assert(isString(value.payload.worktreeId), 'removeWorktreeRecord.worktreeId must be a string')
+    case 'removeWorkspaceRecord':
+      assert(isString(value.payload.projectId), 'removeWorkspaceRecord.projectId must be a string')
+      assert(
+        isString(value.payload.workspaceId),
+        'removeWorkspaceRecord.workspaceId must be a string'
+      )
       return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
@@ -906,17 +909,17 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.payload.message), 'tabError.message must be a string')
       return value as ServerEvent
     case 'tabStatus':
-      assert(isString(value.payload.sessionId), 'tabStatus.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabStatus.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabStatus.tabId must be a string')
       assert(isTabActivity(value.payload.status), 'tabStatus.status is invalid')
       return value as ServerEvent
     case 'tabTurnComplete':
-      assert(isString(value.payload.sessionId), 'tabTurnComplete.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabTurnComplete.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabTurnComplete.tabId must be a string')
       assert(isFiniteNumber(value.payload.idleMs), 'tabTurnComplete.idleMs must be a number')
       return value as ServerEvent
     case 'tabQuestion':
-      assert(isString(value.payload.sessionId), 'tabQuestion.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabQuestion.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabQuestion.tabId must be a string')
       assert(isQuestionKind(value.payload.kind), 'tabQuestion.kind is invalid')
       assert(isString(value.payload.prompt), 'tabQuestion.prompt must be a string')
@@ -926,11 +929,11 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       )
       return value as ServerEvent
     case 'tabAdded':
-      assert(isString(value.payload.sessionId), 'tabAdded.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabAdded.projectId must be a string')
       assert(isTabSession(value.payload.tab), 'tabAdded.tab is invalid')
       return value as ServerEvent
     case 'tabMetadataUpdated':
-      assert(isString(value.payload.sessionId), 'tabMetadataUpdated.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabMetadataUpdated.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabMetadataUpdated.tabId must be a string')
       assert(
         value.payload.title === undefined || isString(value.payload.title),
@@ -943,49 +946,49 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
         'tabMetadataUpdated.autoRenameStatus is invalid'
       )
       return value as ServerEvent
-    case 'sessionStatus':
-      assert(isString(value.payload.sessionId), 'sessionStatus.sessionId must be a string')
-      assert(isSessionStatus(value.payload.status), 'sessionStatus.status is invalid')
+    case 'projectStatus':
+      assert(isString(value.payload.projectId), 'projectStatus.projectId must be a string')
+      assert(isProjectStatus(value.payload.status), 'projectStatus.status is invalid')
       return value as ServerEvent
-    case 'workspaceCreateRequested':
+    case 'projectCreateRequested':
       assert(
         isString(value.payload.name) && value.payload.name.length > 0,
-        'workspaceCreateRequested.name must be a non-empty string'
+        'projectCreateRequested.name must be a non-empty string'
       )
       assert(
         value.payload.projectPath === undefined || isString(value.payload.projectPath),
-        'workspaceCreateRequested.projectPath must be a string when present'
+        'projectCreateRequested.projectPath must be a string when present'
       )
       assert(
         value.payload.switch === undefined || typeof value.payload.switch === 'boolean',
-        'workspaceCreateRequested.switch must be a boolean when present'
+        'projectCreateRequested.switch must be a boolean when present'
       )
       return value as ServerEvent
-    case 'workspaceSwitchRequested':
+    case 'projectSwitchRequested':
       assert(
-        isString(value.payload.targetSessionId),
-        'workspaceSwitchRequested.targetSessionId must be a string'
+        isString(value.payload.targetProjectId),
+        'projectSwitchRequested.targetProjectId must be a string'
       )
       return value as ServerEvent
-    case 'workspaceCloseRequested':
+    case 'projectCloseRequested':
       assert(
-        isString(value.payload.targetSessionId),
-        'workspaceCloseRequested.targetSessionId must be a string'
+        isString(value.payload.targetProjectId),
+        'projectCloseRequested.targetProjectId must be a string'
       )
       return value as ServerEvent
-    case 'workspaceSwitched':
-      assert(isString(value.payload.sessionId), 'workspaceSwitched.sessionId must be a string')
+    case 'projectSwitched':
+      assert(isString(value.payload.projectId), 'projectSwitched.projectId must be a string')
       return value as ServerEvent
-    case 'worktreeAdded':
-      assert(isString(value.payload.sessionId), 'worktreeAdded.sessionId must be a string')
+    case 'workspaceAdded':
+      assert(isString(value.payload.projectId), 'workspaceAdded.projectId must be a string')
       assert(
-        isWorktreeRecord(value.payload.worktree),
-        'worktreeAdded.worktree must be a WorktreeRecord'
+        isWorkspaceRecord(value.payload.workspace),
+        'workspaceAdded.workspace must be a WorkspaceRecord'
       )
       return value as ServerEvent
-    case 'worktreeRemoved':
-      assert(isString(value.payload.sessionId), 'worktreeRemoved.sessionId must be a string')
-      assert(isString(value.payload.worktreeId), 'worktreeRemoved.worktreeId must be a string')
+    case 'workspaceRemoved':
+      assert(isString(value.payload.projectId), 'workspaceRemoved.projectId must be a string')
+      assert(isString(value.payload.workspaceId), 'workspaceRemoved.workspaceId must be a string')
       return value as ServerEvent
     default:
       throw new IpcProtocolError(`Unknown IPC response type: ${String(value.type)}`)

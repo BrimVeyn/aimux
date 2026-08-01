@@ -29,12 +29,12 @@ import { lastNonBlankLine } from '../pty/last-line'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 import { TerminalManagerClient } from '../terminal-manager/manager-client'
 import {
-  addWorktreeToCatalog,
-  assertSessionInCatalog,
+  addWorkspaceToCatalog,
+  assertProjectInCatalog,
   bumpLastOpenedInCatalog,
-  createWorkspaceInCatalog,
+  createProjectInCatalog,
   deleteFromCatalog,
-  removeWorktreeFromCatalog,
+  removeWorkspaceFromCatalog,
 } from './catalog-writer'
 import {
   consumeDaemonHandoff,
@@ -54,7 +54,7 @@ import {
 } from './runtime-paths'
 
 export interface DaemonTabEntry {
-  sessionId: string
+  projectId: string
   assistant: AssistantId
   command: string
   viewport: TerminalSnapshot | undefined
@@ -73,7 +73,7 @@ export interface DaemonTabEntry {
    */
   title?: string
   status?: TabStatus
-  worktreeId?: string
+  workspaceId?: string
   workerName?: string
   autoRenameStatus?: 'eligible' | 'attempted'
 }
@@ -91,7 +91,7 @@ export interface DaemonTabEntry {
  */
 export function mergeTabRegistryEntry(
   registry: Map<string, DaemonTabEntry>,
-  sessionId: string,
+  projectId: string,
   tabId: string,
   assistant: AssistantId,
   command: string,
@@ -100,7 +100,7 @@ export function mergeTabRegistryEntry(
   metadata?: {
     title?: string
     status?: TabStatus
-    worktreeId?: string
+    workspaceId?: string
     workerName?: string
     autoRenameStatus?: 'eligible' | 'attempted'
   }
@@ -114,13 +114,13 @@ export function mergeTabRegistryEntry(
       ? 'attempted'
       : (metadata?.autoRenameStatus ?? existing?.autoRenameStatus),
     command,
-    sessionId,
+    projectId,
     status: metadata?.status ?? existing?.status,
     title: preserveAttemptedMetadata ? existing.title : (metadata?.title ?? existing?.title),
     viewport,
     viewportSeq: existing?.viewportSeq ?? (viewport ? allocateSeq() : 0),
     workerName: metadata?.workerName ?? existing?.workerName,
-    worktreeId: metadata?.worktreeId ?? existing?.worktreeId,
+    workspaceId: metadata?.workspaceId ?? existing?.workspaceId,
   }
   registry.set(tabId, entry)
   return entry
@@ -128,11 +128,11 @@ export function mergeTabRegistryEntry(
 
 export function findWorkerNameConflict(
   registry: ReadonlyMap<string, DaemonTabEntry>,
-  sessionId: string,
+  projectId: string,
   workerName: string
 ): string | undefined {
   for (const [tabId, entry] of registry) {
-    if (entry.sessionId === sessionId && entry.workerName === workerName) return tabId
+    if (entry.projectId === projectId && entry.workerName === workerName) return tabId
   }
   return undefined
 }
@@ -157,12 +157,12 @@ function sendOk(socket: Socket, id: string): void {
   send(socket, { id, payload: {}, type: 'ok' })
 }
 
-function requireSession(socket: Socket, attachedSessions: Map<Socket, string>): string {
-  const sessionId = attachedSessions.get(socket)
-  if (!(sessionId != null && sessionId !== '')) {
-    throw new Error('No session attached')
+function requireProject(socket: Socket, attachedProjects: Map<Socket, string>): string {
+  const projectId = attachedProjects.get(socket)
+  if (!(projectId != null && projectId !== '')) {
+    throw new Error('No project attached')
   }
-  return sessionId
+  return projectId
 }
 
 function requireNegotiatedVersion(socket: Socket, versions: Map<Socket, number>): number {
@@ -248,30 +248,30 @@ export async function runDaemon(): Promise<void> {
   await ensureTerminalManagerReady(manager)
 
   const sockets = new Set<Socket>()
-  const attachedSessions = new Map<Socket, string>()
+  const attachedProjects = new Map<Socket, string>()
   const negotiatedVersions = new Map<Socket, number>()
   // Sockets that attached with `thin: true` (headless CLIs). Used to
   // distinguish "a UI is attached" from "only CLIs are talking to me" when
-  // deciding whether workspace/worktree mutations go via broadcast (UI does
+  // deciding whether project/workspace mutations go via broadcast (UI does
   // the write) or via catalog-writer (daemon does the write).
   const thinAttachers = new Set<Socket>()
 
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
   const tabRegistry = new Map<string, DaemonTabEntry>()
-  // Active tab id per session, populated from attachResult and updated by
+  // Active tab id per project, populated from attachResult and updated by
   // setActiveTab. Surfaced by `listTabs` so a headless CLI doesn't need to
   // attach just to know which tab the UI is focused on.
-  const sessionActiveTabIds = new Map<string, string | null>()
-  // Last (cols, rows) the session was attached with. `createTab` with
+  const projectActiveTabIds = new Map<string, string | null>()
+  // Last (cols, rows) the project was attached with. `createTab` with
   // cols/rows = 0 falls back to this when the `createTabSizeFallback`
   // capability is in play.
-  const sessionDimensions = new Map<string, { cols: number; rows: number }>()
+  const projectDimensions = new Map<string, { cols: number; rows: number }>()
   let nextViewportSeq = 1
 
   const allocateSeq = (): number => nextViewportSeq++
   const rememberTab = (
-    sessionId: string,
+    projectId: string,
     tabId: string,
     assistant: AssistantId,
     command: string,
@@ -279,7 +279,7 @@ export async function runDaemon(): Promise<void> {
     metadata?: {
       title?: string
       status?: TabStatus
-      worktreeId?: string
+      workspaceId?: string
       workerName?: string
       autoRenameStatus?: 'eligible' | 'attempted'
     }
@@ -287,7 +287,7 @@ export async function runDaemon(): Promise<void> {
     const before = tabRegistry.get(tabId)
     const entry = mergeTabRegistryEntry(
       tabRegistry,
-      sessionId,
+      projectId,
       tabId,
       assistant,
       command,
@@ -301,8 +301,8 @@ export async function runDaemon(): Promise<void> {
       initialViewportProvided: initialViewport !== undefined,
       preservedExistingViewport:
         before?.viewport !== undefined && entry.viewport === before.viewport,
+      projectId,
       resultSeq: entry.viewportSeq,
-      sessionId,
       tabId,
     })
     return entry
@@ -314,9 +314,9 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
-  const broadcastForSession = (sessionId: string, event: ServerEvent): void => {
+  const broadcastForProject = (projectId: string, event: ServerEvent): void => {
     for (const socket of sockets) {
-      if (attachedSessions.get(socket) === sessionId) {
+      if (attachedProjects.get(socket) === projectId) {
         send(socket, event)
       }
     }
@@ -326,23 +326,23 @@ export async function runDaemon(): Promise<void> {
   // it. Older peers whose `parseServerMessage` doesn't recognise the type
   // would throw on receipt and drop the connection — MIN_VERSION stays at 10
   // for compat, so we can't rely on every attached socket being v11.
-  const broadcastForSessionVersioned = (
-    sessionId: string,
+  const broadcastForProjectVersioned = (
+    projectId: string,
     minVersion: number,
     event: ServerEvent
   ): void => {
     for (const socket of sockets) {
-      if (attachedSessions.get(socket) !== sessionId) continue
+      if (attachedProjects.get(socket) !== projectId) continue
       const version = negotiatedVersions.get(socket)
       if (version === undefined || version < minVersion) continue
       send(socket, event)
     }
   }
 
-  // Workspace-scope broadcast: reaches every socket that negotiated at least
-  // `minVersion` regardless of which session it's attached to. Workspace
-  // lifecycle events (create/switch/close) target a session that the UI may
-  // not currently be attached to, so `broadcastForSessionVersioned` won't do.
+  // Project-scope broadcast: reaches every socket that negotiated at least
+  // `minVersion` regardless of which project it's attached to. Project
+  // lifecycle events (create/switch/close) target a project that the UI may
+  // not currently be attached to, so `broadcastForProjectVersioned` won't do.
   const broadcastAllVersioned = (minVersion: number, event: ServerEvent): void => {
     for (const socket of sockets) {
       const version = negotiatedVersions.get(socket)
@@ -361,7 +361,7 @@ export async function runDaemon(): Promise<void> {
     if (patch.autoRenameStatus !== undefined) entry.autoRenameStatus = patch.autoRenameStatus
     void (async () => {
       try {
-        await manager.updateTabMetadata(entry.sessionId, tabId, patch)
+        await manager.updateTabMetadata(entry.projectId, tabId, patch)
       } catch (error) {
         logDebug('daemon.tabMetadata.managerFailed', {
           error: error instanceof Error ? error.message : String(error),
@@ -369,8 +369,8 @@ export async function runDaemon(): Promise<void> {
         })
       }
     })()
-    broadcastForSessionVersioned(entry.sessionId, 14, {
-      payload: { ...patch, sessionId: entry.sessionId, tabId },
+    broadcastForProjectVersioned(entry.projectId, 14, {
+      payload: { ...patch, projectId: entry.projectId, tabId },
       type: 'tabMetadataUpdated',
     })
   }
@@ -390,60 +390,60 @@ export async function runDaemon(): Promise<void> {
     updateTab: applyTabMetadata,
   })
 
-  // Count UI attachers so workspace/worktree handlers can decide whether to
+  // Count UI attachers so project/workspace handlers can decide whether to
   // relay via broadcast (UI attached → its reducer owns the write) or mutate
   // the catalog directly. A "UI attacher" here is any non-thin attach — thin
   // attachers are CLIs which don't run reducers.
   const countUiAttachers = (): number => {
     let count = 0
     for (const socket of sockets) {
-      if (attachedSessions.get(socket) === undefined) continue
+      if (attachedProjects.get(socket) === undefined) continue
       if (thinAttachers.has(socket)) continue
       count++
     }
     return count
   }
 
-  manager.on('render', (sessionId, tabId, viewport, terminalModes) => {
+  manager.on('render', (projectId, tabId, viewport, terminalModes) => {
     const existing = tabRegistry.get(tabId)
     let newSeq: number | null = null
     if (existing) {
       existing.viewport = viewport
       existing.viewportSeq = nextViewportSeq++
-      existing.sessionId = sessionId
+      existing.projectId = projectId
       newSeq = existing.viewportSeq
     }
     logDebug('daemon.manager.render', {
       attachedSocketCount: sockets.size,
       hadRegistryEntry: existing !== undefined,
       newSeq,
-      sessionId,
+      projectId,
       tabId,
       viewportLines: viewport.lines.length,
     })
     const event: ServerEvent = { payload: { tabId, terminalModes, viewport }, type: 'tabRender' }
-    broadcastForSession(sessionId, event)
+    broadcastForProject(projectId, event)
   })
-  manager.on('exit', (sessionId, tabId, exitCode) => {
-    logDebug('daemon.manager.exit', { exitCode, sessionId, tabId })
+  manager.on('exit', (projectId, tabId, exitCode) => {
+    logDebug('daemon.manager.exit', { exitCode, projectId, tabId })
     tabRegistry.delete(tabId)
     autoRename.unregister(tabId)
-    if (sessionActiveTabIds.get(sessionId) === tabId) {
-      sessionActiveTabIds.set(sessionId, null)
+    if (projectActiveTabIds.get(projectId) === tabId) {
+      projectActiveTabIds.set(projectId, null)
     }
     const event: ServerEvent = { payload: { exitCode, tabId }, type: 'tabExit' }
-    broadcastForSession(sessionId, event)
+    broadcastForProject(projectId, event)
   })
-  manager.on('error', (sessionId, tabId, message) => {
-    logDebug('daemon.manager.error', { message, sessionId, tabId })
+  manager.on('error', (projectId, tabId, message) => {
+    logDebug('daemon.manager.error', { message, projectId, tabId })
     const event: ServerEvent = { payload: { message, tabId }, type: 'tabError' }
-    broadcastForSession(sessionId, event)
+    broadcastForProject(projectId, event)
   })
 
-  const listTabsForSession = (sessionId: string): LoopTabView[] => {
+  const listTabsForProject = (projectId: string): LoopTabView[] => {
     const result: LoopTabView[] = []
     for (const [tabId, entry] of tabRegistry) {
-      if (entry.sessionId !== sessionId) continue
+      if (entry.projectId !== projectId) continue
       result.push({
         assistant: entry.assistant,
         command: entry.command,
@@ -455,45 +455,45 @@ export async function runDaemon(): Promise<void> {
   }
 
   const statusLoop = runStatusDetectionLoop({
-    listSessions: () => {
+    listProjects: () => {
       const seen = new Set<string>()
-      for (const entry of tabRegistry.values()) seen.add(entry.sessionId)
+      for (const entry of tabRegistry.values()) seen.add(entry.projectId)
       return [...seen]
     },
-    listTabs: listTabsForSession,
-    onSessionStatus: (sessionId, status) => {
-      logDebug('daemon.status.session', { sessionId, status })
-      broadcastAll({ payload: { sessionId, status }, type: 'sessionStatus' })
+    listTabs: listTabsForProject,
+    onProjectStatus: (projectId, status) => {
+      logDebug('daemon.status.project', { projectId, status })
+      broadcastAll({ payload: { projectId, status }, type: 'projectStatus' })
     },
-    onTabQuestion: (tabId, sessionId, detail) => {
-      logDebug('daemon.status.question', { kind: detail.kind, sessionId, tabId })
+    onTabQuestion: (tabId, projectId, detail) => {
+      logDebug('daemon.status.question', { kind: detail.kind, projectId, tabId })
       // v13 / capability `questionEvents`. Same v13 send-time gate as below.
       broadcastAllVersioned(13, {
         payload: {
           kind: detail.kind,
           options: detail.options,
+          projectId,
           prompt: detail.prompt,
-          sessionId,
           tabId,
         },
         type: 'tabQuestion',
       })
     },
-    onTabStatus: (tabId, status, sessionId) => {
-      logDebug('daemon.status.tab', { sessionId, status, tabId })
+    onTabStatus: (tabId, status, projectId) => {
+      logDebug('daemon.status.tab', { projectId, status, tabId })
       // Broadcast to every client. Clients silently ignore events for tabIds
       // they don't know about, so there's no UI impact — this costs one
       // extra socket write per tab per change, which is trivial, and
       // removes a race where in-flight tab events could be dropped when a
-      // client tears down its socket to switch sessions.
-      broadcastAll({ payload: { sessionId, status, tabId }, type: 'tabStatus' })
+      // client tears down its socket to switch projects.
+      broadcastAll({ payload: { projectId, status, tabId }, type: 'tabStatus' })
     },
-    onTurnComplete: (tabId, sessionId, idleMs) => {
-      logDebug('daemon.status.turnComplete', { idleMs, sessionId, tabId })
+    onTurnComplete: (tabId, projectId, idleMs) => {
+      logDebug('daemon.status.turnComplete', { idleMs, projectId, tabId })
       // v13 / capability `turnLifecycle`. Gate at send time — pre-v13 parsers
       // throw on unknown event types and would drop the connection. MIN stays
       // at 10, so we fan this only to peers that negotiated at least v13.
-      broadcastAllVersioned(13, { payload: { idleMs, sessionId, tabId }, type: 'tabTurnComplete' })
+      broadcastAllVersioned(13, { payload: { idleMs, projectId, tabId }, type: 'tabTurnComplete' })
     },
     turnSettleMs: turnCompleteSettleMs(),
   })
@@ -546,7 +546,7 @@ export async function runDaemon(): Promise<void> {
    * Tell the TM whether to bother snapshotting + broadcasting. Toggled on
    * 0↔1 transitions of the client socket count: when no UI is watching, the
    * TM can skip per-chunk viewport diff/projection work entirely. The TM
-   * flushes a fresh snapshot per session on re-enable, so reattaching gives
+   * flushes a fresh snapshot per project on re-enable, so reattaching gives
    * the client a current viewport.
    *
    * Fire-and-forget: failure to send isn't fatal (TM will just keep its
@@ -633,9 +633,9 @@ export async function runDaemon(): Promise<void> {
                 case 'attach': {
                   logDebug('daemon.request.attach.start', {
                     cols: message.payload.cols,
+                    projectId: message.payload.projectId,
                     rows: message.payload.rows,
-                    sessionId: message.payload.sessionId,
-                    snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                    snapshotTabs: message.payload.projectSnapshot?.tabs.length ?? 0,
                     thin: message.payload.thin === true,
                   })
                   const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
@@ -645,27 +645,27 @@ export async function runDaemon(): Promise<void> {
                     )
                   }
 
-                  attachedSessions.set(socket, message.payload.sessionId)
+                  attachedProjects.set(socket, message.payload.projectId)
                   if (message.payload.thin === true) {
                     thinAttachers.add(socket)
                   } else {
                     thinAttachers.delete(socket)
                   }
                   // A thin attacher (headless CLI) does not own a viewport, so
-                  // it must not resize PTYs on a session a UI is driving. TM's
+                  // it must not resize PTYs on a project a UI is driving. TM's
                   // attachSession always calls `sessionManager.resize` on the
                   // incoming dimensions, so we substitute prior dims (or a
                   // safe default when none exist) before calling it. That
                   // makes the resize a no-op against the current PTY size
-                  // instead of clobbering it. We also seed sessionDimensions
+                  // instead of clobbering it. We also seed projectDimensions
                   // on first-ever thin attach so `createTab`'s 0×0 fallback
                   // works for headless bootstrap flows (no UI has ever
-                  // attached to this session).
+                  // attached to this project).
                   let attachCols = message.payload.cols
                   let attachRows = message.payload.rows
                   const isThin = message.payload.thin === true
                   if (isThin) {
-                    const prior = sessionDimensions.get(message.payload.sessionId)
+                    const prior = projectDimensions.get(message.payload.projectId)
                     if (prior) {
                       attachCols = prior.cols
                       attachRows = prior.rows
@@ -676,32 +676,32 @@ export async function runDaemon(): Promise<void> {
                       // real UI attach afterwards overwrites this.
                       attachCols = 80
                       attachRows = 24
-                      sessionDimensions.set(message.payload.sessionId, {
+                      projectDimensions.set(message.payload.projectId, {
                         cols: attachCols,
                         rows: attachRows,
                       })
                       logDebug('daemon.attach.thin.seedDefaultDimensions', {
                         cols: attachCols,
+                        projectId: message.payload.projectId,
                         rows: attachRows,
-                        sessionId: message.payload.sessionId,
                       })
                     }
                   } else {
-                    sessionDimensions.set(message.payload.sessionId, {
+                    projectDimensions.set(message.payload.projectId, {
                       cols: message.payload.cols,
                       rows: message.payload.rows,
                     })
                   }
                   const attachResult = await manager.attachSession({
                     cols: attachCols,
+                    projectId: message.payload.projectId,
+                    projectSnapshot: message.payload.projectSnapshot,
                     rows: attachRows,
-                    sessionId: message.payload.sessionId,
-                    workspaceSnapshot: message.payload.workspaceSnapshot,
                   })
-                  sessionActiveTabIds.set(message.payload.sessionId, attachResult.activeTabId)
+                  projectActiveTabIds.set(message.payload.projectId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
                     const remembered = rememberTab(
-                      message.payload.sessionId,
+                      message.payload.projectId,
                       tab.id,
                       tab.assistant,
                       tab.command,
@@ -711,7 +711,7 @@ export async function runDaemon(): Promise<void> {
                         status: tab.status,
                         title: tab.title,
                         workerName: tab.workerName,
-                        worktreeId: tab.worktreeId,
+                        workspaceId: tab.workspaceId,
                       }
                     )
                     autoRename.register({
@@ -722,14 +722,14 @@ export async function runDaemon(): Promise<void> {
                     })
                   }
                   // Classify synchronously BEFORE sending attachResult so
-                  // each tab's activity and the full session-status snapshot
+                  // each tab's activity and the full project-status snapshot
                   // are available to embed in the reply. This makes the
-                  // client apply them atomically with `hydrate-workspace`
+                  // client apply them atomically with `hydrate-project`
                   // and closes the race where separate `tabStatus` events
                   // landed before the tab existed in client state.
-                  const tabsForLoop = listTabsForSession(message.payload.sessionId)
+                  const tabsForLoop = listTabsForProject(message.payload.projectId)
                   logDebug('daemon.attach.preClassify', {
-                    sessionId: message.payload.sessionId,
+                    projectId: message.payload.projectId,
                     tabs: tabsForLoop.map((t) => ({
                       assistant: t.assistant,
                       hasViewport: t.viewport !== undefined,
@@ -737,7 +737,7 @@ export async function runDaemon(): Promise<void> {
                       seq: tabRegistry.get(t.id)?.viewportSeq ?? null,
                     })),
                   })
-                  statusLoop.classifyNow(message.payload.sessionId, tabsForLoop)
+                  statusLoop.classifyNow(message.payload.projectId, tabsForLoop)
                   const tabsWithActivity = attachResult.tabs.map((tab) => {
                     const metadata = tabRegistry.get(tab.id)
                     return {
@@ -748,17 +748,17 @@ export async function runDaemon(): Promise<void> {
                       workerName: metadata?.workerName ?? tab.workerName,
                     }
                   })
-                  const initialSessionStatuses = statusLoop.snapshotSessions()
+                  const initialProjectStatuses = statusLoop.snapshotProjects()
                   logDebug('daemon.attach.replay', {
-                    sessionId: message.payload.sessionId,
-                    sessions: initialSessionStatuses,
+                    projectId: message.payload.projectId,
+                    projects: initialProjectStatuses,
                     tabs: tabsWithActivity.map((t) => ({ activity: t.activity, id: t.id })),
                   })
                   send(socket, {
                     id: message.id,
                     payload: {
                       activeTabId: attachResult.activeTabId,
-                      initialSessionStatuses,
+                      initialProjectStatuses,
                       protocolVersion: negotiatedVersion,
                       tabs: tabsWithActivity,
                     },
@@ -766,13 +766,13 @@ export async function runDaemon(): Promise<void> {
                   })
                   logDebug('daemon.request.attach.success', {
                     activeTabId: attachResult.activeTabId,
-                    sessionId: message.payload.sessionId,
+                    projectId: message.payload.projectId,
                     tabs: attachResult.tabs.length,
                   })
                   break
                 }
                 case 'createTab': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   if (message.payload.workerName !== undefined) {
                     if (!manager.hasCapability(MANAGER_CAPABILITY_WORKER_METADATA)) {
@@ -782,29 +782,29 @@ export async function runDaemon(): Promise<void> {
                     }
                     const conflictTabId = findWorkerNameConflict(
                       tabRegistry,
-                      sessionId,
+                      projectId,
                       message.payload.workerName
                     )
                     if (conflictTabId !== undefined) {
                       throw new Error(
-                        `worker name already exists in this workspace: ${message.payload.workerName} (${conflictTabId})`
+                        `worker name already exists in this project: ${message.payload.workerName} (${conflictTabId})`
                       )
                     }
                   }
                   // Capability `createTabSizeFallback`: cols/rows = 0 means
-                  // "use the session's last attached dimensions". Headless
+                  // "use the project's last attached dimensions". Headless
                   // CLIs don't have a viewport of their own, so this lets
                   // them spawn a PTY that lines up with the UI on the same
-                  // session. If we have no remembered size yet, the TM
+                  // project. If we have no remembered size yet, the TM
                   // would receive 0 and spawn a zero-sized PTY — surface a
                   // clear error instead.
                   let cols = message.payload.cols
                   let rows = message.payload.rows
                   if (cols === 0 || rows === 0) {
-                    const prior = sessionDimensions.get(sessionId)
+                    const prior = projectDimensions.get(projectId)
                     if (!prior) {
                       throw new Error(
-                        'createTab requested size fallback (cols=0 or rows=0) but no UI has attached to this session yet'
+                        'createTab requested size fallback (cols=0 or rows=0) but no UI has attached to this project yet'
                       )
                     }
                     if (cols === 0) cols = prior.cols
@@ -813,8 +813,8 @@ export async function runDaemon(): Promise<void> {
                   logDebug('daemon.request.createTab.start', {
                     cols,
                     command: message.payload.command,
+                    projectId,
                     rows,
-                    sessionId,
                     sizeFallback: message.payload.cols === 0 || message.payload.rows === 0,
                     tabId: message.payload.tabId,
                     title: message.payload.title,
@@ -829,7 +829,7 @@ export async function runDaemon(): Promise<void> {
                     message.payload.autoRenameCandidate === true
                   )
                   rememberTab(
-                    sessionId,
+                    projectId,
                     message.payload.tabId,
                     message.payload.assistant,
                     fullCommand,
@@ -839,7 +839,7 @@ export async function runDaemon(): Promise<void> {
                       status: 'starting',
                       title: message.payload.title,
                       workerName: message.payload.workerName,
-                      worktreeId: message.payload.worktreeId,
+                      workspaceId: message.payload.workspaceId,
                     }
                   )
                   // Inject the hook bridge env so Claude Code's hooks can
@@ -858,8 +858,8 @@ export async function runDaemon(): Promise<void> {
                       autoRenameStatus,
                       cols,
                       env,
+                      projectId,
                       rows,
-                      sessionId,
                     })
                   } catch (error) {
                     // `rememberTab` must happen before the manager call so
@@ -885,32 +885,32 @@ export async function runDaemon(): Promise<void> {
                     terminalModes: createDefaultTerminalModes(),
                     title: message.payload.title,
                     workerName: message.payload.workerName,
-                    worktreeId: message.payload.worktreeId,
+                    workspaceId: message.payload.workspaceId,
                   }
-                  broadcastForSessionVersioned(sessionId, 11, {
-                    payload: { sessionId, tab: synthesizedTab },
+                  broadcastForProjectVersioned(projectId, 11, {
+                    payload: { projectId, tab: synthesizedTab },
                     type: 'tabAdded',
                   })
                   autoRename.register(synthesizedTab)
                   logDebug('daemon.request.createTab.success', {
-                    sessionId,
+                    projectId,
                     tabId: message.payload.tabId,
                   })
                   break
                 }
                 case 'write': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  await manager.write(sessionId, message.payload.tabId, message.payload.data)
+                  await manager.write(projectId, message.payload.tabId, message.payload.data)
                   autoRename.observeWrite(message.payload.tabId, message.payload.data)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'renameTab': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  if (tabRegistry.get(message.payload.tabId)?.sessionId !== sessionId) {
-                    throw new Error(`Tab not found in attached session: ${message.payload.tabId}`)
+                  if (tabRegistry.get(message.payload.tabId)?.projectId !== projectId) {
+                    throw new Error(`Tab not found in attached project: ${message.payload.tabId}`)
                   }
                   autoRename.manualRename(message.payload.tabId)
                   applyTabMetadata(message.payload.tabId, {
@@ -921,21 +921,21 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'resizeClient': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  sessionDimensions.set(sessionId, {
+                  projectDimensions.set(projectId, {
                     cols: message.payload.cols,
                     rows: message.payload.rows,
                   })
-                  await manager.resize(sessionId, message.payload.cols, message.payload.rows)
+                  await manager.resize(projectId, message.payload.cols, message.payload.rows)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'resizeTab': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   await manager.resizeTab(
-                    sessionId,
+                    projectId,
                     message.payload.tabId,
                     message.payload.cols,
                     message.payload.rows
@@ -944,49 +944,49 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'scroll': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  await manager.scroll(sessionId, message.payload.tabId, message.payload.deltaLines)
+                  await manager.scroll(projectId, message.payload.tabId, message.payload.deltaLines)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'scrollToBottom': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  await manager.scrollToBottom(sessionId, message.payload.tabId)
+                  await manager.scrollToBottom(projectId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'setActiveTab': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   // Update the cache AFTER the TM confirms the change — if
                   // manager.setActiveTab throws (tab doesn't exist, TM
                   // rejects), the cache would otherwise retain the bogus tabId
                   // and a subsequent listTabs would return a stale activeTabId.
-                  await manager.setActiveTab(sessionId, message.payload.tabId)
-                  sessionActiveTabIds.set(sessionId, message.payload.tabId)
+                  await manager.setActiveTab(projectId, message.payload.tabId)
+                  projectActiveTabIds.set(projectId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'closeTab': {
-                  const sessionId = requireSession(socket, attachedSessions)
+                  const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   tabRegistry.delete(message.payload.tabId)
                   autoRename.unregister(message.payload.tabId)
-                  if (sessionActiveTabIds.get(sessionId) === message.payload.tabId) {
-                    sessionActiveTabIds.set(sessionId, null)
+                  if (projectActiveTabIds.get(projectId) === message.payload.tabId) {
+                    projectActiveTabIds.set(projectId, null)
                   }
-                  await manager.closeTab(sessionId, message.payload.tabId)
+                  await manager.closeTab(projectId, message.payload.tabId)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'listTabs': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const sessionId = message.payload.sessionId
+                  const projectId = message.payload.projectId
                   const tabs: TabSessionSummary[] = []
                   for (const [tabId, entry] of tabRegistry) {
-                    if (entry.sessionId !== sessionId) continue
+                    if (entry.projectId !== projectId) continue
                     tabs.push({
                       activity: statusLoop.getTabStatus(tabId) ?? undefined,
                       assistant: entry.assistant,
@@ -1001,33 +1001,33 @@ export async function runDaemon(): Promise<void> {
                       status: entry.status ?? 'running',
                       title: entry.title ?? '',
                       workerName: entry.workerName,
-                      worktreeId: entry.worktreeId,
+                      workspaceId: entry.workspaceId,
                     })
                   }
                   send(socket, {
                     id: message.id,
                     payload: {
-                      activeTabId: sessionActiveTabIds.get(sessionId) ?? null,
+                      activeTabId: projectActiveTabIds.get(projectId) ?? null,
                       tabs,
                     },
                     type: 'listTabsResult',
                   })
-                  logDebug('daemon.request.listTabs', { sessionId, tabs: tabs.length })
+                  logDebug('daemon.request.listTabs', { projectId, tabs: tabs.length })
                   break
                 }
                 case 'disposeAll': {
-                  const sessionId = attachedSessions.get(socket)
+                  const projectId = attachedProjects.get(socket)
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  if (sessionId != null && sessionId !== '') {
+                  if (projectId != null && projectId !== '') {
                     for (const [tabId, entry] of tabRegistry) {
-                      if (entry.sessionId === sessionId) {
+                      if (entry.projectId === projectId) {
                         autoRename.unregister(tabId)
                         tabRegistry.delete(tabId)
                       }
                     }
-                    sessionActiveTabIds.delete(sessionId)
-                    sessionDimensions.delete(sessionId)
-                    await manager.disposeSession(sessionId)
+                    projectActiveTabIds.delete(projectId)
+                    projectDimensions.delete(projectId)
+                    await manager.disposeSession(projectId)
                   }
                   sendOk(socket, message.id)
                   break
@@ -1043,133 +1043,133 @@ export async function runDaemon(): Promise<void> {
                   await handleReexecRequest(socket, message.id, message.payload.reason)
                   break
                 }
-                case 'createWorkspace': {
+                case 'createProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { name, projectPath, switch: doSwitch } = message.payload
                   if (countUiAttachers() > 0) {
                     // Relay to the UI so it can preserve the live snapshot
-                    // of the currently-open workspace before appending the
+                    // of the currently-open project before appending the
                     // new one. Fire-and-forget from the daemon's side.
                     broadcastAllVersioned(12, {
                       payload: { name, projectPath, switch: doSwitch },
-                      type: 'workspaceCreateRequested',
+                      type: 'projectCreateRequested',
                     })
-                    logDebug('daemon.request.createWorkspace.relay', { name, projectPath })
+                    logDebug('daemon.request.createProject.relay', { name, projectPath })
                   } else {
-                    const created = createWorkspaceInCatalog(name, projectPath)
+                    const created = createProjectInCatalog(name, projectPath)
                     if (doSwitch === true) {
                       bumpLastOpenedInCatalog(created.id)
                       // Mirror the UI-attached path: an ack event so a
                       // `--wait` CLI can exit even in the headless flow.
                       broadcastAllVersioned(12, {
-                        payload: { sessionId: created.id },
-                        type: 'workspaceSwitched',
+                        payload: { projectId: created.id },
+                        type: 'projectSwitched',
                       })
                     }
-                    logDebug('daemon.request.createWorkspace.direct', {
+                    logDebug('daemon.request.createProject.direct', {
                       name,
-                      sessionId: created.id,
+                      projectId: created.id,
                     })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'switchWorkspace': {
+                case 'switchProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { targetSessionId } = message.payload
+                  const { targetProjectId } = message.payload
                   // Fail fast when the target is unknown — otherwise a UI-
                   // attached `--wait` CLI would sit until timeout while the
                   // UI silently drops the broadcast.
-                  assertSessionInCatalog(targetSessionId)
+                  assertProjectInCatalog(targetProjectId)
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { targetSessionId },
-                      type: 'workspaceSwitchRequested',
+                      payload: { targetProjectId },
+                      type: 'projectSwitchRequested',
                     })
-                    logDebug('daemon.request.switchWorkspace.relay', { targetSessionId })
+                    logDebug('daemon.request.switchProject.relay', { targetProjectId })
                   } else {
-                    bumpLastOpenedInCatalog(targetSessionId)
+                    bumpLastOpenedInCatalog(targetProjectId)
                     // No UI to run the switch handler, so the switch is
                     // effectively complete once the catalog reflects it.
                     // Emit the switched event so a --wait CLI can exit.
                     broadcastAllVersioned(12, {
-                      payload: { sessionId: targetSessionId },
-                      type: 'workspaceSwitched',
+                      payload: { projectId: targetProjectId },
+                      type: 'projectSwitched',
                     })
-                    logDebug('daemon.request.switchWorkspace.direct', { targetSessionId })
+                    logDebug('daemon.request.switchProject.direct', { targetProjectId })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'closeWorkspace': {
+                case 'closeProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { targetSessionId } = message.payload
-                  assertSessionInCatalog(targetSessionId)
+                  const { targetProjectId } = message.payload
+                  assertProjectInCatalog(targetProjectId)
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { targetSessionId },
-                      type: 'workspaceCloseRequested',
+                      payload: { targetProjectId },
+                      type: 'projectCloseRequested',
                     })
-                    logDebug('daemon.request.closeWorkspace.relay', { targetSessionId })
+                    logDebug('daemon.request.closeProject.relay', { targetProjectId })
                   } else {
-                    deleteFromCatalog(targetSessionId)
-                    logDebug('daemon.request.closeWorkspace.direct', { targetSessionId })
+                    deleteFromCatalog(targetProjectId)
+                    logDebug('daemon.request.closeProject.direct', { targetProjectId })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'announceWorkspaceSwitched': {
+                case 'announceProjectSwitched': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   // UI-emitted acknowledgement. Relay so any --wait CLI can
                   // exit. We don't validate that the announcement matches
                   // an outstanding request — a UI can announce a switch that
                   // happened via any means (menu, keybind, CLI).
                   broadcastAllVersioned(12, {
-                    payload: { sessionId: message.payload.sessionId },
-                    type: 'workspaceSwitched',
+                    payload: { projectId: message.payload.projectId },
+                    type: 'projectSwitched',
                   })
                   sendOk(socket, message.id)
                   break
                 }
-                case 'addWorktreeRecord': {
+                case 'addWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { sessionId: targetSessionId, worktree } = message.payload
+                  const { projectId: targetProjectId, workspace } = message.payload
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { sessionId: targetSessionId, worktree },
-                      type: 'worktreeAdded',
+                      payload: { projectId: targetProjectId, workspace },
+                      type: 'workspaceAdded',
                     })
-                    logDebug('daemon.request.addWorktreeRecord.relay', {
-                      sessionId: targetSessionId,
-                      worktreeId: worktree.id,
+                    logDebug('daemon.request.addWorkspaceRecord.relay', {
+                      projectId: targetProjectId,
+                      workspaceId: workspace.id,
                     })
                   } else {
-                    addWorktreeToCatalog(targetSessionId, worktree)
-                    logDebug('daemon.request.addWorktreeRecord.direct', {
-                      sessionId: targetSessionId,
-                      worktreeId: worktree.id,
+                    addWorkspaceToCatalog(targetProjectId, workspace)
+                    logDebug('daemon.request.addWorkspaceRecord.direct', {
+                      projectId: targetProjectId,
+                      workspaceId: workspace.id,
                     })
                   }
                   sendOk(socket, message.id)
                   break
                 }
-                case 'removeWorktreeRecord': {
+                case 'removeWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { sessionId: targetSessionId, worktreeId } = message.payload
+                  const { projectId: targetProjectId, workspaceId } = message.payload
                   if (countUiAttachers() > 0) {
                     broadcastAllVersioned(12, {
-                      payload: { sessionId: targetSessionId, worktreeId },
-                      type: 'worktreeRemoved',
+                      payload: { projectId: targetProjectId, workspaceId },
+                      type: 'workspaceRemoved',
                     })
-                    logDebug('daemon.request.removeWorktreeRecord.relay', {
-                      sessionId: targetSessionId,
-                      worktreeId,
+                    logDebug('daemon.request.removeWorkspaceRecord.relay', {
+                      projectId: targetProjectId,
+                      workspaceId,
                     })
                   } else {
-                    removeWorktreeFromCatalog(targetSessionId, worktreeId)
-                    logDebug('daemon.request.removeWorktreeRecord.direct', {
-                      sessionId: targetSessionId,
-                      worktreeId,
+                    removeWorkspaceFromCatalog(targetProjectId, workspaceId)
+                    logDebug('daemon.request.removeWorkspaceRecord.direct', {
+                      projectId: targetProjectId,
+                      workspaceId,
                     })
                   }
                   sendOk(socket, message.id)
@@ -1196,17 +1196,17 @@ export async function runDaemon(): Promise<void> {
     })
 
     socket.on('close', () => {
-      logDebug('daemon.client.close', { sessionId: attachedSessions.get(socket) ?? null })
+      logDebug('daemon.client.close', { projectId: attachedProjects.get(socket) ?? null })
       sockets.delete(socket)
-      attachedSessions.delete(socket)
+      attachedProjects.delete(socket)
       negotiatedVersions.delete(socket)
       thinAttachers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
     socket.on('error', () => {
-      logDebug('daemon.client.error', { sessionId: attachedSessions.get(socket) ?? null })
+      logDebug('daemon.client.error', { projectId: attachedProjects.get(socket) ?? null })
       sockets.delete(socket)
-      attachedSessions.delete(socket)
+      attachedProjects.delete(socket)
       negotiatedVersions.delete(socket)
       thinAttachers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)

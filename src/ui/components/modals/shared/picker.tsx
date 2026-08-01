@@ -18,7 +18,7 @@ export interface PickerItem {
   onClick?: () => void
   onEdit?: () => void
   onDelete?: () => void
-  onWorktree?: () => void
+  onWorkspace?: () => void
 }
 
 interface PickerProps {
@@ -42,11 +42,11 @@ const MODAL_CHROME_ROWS = 6
 function PickerItemCtas({
   onDelete,
   onEdit,
-  onWorktree,
+  onWorkspace,
 }: {
   onEdit?: () => void
   onDelete?: () => void
-  onWorktree?: () => void
+  onWorkspace?: () => void
 }) {
   const t = useTheme()
   const handleEdit = useCallback(
@@ -56,12 +56,12 @@ function PickerItemCtas({
     },
     [onEdit]
   )
-  const handleWorktree = useCallback(
+  const handleWorkspace = useCallback(
     (event: OtuiMouseEvent) => {
       event.stopPropagation()
-      onWorktree?.()
+      onWorkspace?.()
     },
-    [onWorktree]
+    [onWorkspace]
   )
   const handleDelete = useCallback(
     (event: OtuiMouseEvent) => {
@@ -77,8 +77,8 @@ function PickerItemCtas({
           <text fg={t.primary}>[edit]</text>
         </box>
       ) : null}
-      {onWorktree ? (
-        <box onMouseDown={handleWorktree}>
+      {onWorkspace ? (
+        <box onMouseDown={handleWorkspace}>
           <text fg={t.warning}>[WT]</text>
         </box>
       ) : null}
@@ -189,11 +189,11 @@ export function Picker({
             const capturedIndex = index
             const trailing =
               item.trailing ??
-              (active && (item.onEdit || item.onDelete || item.onWorktree) ? (
+              (active && (item.onEdit || item.onDelete || item.onWorkspace) ? (
                 <PickerItemCtas
                   onEdit={item.onEdit}
                   onDelete={item.onDelete}
-                  onWorktree={item.onWorktree}
+                  onWorkspace={item.onWorkspace}
                 />
               ) : null)
             nodes.push(

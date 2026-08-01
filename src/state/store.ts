@@ -1,4 +1,5 @@
-import type { WorktreeTemplate } from '../config'
+import type { WorkspaceTemplate } from '../config'
+import type { AppAction } from './actions'
 
 import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
 import { reduceAutoCommit } from './reducers/auto-commit-state'
@@ -6,19 +7,18 @@ import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
-import { reduceSessionState } from './reducers/session-state'
+import { reduceProjectState } from './reducers/project-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
 import {
-  type AppAction,
   type AppState,
   type BarsState,
   EMPTY_AUTO_COMMIT_STATE,
   EMPTY_MULTI_REPO_STATE,
   type GitModeState,
   type GitPaneState,
-  type SessionRecord,
+  type ProjectRecord,
   type SnippetRecord,
 } from './types'
 
@@ -29,8 +29,8 @@ export interface InitialStateOverrides {
   gitMode?: Partial<GitModeState>
   gitPane?: Partial<GitPaneState>
   bars?: BarsState
-  sessionBarVisible?: boolean
-  worktreeTemplates?: WorktreeTemplate[]
+  projectBarVisible?: boolean
+  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 const DEFAULT_GIT_PANE: GitPaneState = {
@@ -46,13 +46,22 @@ export const DEFAULT_BARS: BarsState = {
   left: {
     visible: true,
     widgets: [
-      { grow: 50, id: 'workspaces', visible: true },
+      { grow: 50, id: 'projects', visible: true },
       { grow: 50, id: 'git', visible: true },
     ],
     width: 28,
   },
   right: { visible: false, widgets: [], width: 40 },
 }
+
+/**
+ * Persisted widget ids from before the project/workspace rename. Without this
+ * the old id is simply unknown, so the widget is pruned, the bar renders empty
+ * and the emptied layout is written straight back to aimux.json.
+ *
+ * ponytail: drop with the other rename shims.
+ */
+const LEGACY_WIDGET_IDS: Record<string, string> = { workspaces: 'projects' }
 
 /**
  * Drop widget ids this build cannot render (config written by a newer or
@@ -62,63 +71,81 @@ function sanitizeBars(bars: BarsState): BarsState {
   const sanitizeBar = (bar: BarsState[keyof BarsState]): BarsState[keyof BarsState] => ({
     ...bar,
     widgets: bar.widgets
+      .map((widget) => ({ ...widget, id: LEGACY_WIDGET_IDS[widget.id] ?? widget.id }))
       .filter((widget) => (KNOWN_WIDGET_IDS as readonly string[]).includes(widget.id))
       .map((widget) => ({ ...widget, grow: Math.max(1, Math.round(widget.grow)) })),
     width: clampBarWidth(bar.width),
   })
-  return { left: sanitizeBar(bars.left), right: sanitizeBar(bars.right) }
+  const sanitized: BarsState = { left: sanitizeBar(bars.left), right: sanitizeBar(bars.right) }
+
+  // A widget can only ever be moved between bars or hidden, never deleted, so
+  // one that is in neither bar means the persisted layout was corrupted —
+  // which is exactly what the pre-rename `workspaces` id did to older files
+  // before LEGACY_WIDGET_IDS existed. Put it back where it ships by default,
+  // otherwise the bar renders empty forever and re-saves that emptiness.
+  for (const side of ['left', 'right'] as const) {
+    for (const fallback of DEFAULT_BARS[side].widgets) {
+      const present =
+        sanitized.left.widgets.some((w) => w.id === fallback.id) ||
+        sanitized.right.widgets.some((w) => w.id === fallback.id)
+      if (!present) {
+        sanitized[side] = { ...sanitized[side], widgets: [...sanitized[side].widgets, fallback] }
+      }
+    }
+  }
+  return sanitized
 }
 
 export function createInitialState(
   customCommands: Record<string, string> = {},
-  sessions: SessionRecord[] = [],
+  projects: ProjectRecord[] = [],
   snippets: SnippetRecord[] = [],
-  showSessionPicker = false,
+  showProjectPicker = false,
   overrides: InitialStateOverrides = {}
 ): AppState {
   return {
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,
     bars: sanitizeBars(overrides.bars ?? DEFAULT_BARS),
-    currentSessionId: null,
+    currentProjectId: null,
     customCommands,
-    focusMode: showSessionPicker ? 'command-edit' : 'navigation',
+    focusMode: showProjectPicker ? 'command-edit' : 'navigation',
     gitMode: { ...emptyGitMode(), ...overrides.gitMode },
     gitPane: { ...DEFAULT_GIT_PANE, ...overrides.gitPane },
     gitPanel: emptyGitPanel(),
-    lastActiveTabByWorktree: {},
+    lastActiveTabByWorkspace: {},
     layout: {
       terminalCols: DEFAULT_TERMINAL_COLS,
       terminalRows: DEFAULT_TERMINAL_ROWS,
     },
     layoutTrees: {},
-    modal: showSessionPicker
+    modal: showProjectPicker
       ? {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'session-picker',
+          type: 'project-picker',
         }
       : emptyModal(),
     multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
-    sessionBar: {
-      visible: overrides.sessionBarVisible ?? true,
+    projectBar: {
+      visible: overrides.projectBarVisible ?? true,
     },
-    sessions,
-    sessionStatuses: {},
+    projects,
+    projectStatuses: {},
     snippets,
     tabGroupMap: {},
     tabs: [],
-    worktreeDivergence: {},
-    worktreeTemplates: overrides.worktreeTemplates ?? [],
+    workspaceDivergence: {},
+    workspaceTemplates: overrides.workspaceTemplates ?? [],
   }
 }
 
 export function appReducer(state: AppState, action: AppAction): AppState {
-  const sessionState = reduceSessionState(state, action)
-  if (sessionState) return sessionState
+  const projectState = reduceProjectState(state, action)
+  if (projectState) return projectState
 
   const tabState = reduceTabState(state, action)
   if (tabState) return tabState

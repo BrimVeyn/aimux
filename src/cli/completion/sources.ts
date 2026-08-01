@@ -8,8 +8,8 @@
  *     shell must never see a stack trace where a completion list belongs.
  *
  * Phase 1 implements only the sources that read local state (built-in
- * assistants, the workspace catalog). Daemon-backed sources — tabs, workers,
- * worktrees — and git refs return nothing until phase 2 wires them up.
+ * assistants, the project catalog). Daemon-backed sources — tabs, workers,
+ * workspaces — and git refs return nothing until phase 2 wires them up.
  */
 
 import type { DynamicCompletionSource } from '../flags'
@@ -24,20 +24,20 @@ function assistantCandidates(): CompletionCandidate[] {
   }))
 }
 
-async function workspaceCandidates(): Promise<CompletionCandidate[]> {
-  // Imported lazily: the session catalog pulls in config + state modules that
+async function projectCandidates(): Promise<CompletionCandidate[]> {
+  // Imported lazily: the project catalog pulls in config + state modules that
   // the static-source paths (groups, verbs, flags) have no reason to load.
-  const { listWorkspaces } = await import('../client/workspace-resolver')
-  const sessions = listWorkspaces()
+  const { listProjects } = await import('../client/project-resolver')
+  const projects = listProjects()
   const nameCounts = new Map<string, number>()
-  for (const session of sessions) {
-    nameCounts.set(session.name, (nameCounts.get(session.name) ?? 0) + 1)
+  for (const project of projects) {
+    nameCounts.set(project.name, (nameCounts.get(project.name) ?? 0) + 1)
   }
-  return sessions.map((session) =>
-    // Ambiguous names can't be resolved by `--workspace`, so offer the id.
-    (nameCounts.get(session.name) ?? 0) > 1
-      ? { description: session.name, value: session.id }
-      : { description: session.id, value: session.name }
+  return projects.map((project) =>
+    // Ambiguous names can't be resolved by `--project`, so offer the id.
+    (nameCounts.get(project.name) ?? 0) > 1
+      ? { description: project.name, value: project.id }
+      : { description: project.id, value: project.name }
   )
 }
 
@@ -45,10 +45,10 @@ async function resolveSource(source: DynamicCompletionSource): Promise<Completio
   switch (source) {
     case 'assistant':
       return assistantCandidates()
-    case 'workspace':
-      return await workspaceCandidates()
-    // Phase 2: 'tab' | 'worker' | 'worktree' need a daemon round-trip under a
-    // deadline; 'git-ref' needs a `git for-each-ref` in the workspace repo.
+    case 'project':
+      return await projectCandidates()
+    // Phase 2: 'tab' | 'worker' | 'workspace' need a daemon round-trip under a
+    // deadline; 'git-ref' needs a `git for-each-ref` in the project repo.
     default:
       return []
   }
@@ -56,7 +56,7 @@ async function resolveSource(source: DynamicCompletionSource): Promise<Completio
 
 /**
  * Resolve a dynamic source, filter by the partial word, and re-apply the
- * prefix the planner stripped (e.g. `--workspace=`). Always resolves.
+ * prefix the planner stripped (e.g. `--project=`). Always resolves.
  */
 export async function resolveDynamicCandidates(
   source: DynamicCompletionSource,

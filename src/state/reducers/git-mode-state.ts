@@ -1,4 +1,5 @@
 import type { PreparedParsedDiff } from '../../ui/components/git/diff-renderer/prepare-diff'
+import type { AppAction } from '../actions'
 
 import { collectFoldables } from '../../ui/components/git/diff-renderer/build-rows'
 import {
@@ -9,7 +10,6 @@ import {
   reconcileSelectedGitEntryKey,
 } from '../git-tree'
 import {
-  type AppAction,
   type AppState,
   type FoldState,
   getParsedPayload,

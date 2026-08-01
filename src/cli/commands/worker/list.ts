@@ -1,6 +1,6 @@
 import type { CliCommand } from '../../registry'
 
-import { workspaceIdentity } from '../../client/workspace-resolver'
+import { projectIdentity } from '../../client/project-resolver'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
 import {
@@ -16,9 +16,9 @@ export const workerList: CliCommand = {
   flags: [
     ...SHARED_FLAGS,
     {
-      description: 'list workers in every catalogued workspace, not just the target one',
+      description: 'list workers in every catalogued project, not just the target one',
       kind: 'boolean',
-      name: 'all-workspaces',
+      name: 'all-projects',
     },
   ],
   group: 'worker',
@@ -27,41 +27,41 @@ export const workerList: CliCommand = {
 
     // `{"workers":[]}` alone is indistinguishable from "every worker died", and
     // the natural recovery from that reading is a destructive re-dispatch. Name
-    // the workspace that was queried so an empty fleet is legible as "not here"
+    // the project that was queried so an empty fleet is legible as "not here"
     // rather than "gone", and offer one call that answers "are they really gone?"
-    if (ctx.args.flags['all-workspaces'] === true) {
+    if (ctx.args.flags['all-projects'] === true) {
       const targets = await listWorkerTargets(ctx)
       writeJson({
         schemaVersion: WORKER_SCHEMA_VERSION,
         workers: targets
           .filter((target) => selector === undefined || target.tab.workerName === selector)
           .map((target) => ({
-            ...workerView(target.workspace, target.tab),
-            workspace: workspaceIdentity(target.workspace),
+            ...workerView(target.project, target.tab),
+            project: projectIdentity(target.project),
           })),
       })
       return EXIT_OK
     }
 
     if (selector !== undefined) {
-      const { tab, workspace } = await resolveWorkerTarget(ctx, selector)
+      const { project, tab } = await resolveWorkerTarget(ctx, selector)
       writeJson({
+        project: projectIdentity(project),
         schemaVersion: WORKER_SCHEMA_VERSION,
-        workers: [workerView(workspace, tab)],
-        workspace: workspaceIdentity(workspace),
+        workers: [workerView(project, tab)],
       })
       return EXIT_OK
     }
 
-    const workspace = ctx.getWorkspace()
-    const tabs = await listNamedWorkerTabs(ctx, workspace)
+    const project = ctx.getProject()
+    const tabs = await listNamedWorkerTabs(ctx, project)
     writeJson({
+      project: projectIdentity(project),
       schemaVersion: WORKER_SCHEMA_VERSION,
-      workers: tabs.map((tab) => workerView(workspace, tab)),
-      workspace: workspaceIdentity(workspace),
+      workers: tabs.map((tab) => workerView(project, tab)),
     })
     return EXIT_OK
   },
-  summary: 'List named workers with liveness and worktree context',
+  summary: 'List named workers with liveness and workspace context',
   verb: 'list',
 }

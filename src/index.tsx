@@ -5,7 +5,7 @@
 const command = process.argv[2]
 
 // Shell completion. First branch and cheapest: it loads the CLI registry and
-// nothing else — no daemon client, no session backend, no renderer.
+// nothing else — no daemon client, no project backend, no renderer.
 if (command === '__complete') {
   const { runComplete } = await import('./cli/completion/entry')
   process.exit(await runComplete(process.argv.slice(3)))
@@ -19,7 +19,7 @@ if (command === 'completion') {
 // CLI control plane (docs/reference/cli.md). Branch BEFORE the UI bootstrap so
 // `aimux tab list` from a non-TTY shell never spins up the React renderer.
 // Dynamic import keeps the CLI code out of the UI's cold-start cost.
-const CLI_GROUPS = new Set(['tab', 'workspace', 'worktree', 'worker'])
+const CLI_GROUPS = new Set(['tab', 'project', 'workspace', 'worker'])
 if (typeof command === 'string' && CLI_GROUPS.has(command)) {
   const { runCli } = await import('./cli')
   process.exit(await runCli(process.argv.slice(2)))

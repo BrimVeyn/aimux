@@ -13,7 +13,7 @@ import {
 } from '../../src/ipc/protocol'
 import { probeDaemonProtocolCompatibility } from '../../src/session-backend/bootstrap'
 
-describe('session backend bootstrap handshake', () => {
+describe('project backend bootstrap handshake', () => {
   const originalRuntimeDir = process.env.XDG_RUNTIME_DIR
   let tempRuntimeDir: string | null = null
 
@@ -59,7 +59,7 @@ describe('session backend bootstrap handshake', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -130,7 +130,7 @@ describe('session backend bootstrap handshake', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: 1,
                 tabs: [],
               },

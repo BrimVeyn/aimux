@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events'
 import { connect, type Socket } from 'node:net'
 
-import type { AssistantId, WorkspaceSnapshotV1 } from '../state/types'
-import type { ResizeOptions, SessionBackend, SessionBackendEvents } from './types'
+import type { AssistantId, ProjectSnapshotV1 } from '../state/types'
+import type { ProjectBackendEvents, ResizeOptions, SessionBackend } from './types'
 
 import { getIpcDaemonSocketPath } from '../daemon/runtime-paths'
 import { logDebug } from '../debug/input-log'
@@ -24,7 +24,7 @@ const IPC_REQUEST_TIMEOUT_MS = 10_000
 const RECONNECT_DELAY_MS = 250
 
 export class RemoteSessionBackend
-  extends EventEmitter<SessionBackendEvents>
+  extends EventEmitter<ProjectBackendEvents>
   implements SessionBackend
 {
   private socket: Socket | null = null
@@ -38,12 +38,12 @@ export class RemoteSessionBackend
   >()
   private decoder = new MessageDecoder<ServerResponse | ServerEvent>(parseServerMessage)
   private attached = false
-  private currentSessionId: string | null = null
+  private currentProjectId: string | null = null
   private attachOptions: {
-    sessionId: string
+    projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   } | null = null
   private selectedProtocolVersion: number | null = null
   private daemonCapabilities: ReadonlySet<string> = new Set()
@@ -68,7 +68,7 @@ export class RemoteSessionBackend
     }
   }
 
-  private closeSocket(reason: string, preserveSession = false): void {
+  private closeSocket(reason: string, preserveProject = false): void {
     const socket = this.socket
     this.socket = null
     this.attached = false
@@ -77,8 +77,8 @@ export class RemoteSessionBackend
     this.decoder.reset()
     this.rejectPendingRequests(new Error(reason))
 
-    if (!preserveSession) {
-      this.currentSessionId = null
+    if (!preserveProject) {
+      this.currentProjectId = null
       this.attachOptions = null
     }
 
@@ -94,7 +94,7 @@ export class RemoteSessionBackend
   }
 
   private handleConnectionLoss(reason: string): void {
-    logDebug('backend.remote.connectionLoss', { reason, sessionId: this.currentSessionId })
+    logDebug('backend.remote.connectionLoss', { projectId: this.currentProjectId, reason })
     this.closeSocket(reason, true)
     if (this.shouldReconnect && this.attachOptions) {
       void this.scheduleReconnect()
@@ -187,7 +187,7 @@ export class RemoteSessionBackend
         break
       case 'tabStatus':
         logDebug('backend.remote.tabStatus', {
-          sessionId: message.payload.sessionId,
+          projectId: message.payload.projectId,
           status: message.payload.status,
           tabId: message.payload.tabId,
         })
@@ -198,48 +198,48 @@ export class RemoteSessionBackend
         // v13 orchestration signals — consumed by the headless CLI, not the UI
         // backend. Enumerated so the switch stays exhaustive; no UI wiring yet.
         break
-      case 'sessionStatus':
-        logDebug('backend.remote.sessionStatus', {
-          sessionId: message.payload.sessionId,
+      case 'projectStatus':
+        logDebug('backend.remote.projectStatus', {
+          projectId: message.payload.projectId,
           status: message.payload.status,
         })
-        this.emit('sessionActivity', message.payload.sessionId, message.payload.status)
+        this.emit('projectActivity', message.payload.projectId, message.payload.status)
         break
       case 'tabAdded':
         logDebug('backend.remote.tabAdded', {
-          sessionId: message.payload.sessionId,
+          projectId: message.payload.projectId,
           tabId: message.payload.tab.id,
         })
-        this.emit('tabAdded', message.payload.sessionId, message.payload.tab)
+        this.emit('tabAdded', message.payload.projectId, message.payload.tab)
         break
       case 'tabMetadataUpdated':
-        this.emit('tabMetadataUpdated', message.payload.sessionId, message.payload.tabId, {
+        this.emit('tabMetadataUpdated', message.payload.projectId, message.payload.tabId, {
           autoRenameStatus: message.payload.autoRenameStatus,
           title: message.payload.title,
         })
         break
-      case 'workspaceCreateRequested':
+      case 'projectCreateRequested':
         this.emit(
-          'workspaceCreateRequested',
+          'projectCreateRequested',
           message.payload.name,
           message.payload.projectPath,
           message.payload.switch === true
         )
         break
-      case 'workspaceSwitchRequested':
-        this.emit('workspaceSwitchRequested', message.payload.targetSessionId)
+      case 'projectSwitchRequested':
+        this.emit('projectSwitchRequested', message.payload.targetProjectId)
         break
-      case 'workspaceCloseRequested':
-        this.emit('workspaceCloseRequested', message.payload.targetSessionId)
+      case 'projectCloseRequested':
+        this.emit('projectCloseRequested', message.payload.targetProjectId)
         break
-      case 'workspaceSwitched':
-        this.emit('workspaceSwitched', message.payload.sessionId)
+      case 'projectSwitched':
+        this.emit('projectSwitched', message.payload.projectId)
         break
-      case 'worktreeAdded':
-        this.emit('worktreeAdded', message.payload.sessionId, message.payload.worktree)
+      case 'workspaceAdded':
+        this.emit('workspaceAdded', message.payload.projectId, message.payload.workspace)
         break
-      case 'worktreeRemoved':
-        this.emit('worktreeRemoved', message.payload.sessionId, message.payload.worktreeId)
+      case 'workspaceRemoved':
+        this.emit('workspaceRemoved', message.payload.projectId, message.payload.workspaceId)
         break
     }
   }
@@ -314,10 +314,10 @@ export class RemoteSessionBackend
   }
 
   private async performAttach(options: {
-    sessionId: string
+    projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<AttachResult> {
     await this.connectAndHandshake()
 
@@ -360,13 +360,13 @@ export class RemoteSessionBackend
         try {
           await this.performAttach(reconnectOptions)
           logDebug('backend.remote.reconnect.success', {
-            sessionId: reconnectOptions.sessionId,
+            projectId: reconnectOptions.projectId,
           })
           return
         } catch (error) {
           logDebug('backend.remote.reconnect.retry', {
             error: error instanceof Error ? error.message : String(error),
-            sessionId: reconnectOptions.sessionId,
+            projectId: reconnectOptions.projectId,
           })
           await Bun.sleep(RECONNECT_DELAY_MS)
         }
@@ -381,27 +381,27 @@ export class RemoteSessionBackend
   }
 
   async attach(options: {
-    sessionId: string
+    projectId: string
     cols: number
     rows: number
-    workspaceSnapshot?: WorkspaceSnapshotV1
+    projectSnapshot?: ProjectSnapshotV1
   }): Promise<AttachResult> {
     this.shouldReconnect = true
-    this.currentSessionId = options.sessionId
+    this.currentProjectId = options.projectId
     this.attachOptions = options
 
     logDebug('backend.remote.attach.start', {
       cols: options.cols,
+      projectId: options.projectId,
       rows: options.rows,
-      sessionId: options.sessionId,
-      snapshotTabs: options.workspaceSnapshot?.tabs.length ?? 0,
+      snapshotTabs: options.projectSnapshot?.tabs.length ?? 0,
       socketPath: getIpcDaemonSocketPath(),
     })
 
     const result = await this.performAttach(options)
     logDebug('backend.remote.attach.success', {
       activeTabId: result.activeTabId,
-      sessionId: options.sessionId,
+      projectId: options.projectId,
       tabs: result.tabs.length,
     })
 
@@ -417,7 +417,7 @@ export class RemoteSessionBackend
     cols: number
     rows: number
     cwd?: string
-    worktreeId?: string
+    workspaceId?: string
     autoRenameCandidate?: boolean
   }): void {
     if (!this.attached) {
@@ -490,7 +490,7 @@ export class RemoteSessionBackend
       logDebug('backend.remote.skipResizeBeforeAttach', { cols, rows })
       return
     }
-    logDebug('backend.remote.resize', { cols, rows, sessionId: this.currentSessionId })
+    logDebug('backend.remote.resize', { cols, projectId: this.currentProjectId, rows })
     this.dispatchCommand(
       { id: crypto.randomUUID(), payload: { cols, rows }, type: 'resizeClient' },
       'resizeClient'
@@ -533,17 +533,17 @@ export class RemoteSessionBackend
     this.dispatchCommand({ id: crypto.randomUUID(), payload: {}, type: 'disposeAll' }, 'disposeAll')
   }
 
-  announceWorkspaceSwitched(sessionId: string): void {
-    // Fire-and-forget so `handleSwitchSessionEffect` doesn't block waiting on
-    // the daemon roundtrip. The daemon relays this as a `workspaceSwitched`
-    // broadcast that unblocks any `aimux workspace switch --wait` CLI.
+  announceProjectSwitched(projectId: string): void {
+    // Fire-and-forget so `handleSwitchProjectEffect` doesn't block waiting on
+    // the daemon roundtrip. The daemon relays this as a `projectSwitched`
+    // broadcast that unblocks any `aimux project switch --wait` CLI.
     this.dispatchCommand(
       {
         id: crypto.randomUUID(),
-        payload: { sessionId },
-        type: 'announceWorkspaceSwitched',
+        payload: { projectId },
+        type: 'announceProjectSwitched',
       },
-      'announceWorkspaceSwitched'
+      'announceProjectSwitched'
     )
   }
 

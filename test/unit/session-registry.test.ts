@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { ProjectSnapshotV1 } from '../../src/state/types'
 
 import { SessionRegistry } from '../../src/daemon/session-registry'
 
@@ -29,7 +29,7 @@ function createSnapshotTab(
   }
 }
 
-function createSnapshot(overrides?: Partial<WorkspaceSnapshotV1>): WorkspaceSnapshotV1 {
+function createSnapshot(overrides?: Partial<ProjectSnapshotV1>): ProjectSnapshotV1 {
   return {
     activeTabId: 'tab-a',
     savedAt: new Date().toISOString(),
@@ -103,7 +103,7 @@ describe('SessionRegistry', () => {
   test('reattach keeps live tabs the snapshot no longer knows about', () => {
     const registry = new SessionRegistry()
 
-    // Seed two live tabs (as if the workspace was populated).
+    // Seed two live tabs (as if the project was populated).
     registry.attachFromSnapshot(
       createSnapshot({
         tabs: [createSnapshotTab('tab-a', 'Alpha'), createSnapshotTab('tab-b', 'Beta', 'codex')],
@@ -111,9 +111,9 @@ describe('SessionRegistry', () => {
     )
 
     // A sibling CLI spawned tab-b *after* the UI last persisted this
-    // workspace's snapshot, so the reattach snapshot only mentions tab-a. The
+    // project's snapshot, so the reattach snapshot only mentions tab-a. The
     // registry is authoritative for membership, so tab-b must survive —
-    // otherwise switching to this workspace renders it as empty/stale.
+    // otherwise switching to this project renders it as empty/stale.
     const reattached = registry.attachFromSnapshot(
       createSnapshot({ activeTabId: 'tab-a', tabs: [createSnapshotTab('tab-a', 'Alpha')] })
     )

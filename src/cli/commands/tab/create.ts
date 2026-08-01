@@ -1,6 +1,6 @@
 import { resolve as resolvePath } from 'node:path'
 
-import type { WorktreeRecord } from '../../../state/types'
+import type { WorkspaceRecord } from '../../../state/types'
 import type { CliContext } from '../../context'
 import type { CliCommand } from '../../registry'
 
@@ -22,7 +22,7 @@ import {
 } from '../../../pty/command-registry'
 import { CliUsageError, SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createWorkspaceWorktree } from '../worktree/create-core'
+import { createProjectWorkspace } from '../workspace/create-core'
 
 const FALLBACK_COLS = 200
 const FALLBACK_ROWS = 60
@@ -35,10 +35,10 @@ export interface CreateCliTabOptions {
   cwd?: string
   effort?: string
   model?: string
-  newWorktree?: boolean | string
+  newWorkspace?: boolean | string
   title?: string
   workerName?: string
-  worktreeId?: string
+  workspaceId?: string
 }
 
 export interface CreateCliTabResult {
@@ -53,26 +53,26 @@ export interface CreateCliTabResult {
   tabId: string
   title: string
   workerName: string | null
-  worktreeId: string | null
+  workspaceId: string | null
 }
 
 /**
  * Resolve the cwd a spawned tab should run in. Precedence: explicit `--cwd`
- * (resolved to absolute) > the resolved worktree's path > undefined (the
- * daemon's default). Worktree record paths are already absolute.
+ * (resolved to absolute) > the resolved workspace's path > undefined (the
+ * daemon's default). Workspace record paths are already absolute.
  */
 export function resolveTabCwd(
   cwdFlag: string | undefined,
-  worktreeRecord: { path: string } | undefined
+  workspaceRecord: { path: string } | undefined
 ): string | undefined {
   if (cwdFlag !== undefined) return resolvePath(cwdFlag)
-  return worktreeRecord?.path
+  return workspaceRecord?.path
 }
 
 /**
  * Resolve the base command a tab launches. Mirrors the UI's precedence
  * (`src/app-runtime/side-effects.ts`): an explicit `--command` override wins,
- * else the workspace's persisted `customCommands[assistantId]` (so CLI workers
+ * else the project's persisted `customCommands[assistantId]` (so CLI workers
  * inherit e.g. `claude --dangerously-skip-permissions`), else the builtin
  * default. `getAllAssistantOptions` deliberately does NOT apply builtin
  * overrides, so this lookup must be explicit.
@@ -85,13 +85,13 @@ export function resolveAssistantCommand(
   return commandOverride ?? customCommands[option.id] ?? option.command
 }
 
-async function rollbackCreatedWorktree(
-  record: WorktreeRecord,
+async function rollbackCreatedWorkspace(
+  record: WorkspaceRecord,
   ctx: CliContext,
   originalError: unknown
 ): Promise<never> {
   const daemon = await ctx.getDaemon()
-  const workspace = ctx.getWorkspace()
+  const project = ctx.getProject()
   let rollbackError: unknown
   try {
     await removeGitWorktree({
@@ -100,9 +100,9 @@ async function rollbackCreatedWorktree(
       targetPath: record.path,
     })
     await pruneEmptyWorktreeParent(record.path)
-    await daemon.expectOk('removeWorktreeRecord', {
-      sessionId: workspace.id,
-      worktreeId: record.id,
+    await daemon.expectOk('removeWorkspaceRecord', {
+      projectId: project.id,
+      workspaceId: record.id,
     })
   } catch (error) {
     rollbackError = error
@@ -117,8 +117,8 @@ async function rollbackCreatedWorktree(
 /**
  * Create a tab without writing to stdout. Worker commands compose this helper
  * with prompt dispatch/await while `tab create` remains a thin compatibility
- * adapter. All validation and daemon attachment happen before a worktree is
- * created; any later failure rolls the fresh worktree back.
+ * adapter. All validation and daemon attachment happen before a workspace is
+ * created; any later failure rolls the fresh workspace back.
  */
 export async function createCliTab(
   ctx: CliContext,
@@ -132,10 +132,10 @@ export async function createCliTab(
     cwd: cwdRaw,
     effort,
     model,
-    newWorktree,
+    newWorkspace,
     title: requestedTitle,
     workerName,
-    worktreeId: requestedWorktreeId,
+    workspaceId: requestedWorkspaceId,
   } = options
   if (assistantId.length === 0) throw new CliUsageError('--assistant is required')
   if (workerName !== undefined && workerName.trim().length === 0) {
@@ -147,18 +147,18 @@ export async function createCliTab(
     )
   }
 
-  const createFreshWorktree = newWorktree !== undefined && newWorktree !== false
-  if (createFreshWorktree && requestedWorktreeId !== undefined) {
+  const createFreshWorkspace = newWorkspace !== undefined && newWorkspace !== false
+  if (createFreshWorkspace && requestedWorkspaceId !== undefined) {
     throw new CliUsageError(
-      '--new-worktree creates its own; use --worktree <id> to co-locate instead'
+      '--new-workspace creates its own; use --workspace <id> to co-locate instead'
     )
   }
-  if (createFreshWorktree && cwdRaw !== undefined) {
-    throw new CliUsageError('--new-worktree sets the cwd to the new worktree; drop --cwd')
+  if (createFreshWorkspace && cwdRaw !== undefined) {
+    throw new CliUsageError('--new-workspace sets the cwd to the new workspace; drop --cwd')
   }
-  if (!createFreshWorktree && (base !== undefined || branch !== undefined)) {
+  if (!createFreshWorkspace && (base !== undefined || branch !== undefined)) {
     throw new CliUsageError(
-      '--base / --branch require --new-worktree (use `worktree create` otherwise)'
+      '--base / --branch require --new-workspace (use `workspace create` otherwise)'
     )
   }
 
@@ -177,7 +177,7 @@ export async function createCliTab(
   const title = requestedTitle ?? option.label
   const tabId = createPrefixedId('tab')
 
-  const workspace = ctx.getWorkspace()
+  const project = ctx.getProject()
   const daemon = await ctx.getDaemon()
   if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
     throw new Error(
@@ -193,44 +193,44 @@ export async function createCliTab(
     if (!daemon.hasCapability(IPC_CAPABILITY_LIST_TABS)) {
       throw new Error('daemon cannot validate worker-name uniqueness — restart aimux')
     }
-    const existing = await daemon.listTabs(workspace.id)
+    const existing = await daemon.listTabs(project.id)
     if (existing.tabs.some((tab) => tab.workerName === workerName)) {
-      throw new Error(`worker name already exists in workspace "${workspace.name}": ${workerName}`)
+      throw new Error(`worker name already exists in project "${project.name}": ${workerName}`)
     }
   }
 
-  // Attach before creating a worktree so stale daemon/session failures have no
+  // Attach before creating a workspace so stale daemon/project failures have no
   // git-side effect.
-  await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+  await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
 
-  let worktreeId = requestedWorktreeId ?? workspace.activeWorktreeId
-  let worktreeRecord =
-    worktreeId !== undefined
-      ? workspace.worktrees?.find((entry) => entry.id === worktreeId)
+  let workspaceId = requestedWorkspaceId ?? project.activeWorkspaceId
+  let workspaceRecord =
+    workspaceId !== undefined
+      ? project.workspaces?.find((entry) => entry.id === workspaceId)
       : undefined
-  if (requestedWorktreeId !== undefined && worktreeRecord === undefined) {
-    const ids = workspace.worktrees?.map((entry) => entry.id).join(', ') ?? '(none)'
-    throw new Error(`unknown worktree id: ${requestedWorktreeId} (known: ${ids})`)
+  if (requestedWorkspaceId !== undefined && workspaceRecord === undefined) {
+    const ids = project.workspaces?.map((entry) => entry.id).join(', ') ?? '(none)'
+    throw new Error(`unknown workspace id: ${requestedWorkspaceId} (known: ${ids})`)
   }
 
-  let createdWorktree: WorktreeRecord | undefined
-  if (createFreshWorktree) {
-    const worktreeName =
-      typeof newWorktree === 'string' && newWorktree !== ''
-        ? newWorktree
+  let createdWorkspace: WorkspaceRecord | undefined
+  if (createFreshWorkspace) {
+    const workspaceName =
+      typeof newWorkspace === 'string' && newWorkspace !== ''
+        ? newWorkspace
         : `${assistantId}-${tabId.slice(-6)}`
-    createdWorktree = await createWorkspaceWorktree({
+    createdWorkspace = await createProjectWorkspace({
       base: base ?? 'HEAD',
-      branch: branch ?? `aimux/${worktreeName}`,
+      branch: branch ?? `aimux/${workspaceName}`,
       daemon,
-      name: worktreeName,
-      workspace,
+      name: workspaceName,
+      project,
     })
-    worktreeId = createdWorktree.id
-    worktreeRecord = createdWorktree
+    workspaceId = createdWorkspace.id
+    workspaceRecord = createdWorkspace
   }
 
-  const cwd = resolveTabCwd(cwdRaw, worktreeRecord)
+  const cwd = resolveTabCwd(cwdRaw, workspaceRecord)
   const useFallback = daemon.hasCapability(IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK)
   try {
     await daemon.expectOk('createTab', {
@@ -244,28 +244,28 @@ export async function createCliTab(
       tabId,
       title,
       workerName,
-      worktreeId,
+      workspaceId,
     })
   } catch (error) {
-    if (createdWorktree !== undefined) {
-      return rollbackCreatedWorktree(createdWorktree, ctx, error)
+    if (createdWorkspace !== undefined) {
+      return rollbackCreatedWorkspace(createdWorkspace, ctx, error)
     }
     throw error
   }
 
   return {
     assistant: assistantId,
-    branch: worktreeRecord?.branch ?? null,
+    branch: workspaceRecord?.branch ?? null,
     command: [executable, ...args].join(' '),
     cwd: cwd ?? null,
     effort: effort ?? null,
     model: model ?? null,
-    name: worktreeRecord?.name ?? null,
-    path: worktreeRecord?.path ?? null,
+    name: workspaceRecord?.name ?? null,
+    path: workspaceRecord?.path ?? null,
     tabId,
     title,
     workerName: workerName ?? null,
-    worktreeId: worktreeId ?? null,
+    workspaceId: workspaceId ?? null,
   }
 }
 
@@ -310,26 +310,27 @@ export const tabCreate: CliCommand = {
       name: 'effort',
     },
     {
-      complete: { kind: 'dynamic', source: 'worktree' },
-      description: 'worktree id the tab belongs to (defaults to the workspace’s active worktree)',
+      complete: { kind: 'dynamic', source: 'workspace' },
+      description: 'workspace id the tab belongs to (defaults to the project’s active workspace)',
       kind: 'string',
-      name: 'worktree',
+      name: 'workspace',
     },
     {
       complete: { kind: 'none' },
-      description: 'create a fresh worktree for this tab (optionally named: --new-worktree=<name>)',
+      description:
+        'create a fresh workspace for this tab (optionally named: --new-workspace=<name>)',
       kind: 'optional-string',
-      name: 'new-worktree',
+      name: 'new-workspace',
     },
     {
       complete: { kind: 'dynamic', source: 'git-ref' },
-      description: 'base ref for --new-worktree (default HEAD)',
+      description: 'base ref for --new-workspace (default HEAD)',
       kind: 'string',
       name: 'base',
     },
     {
       complete: { kind: 'none' },
-      description: 'branch for --new-worktree (default aimux/<name>)',
+      description: 'branch for --new-workspace (default aimux/<name>)',
       kind: 'string',
       name: 'branch',
     },
@@ -347,13 +348,13 @@ export const tabCreate: CliCommand = {
 
     const title = typeof ctx.args.flags.title === 'string' ? ctx.args.flags.title : undefined
     const cwdRaw = typeof ctx.args.flags.cwd === 'string' ? ctx.args.flags.cwd : undefined
-    const newWorktreeRaw = ctx.args.flags['new-worktree']
-    const newWorktreeFlag =
-      typeof newWorktreeRaw === 'string' || typeof newWorktreeRaw === 'boolean'
-        ? newWorktreeRaw
+    const newWorkspaceRaw = ctx.args.flags['new-workspace']
+    const newWorkspaceFlag =
+      typeof newWorkspaceRaw === 'string' || typeof newWorkspaceRaw === 'boolean'
+        ? newWorkspaceRaw
         : undefined
-    const worktreeFlag =
-      typeof ctx.args.flags.worktree === 'string' ? ctx.args.flags.worktree : undefined
+    const workspaceFlag =
+      typeof ctx.args.flags.workspace === 'string' ? ctx.args.flags.workspace : undefined
     const baseFlag = typeof ctx.args.flags.base === 'string' ? ctx.args.flags.base : undefined
     const branchFlag = typeof ctx.args.flags.branch === 'string' ? ctx.args.flags.branch : undefined
     const result = await createCliTab(ctx, {
@@ -364,9 +365,9 @@ export const tabCreate: CliCommand = {
       cwd: cwdRaw,
       effort,
       model,
-      newWorktree: newWorktreeFlag,
+      newWorkspace: newWorkspaceFlag,
       title,
-      worktreeId: worktreeFlag,
+      workspaceId: workspaceFlag,
     })
     writeJson(result)
     return EXIT_OK

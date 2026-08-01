@@ -1,7 +1,8 @@
 import { useStore } from 'zustand'
 import { createStore } from 'zustand/vanilla'
 
-import type { AppAction, AppState } from './types'
+import type { AppAction } from './actions'
+import type { AppState } from './types'
 
 import { appReducer, createInitialState } from './store'
 

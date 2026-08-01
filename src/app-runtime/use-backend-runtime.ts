@@ -1,7 +1,8 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { LayoutState } from '../state/types'
 
 import { attachCurrentSession } from './backend-attach-runtime'
 import { bindBackendRuntimeEvents } from './backend-runtime-events'
@@ -11,10 +12,10 @@ interface BackendRuntimeOptions {
   backend: SessionBackend
   dispatch: (action: AppAction) => void
   activeTabId: string | null
-  currentSessionId: string | null
+  currentProjectId: string | null
   layoutRef: MutableRefObject<LayoutState>
   resizingRef: MutableRefObject<boolean>
-  currentSessionWorkspaceSnapshot: Parameters<SessionBackend['attach']>[0]['workspaceSnapshot']
+  currentProjectProjectSnapshot: Parameters<SessionBackend['attach']>[0]['projectSnapshot']
   syntaxOverlayEnabled: () => boolean
 }
 
@@ -27,8 +28,8 @@ export interface TabRuntimeControls {
 export function useBackendRuntime({
   activeTabId,
   backend,
-  currentSessionId,
-  currentSessionWorkspaceSnapshot,
+  currentProjectId,
+  currentProjectProjectSnapshot,
   dispatch,
   layoutRef,
   resizingRef,
@@ -39,7 +40,7 @@ export function useBackendRuntime({
   const { clearAllTimers, clearIdleTimer, clearStartupGrace, startStartupGrace } = timeouts
 
   useEffect(() => {
-    if (!(currentSessionId != null && currentSessionId !== '')) {
+    if (!(currentProjectId != null && currentProjectId !== '')) {
       attachRequestIdRef.current += 1
       return
     }
@@ -47,22 +48,22 @@ export function useBackendRuntime({
     return attachCurrentSession({
       attachRequestIdRef,
       backend,
-      currentSessionId,
-      currentSessionWorkspaceSnapshot,
+      currentProjectId,
+      currentProjectProjectSnapshot,
       dispatch,
       layoutRef,
     })
-  }, [backend, currentSessionId, currentSessionWorkspaceSnapshot, dispatch, layoutRef])
+  }, [backend, currentProjectId, currentProjectProjectSnapshot, dispatch, layoutRef])
 
   useEffect(() => {
-    if (!(currentSessionId != null && currentSessionId !== '')) {
+    if (!(currentProjectId != null && currentProjectId !== '')) {
       return
     }
 
     // The backend owns each tab's scroll position; a backgrounded tab keeps it
     // in its own emulator, so switching back needs no re-anchor from here.
     backend.setActiveTab(activeTabId)
-  }, [activeTabId, backend, currentSessionId])
+  }, [activeTabId, backend, currentProjectId])
 
   useEffect(() => {
     return bindBackendRuntimeEvents({

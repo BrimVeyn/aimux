@@ -41,11 +41,11 @@ describe('config profile paths', () => {
     delete process.env.AIMUX_RUNTIME_PROFILE
 
     const config = await import(`../../src/config.ts?profile=dev-${Date.now()}`)
-    const sessions = await import(`../../src/state/session-catalog.ts?profile=dev-${Date.now()}`)
+    const projects = await import(`../../src/state/project-catalog.ts?profile=dev-${Date.now()}`)
 
     expect(config.getConfigPath()).toBe(join(tempHome, '.config', 'aimux', 'dev', 'aimux.json'))
-    expect(sessions.getSessionCatalogPath()).toBe(
-      join(tempHome, '.config', 'aimux', 'dev', 'aimux-sessions.json')
+    expect(projects.getProjectCatalogPath()).toBe(
+      join(tempHome, '.config', 'aimux', 'dev', 'aimux-projects.json')
     )
   })
 

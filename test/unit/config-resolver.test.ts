@@ -3,9 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import { resolveConfig } from '../../packages/aimux-config/src/resolver'
 
 describe('resolveConfig startup override aliases', () => {
-  test('normalizes deprecated theme and session bar fields', () => {
+  test('normalizes deprecated theme and project bar fields', () => {
     const config = resolveConfig({
-      sessionBar: {
+      projectBar: {
         visible: false,
       },
       theme: {
@@ -14,7 +14,7 @@ describe('resolveConfig startup override aliases', () => {
     })
 
     expect(config.theme).toEqual({ initialId: undefined, initialMode: 'light' })
-    expect(config.sessionBar).toEqual({
+    expect(config.projectBar).toEqual({
       initialVisible: false,
     })
   })
@@ -37,7 +37,7 @@ describe('resolveConfig startup override aliases', () => {
         treeCompaction: false,
         visible: true,
       },
-      sessionBar: {
+      projectBar: {
         initialVisible: true,
         visible: false,
       },
@@ -48,7 +48,7 @@ describe('resolveConfig startup override aliases', () => {
     })
 
     expect(config.theme?.initialMode).toBe('dark')
-    expect(config.sessionBar).toEqual({
+    expect(config.projectBar).toEqual({
       initialVisible: true,
     })
     // Placement fields (initialMode/initialPosition/initialRatio/initialVisible)

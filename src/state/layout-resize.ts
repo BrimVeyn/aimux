@@ -1,4 +1,4 @@
-import type { WorkspaceSnapshotV1 } from './types'
+import type { ProjectSnapshotV1 } from './types'
 
 import { computePaneRects, type LayoutNode, PANE_BORDER, type PaneRect } from './layout-tree'
 
@@ -9,7 +9,7 @@ export interface TerminalBounds {
   rows: number
 }
 
-export function getSnapshotTrees(snapshot: WorkspaceSnapshotV1 | undefined): LayoutNode[] {
+export function getSnapshotTrees(snapshot: ProjectSnapshotV1 | undefined): LayoutNode[] {
   if (snapshot?.layoutTrees) {
     return Object.values(snapshot.layoutTrees)
   }

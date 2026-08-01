@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: First-run setup, creating a profile, and your first workspace.
+description: First-run setup, creating a profile, and your first project.
 ---
 
 # Getting Started
@@ -63,19 +63,19 @@ Create `~/.config/aimux/<profile>/aimux.config.ts`:
 import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  sessionBar: {
+  projectBar: {
     initialPosition: 'top',
     initialVisible: true,
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
+    k.mode('navigation', (m) => m.map('<C-g>', actions.projectPicker, 'Project picker')),
 })
 ```
 
 This example stays inside the surfaces that are wired into the runtime today.
 
-Fields like `sessionBar.initialVisible` are startup overrides. They are applied
+Fields like `projectBar.initialVisible` are startup overrides. They are applied
 again on every launch, while app-managed runtime changes persist in
 `aimux.json`.
 
@@ -91,24 +91,24 @@ On first launch, `aimux` loads:
 
 - `aimux.config.ts` or `aimux.config.js` from the active profile directory
 - `aimux.json` if it already exists
-- the workspace catalog and snippet catalog for the active profile
+- the project catalog and snippet catalog for the active profile
 
-The app starts in the workspace picker flow. Existing workspaces are loaded into
+The app starts in the project picker flow. Existing projects are loaded into
 the picker, and if none exist yet you can create the first one there.
 
-## 6. Create Your First Workspace
+## 6. Create Your First Project
 
-The workspace picker is the main entrypoint for workspace management.
+The project picker is the main entrypoint for project management.
 
 Typical first-run flow:
 
 1. Open `aimux`
-2. Create a workspace from the picker
+2. Create a project from the picker
 3. Optionally attach a project directory
 4. Open a tab for `claude`, `codex`, `opencode`, `grok`, `kimi`, or `terminal`
 5. Use `i` to focus the terminal and `Ctrl+Z` to return to navigation mode
 
-See `guide/sessions.md` for the full workspace model.
+See `guide/projects.md` for the full project model.
 
 ## 7. Learn the Default Keys
 
@@ -116,7 +116,7 @@ Important defaults:
 
 - `?` opens the help modal
 - `i` enters terminal-input mode
-- `Ctrl+G` opens the workspace picker
+- `Ctrl+G` opens the project picker
 - `Ctrl+N` opens the new-tab modal
 - `Ctrl+S` opens the snippet picker — see [`guide/snippets.md`](guide/snippets.md)
   for inline triggers (`:sig<space>`), built-in variables, and shell-backed
@@ -133,7 +133,7 @@ After you start using `aimux`, the profile directory may contain:
 
 - `aimux.config.ts` - your typed config
 - `aimux.json` - app-managed runtime preferences
-- `aimux-sessions.json` - workspace catalog and per-workspace snapshots
+- `aimux-projects.json` - project catalog and per-project snapshots
 - `aimux-snippets.json` - snippet catalog
 
 See `concepts/config-and-state.md` for the exact ownership of each file.

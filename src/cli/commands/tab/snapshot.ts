@@ -38,7 +38,7 @@ export const tabSnapshot: CliCommand = {
     }
     const renderOptions = { trim: ctx.args.flags['no-trim'] !== true }
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     if (!daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH)) {
       throw new Error(
@@ -71,8 +71,8 @@ export const tabSnapshot: CliCommand = {
 
     const attach = await daemon.attach({
       cols: 0,
+      projectId: project.id,
       rows: 0,
-      sessionId: workspace.id,
       thin: true,
     })
     const tab = attach.tabs.find((t) => t.id === tabId)

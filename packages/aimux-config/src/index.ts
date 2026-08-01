@@ -38,7 +38,7 @@ export {
 } from './external-editor-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
-// User-facing config types (keymap/backends/sessions/etc.).
+// User-facing config types (keymap/backends/projects/etc.).
 export type {
   Action,
   ActionFn,
@@ -75,9 +75,9 @@ export type {
   ModeKeymapDef,
   MultiRepoConfig,
   MultiRepoState,
+  ProjectRecord,
   ResolvedConfig,
   ResolvedKeymapConfig,
-  SessionRecord,
   SidebarConfig,
   SideEffect,
   SnippetDef,
@@ -88,7 +88,7 @@ export type {
   StatusBarConfig,
   StatusBarSeparator,
   TabSession,
-  WorktreeTemplate,
-  WorktreeTemplatePane,
-  WorktreeTemplateTab,
+  WorkspaceTemplate,
+  WorkspaceTemplatePane,
+  WorkspaceTemplateTab,
 } from './types'

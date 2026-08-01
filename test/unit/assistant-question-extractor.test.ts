@@ -70,7 +70,7 @@ describe('extractQuestion', () => {
       'grok',
       snapshot(
         'Bottom Line',
-        'Swap legacy sessions for JWT + rotation',
+        'Swap legacy projects for JWT + rotation',
         '[ a ] pprove [ c ] omment [ q ] uit plan'
       )
     )

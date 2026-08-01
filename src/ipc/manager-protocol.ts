@@ -1,11 +1,11 @@
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
-import { isWorkspaceSnapshotV1 } from '../state/validation'
+import { isProjectSnapshotV1 } from '../state/validation'
 import {
   getProcessVersion,
   IpcProtocolError,
@@ -36,13 +36,13 @@ import {
 // v9: additive — `tabMetadata` updates titles and auto-rename state without
 // restarting PTYs. Capability-gated; MIN remains at 8.
 //
-// v10: additive — `workerName` persists a workspace-scoped orchestration
+// v10: additive — `workerName` persists a project-scoped orchestration
 // handle on tabs created through the headless worker facade.
 //
 // v11: breaking release boundary — force a fresh terminal-manager so named
 // worker metadata is guaranteed to survive daemon reattach and process swaps.
-export const MANAGER_PROTOCOL_MIN_VERSION = 11
-export const MANAGER_PROTOCOL_VERSION = 11
+export const MANAGER_PROTOCOL_MIN_VERSION = 12
+export const MANAGER_PROTOCOL_VERSION = 12
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New
@@ -52,7 +52,7 @@ export const MANAGER_PROTOCOL_VERSION = 11
  */
 export const MANAGER_PROTOCOL_CAPABILITIES: readonly string[] = [
   'setBroadcastEnabled',
-  'createTabWorktreeId',
+  'createTabWorkspaceId',
   'tabMetadata',
   'workerMetadata',
 ]
@@ -96,10 +96,10 @@ export interface ManagerHelloResult {
 
 export interface ManagerAttachRequest {
   protocolVersion: number
-  sessionId: string
+  projectId: string
   cols: number
   rows: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectSnapshot?: ProjectSnapshotV1
 }
 
 export interface ManagerAttachResult {
@@ -115,7 +115,7 @@ export type ManagerRequest =
       id: string
       type: 'createTab'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         assistant: TabSession['assistant']
         title: string
@@ -127,22 +127,22 @@ export type ManagerRequest =
         /** Extra env vars merged into the spawned PTY's environment. */
         env?: Record<string, string>
         /**
-         * Worktree this tab belongs to (UI grouping). Capability-gated on
-         * `createTabWorktreeId`. Pre-cap TMs silently drop the field, which
+         * Workspace this tab belongs to (UI grouping). Capability-gated on
+         * `createTabWorkspaceId`. Pre-cap TMs silently drop the field, which
          * matches the previous behaviour where every new tab had
-         * `worktreeId = undefined`.
+         * `workspaceId = undefined`.
          */
-        worktreeId?: string
+        workspaceId?: string
         workerName?: string
         autoRenameStatus?: 'eligible' | 'attempted'
       }
     }
-  | { id: string; type: 'write'; payload: { sessionId: string; tabId: string; data: string } }
+  | { id: string; type: 'write'; payload: { projectId: string; tabId: string; data: string } }
   | {
       id: string
       type: 'updateTabMetadata'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         title?: string
         autoRenameStatus?: 'eligible' | 'attempted'
@@ -152,7 +152,7 @@ export type ManagerRequest =
       id: string
       type: 'resizeClient'
       payload: {
-        sessionId: string
+        projectId: string
         cols: number
         rows: number
       }
@@ -161,7 +161,7 @@ export type ManagerRequest =
       id: string
       type: 'resizeTab'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         cols: number
         rows: number
@@ -170,16 +170,16 @@ export type ManagerRequest =
   | {
       id: string
       type: 'scrollToBottom'
-      payload: { sessionId: string; tabId: string }
+      payload: { projectId: string; tabId: string }
     }
   | {
       id: string
       type: 'scroll'
-      payload: { sessionId: string; tabId: string; deltaLines: number }
+      payload: { projectId: string; tabId: string; deltaLines: number }
     }
-  | { id: string; type: 'setActiveTab'; payload: { sessionId: string; tabId: string | null } }
-  | { id: string; type: 'closeTab'; payload: { sessionId: string; tabId: string } }
-  | { id: string; type: 'disposeSession'; payload: { sessionId: string } }
+  | { id: string; type: 'setActiveTab'; payload: { projectId: string; tabId: string | null } }
+  | { id: string; type: 'closeTab'; payload: { projectId: string; tabId: string } }
+  | { id: string; type: 'disposeSession'; payload: { projectId: string } }
   | { id: string; type: 'ping'; payload: Record<string, never> }
   | { id: string; type: 'setBroadcastEnabled'; payload: { enabled: boolean } }
 
@@ -193,14 +193,14 @@ export type ManagerEvent =
   | {
       type: 'tabRender'
       payload: {
-        sessionId: string
+        projectId: string
         tabId: string
         viewport: TerminalSnapshot
         terminalModes: TerminalModeState
       }
     }
-  | { type: 'tabExit'; payload: { sessionId: string; tabId: string; exitCode: number } }
-  | { type: 'tabError'; payload: { sessionId: string; tabId: string; message: string } }
+  | { type: 'tabExit'; payload: { projectId: string; tabId: string; exitCode: number } }
+  | { type: 'tabError'; payload: { projectId: string; tabId: string; message: string } }
 
 export type ManagerMessage = ManagerRequest | ManagerResponse | ManagerEvent
 
@@ -354,17 +354,17 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
         isFiniteNumber(value.payload.protocolVersion),
         'attachSession.protocolVersion must be a number'
       )
-      assert(isString(value.payload.sessionId), 'attachSession.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'attachSession.projectId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'attachSession.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'attachSession.rows must be a number')
       assert(
-        value.payload.workspaceSnapshot === undefined ||
-          isWorkspaceSnapshotV1(value.payload.workspaceSnapshot),
-        'attachSession.workspaceSnapshot must be a valid workspace snapshot'
+        value.payload.projectSnapshot === undefined ||
+          isProjectSnapshotV1(value.payload.projectSnapshot),
+        'attachSession.projectSnapshot must be a valid project snapshot'
       )
       return value as ManagerRequest
     case 'createTab':
-      assert(isString(value.payload.sessionId), 'createTab.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'createTab.projectId must be a string')
       assert(isString(value.payload.tabId), 'createTab.tabId must be a string')
       assert(
         isString(value.payload.assistant) && value.payload.assistant.length > 0,
@@ -387,8 +387,8 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
         'createTab.env must be a string-keyed string record'
       )
       assert(
-        value.payload.worktreeId === undefined || isString(value.payload.worktreeId),
-        'createTab.worktreeId must be a string when present'
+        value.payload.workspaceId === undefined || isString(value.payload.workspaceId),
+        'createTab.workspaceId must be a string when present'
       )
       assert(
         value.payload.workerName === undefined || isString(value.payload.workerName),
@@ -402,12 +402,12 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       )
       return value as ManagerRequest
     case 'write':
-      assert(isString(value.payload.sessionId), 'write.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'write.projectId must be a string')
       assert(isString(value.payload.tabId), 'write.tabId must be a string')
       assert(isString(value.payload.data), 'write.data must be a string')
       return value as ManagerRequest
     case 'updateTabMetadata':
-      assert(isString(value.payload.sessionId), 'updateTabMetadata.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'updateTabMetadata.projectId must be a string')
       assert(isString(value.payload.tabId), 'updateTabMetadata.tabId must be a string')
       assert(
         value.payload.title === undefined || isString(value.payload.title),
@@ -421,35 +421,35 @@ export function parseManagerRequest(value: unknown): ManagerRequest {
       )
       return value as ManagerRequest
     case 'resizeClient':
-      assert(isString(value.payload.sessionId), 'resizeClient.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'resizeClient.projectId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeClient.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeClient.rows must be a number')
       return value as ManagerRequest
     case 'resizeTab':
-      assert(isString(value.payload.sessionId), 'resizeTab.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'resizeTab.projectId must be a string')
       assert(isString(value.payload.tabId), 'resizeTab.tabId must be a string')
       assert(isFiniteNumber(value.payload.cols), 'resizeTab.cols must be a number')
       assert(isFiniteNumber(value.payload.rows), 'resizeTab.rows must be a number')
       return value as ManagerRequest
     case 'scroll':
-      assert(isString(value.payload.sessionId), 'scroll.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'scroll.projectId must be a string')
       assert(isString(value.payload.tabId), 'scroll.tabId must be a string')
       assert(isFiniteNumber(value.payload.deltaLines), 'scroll.deltaLines must be a number')
       return value as ManagerRequest
     case 'scrollToBottom':
-      assert(isString(value.payload.sessionId), 'scrollToBottom.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'scrollToBottom.projectId must be a string')
       assert(isString(value.payload.tabId), 'scrollToBottom.tabId must be a string')
       return value as ManagerRequest
     case 'setActiveTab':
-      assert(isString(value.payload.sessionId), 'setActiveTab.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'setActiveTab.projectId must be a string')
       assert(isNullableString(value.payload.tabId), 'setActiveTab.tabId must be a string or null')
       return value as ManagerRequest
     case 'closeTab':
-      assert(isString(value.payload.sessionId), 'closeTab.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'closeTab.projectId must be a string')
       assert(isString(value.payload.tabId), 'closeTab.tabId must be a string')
       return value as ManagerRequest
     case 'disposeSession':
-      assert(isString(value.payload.sessionId), 'disposeSession.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'disposeSession.projectId must be a string')
       return value as ManagerRequest
     case 'ping':
       return value as ManagerRequest
@@ -488,18 +488,18 @@ export function parseManagerMessage(value: unknown): ManagerResponse | ManagerEv
       assert(isString(value.payload.message), 'error.message must be a string')
       return value as ManagerResponse
     case 'tabRender':
-      assert(isString(value.payload.sessionId), 'tabRender.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabRender.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabRender.tabId must be a string')
       assert(isTerminalSnapshot(value.payload.viewport), 'tabRender.viewport is invalid')
       assert(isTerminalModeState(value.payload.terminalModes), 'tabRender.terminalModes is invalid')
       return value as ManagerEvent
     case 'tabExit':
-      assert(isString(value.payload.sessionId), 'tabExit.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabExit.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabExit.tabId must be a string')
       assert(isFiniteNumber(value.payload.exitCode), 'tabExit.exitCode must be a number')
       return value as ManagerEvent
     case 'tabError':
-      assert(isString(value.payload.sessionId), 'tabError.sessionId must be a string')
+      assert(isString(value.payload.projectId), 'tabError.projectId must be a string')
       assert(isString(value.payload.tabId), 'tabError.tabId must be a string')
       assert(isString(value.payload.message), 'tabError.message must be a string')
       return value as ManagerEvent

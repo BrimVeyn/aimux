@@ -43,7 +43,7 @@ defineConfig({
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
-  sessionBar?: SessionBarConfig
+  projectBar?: ProjectBarConfig
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
@@ -52,7 +52,7 @@ defineConfig({
   autoRename?: Partial<AutoRenameConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
-  worktreeTemplates?: WorktreeTemplate[]
+  workspaceTemplates?: WorkspaceTemplate[]
 })
 ```
 
@@ -61,7 +61,7 @@ defineConfig({
 | Field                | Status             | Notes                                                                                                                   |
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `keymaps`            | Supported          | Fully resolved and registered by the app                                                                                |
-| `sessionBar`         | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                   |
+| `projectBar`         | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                   |
 | `gitPane`            | Supported          | Content prefs only; placement moved to the app-managed `bars` state                                                     |
 | `theme`              | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins                                    |
 | `backends`           | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                                  |
@@ -70,10 +70,10 @@ defineConfig({
 | `snippets`           | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
 | `snippetTriggerChar` | Supported          | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                           |
 | `autoCommit`         | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                                 |
-| `autoRename`         | Supported          | Renames new assistant tabs from their first prompt. Enabled by default; see `../guide/sessions.md#automatic-tab-names`  |
-| `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces`    |
+| `autoRename`         | Supported          | Renames new assistant tabs from their first prompt. Enabled by default; see `../guide/projects.md#automatic-tab-names`  |
+| `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-projects`      |
 | `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
-| `worktreeTemplates`  | Supported          | Multi-tab / multi-pane layouts spawned at worktree creation. See `../guide/worktrees.md#templates`                      |
+| `workspaceTemplates` | Supported          | Multi-tab / multi-pane layouts spawned at workspace creation. See `../guide/projects.md#templates`                      |
 
 ## `defineConfig`
 
@@ -122,14 +122,14 @@ Important runtime facts:
 
 See `../guide/keymaps.md` for notation and merge semantics.
 
-## `sessionBar`
+## `projectBar`
 
 Status: `Supported`
 
 Type:
 
 ```ts
-sessionBar?: {
+projectBar?: {
   initialVisible?: boolean
 }
 ```
@@ -137,14 +137,14 @@ sessionBar?: {
 Runtime behavior:
 
 - consumed during app initialization
-- used as a higher-priority source than `aimux.json.sessionBarVisible`
+- used as a higher-priority source than `aimux.json.projectBarVisible`
 - reapplied on every launch while this config entry remains set
 
 Example:
 
 ```ts
 export default defineConfig({
-  sessionBar: {
+  projectBar: {
     initialVisible: true,
   },
 })
@@ -300,7 +300,7 @@ interface PersistedBar {
 }
 ```
 
-Widget ids: `workspaces`, `git`. Move a widget between bars, reorder it, or
+Widget ids: `projects`, `git`. Move a widget between bars, reorder it, or
 hide it with the right-click menu on the widget. `<C-b>` toggles the left bar,
 `<Leader>B` the right one.
 
@@ -582,19 +582,19 @@ export default defineConfig({
 })
 ```
 
-## `worktreeTemplates`
+## `workspaceTemplates`
 
-A list of reusable layouts spawned when the user creates a new worktree.
-Each template appears in a picker at the end of the new-worktree flow; the
+A list of reusable layouts spawned when the user creates a new workspace.
+Each template appears in a picker at the end of the new-workspace flow; the
 chosen template's tabs and panes are created, sized, and (optionally)
 prefilled with an initial command.
 
-See `../guide/worktrees.md#templates` for the full walkthrough, including
-the picker UX, the "Worktree from template…" shortcut entry, and validation
+See `../guide/projects.md#templates` for the full walkthrough, including
+the picker UX, the "Workspace from template…" shortcut entry, and validation
 rules.
 
 ```ts
-worktreeTemplates: [
+workspaceTemplates: [
   {
     id: 'lint-watch',
     name: 'Claude + lint watch',
@@ -621,18 +621,18 @@ worktreeTemplates: [
 Types:
 
 ```ts
-interface WorktreeTemplate {
+interface WorkspaceTemplate {
   id: string
   name: string
   description?: string
-  tabs: WorktreeTemplateTab[]
+  tabs: WorkspaceTemplateTab[]
 }
 
-interface WorktreeTemplateTab {
-  panes: WorktreeTemplatePane[]
+interface WorkspaceTemplateTab {
+  panes: WorkspaceTemplatePane[]
 }
 
-interface WorktreeTemplatePane {
+interface WorkspaceTemplatePane {
   id: string
   assistant: string
   splitFrom?: string
@@ -642,7 +642,7 @@ interface WorktreeTemplatePane {
 }
 ```
 
-`worktreeTemplates` can also be set in `aimux.json` under the same key
+`workspaceTemplates` can also be set in `aimux.json` under the same key
 (JSON form, same schema). The TS config wins when both are present.
 
 ## Actions
@@ -652,11 +652,11 @@ interface WorktreeTemplatePane {
 Common groups:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
+- projects: `projectPicker`, `switchProjectByIndex(n)` and project modal actions
 - snippets: `snippetPicker`, snippet filter and editor actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `resizeSidebar`, `toggleSessionBar`, `toggleGitPane`,
+- UI: `toggleSidebar`, `resizeSidebar`, `toggleProjectBar`, `toggleGitPane`,
   `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: `enterGitMode`, `exitGitMode`, stage/unstage/delete, commit, push

@@ -1,6 +1,11 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { projectClose } from './commands/project/close'
+import { projectCreate } from './commands/project/create'
+import { projectList } from './commands/project/list'
+import { projectShow } from './commands/project/show'
+import { projectSwitch } from './commands/project/switch'
 import { tabAwait } from './commands/tab/await'
 import { tabClose } from './commands/tab/close'
 import { tabCreate } from './commands/tab/create'
@@ -18,14 +23,9 @@ import { workerPrompt } from './commands/worker/prompt'
 import { workerRun } from './commands/worker/run'
 import { workerStop } from './commands/worker/stop'
 import { workerSubmit } from './commands/worker/submit'
-import { workspaceClose } from './commands/workspace/close'
 import { workspaceCreate } from './commands/workspace/create'
 import { workspaceList } from './commands/workspace/list'
-import { workspaceShow } from './commands/workspace/show'
-import { workspaceSwitch } from './commands/workspace/switch'
-import { worktreeCreate } from './commands/worktree/create'
-import { worktreeList } from './commands/worktree/list'
-import { worktreeRemove } from './commands/worktree/remove'
+import { workspaceRemove } from './commands/workspace/remove'
 
 export interface CliCommand {
   group: string
@@ -47,14 +47,14 @@ export const COMMANDS: readonly CliCommand[] = [
   tabSnapshot,
   tabTail,
   tabWait,
+  projectList,
+  projectShow,
+  projectCreate,
+  projectSwitch,
+  projectClose,
   workspaceList,
-  workspaceShow,
   workspaceCreate,
-  workspaceSwitch,
-  workspaceClose,
-  worktreeList,
-  worktreeCreate,
-  worktreeRemove,
+  workspaceRemove,
   workerRun,
   workerPrompt,
   workerSubmit,

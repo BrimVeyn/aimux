@@ -1,6 +1,6 @@
 ---
 title: CLI Reference
-description: Every aimux command — TUI, control commands, and the headless control plane (tab/workspace/worktree).
+description: Every aimux command — TUI, control commands, and the headless control plane (tab/project/workspace).
 ---
 
 # CLI Reference
@@ -10,7 +10,7 @@ The `aimux` CLI has two personas:
 - **Interactive** — `aimux` launches the TUI. `aimux doctor`, `aimux update`,
   and the restart commands manage the local install.
 - **Headless control plane** — `aimux worker …`, `aimux tab …`,
-  `aimux workspace …`, and `aimux worktree …` drive the running daemon without
+  `aimux project …`, and `aimux workspace …` drive the running daemon without
   the TUI. Every command writes one JSON object on stdout (or an NDJSON
   stream for `tab wait` / `tab tail`), so an outer script or agent can pipe
   the output through `jq`.
@@ -24,7 +24,7 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 | ----- | ---------------------------------------------------------------------------------------------------------- |
 | `0`   | Success                                                                                                    |
 | `2`   | Usage error (bad flags, missing required argument)                                                         |
-| `3`   | Runtime error (tab crashed, git refused a worktree operation, …)                                           |
+| `3`   | Runtime error (tab crashed, git refused a workspace operation, …)                                          |
 | `4`   | Daemon unreachable — socket missing, spawn failed, no handshake                                            |
 | `10`  | `tab run` / `tab await`: worker is blocked on a question/permission                                        |
 | `11`  | `worker run/prompt --detach`: prompt is in the composer but no turn started (recover with `worker submit`) |
@@ -34,18 +34,18 @@ All commands are profile-aware — they use `AIMUX_PROFILE` (or the shared
 
 Every headless command accepts:
 
-| Flag                     | Meaning                                                                                                      |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `--workspace <name\|id>` | Target workspace. Falls back to `AIMUX_WORKSPACE`, then to the catalog entry with the newest `lastOpenedAt`. |
-| `--profile <name>`       | Override `AIMUX_PROFILE` for this invocation.                                                                |
+| Flag                   | Meaning                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `--project <name\|id>` | Target project. Falls back to `AIMUX_PROJECT`, then to the catalog entry with the newest `lastOpenedAt`. |
+| `--profile <name>`     | Override `AIMUX_PROFILE` for this invocation.                                                            |
 
-**Pin the workspace for anything long-running.** The default ("newest
-`lastOpenedAt`") follows the UI: switching workspaces in the TUI changes what a
+**Pin the project for anything long-running.** The default ("newest
+`lastOpenedAt`") follows the UI: switching projects in the TUI changes what a
 later CLI call resolves to, so a fleet dispatched without a pin can end up
-cutting worktrees in a different repository. Pass `--workspace` per call or
-export `AIMUX_WORKSPACE=<name|id>` once. Every `worker` command echoes the
-resolved `workspace: { id, name, repoRoot }` so the target is verifiable from
-the output, and `worker doctor` reports `workspace.source`
+cutting workspaces in a different repository. Pass `--project` per call or
+export `AIMUX_PROJECT=<name|id>` once. Every `worker` command echoes the
+resolved `project: { id, name, repoRoot }` so the target is verifiable from
+the output, and `worker doctor` reports `project.source`
 (`flag` | `env` | `active`).
 
 ## TUI + Local Install
@@ -57,7 +57,7 @@ Starts the TUI.
 At startup the CLI:
 
 - resolves the active runtime profile
-- creates or connects to the internal session backend that powers workspace state
+- creates or connects to the internal session backend that powers project state
 - loads user config from the active profile
 - renders the app
 
@@ -112,7 +112,7 @@ entirely.
 
 Completion covers groups, verbs, flag names (minus the ones already on the
 line), fixed value vocabularies (`--status`, `--format`), assistant ids, and
-workspaces. Path-taking flags (`--prompt-file`, `--cwd`, `--project`) hand off
+projects. Path-taking flags (`--prompt-file`, `--cwd`, `--project`) hand off
 to the shell's own filename completion.
 
 Flags:
@@ -141,26 +141,26 @@ it errors out with a message telling you to restart `aimux`.
 ### Worker commands
 
 The `worker` group is the preferred interface for an agent orchestrating other
-agents. It composes the lower-level tab and worktree primitives, gives each
-worker a stable workspace-scoped name, and returns `schemaVersion: 1` envelopes.
+agents. It composes the lower-level tab and workspace primitives, gives each
+worker a stable project-scoped name, and returns `schemaVersion: 1` envelopes.
 
 ```
-aimux worker run --workspace repo --name auth --assistant claude --prompt-file /tmp/auth.md
-aimux worker run --workspace repo --name api --assistant codex --stdin --detach
+aimux worker run --project repo --name auth --assistant claude --prompt-file /tmp/auth.md
+aimux worker run --project repo --name api --assistant codex --stdin --detach
 aimux worker prompt auth --prompt-file /tmp/correction.md [--replace]
 aimux worker submit auth
 aimux worker await api
-aimux worker list [name|tab-id] [--all-workspaces]
-aimux worker stop auth [--cleanup-worktree] [--force]
+aimux worker list [name|tab-id] [--all-projects]
+aimux worker stop auth [--cleanup-workspace] [--force]
 aimux worker doctor
 ```
 
-Every envelope carries `workspace: { id, name, repoRoot }` alongside the worker,
-and each worker view carries its own `repoRoot` — the repository the worktree was
+Every envelope carries `project: { id, name, repoRoot }` alongside the worker,
+and each worker view carries its own `repoRoot` — the repository the workspace was
 cut from.
 
-`worker run` creates a fresh worktree by default. Use `--worktree <id>` to
-co-locate intentionally or `--no-worktree` to use the active worktree. Without
+`worker run` creates a fresh workspace by default. Use `--workspace <id>` to
+co-locate intentionally or `--no-workspace` to use the active workspace. Without
 `--detach`, it waits for a completed/question/timeout/error outcome. With
 `--detach`, it returns after prompt uptake is confirmed. The base ref is verified
 in the resolved repository first, so a ref that does not exist there fails with
@@ -190,25 +190,25 @@ blocks until the turn starts — the awaitable form of
 whenever a human may have typed into the worker's tab: without it the write is
 appended to whatever is already there, concatenating both into one instruction.
 
-`worker list` always reports the `workspace` it queried, so an empty `workers`
+`worker list` always reports the `project` it queried, so an empty `workers`
 array reads as "none here" rather than "the fleet died".
-`worker list --all-workspaces` answers "are my workers really gone?" in one call
-and labels each worker with its owning workspace.
+`worker list --all-projects` answers "are my workers really gone?" in one call
+and labels each worker with its owning project.
 
-Addressing a worker by name keeps working when the active workspace moves: if the
-name isn't in the resolved workspace, aimux searches the catalog and binds to the
-workspace that actually owns it. With an explicit `--workspace` /
-`AIMUX_WORKSPACE` the pin is respected, but the error names the workspace that
+Addressing a worker by name keeps working when the active project moves: if the
+name isn't in the resolved project, aimux searches the catalog and binds to the
+project that actually owns it. With an explicit `--project` /
+`AIMUX_PROJECT` the pin is respected, but the error names the project that
 does hold the worker.
 
-`worker stop --cleanup-worktree` removes only aimux-created, unshared
-worktrees. Dirty worktrees require `--force`; primary and external worktrees are
+`worker stop --cleanup-workspace` removes only aimux-created, unshared
+workspaces. Dirty workspaces require `--force`; primary and external workspaces are
 never removed by this command. It works headlessly (no attached UI required);
-tab-close and worktree-removal are reported independently (`closed`,
-`closeError`, `worktreeRemoved`) so a failure in one never strands the other.
+tab-close and workspace-removal are reported independently (`closed`,
+`closeError`, `workspaceRemoved`) so a failure in one never strands the other.
 
 `worker doctor` reports the client version, negotiated daemon protocol and
-capabilities, available assistants, model/effort controls, workspace (including
+capabilities, available assistants, model/effort controls, project (including
 `source` and `repoRoot`), non-fatal `warnings`, and the packaged orchestrator
 skill path.
 
@@ -216,11 +216,11 @@ skill path.
 
 #### `aimux tab list`
 
-Lists tabs in the target workspace.
+Lists tabs in the target project.
 
 ```
-aimux tab list [--verbose] [--workspace W]
--> { tabs: [{ id, assistant, title, status, activity, command, worktreeId? }],
+aimux tab list [--verbose] [--project W]
+-> { tabs: [{ id, assistant, title, status, activity, command, workspaceId? }],
      activeTabId }
 ```
 
@@ -235,14 +235,14 @@ Creates a new tab.
 ```
 aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
                  [--model M] [--effort E]
-                 [--worktree WT | --new-worktree[=<name>] [--base R] [--branch B]]
-                 [--workspace W]
+                 [--workspace WT | --new-workspace[=<name>] [--base R] [--branch B]]
+                 [--project W]
 -> { tabId, assistant, title, command, cwd, model, effort,
-     worktreeId, path, branch, name }   # worktree fields null when none
+     workspaceId, path, branch, name }   # workspace fields null when none
 ```
 
-- **cwd** defaults to the resolved worktree's path (so a worker spawned into a
-  worktree actually runs inside it); an explicit `--cwd` overrides.
+- **cwd** defaults to the resolved workspace's path (so a worker spawned into a
+  workspace actually runs inside it); an explicit `--cwd` overrides.
 - **`--command`** overrides the assistant's default binary entirely.
 - **`--model` / `--effort`** map to the assistant's own flags (claude
   `--model`/`--effort`; codex `--model` + `-c model_reasoning_effort=…`; opencode
@@ -250,16 +250,16 @@ aimux tab create --assistant <id> [--title T] [--cwd .] [--command CMD]
   combined with `--command`. Values aren't validated by aimux — a bad one makes
   the worker CLI fail at startup.
 - **customCommands**: the base command is resolved as
-  `--command` > the workspace's persisted `customCommands[assistant]` > the
+  `--command` > the project's persisted `customCommands[assistant]` > the
   builtin default, so CLI-spawned tabs inherit e.g. `claude
 --dangerously-skip-permissions` exactly like the UI. `--command claude` is the
   bypass.
-- **`--worktree WT`** pins the tab to an existing worktree id (co-locate several
-  tabs in one tree); without it the workspace's active worktree is used.
-- **`--new-worktree[=<name>]`** creates a fresh worktree (branch `aimux/<name>`
-  off `--base`, default HEAD) and runs the tab in it, emitting the worktree's
+- **`--workspace WT`** pins the tab to an existing workspace id (co-locate several
+  tabs in one tree); without it the project's active workspace is used.
+- **`--new-workspace[=<name>]`** creates a fresh workspace (branch `aimux/<name>`
+  off `--base`, default HEAD) and runs the tab in it, emitting the workspace's
   `path`/`branch`/`name`. A bare flag derives the name; the `=` form names it.
-  Mutually exclusive with `--worktree` and `--cwd`; `--base`/`--branch` require
+  Mutually exclusive with `--workspace` and `--cwd`; `--base`/`--branch` require
   it.
 
 #### `aimux tab send`
@@ -353,7 +353,7 @@ capability.
 
 #### `aimux tab focus`
 
-Sets the active tab in the workspace.
+Sets the active tab in the project.
 
 ```
 aimux tab focus <tabId> -> { ok: true }
@@ -407,104 +407,104 @@ aimux tab tail <tabId> [--raw] [--rate-limit-ms N] [--follow-status] [--timeout 
 - `--rate-limit-ms N` coalesces bursts of renders arriving within N ms.
 - `--follow-status` interleaves `tabStatus` transitions into the stream.
 
-### Workspace commands
+### Project commands
 
-#### `aimux workspace list`
+#### `aimux project list`
 
-Lists the profile's workspace catalog.
-
-```
-aimux workspace list -> { workspaces: [{ id, name, projectPath, lastOpenedAt, ... }] }
-```
-
-#### `aimux workspace show`
-
-Shows the resolved workspace (defaults to the most recently opened).
+Lists the profile's project catalog.
 
 ```
-aimux workspace show [--workspace W]
--> { id, name, projectPath, activeWorktreeId, worktrees: [...] }
+aimux project list -> { projects: [{ id, name, projectPath, lastOpenedAt, ... }] }
 ```
 
-#### `aimux workspace create`
+#### `aimux project show`
 
-Creates a workspace. When a UI is attached the daemon relays the request to
+Shows the resolved project (defaults to the most recently opened).
+
+```
+aimux project show [--project W]
+-> { id, name, projectPath, activeWorkspaceId, workspaces: [...] }
+```
+
+#### `aimux project create`
+
+Creates a project. When a UI is attached the daemon relays the request to
 the UI's reducer (preserving the live snapshot); headless, it writes the
 catalog directly.
 
 ```
-aimux workspace create <name> [--project P] [--switch]
+aimux project create <name> [--project <path>] [--switch]
                               [--wait] [--timeout N]
 -> { name, projectPath, switch, sessionId? }
 ```
 
-- `--switch` immediately makes the new workspace active.
+- `--switch` immediately makes the new project active.
 - `--wait` requires `--switch`; blocks until the daemon broadcasts
-  `workspaceSwitched`. Timeout defaults to 30 s.
+  `projectSwitched`. Timeout defaults to 30 s.
 
-#### `aimux workspace switch`
+#### `aimux project switch`
 
 Switches the running UI (or bumps `lastOpenedAt` when headless).
 
 ```
-aimux workspace switch <name|id> [--wait] [--timeout N]
+aimux project switch <name|id> [--wait] [--timeout N]
 -> { name, targetSessionId }
 ```
 
-`--wait` subscribes to `workspaceSwitched` before sending the request, so
+`--wait` subscribes to `projectSwitched` before sending the request, so
 the both-paths case (UI attached vs. headless) is race-free.
 
 The daemon validates the target against the catalog before broadcasting —
 an unknown id fails the CLI fast rather than hanging on `--wait`.
 
-#### `aimux workspace close`
+#### `aimux project close`
 
-Removes a workspace from the catalog. UI-attached path uses the UI's delete
+Removes a project from the catalog. UI-attached path uses the UI's delete
 handler; headless path writes the catalog directly.
 
 ```
-aimux workspace close <name|id>
+aimux project close <name|id>
 -> { closedSessionId, name }
 ```
 
-### Worktree commands
+### Workspace commands
 
-Worktrees are per-workspace git worktrees, cross-checked against `git
-worktree list` on inspection.
+Workspaces are per-project git worktrees, cross-checked against `git
+workspace list` on inspection.
 
-#### `aimux worktree list`
+#### `aimux workspace list`
 
-Lists worktrees for the workspace. `gitTracked` flags catalog rows that git
+Lists workspaces for the project. `gitTracked` flags catalog rows that git
 no longer sees (prunable / vanished).
 
 ```
-aimux worktree list [--workspace W]
--> { workspaceId, activeWorktreeId, worktrees: [{ id, name, branch, path,
+aimux workspace list [--project W]
+-> { projectId, activeWorkspaceId, workspaces: [{ id, name, branch, path,
      repoRoot, source, gitTracked, createdByAimux }] }
 ```
 
-#### `aimux worktree create`
+#### `aimux workspace create`
 
 Creates a git worktree AND registers it in the catalog. If the daemon
-rejects the registration, the on-disk worktree is rolled back so `list`
+rejects the registration, the on-disk workspace is rolled back so `list`
 never surfaces an orphan.
 
 ```
-aimux worktree create --name N [--branch B] [--base ref] [--workspace W]
+aimux workspace create --name N [--branch B] [--base ref] [--project W]
 -> { id, name, branch, path, repoRoot }
 ```
 
 - `--branch` defaults to `aimux/<name>`.
 - `--base` defaults to `HEAD`.
 
-#### `aimux worktree remove`
+#### `aimux workspace remove`
 
-Removes a worktree. Git side runs first (respects the dirty-check unless
+Removes a workspace. Git side runs first (respects the dirty-check unless
 `--force`), then the catalog record is dropped. Refuses to remove the
-primary worktree.
+primary workspace.
 
 ```
-aimux worktree remove <id|path> [--force] [--workspace W]
+aimux workspace remove <id|path> [--force] [--project W]
 -> { id, name, path }
 ```
 
@@ -521,7 +521,7 @@ aimux worktree remove <id|path> [--force] [--workspace W]
 Runtime-oriented commands use the active profile namespace. That affects:
 
 - config file resolution for the TUI startup path
-- workspace and snippet catalogs
+- project and snippet catalogs
 - daemon socket path
 - terminal-manager socket path
 

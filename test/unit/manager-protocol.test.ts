@@ -12,9 +12,9 @@ import {
 } from '../../src/ipc/manager-protocol'
 
 describe('manager protocol', () => {
-  test('requires the v11 breaking-release boundary', () => {
-    expect(MANAGER_PROTOCOL_MIN_VERSION).toBe(11)
-    expect(MANAGER_PROTOCOL_VERSION).toBe(11)
+  test('requires the v12 breaking-release boundary', () => {
+    expect(MANAGER_PROTOCOL_MIN_VERSION).toBe(12)
+    expect(MANAGER_PROTOCOL_VERSION).toBe(12)
   })
 
   test('selects highest mutually supported version', () => {
@@ -121,7 +121,7 @@ test('parses additive tab metadata updates', () => {
     id: 'metadata-1',
     payload: {
       autoRenameStatus: 'attempted',
-      sessionId: 'session-1',
+      projectId: 'project-1',
       tabId: 'tab-1',
       title: 'Cache fix',
     },

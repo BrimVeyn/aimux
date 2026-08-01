@@ -78,7 +78,7 @@ describe('mode handlers', () => {
     expect(armed.actions).toEqual([])
   })
 
-  test('navigation: Ctrl+Z opens the workspaces bar when hidden, no-op when visible', () => {
+  test('navigation: Ctrl+Z opens the projects bar when hidden, no-op when visible', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const hiddenCtx = ctx()
     hiddenCtx.state.bars = {
@@ -127,27 +127,26 @@ describe('mode handlers', () => {
     expect(result.effects[0]?.type).toBe('restart-tab')
   })
 
-  test('navigation: Ctrl+G opens session picker', () => {
+  test('navigation: Ctrl+G opens project picker', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
       handler.handleKey(key('g', { ctrl: true }), ctx()),
-      'Expected session picker result'
+      'Expected project picker result'
     )
-    expect(result.actions).toEqual([{ type: 'open-session-picker' }])
-    expect(result.transition).toBe('modal.session-picker.filtering')
+    expect(result.actions).toEqual([{ type: 'open-project-picker' }])
+    expect(result.transition).toBe('modal.project-picker.filtering')
   })
 
-  test('new-tab modal: Ctrl+W toggles worktree mode', () => {
-    const handler = requireValue(
-      getHandler('modal.new-tab.command-edit'),
-      'Missing new-tab handler'
-    )
+  test('navigation: Ctrl+P opens the create-workspace modal', () => {
+    const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('w', { ctrl: true }), ctx()),
-      'Expected WT result'
+      handler.handleKey(key('p', { ctrl: true }), ctx()),
+      'Expected create-workspace result'
     )
 
-    expect(result.actions).toEqual([{ type: 'toggle-new-tab-worktree' }])
+    expect(result.actions).toEqual([{ type: 'open-create-workspace-modal' }])
+    expect(result.effects).toEqual([{ type: 'load-create-workspace-base-branches' }])
+    expect(result.transition).toBe('modal.create-workspace')
   })
 
   test('navigation: Shift+L reorders tab right', () => {
@@ -199,7 +198,7 @@ describe('mode handlers', () => {
 
   test('terminal-input: <leader> (Ctrl+W) is now a prefix (enter-layout on timeout)', () => {
     // Ctrl+W is both bound alone (→ enter-layout) and as a prefix for
-    // <leader>b / <leader>1..9 session-bar shortcuts. The trie therefore
+    // <leader>b / <leader>1..9 project-bar shortcuts. The trie therefore
     // waits for a continuation; handleKey returns an empty pending result.
     // The exact binding fires via the handler's timeout callback, which is
     // covered by sequence-resolver tests.
@@ -224,23 +223,23 @@ describe('mode handlers', () => {
     expect(handler.handleKey(key('l', { ctrl: true }), ctx())).toBeNull()
   })
 
-  test('modal.session-picker: escape blocked without currentSessionId', () => {
+  test('modal.project-picker: escape blocked without currentProjectId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker.filtering'),
-      'Missing session-picker handler'
+      getHandler('modal.project-picker.filtering'),
+      'Missing project-picker handler'
     )
-    const result = handler.handleKey(key('escape'), ctx({ currentSessionId: null }))
+    const result = handler.handleKey(key('escape'), ctx({ currentProjectId: null }))
     expect(result).toBeNull()
   })
 
-  test('modal.session-picker: escape works with currentSessionId', () => {
+  test('modal.project-picker: escape works with currentProjectId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker.filtering'),
-      'Missing session-picker handler'
+      getHandler('modal.project-picker.filtering'),
+      'Missing project-picker handler'
     )
     const result = requireValue(
-      handler.handleKey(key('escape'), ctx({ currentSessionId: 's-1' })),
-      'Expected session-picker escape result'
+      handler.handleKey(key('escape'), ctx({ currentProjectId: 's-1' })),
+      'Expected project-picker escape result'
     )
     expect(result.transition).toBe('navigation')
   })

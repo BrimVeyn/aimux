@@ -29,7 +29,7 @@ interface GitPanelProps {
   pathConfig?: GitPanePathConfig
   diffCountConfig?: GitPaneDiffCountConfig
   headOffset?: number
-  // When set, the single changed-files section is a worktree fork-point review
+  // When set, the single changed-files section is a workspace fork-point review
   // ("vs <base>") rather than a HEAD~N history walk.
   baseLabel?: string
   compact?: boolean
@@ -361,7 +361,7 @@ function computeStatusPlaceholder(
 ): StatusPlaceholder | null {
   const t = getCurrentTheme()
   if (!hasProjectPath) {
-    return { label: 'No active session', labelColor: t.textMuted }
+    return { label: 'No active project', labelColor: t.textMuted }
   }
   if (gitPanel.error === 'not-a-repo') {
     return { label: 'Not a git repository', labelColor: t.textMuted }

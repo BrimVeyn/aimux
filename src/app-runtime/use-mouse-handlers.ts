@@ -4,8 +4,9 @@ import { useEffect, useRef } from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
+import type { AppAction } from '../state/actions'
 import type { SplitDirection } from '../state/layout-tree'
-import type { AppAction, AppState, BarSide, TabSession, TerminalLine } from '../state/types'
+import type { AppState, BarSide, TabSession, TerminalLine } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { MultiClickDetector } from '../input/multi-click-detector'

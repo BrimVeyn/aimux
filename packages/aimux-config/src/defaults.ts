@@ -49,7 +49,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<C-c>', actions.quit, 'Quit')
         .map('<C-n>', actions.newTab, 'New tab')
-        .map('<C-g>', actions.sessionPicker, 'Session picker')
+        .map('<C-p>', actions.createWorkspaceModal, 'Create workspace')
+        .map('<C-g>', actions.projectPicker, 'Project picker')
         .map('<C-z>', actions.ctrlZSidebar, 'Focus sidebar')
         .map('dd', actions.closeTab, 'Close tab')
         .map('<C-b>', actions.toggleSidebar, 'Toggle sidebar')
@@ -62,14 +63,14 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-d>', actions.enterGitMode, 'Enter git mode')
         .map('<C-j>', actions.resizeGitPane(-0.05), 'Git pane smaller')
         .map('<C-k>', actions.resizeGitPane(0.05), 'Git pane larger')
-        .map('j', actions.nextSidebarItem, 'Next workspace/worktree')
-        .map('k', actions.prevSidebarItem, 'Prev workspace/worktree')
+        .map('j', actions.nextSidebarItem, 'Next project/workspace')
+        .map('k', actions.prevSidebarItem, 'Prev project/workspace')
         .map('l', actions.nextTab, 'Next tab')
         .map('h', actions.prevTab, 'Prev tab')
         .map('L', actions.reorderTab(1), 'Move tab right')
         .map('H', actions.reorderTab(-1), 'Move tab left')
-        .map('J', actions.reorderSession(1), 'Move workspace down')
-        .map('K', actions.reorderSession(-1), 'Move workspace up')
+        .map('J', actions.reorderProject(1), 'Move project down')
+        .map('K', actions.reorderProject(-1), 'Move project up')
         .map('r', actions.renameTab, 'Rename tab')
         .map('i', actions.enterInsert, 'Focus terminal')
         .map('S', actions.openFlashJump, 'Flash jump')
@@ -97,11 +98,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Session bar: same chords from nav and while typing in the terminal
+    // Project bar: same chords from nav and while typing in the terminal
     // -----------------------------------------------------------------------
     .mode(['navigation', 'terminal-input'], (m) =>
       m
-        .map('<Leader>b', actions.toggleSessionBar, 'Toggle session bar')
+        .map('<Leader>b', actions.toggleProjectBar, 'Toggle project bar')
         .map('<Leader>B', actions.toggleBar('right'), 'Toggle right bar')
         .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
         .map('<Leader>1', actions.switchTabByIndex(1), 'Tab 1')
@@ -127,7 +128,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('e', actions.gitToggleFoldAll, 'Expand/collapse all folds')
         .map('o', actions.openSelectedGitFileInEditor, 'Open in editor')
         .map('c', actions.gitCommitOpen, 'Commit')
-        .map('m', actions.openWorktreeMove, 'Move worktree')
+        .map('m', actions.openWorkspaceMove, 'Move workspace')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
         .map('b', actions.toggleGitReviewBase, 'Review vs base')
@@ -208,9 +209,9 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: worktree-move
+    // Modal: workspace-move
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-move', (m) =>
+    .mode('modal.workspace-move', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('j', actions.moveModalSelection(1), 'Next')
@@ -219,30 +220,30 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Up>', actions.moveModalSelection(-1))
         .map('<C-n>', actions.moveModalSelection(1))
         .map('<C-p>', actions.moveModalSelection(-1))
-        .map('d', actions.toggleWorktreeMoveDelete, 'Toggle delete source')
-        .map('<CR>', actions.confirmWorktreeMove, 'Move')
+        .map('d', actions.toggleWorkspaceMoveDelete, 'Toggle delete source')
+        .map('<CR>', actions.confirmWorkspaceMove, 'Move')
     )
 
     // -----------------------------------------------------------------------
-    // Modal: worktree-move recoverable-failure confirmation (stash / conflicts)
+    // Modal: workspace-move recoverable-failure confirmation (stash / conflicts)
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-move-confirm', (m) =>
+    .mode('modal.workspace-move-confirm', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('n', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmWorktreeMoveRetry, 'Confirm')
-        .map('y', actions.confirmWorktreeMoveRetry, 'Confirm')
+        .map('<CR>', actions.confirmWorkspaceMoveRetry, 'Confirm')
+        .map('y', actions.confirmWorkspaceMoveRetry, 'Confirm')
     )
 
     // -----------------------------------------------------------------------
-    // Modal: standalone worktree delete confirmation (sidebar "Remove worktree")
+    // Modal: standalone workspace delete confirmation (sidebar "Remove workspace")
     // -----------------------------------------------------------------------
-    .mode('modal.worktree-delete-confirm', (m) =>
+    .mode('modal.workspace-delete-confirm', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
         .map('n', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmWorktreeDeleteModal, 'Delete worktree')
-        .map('y', actions.confirmWorktreeDeleteModal, 'Delete worktree')
+        .map('<CR>', actions.confirmWorkspaceDeleteModal, 'Delete workspace')
+        .map('y', actions.confirmWorkspaceDeleteModal, 'Delete workspace')
     )
 
     // -----------------------------------------------------------------------
@@ -266,12 +267,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: rename-worktree
+    // Modal: rename-workspace
     // -----------------------------------------------------------------------
-    .mode('modal.rename-worktree', (m) =>
+    .mode('modal.rename-workspace', (m) =>
       m
         .map('<Esc>', actions.closeModal, 'Cancel')
-        .map('<CR>', actions.confirmRenameWorktree, 'Confirm')
+        .map('<CR>', actions.confirmRenameWorkspace, 'Confirm')
         .passthrough()
     )
 
@@ -282,9 +283,6 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Esc>', actions.cancelNewTabModal, 'Cancel')
         .map('<CR>', actions.launchSelectedAssistant, 'Launch')
-        .map('<C-w>', actions.toggleNewTabWorktree, 'WT')
-        .map('<C-d>', actions.deleteSelectedWorktree, 'Delete WT')
-        .map('<Tab>', actions.switchField, 'Next field')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -301,23 +299,12 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: new-tab worktree delete confirmation dialog
+    // Modal: project-picker (always in filter mode via Picker)
     // -----------------------------------------------------------------------
-    .mode('modal.new-tab.worktree-delete-confirm', (m) =>
+    .mode('modal.project-picker.filtering', (m) =>
       m
-        .map('<Esc>', actions.cancelDeleteWorktree, 'Cancel')
-        .map('n', actions.cancelDeleteWorktree, 'Cancel')
-        .map('<CR>', actions.confirmDeleteWorktree, 'Delete worktree')
-        .map('y', actions.confirmDeleteWorktree, 'Delete worktree')
-    )
-
-    // -----------------------------------------------------------------------
-    // Modal: session-picker (always in filter mode via Picker)
-    // -----------------------------------------------------------------------
-    .mode('modal.session-picker.filtering', (m) =>
-      m
-        .map('<Esc>', actions.sessionPickerEscape, 'Cancel')
-        .map('<CR>', actions.confirmSelectedSession, 'Open')
+        .map('<Esc>', actions.projectPickerEscape, 'Cancel')
+        .map('<CR>', actions.confirmSelectedProject, 'Open')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))
@@ -326,23 +313,39 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: session-name
+    // Modal: project-name
     // -----------------------------------------------------------------------
-    .mode('modal.session-name', (m) =>
+    .mode('modal.project-name', (m) =>
       m
-        .map('<Esc>', actions.backToSessionPicker, 'Cancel')
-        .map('<CR>', actions.confirmSessionRename, 'Confirm')
+        .map('<Esc>', actions.backToProjectPicker, 'Cancel')
+        .map('<CR>', actions.confirmProjectRename, 'Confirm')
         .passthrough()
     )
 
     // -----------------------------------------------------------------------
-    // Modal: create-session
+    // Modal: create-project
     // -----------------------------------------------------------------------
-    .mode('modal.create-session', (m) =>
+    .mode('modal.create-project', (m) =>
       m
-        .map('<Esc>', actions.createSessionEscape, 'Cancel')
+        .map('<Esc>', actions.createProjectEscape, 'Cancel')
         .map('<Tab>', actions.switchField, 'Next field')
-        .map('<CR>', actions.confirmCreateSession, 'Confirm')
+        .map('<CR>', actions.confirmCreateProject, 'Confirm')
+        .map('<C-n>', actions.moveModalSelection(1), 'Next')
+        .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
+        .map('<Down>', actions.moveModalSelection(1))
+        .map('<Up>', actions.moveModalSelection(-1))
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
+    // Modal: create-workspace (a project inside the current project)
+    // -----------------------------------------------------------------------
+    .mode('modal.create-workspace', (m) =>
+      m
+        .map('<Esc>', actions.createWorkspaceEscape, 'Back/Cancel')
+        .map('<Tab>', actions.switchCreateWorkspaceField, 'Next field')
+        .map('<CR>', actions.confirmCreateWorkspace, 'Create')
+        .map('<C-CR>', actions.createWorkspaceNewline, 'Newline')
         .map('<C-n>', actions.moveModalSelection(1), 'Next')
         .map('<C-p>', actions.moveModalSelection(-1), 'Prev')
         .map('<Down>', actions.moveModalSelection(1))

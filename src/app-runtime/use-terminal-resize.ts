@@ -10,7 +10,8 @@ import {
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
 import { getBarWidth } from '../state/bars'
@@ -179,15 +180,15 @@ export function useTerminalResize({
   // loop so an unchanged box never re-triggers a resize.
   const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
 
-  // Drop the dedupe cache when the workspace changes. attach() re-gates every
+  // Drop the dedupe cache when the project changes. attach() re-gates every
   // restored tab's paneReady to false; if a tabId carries the same dimensions
-  // across workspaces, handleMeasure's prev-match would short-circuit and
+  // across projects, handleMeasure's prev-match would short-circuit and
   // never call resizeTab({confirmedFromMeasurement:true}), leaving the gate
   // closed forever — the new pane then paints a stale buffered snapshot from
-  // the old workspace, which is the 2–3 row offset users see.
-  const lastSessionIdRef = useRef(state.currentSessionId)
-  if (lastSessionIdRef.current !== state.currentSessionId) {
-    lastSessionIdRef.current = state.currentSessionId
+  // the old project, which is the 2–3 row offset users see.
+  const lastProjectIdRef = useRef(state.currentProjectId)
+  if (lastProjectIdRef.current !== state.currentProjectId) {
+    lastProjectIdRef.current = state.currentProjectId
     measuredRef.current.clear()
   }
 
@@ -229,13 +230,13 @@ export function useTerminalResize({
   const leftBarWidth = getBarWidth(state.bars.left)
   const rightBarWidth = getBarWidth(state.bars.right)
   const terminalSize = useMemo(() => {
-    const sessionBarRows = state.sessionBar.visible ? 1 : 0
-    const sessionBarTopOffset = sessionBarRows
+    const projectBarRows = state.projectBar.visible ? 1 : 0
+    const projectBarTopOffset = projectBarRows
     const reservedRows =
       MAIN_AREA_VERTICAL_PADDING +
       STATUS_BAR_HEIGHT +
       TERMINAL_PANE_VERTICAL_CHROME +
-      sessionBarRows
+      projectBarRows
     const cols = Math.max(
       MIN_TERMINAL_COLS,
       Math.floor(dimensions.width - leftBarWidth - rightBarWidth - MAIN_AREA_HORIZONTAL_CHROME)
@@ -246,7 +247,7 @@ export function useTerminalResize({
       cols,
       rows,
       x: leftBarWidth + 1,
-      y: 1 + sessionBarTopOffset,
+      y: 1 + projectBarTopOffset,
     }
 
     return { cols, rows }
@@ -256,7 +257,7 @@ export function useTerminalResize({
     dimensions.width,
     leftBarWidth,
     rightBarWidth,
-    state.sessionBar.visible,
+    state.projectBar.visible,
   ])
 
   useLayoutEffect(() => {
@@ -278,7 +279,7 @@ export function useTerminalResize({
     })
     handledBySyncRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leftBarWidth, rightBarWidth, state.sessionBar.visible])
+  }, [leftBarWidth, rightBarWidth, state.projectBar.visible])
 
   useEffect(() => {
     if (handledBySyncRef.current) {

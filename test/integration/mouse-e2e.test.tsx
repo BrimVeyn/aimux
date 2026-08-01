@@ -208,7 +208,7 @@ function MouseHarness({
   const storeState = useMemo(
     () => ({
       activeTabId: TEST_TAB_ID,
-      currentSessionId: null,
+      currentProjectId: null,
       customCommands: {
         antigravity: 'antigravity',
         claude: command,
@@ -234,11 +234,11 @@ function MouseHarness({
       layoutTrees: {},
       modal: {
         editBuffer: null,
+        projectTargetId: null,
         selectedIndex: 0,
-        sessionTargetId: null,
         type: null,
       },
-      sessions: [],
+      projects: [],
       sidebar: {
         maxWidth: SIDEBAR_MAX_WIDTH,
         minWidth: SIDEBAR_MIN_WIDTH,
@@ -364,7 +364,7 @@ function ResizeHarness({ bars }: { bars: BarsState }) {
       activeTabId: TEST_TAB_ID,
       bars,
       focusMode: 'navigation' as const,
-      sessionBar: { ...base.sessionBar, visible: false },
+      projectBar: { ...base.projectBar, visible: false },
       tabs: [
         {
           activity: 'idle',
@@ -509,7 +509,7 @@ const LEFT_ONLY_BARS: BarsState = {
   left: {
     visible: true,
     widgets: [
-      { grow: 50, id: 'workspaces', visible: true },
+      { grow: 50, id: 'projects', visible: true },
       { grow: 50, id: 'git', visible: true },
     ],
     width: 28,
@@ -518,7 +518,7 @@ const LEFT_ONLY_BARS: BarsState = {
 }
 
 const BOTH_BARS: BarsState = {
-  left: { visible: true, widgets: [{ grow: 100, id: 'workspaces', visible: true }], width: 28 },
+  left: { visible: true, widgets: [{ grow: 100, id: 'projects', visible: true }], width: 28 },
   right: { visible: true, widgets: [{ grow: 100, id: 'git', visible: true }], width: 30 },
 }
 

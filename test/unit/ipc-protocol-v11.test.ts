@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK,
-  IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID,
+  IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID,
   IPC_CAPABILITY_HOT_REEXEC,
   IPC_CAPABILITY_LIST_TABS,
   IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS,
@@ -24,27 +24,27 @@ describe('ipc protocol v11', () => {
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_THIN_ATTACH)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_SIZE_FALLBACK)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_LIFECYCLE_EVENTS)
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_WORKTREE_ID)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_CREATE_TAB_WORKSPACE_ID)
   })
 
-  test('listTabs round-trips with a string sessionId', () => {
+  test('listTabs round-trips with a string projectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
-        payload: { sessionId: 'session-1' },
+        payload: { projectId: 'project-1' },
         type: 'listTabs',
       })
     ).not.toThrow()
   })
 
-  test('listTabs rejects a non-string sessionId', () => {
+  test('listTabs rejects a non-string projectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
-        payload: { sessionId: 42 },
+        payload: { projectId: 42 },
         type: 'listTabs',
       })
-    ).toThrow('listTabs.sessionId must be a string')
+    ).toThrow('listTabs.projectId must be a string')
   })
 
   test('attach.thin parses as a boolean when present', () => {
@@ -53,9 +53,9 @@ describe('ipc protocol v11', () => {
         id: 'r2',
         payload: {
           cols: 80,
+          projectId: 'project-2',
           protocolVersion: IPC_PROTOCOL_VERSION,
           rows: 24,
-          sessionId: 'session-2',
           thin: true,
         },
         type: 'attach',
@@ -69,9 +69,9 @@ describe('ipc protocol v11', () => {
         id: 'r3',
         payload: {
           cols: 80,
+          projectId: 'project-3',
           protocolVersion: IPC_PROTOCOL_VERSION,
           rows: 24,
-          sessionId: 'session-3',
           thin: 'yes',
         },
         type: 'attach',
@@ -114,7 +114,7 @@ describe('ipc protocol v11', () => {
     ).toThrow('listTabsResult.payload is invalid')
   })
 
-  test('createTab.worktreeId parses when present', () => {
+  test('createTab.workspaceId parses when present', () => {
     expect(() =>
       parseClientRequest({
         id: 'r6',
@@ -125,14 +125,14 @@ describe('ipc protocol v11', () => {
           rows: 24,
           tabId: 'tab-1',
           title: 'Claude',
-          worktreeId: 'worktree-abc',
+          workspaceId: 'workspace-abc',
         },
         type: 'createTab',
       })
     ).not.toThrow()
   })
 
-  test('createTab.worktreeId rejects a non-string value', () => {
+  test('createTab.workspaceId rejects a non-string value', () => {
     expect(() =>
       parseClientRequest({
         id: 'r7',
@@ -143,11 +143,11 @@ describe('ipc protocol v11', () => {
           rows: 24,
           tabId: 'tab-1',
           title: 'Claude',
-          worktreeId: 12,
+          workspaceId: 12,
         },
         type: 'createTab',
       })
-    ).toThrow('createTab.worktreeId must be a string when present')
+    ).toThrow('createTab.workspaceId must be a string when present')
   })
 
   test('workerName metadata round-trips on createTab and listTabsResult', () => {
@@ -193,7 +193,7 @@ describe('ipc protocol v11', () => {
     expect(() =>
       parseServerMessage({
         payload: {
-          sessionId: 'session-1',
+          projectId: 'project-1',
           tab: {
             assistant: 'claude',
             buffer: '',
@@ -208,7 +208,7 @@ describe('ipc protocol v11', () => {
               sendFocusMode: false,
             },
             title: 'Claude',
-            worktreeId: 'wt-1',
+            workspaceId: 'wt-1',
           },
         },
         type: 'tabAdded',
@@ -219,7 +219,7 @@ describe('ipc protocol v11', () => {
   test('tabAdded rejects a malformed tab payload', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', tab: { id: 'tab-1' } },
+        payload: { projectId: 'project-1', tab: { id: 'tab-1' } },
         type: 'tabAdded',
       })
     ).toThrow('tabAdded.tab is invalid')

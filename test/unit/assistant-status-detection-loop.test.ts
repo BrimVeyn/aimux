@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type {
   AssistantId,
-  SessionStatus,
+  ProjectStatus,
   TabActivity,
   TerminalLine,
   TerminalSnapshot,
@@ -27,29 +27,29 @@ interface FakeTab {
   viewport?: TerminalSnapshot
 }
 
-function makeHarness(initialTabsBySession: Map<string, FakeTab[]>) {
-  const tabs = new Map<string, FakeTab[]>(initialTabsBySession)
-  const tabStatusEvents: { tabId: string; status: TabActivity; sessionId: string }[] = []
-  const sessionStatusEvents: { sessionId: string; status: SessionStatus }[] = []
+function makeHarness(initialTabsByProject: Map<string, FakeTab[]>) {
+  const tabs = new Map<string, FakeTab[]>(initialTabsByProject)
+  const tabStatusEvents: { tabId: string; status: TabActivity; projectId: string }[] = []
+  const projectStatusEvents: { projectId: string; status: ProjectStatus }[] = []
   const loop = runStatusDetectionLoop({
-    listSessions: () => [...tabs.keys()],
-    listTabs: (sessionId): LoopTabView[] =>
-      (tabs.get(sessionId) ?? []).map((t) => ({
+    listProjects: () => [...tabs.keys()],
+    listTabs: (projectId): LoopTabView[] =>
+      (tabs.get(projectId) ?? []).map((t) => ({
         assistant: t.assistant,
         command: t.command,
         id: t.id,
         viewport: t.viewport,
       })),
-    onSessionStatus: (sessionId, status) => {
-      sessionStatusEvents.push({ sessionId, status })
+    onProjectStatus: (projectId, status) => {
+      projectStatusEvents.push({ projectId, status })
     },
-    onTabStatus: (tabId, status, sessionId) => {
-      tabStatusEvents.push({ sessionId, status, tabId })
+    onTabStatus: (tabId, status, projectId) => {
+      tabStatusEvents.push({ projectId, status, tabId })
     },
     // 0 disables the ticker — tests drive via classifyNow.
     tickMs: 10_000,
   })
-  return { loop, sessionStatusEvents, tabs, tabStatusEvents }
+  return { loop, projectStatusEvents, tabs, tabStatusEvents }
 }
 
 describe('runStatusDetectionLoop', () => {
@@ -78,7 +78,7 @@ describe('runStatusDetectionLoop', () => {
         },
       ])
       expect(h.loop.getTabStatus('tab-1')).toBe('working')
-      expect(h.loop.getSessionStatus('sess-A')).toEqual({ waiting: false, working: true })
+      expect(h.loop.getProjectStatus('sess-A')).toEqual({ waiting: false, working: true })
       const tabSnap = h.loop.snapshotTabs().find((s) => s.tabId === 'tab-1')
       expect(tabSnap?.status).toBe('working')
     } finally {
@@ -135,7 +135,7 @@ describe('runStatusDetectionLoop', () => {
 
   test('turn-complete: emits once after idle holds for the settle window, then re-arms after a working blip', async () => {
     let clock = 0
-    const turnEvents: { tabId: string; sessionId: string; idleMs: number }[] = []
+    const turnEvents: { tabId: string; projectId: string; idleMs: number }[] = []
     const idleViewport = snapshot('❯ ', '')
     const workingViewport = snapshot('✱ Thinking…', '  esc to interrupt')
     const tabState = {
@@ -144,7 +144,7 @@ describe('runStatusDetectionLoop', () => {
       viewport: idleViewport,
     }
     const loop = runStatusDetectionLoop({
-      listSessions: () => ['sess-A'],
+      listProjects: () => ['sess-A'],
       listTabs: (): LoopTabView[] => [
         {
           assistant: tabState.assistant,
@@ -154,10 +154,10 @@ describe('runStatusDetectionLoop', () => {
         },
       ],
       nowFn: () => clock,
-      onSessionStatus: () => {},
+      onProjectStatus: () => {},
       onTabStatus: () => {},
-      onTurnComplete: (tabId, sessionId, idleMs) => {
-        turnEvents.push({ idleMs, sessionId, tabId })
+      onTurnComplete: (tabId, projectId, idleMs) => {
+        turnEvents.push({ idleMs, projectId, tabId })
       },
       tickMs: 5,
       turnSettleMs: 100,
@@ -200,12 +200,12 @@ describe('runStatusDetectionLoop', () => {
     const workingViewport = snapshot('✱ Thinking…', '  esc to interrupt')
     const tabState = { viewport: idleViewport }
     const loop = runStatusDetectionLoop({
-      listSessions: () => ['sess-A'],
+      listProjects: () => ['sess-A'],
       listTabs: (): LoopTabView[] => [
         { assistant: 'claude', command: 'claude', id: 'tab-1', viewport: tabState.viewport },
       ],
       nowFn: () => clock,
-      onSessionStatus: () => {},
+      onProjectStatus: () => {},
       onTabStatus: () => {},
       onTurnComplete: () => {
         turnEvents.push(1)
@@ -239,12 +239,12 @@ describe('runStatusDetectionLoop', () => {
     const waiting = snapshot('Do you want to proceed?', '❯ 1. Yes', '  2. No')
     const tabState = { viewport: idle }
     const loop = runStatusDetectionLoop({
-      listSessions: () => ['sess-A'],
+      listProjects: () => ['sess-A'],
       listTabs: (): LoopTabView[] => [
         { assistant: 'claude', command: 'claude', id: 'tab-1', viewport: tabState.viewport },
       ],
-      onSessionStatus: () => {},
-      onTabQuestion: (tabId, _sessionId, detail) => {
+      onProjectStatus: () => {},
+      onTabQuestion: (tabId, _projectId, detail) => {
         questions.push({ ...detail, tabId })
       },
       onTabStatus: () => {},

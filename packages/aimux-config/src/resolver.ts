@@ -60,13 +60,15 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
-    sessionBar: resolveSessionBar(userConfig.sessionBar),
+    // ponytail: `sessionBar` / `worktreeTemplates` are the pre-rename keys.
+    // Unknown keys parse silently, so without these the setting just vanishes.
+    projectBar: resolveProjectBar(userConfig.projectBar ?? userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
-    worktreeTemplates: userConfig.worktreeTemplates ?? [],
+    workspaceTemplates: userConfig.workspaceTemplates ?? userConfig.worktreeTemplates ?? [],
   }
 }
 
@@ -96,9 +98,9 @@ function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['the
   }
 }
 
-function resolveSessionBar(
-  userConfig: AimuxUserConfig['sessionBar']
-): ResolvedConfig['sessionBar'] {
+function resolveProjectBar(
+  userConfig: AimuxUserConfig['projectBar']
+): ResolvedConfig['projectBar'] {
   if (!userConfig) return {}
   return {
     initialVisible: userConfig.initialVisible ?? userConfig.visible,

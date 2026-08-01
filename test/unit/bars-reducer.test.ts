@@ -15,7 +15,7 @@ function grows(state: AppState, side: 'left' | 'right'): Record<string, number> 
 
 test('default layout puts both widgets in the left bar, right bar collapsed', () => {
   const s = seedState()
-  expect(s.bars.left.widgets.map((w) => w.id)).toEqual(['workspaces', 'git'])
+  expect(s.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'git'])
   expect(getBarWidth(s.bars.left)).toBe(28)
   expect(getBarWidth(s.bars.right)).toBe(0)
 })
@@ -40,7 +40,7 @@ test('move-widget across bars preserves grow and reveals the target bar', () => 
   const s0 = seedState()
   const gitGrow = grows(s0, 'left').git
   const s1 = appReducer(s0, { index: 0, side: 'right', type: 'move-widget', widgetId: 'git' })
-  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['workspaces'])
+  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['projects'])
   expect(s1.bars.right.widgets.map((w) => w.id)).toEqual(['git'])
   expect(grows(s1, 'right').git).toBe(gitGrow)
   expect(s1.bars.right.visible).toBe(true)
@@ -54,11 +54,11 @@ test('emptying a bar collapses it to zero width', () => {
     index: 1,
     side: 'right',
     type: 'move-widget',
-    widgetId: 'workspaces',
+    widgetId: 'projects',
   })
   expect(s2.bars.left.widgets).toHaveLength(0)
   expect(getBarWidth(s2.bars.left)).toBe(0)
-  expect(s2.bars.right.widgets.map((w) => w.id)).toEqual(['git', 'workspaces'])
+  expect(s2.bars.right.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
 })
 
 test('move-widget within a bar reorders it', () => {
@@ -68,12 +68,12 @@ test('move-widget within a bar reorders it', () => {
     type: 'move-widget',
     widgetId: 'git',
   })
-  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'workspaces'])
+  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects'])
 })
 
 test('toggle-widget hides a widget, then re-showing it reveals a hidden bar', () => {
   const hidden = appReducer(seedState(), { type: 'toggle-widget', widgetId: 'git' })
-  expect(visibleWidgets(hidden.bars.left).map((w) => w.id)).toEqual(['workspaces'])
+  expect(visibleWidgets(hidden.bars.left).map((w) => w.id)).toEqual(['projects'])
 
   const barHidden = appReducer(hidden, { side: 'left', type: 'toggle-bar' })
   expect(getBarWidth(barHidden.bars.left)).toBe(0)
@@ -87,7 +87,7 @@ test('set-bar-boundary moves only the pair and preserves total grow', () => {
   const s0 = seedState()
   const total = s0.bars.left.widgets.reduce((sum, w) => sum + w.grow, 0)
   const s1 = appReducer(s0, { index: 0, ratio: 0.7, side: 'left', type: 'set-bar-boundary' })
-  expect(grows(s1, 'left')).toEqual({ git: 30, workspaces: 70 })
+  expect(grows(s1, 'left')).toEqual({ git: 30, projects: 70 })
   expect(s1.bars.left.widgets.reduce((sum, w) => sum + w.grow, 0)).toBe(total)
 })
 
@@ -98,17 +98,17 @@ test('set-bar-boundary clamps at the minimum share', () => {
     side: 'left',
     type: 'set-bar-boundary',
   })
-  expect(grows(s1, 'left')).toEqual({ git: 90, workspaces: 10 })
+  expect(grows(s1, 'left')).toEqual({ git: 90, projects: 10 })
 })
 
 test('resize-widget grows the first widget and shrinks the second', () => {
-  const s1 = appReducer(seedState(), { delta: 0.1, type: 'resize-widget', widgetId: 'workspaces' })
-  expect(grows(s1, 'left')).toEqual({ git: 40, workspaces: 60 })
+  const s1 = appReducer(seedState(), { delta: 0.1, type: 'resize-widget', widgetId: 'projects' })
+  expect(grows(s1, 'left')).toEqual({ git: 40, projects: 60 })
 })
 
 test('resize-widget on the second widget flips the sign', () => {
   const s1 = appReducer(seedState(), { delta: 0.1, type: 'resize-widget', widgetId: 'git' })
-  expect(grows(s1, 'left')).toEqual({ git: 60, workspaces: 40 })
+  expect(grows(s1, 'left')).toEqual({ git: 60, projects: 40 })
 })
 
 test('a hidden widget is excluded from boundary math', () => {

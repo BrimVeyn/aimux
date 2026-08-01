@@ -5,7 +5,7 @@
  * (https://github.com/ogulcancelik/herdr, MIT). Rule tables trace back to
  * `src/detect.rs` in that repo.
  *
- * The detector classifies a terminal session as `working`, `waiting-input`,
+ * The detector classifies a terminal project as `working`, `waiting-input`,
  * or `idle`. Built-in CLIs (claude, codex, opencode, grok, kimi) have dedicated
  * classify* functions. Custom CLIs fall back to a generic heuristic that
  * (a) recognises common shells as always-idle and (b) uses pane-tail change
@@ -275,8 +275,8 @@ function classifyKimi(haystack: string, rawTail: string): TabActivity {
     haystack.includes('apply these edits?') ||
     haystack.includes('stop this task?') ||
     haystack.includes('ready to build with this plan?') ||
-    haystack.includes('approve for session') ||
-    haystack.includes('approve for this session') ||
+    haystack.includes('approve for project') ||
+    haystack.includes('approve for this project') ||
     haystack.includes('type feedback') ||
     haystack.includes('waiting for authorization') ||
     haystack.includes('sign in to kimi') ||
@@ -297,7 +297,7 @@ function classifyKimi(haystack: string, rawTail: string): TabActivity {
 
   // Agent actively streaming / calling tools.
   // Anchor thinking on ellipsis so the footer model suffix "thinking" alone
-  // (e.g. "kimi-k2 thinking") does not mark an idle session as working.
+  // (e.g. "kimi-k2 thinking") does not mark an idle project as working.
   if (
     haystack.includes('working...') ||
     haystack.includes('working…') ||

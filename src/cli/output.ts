@@ -25,7 +25,7 @@ export function writeError(message: string): void {
 //   10  question (`tab run`: worker is blocked on a question/permission)
 //   11  pending submit (`worker run --detach`: prompt is in the composer but no
 //       turn started — recoverable with `worker submit`, unlike a real error)
-//   124 timeout (`tab wait`, `tab tail --timeout`, `workspace switch --wait`)
+//   124 timeout (`tab wait`, `tab tail --timeout`, `project switch --wait`)
 export const EXIT_OK = 0
 export const EXIT_USAGE = 2
 export const EXIT_RUNTIME = 3

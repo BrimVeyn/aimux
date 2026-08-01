@@ -19,14 +19,14 @@ export const workerAwait: CliCommand = {
   ],
   group: 'worker',
   run: async (ctx) => {
-    const { tab, workspace } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
+    const { project, tab } = await resolveWorkerTarget(ctx, ctx.args.positionals[0] ?? '')
     const outcome = await awaitExistingWorker(
       ctx,
-      workspace,
+      project,
       tab.id,
       typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS
     )
-    writeJson(workerEnvelope(workspace, workerView(workspace, tab), outcome))
+    writeJson(workerEnvelope(project, workerView(project, tab), outcome))
     return workerOutcomeExitCode(outcome)
   },
   summary: "Await an existing worker's in-flight turn",

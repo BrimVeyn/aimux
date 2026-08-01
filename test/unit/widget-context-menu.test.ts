@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, BarsState } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { BarsState } from '../../src/state/types'
 
 import { setActiveDispatch } from '../../src/state/dispatch-ref'
 import {
@@ -13,7 +14,7 @@ function bars(overrides: Partial<BarsState> = {}): BarsState {
     left: {
       visible: true,
       widgets: [
-        { grow: 50, id: 'workspaces', visible: true },
+        { grow: 50, id: 'projects', visible: true },
         { grow: 50, id: 'git', visible: true },
       ],
       width: 28,
@@ -35,7 +36,7 @@ function capture(run: () => void): AppAction[] {
 }
 
 test('first widget of two offers move-across, move-down and hide', () => {
-  const menu = buildWidgetContextMenu(bars(), 'left', 'workspaces')
+  const menu = buildWidgetContextMenu(bars(), 'left', 'projects')
   expect(menu.map(([label]) => label)).toEqual(['Move to right bar', 'Move down', 'Hide'])
 })
 
@@ -51,16 +52,16 @@ test('move-across appends the widget to the other bar', () => {
 })
 
 test('move-down swaps with the next widget', () => {
-  const menu = buildWidgetContextMenu(bars(), 'left', 'workspaces')
+  const menu = buildWidgetContextMenu(bars(), 'left', 'projects')
   const actions = capture(() => menu[1]?.[1]())
-  expect(actions).toEqual([{ index: 1, side: 'left', type: 'move-widget', widgetId: 'workspaces' }])
+  expect(actions).toEqual([{ index: 1, side: 'left', type: 'move-widget', widgetId: 'projects' }])
 })
 
 test('the last visible widget cannot be hidden', () => {
   const single = bars({
-    left: { visible: true, widgets: [{ grow: 100, id: 'workspaces', visible: true }], width: 28 },
+    left: { visible: true, widgets: [{ grow: 100, id: 'projects', visible: true }], width: 28 },
   })
-  const menu = buildWidgetContextMenu(single, 'left', 'workspaces')
+  const menu = buildWidgetContextMenu(single, 'left', 'projects')
   expect(menu.map(([label]) => label)).toEqual(['Move to right bar'])
 })
 
@@ -69,7 +70,7 @@ test('the bar menu offers a way back for each hidden widget', () => {
     left: {
       visible: true,
       widgets: [
-        { grow: 50, id: 'workspaces', visible: true },
+        { grow: 50, id: 'projects', visible: true },
         { grow: 50, id: 'git', visible: false },
       ],
       width: 28,

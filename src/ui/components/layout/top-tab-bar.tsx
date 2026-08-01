@@ -8,13 +8,13 @@ import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 're
 
 import type { FocusMode, TabSession } from '../../../state/types'
 
-import { useWorktreeDivergencePolling } from '../../../git/worktree-divergence-poller'
+import { useWorkspaceDivergencePolling } from '../../../git/workspace-divergence-poller'
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { filterTabsForActiveWorktree } from '../../../state/session-worktrees'
+import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
-import { moveIdToIdPosition } from '../../session-ordering'
+import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
 import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
@@ -197,29 +197,29 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   const headerBg = t.backgroundPanel
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
-  const bar = useAppStore((s) => s.sessionBar)
+  const bar = useAppStore((s) => s.projectBar)
   const leftBarVisible = useAppStore((s) => getBarWidth(s.bars.left) > 0)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
   const focusMode: FocusMode = useAppStore((s) => s.focusMode)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const tabGroupMap = useAppStore((s) => s.tabGroupMap)
 
-  // Sidebar now also shows worktree chips with divergence — poll whenever
+  // Sidebar now also shows workspace chips with divergence — poll whenever
   // either surface is visible.
-  useWorktreeDivergencePolling(bar.visible || leftBarVisible || forceVisible)
+  useWorkspaceDivergencePolling(bar.visible || leftBarVisible || forceVisible)
 
-  const currentSession = useMemo(
+  const currentProject = useMemo(
     () =>
-      currentSessionId != null && currentSessionId !== ''
-        ? sessions.find((s) => s.id === currentSessionId)
+      currentProjectId != null && currentProjectId !== ''
+        ? projects.find((s) => s.id === currentProjectId)
         : undefined,
-    [currentSessionId, sessions]
+    [currentProjectId, projects]
   )
 
   const visibleTabs = useMemo(
-    () => filterTabsForActiveWorktree(tabs, currentSession),
-    [tabs, currentSession]
+    () => filterTabsForActiveWorkspace(tabs, currentProject),
+    [tabs, currentProject]
   )
 
   const entries = useMemo(
@@ -260,7 +260,7 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   )
 
   // --- Drag-and-drop reorder of the tab strip ---------------------------------
-  // Mirrors the workspace-list drag, but on the horizontal axis: entries are
+  // Mirrors the project-list drag, but on the horizontal axis: entries are
   // laid out left-to-right inside a scrollX box, so hit-testing is on x/width.
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
@@ -344,13 +344,13 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
 
   const handleNewTab = useCallback((e: OtuiMouseEvent) => {
     e.stopPropagation()
-    dispatchGlobal({ type: 'open-new-tab-modal' })
+    runSideEffectGlobal({ type: 'open-new-tab' })
   }, [])
 
   if (!bar.visible && !forceVisible) return null
-  // Keep the bar visible even with zero entries — when the active worktree
+  // Keep the bar visible even with zero entries — when the active workspace
   // has no tabs, the lone "+" affordance is what tells the user "you're in
-  // an empty worktree, click here to start one".
+  // an empty workspace, click here to start one".
 
   const isFocused = focusMode === 'terminal-input' || focusMode === 'navigation'
 

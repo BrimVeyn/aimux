@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events'
 
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
@@ -12,110 +12,110 @@ import { SessionRegistry } from './session-registry'
 
 interface SessionManagerEvents {
   render: [
-    sessionId: string,
+    projectId: string,
     tabId: string,
     viewport: TerminalSnapshot,
     terminalModes: TerminalModeState,
   ]
-  exit: [sessionId: string, tabId: string, exitCode: number]
-  error: [sessionId: string, tabId: string, message: string]
+  exit: [projectId: string, tabId: string, exitCode: number]
+  error: [projectId: string, tabId: string, message: string]
 }
 
 export class SessionManager extends EventEmitter<SessionManagerEvents> {
   private registries = new Map<string, SessionRegistry>()
 
-  private getOrCreateRegistry(sessionId: string): SessionRegistry {
-    const existing = this.registries.get(sessionId)
+  private getOrCreateRegistry(projectId: string): SessionRegistry {
+    const existing = this.registries.get(projectId)
     if (existing) {
       return existing
     }
 
     const registry = new SessionRegistry()
     registry.on('render', (tabId, viewport, terminalModes) => {
-      this.emit('render', sessionId, tabId, viewport, terminalModes)
+      this.emit('render', projectId, tabId, viewport, terminalModes)
     })
     registry.on('exit', (tabId, exitCode) => {
-      this.emit('exit', sessionId, tabId, exitCode)
+      this.emit('exit', projectId, tabId, exitCode)
     })
     registry.on('error', (tabId, message) => {
-      this.emit('error', sessionId, tabId, message)
+      this.emit('error', projectId, tabId, message)
     })
-    this.registries.set(sessionId, registry)
+    this.registries.set(projectId, registry)
     return registry
   }
 
-  attachSession(sessionId: string, snapshot?: WorkspaceSnapshotV1) {
+  attachSession(projectId: string, snapshot?: ProjectSnapshotV1) {
     logDebug('daemon.sessionManager.attachSession', {
       hasSnapshot: !!snapshot,
-      sessionId,
+      projectId,
       snapshotTabs: snapshot?.tabs.length ?? 0,
     })
-    return this.getOrCreateRegistry(sessionId).attachFromSnapshot(snapshot)
+    return this.getOrCreateRegistry(projectId).attachFromSnapshot(snapshot)
   }
 
-  createTab(sessionId: string, options: Parameters<SessionRegistry['createSession']>[0]): void {
+  createTab(projectId: string, options: Parameters<SessionRegistry['createSession']>[0]): void {
     logDebug('daemon.sessionManager.createTab', {
       command: options.command,
-      sessionId,
+      projectId,
       tabId: options.tabId,
       title: options.title,
     })
-    this.getOrCreateRegistry(sessionId).createSession(options)
+    this.getOrCreateRegistry(projectId).createSession(options)
   }
 
-  write(sessionId: string, tabId: string, data: string): void {
-    this.getOrCreateRegistry(sessionId).write(tabId, data)
+  write(projectId: string, tabId: string, data: string): void {
+    this.getOrCreateRegistry(projectId).write(tabId, data)
   }
 
   updateTabMetadata(
-    sessionId: string,
+    projectId: string,
     tabId: string,
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
   ): void {
-    this.getOrCreateRegistry(sessionId).updateTabMetadata(tabId, patch)
+    this.getOrCreateRegistry(projectId).updateTabMetadata(tabId, patch)
   }
 
-  resize(sessionId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
-    this.getOrCreateRegistry(sessionId).resizeAll(cols, rows, options)
+  resize(projectId: string, cols: number, rows: number, options?: { sync?: boolean }): void {
+    this.getOrCreateRegistry(projectId).resizeAll(cols, rows, options)
   }
 
   resizeTab(
-    sessionId: string,
+    projectId: string,
     tabId: string,
     cols: number,
     rows: number,
     options?: { sync?: boolean }
   ): void {
-    this.getOrCreateRegistry(sessionId).resizeTab(tabId, cols, rows, options)
+    this.getOrCreateRegistry(projectId).resizeTab(tabId, cols, rows, options)
   }
 
-  scroll(sessionId: string, tabId: string, deltaLines: number): void {
-    this.getOrCreateRegistry(sessionId).scrollViewport(tabId, deltaLines)
+  scroll(projectId: string, tabId: string, deltaLines: number): void {
+    this.getOrCreateRegistry(projectId).scrollViewport(tabId, deltaLines)
   }
 
-  scrollToBottom(sessionId: string, tabId: string): void {
-    this.getOrCreateRegistry(sessionId).scrollViewportToBottom(tabId)
+  scrollToBottom(projectId: string, tabId: string): void {
+    this.getOrCreateRegistry(projectId).scrollViewportToBottom(tabId)
   }
 
-  setActiveTab(sessionId: string, tabId: string | null): void {
-    this.getOrCreateRegistry(sessionId).setActiveTab(tabId)
+  setActiveTab(projectId: string, tabId: string | null): void {
+    this.getOrCreateRegistry(projectId).setActiveTab(tabId)
   }
 
-  closeTab(sessionId: string, tabId: string): void {
-    this.getOrCreateRegistry(sessionId).closeTab(tabId)
+  closeTab(projectId: string, tabId: string): void {
+    this.getOrCreateRegistry(projectId).closeTab(tabId)
   }
 
-  disposeSession(sessionId: string): void {
+  disposeSession(projectId: string): void {
     logDebug('daemon.sessionManager.disposeSession', {
-      hadRegistry: this.registries.has(sessionId),
-      sessionId,
+      hadRegistry: this.registries.has(projectId),
+      projectId,
     })
-    const registry = this.registries.get(sessionId)
+    const registry = this.registries.get(projectId)
     if (!registry) {
       return
     }
     registry.disposeAll()
-    this.registries.delete(sessionId)
+    this.registries.delete(projectId)
   }
 
   disposeAll(): void {
@@ -143,7 +143,7 @@ export class SessionManager extends EventEmitter<SessionManagerEvents> {
     return [...this.registries.keys()]
   }
 
-  listTabs(sessionId: string): TabSession[] {
-    return this.registries.get(sessionId)?.listTabs() ?? []
+  listTabs(projectId: string): TabSession[] {
+    return this.registries.get(projectId)?.listTabs() ?? []
   }
 }

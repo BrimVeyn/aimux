@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
 import type { SplitDirection } from './state/layout-tree'
-import type { GitFileListMode, WorkspaceSnapshotV1 } from './state/types'
+import type { GitFileListMode, ProjectSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
-import { isWorkspaceSnapshotV1 } from './state/validation'
+import { isProjectSnapshotV1 } from './state/validation'
 import { migrateThemeId as resolveLegacyThemeId, type ThemeId, type ThemeMode } from './ui/themes'
 
 function migrateThemeId(value: unknown): ThemeId | undefined {
@@ -64,7 +64,7 @@ export interface PersistedBars {
   right: PersistedBar
 }
 
-export interface WorktreeTemplatePane {
+export interface WorkspaceTemplatePane {
   id: string
   assistant: string
   splitFrom?: string
@@ -73,15 +73,15 @@ export interface WorktreeTemplatePane {
   send?: string
 }
 
-export interface WorktreeTemplateTab {
-  panes: WorktreeTemplatePane[]
+export interface WorkspaceTemplateTab {
+  panes: WorkspaceTemplatePane[]
 }
 
-export interface WorktreeTemplate {
+export interface WorkspaceTemplate {
   id: string
   name: string
   description?: string
-  tabs: WorktreeTemplateTab[]
+  tabs: WorkspaceTemplateTab[]
 }
 
 export interface AimuxConfig {
@@ -93,12 +93,12 @@ export interface AimuxConfig {
   gitPane?: PersistedGitPane
   bars?: PersistedBars
   sidebar?: PersistedSidebar
-  sessionBarVisible?: boolean
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectBarVisible?: boolean
+  projectSnapshot?: ProjectSnapshotV1
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
   prunedOrphanAimuxBranches?: boolean
-  worktreeTemplates?: WorktreeTemplate[]
+  workspaceTemplates?: WorkspaceTemplate[]
 }
 
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
@@ -198,11 +198,11 @@ export function deriveBarsFromLegacy(
   const embeddedRatio = gitPane?.embeddedRatio ?? gitPane?.ratio ?? 0.5
   const gitGrow = Math.max(1, Math.round(embeddedRatio * 100))
   const git = { grow: gitGrow, id: 'git', visible: gitVisible }
-  const workspaces = { grow: Math.max(1, 100 - gitGrow), id: 'workspaces', visible: true }
+  const projects = { grow: Math.max(1, 100 - gitGrow), id: 'projects', visible: true }
 
   const left: PersistedBar = {
     visible: sidebar?.visible ?? true,
-    widgets: gitPane?.position === 'top' ? [git, workspaces] : [workspaces, git],
+    widgets: gitPane?.position === 'top' ? [git, projects] : [projects, git],
     width: sidebar?.width ?? 28,
   }
   const right: PersistedBar = { visible: false, widgets: [], width: 40 }
@@ -211,7 +211,7 @@ export function deriveBarsFromLegacy(
   // column — it maps straight onto the right bar. On the left it shared the
   // edge with the sidebar, which the single-bar model expresses as a stack.
   if (gitPane?.mode === 'pane' && gitPane.position === 'right') {
-    left.widgets = [{ ...workspaces, grow: 100 }]
+    left.widgets = [{ ...projects, grow: 100 }]
     right.visible = true
     right.widgets = [{ ...git, grow: 100 }]
     right.width = Math.round((gitPane.paneRatio ?? gitPane.ratio ?? 0.5) * 80)
@@ -223,7 +223,7 @@ function isRatioValid(value: unknown): boolean {
   return typeof value === 'number' && Number.isFinite(value) && value > 0.15 && value < 0.85
 }
 
-function isWorktreeTemplateTab(value: unknown): value is WorktreeTemplateTab {
+function isWorkspaceTemplateTab(value: unknown): value is WorkspaceTemplateTab {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   if (!Array.isArray(v.panes) || v.panes.length === 0) return false
@@ -251,7 +251,7 @@ function isWorktreeTemplateTab(value: unknown): value is WorktreeTemplateTab {
   return true
 }
 
-export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
+export function isWorkspaceTemplate(value: unknown): value is WorkspaceTemplate {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
   if (typeof v.id !== 'string' || v.id.length === 0) return false
@@ -259,29 +259,29 @@ export function isWorktreeTemplate(value: unknown): value is WorktreeTemplate {
   if (v.description !== undefined && typeof v.description !== 'string') return false
   if (!Array.isArray(v.tabs) || v.tabs.length === 0) return false
   for (const tab of v.tabs) {
-    if (!isWorktreeTemplateTab(tab)) return false
+    if (!isWorkspaceTemplateTab(tab)) return false
   }
   return true
 }
 
-export function parseWorktreeTemplates(
+export function parseWorkspaceTemplates(
   value: unknown,
   issues: string[]
-): WorktreeTemplate[] | undefined {
+): WorkspaceTemplate[] | undefined {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) {
-    issues.push('ignored invalid worktreeTemplates (not an array)')
+    issues.push('ignored invalid workspaceTemplates (not an array)')
     return undefined
   }
   const seen = new Set<string>()
-  const valid: WorktreeTemplate[] = []
+  const valid: WorkspaceTemplate[] = []
   for (const entry of value) {
-    if (!isWorktreeTemplate(entry)) {
-      issues.push('ignored invalid worktreeTemplate entry')
+    if (!isWorkspaceTemplate(entry)) {
+      issues.push('ignored invalid workspaceTemplate entry')
       continue
     }
     if (seen.has(entry.id)) {
-      issues.push(`ignored duplicate worktreeTemplate id "${entry.id}"`)
+      issues.push(`ignored duplicate workspaceTemplate id "${entry.id}"`)
       continue
     }
     seen.add(entry.id)
@@ -346,10 +346,14 @@ export function loadConfigResult(): ConfigLoadResult {
       sidebar?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
+      projectBarVisible?: unknown
+      /** ponytail: pre-rename spelling, honoured for one release. */
       sessionBarVisible?: unknown
-      workspaceSnapshot?: unknown
+      projectSnapshot?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
+      workspaceTemplates?: unknown
+      /** ponytail: pre-rename spelling, honoured for one release. */
       worktreeTemplates?: unknown
     }
 
@@ -419,17 +423,17 @@ export function loadConfigResult(): ConfigLoadResult {
       }
     }
 
-    const validSessionBarVisible =
-      typeof parsed.sessionBarVisible === 'boolean' ? parsed.sessionBarVisible : undefined
-    if (parsed.sessionBarVisible !== undefined && validSessionBarVisible === undefined) {
-      issues.push('ignored invalid sessionBarVisible')
+    // `sessionBarVisible` was the pre-rename key; without the fallback the bar
+    // would silently reset to its default on the first launch after upgrading.
+    const rawProjectBarVisible = parsed.projectBarVisible ?? parsed.sessionBarVisible
+    const validProjectBarVisible =
+      typeof rawProjectBarVisible === 'boolean' ? rawProjectBarVisible : undefined
+    if (rawProjectBarVisible !== undefined && validProjectBarVisible === undefined) {
+      issues.push('ignored invalid projectBarVisible')
     }
 
-    if (
-      parsed.workspaceSnapshot !== undefined &&
-      !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-    ) {
-      issues.push('ignored invalid workspaceSnapshot')
+    if (parsed.projectSnapshot !== undefined && !isProjectSnapshotV1(parsed.projectSnapshot)) {
+      issues.push('ignored invalid projectSnapshot')
     }
 
     const validSkippedUpdateVersion =
@@ -440,7 +444,16 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid skippedUpdateVersion')
     }
 
-    const validWorktreeTemplates = parseWorktreeTemplates(parsed.worktreeTemplates, issues)
+    // `worktreeTemplates` was the pre-rename key. Accepting it for one release
+    // matters more than usual: an unknown key parses fine and the templates
+    // just silently vanish, with no error for the user to act on.
+    if (parsed.workspaceTemplates === undefined && parsed.worktreeTemplates !== undefined) {
+      issues.push('worktreeTemplates is deprecated — rename it to workspaceTemplates')
+    }
+    const validWorkspaceTemplates = parseWorkspaceTemplates(
+      parsed.workspaceTemplates ?? parsed.worktreeTemplates,
+      issues
+    )
 
     if (issues.length > 0) {
       logDebug('config.load.validationIssue', { issues, path: configPath })
@@ -451,18 +464,18 @@ export function loadConfigResult(): ConfigLoadResult {
         bars: validBars ?? deriveBarsFromLegacy(validSidebar, validGitPane),
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
+        projectBarVisible: validProjectBarVisible,
+        projectSnapshot: isProjectSnapshotV1(parsed.projectSnapshot)
+          ? parsed.projectSnapshot
+          : undefined,
         prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
-        sessionBarVisible: validSessionBarVisible,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
         themeMode: validThemeMode,
         themeTransparent: validThemeTransparent,
         version: 2,
-        workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-          ? parsed.workspaceSnapshot
-          : undefined,
-        worktreeTemplates: validWorktreeTemplates,
+        workspaceTemplates: validWorkspaceTemplates,
       },
       issues,
       source: 'file',

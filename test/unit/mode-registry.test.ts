@@ -40,8 +40,8 @@ describe('deriveModeId', () => {
           focusMode: 'modal',
           modal: {
             ...createInitialState().modal,
-            returnToSessionPicker: true,
-            type: 'session-name',
+            returnToProjectPicker: true,
+            type: 'project-name',
           },
         })
       )

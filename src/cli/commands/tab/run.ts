@@ -60,7 +60,7 @@ export const tabRun: CliCommand = {
       typeof ctx.args.flags.timeout === 'number' ? ctx.args.flags.timeout : DEFAULT_TIMEOUT_MS
     const appendEnter = ctx.args.flags['no-enter'] !== true
 
-    const workspace = ctx.getWorkspace()
+    const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
     if (
       !daemon.hasCapability(IPC_CAPABILITY_THIN_ATTACH) ||
@@ -72,7 +72,7 @@ export const tabRun: CliCommand = {
       )
     }
 
-    const attach = await daemon.attach({ cols: 0, rows: 0, sessionId: workspace.id, thin: true })
+    const attach = await daemon.attach({ cols: 0, projectId: project.id, rows: 0, thin: true })
     if (!attach.tabs.some((t) => t.id === tabId)) {
       throw new Error(`tab not found: ${tabId}`)
     }

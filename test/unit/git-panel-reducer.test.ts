@@ -20,7 +20,7 @@ function entry(overrides: Partial<GitFileEntry> = {}): GitFileEntry {
   }
 }
 
-test('git-panel-reset clears cached diffs so a switched worktree fetches fresh', () => {
+test('git-panel-reset clears cached diffs so a switched workspace fetches fresh', () => {
   const base = seedState()
   const s0: AppState = {
     ...base,

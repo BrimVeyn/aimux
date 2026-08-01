@@ -1,4 +1,5 @@
-import type { AppAction, AppState, TabSession } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState, TabSession } from '../types'
 
 import {
   allLeafIds,
@@ -14,12 +15,12 @@ import {
   setSplitRatio,
   splitNode,
 } from '../layout-tree'
-import { normalizeGroupedTabOrder } from '../session-persistence'
+import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
-  filterTabsForActiveWorktree,
-  orderTabsByWorktree,
-  withActiveWorktree,
-} from '../session-worktrees'
+  filterTabsForActiveWorkspace,
+  orderTabsByWorkspace,
+  withActiveWorkspace,
+} from '../project-workspaces'
 import { createDefaultTerminalModes } from '../terminal-modes'
 
 const MAX_BUFFER_LENGTH = 50_000
@@ -197,13 +198,13 @@ function getActiveIndex(state: AppState): number {
   return state.tabs.findIndex((tab) => tab.id === state.activeTabId)
 }
 
-function getCurrentSession(state: AppState) {
-  return state.currentSessionId != null && state.currentSessionId !== ''
-    ? state.sessions.find((session) => session.id === state.currentSessionId)
+function getCurrentProject(state: AppState) {
+  return state.currentProjectId != null && state.currentProjectId !== ''
+    ? state.projects.find((project) => project.id === state.currentProjectId)
     : undefined
 }
 
-function withActiveTabWorktree(
+function withActiveTabWorkspace(
   state: AppState,
   tabId: string | null,
   opts?: { onlyIfMissing?: boolean }
@@ -211,29 +212,29 @@ function withActiveTabWorktree(
   if (
     tabId == null ||
     tabId === '' ||
-    !(state.currentSessionId != null && state.currentSessionId !== '')
+    !(state.currentProjectId != null && state.currentProjectId !== '')
   )
     return state
   const tab = state.tabs.find((entry) => entry.id === tabId)
-  if (!(tab?.worktreeId != null && tab?.worktreeId !== '')) return state
-  const worktreeId = tab.worktreeId
-  // When `onlyIfMissing` is set, we leave the session's worktree alone if it
-  // already points at a known worktree. Used by `hydrate-workspace` so that
-  // a backend re-attach after a user-initiated worktree switch (j/k cycling)
-  // doesn't clobber the freshly chosen worktree by re-syncing from the
+  if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return state
+  const workspaceId = tab.workspaceId
+  // When `onlyIfMissing` is set, we leave the project's workspace alone if it
+  // already points at a known workspace. Used by `hydrate-project` so that
+  // a backend re-attach after a user-initiated workspace switch (j/k cycling)
+  // doesn't clobber the freshly chosen workspace by re-syncing from the
   // restored active tab.
   if (opts?.onlyIfMissing === true) {
-    const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-    const hasValidWorktree =
-      session?.activeWorktreeId != null &&
-      session.activeWorktreeId !== '' &&
-      (session.worktrees?.some((w) => w.id === session.activeWorktreeId) ?? false)
-    if (hasValidWorktree) return state
+    const project = state.projects.find((entry) => entry.id === state.currentProjectId)
+    const hasValidWorkspace =
+      project?.activeWorkspaceId != null &&
+      project.activeWorkspaceId !== '' &&
+      (project.workspaces?.some((w) => w.id === project.activeWorkspaceId) ?? false)
+    if (hasValidWorkspace) return state
   }
   return {
     ...state,
-    sessions: state.sessions.map((session) =>
-      session.id === state.currentSessionId ? withActiveWorktree(session, worktreeId) : session
+    projects: state.projects.map((project) =>
+      project.id === state.currentProjectId ? withActiveWorkspace(project, workspaceId) : project
     ),
   }
 }
@@ -292,7 +293,7 @@ function closeTabAtIndex(state: AppState, indexToClose: number): AppState {
     }
   }
 
-  return withActiveTabWorktree(
+  return withActiveTabWorkspace(
     {
       ...state,
       activeTabId: nextActiveTabId,
@@ -309,35 +310,35 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
   switch (action.type) {
     case 'add-tab': {
       const newTab = { ...action.tab, activity: action.tab.activity ?? 'idle' }
-      return withActiveTabWorktree(
+      return withActiveTabWorkspace(
         {
           ...state,
           activeTabId: newTab.id,
           focusMode: 'navigation',
-          modal: { editBuffer: null, selectedIndex: 0, sessionTargetId: null, type: null },
+          modal: { editBuffer: null, projectTargetId: null, selectedIndex: 0, type: null },
           tabs: [...state.tabs, newTab],
         },
         newTab.id
       )
     }
-    case 'hydrate-workspace': {
-      // The session's activeWorktreeId may have just been switched by the
+    case 'hydrate-project': {
+      // The project's activeWorkspaceId may have just been switched by the
       // user (j/k cycle, sidebar click) before the backend attached. Honor
-      // that choice by only considering tabs visible in that worktree —
+      // that choice by only considering tabs visible in that workspace —
       // otherwise we'd land the active tab on whatever the backend picked
-      // (typically the worktree we *last* persisted, not the current one).
-      const currentSession =
-        state.currentSessionId != null && state.currentSessionId !== ''
-          ? state.sessions.find((s) => s.id === state.currentSessionId)
+      // (typically the workspace we *last* persisted, not the current one).
+      const currentProject =
+        state.currentProjectId != null && state.currentProjectId !== ''
+          ? state.projects.find((s) => s.id === state.currentProjectId)
           : undefined
-      const visibleForWorktree = filterTabsForActiveWorktree(action.tabs, currentSession)
-      const visibleIds = new Set(visibleForWorktree.map((t) => t.id))
+      const visibleForWorkspace = filterTabsForActiveWorkspace(action.tabs, currentProject)
+      const visibleIds = new Set(visibleForWorkspace.map((t) => t.id))
       const hydratedActiveTabId =
         action.activeTabId != null &&
         action.activeTabId !== '' &&
         visibleIds.has(action.activeTabId)
           ? action.activeTabId
-          : (visibleForWorktree[0]?.id ?? null)
+          : (visibleForWorkspace[0]?.id ?? null)
       const tabIds = new Set(action.tabs.map((t) => t.id))
 
       // Restore from new multi-tree format or migrate from legacy single tree
@@ -368,7 +369,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         }
       }
 
-      return withActiveTabWorktree(
+      return withActiveTabWorkspace(
         {
           ...state,
           activeTabId: hydratedActiveTabId,
@@ -389,24 +390,24 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
     case 'close-active-tab':
       return closeTabAtIndex(state, getActiveIndex(state))
     case 'set-active-tab':
-      return withActiveTabWorktree({ ...state, activeTabId: action.tabId }, action.tabId)
+      return withActiveTabWorkspace({ ...state, activeTabId: action.tabId }, action.tabId)
     case 'move-active-tab': {
       if (state.tabs.length === 0) {
         return state
       }
-      const session = getCurrentSession(state)
-      const visibleTabs = filterTabsForActiveWorktree(state.tabs, session)
+      const project = getCurrentProject(state)
+      const visibleTabs = filterTabsForActiveWorkspace(state.tabs, project)
       if (visibleTabs.length === 0) {
         return state
       }
-      const orderedTabs = orderTabsByWorktree(visibleTabs, session)
+      const orderedTabs = orderTabsByWorkspace(visibleTabs, project)
       const currentIndex = orderedTabs.findIndex((tab) => tab.id === state.activeTabId)
       const safeIndex = currentIndex === -1 ? 0 : currentIndex
       const nextIndex = (safeIndex + action.delta + orderedTabs.length) % orderedTabs.length
       const nextTabId = orderedTabs[nextIndex]?.id
       return nextTabId == null || nextTabId === '' || nextTabId === state.activeTabId
         ? state
-        : withActiveTabWorktree({ ...state, activeTabId: nextTabId }, nextTabId)
+        : withActiveTabWorkspace({ ...state, activeTabId: nextTabId }, nextTabId)
     }
     case 'reorder-active-tab': {
       const activeIndex = getActiveIndex(state)
@@ -473,7 +474,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       // Drag-and-drop reorder of the visible tab strip. `orderedTabIds` is the
       // flattened new order of the currently-visible tabs (group members already
       // expanded into contiguous runs). We only rewrite the slots those tabs
-      // occupy in `state.tabs`, leaving tabs from other worktrees anchored in
+      // occupy in `state.tabs`, leaving tabs from other workspaces anchored in
       // place. Because group members arrive contiguous, splits stay intact.
       const visibleSet = new Set(action.orderedTabIds)
       const byId = new Map(state.tabs.map((tab) => [tab.id, tab]))
@@ -486,8 +487,8 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       })
       return { ...state, tabs }
     }
-    case 'reset-tab-session':
-      return withActiveTabWorktree(
+    case 'reset-tab-project':
+      return withActiveTabWorkspace(
         {
           ...state,
           activeTabId: action.tabId,
@@ -590,7 +591,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       }
       const tabs = [...state.tabs.slice(0, insertIndex), newTab, ...state.tabs.slice(insertIndex)]
 
-      return withActiveTabWorktree(
+      return withActiveTabWorkspace(
         {
           ...state,
           activeTabId: newTab.id,
@@ -621,7 +622,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       if (!(neighbor != null && neighbor !== '')) {
         return state
       }
-      return withActiveTabWorktree({ ...state, activeTabId: neighbor }, neighbor)
+      return withActiveTabWorkspace({ ...state, activeTabId: neighbor }, neighbor)
     }
     case 'resize-pane': {
       const resizeGroupId = getGroupIdForTab(state.tabGroupMap, action.tabId)

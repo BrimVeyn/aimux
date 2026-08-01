@@ -14,11 +14,11 @@ This page is for contributors adding feedback to a feature.
 ## When to use a toast (and when not to)
 
 Use a toast when the result needs to be seen no matter where the user is — a
-push result, a worktree created/moved, a workspace deleted, a background failure.
+push result, a workspace created/moved, a project deleted, a background failure.
 
 **Leave it inline** when the message belongs to a surface the user is already
 looking at: git-pane status (staging, commit, `HEAD~N`), or a modal's own
-validation (the new-tab branch-name error, the worktree-delete confirm). A toast
+validation (the new-tab branch-name error, the workspace-delete confirm). A toast
 there would just duplicate it.
 
 ## API

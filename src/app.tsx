@@ -8,20 +8,21 @@ import {
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import type { SideEffectContext } from './app-runtime/side-effect-context'
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { TerminalContentOrigin } from './input/raw-input-handler'
 import type { SessionBackend } from './session-backend/types'
 
-import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
+import { executeSideEffect } from './app-runtime/side-effects'
 import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
+import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
-import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
@@ -37,8 +38,8 @@ import { startAIUsageService } from './services/ai-usage/provider'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
-import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
-import { getSessionProjectPath } from './state/session-worktrees'
+import { findMostRecentProject, loadProjectCatalog } from './state/project-catalog'
+import { getActiveWorkspacePath } from './state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
@@ -59,7 +60,7 @@ import {
   isNewerVersion,
 } from './update/version-check'
 
-const WORKSPACE_SAVE_DEBOUNCE_MS = 250
+const PROJECT_SAVE_DEBOUNCE_MS = 250
 
 export function App({
   backend,
@@ -104,8 +105,8 @@ export function App({
   // selector reads. We discard the value — the store is the source of truth.
   useState(() => {
     const json = loadConfig()
-    const sessionBarVisible =
-      resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
+    const projectBarVisible =
+      resolvedConfig.projectBar?.initialVisible ?? json.projectBarVisible ?? true
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
     const userGitPane = resolvedConfig.gitPane
@@ -118,32 +119,32 @@ export function App({
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }
 
-    const sessionCatalog = loadSessionCatalog()
+    const projectCatalog = loadProjectCatalog()
     const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
     const initial = createInitialState(
       json.customCommands,
-      sessionCatalog,
+      projectCatalog,
       mergedSnippets,
-      sessionCatalog.length === 0,
+      projectCatalog.length === 0,
       {
         bars: json.bars,
         gitPane: gitPaneOverrides,
-        sessionBarVisible,
-        worktreeTemplates:
-          resolvedConfig.worktreeTemplates.length > 0
-            ? resolvedConfig.worktreeTemplates
-            : json.worktreeTemplates,
+        projectBarVisible,
+        workspaceTemplates:
+          resolvedConfig.workspaceTemplates.length > 0
+            ? resolvedConfig.workspaceTemplates
+            : json.workspaceTemplates,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
     // Preserves the dispatch baked into the store by app-store.ts.
     appStore.setState(initial)
-    const mostRecent = findMostRecentSession(sessionCatalog)
+    const mostRecent = findMostRecentProject(projectCatalog)
     if (mostRecent) {
       appStore.getState().dispatch({
-        sessionId: mostRecent.id,
-        type: 'load-session',
-        workspaceSnapshot: mostRecent.workspaceSnapshot,
+        projectId: mostRecent.id,
+        projectSnapshot: mostRecent.projectSnapshot,
+        type: 'load-project',
       })
     }
     return null
@@ -228,16 +229,16 @@ export function App({
   }, [])
 
   useEffect(() => {
-    // One-shot cleanup: prune `aimux/` branches orphaned by temp worktrees that
+    // One-shot cleanup: prune `aimux/` branches orphaned by temp workspaces that
     // were deleted before delete-time branch cleanup existed. Gated by a config
     // flag so it runs once per machine. All git calls are best-effort (nothrow)
-    // and git protects branches still checked out in a live worktree.
+    // and git protects branches still checked out in a live workspace.
     if (loadConfig().prunedOrphanAimuxBranches === true) return
     void (async () => {
       const repoRoots = new Set<string>()
-      for (const session of loadSessionCatalog()) {
-        for (const worktree of session.worktrees ?? []) {
-          if (worktree.repoRoot !== '') repoRoots.add(worktree.repoRoot)
+      for (const project of loadProjectCatalog()) {
+        for (const workspace of project.workspaces ?? []) {
+          if (workspace.repoRoot !== '') repoRoots.add(workspace.repoRoot)
         }
       }
       let removed = 0
@@ -256,15 +257,15 @@ export function App({
   // still the bootstrap default, and useBackendRuntime's attach effect would
   // then hand 80x24 to the backend, resizing the daemon-persisted PTYs (or
   // newly-spawned ones) to the wrong size and stranding the assistant's
-  // already-drawn content in the top-left until a workspace switch.
+  // already-drawn content in the top-left until a project switch.
   const layoutRef = useRef(state.layout)
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeTabId),
     [state.activeTabId, state.tabs]
   )
-  const currentSession = useMemo(
-    () => state.sessions.find((session) => session.id === state.currentSessionId),
-    [state.currentSessionId, state.sessions]
+  const currentProject = useMemo(
+    () => state.projects.find((project) => project.id === state.currentProjectId),
+    [state.currentProjectId, state.projects]
   )
   const activeMouseForwardingEnabled = activeTab?.terminalModes.mouseTrackingMode !== 'none'
   const activeLocalScrollbackEnabled =
@@ -289,7 +290,7 @@ export function App({
   triggerCharRef.current = resolvedConfig.snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
-  const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
+  const currentProjectProjectSnapshot = currentProject?.projectSnapshot
 
   // Must run before useBackendRuntime so its open-loop terminalSize seeds
   // layoutRef before the attach effect reads it. See the comment on layoutRef.
@@ -337,15 +338,15 @@ export function App({
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
     activeTabId: state.activeTabId,
     backend,
-    currentSessionId: state.currentSessionId,
-    currentSessionWorkspaceSnapshot,
+    currentProjectId: state.currentProjectId,
+    currentProjectProjectSnapshot,
     dispatch,
     layoutRef,
     resizingRef,
     syntaxOverlayEnabled,
   })
 
-  useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
+  useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
   useAutoCommitDriver({
     config: resolvedConfig.autoCommit,
@@ -416,9 +417,9 @@ export function App({
     clearIdleTimer,
     clearStartupGrace,
     dispatch,
-    getCurrentSessionProjectPath: () => {
-      if (!(state.currentSessionId != null && state.currentSessionId !== '')) return
-      return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
+    getCurrentProjectProjectPath: () => {
+      if (!(state.currentProjectId != null && state.currentProjectId !== '')) return
+      return getActiveWorkspacePath(state.projects.find((s) => s.id === state.currentProjectId))
     },
     // Read straight from the store, not stateRef. stateRef is only refreshed
     // on render, so within a single JS turn (a click handler that dispatches
@@ -488,12 +489,12 @@ export function App({
       dispatch({ tabId: target.tabId, type: 'set-active-tab' })
       return
     }
-    if (target.kind === 'workspace' || target.kind === 'worktree') {
+    if (target.kind === 'project' || target.kind === 'workspace') {
       executeSideEffect(
         {
-          index: target.sessionIndex,
-          type: 'switch-session-by-index',
-          worktreeId: target.worktreeId,
+          index: target.projectIndex,
+          type: 'switch-project-by-index',
+          workspaceId: target.workspaceId,
         },
         sideEffectCtx
       )

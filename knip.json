@@ -6,6 +6,7 @@
     "commit",
     "rev-parse",
     "rev-list",
+    "symbolic-ref",
     "for-each-ref",
     "push",
     "diff",

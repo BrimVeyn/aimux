@@ -9,7 +9,7 @@ import { logDebug } from '../debug/input-log'
 
 interface DirectoryCache {
   repoPaths: string[]
-  workspaceSet: Set<string>
+  projectSet: Set<string>
   cachedAt: number
 }
 
@@ -38,16 +38,16 @@ async function buildCache(): Promise<DirectoryCache> {
         parentCount.set(parent, (parentCount.get(parent) ?? 0) + 1)
       }
     }
-    const workspacePaths = [...parentCount.entries()]
+    const projectPaths = [...parentCount.entries()]
       .filter(([, count]) => count >= 2)
       .map(([p]) => p)
 
-    return { cachedAt: Date.now(), repoPaths, workspaceSet: new Set(workspacePaths) }
+    return { cachedAt: Date.now(), projectSet: new Set(projectPaths), repoPaths }
   } catch (error) {
     logDebug('platform.projectSearch.buildCache.error', {
       error: error instanceof Error ? error.message : String(error),
     })
-    return { cachedAt: Date.now(), repoPaths: [], workspaceSet: new Set() }
+    return { cachedAt: Date.now(), projectSet: new Set(), repoPaths: [] }
   }
 }
 
@@ -70,7 +70,7 @@ export async function searchProjectDirectories(query: string): Promise<Directory
 
   try {
     const cache = await getOrBuildCache()
-    const allPaths = [...cache.repoPaths, ...cache.workspaceSet].join('\n')
+    const allPaths = [...cache.repoPaths, ...cache.projectSet].join('\n')
 
     const filtered =
       await $`printf '%s' ${allPaths} | fzf --filter=${query} --no-sort | head -50`.quiet()
@@ -89,12 +89,12 @@ export async function searchProjectDirectories(query: string): Promise<Directory
 
     return Promise.all(
       resultPaths.map(async (path) => {
-        if (cache.workspaceSet.has(path)) {
-          return { path, type: 'workspace' as const }
+        if (cache.projectSet.has(path)) {
+          return { path, type: 'project' as const }
         }
         const gitPath = join(path, '.git')
         const st = await stat(gitPath).catch(() => null)
-        const type = st !== null && st.isFile() ? 'worktree' : 'git-repo'
+        const type = st !== null && st.isFile() ? 'workspace' : 'git-repo'
         return { path, type } as const
       })
     )

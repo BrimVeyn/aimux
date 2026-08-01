@@ -15,8 +15,8 @@ export type DynamicCompletionSource =
   | 'git-ref'
   | 'tab'
   | 'worker'
+  | 'project'
   | 'workspace'
-  | 'worktree'
 
 /**
  * Where a flag value or positional draws its shell-completion candidates.
@@ -67,6 +67,23 @@ export function parseArgs(
 ): ParsedArgs {
   const flagByName = new Map<string, FlagSpec>()
   for (const spec of flagSpecs) flagByName.set(spec.name, spec)
+  // Deprecated aliases from the project/workspace rename. Unlike the command
+  // groups these are safe to map silently: --workspace named a project and
+  // --worktree named what is now a workspace, so each old name still points at
+  // the same object.
+  // ponytail: drop with the aimux-sessions.json fallback.
+  // Resolved against the declared specs, never against another alias —
+  // otherwise --worktree would chain through the --workspace alias onto
+  // --project, which is a different object entirely.
+  for (const [old, current] of [
+    ['workspace', 'project'],
+    ['worktree', 'workspace'],
+    ['new-worktree', 'new-workspace'],
+  ] as const) {
+    if (flagByName.has(old)) continue
+    const spec = flagSpecs.find((entry) => entry.name === current)
+    if (spec) flagByName.set(old, spec)
+  }
 
   const flags: Record<string, string | number | boolean> = {}
   const positionals: string[] = []
@@ -85,18 +102,21 @@ export function parseArgs(
       if (!spec) {
         throw new CliUsageError(`unknown flag: --${name}`)
       }
+      // Deprecated aliases resolve to the current spec, so results are always
+      // keyed by the canonical name regardless of which spelling was typed.
+      const key = spec.name
       if (spec.kind === 'boolean') {
         if (eq !== -1) {
           throw new CliUsageError(`flag --${name} does not take a value`)
         }
-        flags[name] = true
+        flags[key] = true
         continue
       }
       if (spec.kind === 'optional-string') {
         // Value binds ONLY in the `=` form (`--flag=value`). A bare `--flag`
         // must not swallow the next token (it may be a positional), so it
         // parses as boolean `true`.
-        flags[name] = eq === -1 ? true : token.slice(eq + 1)
+        flags[key] = eq === -1 ? true : token.slice(eq + 1)
         continue
       }
       const raw = eq === -1 ? argv[++i] : token.slice(eq + 1)
@@ -108,9 +128,9 @@ export function parseArgs(
         if (!Number.isFinite(parsed)) {
           throw new CliUsageError(`flag --${name} must be a number (got: ${raw})`)
         }
-        flags[name] = parsed
+        flags[key] = parsed
       } else {
-        flags[name] = raw
+        flags[key] = raw
       }
       continue
     }
@@ -129,17 +149,17 @@ export function parseArgs(
 }
 
 /**
- * Shared flag set — every command takes these. `--workspace` selects the
- * target session (by id or name); `--profile` overrides `AIMUX_PROFILE`
+ * Shared flag set — every command takes these. `--project` selects the
+ * target project (by id or name); `--profile` overrides `AIMUX_PROFILE`
  * before any runtime path is resolved; `--json` is a no-op kept for
  * consistency with future formats.
  */
 export const SHARED_FLAGS: readonly FlagSpec[] = [
   {
-    complete: { kind: 'dynamic', source: 'workspace' },
-    description: 'workspace id or name',
+    complete: { kind: 'dynamic', source: 'project' },
+    description: 'project id or name',
     kind: 'string',
-    name: 'workspace',
+    name: 'project',
   },
   {
     complete: { kind: 'none' },

@@ -205,10 +205,10 @@ export class DaemonClient {
     return response.payload
   }
 
-  async listTabs(sessionId: string): Promise<ListTabsResult> {
+  async listTabs(projectId: string): Promise<ListTabsResult> {
     const response = await this.send({
       id: crypto.randomUUID(),
-      payload: { sessionId },
+      payload: { projectId },
       type: 'listTabs',
     })
     if (response.type !== 'listTabsResult') {

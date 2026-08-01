@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
   IPC_CAPABILITY_TAB_TAIL,
-  IPC_CAPABILITY_WORKSPACE_LIFECYCLE,
-  IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
   IPC_PROTOCOL_CAPABILITIES,
   IPC_PROTOCOL_VERSION,
   parseClientRequest,
   parseServerMessage,
 } from '../../src/ipc/protocol'
 
-const WORKTREE_FIXTURE = {
+const WORKSPACE_FIXTURE = {
   createdAt: '2026-07-01T00:00:00.000Z',
   createdByAimux: true,
   id: 'wt-1',
@@ -27,160 +27,160 @@ describe('ipc protocol v12', () => {
   })
 
   test('advertises every v12 capability', () => {
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKSPACE_LIFECYCLE)
-    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKTREE_LIFECYCLE_EVENTS)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_PROJECT_LIFECYCLE)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS)
     expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TAB_TAIL)
   })
 
-  test('createWorkspace round-trips with a name', () => {
+  test('createProject round-trips with a name', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
         payload: { name: 'my-ws', projectPath: '/tmp/foo', switch: true },
-        type: 'createWorkspace',
+        type: 'createProject',
       })
     ).not.toThrow()
   })
 
-  test('createWorkspace rejects an empty name', () => {
+  test('createProject rejects an empty name', () => {
     expect(() =>
       parseClientRequest({
         id: 'r1',
         payload: { name: '' },
-        type: 'createWorkspace',
+        type: 'createProject',
       })
-    ).toThrow('createWorkspace.name must be a non-empty string')
+    ).toThrow('createProject.name must be a non-empty string')
   })
 
-  test('switchWorkspace round-trips with a targetSessionId', () => {
+  test('switchProject round-trips with a targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
-        payload: { targetSessionId: 'session-2' },
-        type: 'switchWorkspace',
+        payload: { targetProjectId: 'project-2' },
+        type: 'switchProject',
       })
     ).not.toThrow()
   })
 
-  test('switchWorkspace rejects a missing targetSessionId', () => {
+  test('switchProject rejects a missing targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r2',
         payload: {},
-        type: 'switchWorkspace',
+        type: 'switchProject',
       })
-    ).toThrow('switchWorkspace.targetSessionId must be a string')
+    ).toThrow('switchProject.targetProjectId must be a string')
   })
 
-  test('closeWorkspace round-trips with targetSessionId', () => {
+  test('closeProject round-trips with targetProjectId', () => {
     expect(() =>
       parseClientRequest({
         id: 'r3',
-        payload: { targetSessionId: 'session-3' },
-        type: 'closeWorkspace',
+        payload: { targetProjectId: 'project-3' },
+        type: 'closeProject',
       })
     ).not.toThrow()
   })
 
-  test('announceWorkspaceSwitched round-trips', () => {
+  test('announceProjectSwitched round-trips', () => {
     expect(() =>
       parseClientRequest({
         id: 'r4',
-        payload: { sessionId: 'session-4' },
-        type: 'announceWorkspaceSwitched',
+        payload: { projectId: 'project-4' },
+        type: 'announceProjectSwitched',
       })
     ).not.toThrow()
   })
 
-  test('addWorktreeRecord requires a valid WorktreeRecord', () => {
+  test('addWorkspaceRecord requires a valid WorkspaceRecord', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { sessionId: 'session-5', worktree: WORKTREE_FIXTURE },
-        type: 'addWorktreeRecord',
+        payload: { projectId: 'project-5', workspace: WORKSPACE_FIXTURE },
+        type: 'addWorkspaceRecord',
       })
     ).not.toThrow()
   })
 
-  test('addWorktreeRecord rejects a malformed worktree', () => {
+  test('addWorkspaceRecord rejects a malformed workspace', () => {
     expect(() =>
       parseClientRequest({
         id: 'r5',
-        payload: { sessionId: 'session-5', worktree: { id: 'wt-1' } },
-        type: 'addWorktreeRecord',
+        payload: { projectId: 'project-5', workspace: { id: 'wt-1' } },
+        type: 'addWorkspaceRecord',
       })
-    ).toThrow('addWorktreeRecord.worktree must be a WorktreeRecord')
+    ).toThrow('addWorkspaceRecord.workspace must be a WorkspaceRecord')
   })
 
-  test('removeWorktreeRecord requires both ids', () => {
+  test('removeWorkspaceRecord requires both ids', () => {
     expect(() =>
       parseClientRequest({
         id: 'r6',
-        payload: { sessionId: 'session-6', worktreeId: 'wt-1' },
-        type: 'removeWorktreeRecord',
+        payload: { projectId: 'project-6', workspaceId: 'wt-1' },
+        type: 'removeWorkspaceRecord',
       })
     ).not.toThrow()
   })
 
-  test('workspaceSwitchRequested event round-trips', () => {
+  test('projectSwitchRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { targetSessionId: 'session-1' },
-        type: 'workspaceSwitchRequested',
+        payload: { targetProjectId: 'project-1' },
+        type: 'projectSwitchRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceCreateRequested event round-trips', () => {
+  test('projectCreateRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
         payload: { name: 'ws', projectPath: '/tmp/x', switch: false },
-        type: 'workspaceCreateRequested',
+        type: 'projectCreateRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceCloseRequested event round-trips', () => {
+  test('projectCloseRequested event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { targetSessionId: 'session-1' },
-        type: 'workspaceCloseRequested',
+        payload: { targetProjectId: 'project-1' },
+        type: 'projectCloseRequested',
       })
     ).not.toThrow()
   })
 
-  test('workspaceSwitched event round-trips', () => {
+  test('projectSwitched event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1' },
-        type: 'workspaceSwitched',
+        payload: { projectId: 'project-1' },
+        type: 'projectSwitched',
       })
     ).not.toThrow()
   })
 
-  test('worktreeAdded event round-trips', () => {
+  test('workspaceAdded event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktree: WORKTREE_FIXTURE },
-        type: 'worktreeAdded',
+        payload: { projectId: 'project-1', workspace: WORKSPACE_FIXTURE },
+        type: 'workspaceAdded',
       })
     ).not.toThrow()
   })
 
-  test('worktreeAdded rejects a malformed worktree', () => {
+  test('workspaceAdded rejects a malformed workspace', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktree: { id: 'wt-1' } },
-        type: 'worktreeAdded',
+        payload: { projectId: 'project-1', workspace: { id: 'wt-1' } },
+        type: 'workspaceAdded',
       })
-    ).toThrow('worktreeAdded.worktree must be a WorktreeRecord')
+    ).toThrow('workspaceAdded.workspace must be a WorkspaceRecord')
   })
 
-  test('worktreeRemoved event round-trips', () => {
+  test('workspaceRemoved event round-trips', () => {
     expect(() =>
       parseServerMessage({
-        payload: { sessionId: 'session-1', worktreeId: 'wt-1' },
-        type: 'worktreeRemoved',
+        payload: { projectId: 'project-1', workspaceId: 'wt-1' },
+        type: 'workspaceRemoved',
       })
     ).not.toThrow()
   })

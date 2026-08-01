@@ -87,7 +87,7 @@ describe('RemoteSessionBackend', () => {
                 id: message.id,
                 payload: {
                   activeTabId: null,
-                  initialSessionStatuses: [],
+                  initialProjectStatuses: [],
                   protocolVersion: IPC_PROTOCOL_VERSION,
                   tabs: [],
                 },
@@ -134,7 +134,7 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
+      await backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })
       backend.write('tab-1', 'hello\nworld')
 
       await waitFor(() => requests.find((message) => message.type === 'write'))
@@ -160,8 +160,8 @@ describe('RemoteSessionBackend', () => {
       expect(helloRequests.length).toBeGreaterThanOrEqual(2)
       expect(attachRequests).toHaveLength(2)
       expect(attachRequests[0]?.payload.protocolVersion).toBe(IPC_PROTOCOL_VERSION)
-      expect(attachRequests[0]?.payload.sessionId).toBe('session-a')
-      expect(attachRequests[1]?.payload.sessionId).toBe('session-a')
+      expect(attachRequests[0]?.payload.projectId).toBe('project-a')
+      expect(attachRequests[1]?.payload.projectId).toBe('project-a')
       expect(
         requests.find(
           (message) => message.type === 'write' && message.payload.data === 'hello\nworld'
@@ -205,7 +205,7 @@ describe('RemoteSessionBackend', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -239,7 +239,7 @@ describe('RemoteSessionBackend', () => {
     })
 
     try {
-      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
+      await backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })
       backend.write('tab-1', 'hello')
 
       await waitFor(() => backendError)
@@ -293,7 +293,7 @@ describe('RemoteSessionBackend', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: 999,
                 tabs: [],
               },
@@ -320,7 +320,7 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
+      expect(backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })).rejects.toThrow(
         `Protocol mismatch: client v${IPC_PROTOCOL_VERSION}, daemon v999`
       )
     } finally {

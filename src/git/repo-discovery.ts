@@ -79,7 +79,7 @@ const cache = new Map<string, CacheEntry>()
 /**
  * Cached variant. The cache key is `projectPath` + `maxDepth`: a depth change
  * invalidates the entry. The cache persists until `invalidateRepoCache()` or
- * process exit — discovery is one-shot per session per depth setting.
+ * process exit — discovery is one-shot per project per depth setting.
  */
 export async function discoverRepos(projectPath: string, maxDepth = 1): Promise<DiscoveredRepo[]> {
   const existing = cache.get(projectPath)
