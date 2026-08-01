@@ -38,7 +38,7 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
-import { useAutoCommitConfig } from './settings/live'
+import { useAIUsageConfig, useAutoCommitConfig } from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -161,6 +161,11 @@ export function App({
   const state = useAppStore((s) => s)
   const dispatch = state.dispatch
 
+  // Config the settings screen can change under us. The resolved config file is
+  // the baseline each of these falls back to.
+  const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
+  const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
+
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
     return () => {
@@ -201,13 +206,12 @@ export function App({
   }, [resolvedConfig.integrations.claudeHooks])
 
   useEffect(() => {
-    const aiUsage = resolvedConfig.statusBar?.aiUsage
-    if (!(aiUsage?.enabled === true)) {
+    if (!(aiUsageConfig.enabled === true)) {
       aiUsageStore.getState().setEnabled(false)
       return
     }
     aiUsageStore.getState().setEnabled(true)
-    const handle = startAIUsageService(aiUsage, (snap) => {
+    const handle = startAIUsageService(aiUsageConfig, (snap) => {
       aiUsageStore.getState().setSnapshot(snap)
     })
     return () => {
@@ -215,7 +219,9 @@ export function App({
       aiUsageStore.getState().clear()
       aiUsageStore.getState().setEnabled(false)
     }
-  }, [resolvedConfig.statusBar?.aiUsage])
+    // Memoized by `useAIUsageConfig`, so toggling the indicator restarts the
+    // service and nothing else does.
+  }, [aiUsageConfig])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return
@@ -370,8 +376,6 @@ export function App({
     resizingRef,
     syntaxOverlayEnabled,
   })
-
-  const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
 
   useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)

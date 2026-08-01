@@ -5,6 +5,7 @@ import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
 import { GIT_SECTION } from './git'
 import { LAYOUT_SECTION } from './layout'
+import { STATUS_BAR_SECTION } from './status-bar'
 
 /**
  * Every section, in the order the screen lists them. Adding a setting is one
@@ -15,6 +16,7 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
   LAYOUT_SECTION,
   AUTOMATION_SECTION,
   GIT_SECTION,
+  STATUS_BAR_SECTION,
   ABOUT_SECTION,
 ]
 

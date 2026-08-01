@@ -17,8 +17,8 @@ const originalHome = process.env.HOME
 const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
-const SEPARATOR_ROW = getSectionRows('appearance').find((row) => row.id === SEPARATOR_ID)
-const SEPARATOR_INDEX = getSectionRows('appearance').findIndex((row) => row.id === SEPARATOR_ID)
+const SEPARATOR_ROW = getSectionRows('statusBar').find((row) => row.id === SEPARATOR_ID)
+const SEPARATOR_INDEX = getSectionRows('statusBar').findIndex((row) => row.id === SEPARATOR_ID)
 if (!SEPARATOR_ROW || SEPARATOR_ROW.kind !== 'select') {
   throw new Error('expected a select row for the status bar separator')
 }
@@ -36,7 +36,7 @@ function onSeparatorRow(pane: 'nav' | 'rows' = 'rows'): AppState {
   const base = appReducer(createInitialState(), { type: 'enter-settings' })
   return {
     ...base,
-    settings: { pane, rowIndex: SEPARATOR_INDEX, sectionId: 'appearance' },
+    settings: { pane, rowIndex: SEPARATOR_INDEX, sectionId: 'statusBar' },
   }
 }
 

@@ -1,17 +1,7 @@
-import { setStatusBarSeparator, type StatusBarSeparator } from '@brimveyn/aimux-config'
-
 import type { SettingSection } from '../types'
 
 import { runSideEffectGlobal } from '../../state/dispatch-ref'
 import { getCurrentMode, getCurrentThemeId, getTransparent } from '../../ui/theme'
-
-const SEPARATORS: { value: StatusBarSeparator; label: string }[] = [
-  { label: 'arrow', value: 'arrow' },
-  { label: 'round', value: 'round' },
-  { label: 'slant', value: 'slant' },
-  { label: 'flame', value: 'flame' },
-  { label: 'none', value: 'none' },
-]
 
 /**
  * The theme lives in its own store, not in `AppState`. Rows over it read it
@@ -55,17 +45,6 @@ export const APPEARANCE_SECTION: SettingSection = {
       read: () => getTransparent(),
       storage: 'app',
       write: () => runSideEffectGlobal({ type: 'toggle-transparent' }),
-    },
-    {
-      apply: (value) => setStatusBarSeparator(value as StatusBarSeparator),
-      description: 'Glyph between status bar sections. All but "none" need a nerd font.',
-      fallback: 'arrow',
-      fromConfig: (config) => config.statusBar?.separator,
-      id: 'statusBar.separator',
-      kind: 'select',
-      label: 'Status bar separator',
-      options: SEPARATORS,
-      storage: 'settings',
     },
   ],
 }
