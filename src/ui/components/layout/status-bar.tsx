@@ -44,6 +44,8 @@ function getModeLabel(focusMode: AppState['focusMode']): string {
       return 'EDIT'
     case 'git':
       return 'GIT'
+    case 'settings':
+      return 'SET'
     case 'navigation':
     default:
       return 'NORMAL'
@@ -67,6 +69,8 @@ function getModeColor(focusMode: AppState['focusMode'], t: ResolvedTuiTheme): st
       return t.warning
     case 'git':
       return t.success
+    case 'settings':
+      return t.secondary
     case 'navigation':
     default:
       return t.text

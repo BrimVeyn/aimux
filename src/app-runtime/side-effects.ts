@@ -41,6 +41,7 @@ import {
 } from './project-actions'
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
+import { changeSelectedSetting } from './settings-actions'
 import {
   findSetupTab,
   handleAskAgentForSetupScriptEffect,
@@ -678,6 +679,14 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'promote-setup-tab': {
       handlePromoteSetupTabEffect(ctx)
+      return
+    }
+    case 'activate-settings-row': {
+      changeSelectedSetting(ctx)
+      return
+    }
+    case 'adjust-settings-row': {
+      changeSelectedSetting(ctx, effect.delta)
       return
     }
     default:

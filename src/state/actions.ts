@@ -208,6 +208,14 @@ export type UIAction =
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-project-bar' }
 
+export type SettingsAction =
+  | { type: 'enter-settings' }
+  | { type: 'exit-settings' }
+  | { type: 'settings-focus-pane'; pane: 'nav' | 'rows' }
+  | { type: 'settings-move-selection'; delta: -1 | 1 }
+  | { type: 'settings-select-section'; sectionId: string }
+  | { type: 'settings-select-row'; rowIndex: number }
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
@@ -315,6 +323,7 @@ export type AppAction =
   | TabAction
   | LayoutAction
   | UIAction
+  | SettingsAction
   | DataAction
   | GitPanelAction
   | GitModeAction

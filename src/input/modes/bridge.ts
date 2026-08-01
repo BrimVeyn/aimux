@@ -6,6 +6,7 @@ type SupportedModalType = Exclude<ModalType, null>
 const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
   'git': 'git-mode',
   'navigation': 'navigation',
+  'settings': 'settings',
   'terminal-input': 'terminal-input',
 }
 

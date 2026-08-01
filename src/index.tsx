@@ -96,7 +96,7 @@ const [
   import('./session-backend/bootstrap'),
   import('./cli/completion/install'),
 ])
-const resolvedConfig = await loadUserConfig()
+const { resolved: resolvedConfig, user: userConfig } = await loadUserConfig()
 
 // First launch (and after every upgrade): drop the shell completion script in
 // the conventional location for $SHELL. Silent and best-effort — it writes one
@@ -154,4 +154,4 @@ const backend = await createSessionBackend({
 })
 logDebug('index.backendReady', { backend: backend.constructor.name, runtimeProfile })
 
-root.render(<App backend={backend} resolvedConfig={resolvedConfig} />)
+root.render(<App backend={backend} resolvedConfig={resolvedConfig} userConfig={userConfig} />)

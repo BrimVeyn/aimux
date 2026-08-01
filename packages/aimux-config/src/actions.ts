@@ -945,6 +945,35 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
 }
 
 // ---------------------------------------------------------------------------
+// Settings screen
+// ---------------------------------------------------------------------------
+
+export const enterSettings: KeyResult = r([{ type: 'enter-settings' }], [], 'settings')
+export const exitSettings: KeyResult = r([{ type: 'exit-settings' }], [], 'navigation')
+
+export function focusSettingsPane(pane: 'nav' | 'rows'): KeyResult {
+  return r([{ pane, type: 'settings-focus-pane' }])
+}
+
+export function moveSettingsSelection(delta: -1 | 1): KeyResult {
+  return r([{ delta, type: 'settings-move-selection' }])
+}
+
+/**
+ * One key for every kind of row: it toggles a checkbox, advances an enum, or runs
+ * whatever the row does. Which one is the row's business, not the keymap's — so
+ * there is no per-kind binding to keep in sync with the schema.
+ */
+export const activateSettingsRow: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.settings.pane !== 'rows') return r([{ pane: 'rows', type: 'settings-focus-pane' }])
+  return r([], [{ type: 'activate-settings-row' }])
+}
+
+export function adjustSettingsRow(delta: 1 | -1): KeyResult {
+  return r([], [{ delta, type: 'adjust-settings-row' }])
+}
+
+// ---------------------------------------------------------------------------
 // Deprecated aliases — 0.8.x names kept working for one release.
 //
 // The project/workspace/worktree rename moved every one of these. Aliases only

@@ -14,12 +14,12 @@ import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
+import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'
 import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { TabItem } from './sidebar/tab-item'
-import { useTopTabBarAutoScroll } from './sidebar/use-top-tab-bar-auto-scroll'
 
 interface TopTabBarProps {
   forceVisible?: boolean
@@ -239,8 +239,8 @@ export function TopTabBar({ forceVisible = false }: TopTabBarProps) {
   }, [entries, activeTabId])
 
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
-  useTopTabBarAutoScroll({
-    activeTabId: activeEntryId,
+  useScrollActiveIntoView({
+    activeId: activeEntryId,
     idPrefix: 'top-tab-',
     scrollRef,
     visible: bar.visible || forceVisible,

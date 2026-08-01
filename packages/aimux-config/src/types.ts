@@ -34,6 +34,7 @@ export type ModeId =
   | 'modal.workspace-move-confirm'
   | 'modal.ai-usage'
   | 'modal.flash-jump'
+  | 'settings'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -58,7 +59,13 @@ export interface ProjectStatus {
   working: boolean
   waiting: boolean
 }
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────
@@ -543,6 +550,13 @@ export interface MultiRepoState {
   prefixes: Record<string, string>
 }
 
+/** Where the cursor is in the settings screen — the cursor only, not the values. */
+export interface SettingsUIState {
+  sectionId: string
+  pane: 'nav' | 'rows'
+  rowIndex: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -563,6 +577,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  settings: SettingsUIState
   workspaceDivergence: Record<string, BranchDivergence>
   lastActiveTabByWorkspace: Record<string, string>
   pendingChords: string[] | null
@@ -727,6 +742,14 @@ export type UIAction =
   | { type: 'set-pending-chords'; chords: string[] | null }
   | { type: 'toggle-project-bar' }
 
+export type SettingsAction =
+  | { type: 'enter-settings' }
+  | { type: 'exit-settings' }
+  | { type: 'settings-focus-pane'; pane: 'nav' | 'rows' }
+  | { type: 'settings-move-selection'; delta: -1 | 1 }
+  | { type: 'settings-select-section'; sectionId: string }
+  | { type: 'settings-select-row'; rowIndex: number }
+
 export interface GitRefreshPayload {
   branch: string | null
   ahead: number
@@ -821,6 +844,7 @@ export type AppAction =
   | TabAction
   | LayoutAction
   | UIAction
+  | SettingsAction
   | DataAction
   | GitPanelAction
   | GitModeAction
@@ -906,6 +930,8 @@ export type SideEffect =
   | { type: 'configure-setup-script' }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
+  | { type: 'activate-settings-row' }
+  | { type: 'adjust-settings-row'; delta: 1 | -1 }
 
 // ─── Key input / KeyResult / ModeContext ──────────────────────────────────────
 

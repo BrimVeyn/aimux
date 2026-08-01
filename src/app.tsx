@@ -1,4 +1,5 @@
 import {
+  type AimuxUserConfig,
   type ResolvedConfig,
   setAutoCommitEnabled,
   setExternalEditorConfig,
@@ -37,6 +38,8 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
+import { ALL_SETTING_ROWS } from './settings/sections'
+import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
@@ -67,9 +70,11 @@ const PROJECT_SAVE_DEBOUNCE_MS = 250
 export function App({
   backend,
   resolvedConfig,
+  userConfig,
 }: {
   backend: SessionBackend
   resolvedConfig: ResolvedConfig
+  userConfig: AimuxUserConfig
 }) {
   // Publish the auto-commit enabled flag before any children render so
   // actions (which live outside React) can read it synchronously.
@@ -77,6 +82,15 @@ export function App({
   setMultiRepoConfig(resolvedConfig.multiRepo)
   setExternalEditorConfig(resolvedConfig.externalEditor)
   setStatusBarSeparator(resolvedConfig.statusBar?.separator)
+
+  // Runs after the setters above and for the same reason — they are the config
+  // file's baseline, and this replays what the settings screen has written on
+  // top of it. Lazy initializer, not a bare call: it reads a file, and this
+  // component re-renders on every dispatch.
+  useState(() => {
+    hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    return null
+  })
 
   const keymapHandlers = useMemo(
     () => {

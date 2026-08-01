@@ -44,7 +44,13 @@ export interface ProjectStatus {
 
 export const IDLE_PROJECT_STATUS: ProjectStatus = { waiting: false, working: false }
 
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
 
 export type ModalType =
   | 'new-tab'
@@ -660,6 +666,19 @@ export interface MultiRepoState {
 
 export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] }
 
+/**
+ * Where the cursor is in the settings screen. Only the cursor: the values being
+ * edited live in `src/settings/settings-store.ts`, or already have a home in
+ * this state (`gitPane`, `customCommands`, …). Duplicating them here would make
+ * two of them.
+ */
+export interface SettingsUIState {
+  sectionId: string
+  /** Which of the two columns has the keyboard: the section list, or its rows. */
+  pane: 'nav' | 'rows'
+  rowIndex: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -680,6 +699,7 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  settings: SettingsUIState
   /**
    * Commits each workspace's branch is ahead/behind the ref it forked from,
    * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.

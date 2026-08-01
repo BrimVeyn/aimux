@@ -1,6 +1,6 @@
 import type { MouseEvent } from '@opentui/core'
 
-import { useCallback, useMemo } from 'react'
+import { type ReactNode, useCallback, useMemo } from 'react'
 
 import type { MeasuredPaneRect } from '../app-runtime/use-pane-size-report'
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
@@ -42,6 +42,7 @@ import { WorkspaceMoveModal } from './components/modals/workspace/workspace-move
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
+import { SettingsView } from './components/settings/settings-view'
 import { useTheme } from './theme'
 
 const EMPTY_WORKSPACES: WorkspaceRecord[] = []
@@ -400,42 +401,22 @@ export function RootView({
   const createProjectFields = getCreateProjectFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
 
+  // Git mode and settings each swap the pane tree for one full-width view.
+  // Everything else on screen — status bar, overlays, modal, toasts — is the
+  // same either way, so only the center is a branch: a return per view would
+  // mean maintaining the chrome three times.
   const inGitMode = focusMode === 'git' || modal.type === 'git-commit'
-  if (inGitMode) {
-    return (
-      <box flexDirection="column" width="100%" height="100%" backgroundColor={editorBg}>
-        <TopTabBar forceVisible />
-        <GitView themeId={themeId} />
-        <StatusBar />
-        <PendingChordOverlay />
-        <ContextMenuOverlay />
-        {renderModal(modal, {
-          activeAssistant: activeTab?.assistant,
-          createProjectFields,
-          currentProjectId,
-          currentTabCount: tabs.length,
-          customCommands,
-          focusMode,
-          projects,
-          snippetEditorFields,
-          snippets,
-          themeId,
-          workspaceDivergence,
-        })}
-        <ToastViewport />
-      </box>
-    )
-  }
+  let replacesPanes: ReactNode = null
+  if (inGitMode) replacesPanes = <GitView themeId={themeId} />
+  else if (focusMode === 'settings') replacesPanes = <SettingsView />
 
-  return (
-    <box
-      flexDirection="column"
-      width="100%"
-      height="100%"
-      backgroundColor={editorBg}
-      onMouseDrag={handleRootMouseDrag}
-      onMouseUp={handleRootMouseUp}
-    >
+  const center =
+    replacesPanes !== null ? (
+      <>
+        <TopTabBar forceVisible />
+        {replacesPanes}
+      </>
+    ) : (
       <box flexDirection="row" gap={0} padding={0} flexGrow={1}>
         <Bar
           side="left"
@@ -499,10 +480,26 @@ export function RootView({
           onResizeDragEnd={onSeparatorDragEnd}
         />
       </box>
+    )
+
+  return (
+    <box
+      flexDirection="column"
+      width="100%"
+      height="100%"
+      backgroundColor={editorBg}
+      // Both drag handlers no-op unless a gesture is in flight, so the full-width
+      // views inherit them harmlessly — and a drag that was in flight when one
+      // opened gets finalised instead of stranded.
+      onMouseDrag={handleRootMouseDrag}
+      onMouseUp={handleRootMouseUp}
+    >
+      {center}
       <StatusBar />
       <PendingChordOverlay />
       <ContextMenuOverlay />
       {renderModal(modal, {
+        activeAssistant: activeTab?.assistant,
         createProjectFields,
         currentProjectId,
         currentTabCount: tabs.length,

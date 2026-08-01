@@ -97,6 +97,12 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
         right: hintForGitMode(config, headOffset),
       }
     }
+    case 'settings':
+      return {
+        help: helpHintForMode(config, 'settings'),
+        projectSegments: projectSegs,
+        right: hintForMode(config, 'settings'),
+      }
     case 'command-edit': {
       const commandEditMode = deriveCommandEditModeId(state.modal.type)
       return {

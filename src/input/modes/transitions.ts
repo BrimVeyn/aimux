@@ -41,8 +41,12 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.workspace-move-confirm',
     'modal.flash-jump',
     'git-mode',
+    'settings',
   ],
-  'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage'],
+  // The help overlay opens over settings without a transition (it leaves
+  // focusMode alone), so leaving is the only move this mode makes.
+  'settings': ['navigation'],
+  'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage', 'settings'],
 }
 
 export function isValidTransition(from: ModeId, to: ModeId): boolean {

@@ -30,6 +30,7 @@ export type ModeId =
   | 'modal.workspace-move-confirm'
   | 'modal.ai-usage'
   | 'modal.flash-jump'
+  | 'settings'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
@@ -113,6 +114,9 @@ export type SideEffect =
   | { type: 'configure-setup-script' }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
+  /** Toggle a checkbox, cycle an enum, run a row's action — whatever the row is. */
+  | { type: 'activate-settings-row' }
+  | { type: 'adjust-settings-row'; delta: 1 | -1 }
 
 export interface KeyResult {
   actions: AppAction[]

@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
+import type { StoredSettings } from './settings/types'
 import type { GitFileListMode, ProjectSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
@@ -74,6 +75,13 @@ export interface AimuxConfig {
   sidebar?: PersistedSidebar
   projectBarVisible?: boolean
   projectSnapshot?: ProjectSnapshotV1
+  /**
+   * What the settings screen has written, keyed by row id. Sparse: an absent key
+   * means the user never touched that row, which is not the same as `false`.
+   * Keys this build doesn't know are kept as-is so a downgrade doesn't erase
+   * settings a newer one wrote.
+   */
+  settings?: StoredSettings
   skippedUpdateVersion?: string
   /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
   prunedOrphanAimuxBranches?: boolean
@@ -197,6 +205,28 @@ export function deriveBarsFromLegacy(
   return { left, right }
 }
 
+/**
+ * Keeps the entries it understands and drops the rest, rather than rejecting the
+ * whole block: this record grows one independent key per setting, so one bad
+ * value has no business resetting every other one.
+ */
+function parseStoredSettings(value: unknown): { settings: StoredSettings; dropped: number } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { dropped: 0, settings: {} }
+  }
+  const settings: StoredSettings = {}
+  let dropped = 0
+  for (const [key, entry] of Object.entries(value)) {
+    const ok =
+      typeof entry === 'boolean' ||
+      typeof entry === 'string' ||
+      (typeof entry === 'number' && Number.isFinite(entry))
+    if (ok) settings[key] = entry
+    else dropped++
+  }
+  return { dropped, settings }
+}
+
 function isPersistedSidebar(value: unknown): value is PersistedSidebar {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
@@ -257,6 +287,7 @@ export function loadConfigResult(): ConfigLoadResult {
       /** ponytail: pre-rename spelling, honoured for one release. */
       sessionBarVisible?: unknown
       projectSnapshot?: unknown
+      settings?: unknown
       skippedUpdateVersion?: unknown
       prunedOrphanAimuxBranches?: unknown
       /** Removed; still detected so the doctor can say so. */
@@ -343,6 +374,17 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid projectSnapshot')
     }
 
+    const storedSettings = parseStoredSettings(parsed.settings)
+    const settingsIsRecord =
+      typeof parsed.settings === 'object' &&
+      parsed.settings !== null &&
+      !Array.isArray(parsed.settings)
+    if (parsed.settings !== undefined && !settingsIsRecord) {
+      issues.push('ignored invalid settings')
+    } else if (storedSettings.dropped > 0) {
+      issues.push(`ignored ${String(storedSettings.dropped)} invalid setting(s)`)
+    }
+
     const validSkippedUpdateVersion =
       typeof parsed.skippedUpdateVersion === 'string' && parsed.skippedUpdateVersion.length > 0
         ? parsed.skippedUpdateVersion
@@ -372,6 +414,7 @@ export function loadConfigResult(): ConfigLoadResult {
           ? parsed.projectSnapshot
           : undefined,
         prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
+        settings: storedSettings.settings,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
