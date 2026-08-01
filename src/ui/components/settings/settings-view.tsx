@@ -1,5 +1,6 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
+import { useTerminalDimensions } from '@opentui/react'
 import { memo, useCallback, useMemo, useRef } from 'react'
 
 import { getSectionRows, SETTING_SECTIONS } from '../../../settings/sections'
@@ -14,11 +15,16 @@ import { SettingsRow } from './settings-row'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 /**
- * Columns the settings themselves are allowed. Without a cap the value sits on
- * the far edge of a wide terminal, a hundred columns from the label it belongs
- * to, and the pair stops reading as a pair.
+ * Share of the window the settings themselves are allowed. Without a cap the
+ * value sits on the far edge of a wide terminal, a hundred columns from the label
+ * it belongs to, and the pair stops reading as a pair.
+ *
+ * A share of the window rather than a fixed column count, so it holds whatever
+ * the window is; the floor is there for the narrow ones, where the pane is
+ * smaller than the cap anyway and this stops binding.
  */
-const CONTENT_MAX_WIDTH = 72
+const CONTENT_WIDTH_RATIO = 0.45
+const CONTENT_MIN_WIDTH = 56
 
 export const SettingsView = memo(function SettingsView() {
   const t = useTheme()
@@ -42,6 +48,11 @@ export const SettingsView = memo(function SettingsView() {
     // read from disk may have changed under it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [settings.sectionId, projects, revision]
+  )
+  const dimensions = useTerminalDimensions()
+  const contentMaxWidth = Math.max(
+    CONTENT_MIN_WIDTH,
+    Math.round(dimensions.width * CONTENT_WIDTH_RATIO)
   )
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 
@@ -122,7 +133,7 @@ export const SettingsView = memo(function SettingsView() {
         flexGrow={1}
         backgroundColor={t.background}
       >
-        <box flexDirection="column" flexGrow={1} flexShrink={1} maxWidth={CONTENT_MAX_WIDTH}>
+        <box flexDirection="column" flexGrow={1} flexShrink={1} maxWidth={contentMaxWidth}>
           {sectionNote != null && sectionNote !== '' ? (
             <box flexShrink={0} paddingLeft={1} paddingRight={1}>
               <text fg={t.textMuted}>{sectionNote}</text>

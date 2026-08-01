@@ -63,6 +63,10 @@ that owns it.
 A toggle reads `●` when it is on and `○` when it is off, lit or muted to match.
 Both are one cell wide in a Latin-width terminal.
 
+The settings themselves are held to a share of the window rather than stretched
+across it, so a value stays next to the label it belongs to instead of drifting to
+the far edge of a wide terminal.
+
 ## Where a setting ends up
 
 Two files, and which one gets written depends on the setting:
