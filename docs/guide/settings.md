@@ -96,6 +96,19 @@ you confirm.
 The row re-reads the file as you move around the screen, so a script you changed
 in your editor shows its new state when you come back to it.
 
+## Notification sound
+
+The **Notifications** section has one **Sound**, played when an assistant asks
+you something and when one finishes a turn — never for the tab you are looking
+at. `off` is one of its values, so that row is also the off switch. **Test
+sound** plays whatever is selected, which is how you find out this machine has
+no audio player before a notification you cared about goes silent.
+
+Beside the three shipped sounds, the row lists every audio file in
+`~/.config/aimux/<profile>/sounds/` by its filename — drop yours in there and it
+is offered at the next launch. See
+[`runtime-paths.md`](../reference/runtime-paths.md#files-under-the-active-profile-directory).
+
 ## When `aimux.config.ts` also sets it
 
 `aimux.config.ts` is read at every launch, and it wins.

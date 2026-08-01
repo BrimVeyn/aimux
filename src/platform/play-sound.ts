@@ -46,16 +46,20 @@ function builtinSoundPath(id: string): string | null {
   return candidates.find((candidate) => existsSync(candidate)) ?? null
 }
 
-/** Ids of the files the user has dropped in, without their extension. */
+/**
+ * Ids of the files the user has dropped in, without their extension. Deduped:
+ * `bell-2.wav` and `bell-2.mp3` are one option, and `resolveSoundPath` picks
+ * between them the same way every time.
+ */
 export function listCustomSoundIds(): string[] {
   try {
-    return readdirSync(getCustomSoundsDir())
+    const ids = readdirSync(getCustomSoundsDir())
       .filter((name) => SOUND_EXTENSIONS.has(extname(name).toLowerCase()))
       .map((name) => name.slice(0, -extname(name).length))
       .filter(
         (id) => id !== '' && !BUILTIN_SOUND_IDS.includes(id as (typeof BUILTIN_SOUND_IDS)[number])
       )
-      .sort()
+    return [...new Set(ids)].sort()
   } catch {
     // No directory is the common case, not an error.
     return []
@@ -82,12 +86,16 @@ export function resolveSoundPath(id: string): string | null {
  */
 export function soundPlayerArgv(platform: string, bin: string, path: string): string[] {
   if (platform === 'win32') {
+    // The path is a filename the user chose. PowerShell escapes a quote inside
+    // a single-quoted string by doubling it; without this a name containing one
+    // ends the string and the rest of it is executed.
+    const quoted = path.replaceAll("'", "''")
     return [
       bin,
       '-NoProfile',
       '-NonInteractive',
       '-Command',
-      `(New-Object Media.SoundPlayer '${path}').PlaySync()`,
+      `(New-Object Media.SoundPlayer '${quoted}').PlaySync()`,
     ]
   }
   if (bin.endsWith('ffplay')) return [bin, '-nodisp', '-autoexit', '-loglevel', 'quiet', path]
@@ -127,7 +135,8 @@ export function shouldPlayNow(now: number, previous: number): boolean {
  */
 export function playSoundFile(path: string, options?: { ignoreThrottle?: boolean }): boolean {
   const now = Date.now()
-  if (options?.ignoreThrottle !== true && !shouldPlayNow(now, lastPlayedAt)) return false
+  const throttled = options?.ignoreThrottle !== true
+  if (throttled && !shouldPlayNow(now, lastPlayedAt)) return false
   const platform = process.platform
   const bin = findPlayer(platform)
   if (bin == null) {
@@ -137,7 +146,9 @@ export function playSoundFile(path: string, options?: { ignoreThrottle?: boolean
   const argv = soundPlayerArgv(platform, bin, path)
   try {
     Bun.spawn(argv, { stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
-    lastPlayedAt = now
+    // A test press does not start the window: it would swallow a real
+    // notification arriving in the next few hundred milliseconds.
+    if (throttled) lastPlayedAt = now
     return true
   } catch (error) {
     logDebug('platform.playSound.error', {

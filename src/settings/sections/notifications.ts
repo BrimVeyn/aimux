@@ -11,8 +11,8 @@ import {
 import { toast } from '../../state/toast-store'
 import { settingsStore } from '../settings-store'
 
-/** Read by `src/app-runtime/workspace-activity.ts`, which does the playing. */
-export const NOTIFICATION_SOUND = 'notifications.sound'
+/** Spelled once, here, next to the row that owns it. */
+const NOTIFICATION_SOUND = 'notifications.sound'
 
 /**
  * `off` plus the shipped three plus whatever is in the drop-in directory. Built
@@ -71,7 +71,7 @@ export const NOTIFICATIONS_SECTION: SettingSection = {
           return
         }
         if (!playNotificationSound({ ignoreThrottle: true })) {
-          toast.error('Could not play that sound — see `aimux doctor`')
+          toast.error('Could not play that sound — no audio player found')
         }
       },
       value: () => selectedSoundId(),

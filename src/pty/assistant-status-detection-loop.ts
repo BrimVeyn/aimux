@@ -131,7 +131,10 @@ export function runStatusDetectionLoop(
   const now = options.nowFn ?? Date.now
   const detector = new AssistantStatusDetector()
   const arbiter = new AssistantStatusArbiter()
-  const lastTabStatus = new Map<string, { status: TabActivity; projectId: string }>()
+  const lastTabStatus = new Map<
+    string,
+    { status: TabActivity; projectId: string; workspaceId?: string }
+  >()
   const lastProjectStatus = new Map<string, ProjectStatus>()
   // Timestamp when a tab most recently entered `idle`. Cleared when it leaves
   // idle. `turnEmitted` guards against re-firing `onTurnComplete` within the
@@ -186,7 +189,7 @@ export function runStatusDetectionLoop(
         tailPreview: tailPreview(tab.viewport),
       })
       if (changed) {
-        lastTabStatus.set(tab.id, { projectId, status })
+        lastTabStatus.set(tab.id, { projectId, status, workspaceId: tab.workspaceId })
         options.onTabStatus(tab.id, status, projectId, tab.workspaceId)
       }
 
@@ -251,13 +254,20 @@ export function runStatusDetectionLoop(
       classifySession(projectId, options.listTabs(projectId), ts, 'tick', seenTabs)
     }
 
-    for (const tabId of lastTabStatus.keys()) {
+    for (const [tabId, entry] of lastTabStatus) {
       if (!seenTabs.has(tabId)) {
         detector.forget(tabId)
         arbiter.forget(tabId)
         lastTabStatus.delete(tabId)
         idleSince.delete(tabId)
         turnEmitted.delete(tabId)
+        // A gone tab is no longer working or waiting on anyone. Only clients
+        // attached to its project hear its `tabExit`, so without this last
+        // word a tab that died mid-turn leaves every other client holding a
+        // status that will never be corrected.
+        if (entry.status !== 'idle') {
+          options.onTabStatus(tabId, 'idle', entry.projectId, entry.workspaceId)
+        }
       }
     }
     for (const projectId of lastProjectStatus.keys()) {

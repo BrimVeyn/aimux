@@ -3,25 +3,14 @@ import type { AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
 import { restoreProjectState } from '../project-persistence'
-import { filterTabsForActiveWorkspace, withActiveWorkspace } from '../project-workspaces'
+import {
+  clearWorkspaceDone,
+  filterTabsForActiveWorkspace,
+  withActiveWorkspace,
+} from '../project-workspaces'
 import { filterProjects } from '../selectors'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_WORKSPACE_ACTIVITY } from '../types'
-
-/**
- * Entering a workspace is what "you have seen it" means, so it drops the
- * finished-a-turn tick. Returns the same map when there is nothing to clear, so
- * every caller can spread it unconditionally without churning subscribers.
- */
-function clearWorkspaceDone(
-  state: AppState,
-  workspaceId: string | undefined
-): AppState['workspaceActivity'] {
-  if (workspaceId == null || workspaceId === '') return state.workspaceActivity
-  const entry = state.workspaceActivity[workspaceId]
-  if (entry === undefined || !entry.done) return state.workspaceActivity
-  return { ...state.workspaceActivity, [workspaceId]: { ...entry, done: false } }
-}
 
 const CLOSED_MODAL = {
   editBuffer: null,
@@ -90,7 +79,10 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
         ),
         // Landing on a project lands on its active workspace — same rule as
         // `set-active-workspace`: you have seen it, so the tick goes.
-        workspaceActivity: clearWorkspaceDone(state, loadedProject?.activeWorkspaceId),
+        workspaceActivity: clearWorkspaceDone(
+          state.workspaceActivity,
+          loadedProject?.activeWorkspaceId
+        ),
       }
     }
     case 'set-projects':
@@ -254,7 +246,7 @@ export function reduceProjectState(state: AppState, action: AppAction): AppState
       // Remember the tab we're leaving so coming back to this workspace later
       // restores it instead of snapping to the first tab. Keyed by the
       // workspace we're departing (the current project's active one).
-      const workspaceActivity = clearWorkspaceDone(state, action.workspaceId)
+      const workspaceActivity = clearWorkspaceDone(state.workspaceActivity, action.workspaceId)
       const leavingProject = state.projects.find((s) => s.id === action.projectId)
       const leavingWorkspaceId = leavingProject?.activeWorkspaceId
       const lastActiveTabByWorkspace =

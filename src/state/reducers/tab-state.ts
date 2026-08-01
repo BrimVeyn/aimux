@@ -17,6 +17,7 @@ import {
 } from '../layout-tree'
 import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
+  clearWorkspaceDone,
   filterTabsForActiveWorkspace,
   orderTabsByWorkspace,
   withActiveWorkspace,
@@ -218,6 +219,10 @@ function withActiveTabWorkspace(
   const tab = state.tabs.find((entry) => entry.id === tabId)
   if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return state
   const workspaceId = tab.workspaceId
+  // Opening one of a workspace's tabs is seeing that workspace, so it drops the
+  // finished-a-turn tick — otherwise a background tab finishing in the workspace
+  // you are already in leaves a ✓ that only a workspace switch could clear.
+  const workspaceActivity = clearWorkspaceDone(state.workspaceActivity, workspaceId)
   // When `onlyIfMissing` is set, we leave the project's workspace alone if it
   // already points at a known workspace. Used by `hydrate-project` so that
   // a backend re-attach after a user-initiated workspace switch (j/k cycling)
@@ -229,13 +234,14 @@ function withActiveTabWorkspace(
       project?.activeWorkspaceId != null &&
       project.activeWorkspaceId !== '' &&
       (project.workspaces?.some((w) => w.id === project.activeWorkspaceId) ?? false)
-    if (hasValidWorkspace) return state
+    if (hasValidWorkspace) return { ...state, workspaceActivity }
   }
   return {
     ...state,
     projects: state.projects.map((project) =>
       project.id === state.currentProjectId ? withActiveWorkspace(project, workspaceId) : project
     ),
+    workspaceActivity,
   }
 }
 

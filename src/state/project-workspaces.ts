@@ -3,7 +3,13 @@ import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { basename } from 'node:path'
 
-import type { BranchDivergence, ProjectRecord, TabSession, WorkspaceRecord } from './types'
+import type {
+  BranchDivergence,
+  ProjectRecord,
+  TabSession,
+  WorkspaceActivity,
+  WorkspaceRecord,
+} from './types'
 
 import { createPrefixedId } from '../platform/id'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
@@ -313,6 +319,22 @@ export function withActiveWorkspace(project: ProjectRecord, workspaceId: string)
     activeWorkspaceId: workspaceId,
     updatedAt: new Date().toISOString(),
   }
+}
+
+/**
+ * Landing on a workspace — entering it, or opening one of its tabs — is what
+ * "you have seen it" means, so it drops the finished-a-turn tick. Returns the
+ * same map when there is nothing to clear, so every caller can spread it
+ * unconditionally without churning the sidebar's subscribers.
+ */
+export function clearWorkspaceDone(
+  workspaceActivity: Record<string, WorkspaceActivity>,
+  workspaceId: string | undefined
+): Record<string, WorkspaceActivity> {
+  if (workspaceId == null || workspaceId === '') return workspaceActivity
+  const entry = workspaceActivity[workspaceId]
+  if (entry === undefined || !entry.done) return workspaceActivity
+  return { ...workspaceActivity, [workspaceId]: { ...entry, done: false } }
 }
 
 export function getRenderedTabWorkspaceId(

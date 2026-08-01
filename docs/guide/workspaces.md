@@ -154,12 +154,26 @@ on the right.
 • aimux                                    +
     root
       main
-    scroll drift fix                 +142 -37
+  ? scroll drift fix                 +142 -37
       aimux/scroll-drift-fix
 ```
 
 The heading is not a place the cursor stops. `j` / `k` move between workspace
 rows; clicking a heading takes you to that project's **root**.
+
+The column on the left of each row says what that workspace's assistants are
+doing, for every project rather than only the one you are in:
+
+| Glyph   | Meaning                                                 |
+| ------- | ------------------------------------------------------- |
+| `?`     | an assistant is waiting on an answer                    |
+| spinner | an assistant is working                                 |
+| `✓`     | an assistant finished a turn and you haven't looked yet |
+
+The `✓` clears when you enter the workspace, open one of its tabs, or its
+assistants go back to work. The project heading shows the same glyphs for
+whatever its workspaces add up to. A sound plays on the first two — see
+**Settings → Notifications**, where `off` turns it off.
 
 The churn counts come from a fork point, which only aimux-created workspaces
 record — **root** and externally-discovered workspaces show none.

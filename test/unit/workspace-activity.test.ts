@@ -9,9 +9,12 @@ import {
   recordTabStatus,
   recordTurnComplete,
   resetWorkspaceActivity,
+  seedTabActivity,
 } from '../../src/app-runtime/workspace-activity'
+import { appStore } from '../../src/state/app-store'
 import { setActiveDispatch } from '../../src/state/dispatch-ref'
 import { appReducer, createInitialState } from '../../src/state/store'
+import { createDefaultTerminalModes } from '../../src/state/terminal-modes'
 
 function collectDispatches(): AppAction[] {
   const seen: AppAction[] = []
@@ -22,6 +25,7 @@ function collectDispatches(): AppAction[] {
 afterEach(() => {
   setActiveDispatch(null)
   resetWorkspaceActivity()
+  appStore.setState({ activeTabId: null })
 })
 
 describe('aggregate', () => {
@@ -100,8 +104,65 @@ describe('recordTabStatus', () => {
 describe('recordTurnComplete', () => {
   test('latches the workspace as finished-unseen', () => {
     const seen = collectDispatches()
+    recordTabStatus('t1', 'working', 'w1')
+    seen.length = 0
     recordTurnComplete('t1', 'w1')
     expect(seen).toEqual([{ type: 'mark-workspace-done', workspaceId: 'w1' }])
+  })
+
+  test('a turn we never saw start is ignored', () => {
+    // A restarted daemon re-announces the end of every surviving idle tab's
+    // turn. Without this rule that ticks every workspace and rings once.
+    const seen = collectDispatches()
+    recordTurnComplete('t1', 'w1')
+    expect(seen).toEqual([])
+
+    recordTabStatus('t1', 'idle', 'w1')
+    seen.length = 0
+    recordTurnComplete('t1', 'w1')
+    expect(seen).toEqual([])
+  })
+
+  test('one turn is announced once', () => {
+    const seen = collectDispatches()
+    recordTabStatus('t1', 'working', 'w1')
+    recordTabStatus('t1', 'idle', 'w1')
+    seen.length = 0
+    recordTurnComplete('t1', 'w1')
+    recordTurnComplete('t1', 'w1')
+    expect(seen).toEqual([{ type: 'mark-workspace-done', workspaceId: 'w1' }])
+  })
+
+  test('the tab on screen neither ticks nor rings', () => {
+    appStore.setState({ activeTabId: 't1' })
+    const seen = collectDispatches()
+    recordTabStatus('t1', 'working', 'w1')
+    seen.length = 0
+    recordTurnComplete('t1', 'w1')
+    expect(seen).toEqual([])
+  })
+})
+
+describe('seedTabActivity', () => {
+  test('an attach publishes what the tabs are already doing', () => {
+    const seen = collectDispatches()
+    seedTabActivity([
+      { activity: 'waiting-input', id: 't1', workspaceId: 'w1' },
+      { activity: 'idle', id: 't2', workspaceId: 'w2' },
+    ])
+
+    expect(seen).toContainEqual({
+      type: 'set-workspace-activity',
+      waiting: true,
+      working: false,
+      workspaceId: 'w1',
+    })
+    expect(seen).toContainEqual({
+      type: 'set-workspace-activity',
+      waiting: false,
+      working: false,
+      workspaceId: 'w2',
+    })
   })
 })
 
@@ -139,39 +200,66 @@ describe('the workspaceActivity reducer', () => {
     expect(still).toBe(done)
   })
 
-  test('entering the workspace clears the tick', () => {
-    const now = '2026-08-01T00:00:00.000Z'
-    const base: AppState = {
+  const NOW = '2026-08-01T00:00:00.000Z'
+
+  function stateWithWorkspace(): AppState {
+    return {
       ...createInitialState(),
       currentProjectId: 'p1',
       projects: [
         {
-          createdAt: now,
+          createdAt: NOW,
           id: 'p1',
-          lastOpenedAt: now,
+          lastOpenedAt: NOW,
           name: 'one',
-          updatedAt: now,
+          updatedAt: NOW,
           workspaces: [
             {
-              createdAt: now,
+              createdAt: NOW,
               createdByAimux: false,
               id: 'w1',
               name: 'one',
               path: '/tmp/one',
               repoRoot: '/tmp/one',
               source: 'primary',
-              updatedAt: now,
+              updatedAt: NOW,
             },
           ],
         },
       ],
     }
-    const done = reduce(base, { type: 'mark-workspace-done', workspaceId: 'w1' })
+  }
+
+  test('entering the workspace clears the tick', () => {
+    const done = reduce(stateWithWorkspace(), { type: 'mark-workspace-done', workspaceId: 'w1' })
     const visited = reduce(done, {
       projectId: 'p1',
       type: 'set-active-workspace',
       workspaceId: 'w1',
     })
     expect(visited.workspaceActivity.w1?.done).toBe(false)
+  })
+
+  test('opening one of its tabs clears the tick', () => {
+    // A background tab finishing in the workspace you are already in ticks the
+    // row you are looking at; switching to that tab has to be enough to clear it.
+    const base: AppState = {
+      ...stateWithWorkspace(),
+      tabs: [
+        {
+          assistant: 'claude',
+          buffer: '',
+          command: 'claude',
+          id: 't1',
+          status: 'running',
+          terminalModes: createDefaultTerminalModes(),
+          title: 'one',
+          workspaceId: 'w1',
+        },
+      ],
+    }
+    const done = reduce(base, { type: 'mark-workspace-done', workspaceId: 'w1' })
+    const opened = reduce(done, { tabId: 't1', type: 'set-active-tab' })
+    expect(opened.workspaceActivity.w1?.done).toBe(false)
   })
 })

@@ -22,13 +22,22 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 interface Entry {
   status: TabActivity
   workspaceId: string | undefined
+  /**
+   * Whether this client has seen the tab do something since the last turn it
+   * announced. The daemon's end-of-turn timer is per-process: restart it (an
+   * update, `restart-daemon`) and every surviving idle PTY produces a
+   * turn-complete a settle window later. Requiring an observed `working` /
+   * `waiting-input` first is what keeps that restart from ticking every
+   * workspace and ringing.
+   */
+  armed: boolean
 }
 
-// ponytail: a tab in another project never sends this client its `tabExit`, so
-// an entry here can outlive its PTY. Harmless — a dead tab's last status is
-// `idle`, which contributes nothing to the aggregate, and the `done` latch is
-// cleared the next time the workspace is entered. Revisit if the daemon ever
-// broadcasts tab removal to every client.
+// A tab in another project never sends this client its `tabExit`, so an entry
+// here can outlive its PTY. The daemon emits a final `idle` for a tab it stops
+// seeing (the tick cleanup in `assistant-status-detection-loop.ts`), which is
+// what keeps a tab that died mid-turn from pinning a spinner to a workspace
+// row forever; the entry itself is left behind, contributing nothing.
 const entries = new Map<string, Entry>()
 
 /** The two flags a set of tabs adds up to. Pure, and the reason it is exported. */
@@ -60,16 +69,19 @@ function isBeingWatched(tabId: string): boolean {
 export function recordTabStatus(
   tabId: string,
   status: TabActivity,
-  workspaceId: string | undefined
+  workspaceId: string | undefined,
+  options?: { silent?: boolean }
 ): void {
   const previous = entries.get(tabId)
-  entries.set(tabId, { status, workspaceId })
+  const armed = status === 'working' || status === 'waiting-input' || (previous?.armed ?? false)
+  entries.set(tabId, { armed, status, workspaceId })
   // A tab can be reassigned to another workspace (workspace move); the one it
   // left has one tab fewer and has to be recomputed too.
   if (previous && previous.workspaceId !== workspaceId) publish(previous.workspaceId)
   publish(workspaceId)
 
   if (
+    options?.silent !== true &&
     status === 'waiting-input' &&
     previous?.status !== 'waiting-input' &&
     !isBeingWatched(tabId)
@@ -78,7 +90,26 @@ export function recordTabStatus(
   }
 }
 
+/**
+ * Seed from the tabs an attach handed us, so a workspace whose agent has been
+ * waiting since before this client started says so on the first paint instead
+ * of waiting for a transition that already happened. Silent by definition:
+ * nothing here is news.
+ */
+export function seedTabActivity(
+  tabs: readonly { id: string; activity?: TabActivity; workspaceId?: string }[]
+): void {
+  for (const tab of tabs) {
+    recordTabStatus(tab.id, tab.activity ?? 'idle', tab.workspaceId, { silent: true })
+  }
+}
+
 export function recordTurnComplete(tabId: string, workspaceId: string | undefined): void {
+  const entry = entries.get(tabId)
+  // Nothing observed since the last turn — this is a restarted daemon
+  // re-announcing the end of a turn that ended before we were listening.
+  if (entry?.armed !== true) return
+  entry.armed = false
   if (isBeingWatched(tabId)) return
   if (workspaceId != null && workspaceId !== '') {
     dispatchGlobal({ type: 'mark-workspace-done', workspaceId })

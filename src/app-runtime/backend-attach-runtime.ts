@@ -11,6 +11,7 @@ import {
   getSnapshotTrees,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { seedTabActivity } from './workspace-activity'
 
 export function resizeSnapshotPanes(
   snapshot: ProjectSnapshotV1 | undefined,
@@ -57,14 +58,19 @@ function hydrateAttachedSession(
   backend: SessionBackend
 ): void {
   if (result) {
+    const tabs = mergeSnapshotTabMetadata(result.tabs, projectSnapshot)
     dispatch({
       activeTabId: result.activeTabId,
       layoutTree: projectSnapshot?.layoutTree,
       layoutTrees: projectSnapshot?.layoutTrees,
       tabGroupMap: projectSnapshot?.tabGroupMap,
-      tabs: mergeSnapshotTabMetadata(result.tabs, projectSnapshot),
+      tabs,
       type: 'hydrate-project',
     })
+    // Same reason as the project-status snapshot below, one level down: the
+    // per-tab statuses are edge-triggered, so a workspace whose agent has been
+    // waiting since before this client started would otherwise draw nothing.
+    seedTabActivity(tabs)
     // Dispatch the project-status snapshot *after* hydrate-project so
     // sidebar chips reflect per-project state on attach without waiting
     // for the next daemon-side status transition.
