@@ -79,14 +79,18 @@ export function useSetupRunner(state: AppState, ctx: SideEffectContext): void {
   ctxRef.current = ctx
 
   useEffect(() => {
+    // Tabs are read fresh rather than taken as a dependency: their array
+    // identity changes on every viewport frame, which would re-run this at the
+    // rate the PTYs print. The store is also the more correct source — the
+    // render snapshot can lag a setup tab that was just added.
     const candidates = collectSetupCandidates(
       state.projects,
-      state.tabs,
+      ctxRef.current.getState().tabs,
       seenByProject.current,
       hasSetupScript
     )
     for (const { projectId, workspace } of candidates) {
       runSetup(ctxRef.current, projectId, workspace)
     }
-  }, [state.projects, state.tabs])
+  }, [state.projects])
 }
