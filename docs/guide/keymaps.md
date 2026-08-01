@@ -55,6 +55,7 @@ The most important modes are:
 - `navigation`
 - `terminal-input`
 - `git-mode`
+- `settings`
 
 The runtime also defines modal modes such as:
 
@@ -66,6 +67,7 @@ The runtime also defines modal modes such as:
 - `modal.create-workspace`
 - `modal.workspace-move`
 - `modal.rename-tab`
+- `modal.setting-text`
 - `modal.snippet-picker`
 - `modal.snippet-picker.filtering`
 - `modal.snippet-editor`
@@ -196,6 +198,7 @@ Document your own configs accordingly.
 
 - `Leader+b` - toggle project bar
 - `Leader+B` - toggle right bar
+- `Leader+,` - open the settings screen
 - `Leader+1` through `Leader+9` - switch projects by index
 
 ### `git-mode`
@@ -214,6 +217,19 @@ Enter with `Ctrl+D` from `navigation`. Leading action keys:
 Navigation and diff scroll keys (`j`/`k`, `Ctrl+N`/`Ctrl+P`, `h`/`l`, arrows,
 `Ctrl+D`/`Ctrl+U`, `Backspace`/`Ctrl+H`/`Ctrl+L`) are documented in
 [`git-mode.md`](git-mode.md).
+
+### `settings`
+
+Enter with `Leader+,` from `navigation` or `terminal-input`.
+
+- `h` / `l` - move between the section list and its settings; always a column
+  change, never a value change
+- `j` / `k` - move within the focused column
+- `Space` / `Enter` - change the setting under the cursor
+- `-` / `+` - step a number
+- `Esc` - close
+
+Fully documented in [`settings.md`](settings.md).
 
 ## Help Modal
 

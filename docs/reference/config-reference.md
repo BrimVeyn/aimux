@@ -57,6 +57,11 @@ defineConfig({
 
 ## Support Matrix
 
+Most of these fields also have a row in the in-app settings screen (`<Leader>,`),
+which writes to `aimux.json`. This file is read at every launch and wins over it:
+a field declared here comes back on the next start, and the row says so. See
+`../guide/settings.md`.
+
 | Field                | Status             | Notes                                                                                                                   |
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `keymaps`            | Supported          | Fully resolved and registered by the app                                                                                |
