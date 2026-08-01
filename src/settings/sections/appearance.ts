@@ -43,11 +43,9 @@ export const APPEARANCE_SECTION: SettingSection = {
       ],
       read: () => getCurrentMode(),
       storage: 'app',
-      // The existing effect flips rather than sets, so only act when the value
-      // asked for is not the one already in place.
-      write: (value) => {
-        if (getCurrentMode() !== value) runSideEffectGlobal({ type: 'toggle-mode' })
-      },
+      // Flips rather than sets, which is safe because `writeRow` never hands a
+      // row the value it already has.
+      write: () => runSideEffectGlobal({ type: 'toggle-mode' }),
     },
     {
       description: "Let the host terminal's own background show through.",
@@ -56,10 +54,7 @@ export const APPEARANCE_SECTION: SettingSection = {
       label: 'Transparent background',
       read: () => getTransparent(),
       storage: 'app',
-      write: (value) => {
-        if (getTransparent() !== (value === true))
-          runSideEffectGlobal({ type: 'toggle-transparent' })
-      },
+      write: () => runSideEffectGlobal({ type: 'toggle-transparent' }),
     },
     {
       apply: (value) => setStatusBarSeparator(value as StatusBarSeparator),

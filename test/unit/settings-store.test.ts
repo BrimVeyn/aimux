@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-import type { SettingRow } from '../../src/settings/types'
+import type { SettingCtx, SettingRow } from '../../src/settings/types'
+import type { AppState } from '../../src/state/types'
 
 import { getConfigPath } from '../../src/config'
 import {
@@ -12,6 +13,7 @@ import {
   settingsStore,
   writeRow,
 } from '../../src/settings/settings-store'
+import { createInitialState } from '../../src/state/store'
 
 const originalHome = process.env.HOME
 const originalProfile = process.env.AIMUX_PROFILE
@@ -41,6 +43,7 @@ function readSettingsBlock(path: string): Record<string, unknown> {
   return parsed.settings ?? {}
 }
 
+const STATE: AppState = createInitialState()
 const applied: (boolean | number | string)[] = []
 
 /** A stored toggle wired to `autoCommit.enabled`, the shape most rows have. */
@@ -70,6 +73,11 @@ const ROWS = [TOGGLE, UNCLAIMED]
 
 function values(): Record<string, boolean | number | string> {
   return settingsStore.getState().values
+}
+
+/** `writeRow` compares against the current value, so it needs a read context. */
+function ctx(): SettingCtx {
+  return { state: STATE, values: settingsStore.getState().values }
 }
 
 afterEach(() => {
@@ -125,7 +133,7 @@ test('writing persists just that key and applies it', () => {
   hydrateSettings(ROWS, {})
   applied.length = 0
 
-  writeRow(TOGGLE, true)
+  writeRow(TOGGLE, true, ctx())
 
   // The other key survives, and the value that came from nowhere else does not
   // get written for free.
@@ -138,7 +146,7 @@ test('a value from the config file is never baked into the json', () => {
   const path = withConfig({})
   hydrateSettings(ROWS, { autoCommit: { enabled: true } })
 
-  writeRow(UNCLAIMED, 12)
+  writeRow(UNCLAIMED, 12, ctx())
 
   // Only the row that was written. Persisting `autoCommit.enabled` here would
   // outlive the config-file line it came from and quietly become permanent.
@@ -152,19 +160,21 @@ test('an app-storage row delegates instead of persisting', () => {
     id: 'projectBar.visible',
     kind: 'toggle',
     label: 'Project bar',
-    read: (ctx) => ctx.state.projectBar.visible,
+    read: (readCtx) => readCtx.state.projectBar.visible,
     storage: 'app',
     write: (value) => void written.push(value),
   }
 
-  writeRow(derived, true)
+  // `false`, not `true`: the initial state already has the bar visible, and
+  // writing the value a row already holds is a no-op by design.
+  writeRow(derived, false, ctx())
 
-  expect(written).toEqual([true])
+  expect(written).toEqual([false])
   expect(readSettingsBlock(path)).toEqual({})
 })
 
 test('reading a stored row with no value at all yields its default', () => {
   withConfig({})
 
-  expect(readRow(UNCLAIMED, { state: {} as never, values: {} })).toBe(5)
+  expect(readRow(UNCLAIMED, { state: STATE, values: {} })).toBe(5)
 })

@@ -28,14 +28,16 @@ function nextOptionValue(
 function nextNumberValue(
   row: Extract<SettingRow, { kind: 'number' }>,
   current: SettingValue,
-  delta: 1 | -1
+  delta: 1 | -1,
+  wrap: boolean
 ): number {
   const base = typeof current === 'number' ? current : row.min
   const next = round(base + delta * row.step)
-  // Wrap instead of sitting at the end: <CR> on a row that is already at its max
-  // has to visibly do something, or it reads as a dead key.
-  if (next > row.max) return row.min
-  if (next < row.min) return row.max
+  // `-`/`+` name a direction, so they clamp — holding + on a width and having it
+  // snap to the narrowest is not what anyone meant. <CR> names no direction, so
+  // it cycles: on a row already at its max it has to do something visible.
+  if (next > row.max) return wrap ? row.min : row.max
+  if (next < row.min) return wrap ? row.max : row.min
   return next
 }
 
@@ -44,28 +46,29 @@ function nextNumberValue(
  * (`-`/`+`); without it the row advances the way activating it should — a toggle
  * flips, an enum steps forward, a number steps up.
  */
-export function changeSelectedSetting(ctx: SettingsContext, delta?: 1 | -1): void {
-  const state = ctx.getState()
+export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1): void {
+  const state = runtime.getState()
   if (state.focusMode !== 'settings' || state.settings.pane !== 'rows') return
 
   const row = getSectionRows(state.settings.sectionId)[state.settings.rowIndex]
   if (!row || row.kind === 'info') return
 
-  const current = readRow(row, { state, values: settingsStore.getState().values })
+  const ctx = { state, values: settingsStore.getState().values }
+  const current = readRow(row, ctx)
 
   switch (row.kind) {
     case 'toggle':
       // `-`/`+` set the value rather than flipping it: holding + on a checkbox
       // should settle on "on", not blink.
-      writeRow(row, delta === undefined ? current !== true : delta === 1)
+      writeRow(row, delta === undefined ? current !== true : delta === 1, ctx)
       return
     case 'select': {
       const next = nextOptionValue(row.options, current, delta ?? 1)
-      if (next !== undefined) writeRow(row, next)
+      if (next !== undefined) writeRow(row, next, ctx)
       return
     }
     case 'number':
-      writeRow(row, nextNumberValue(row, current, delta ?? 1))
+      writeRow(row, nextNumberValue(row, current, delta ?? 1, delta === undefined), ctx)
       return
     default:
       row satisfies never

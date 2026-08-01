@@ -78,8 +78,15 @@ export function readRow(row: SettingRow, ctx: SettingCtx): SettingValue {
   return ctx.values[row.id] ?? row.fallback
 }
 
-export function writeRow(row: SettingRow, value: SettingValue): void {
+/**
+ * Writing the value a row already has does nothing. That is not just an
+ * optimisation: an `app` row delegates to the action behind the keybinding, and
+ * several of those toggle rather than set — so handing one a value it already
+ * holds would flip it the wrong way. One rule here beats a guard per row.
+ */
+export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx): void {
   if (row.kind === 'info') return
+  if (readRow(row, ctx) === value) return
   if (row.storage === 'app') {
     row.write(value)
     return
