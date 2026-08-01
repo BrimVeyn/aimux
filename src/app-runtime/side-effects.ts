@@ -213,29 +213,17 @@ function buildWorkspacePrompt(ctx: SideEffectContext, pending: PendingWorkspaceL
 }
 
 /**
- * Second half of the `<C-p>` flow, once the assistant is known: hand it the
- * prompt and rename the workspace after what the prompt describes. Both are
- * background work that must never block or fail the launch itself.
+ * Name the workspace after what its prompt describes, using the assistant the
+ * user just picked. Background work that must never block or fail the launch.
  *
- * The rename always uses `pending.prompt`, never the setup-annotated variant —
- * the note is guidance for the agent, not part of what the user asked for.
+ * Always `pending.prompt`, never the setup-annotated variant built for the
+ * agent — the note is guidance, not part of what the user asked for.
  */
-function startPendingWorkspaceLaunch(
+function renameWorkspaceFromLaunch(
   ctx: SideEffectContext,
   pending: PendingWorkspaceLaunch,
-  assistant: AssistantId,
-  tabId: string,
-  promptDeliveredAtSpawn: boolean
+  assistant: AssistantId
 ): void {
-  if (!promptDeliveredAtSpawn) {
-    void injectPromptWhenReady({
-      backend: ctx.backend,
-      getState: ctx.getState,
-      prompt: buildWorkspacePrompt(ctx, pending),
-      tabId,
-    })
-  }
-
   const workspace = ctx
     .getState()
     .projects.find((entry) => entry.id === pending.projectId)
@@ -317,34 +305,34 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // Otherwise the tab lands in the project's active workspace, which
       // launchAssistant resolves itself.
       const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
-      const barePrompt = state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined
-      const prompt = pending ? buildWorkspacePrompt(ctx, pending) : barePrompt
+      // Normalized to '' so "is there a prompt" is one comparison rather than a
+      // null check repeated at each decision below.
+      const prompt = pending
+        ? buildWorkspacePrompt(ctx, pending)
+        : ((state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined) ?? '')
 
       // Hand the prompt to the CLI at spawn where the CLI takes one. Pasting it
       // into a live TUI works — it is what this flow did — but it means polling
       // for readiness, probing the screen, and retrying. An argv slot has none of
       // those failure modes.
-      const atSpawn =
-        prompt != null &&
-        prompt !== '' &&
-        assistantAcceptsPromptArg(assistant, state.customCommands)
+      const atSpawn = prompt !== '' && assistantAcceptsPromptArg(assistant, state.customCommands)
       logInputDebug('app.launchSelectedAssistant', {
         assistant,
         chained: pending != null,
         modal: state.modal.type,
         promptAtSpawn: atSpawn,
-        promptLength: prompt?.length ?? 0,
+        promptLength: prompt.length,
       })
 
       const tabId = launchAssistant(
         ctx,
         assistant,
         pending?.workspaceId,
-        atSpawn && prompt != null ? [prompt] : undefined
+        atSpawn ? [prompt] : undefined
       )
-      if (pending) {
-        startPendingWorkspaceLaunch(ctx, pending, assistant, tabId, atSpawn)
-      } else if (!atSpawn && prompt != null && prompt !== '') {
+      // Delivery is decided and done here, chained or not: two call sites meant
+      // the prompt could be built twice, from two different reads of the store.
+      if (prompt !== '' && !atSpawn) {
         void injectPromptWhenReady({
           backend: ctx.backend,
           getState: ctx.getState,
@@ -352,6 +340,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
           tabId,
         })
       }
+      if (pending) renameWorkspaceFromLaunch(ctx, pending, assistant)
       return
     }
     case 'edit-selected-assistant': {

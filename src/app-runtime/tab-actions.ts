@@ -125,7 +125,7 @@ export function startTabSession(
   }
 
   backend.createSession({
-    args: extraArgs && extraArgs.length > 0 ? [...args, ...extraArgs] : args,
+    args: extraArgs ? [...args, ...extraArgs] : args,
     assistant: tab.assistant,
     autoRenameCandidate,
     cols,
