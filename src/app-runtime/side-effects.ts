@@ -8,7 +8,7 @@ import { loadConfig, saveConfig } from '../config'
 import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
-import { getDefaultBranch, listLocalBranches } from '../git/worktree'
+import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
 import { assistantAcceptsPromptArg } from '../pty/command-registry'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
@@ -36,6 +36,7 @@ import {
   handleCreateProjectEffect,
   handleDeleteProjectEffect,
   handleRenameProjectEffect,
+  handleSetProjectDefaultBaseRefEffect,
   handleSwitchProjectEffect,
   restartTabSession,
 } from './project-actions'
@@ -207,6 +208,12 @@ function applyThemeEffect(
   }
 }
 
+/** The given branch first, the rest in the order they came. */
+function hoistBranch(branches: string[], first: string | undefined): string[] {
+  if (first == null || !branches.includes(first)) return branches
+  return [first, ...branches.filter((branch) => branch !== first)]
+}
+
 /**
  * Setup runs concurrently with the agent by design, so say so rather than
  * letting the agent run tests against a half-installed tree and draw the wrong
@@ -359,12 +366,21 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
         const project = state.projects.find((entry) => entry.id === state.currentProjectId)
         const sourcePath = getActiveWorkspace(project)?.path ?? getActiveWorkspacePath(project)
         if (!(sourcePath != null && sourcePath !== '')) return
-        const [branches, defaultBranch] = await Promise.all([
+        const [branches, defaultBranch, currentBranch] = await Promise.all([
           listLocalBranches(sourcePath),
           getDefaultBranch(sourcePath),
+          getCurrentBranch(sourcePath),
         ])
         if (ctx.getState().modal.type !== 'create-workspace') return
-        ctx.dispatch({ branches, defaultBranch, type: 'set-create-workspace-base-branches' })
+        ctx.dispatch({
+          // Stacking on the branch you are already on is the other common base,
+          // and committer date buries it once anyone else pushes.
+          branches: hoistBranch(branches, currentBranch),
+          // The project's convention wins over what the repo declares: a gitflow
+          // repo still says `main` while everyone branches off `develop`.
+          defaultBranch: project?.defaultBaseRef ?? defaultBranch,
+          type: 'set-create-workspace-base-branches',
+        })
       })()
       return
     }
@@ -676,6 +692,15 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'configure-setup-script': {
       handleConfigureSetupScriptEffect(ctx, effect.projectId)
+      return
+    }
+    case 'set-project-default-base-ref': {
+      handleSetProjectDefaultBaseRefEffect(
+        state.projects,
+        dispatch,
+        effect.projectId,
+        effect.baseRef
+      )
       return
     }
     case 'ask-agent-for-setup-script': {

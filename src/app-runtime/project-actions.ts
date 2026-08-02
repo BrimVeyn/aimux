@@ -63,6 +63,32 @@ export function renameProjectRecords(
   )
 }
 
+/**
+ * Set (or clear, when blank) the branch this project's new workspaces fork from.
+ * Stored on the record rather than in the settings file because the value is the
+ * project's, and the settings screen only hydrates rows that exist without one.
+ */
+export function handleSetProjectDefaultBaseRefEffect(
+  projects: ProjectRecord[],
+  dispatch: (action: AppAction) => void,
+  projectId: string,
+  baseRef: string
+): void {
+  const trimmed = baseRef.trim()
+  const updated = projects.map((project) =>
+    project.id === projectId
+      ? {
+          ...project,
+          defaultBaseRef: trimmed === '' ? undefined : trimmed,
+          updatedAt: new Date().toISOString(),
+        }
+      : project
+  )
+  logInputDebug('app.project.defaultBaseRef', { baseRef: trimmed, projectId })
+  saveProjectCatalog(updated)
+  dispatch({ projects: updated, type: 'set-projects' })
+}
+
 export function switchProjectRecords(state: AppState, project: ProjectRecord): ProjectRecord[] {
   const projectsWithSnapshot = buildProjectsWithCurrentSnapshot(
     state.projects,

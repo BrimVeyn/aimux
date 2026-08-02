@@ -68,8 +68,9 @@ export async function createProjectWorkspace(
   await ensureAimuxWorktreeRoot()
   await assertSafeAimuxWorktreePath(targetPath)
 
+  let forkRef: string
   try {
-    await createGitWorktree({
+    forkRef = await createGitWorktree({
       baseRef: base,
       branchName: branch,
       repoPath: primary.repoRoot,
@@ -84,7 +85,8 @@ export async function createProjectWorkspace(
 
   const now = new Date().toISOString()
   const record: WorkspaceRecord = {
-    baseRef: base,
+    // What it forked from: `origin/<base>` when the base was refreshed.
+    baseRef: forkRef,
     branch,
     createdAt: now,
     createdByAimux: true,

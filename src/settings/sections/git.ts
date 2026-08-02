@@ -82,6 +82,17 @@ export const GIT_SECTION: SettingSection = {
       storage: 'settings',
     },
     {
+      // No `apply`: the reader is `resolveWorktreeBaseRef`, which reads the
+      // config file itself so the CLI's `workspace create` — where this screen
+      // never hydrates — agrees with the TUI instead of always fetching.
+      description: 'Fetch the base branch before forking from it. Off forks from your local copy.',
+      fallback: true,
+      id: 'git.fetchBase',
+      kind: 'toggle',
+      label: 'Refresh the base branch',
+      storage: 'settings',
+    },
+    {
       apply: (value) => setMultiRepoConfig({ ...getMultiRepoConfig(), enabled: value === true }),
       description: 'Aggregate the status of git repos nested under the project.',
       fallback: true,

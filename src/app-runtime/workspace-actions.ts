@@ -116,11 +116,13 @@ export async function createAimuxTempWorkspace(
 
   await mkdir(dirname(targetPath), { recursive: true })
   await assertSafeAimuxWorktreePath(targetPath)
-  await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
+  // What it forked from, not what was asked for: the two differ whenever the
+  // base was refreshed from origin, and the record is what "based on" reads.
+  const forkRef = await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
   const now = new Date().toISOString()
 
   const workspace: WorkspaceRecord = {
-    baseRef,
+    baseRef: forkRef,
     branch: branchName,
     commitSha: await getHeadSha(targetPath),
     createdAt: now,
