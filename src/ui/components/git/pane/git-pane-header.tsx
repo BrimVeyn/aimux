@@ -8,7 +8,7 @@ import { selectPrRowVisible, usePrStatusStore } from '../../../../state/pr-statu
 import { useTheme, useTransparent } from '../../../theme'
 import { PrStateRow } from './pr-state-row'
 
-export type GitPaneTab = 'files' | 'checks'
+export type GitPaneTab = 'files' | 'pr'
 
 interface GitPaneHeaderProps {
   gitPanel: GitPanelState
@@ -41,7 +41,7 @@ export const GitPaneHeader = memo(function GitPaneHeader({
     runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
   }, [nextFileListMode])
   const showFiles = useCallback(() => onTabChange?.('files'), [onTabChange])
-  const showChecks = useCallback(() => onTabChange?.('checks'), [onTabChange])
+  const showPr = useCallback(() => onTabChange?.('pr'), [onTabChange])
 
   const hasTabs = tab !== undefined && onTabChange !== undefined
   const hasProject = projectPath != null && projectPath !== ''
@@ -60,17 +60,17 @@ export const GitPaneHeader = memo(function GitPaneHeader({
   const showBehind = behind > 0
   const showTracking = showAhead || showBehind
 
-  // The PR row already carries the branch identity (and the checks tab spells
-  // out `base ← head`), so the branch row is only worth a line without a PR.
+  // The PR row already carries the branch identity, so the branch row is only
+  // worth a line without a PR.
   const showPrRow = hasTabs && prRowVisible
   const showBranchRow = !showPrRow && gitPanel.error === null
-  const showToggle = tab !== 'checks' && gitPanel.files.length > 0
+  const showToggle = tab !== 'pr' && gitPanel.files.length > 0
   const showHistorical = headOffset > 0
   const showReviewBase = baseLabel != null && baseLabel !== ''
   const showScope = showHistorical || showReviewBase
   const trackingAndToggle = (
     <box flexDirection="row" flexShrink={0} gap={2}>
-      {showTracking && tab !== 'checks' ? (
+      {showTracking && tab !== 'pr' ? (
         <box flexDirection="row" gap={1}>
           {showAhead ? (
             <text selectable={false} fg={t.textMuted} wrapMode="none">
@@ -132,16 +132,16 @@ export const GitPaneHeader = memo(function GitPaneHeader({
             <box
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={tab === 'checks' ? activeTabBg : undefined}
-              onMouseDown={showChecks}
+              backgroundColor={tab === 'pr' ? activeTabBg : undefined}
+              onMouseDown={showPr}
             >
               <text
                 selectable={false}
-                fg={tab === 'checks' ? t.text : t.textMuted}
-                bg={tab === 'checks' ? activeTabBg : undefined}
+                fg={tab === 'pr' ? t.text : t.textMuted}
+                bg={tab === 'pr' ? activeTabBg : undefined}
                 wrapMode="none"
               >
-                checks
+                pr
               </text>
             </box>
           </box>

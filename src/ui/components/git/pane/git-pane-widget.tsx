@@ -56,7 +56,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
       <GitPaneHeader gitPanel={display} onTabChange={setTab} projectPath={projectPath} tab={tab} />
-      {tab === 'checks' ? (
+      {tab === 'pr' ? (
         <PrChecksPanel contentWidth={contentWidth} />
       ) : (
         <GitPanel

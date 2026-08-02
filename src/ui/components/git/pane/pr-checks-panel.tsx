@@ -156,9 +156,23 @@ export const PrChecksPanel = memo(function PrChecksPanel({
         scrollbarOptions={HIDDEN_SCROLLBAR_OPTIONS}
         contentOptions={AIRY_CONTENT_OPTIONS}
       >
-        <text selectable={false} fg={stale ? t.textMuted : t.text} bg={bg}>
-          <strong>{pr.title}</strong>
-        </text>
+        <box flexDirection="column">
+          <text selectable={false} fg={stale ? t.textMuted : t.text} bg={bg}>
+            <strong>{pr.title}</strong>
+          </text>
+          {/* The PR diffstat (base..head), not the working tree the files tab shows. */}
+          <box flexDirection="row" gap={1}>
+            <text selectable={false} fg={t.success} bg={bg} wrapMode="none">
+              +{pr.additions}
+            </text>
+            <text selectable={false} fg={t.error} bg={bg} wrapMode="none">
+              -{pr.deletions}
+            </text>
+            <text selectable={false} fg={t.textMuted} bg={bg} wrapMode="none">
+              {pr.changedFiles === 1 ? '1 file' : `${pr.changedFiles} files`}
+            </text>
+          </box>
+        </box>
         {body !== '' ? (
           <box flexDirection="column">
             <text selectable={false} fg={t.textMuted} bg={bg}>
