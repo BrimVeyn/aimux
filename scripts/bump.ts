@@ -25,10 +25,15 @@ function fail(msg: string): never {
   process.exit(1)
 }
 
-function sh(cmd: string, args: string[], opts: { capture?: boolean } = {}): string {
+function sh(
+  cmd: string,
+  args: string[],
+  opts: { capture?: boolean; env?: Record<string, string> } = {}
+): string {
   const res = spawnSync(cmd, args, {
     cwd: ROOT,
     encoding: 'utf8',
+    env: opts.env ? { ...process.env, ...opts.env } : process.env,
     stdio: opts.capture === true ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   })
   if (res.status !== 0) {
@@ -177,6 +182,7 @@ async function main() {
     : `chore(release): ${tag}`
   console.log('will:')
   let step = 1
+  console.log(`  ${step++}. run pre-push checks (lint, format, typecheck, test)`)
   console.log(`  ${step++}. rewrite package.json version → ${rootNext}`)
   if (configPlan) {
     console.log(`  ${step++}. rewrite packages/aimux-config/package.json → ${configPlan.next}`)
@@ -191,6 +197,12 @@ async function main() {
     console.log('aborted.')
     process.exit(1)
   }
+
+  // Run the pre-push suite BEFORE mutating anything: a failing test used to
+  // surface only at `git push`, by which point the version bump was already
+  // written, committed and tagged — so retrying skipped a version.
+  console.log('running pre-push checks…')
+  sh('bunx', ['lefthook', 'run', 'pre-push'])
 
   writeFileSync(ROOT_PKG, rewriteVersion(rootPkg.raw, rootNext))
   if (configPlan) {
@@ -209,8 +221,9 @@ async function main() {
   sh('git', ['tag', '-a', tag, '-m', `Release ${tag}`])
 
   console.log(`pushing ${branch} and ${tag}…`)
-  sh('git', ['push', 'origin', branch])
-  sh('git', ['push', 'origin', tag])
+  // LEFTHOOK=0: the pre-push suite already ran above on the same tree.
+  sh('git', ['push', 'origin', branch], { env: { LEFTHOOK: '0' } })
+  sh('git', ['push', 'origin', tag], { env: { LEFTHOOK: '0' } })
 
   console.log(`\u001b[32m✔\u001b[0m released ${tag}`)
 }
