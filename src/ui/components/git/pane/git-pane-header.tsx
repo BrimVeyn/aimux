@@ -8,7 +8,7 @@ import { selectPrRowVisible, usePrStatusStore } from '../../../../state/pr-statu
 import { useTheme, useTransparent } from '../../../theme'
 import { PrStateRow } from './pr-state-row'
 
-export type GitPaneTab = 'files' | 'pr'
+export type GitPaneTab = 'diff' | 'github'
 
 interface GitPaneHeaderProps {
   gitPanel: GitPanelState
@@ -40,14 +40,14 @@ export const GitPaneHeader = memo(function GitPaneHeader({
     dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
     runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
   }, [nextFileListMode])
-  const showFiles = useCallback(() => onTabChange?.('files'), [onTabChange])
-  const showPr = useCallback(() => onTabChange?.('pr'), [onTabChange])
+  const showDiff = useCallback(() => onTabChange?.('diff'), [onTabChange])
+  const showGithub = useCallback(() => onTabChange?.('github'), [onTabChange])
 
   const hasTabs = tab !== undefined && onTabChange !== undefined
   const hasProject = projectPath != null && projectPath !== ''
   if (!hasProject) return null
   // A git error must not hide the tab row, otherwise there's no way back to
-  // `files` (and the PR checks are still worth showing outside a repo).
+  // `diff` (and the PR checks are still worth showing outside a repo).
   if (gitPanel.error !== null && !hasTabs) return null
 
   const branch = gitPanel.branch
@@ -64,13 +64,13 @@ export const GitPaneHeader = memo(function GitPaneHeader({
   // worth a line without a PR.
   const showPrRow = hasTabs && prRowVisible
   const showBranchRow = !showPrRow && gitPanel.error === null
-  const showToggle = tab !== 'pr' && gitPanel.files.length > 0
+  const showToggle = tab !== 'github' && gitPanel.files.length > 0
   const showHistorical = headOffset > 0
   const showReviewBase = baseLabel != null && baseLabel !== ''
   const showScope = showHistorical || showReviewBase
   const trackingAndToggle = (
     <box flexDirection="row" flexShrink={0} gap={2}>
-      {showTracking && tab !== 'pr' ? (
+      {showTracking && tab !== 'github' ? (
         <box flexDirection="row" gap={1}>
           {showAhead ? (
             <text selectable={false} fg={t.textMuted} wrapMode="none">
@@ -117,31 +117,31 @@ export const GitPaneHeader = memo(function GitPaneHeader({
             <box
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={tab === 'files' ? activeTabBg : undefined}
-              onMouseDown={showFiles}
+              backgroundColor={tab === 'diff' ? activeTabBg : undefined}
+              onMouseDown={showDiff}
             >
               <text
                 selectable={false}
-                fg={tab === 'files' ? t.text : t.textMuted}
-                bg={tab === 'files' ? activeTabBg : undefined}
+                fg={tab === 'diff' ? t.text : t.textMuted}
+                bg={tab === 'diff' ? activeTabBg : undefined}
                 wrapMode="none"
               >
-                files
+                diff
               </text>
             </box>
             <box
               paddingLeft={1}
               paddingRight={1}
-              backgroundColor={tab === 'pr' ? activeTabBg : undefined}
-              onMouseDown={showPr}
+              backgroundColor={tab === 'github' ? activeTabBg : undefined}
+              onMouseDown={showGithub}
             >
               <text
                 selectable={false}
-                fg={tab === 'pr' ? t.text : t.textMuted}
-                bg={tab === 'pr' ? activeTabBg : undefined}
+                fg={tab === 'github' ? t.text : t.textMuted}
+                bg={tab === 'github' ? activeTabBg : undefined}
                 wrapMode="none"
               >
-                pr
+                github
               </text>
             </box>
           </box>

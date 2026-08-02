@@ -34,7 +34,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({
       : undefined
   const projectPath = getActiveWorkspacePath(currentProject)
 
-  const [tab, setTab] = useState<GitPaneTab>('files')
+  const [tab, setTab] = useState<GitPaneTab>('diff')
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })
@@ -56,7 +56,7 @@ export const GitPaneWidget = memo(function GitPaneWidget({
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
       <GitPaneHeader gitPanel={display} onTabChange={setTab} projectPath={projectPath} tab={tab} />
-      {tab === 'pr' ? (
+      {tab === 'github' ? (
         <PrChecksPanel contentWidth={contentWidth} />
       ) : (
         <GitPanel
