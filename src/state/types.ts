@@ -217,6 +217,14 @@ export interface ProjectRecord {
   projectSnapshot?: ProjectSnapshotV1
   workspaces?: WorkspaceRecord[]
   activeWorkspaceId?: string
+  /**
+   * The branch new workspaces fork from, when the repo's own default is the
+   * wrong answer — a gitflow repo branches off `develop` while still declaring
+   * `main` as its default, and nothing about the repo says so. Per project
+   * because the convention is the team's, not the user's: three repos, three
+   * answers. Unset means the repo's default branch.
+   */
+  defaultBaseRef?: string
 }
 
 export interface ProjectBarState {

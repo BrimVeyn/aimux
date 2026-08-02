@@ -15,6 +15,7 @@
     "branch",
     "cat-file",
     "worktree",
+    "fetch",
     "merge-base",
     "merge",
     "reset",

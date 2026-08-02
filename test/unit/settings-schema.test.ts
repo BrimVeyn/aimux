@@ -136,6 +136,7 @@ const FROZEN_ROW_IDS = [
   'externalEditor.command',
   'externalEditor.kind',
   'git.diffCount',
+  'git.fetchBase',
   'git.fileListMode',
   'git.prefetchRadius',
   'git.treeCompaction',

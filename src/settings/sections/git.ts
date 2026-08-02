@@ -5,6 +5,8 @@ import type { SettingSection, SettingValue } from '../types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 
+export const FETCH_BASE = 'git.fetchBase'
+
 function isFileListMode(value: SettingValue): value is GitFileListMode {
   return value === 'tree' || value === 'flat'
 }
@@ -79,6 +81,16 @@ export const GIT_SECTION: SettingSection = {
       max: 50,
       min: 0,
       step: 1,
+      storage: 'settings',
+    },
+    {
+      // No `apply`: `shouldRefreshBase` reads this off the file, so the CLI —
+      // where this screen never hydrates — honours it too.
+      description: 'Fetch the base branch before forking from it. Off forks from your local copy.',
+      fallback: true,
+      id: FETCH_BASE,
+      kind: 'toggle',
+      label: 'Refresh the base branch',
       storage: 'settings',
     },
     {

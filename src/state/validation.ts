@@ -180,7 +180,8 @@ export function isProjectRecord(value: unknown): value is ProjectRecord {
     (value.projectSnapshot === undefined || isProjectSnapshotV1(value.projectSnapshot)) &&
     (value.workspaces === undefined ||
       (Array.isArray(value.workspaces) && value.workspaces.every(isWorkspaceRecord))) &&
-    (value.activeWorkspaceId === undefined || isString(value.activeWorkspaceId))
+    (value.activeWorkspaceId === undefined || isString(value.activeWorkspaceId)) &&
+    (value.defaultBaseRef === undefined || isString(value.defaultBaseRef))
   )
 }
 

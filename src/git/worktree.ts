@@ -98,9 +98,48 @@ export async function renameGitBranch(
   return result.exitCode === 0
 }
 
+/**
+ * The ref a new workspace should actually fork from.
+ *
+ * "Base it on main" means the main the team pushed, not whatever the local main
+ * happened to be at the last pull — a workspace started ten commits behind says
+ * nothing at the time and shows up as conflicts at merge. So fetch the base's
+ * counterpart on origin and fork from that when there is one.
+ *
+ * Every step is best-effort on purpose. The fetch is `nothrow`, so a machine
+ * with no network still gets a workspace off the local ref; and a base with no
+ * counterpart on origin — a local-only branch, a SHA, `HEAD`, or an
+ * already-qualified `origin/x` — resolves to nothing and is used as given, which
+ * is why no ref-shape guessing is needed here.
+ *
+ * The refspec is spelled out rather than left to `remote.origin.fetch`: a bare
+ * `fetch origin main` on a remote with no configured refspec updates only
+ * FETCH_HEAD, leaving a stale `origin/main` that resolves perfectly well — so
+ * the fork would silently land on exactly the old commit this exists to avoid.
+ *
+ * ponytail: unpushed commits on the local base are unreachable from the picker
+ * once this is on — the remote ref wins whenever it exists, and the toggle is
+ * the only way back. Listing `main` and `origin/main` as separate base options
+ * is the upgrade path.
+ */
+export async function resolveWorktreeBaseRef(repoPath: string, baseRef: string): Promise<string> {
+  const remoteRef = `origin/${baseRef}`
+  await $`git -C ${repoPath} fetch origin +${baseRef}:refs/remotes/${remoteRef}`.quiet().nothrow()
+  return (await resolveGitRef(repoPath, remoteRef)) !== undefined ? remoteRef : baseRef
+}
+
+/**
+ * Returns the ref it forked from, which is not always the one it was handed.
+ *
+ * `refreshBase` is required rather than read from the user's config here: this
+ * module wraps git and nothing else, and a caller that has to name the policy
+ * cannot forget it exists — which a settings lookup hidden in here would let
+ * them do. `shouldRefreshBase` is what both callers name it with.
+ */
 export async function createGitWorktree({
   baseRef,
   branchName,
+  refreshBase,
   repoPath,
   targetPath,
 }: {
@@ -108,10 +147,18 @@ export async function createGitWorktree({
   targetPath: string
   branchName: string
   baseRef: string
-}): Promise<void> {
-  const result = await $`git -C ${repoPath} worktree add -b ${branchName} ${targetPath} ${baseRef}`
-    .quiet()
-    .nothrow()
+  refreshBase: boolean
+}): Promise<string> {
+  const forkRef = refreshBase ? await resolveWorktreeBaseRef(repoPath, baseRef) : baseRef
+  // `--no-track`: forking from `origin/main` would otherwise set that as the new
+  // branch's upstream, and a workspace branch tracking main is not a workspace
+  // branch — `git push` either refuses it (push.default=simple) or, worse,
+  // pushes the branch onto main. Forking from a local branch never set tracking,
+  // so this only pins down what refreshing the base would have changed.
+  const result =
+    await $`git -C ${repoPath} worktree add --no-track -b ${branchName} ${targetPath} ${forkRef}`
+      .quiet()
+      .nothrow()
   if (result.exitCode !== 0) {
     // Always name the repository. A bare "fatal: not a valid object name: 'X'"
     // reads as a ref-resolution bug when the real cause is that git ran in a
@@ -119,6 +166,7 @@ export async function createGitWorktree({
     const stderr = result.stderr.toString().trim()
     throw new Error(`${stderr || 'failed to create git worktree'} (in ${repoPath})`)
   }
+  return forkRef
 }
 
 // Force-delete a local branch. Returns false (without throwing) when git

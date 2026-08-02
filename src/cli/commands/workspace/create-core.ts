@@ -10,6 +10,7 @@ import {
   makeWorktreePath,
   pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
+import { shouldRefreshBase } from '../../../settings/flags'
 
 export interface CreateWorkspaceParams {
   /** Base ref for the branch (callers default to 'HEAD'). */
@@ -68,10 +69,12 @@ export async function createProjectWorkspace(
   await ensureAimuxWorktreeRoot()
   await assertSafeAimuxWorktreePath(targetPath)
 
+  let forkRef: string
   try {
-    await createGitWorktree({
+    forkRef = await createGitWorktree({
       baseRef: base,
       branchName: branch,
+      refreshBase: shouldRefreshBase(),
       repoPath: primary.repoRoot,
       targetPath,
     })
@@ -84,7 +87,8 @@ export async function createProjectWorkspace(
 
   const now = new Date().toISOString()
   const record: WorkspaceRecord = {
-    baseRef: base,
+    // What it forked from: `origin/<base>` when the base was refreshed.
+    baseRef: forkRef,
     branch,
     createdAt: now,
     createdByAimux: true,
