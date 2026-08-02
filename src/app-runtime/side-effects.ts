@@ -749,11 +749,18 @@ function runUpdateFromTui(ctx: SideEffectContext, latestVersion: string): void {
   void ctx.backend.destroy(true)
   ctx.renderer.destroy()
   process.stdout.write(`\nUpdating aimux to ${latestVersion}...\n`)
-  const proc = Bun.spawn(['bun', 'update', '-g', '@brimveyn/aimux', '@brimveyn/aimux-config'], {
-    stderr: 'inherit',
-    stdin: 'inherit',
-    stdout: 'inherit',
-  })
+  // `bun update -g` is a no-op when the global entry pins an exact version
+  // (`"@brimveyn/aimux": "1.22.2"`), which is what `install -g pkg@version`
+  // writes — the update "succeeded", the version never moved, and the modal
+  // came back every launch. Install the resolved version explicitly instead.
+  const proc = Bun.spawn(
+    ['bun', 'install', '-g', `@brimveyn/aimux@${latestVersion}`, '@brimveyn/aimux-config@latest'],
+    {
+      stderr: 'inherit',
+      stdin: 'inherit',
+      stdout: 'inherit',
+    }
+  )
   void (async () => {
     const code = await proc.exited
     if (code === 0) {
