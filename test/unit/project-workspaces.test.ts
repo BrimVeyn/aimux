@@ -2,12 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 import type { ProjectRecord } from '../../src/state/types'
 
 import {
   assertSafeAimuxWorktreePath,
+  getAimuxWorktreeRoot,
   isInsideAimuxWorktreeRoot,
   makeWorktreePath,
   pruneEmptyWorktreeParent,
@@ -144,11 +145,21 @@ describe('project workspaces', () => {
       workspaceName: '../feature bad with an absurdly long human name that should not leak',
     })
 
-    expect(path).toStartWith('/tmp/aimux-wt/')
+    expect(path).toStartWith(`${getAimuxWorktreeRoot()}/`)
     expect(path).not.toContain('..')
-    expect(path.length).toBeLessThan(70)
+    expect(basename(path).length).toBeLessThan(32)
     expect(isInsideAimuxWorktreeRoot(path)).toBe(true)
     expect(isInsideAimuxWorktreeRoot('/tmp/not-aimux/repo')).toBe(false)
+  })
+
+  test('worktrees are not generated under /tmp, which reboots wipe', () => {
+    const previousRoot = process.env.AIMUX_WORKTREE_ROOT
+    delete process.env.AIMUX_WORKTREE_ROOT
+    try {
+      expect(getAimuxWorktreeRoot()).not.toStartWith('/tmp/')
+    } finally {
+      if (previousRoot !== undefined) process.env.AIMUX_WORKTREE_ROOT = previousRoot
+    }
   })
 
   test('different repos with the same basename do not collide', () => {
@@ -195,7 +206,8 @@ describe('project workspaces', () => {
     expect(normalized.projectPath).toBe(primary.path)
   })
 
-  test('/private/tmp aliases are treated as inside the Aimux workspace root', () => {
+  test('the legacy /tmp root, and its /private/tmp alias, stay aimux-managed', () => {
+    expect(isInsideAimuxWorktreeRoot('/tmp/aimux-wt/r-test/wt-test')).toBe(true)
     expect(isInsideAimuxWorktreeRoot('/private/tmp/aimux-wt/r-test/wt-test')).toBe(true)
   })
 

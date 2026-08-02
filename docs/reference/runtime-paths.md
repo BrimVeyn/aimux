@@ -82,6 +82,19 @@ Otherwise:
 ~/.local/state/aimux-<profile>/
 ```
 
+## Worktree Root
+
+Workspaces aimux creates itself live under:
+
+```text
+<XDG_DATA_HOME or ~/.local/share>/aimux/worktrees/r-<repo-hash>/<slug>
+```
+
+Set `AIMUX_WORKTREE_ROOT` to put them somewhere else. The root is deliberately
+not under `/tmp`: it holds uncommitted work, and a reboot clears `/tmp`.
+Worktrees created by older versions under `/tmp/aimux-wt` are still recognized
+as aimux-managed, so aimux can delete them — but nothing new is created there.
+
 ## Socket Paths
 
 Inside the runtime directory:

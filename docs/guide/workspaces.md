@@ -20,7 +20,8 @@ Each project tracks three kinds of workspace:
 - **primary** — the project's original checkout. Always present; can't be
   deleted.
 - **aimux-temp** — created by aimux under `AIMUX_WORKTREE_ROOT` (default
-  `/tmp/aimux-wt`, see [runtime paths](../reference/runtime-paths.md)). These are
+  `~/.local/share/aimux/worktrees`, see
+  [runtime paths](../reference/runtime-paths.md)). These are
   the ones aimux fully manages: it can create, move, and delete them.
 - **external** — workspaces you created outside aimux that it discovered via
   `git worktree list`. aimux shows and uses them but won't delete them from disk.

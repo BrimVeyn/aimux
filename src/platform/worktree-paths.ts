@@ -2,12 +2,23 @@ import { createHash } from 'node:crypto'
 import { lstat, mkdir, realpath, rmdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 
-const DEFAULT_WORKTREE_ROOT = '/tmp/aimux-wt'
+// Worktrees hold uncommitted work, so they live in the XDG data dir, not /tmp:
+// a reboot clears /tmp on macOS and on most Linux distros, and took the work
+// with it. The old root stays recognized (never generated) so worktrees created
+// before this change are still classified and deleted as aimux-managed.
+const LEGACY_WORKTREE_ROOT = '/tmp/aimux-wt'
 const MAX_SLUG_LENGTH = 24
+
+function defaultWorktreeRoot(): string {
+  const xdgData = process.env.XDG_DATA_HOME
+  const base =
+    xdgData != null && xdgData !== '' ? xdgData : join(process.env.HOME ?? '.', '.local', 'share')
+  return join(base, 'aimux', 'worktrees')
+}
 
 export function getAimuxWorktreeRoot(): string {
   const root = process.env.AIMUX_WORKTREE_ROOT
-  return root != null && root !== '' ? root : DEFAULT_WORKTREE_ROOT
+  return root != null && root !== '' ? root : defaultWorktreeRoot()
 }
 
 export function sanitizePathSegment(input: string, maxLength = MAX_SLUG_LENGTH): string {
@@ -42,9 +53,10 @@ export function makeWorktreePath({
 
 export function isInsideAimuxWorktreeRoot(path: string): boolean {
   const normalizeTmp = (value: string) => value.replace(/^\/private\/tmp(?=\/|$)/, '/tmp')
-  const root = `${normalizeTmp(resolve(getAimuxWorktreeRoot()))}/`
   const target = `${normalizeTmp(resolve(path))}/`
-  return target.startsWith(root)
+  return [getAimuxWorktreeRoot(), LEGACY_WORKTREE_ROOT].some((root) =>
+    target.startsWith(`${normalizeTmp(resolve(root))}/`)
+  )
 }
 
 export async function ensureAimuxWorktreeRoot(): Promise<string> {
@@ -80,13 +92,13 @@ export async function pruneEmptyWorktreeParent(worktreePath: string): Promise<vo
 export async function assertSafeAimuxWorktreePath(path: string): Promise<void> {
   const root = await ensureAimuxWorktreeRoot()
   if (!isInsideAimuxWorktreeRoot(path)) {
-    throw new Error(`refusing worktree path outside Aimux temp root: ${path}`)
+    throw new Error(`refusing worktree path outside Aimux worktree root: ${path}`)
   }
   // Create the repo-scoped parent (<root>/r-<hash>) before resolving it: git
   // worktree add does not create intermediate dirs, and realpath() would throw
   // ENOENT on the first worktree for a repo. mkdir(recursive) leaves an
   // existing symlink in place, so the realpath check below still catches an
-  // escape out of the temp root.
+  // escape out of the worktree root.
   const parent = resolve(path, '..')
   await mkdir(parent, { recursive: true })
   const realRoot = await realpath(root)
