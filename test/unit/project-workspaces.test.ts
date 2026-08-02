@@ -152,13 +152,27 @@ describe('project workspaces', () => {
     expect(isInsideAimuxWorktreeRoot('/tmp/not-aimux/repo')).toBe(false)
   })
 
-  test('worktrees are not generated under /tmp, which reboots wipe', () => {
-    const previousRoot = process.env.AIMUX_WORKTREE_ROOT
-    delete process.env.AIMUX_WORKTREE_ROOT
+  // The default lands in the data dir, never in /tmp, which a reboot wipes.
+  // HOME and XDG_DATA_HOME are pinned here: other tests sandbox HOME under
+  // tmpdir, so reading the ambient env would test the runner, not the code.
+  test('worktrees default under the data dir, which survives a reboot', () => {
+    const { AIMUX_WORKTREE_ROOT, HOME, XDG_DATA_HOME } = process.env
+    const restore = (name: string, value: string | undefined) => {
+      if (value === undefined) delete process.env[name]
+      else process.env[name] = value
+    }
     try {
-      expect(getAimuxWorktreeRoot()).not.toStartWith('/tmp/')
+      delete process.env.AIMUX_WORKTREE_ROOT
+      delete process.env.XDG_DATA_HOME
+      process.env.HOME = '/home/tester'
+      expect(getAimuxWorktreeRoot()).toBe('/home/tester/.local/share/aimux/worktrees')
+
+      process.env.XDG_DATA_HOME = '/home/tester/data'
+      expect(getAimuxWorktreeRoot()).toBe('/home/tester/data/aimux/worktrees')
     } finally {
-      if (previousRoot !== undefined) process.env.AIMUX_WORKTREE_ROOT = previousRoot
+      restore('AIMUX_WORKTREE_ROOT', AIMUX_WORKTREE_ROOT)
+      restore('HOME', HOME)
+      restore('XDG_DATA_HOME', XDG_DATA_HOME)
     }
   })
 
