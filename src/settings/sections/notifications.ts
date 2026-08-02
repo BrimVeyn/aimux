@@ -45,10 +45,10 @@ function selectedVolume(): number {
  * user has set the row to `off`, which is what makes it safe to call on every
  * status edge.
  */
-export function playNotificationSound(options?: { ignoreThrottle?: boolean }): boolean {
+export function playNotificationSound(): boolean {
   const path = resolveSoundPath(selectedSoundId())
   if (path == null) return false
-  return playSoundFile(path, { ...options, volume: selectedVolume() })
+  return playSoundFile(path, { volume: selectedVolume() })
 }
 
 export const NOTIFICATIONS_SECTION: SettingSection = {
@@ -89,7 +89,7 @@ export const NOTIFICATIONS_SECTION: SettingSection = {
           toast.info('Notification sound is off')
           return
         }
-        if (!playNotificationSound({ ignoreThrottle: true })) {
+        if (!playNotificationSound()) {
           toast.error('Could not play that sound — no audio player found')
         }
       },
