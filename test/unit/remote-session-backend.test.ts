@@ -13,7 +13,10 @@ import {
 } from '../../src/ipc/protocol'
 import { RemoteSessionBackend } from '../../src/session-backend/remote-session-backend'
 
-async function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_500): Promise<T> {
+// 1.5s was enough alone and not under a loaded suite — the socket round-trips
+// here are all sub-millisecond when they work, so a longer ceiling only ever
+// costs time on a run that was going to fail anyway.
+async function waitFor<T>(getValue: () => T | undefined, timeoutMs = 5_000): Promise<T> {
   const start = Date.now()
 
   return new Promise((resolve, reject) => {
