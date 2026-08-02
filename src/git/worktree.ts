@@ -206,7 +206,7 @@ export async function removeGitWorktree({
   force: boolean
 }): Promise<void> {
   if (!isInsideAimuxWorktreeRoot(targetPath)) {
-    throw new Error(`refusing to delete worktree outside Aimux temp root: ${targetPath}`)
+    throw new Error(`refusing to delete worktree outside Aimux worktree root: ${targetPath}`)
   }
   const result = force
     ? await $`git -C ${repoPath} worktree remove --force ${targetPath}`.quiet().nothrow()
