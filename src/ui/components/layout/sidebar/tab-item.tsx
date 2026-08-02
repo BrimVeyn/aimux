@@ -57,11 +57,11 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
 
 function BusyGlyph() {
   const t = useTheme()
-  const frame = useBusySpinner()
+  const spinner = useBusySpinner()
   return (
     <text fg={t.primary} selectable={false}>
       {' '}
-      {frame}
+      {spinner}
     </text>
   )
 }
@@ -78,6 +78,8 @@ function WaitingGlyph() {
 
 function ActivityGlyph({ tab }: { tab: TabSession }) {
   const t = useTheme()
+  // No sprite here on purpose: a tab is one line, and a sprite placed at a
+  // second size would give a cell two images it could resolve to.
   if (tab.status === 'error') {
     return (
       <text fg={t.error} selectable={false}>

@@ -13,7 +13,6 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-
 import { getPrimaryWorkspace } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_PROJECT_STATUS } from '../../../../state/types'
-import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
@@ -329,9 +328,7 @@ const ProjectRow = memo(function ProjectRow({
       return activity !== undefined && (activity.working || activity.waiting || activity.done)
     })
   )
-  const showSpinner = status.working && !workspacesSpeak
   const showWaiting = status.waiting && !workspacesSpeak
-  const spinner = useBusySpinner(showSpinner)
   // Only the drag highlight is "selected"-strength here. A heading that lights
   // up like a cursor row is what made the project look like a workspace.
   let bgColor: string | undefined
@@ -340,7 +337,6 @@ const ProjectRow = memo(function ProjectRow({
   } else if (inCurrentGroup) {
     bgColor = base.backgroundPanel
   }
-  const workingColor = t.primary
   const waitingColor = t.warning
   const currentProjectId = useAppStore((s) => s.currentProjectId)
 
@@ -398,16 +394,16 @@ const ProjectRow = memo(function ProjectRow({
     [project.id, project.name]
   )
 
-  // Neutral muted marker; working/waiting overrides it. Keeping a glyph
-  // in the slot avoids name shifts when state indicators come and go.
-  let leadingGlyph = '•'
+  // Neutral muted marker, and a question when a workspace of this project needs
+  // an answer. No progress indicator: a heading can only say "somewhere below",
+  // and the row that actually knows is one line down. Keeping a glyph in the slot
+  // avoids name shifts when the question comes and goes — which is also why the
+  // gap after it is part of the glyph.
+  let leadingGlyph = '• '
   let leadingColor = t.textMuted
   if (showWaiting) {
-    leadingGlyph = '?'
+    leadingGlyph = '? '
     leadingColor = waitingColor
-  } else if (showSpinner) {
-    leadingGlyph = spinner
-    leadingColor = workingColor
   }
 
   // No branch line: the repo checkout is not somewhere aimux works, so naming
@@ -433,9 +429,6 @@ const ProjectRow = memo(function ProjectRow({
       <box flexDirection="row" alignItems="center">
         <text fg={leadingColor} selectable={false} wrapMode="none">
           {leadingGlyph}
-        </text>
-        <text fg={t.text} selectable={false} wrapMode="none">
-          {' '}
         </text>
         <FlashLabelBadge rowKey={`ws:${project.id}`} />
         <text fg={t.text} selectable={false} wrapMode="none">

@@ -17,12 +17,12 @@ import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../../../state/project-workspaces'
 import { setGitDiffScroller } from '../../git-view-controls'
+import { formatBytes } from '../../terminal-graphics/dimensions'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
-import { formatBytes } from './image-diff/dimensions'
 import { GitPaneHeader } from './pane/git-pane-header'
 
 interface DiffStageProps {

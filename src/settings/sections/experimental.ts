@@ -1,6 +1,9 @@
 import type { SettingSection } from '../types'
 
+import { userSpriteDir } from '../../ui/terminal-graphics/sprites'
+
 export const HARMONIZE_CLAUDE_THEME = 'theme.beta.harmonizeClaudeTheme'
+export const ACTIVITY_SPRITES = 'theme.beta.experimentalActivitySprites'
 
 /**
  * The `theme.beta.*` block of the config, under the label its own docstrings use.
@@ -31,6 +34,24 @@ export const EXPERIMENTAL_SECTION: SettingSection = {
       label: 'Syntax highlight from the theme',
       restart: true,
       storage: 'settings',
+    },
+    {
+      description: 'A little animation per agent state, instead of the spinner and the dots.',
+      fallback: false,
+      fromConfig: (config) => config.theme?.beta?.experimentalActivitySprites,
+      id: ACTIVITY_SPRITES,
+      kind: 'toggle',
+      label: 'Activity sprites (Kitty or Ghostty, not tmux)',
+      storage: 'settings',
+    },
+    // The row above is useless without knowing where to put anything, and a path
+    // that has to be looked up in the docs is a path nobody uses.
+    {
+      description: 'Drop a `<state>.gif` here — states: idle, working, waiting, done.',
+      id: 'experimental.spriteFolder',
+      kind: 'info',
+      label: 'Sprite folder',
+      value: () => userSpriteDir(),
     },
   ],
 }
