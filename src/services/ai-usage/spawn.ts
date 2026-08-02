@@ -13,12 +13,25 @@ export async function runCli(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
   cwd?: string
 ): Promise<CliResult> {
-  const proc = Bun.spawn([command, ...args], {
-    cwd,
-    stderr: 'pipe',
-    stdin: 'ignore',
-    stdout: 'pipe',
-  })
+  let proc: Bun.Subprocess<'ignore', 'pipe', 'pipe'>
+  try {
+    proc = Bun.spawn([command, ...args], {
+      cwd,
+      stderr: 'pipe',
+      stdin: 'ignore',
+      stdout: 'pipe',
+    })
+  } catch (error) {
+    // posix_spawn throws — synchronously — for a missing binary AND for a cwd
+    // that no longer exists (a deleted project dir or a pruned worktree), and
+    // it names the binary in both. Uncaught, that took the whole app down.
+    return {
+      error: `${command}: ${String(error)}`.slice(0, 200),
+      ok: false,
+      stderr: '',
+      stdout: '',
+    }
+  }
 
   const timeout = setTimeout(() => {
     try {
