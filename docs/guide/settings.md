@@ -139,6 +139,43 @@ The **Experimental** section holds the config's `theme.beta.*` flags. They are
 unfinished: they can change behaviour or go away in any release, which is why they
 are grouped under that label rather than filed by what they touch.
 
+### Activity sprites
+
+With the toggle on, the sidebar draws a small animation per agent state instead
+of the spinner and the dots. It needs a terminal that speaks the Kitty graphics
+protocol — Kitty, Ghostty, WezTerm — and is off under tmux, which owns the grid
+and does not understand the placeholder cells the sprites are drawn into.
+Anywhere it cannot draw, the spinner and the dots come back.
+
+aimux ships a set. To use your own, drop them into the **Sprite folder** the row
+below the toggle names (`<config dir>/sprites`). One entry per state, and the name
+says everything — there is no manifest:
+
+| Entry          | Means                                                                |
+| -------------- | -------------------------------------------------------------------- |
+| `working.gif`  | shown while the agent works; the GIF brings its own frames and delay |
+| `idle@1000/`   | a folder of `0.png`, `1.png`, … — one file per frame, 1000ms each    |
+| `waiting@170/` | shown when the agent is waiting on you                               |
+| `done@170/`    | finished and unread                                                  |
+
+The states are `idle`, `working`, `waiting` and `done`. A GIF is the easy way and
+needs ImageMagick on your `PATH`; the folder form needs nothing, and is how the
+shipped sprites are stored. An entry you drop replaces the one aimux ships for
+that state; anything else in the folder is ignored. It is all read once at
+startup, so a sprite added while aimux runs appears at the next launch.
+
+Every frame is uploaded to the terminal as its own image. A sheet is deliberately
+not cut at display time: the protocol has a source rectangle for exactly that,
+but not every terminal honours it on these placements, and one that ignores it
+draws the whole sheet into the two cells instead of the frame asked for.
+
+Keep frames roughly square, and at their native resolution. The terminal fits an
+image to its slot keeping the aspect ratio, so a frame much wider or taller than
+square is drawn small with empty space around it rather than filling the slot.
+Do not upscale pixel art with a smoothing filter before dropping it in — that
+blur is baked into the file, and nothing downstream can undo it. If you need to
+resize, use nearest-neighbour (`magick in.png -filter point -resize 200% out.png`).
+
 ## Applies on restart
 
 A few rows say so, because the thing that reads them is set up before this screen

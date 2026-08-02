@@ -1,18 +1,30 @@
 import { type MouseEvent as OtuiMouseEvent, TextAttributes } from '@opentui/core'
 import { memo, useCallback, useMemo } from 'react'
 
-import type { ProjectRecord, WorkspaceRecord } from '../../../../state/types'
+import type { ProjectRecord, WorkspaceActivity, WorkspaceRecord } from '../../../../state/types'
+import type { SpriteState } from '../../../terminal-graphics/sprites'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { formatDiffStat } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
+import { useActivitySprite } from '../../../hooks/use-activity-sprite'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
+// eslint-disable-next-line no-duplicate-imports
+import { SPRITE_COLS } from '../../../terminal-graphics/sprites'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
+
+/** Same priority as the glyphs below, so a sprite says what the glyph would. */
+function spriteStateFor(activity: WorkspaceActivity): SpriteState {
+  if (activity.waiting) return 'waiting'
+  if (activity.working) return 'working'
+  if (activity.done) return 'done'
+  return 'idle'
+}
 
 interface WorkspaceRowProps {
   project: ProjectRecord
@@ -41,8 +53,15 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   const isCurrentProject = project.id === currentProjectId
   const divergence = useAppStore((s) => s.workspaceDivergence[workspace.id])
   const activity = useAppStore((s) => s.workspaceActivity[workspace.id]) ?? IDLE_WORKSPACE_ACTIVITY
-  // Only the working case animates, so the timer is off for every other row.
-  const spinner = useBusySpinner(activity.working)
+  // A sprite is placed across the two lines of the row, so only a row that has
+  // both — the branch line under the name — can carry one. A branchless checkout
+  // keeps the text marker rather than getting a second placement geometry of its
+  // own: one shape is what keeps a cell from resolving to the wrong image.
+  const hasBranch = workspace.branch != null && workspace.branch !== ''
+  const sprite = useActivitySprite(hasBranch ? spriteStateFor(activity) : null)
+  // Only the working case animates, so the timer is off for every other row —
+  // and off entirely when a sprite is drawing this row instead.
+  const spinner = useBusySpinner(activity.working && sprite === null)
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -119,11 +138,19 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // without reading anything.
   const cursorGlyph = isActiveItem ? '▌' : ' '
 
+  // The marker slot: two cells of text, or the wider box a sprite needs. The
+  // bundled set covers every state, so with sprites on, every two-line row uses
+  // the same width whatever its state — only a branchless row keeps the narrow
+  // slot, and its name sits one cell left of its siblings'. Accepted: the
+  // alternative is a second placement geometry, which is what mis-sized every
+  // sprite in the first place.
+  const markerCells = sprite === null ? 2 : SPRITE_COLS
+
   const { added, removed } = formatDiffStat(divergence)
   const statWidth = added.length + removed.length + (added !== '' && removed !== '' ? 1 : 0)
   const nameLabel = truncate(
     workspace.name,
-    Math.max(0, contentWidth - 4 - (statWidth > 0 ? statWidth + 1 : 0))
+    Math.max(0, contentWidth - 2 - markerCells - (statWidth > 0 ? statWidth + 1 : 0))
   )
   // Second line, hanging under the name, and where the branch glyph lives — it
   // labels the branch, not the workspace. Only workspaces that own a branch get
@@ -132,25 +159,30 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // The glyph starts where the name above it starts, so the branch hangs one
   // glyph-width in from it — the row reads as a title with a labelled line
   // under it, not as two columns.
-  const branchLabel =
-    workspace.branch == null || workspace.branch === ''
-      ? null
-      : truncate(workspace.branch, Math.max(0, contentWidth - 6))
+  const branchLabel = !hasBranch
+    ? null
+    : truncate(workspace.branch ?? '', Math.max(0, contentWidth - 4 - markerCells))
 
   // Same vocabulary as the project heading one level up, in the same priority:
   // a question outranks work in progress, which outranks "it finished and you
   // haven't looked". A space when there is nothing to say — the row keeps its
   // width either way, so nothing shifts.
-  let statusGlyph = ' '
+  // Every text marker is two cells, the glyph and the gap after it, so nothing
+  // shifts when an agent starts or stops. The sprite is the one exception and
+  // carries its own width — see markerCells above.
+  let statusGlyph = '  '
   let statusColor = t.textMuted
-  if (activity.waiting) {
-    statusGlyph = '?'
+  if (sprite) {
+    statusGlyph = sprite.glyphs[0] ?? '  '
+    statusColor = sprite.fg
+  } else if (activity.waiting) {
+    statusGlyph = '? '
     statusColor = t.warning
   } else if (activity.working) {
-    statusGlyph = spinner
+    statusGlyph = `${spinner} `
     statusColor = t.primary
   } else if (activity.done) {
-    statusGlyph = '●'
+    statusGlyph = '● '
     statusColor = t.success
   }
 
@@ -169,7 +201,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
           {cursorGlyph}
         </text>
         <text fg={statusColor} selectable={false} wrapMode="none">
-          {statusGlyph}{' '}
+          {statusGlyph}
         </text>
         <FlashLabelBadge rowKey={`wt:${workspace.id}`} />
         {/* Full strength only under the cursor. Every name at full strength
@@ -205,8 +237,13 @@ export const WorkspaceRow = memo(function WorkspaceRow({
           <text fg={t.primary} selectable={false} wrapMode="none">
             {cursorGlyph}
           </text>
+          {/* The marker slot again, so a sprite tall enough to want both lines
+              gets its bottom half. Two cells either way, which is what the
+              branch glyph has always hung off. */}
+          <text fg={statusColor} selectable={false} wrapMode="none">
+            {sprite?.glyphs[1] ?? '  '}
+          </text>
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'  '}
             {'\u{e702}'} {branchLabel}
           </text>
         </box>

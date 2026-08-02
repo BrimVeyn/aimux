@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
-import { HARMONIZE_CLAUDE_THEME } from './sections/experimental'
+import { ACTIVITY_SPRITES, HARMONIZE_CLAUDE_THEME } from './sections/experimental'
 import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 
@@ -72,6 +72,15 @@ export function useAutoCommitModel(assistant: string | undefined): string | unde
       : s.values[`${AUTO_COMMIT_MODEL_PREFIX}${assistant}`]
   )
   return typeof stored === 'string' && stored !== '' ? stored : undefined
+}
+
+/**
+ * Whether agent state is drawn as a sprite. Read straight off the store rather
+ * than through the resolved config: hydration already folds in whatever
+ * `aimux.config.ts` declares, and this way the toggle lands without a restart.
+ */
+export function useActivitySprites(): boolean {
+  return useSettingsStore((s) => s.values[ACTIVITY_SPRITES] === true)
 }
 
 /** Whether to keep Claude Code's theme in step with the active aimux theme. */

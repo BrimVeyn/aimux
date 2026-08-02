@@ -46,10 +46,16 @@ function chunkString(s: string, size: number): string[] {
 
 // Build the upload escape(s) for a PNG (f=100) image. Chunked per Kitty spec
 // recommendation (≤ 4096 base64 bytes per escape).
+//
+// The upload is preceded by a delete of the same id. Images outlive the
+// process — they belong to the terminal window — and this process allocates
+// ids from a fixed base, so a previous run may have left this very id carrying
+// a *different* placement. An image with two virtual placements and nothing to
+// disambiguate them draws at whichever size the terminal happens to pick.
 export function uploadPngEscape(pngBytes: Uint8Array, id: number): string {
   const b64 = encodeBase64(pngBytes)
   const chunks = chunkString(b64, MAX_BASE64_CHUNK)
-  const parts: string[] = []
+  const parts: string[] = [`${ESC}_Ga=d,d=I,i=${id},q=2;${ST}`]
   for (let i = 0; i < chunks.length; i++) {
     const isLast = i === chunks.length - 1
     const m = isLast ? 0 : 1
@@ -60,12 +66,32 @@ export function uploadPngEscape(pngBytes: Uint8Array, id: number): string {
   return wrapForTmux(parts.join(''))
 }
 
+// A virtual placement (U=1) is not painted over the screen: the terminal
+// composites the image into whichever cells carry the Unicode placeholder,
+// which is what lets an image survive redraws the app makes on its own. `cols`
+// and `rows` size the placeholder box, and the image is scaled to fill it.
+//
+// Deliberately no source rectangle (`x`/`y`/`w`/`h`): terminals that speak the
+// rest of this protocol do not all honour it on a virtual placement, and one
+// that ignores it silently draws the whole image instead of the slice asked
+// for. Callers upload one image per frame.
+export function virtualPlacementEscape(id: number, cols: number, rows: number): string {
+  return wrapForTmux(`${ESC}_Ga=p,U=1,i=${id},c=${cols},r=${rows},q=2;${ST}`)
+}
+
 export function deleteImageEscape(id: number): string {
   return wrapForTmux(`${ESC}_Ga=d,d=I,i=${id},q=2;${ST}`)
 }
 
 export function imageIdToRgb(id: number): [number, number, number] {
   return idToRgb(id)
+}
+
+// Same id, spelled the way a renderable's `fg` wants it. The colour is not a
+// colour here: it is what tells the terminal which image a placeholder cell
+// stands for, so it has to survive the round trip through the renderer intact.
+export function imageIdToHex(id: number): string {
+  return `#${(id & 0xffffff).toString(16).padStart(6, '0')}`
 }
 
 export function writeRaw(seq: string): void {

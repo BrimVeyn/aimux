@@ -8,8 +8,8 @@ import {
   isInsideTmux,
   terminalLabel,
 } from '../../../terminal-graphics/capabilities'
+import { formatBytes, readImageDimensions } from '../../../terminal-graphics/dimensions'
 import { useTheme } from '../../../theme'
-import { formatBytes, readImageDimensions } from './dimensions'
 import { TerminalImagePane } from './terminal-image-pane'
 
 interface ImageDiffViewProps {

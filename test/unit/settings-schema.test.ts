@@ -155,6 +155,8 @@ const FROZEN_ROW_IDS = [
   'statusBar.aiUsage.enabled',
   'statusBar.aiUsage.pollSeconds',
   'statusBar.separator',
+  'experimental.spriteFolder',
+  'theme.beta.experimentalActivitySprites',
   'theme.beta.experimentalSyntaxHighlight',
   'theme.beta.harmonizeClaudeTheme',
 ]

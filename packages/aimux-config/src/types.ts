@@ -1203,6 +1203,14 @@ export interface AimuxThemeConfig {
   beta?: {
     harmonizeClaudeTheme?: boolean
     /**
+     * Draw each agent state (idle, working, waiting, done) as a small animated
+     * sprite rather than a spinner and a set of dots. Needs a terminal that
+     * speaks the Kitty graphics protocol (Kitty, Ghostty, WezTerm) and does not
+     * work under tmux. Sprites are read from `<config dir>/sprites`, falling
+     * back to the ones aimux ships.
+     */
+    experimentalActivitySprites?: boolean
+    /**
      * Disable Claude Code's built-in syntax highlighting and re-color diff
      * lines from the aimux theme via shiki. Sets
      * `CLAUDE_CODE_SYNTAX_HIGHLIGHT=false` for child PTYs and post-processes
