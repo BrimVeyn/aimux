@@ -4,7 +4,9 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import { loadConfig, saveConfig } from '../../src/config'
 import { createGitWorktree, resolveGitRef, resolveWorktreeBaseRef } from '../../src/git/worktree'
+import { shouldRefreshBase } from '../../src/settings/flags'
 
 /**
  * A remote with a commit the clone has never seen, which is the whole point:
@@ -13,6 +15,8 @@ import { createGitWorktree, resolveGitRef, resolveWorktreeBaseRef } from '../../
 let root: string
 let remote: string
 let clone: string
+/** A clone whose `remote.origin.fetch` is stripped, see the test that uses it. */
+let narrow: string
 let homeBefore: string | undefined
 
 async function commit(repo: string, message: string): Promise<void> {
@@ -35,6 +39,10 @@ beforeAll(async () => {
   await $`git -C ${remote} config user.name test`.quiet()
   await commit(remote, 'first')
   await $`git clone ${remote} ${clone}`.quiet()
+  narrow = join(root, 'narrow')
+  await $`git clone ${remote} ${narrow}`.quiet()
+  await $`git -C ${narrow} config --unset remote.origin.fetch`.quiet()
+  // Both clones are now one commit behind, with their origin/main to match.
   await commit(remote, 'second')
 })
 
@@ -57,6 +65,19 @@ test('a base with a counterpart on origin resolves to it, fetched', async () => 
   expect(await resolveGitRef(clone, 'main')).toBe(localBefore ?? 'unresolved')
 })
 
+test('the base is refreshed even when the remote has no fetch refspec', async () => {
+  // Without an explicit refspec, `git fetch origin main` here writes only
+  // FETCH_HEAD: origin/main stays behind, resolves fine, and the fork lands on
+  // the stale commit while looking entirely successful.
+  const staleBefore = await resolveGitRef(narrow, 'origin/main')
+  expect(staleBefore).not.toBe(await resolveGitRef(remote, 'main'))
+
+  expect(await resolveWorktreeBaseRef(narrow, 'main')).toBe('origin/main')
+  expect(await resolveGitRef(narrow, 'origin/main')).toBe(
+    (await resolveGitRef(remote, 'main')) ?? 'unresolved'
+  )
+})
+
 test('a base with no counterpart on origin is used as given', async () => {
   await $`git -C ${clone} branch local-only`.quiet()
 
@@ -72,6 +93,7 @@ test('a workspace forked from the refreshed base has the commit, and no upstream
   const forkRef = await createGitWorktree({
     baseRef: 'main',
     branchName: 'aimux/from-origin',
+    refreshBase: true,
     repoPath: clone,
     targetPath: target,
   })
@@ -84,6 +106,37 @@ test('a workspace forked from the refreshed base has the commit, and no upstream
     .quiet()
     .nothrow()
   expect(upstream.exitCode).not.toBe(0)
+})
+
+test('refreshBase false forks from the local ref, without reaching the remote', async () => {
+  const target = join(root, 'workspace-local')
+  const localMain = await resolveGitRef(clone, 'main')
+
+  const forkRef = await createGitWorktree({
+    baseRef: 'main',
+    branchName: 'aimux/local-base',
+    refreshBase: false,
+    repoPath: clone,
+    targetPath: target,
+  })
+
+  expect(forkRef).toBe('main')
+  // The commit the remote has moved on to must NOT be here: that is the whole
+  // promise of the toggle.
+  expect(await resolveGitRef(target, 'HEAD')).toBe(localMain ?? 'none')
+  expect(await resolveGitRef(target, 'HEAD')).not.toBe(await resolveGitRef(remote, 'main'))
+})
+
+test('git.fetchBase in the config file is what decides it', () => {
+  expect(shouldRefreshBase()).toBe(true)
+
+  // Written through the app's own writer, so this test cannot pass against a
+  // config shape the app would not actually produce.
+  saveConfig({ ...loadConfig(), settings: { 'git.fetchBase': false } })
+  expect(shouldRefreshBase()).toBe(false)
+
+  saveConfig({ ...loadConfig(), settings: { 'git.fetchBase': true } })
+  expect(shouldRefreshBase()).toBe(true)
 })
 
 test('a repo with no origin at all still yields a usable base', async () => {

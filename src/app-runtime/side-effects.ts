@@ -36,7 +36,6 @@ import {
   handleCreateProjectEffect,
   handleDeleteProjectEffect,
   handleRenameProjectEffect,
-  handleSetProjectDefaultBaseRefEffect,
   handleSwitchProjectEffect,
   restartTabSession,
 } from './project-actions'
@@ -73,6 +72,7 @@ import {
   isForceableWorkspaceDeleteError,
   runDeleteWorkspace,
   runMoveWorkspace,
+  setProjectDefaultBaseRef,
 } from './workspace-actions'
 import { placeholderWorkspaceName, renameWorkspaceFromPrompt } from './workspace-naming'
 
@@ -695,12 +695,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'set-project-default-base-ref': {
-      handleSetProjectDefaultBaseRefEffect(
-        state.projects,
-        dispatch,
-        effect.projectId,
-        effect.baseRef
-      )
+      setProjectDefaultBaseRef(ctx, effect.projectId, effect.baseRef)
       return
     }
     case 'ask-agent-for-setup-script': {

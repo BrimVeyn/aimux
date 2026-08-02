@@ -10,6 +10,7 @@ import {
   makeWorktreePath,
   pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
+import { shouldRefreshBase } from '../../../settings/flags'
 
 export interface CreateWorkspaceParams {
   /** Base ref for the branch (callers default to 'HEAD'). */
@@ -73,6 +74,7 @@ export async function createProjectWorkspace(
     forkRef = await createGitWorktree({
       baseRef: base,
       branchName: branch,
+      refreshBase: shouldRefreshBase(),
       repoPath: primary.repoRoot,
       targetPath,
     })

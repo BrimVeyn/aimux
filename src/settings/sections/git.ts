@@ -5,6 +5,8 @@ import type { SettingSection, SettingValue } from '../types'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 
+export const FETCH_BASE = 'git.fetchBase'
+
 function isFileListMode(value: SettingValue): value is GitFileListMode {
   return value === 'tree' || value === 'flat'
 }
@@ -82,12 +84,11 @@ export const GIT_SECTION: SettingSection = {
       storage: 'settings',
     },
     {
-      // No `apply`: the reader is `resolveWorktreeBaseRef`, which reads the
-      // config file itself so the CLI's `workspace create` — where this screen
-      // never hydrates — agrees with the TUI instead of always fetching.
+      // No `apply`: `shouldRefreshBase` reads this off the file, so the CLI —
+      // where this screen never hydrates — honours it too.
       description: 'Fetch the base branch before forking from it. Off forks from your local copy.',
       fallback: true,
-      id: 'git.fetchBase',
+      id: FETCH_BASE,
       kind: 'toggle',
       label: 'Refresh the base branch',
       storage: 'settings',

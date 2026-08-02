@@ -23,6 +23,7 @@ import {
   makeWorktreePath,
   sanitizePathSegment,
 } from '../platform/worktree-paths'
+import { shouldRefreshBase } from '../settings/flags'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -58,6 +59,27 @@ export function handleSwitchWorkspace(
   const projects = replaceProject(ctx, projectId, (entry) => ({
     ...entry,
     activeWorkspaceId: workspaceId,
+    updatedAt: new Date().toISOString(),
+  }))
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
+}
+
+/**
+ * Set (or clear, when blank) the branch this project's new workspaces fork from.
+ * Here rather than with the project actions: the value is workspace policy that
+ * happens to be stored on the project, and this is where the record-update
+ * helper and the rest of that policy already live.
+ */
+export function setProjectDefaultBaseRef(
+  ctx: SideEffectContext,
+  projectId: string,
+  baseRef: string
+): void {
+  const trimmed = baseRef.trim()
+  const projects = replaceProject(ctx, projectId, (entry) => ({
+    ...entry,
+    defaultBaseRef: trimmed === '' ? undefined : trimmed,
     updatedAt: new Date().toISOString(),
   }))
   saveProjectCatalog(projects)
@@ -118,7 +140,13 @@ export async function createAimuxTempWorkspace(
   await assertSafeAimuxWorktreePath(targetPath)
   // What it forked from, not what was asked for: the two differ whenever the
   // base was refreshed from origin, and the record is what "based on" reads.
-  const forkRef = await createGitWorktree({ baseRef, branchName, repoPath: repoRoot, targetPath })
+  const forkRef = await createGitWorktree({
+    baseRef,
+    branchName,
+    refreshBase: shouldRefreshBase(),
+    repoPath: repoRoot,
+    targetPath,
+  })
   const now = new Date().toISOString()
 
   const workspace: WorkspaceRecord = {

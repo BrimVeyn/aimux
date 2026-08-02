@@ -1,7 +1,6 @@
 import { $ } from 'bun'
 import { existsSync } from 'node:fs'
 
-import { loadConfig } from '../config'
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
 export interface GitWorktreeInfo {
@@ -113,22 +112,34 @@ export async function renameGitBranch(
  * already-qualified `origin/x` — resolves to nothing and is used as given, which
  * is why no ref-shape guessing is needed here.
  *
+ * The refspec is spelled out rather than left to `remote.origin.fetch`: a bare
+ * `fetch origin main` on a remote with no configured refspec updates only
+ * FETCH_HEAD, leaving a stale `origin/main` that resolves perfectly well — so
+ * the fork would silently land on exactly the old commit this exists to avoid.
+ *
  * ponytail: unpushed commits on the local base are unreachable from the picker
  * once this is on — the remote ref wins whenever it exists, and the toggle is
  * the only way back. Listing `main` and `origin/main` as separate base options
  * is the upgrade path.
  */
 export async function resolveWorktreeBaseRef(repoPath: string, baseRef: string): Promise<string> {
-  if (loadConfig().settings?.['git.fetchBase'] === false) return baseRef
-  await $`git -C ${repoPath} fetch origin ${baseRef}`.quiet().nothrow()
   const remoteRef = `origin/${baseRef}`
+  await $`git -C ${repoPath} fetch origin +${baseRef}:refs/remotes/${remoteRef}`.quiet().nothrow()
   return (await resolveGitRef(repoPath, remoteRef)) !== undefined ? remoteRef : baseRef
 }
 
-/** Returns the ref it forked from, which is not always the one it was handed. */
+/**
+ * Returns the ref it forked from, which is not always the one it was handed.
+ *
+ * `refreshBase` is required rather than read from the user's config here: this
+ * module wraps git and nothing else, and a caller that has to name the policy
+ * cannot forget it exists — which a settings lookup hidden in here would let
+ * them do. `shouldRefreshBase` is what both callers name it with.
+ */
 export async function createGitWorktree({
   baseRef,
   branchName,
+  refreshBase,
   repoPath,
   targetPath,
 }: {
@@ -136,10 +147,9 @@ export async function createGitWorktree({
   targetPath: string
   branchName: string
   baseRef: string
+  refreshBase: boolean
 }): Promise<string> {
-  // Here rather than in the callers: a third one would otherwise silently fork
-  // from a stale local branch again.
-  const forkRef = await resolveWorktreeBaseRef(repoPath, baseRef)
+  const forkRef = refreshBase ? await resolveWorktreeBaseRef(repoPath, baseRef) : baseRef
   // `--no-track`: forking from `origin/main` would otherwise set that as the new
   // branch's upstream, and a workspace branch tracking main is not a workspace
   // branch — `git push` either refuses it (push.default=simple) or, worse,
