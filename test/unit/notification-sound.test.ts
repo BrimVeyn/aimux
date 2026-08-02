@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   BUILTIN_SOUND_IDS,
+  playSoundFile,
   resolveSoundPath,
   shouldPlayNow,
   SOUND_OFF,
@@ -59,9 +60,19 @@ describe('notification sound', () => {
   })
 
   test('the throttle collapses a burst into one sound', () => {
-    // Six tabs finishing in the same tick must not stack six players.
+    // Six tabs finishing in the same tick must not stack six players. Held down,
+    // the "Test sound" row repeats far faster than that.
     expect(shouldPlayNow(1_000, 0)).toBe(true)
     expect(shouldPlayNow(1_010, 1_000)).toBe(false)
     expect(shouldPlayNow(1_700, 1_000)).toBe(true)
+  })
+
+  test('a throttled press is not reported as a failure', () => {
+    // The settings row toasts "no audio player found" on false — a second press
+    // inside the window must not claim the machine has no player.
+    if (process.platform !== 'darwin') return
+    const path = resolveSoundPath(BUILTIN_SOUND_IDS[0]) as string
+    expect(playSoundFile(path, { volume: 0 })).toBe(true)
+    expect(playSoundFile(path, { volume: 0 })).toBe(true)
   })
 })

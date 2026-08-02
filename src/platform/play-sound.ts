@@ -141,6 +141,7 @@ function findPlayer(platform: string): string | null {
 }
 
 let lastPlayedAt = 0
+let playing: { kill: () => void } | null = null
 
 /**
  * Whether enough time has passed since the last sound. Separate from the play
@@ -151,16 +152,17 @@ export function shouldPlayNow(now: number, previous: number): boolean {
 }
 
 /**
- * Play a sound file. Returns whether a player was actually spawned, which is
- * what the settings screen's "Test sound" row reports.
+ * Play a sound file. Returns false only when nothing could play at all — a
+ * missing player or a failed spawn — which is what the settings screen's "Test
+ * sound" row reports. A throttled call is not a failure.
+ *
+ * The throttle covers every caller, the test row included: held down, its key
+ * repeats tens of times a second, and one live player per press is enough to
+ * take CoreAudio down with it.
  */
-export function playSoundFile(
-  path: string,
-  options?: { ignoreThrottle?: boolean; volume?: number }
-): boolean {
+export function playSoundFile(path: string, options?: { volume?: number }): boolean {
   const now = Date.now()
-  const throttled = options?.ignoreThrottle !== true
-  if (throttled && !shouldPlayNow(now, lastPlayedAt)) return false
+  if (!shouldPlayNow(now, lastPlayedAt)) return true
   const platform = process.platform
   const bin = findPlayer(platform)
   if (bin == null) {
@@ -169,10 +171,11 @@ export function playSoundFile(
   }
   const argv = soundPlayerArgv(platform, bin, path, options?.volume ?? DEFAULT_VOLUME)
   try {
-    Bun.spawn(argv, { stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
-    // A test press does not start the window: it would swallow a real
-    // notification arriving in the next few hundred milliseconds.
-    if (throttled) lastPlayedAt = now
+    // Cut the previous one rather than layer on top of it. Players come and go
+    // on their own, so killing an already-exited one has to be harmless.
+    playing?.kill()
+    playing = Bun.spawn(argv, { stderr: 'ignore', stdin: 'ignore', stdout: 'ignore' })
+    lastPlayedAt = now
     return true
   } catch (error) {
     logDebug('platform.playSound.error', {
