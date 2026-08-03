@@ -55,7 +55,10 @@ describe('PtyManager', () => {
         })
 
         manager.createSession({
-          cols: 80,
+          // Wide enough that `pwd` fits on one line: the assertion below is
+          // about the spawn round-trip, not about how long the checkout path
+          // happens to be (worktrees easily blow past 80 columns).
+          cols: 400,
           command: 'pwd',
           cwd: process.cwd(),
           rows: 24,
