@@ -1,4 +1,4 @@
-import type { AIUsageTool, ResolvedTuiTheme } from '@brimveyn/aimux-config'
+import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 import { useCallback } from 'react'
 
@@ -16,12 +16,6 @@ function formatTokens(total: number): string {
   if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`
   if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`
   return String(total)
-}
-
-function pickPercentColor(t: ResolvedTuiTheme, percent: number): string {
-  if (percent >= 85) return t.error
-  if (percent >= 60) return t.warning
-  return t.success
 }
 
 export function AIUsageIndicator() {
@@ -63,35 +57,20 @@ export function AIUsageIndicator() {
         if (snap.error != null && snap.error !== '' && !(snap.stale === true)) {
           return (
             <box key={tool} flexDirection="row">
-              <text fg={t.error} selectable={false}>
-                {ICON[tool]}
-              </text>
-            </box>
-          )
-        }
-
-        if (snap.percent !== null) {
-          const p = Math.round(snap.percent)
-          const color = pickPercentColor(t, snap.percent)
-          return (
-            <box key={tool} flexDirection="row">
               <text fg={t.text} selectable={false}>
                 {ICON[tool]}
               </text>
-              <text fg={color} selectable={false}>
-                {` ${p}%`}
-              </text>
             </box>
           )
         }
 
+        const value =
+          snap.percent !== null ? `${Math.round(snap.percent)}%` : formatTokens(snap.tokens.total)
+
         return (
           <box key={tool} flexDirection="row">
-            <text fg={t.textMuted} selectable={false}>
-              {ICON[tool]}
-            </text>
-            <text fg={t.textMuted} selectable={false}>
-              {` ${formatTokens(snap.tokens.total)}`}
+            <text fg={t.text} selectable={false}>
+              {`${ICON[tool]} ${value}`}
             </text>
           </box>
         )
