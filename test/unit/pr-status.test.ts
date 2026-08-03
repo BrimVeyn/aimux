@@ -5,6 +5,7 @@ import {
   parsePrView,
   prActionState,
   type PrCheck,
+  prCleanupKind,
   type PrSummary,
 } from '../../src/git/pr-status'
 
@@ -231,6 +232,22 @@ describe('prActionState', () => {
     })
     expect(prActionState(pr({ state: 'CLOSED' }), []).action).toBeNull()
     expect(prActionState(pr(), []).action).toBe('merge')
+  })
+
+  test('cleanup drops a linked workspace but only switches branch on the checkout', () => {
+    const merged = { base: 'main', head: 'feat/x' }
+    expect(prCleanupKind('cleanup', merged, true)).toBe('worktree')
+    expect(prCleanupKind('cleanup', merged, false)).toBe('branch')
+    // Whatever the PR targeted is where we land — never a hardcoded `main`.
+    expect(prCleanupKind('cleanup', { base: 'develop', head: 'feat/x' }, false)).toBe('branch')
+  })
+
+  test('never offers cleanup without a merge, or with nowhere to go', () => {
+    expect(prCleanupKind('merge', { base: 'main', head: 'feat/x' }, true)).toBeNull()
+    expect(prCleanupKind(null, { base: 'main', head: 'feat/x' }, true)).toBeNull()
+    // Already on the base, or the base is unknown: no branch to switch to.
+    expect(prCleanupKind('cleanup', { base: 'main', head: 'main' }, false)).toBeNull()
+    expect(prCleanupKind('cleanup', { base: '', head: 'feat/x' }, false)).toBeNull()
   })
 
   test('never offers merge on a draft', () => {
