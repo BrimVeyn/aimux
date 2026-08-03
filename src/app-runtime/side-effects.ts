@@ -1,7 +1,6 @@
 import { isAutoCommitEnabled } from '@brimveyn/aimux-config'
 
 import type { SideEffect } from '../input/modes/types'
-import type { AssistantId, PendingWorkspaceLaunch, WorkspaceRecord } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
 import { loadConfig, saveConfig } from '../config'
@@ -9,10 +8,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
-import { createPrefixedId } from '../platform/id'
-import { assistantAcceptsPromptArg } from '../pty/command-registry'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
-import { hasSetupScript } from '../state/project-data'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
@@ -41,7 +37,6 @@ import {
   handleSwitchProjectEffect,
   restartTabSession,
 } from './project-actions'
-import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
 import {
   changeSelectedSetting,
@@ -50,7 +45,6 @@ import {
   resetSelectedSetting,
 } from './settings-actions'
 import {
-  findSetupTab,
   handleAskAgentForSetupScriptEffect,
   handleConfigureSetupScriptEffect,
   handlePromoteSetupTabEffect,
@@ -66,17 +60,16 @@ import {
   confirmSplitSelection,
   createTabSession,
   executeSplitPane,
-  launchAssistant,
+  launchWithPrompt,
   startExistingTab,
 } from './tab-actions'
 import {
-  createAimuxTempWorkspace,
   isForceableWorkspaceDeleteError,
   runDeleteWorkspace,
   runMoveWorkspace,
   setProjectDefaultBaseRef,
 } from './workspace-actions'
-import { placeholderWorkspaceName, renameWorkspaceFromPrompt } from './workspace-naming'
+import { launchPendingWorkspace, startWorkspaceCreation } from './workspace-launch'
 
 function handleProjectSelection(ctx: SideEffectContext): void {
   const { backend, dispatch, state } = ctx
@@ -216,136 +209,6 @@ function hoistBranch(branches: string[], first: string | undefined): string[] {
   return [first, ...branches.filter((branch) => branch !== first)]
 }
 
-/**
- * Setup runs concurrently with the agent by design, so say so rather than
- * letting the agent run tests against a half-installed tree and draw the wrong
- * conclusion. Only prefixed when a setup is actually live.
- */
-function buildWorkspacePrompt(ctx: SideEffectContext, pending: PendingWorkspaceLaunch): string {
-  const setupTab = findSetupTab(ctx.getState().tabs, pending.workspaceId)
-  // No setup tab yet does not mean no setup: the workspace may have landed in
-  // the store this very tick, and the runner only spawns on the next render. A
-  // project with a script is going to run it, so say so.
-  const setupRunning = setupTab ? setupTab.status === 'running' : hasSetupScript(pending.projectId)
-  if (!setupRunning) return pending.prompt
-  return `Note: a setup script is currently installing this workspace's dependencies in the background. Wait for it to finish before running builds, tests, or anything that reads installed dependencies.\n\n${pending.prompt}`
-}
-
-/**
- * Name the workspace after what its prompt describes, using the assistant the
- * user just picked. Background work that must never block or fail the launch.
- *
- * Always `pending.prompt`, never the setup-annotated variant built for the
- * agent — the note is guidance, not part of what the user asked for.
- */
-function renameWorkspaceFromLaunch(
-  ctx: SideEffectContext,
-  pending: PendingWorkspaceLaunch,
-  assistant: AssistantId
-): void {
-  const workspace = ctx
-    .getState()
-    .projects.find((entry) => entry.id === pending.projectId)
-    ?.workspaces?.find((entry) => entry.id === pending.workspaceId)
-  if (!workspace) return
-
-  void renameWorkspaceFromPrompt(
-    { projectId: pending.projectId, prompt: pending.prompt, provider: assistant, workspace },
-    {
-      applyName: (projectId, workspaceId, patch) =>
-        ctx.dispatch({ patch, projectId, type: 'update-workspace-record', workspaceId }),
-    }
-  )
-}
-
-/**
- * The `<C-p>` worktree being cut while its assistant picker is already open.
- * Single-slot: only one create-workspace modal can be open, so only one chain
- * can ever be in flight.
- */
-let pendingWorkspaceCreate: Promise<WorkspaceRecord | undefined> | null = null
-
-/**
- * The `<C-p>` flow: chain into the new-tab modal *now* and cut the worktree in
- * the background. `git fetch` + `worktree add` take seconds, and the next
- * question — which assistant — does not depend on either, so making the user
- * watch a frozen modal buys nothing. `launch-selected-assistant` waits on
- * `pendingWorkspaceCreate`, so the tab still lands in a finished workspace.
- */
-function startWorkspaceCreation(
-  ctx: SideEffectContext,
-  projectId: string,
-  params: {
-    prompt: string
-    baseRef?: string
-  }
-): void {
-  // Allocated here rather than by the create: the picker below pins its tab to
-  // this workspace before git has produced anything to pin to.
-  const workspaceId = createPrefixedId('workspace')
-  pendingWorkspaceCreate = (async () => {
-    try {
-      return await enqueueGitOp(async () =>
-        // A name derived locally from the prompt, so the sidebar reads right from
-        // the first frame. The model-generated one replaces it a few seconds later.
-        // The branch is left to `createAimuxTempWorkspace`, which suffixes it with
-        // a timestamp: two workspaces started from the same prompt must not
-        // collide on the branch name before the model has distinguished them.
-        createAimuxTempWorkspace(ctx, projectId, {
-          baseRef: params.baseRef,
-          name: placeholderWorkspaceName(params.prompt),
-          workspaceId,
-        })
-      )
-    } catch (error) {
-      // The modal that used to show this is already gone, so the toast is the
-      // only channel left — and the launch reads the undefined as "do not spawn".
-      toast.error(error instanceof Error ? error.message : String(error))
-      return
-    }
-  })()
-  ctx.dispatch({ type: 'close-modal' })
-  ctx.dispatch({
-    pendingWorkspace: { projectId, prompt: params.prompt, workspaceId },
-    type: 'open-new-tab-modal',
-  })
-}
-
-/**
- * Spawn the assistant and get `prompt` in front of it.
- *
- * Handed over at spawn where the CLI takes one. Pasting it into a live TUI
- * works — it is what this flow did — but it means polling for readiness,
- * probing the screen, and retrying. An argv slot has none of those failure
- * modes.
- */
-function launchWithPrompt(
-  ctx: SideEffectContext,
-  assistant: AssistantId,
-  prompt: string,
-  workspaceId: string | undefined
-): void {
-  const atSpawn = prompt !== '' && assistantAcceptsPromptArg(assistant, ctx.state.customCommands)
-  logInputDebug('app.launchSelectedAssistant', {
-    assistant,
-    chained: workspaceId != null,
-    promptAtSpawn: atSpawn,
-    promptLength: prompt.length,
-  })
-
-  const tabId = launchAssistant(ctx, assistant, workspaceId, atSpawn ? [prompt] : undefined)
-  // Delivery is decided and done here, chained or not: two call sites meant the
-  // prompt could be built twice, from two different reads of the store.
-  if (prompt !== '' && !atSpawn) {
-    void injectPromptWhenReady({
-      backend: ctx.backend,
-      getState: ctx.getState,
-      prompt,
-      tabId,
-    })
-  }
-}
-
 export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): void {
   const { backend, dispatch, state } = ctx
 
@@ -372,37 +235,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'launch-selected-assistant': {
       const assistant = getSelectedAssistantOption(state).id
-      // Chained from `<C-p>`: pin the tab to the workspace being created, hand it
-      // the prompt, and name the workspace with the assistant the user picked.
-      // Otherwise the tab lands in the project's active workspace, which
-      // launchAssistant resolves itself.
-      const pending = state.modal.type === 'new-tab' ? state.modal.pendingWorkspace : undefined
-      if (!pending) {
-        // Normalized to '' so "is there a prompt" stays one comparison.
-        const pendingPrompt = state.modal.type === 'new-tab' ? state.modal.pendingPrompt : undefined
-        launchWithPrompt(ctx, assistant, pendingPrompt ?? '', undefined)
+      const newTab = state.modal.type === 'new-tab' ? state.modal : undefined
+      // Chained from `<C-p>`: the tab is pinned to the workspace being cut, and
+      // waits for it. Otherwise it lands in the project's active workspace,
+      // which launchAssistant resolves itself.
+      if (newTab?.pendingWorkspace) {
+        launchPendingWorkspace(ctx, assistant, newTab.pendingWorkspace)
         return
       }
-      const creating = pendingWorkspaceCreate
-      pendingWorkspaceCreate = null
-      void (async () => {
-        // The worktree may still be being cut. Spawning first would drop the tab
-        // in the project checkout instead of the workspace it is pinned to.
-        if (creating && !(await creating)) {
-          toast.error('Workspace creation failed — no tab was opened')
-          return
-        }
-        // Read the store again: the workspace record landed after `ctx.state`
-        // was captured, and `getTabProjectPath` resolves the cwd from it.
-        const fresh = { ...ctx, state: ctx.getState() }
-        launchWithPrompt(
-          fresh,
-          assistant,
-          buildWorkspacePrompt(fresh, pending),
-          pending.workspaceId
-        )
-        renameWorkspaceFromLaunch(fresh, pending, assistant)
-      })()
+      // Normalized to '' so "is there a prompt" stays one comparison.
+      launchWithPrompt(ctx, assistant, newTab?.pendingPrompt ?? '', undefined)
       return
     }
     case 'edit-selected-assistant': {
