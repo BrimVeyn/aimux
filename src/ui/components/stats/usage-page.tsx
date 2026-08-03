@@ -1,5 +1,3 @@
-import type { BorderSides } from '@opentui/core'
-
 import { formatUsd, totalCost } from '../../../services/usage-history/cost'
 import {
   daysBetween,
@@ -11,14 +9,24 @@ import {
   weekdayTotals,
 } from '../../../services/usage-history/insights'
 import { summarizeDays } from '../../../services/usage-history/stats'
-import { localDay } from '../../../services/usage-history/store'
 import { formatCompact } from '../../format-number'
-import { useTheme } from '../../theme'
 import { chartColumns, fitShape } from './chart'
-import { formatClock, formatCount, formatDayLabel, formatPercent } from './format'
+import { formatClock, formatCount, formatPercent, weeklyLabels } from './format'
 import { Heatmap, HeatmapLegend, heatmapWidth, useHeatmapRamp } from './heatmap'
 import { QuotaSection } from './quotas'
-import { BarRow, GLYPH, Muted, Rule, Section, StatTile, TileRow, VBarChart } from './shared'
+import {
+  BarRow,
+  GLYPH,
+  Muted,
+  PAGE_PAD,
+  Rule,
+  Section,
+  splitWidths,
+  StatTile,
+  TileRow,
+  TwoColumn,
+  VBarChart,
+} from './shared'
 import { isEmpty, type StatsData } from './use-stats-data'
 
 /**
@@ -33,18 +41,6 @@ import { isEmpty, type StatsData } from './use-stats-data'
  * compares is just a border drawn around four numbers, and the same numbers sit
  * better on the headline row or in the charts that show how they got there.
  */
-
-/**
- * The page's grid. One padding column either side, two content columns, and a
- * three-cell gutter carrying the vertical rule. Every section, rule and note is
- * measured against these numbers rather than against its own content.
- */
-const PAD = 1
-const GUTTER = 3
-const TWO_COLUMN_MIN = 92
-
-/** Module scope: a fresh array every render would repaint the divider each frame. */
-const BORDER_LEFT: BorderSides[] = ['left']
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
@@ -96,14 +92,12 @@ function monthToDate(data: StatsData): { cost: number; elapsed: number; inMonth:
 }
 
 export function UsagePage({ data, width }: { data: StatsData; width: number }) {
-  const t = useTheme()
   const ramp = useHeatmapRamp()
   const now = new Date()
 
-  const usable = Math.max(24, width - PAD * 2)
-  const twoUp = usable >= TWO_COLUMN_MIN
-  const leftWidth = twoUp ? Math.floor((usable - GUTTER) / 2) : usable
-  const rightWidth = twoUp ? usable - GUTTER - leftWidth : usable
+  const usable = Math.max(24, width - PAGE_PAD * 2)
+  const split = splitWidths(usable)
+  const { leftWidth, rightWidth } = split
 
   const summary = summarizeDays(data.claude)
   const codexSummary = summarizeDays(data.codex)
@@ -132,14 +126,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const hourShape = fitShape(hours.length, leftWidth - 8)
   const chartDays = chartColumns(usable - 8)
   const dailyTokens = lastDays(data.claude, chartDays, data.todayDate, (day) => day.tokens.total)
-  // A date every seventh bar, so the ruler reads as weeks and the labels have
-  // room to breathe rather than colliding into a smear.
-  const chartLabels = Array.from({ length: chartDays }, (_, index) => {
-    if ((chartDays - 1 - index) % 7 !== 0) return ''
-    const date = new Date(data.todayDate)
-    date.setDate(date.getDate() - (chartDays - 1 - index))
-    return formatDayLabel(localDay(date))
-  })
+  const chartLabels = weeklyLabels(chartDays, data.todayDate)
 
   const tileWidth = Math.floor(usable / 4)
   const hasHistory = !isEmpty(data.claude)
@@ -247,7 +234,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   )
 
   return (
-    <box flexDirection="column" paddingLeft={PAD} paddingRight={PAD}>
+    <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
       <TileRow>
         <StatTile
           glyph={GLYPH.calendar}
@@ -302,31 +289,10 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
         <Muted>no history yet — the first rollup runs in the background</Muted>
       )}
 
-      {twoUp ? (
-        <box flexDirection="row" flexShrink={0}>
-          <box width={leftWidth} flexDirection="column" flexShrink={0}>
-            {left}
-          </box>
-          {/* Drawn as a border so it runs the full height of whichever column is
-              taller, instead of a guessed number of rows. */}
-          <box width={1} flexShrink={0} />
-          <box
-            border={BORDER_LEFT}
-            borderColor={t.borderSubtle}
-            paddingLeft={1}
-            width={rightWidth + 2}
-            flexDirection="column"
-            flexShrink={0}
-          >
-            {right}
-          </box>
-        </box>
-      ) : (
-        <box flexDirection="column" flexShrink={0}>
-          {left}
-          {right}
-        </box>
-      )}
+      <TwoColumn split={split}>
+        {left}
+        {right}
+      </TwoColumn>
 
       {hasHistory ? (
         <Section

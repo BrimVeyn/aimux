@@ -10,6 +10,7 @@ import {
   readCounters,
   saveCounters,
 } from '../../src/services/aimux-counters/store'
+import { lastCounterDays } from '../../src/services/aimux-counters/summary'
 
 const originalHome = process.env.HOME
 const dirs: string[] = []
@@ -58,6 +59,23 @@ describe('mergeCounterDay', () => {
 
   test('a zero delta leaves the stored value untouched', () => {
     expect(mergeCounterDay({ keys: 42 }, { keys: 0 }, {})).toEqual({ keys: 42 })
+  })
+})
+
+describe('lastCounterDays', () => {
+  const days = { '2026-08-01': { keys: 10 }, '2026-08-03': { keys: 30 } }
+
+  test('one value per calendar day, oldest first, with the gaps as zeroes', () => {
+    // A day aimux never ran is a real zero, not a hole: the x-axis is time, and
+    // dropping the empty days would draw the 1st next to the 3rd.
+    expect(lastCounterDays(days, 4, new Date(2026, 7, 4), 'keys')).toEqual([10, 0, 30, 0])
+  })
+
+  test('the walk is in local days, not in fixed 24-hour steps', () => {
+    // Calendar arithmetic across a DST change: `getTime() - n * DAY_MS` would
+    // land on 23:00 the day before and shift the whole series by one.
+    const series = lastCounterDays({ '2026-03-29': { keys: 7 } }, 3, new Date(2026, 2, 30), 'keys')
+    expect(series).toEqual([0, 7, 0])
   })
 })
 

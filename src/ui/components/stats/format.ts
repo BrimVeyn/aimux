@@ -1,3 +1,5 @@
+import { localDay } from '../../../services/usage-history/store'
+
 /**
  * Number and time formatting for the stats screen.
  *
@@ -27,6 +29,19 @@ export function formatDuration(ms: number): string {
   return `${hours}h ${String(minutes).padStart(2, '0')}`
 }
 
+/**
+ * A lifetime span as `78d 23h`.
+ *
+ * `formatDuration` counts in hours all the way up, which is right for a session
+ * and useless for a total: `1894h 58` is a number nobody reads as an amount of
+ * time. Two days is where the hour stops being the unit that means something.
+ */
+export function formatSpan(ms: number): string {
+  const hours = ms / MS_PER_HOUR
+  if (hours < 48) return formatDuration(ms)
+  return `${Math.floor(hours / 24)}d ${Math.round(hours % 24)}h`
+}
+
 /** Minutes past local midnight as `09:12`. */
 export function formatClock(minutes: number): string {
   const hours = Math.floor(minutes / MINUTES_IN_HOUR)
@@ -40,6 +55,22 @@ export function formatDayLabel(key: string): string {
   const name = MONTHS[(month ?? 1) - 1]
   if (name === undefined) return key
   return `${name} ${day ?? ''}`
+}
+
+/**
+ * The ruler under a daily chart: a date every seventh bar, blank between.
+ *
+ * Weekly rather than daily so the labels have room to breathe instead of
+ * colliding into a smear, and counted back from the last bar because that bar is
+ * today — the one date on the ruler worth reading.
+ */
+export function weeklyLabels(count: number, today: Date): string[] {
+  return Array.from({ length: count }, (_, index) => {
+    if ((count - 1 - index) % 7 !== 0) return ''
+    const date = new Date(today)
+    date.setDate(date.getDate() - (count - 1 - index))
+    return formatDayLabel(localDay(date))
+  })
 }
 
 export function formatPercent(part: number, whole: number): string {

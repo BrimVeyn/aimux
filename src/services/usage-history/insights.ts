@@ -229,6 +229,42 @@ export function sessionStats(days: UsageDays): SessionStats {
   return { count, days: dayCount, longestDay, longestMs, medianMs, singlePrompt }
 }
 
+/**
+ * Upper bounds in minutes. The last bucket is everything above the final bound,
+ * so the array the histogram draws is one longer than this one.
+ */
+const SESSION_BOUNDS = [5, 15, 30, 60, 120] as const
+
+/** One label per bucket, for the bar rows the Projects page draws. */
+export const SESSION_BUCKETS = [
+  'under 5 min',
+  '5 to 15 min',
+  '15 to 30 min',
+  '30 to 60 min',
+  '1 to 2 hours',
+  'over 2 hours',
+] as const
+
+/**
+ * How many sessions fell in each length bucket.
+ *
+ * A median and a longest say where the middle and the edge are but not the
+ * shape, and the shape is the interesting part: a day of one long session and a
+ * day of twenty two-minute ones have the same total and nothing else in common.
+ */
+export function sessionLengths(days: UsageDays): number[] {
+  const buckets = Array.from({ length: SESSION_BUCKETS.length }, () => 0)
+  for (const day of Object.values(days)) {
+    for (const session of Object.values(day.sessions)) {
+      const minutes = Math.max(0, session.last - session.first) / 60_000
+      const found = SESSION_BOUNDS.findIndex((bound) => minutes < bound)
+      const index = found === -1 ? buckets.length - 1 : found
+      buckets[index] = (buckets[index] ?? 0) + 1
+    }
+  }
+  return buckets
+}
+
 // ─── Means ───────────────────────────────────────────────────────────────────
 
 export function totalMean(days: UsageDays, pick: (day: UsageDay) => UsageMean): UsageMean {

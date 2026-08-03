@@ -11,7 +11,6 @@ import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { AimuxPage } from './aimux-page'
 import { ProjectsPage } from './projects-page'
-import { RecordsPage } from './records-page'
 import { UsagePage } from './usage-page'
 import { useStatsData } from './use-stats-data'
 
@@ -76,9 +75,6 @@ export const StatsView = memo(function StatsView() {
         break
       case 'aimux':
         body = <AimuxPage data={data} width={contentWidth} />
-        break
-      case 'records':
-        body = <RecordsPage data={data} />
         break
       default:
         page.id satisfies never

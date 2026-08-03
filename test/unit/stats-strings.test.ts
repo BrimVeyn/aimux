@@ -14,95 +14,14 @@ import {
   formatDuration,
   formatFingerDistance,
   formatPercent,
+  formatSpan,
 } from '../../src/ui/components/stats/format'
-import { buildTable, columnWidths } from '../../src/ui/components/stats/table'
 
 /**
  * The stats screen cannot be eyeballed from a test, so what is checked here is
- * the one thing that silently ruins it: a box whose borders do not meet.
+ * the string building underneath it: an off-by-one in a chart row or a ruler
+ * draws a plausible-looking picture of the wrong numbers.
  */
-
-describe('buildTable', () => {
-  const columns = [{ header: 'Total' }, { align: 'left' as const, header: 'Model' }]
-  const rows = [
-    ['1 284', 'opus-5'],
-    ['7', 'haiku-4-5'],
-  ]
-
-  test('every line is exactly the same width', () => {
-    const table = buildTable(columns, rows)
-    const widths = new Set(
-      [table.top, table.header, table.mid, ...table.rows, table.bottom].map((line) => line.length)
-    )
-
-    // The failure this guards against is one column of drift somewhere in the
-    // middle, which draws a box with a step in its side.
-    expect(widths.size).toBe(1)
-  })
-
-  test('columns are as wide as their widest cell, header included', () => {
-    expect(columnWidths(columns, rows)).toEqual(['1 284'.length, 'haiku-4-5'.length])
-    // The header wins when it is the longest thing in the column.
-    expect(columnWidths([{ header: 'Daemon restarts' }], [['3']])).toEqual([15])
-  })
-
-  test('corners and junctions are drawn in the right places', () => {
-    const table = buildTable(columns, rows)
-
-    expect(table.top.startsWith('\u{250C}')).toBe(true)
-    expect(table.top.endsWith('\u{2510}')).toBe(true)
-    expect(table.bottom.startsWith('\u{2514}')).toBe(true)
-    expect(table.bottom.endsWith('\u{2518}')).toBe(true)
-    // One interior junction per seam between columns.
-    expect(table.mid.split('\u{253C}')).toHaveLength(columns.length)
-  })
-
-  test('values align right and text aligns left', () => {
-    const table = buildTable([{ header: 'N' }, { align: 'left', header: 'Name' }], [['7', 'ab']])
-    // `│ 7 │ ab   │` — the number hugs its right edge, the name its left.
-    expect(table.rows[0]).toBe('\u{2502} 7 \u{2502} ab   \u{2502}')
-  })
-
-  test('a cell longer than its column is truncated, never wrapped', () => {
-    const table = buildTable([{ header: 'K' }], [['a-very-long-value']])
-    // The column grows to the value here, so what this pins is that a row never
-    // becomes two lines: a wrapped cell would break every border below it.
-    expect(table.rows).toHaveLength(1)
-    expect(table.rows[0]?.includes('\n')).toBe(false)
-  })
-
-  test('a target width is met exactly, stretching or squeezing', () => {
-    for (const target of [40, 41, 60, 17]) {
-      const table = buildTable(columns, rows, target)
-      const lines = [table.top, table.header, table.mid, ...table.rows, table.bottom]
-      // The grid depends on this: two tables in one column with different
-      // natural widths must still end on the same screen column.
-      expect(lines.map((line) => line.length)).toEqual(lines.map(() => target))
-    }
-  })
-
-  test('slack is spread across columns, not dumped on one', () => {
-    const table = buildTable(columns, rows, 40)
-    const cells = table.header.split('\u{2502}').slice(1, -1)
-    const widest = Math.max(...cells.map((cell) => cell.length))
-    const narrowest = Math.min(...cells.map((cell) => cell.length))
-    expect(widest - narrowest).toBeLessThanOrEqual(5)
-  })
-
-  test('squeezing stops before a column becomes unreadable', () => {
-    // Far narrower than the content: columns shrink to their floor and the
-    // table overruns rather than collapsing to nothing.
-    const table = buildTable(columns, rows, 4)
-    expect(table.top.length).toBe(table.bottom.length)
-    expect(table.rows[0]?.length).toBe(table.top.length)
-  })
-
-  test('an empty row set still closes the box', () => {
-    const table = buildTable([{ header: 'K' }], [])
-    expect(table.rows).toHaveLength(0)
-    expect(table.top.length).toBe(table.bottom.length)
-  })
-})
 
 describe('buildChart', () => {
   test('every row is the same width and top-first', () => {
@@ -333,6 +252,15 @@ describe('stats formatting', () => {
     expect(formatDuration(9 * 3_600_000 + 4 * 60_000)).toBe('9h 04')
     // Nothing recorded is `—`, not `0 s`: they mean different things.
     expect(formatDuration(0)).toBe('—')
+  })
+
+  test('a lifetime span switches to days before the hours stop meaning anything', () => {
+    // Under two days the hour is still the unit a reader thinks in.
+    expect(formatSpan(9 * 3_600_000 + 4 * 60_000)).toBe('9h 04')
+    expect(formatSpan(47 * 3_600_000)).toBe('47h 00')
+    // Past that, `1894h 58` is a number nobody reads as an amount of time.
+    expect(formatSpan(48 * 3_600_000)).toBe('2d 0h')
+    expect(formatSpan(1894 * 3_600_000 + 58 * 60_000)).toBe('78d 23h')
   })
 
   test('clock times are zero-padded to the minute', () => {

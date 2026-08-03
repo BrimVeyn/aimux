@@ -1,6 +1,8 @@
 import type { CounterDays, CounterKey, MaxCounterKey } from './store'
 
-/** Pure shaping of the stored counter days into what the aimux and Records pages render. */
+import { localDay } from '../usage-history/store'
+
+/** Pure shaping of the stored counter days into what the aimux page renders. */
 
 export interface CounterPeak {
   day: string
@@ -48,6 +50,25 @@ export function peakOf(days: CounterDays, key: MaxCounterKey): CounterPeak {
     if (value > best.value) best = { day: date, value }
   }
   return best
+}
+
+/**
+ * One value per calendar day for the `count` days ending today, oldest first.
+ *
+ * The counters' twin of `lastDays` over the usage history, and unrecorded days
+ * are zero for the same reason: a day aimux never ran is a real zero, not a hole.
+ */
+export function lastCounterDays(
+  days: CounterDays,
+  count: number,
+  today: Date,
+  key: CounterKey | MaxCounterKey
+): number[] {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(today)
+    date.setDate(date.getDate() - (count - 1 - index))
+    return days[localDay(date)]?.[key] ?? 0
+  })
 }
 
 export function sumOf(days: CounterDays, key: CounterKey): number {

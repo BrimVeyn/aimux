@@ -1,19 +1,23 @@
-import type { RGBA } from '@opentui/core'
+import type { BorderSides, RGBA } from '@opentui/core'
 import type { ReactNode } from 'react'
 
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
 import { type BarShape, buildChart, buildRuler, strideOf } from './chart'
-import { buildTable, type TableColumn } from './table'
-
-export type { TableColumn } from './table'
 
 /**
  * The stats screen's building blocks.
  *
- * Density comes from bordered tables — one header row over one value row — rather
- * than a stack of label/value lines each under its own heading. A five-column
- * table says in five rows what fifteen stacked rows used to.
+ * Every page is the same grid: a headline row of tiles, a rule, then sections
+ * measured against the page's own width rather than against their content. A
+ * section's note lands on the same column on every page, and that shared right
+ * edge is what makes a screen read as one page instead of as blocks that happen
+ * to sit near each other.
+ *
+ * There are no tables. A table earns its place when several unrelated numbers
+ * have to be read against each other; a row of totals nobody compares is a
+ * border drawn around four numbers, and those numbers sit better on the headline
+ * row, in a fact grid, or in the chart that shows how they got there.
  *
  * Colour follows one rule throughout: **text wears text tokens**. Values and
  * labels stay in `text`/`textMuted`, and a coloured mark beside them carries the
@@ -44,48 +48,6 @@ export const GLYPH = {
   tokens: '\u{25A6}',
   week: '\u{25A6}',
 } as const
-
-/**
- * A bordered grid. Each line is one `<text>`, coloured as a whole — headers muted,
- * values in the text token, rules in the subtle border. Per-cell colour would mean
- * one node per cell, and a table is drawn far more often than it is read for a
- * single highlighted number.
- */
-export function StatTable({
-  columns,
-  rows,
-  width,
-}: {
-  columns: TableColumn[]
-  rows: string[][]
-  /** Fill exactly this many columns, so tables stacked in one column share an edge. */
-  width?: number
-}) {
-  const t = useTheme()
-  const table = buildTable(columns, rows, width)
-
-  return (
-    <box flexDirection="column" flexShrink={0}>
-      <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {table.top}
-      </text>
-      <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {table.header}
-      </text>
-      <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {table.mid}
-      </text>
-      {table.rows.map((line, index) => (
-        <text key={line + String(index)} fg={t.text} selectable={false} wrapMode="none">
-          {line}
-        </text>
-      ))}
-      <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {table.bottom}
-      </text>
-    </box>
-  )
-}
 
 const RULE = '\u{2500}'
 
@@ -152,41 +114,6 @@ export function Section({
   )
 }
 
-/** A titled block. The glyph is part of the title so the eye finds sections by shape. */
-export function Panel({
-  children,
-  glyph,
-  note,
-  title,
-}: {
-  children: ReactNode
-  glyph: string
-  note?: string
-  title: string
-}) {
-  const t = useTheme()
-  return (
-    <box flexDirection="column" flexShrink={0} paddingTop={1}>
-      <box flexDirection="row">
-        <text fg={t.primary} selectable={false} wrapMode="none">
-          {`${glyph} `}
-        </text>
-        <text fg={t.text} selectable={false} wrapMode="none">
-          {title}
-        </text>
-        {note != null && note !== '' ? (
-          <box flexGrow={1} flexDirection="row" justifyContent="flex-end">
-            <text fg={t.textMuted} selectable={false} wrapMode="none">
-              {note}
-            </text>
-          </box>
-        ) : null}
-      </box>
-      {children}
-    </box>
-  )
-}
-
 export function Muted({ children }: { children: string }) {
   const t = useTheme()
   return (
@@ -197,39 +124,159 @@ export function Muted({ children }: { children: string }) {
 }
 
 /**
- * Side-by-side above `minWidth`, stacked below it.
- *
- * A terminal is not a page: at 80 columns two columns of tables collide, and a
- * collided table is worse than a tall one.
+ * The page's grid: one padding column either side, two content columns, and a
+ * three-cell gutter carrying the vertical rule.
  */
-export function Columns({
-  children,
-  gap = 3,
-  minWidth = 92,
-  width,
-}: {
-  children: [ReactNode, ReactNode]
-  gap?: number
-  minWidth?: number
-  width: number
-}) {
-  if (width < minWidth) {
+export const PAGE_PAD = 1
+/** The spacer, the rule, and the right column's own padding. */
+const GUTTER = 3
+/** Below this the two columns collide, and a collided section is worse than a tall page. */
+const TWO_COLUMN_MIN = 92
+
+export interface Split {
+  leftWidth: number
+  rightWidth: number
+  twoUp: boolean
+}
+
+/** The two content columns of `usable`, or one column's worth twice over when narrow. */
+export function splitWidths(usable: number): Split {
+  const twoUp = usable >= TWO_COLUMN_MIN
+  const leftWidth = twoUp ? Math.floor((usable - GUTTER) / 2) : usable
+  return { leftWidth, rightWidth: twoUp ? usable - GUTTER - leftWidth : usable, twoUp }
+}
+
+/** Module scope: a fresh array every render would repaint the divider each frame. */
+const BORDER_LEFT: BorderSides[] = ['left']
+
+/**
+ * Two stacks of sections side by side, divided by a rule.
+ *
+ * The rule is drawn as a border rather than as a guessed number of rows, so it
+ * runs the full height of whichever column ends up taller.
+ */
+export function TwoColumn({ children, split }: { children: [ReactNode, ReactNode]; split: Split }) {
+  const t = useTheme()
+  if (!split.twoUp) {
     return (
-      <box flexDirection="column">
+      <box flexDirection="column" flexShrink={0}>
         {children[0]}
         {children[1]}
       </box>
     )
   }
-  const columnWidth = Math.floor((width - gap) / 2)
   return (
-    <box flexDirection="row" gap={gap}>
-      <box flexDirection="column" width={columnWidth} flexShrink={0}>
+    <box flexDirection="row" flexShrink={0}>
+      <box width={split.leftWidth} flexDirection="column" flexShrink={0}>
         {children[0]}
       </box>
-      <box flexDirection="column" width={columnWidth} flexShrink={0}>
+      <box width={1} flexShrink={0} />
+      <box
+        border={BORDER_LEFT}
+        borderColor={t.borderSubtle}
+        paddingLeft={1}
+        width={split.rightWidth + 2}
+        flexDirection="column"
+        flexShrink={0}
+      >
         {children[1]}
       </box>
+    </box>
+  )
+}
+
+/** Widest a fact's label is allowed to get before the value starts drifting away from it. */
+const FACT_LABEL_MAX = 20
+
+/**
+ * Label/value pairs in columns, for the counts a chart cannot carry.
+ *
+ * Heterogeneous totals — workspaces, tabs, daemon restarts — share no scale, so
+ * a bar between them would encode a comparison nobody is making. What they need
+ * is to be readable side by side, which is a column of labels and a column of
+ * numbers and nothing else.
+ */
+export function FactGrid({
+  columns = 2,
+  facts,
+  width,
+}: {
+  columns?: number
+  facts: [string, string][]
+  width: number
+}) {
+  const t = useTheme()
+  const perColumn = Math.ceil(facts.length / columns)
+  const columnWidth = Math.floor(width / columns)
+  const labelWidth = Math.max(8, Math.min(FACT_LABEL_MAX, Math.floor(columnWidth / 2)))
+
+  return (
+    <box flexDirection="row" flexShrink={0}>
+      {Array.from({ length: columns }, (_, column) => (
+        <box
+          key={column}
+          width={columnWidth}
+          flexDirection="column"
+          flexShrink={0}
+          overflow="hidden"
+        >
+          {facts.slice(column * perColumn, (column + 1) * perColumn).map(([label, value]) => (
+            <box key={label} flexDirection="row" flexShrink={0}>
+              <box width={labelWidth} flexShrink={0}>
+                <text fg={t.textMuted} selectable={false} wrapMode="none">
+                  {truncate(label, labelWidth - 1)}
+                </text>
+              </box>
+              <text fg={t.text} selectable={false} wrapMode="none">
+                {truncate(value, columnWidth - labelWidth)}
+              </text>
+            </box>
+          ))}
+        </box>
+      ))}
+    </box>
+  )
+}
+
+/**
+ * One record: what it is, what it was, and when.
+ *
+ * The same three-part geometry as a bar row — label on the left, the number in
+ * the middle, the page's right edge on the right — so a records section lines up
+ * with the bars above it instead of reading as a table someone pasted in.
+ */
+export function RecordRow({
+  label,
+  value,
+  when,
+  width,
+}: {
+  label: string
+  value: string
+  /** Blank for a record no single day owns, like a streak or a lifetime total. */
+  when: string
+  width: number
+}) {
+  const t = useTheme()
+  const labels = Math.max(10, Math.min(24, Math.round(width / 3)))
+
+  return (
+    <box width={width} flexDirection="row" flexShrink={0}>
+      <box width={labels} flexShrink={0}>
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {truncate(label, labels - 1)}
+        </text>
+      </box>
+      <text fg={t.text} selectable={false} wrapMode="none">
+        {value}
+      </text>
+      {when === '' ? null : (
+        <box flexGrow={1} flexDirection="row" justifyContent="flex-end">
+          <text fg={t.textMuted} selectable={false} wrapMode="none">
+            {when}
+          </text>
+        </box>
+      )}
     </box>
   )
 }

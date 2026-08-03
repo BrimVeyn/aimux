@@ -7,6 +7,7 @@ import { dayCost, rateFor, totalCost } from '../../src/services/usage-history/co
 import {
   hourTotals,
   lateNightPrompts,
+  sessionLengths,
   sessionStats,
   streaks,
   typicalDay,
@@ -679,6 +680,40 @@ describe('sessionStats', () => {
     // there are lets the page say so instead of hiding them.
     expect(stats.singlePrompt).toBe(1)
     expect(stats.count).toBe(2)
+  })
+})
+
+describe('sessionLengths', () => {
+  const minute = 60_000
+
+  function sessionsOf(...spans: number[]): UsageDays {
+    const base = new Date(2026, 7, 3, 9, 0).getTime()
+    const target = day(spans.length, 0)
+    target.sessions = Object.fromEntries(
+      spans.map((minutes, index) => [
+        String(index),
+        { first: base, last: base + minutes * minute, prompts: 2 },
+      ])
+    )
+    return { '2026-08-03': target }
+  }
+
+  test('each session lands in the bucket its length belongs to', () => {
+    // One per bucket, each comfortably inside it.
+    expect(sessionLengths(sessionsOf(2, 10, 20, 45, 90, 300))).toEqual([1, 1, 1, 1, 1, 1])
+  })
+
+  test('a bound belongs to the bucket above it, and there is no bucket below zero', () => {
+    // The bounds are exclusive upper limits: exactly five minutes is not "under
+    // five", and a session that never got a second prompt is.
+    expect(sessionLengths(sessionsOf(0, 5, 15, 30, 60, 120))).toEqual([1, 1, 1, 1, 1, 1])
+  })
+
+  test('every session is counted exactly once, however long', () => {
+    const buckets = sessionLengths(sessionsOf(1, 1, 1, 4000))
+    expect(buckets.reduce((sum, value) => sum + value, 0)).toBe(4)
+    // The last bucket is open-ended, so a 66-hour session has somewhere to go.
+    expect(buckets.at(-1)).toBe(1)
   })
 })
 
