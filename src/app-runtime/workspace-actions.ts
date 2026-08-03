@@ -94,14 +94,27 @@ function normalizeBranchName(branch: string | undefined): string | undefined {
 export async function createAimuxTempWorkspace(
   ctx: SideEffectContext,
   projectId: string,
-  requestedName?: string,
-  requestedBranchName?: string,
-  requestedBaseRef?: string,
-  sourceWorkspaceId?: string
+  options: {
+    name?: string
+    branchName?: string
+    baseRef?: string
+    sourceWorkspaceId?: string
+    /**
+     * Pre-allocated by callers that must name the workspace before git is done
+     * cutting it — the `<C-p>` chain pins a tab to it while it is still being
+     * created.
+     */
+    workspaceId?: string
+  } = {}
 ): Promise<WorkspaceRecord | undefined> {
+  const {
+    baseRef: requestedBaseRef,
+    branchName: requestedBranchName,
+    name: requestedName,
+  } = options
   const project = ctx.state.projects.find((entry) => entry.id === projectId)
   const source =
-    project?.workspaces?.find((entry) => entry.id === sourceWorkspaceId) ??
+    project?.workspaces?.find((entry) => entry.id === options.sourceWorkspaceId) ??
     getActiveWorkspace(project)
   const sourcePath = source?.path ?? getActiveWorkspacePath(project)
   if (!project || !(sourcePath != null && sourcePath !== '')) return undefined
@@ -111,7 +124,7 @@ export async function createAimuxTempWorkspace(
   const repoRoot = (await getMainWorktreeRoot(sourcePath)) ?? source?.repoRoot ?? sourcePath
   const baseBranch = (await getCurrentBranch(sourcePath)) ?? source?.branch ?? 'HEAD'
   const baseRef = requestedBaseRef ?? baseBranch
-  const workspaceId = createPrefixedId('workspace')
+  const workspaceId = options.workspaceId ?? createPrefixedId('workspace')
   const trimmedName = requestedName?.trim()
   const workspaceName =
     trimmedName != null && trimmedName !== ''

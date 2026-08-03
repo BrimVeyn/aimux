@@ -4,6 +4,7 @@ import type { SideEffectContext } from './side-effect-context'
 import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import {
+  assistantAcceptsPromptArg,
   getAllAssistantOptions,
   getAssistantOption,
   isCommandAvailable,
@@ -20,6 +21,7 @@ import {
 } from '../state/layout-tree'
 import { getActiveWorkspace, getCurrentProject } from '../state/project-workspaces'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
+import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption } from './selection'
 
 /**
@@ -169,6 +171,40 @@ export function launchAssistant(
     rows: state.layout.terminalRows,
   })
   return tab.id
+}
+
+/**
+ * Spawn the assistant and get `prompt` in front of it.
+ *
+ * Handed over at spawn where the CLI takes one. Pasting it into a live TUI
+ * works — it is what the `<C-p>` flow did — but it means polling for readiness,
+ * probing the screen, and retrying. An argv slot has none of those failure
+ * modes. Deciding it here means the prompt cannot be built twice, from two
+ * different reads of the store.
+ */
+export function launchWithPrompt(
+  ctx: SideEffectContext,
+  assistant: AssistantId,
+  prompt: string,
+  workspaceId: string | undefined
+): void {
+  const atSpawn = prompt !== '' && assistantAcceptsPromptArg(assistant, ctx.state.customCommands)
+  logInputDebug('app.launchSelectedAssistant', {
+    assistant,
+    chained: workspaceId != null,
+    promptAtSpawn: atSpawn,
+    promptLength: prompt.length,
+  })
+
+  const tabId = launchAssistant(ctx, assistant, workspaceId, atSpawn ? [prompt] : undefined)
+  if (prompt !== '' && !atSpawn) {
+    void injectPromptWhenReady({
+      backend: ctx.backend,
+      getState: ctx.getState,
+      prompt,
+      tabId,
+    })
+  }
 }
 
 export function getTabProjectPath(
