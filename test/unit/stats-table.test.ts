@@ -5,6 +5,7 @@ import {
   buildRuler,
   CHART_STRIDE,
   chartColumns,
+  fitShape,
 } from '../../src/ui/components/stats/chart'
 import { placePopover } from '../../src/ui/components/stats/day-popover'
 import {
@@ -196,6 +197,43 @@ describe('buildChart', () => {
     expect(chartColumns(400)).toBe(45)
     expect(chartColumns(3)).toBe(4)
   })
+
+  test('a narrower shape draws the same bars in fewer columns', () => {
+    const wide = buildChart([1, 2, 3, 4], 8)
+    const narrow = buildChart([1, 2, 3, 4], 8, String, { gap: 0, width: 1 })
+
+    expect(wide.bars[0]).toHaveLength(4 * CHART_STRIDE - 1)
+    expect(narrow.bars[0]).toHaveLength(4)
+    // Same heights, only thinner: on the row only the tallest bar reaches, it
+    // is one column of solid block rather than two.
+    expect(narrow.bars[4]).toBe('   \u{2588}')
+    expect(wide.bars[4]).toBe('         \u{2588}\u{2588}')
+  })
+})
+
+describe('fitShape', () => {
+  test('the widest shape that fits wins', () => {
+    // 24 bars: 71 columns gapped and two wide, 48 ungapped, 47 one wide and
+    // gapped, 24 at the narrowest.
+    expect(fitShape(24, 100)).toEqual({ gap: 1, width: 2 })
+    expect(fitShape(24, 71)).toEqual({ gap: 1, width: 2 })
+    expect(fitShape(24, 70)).toEqual({ gap: 0, width: 2 })
+    expect(fitShape(24, 47)).toEqual({ gap: 1, width: 1 })
+    expect(fitShape(24, 30)).toEqual({ gap: 0, width: 1 })
+  })
+
+  test('a room too small for even the narrowest shape still returns one', () => {
+    // Squeezed and overflowing beats no chart at all — a fixed series cannot
+    // drop columns the way a rolling window can.
+    expect(fitShape(24, 4)).toEqual({ gap: 0, width: 1 })
+  })
+
+  test('every shape it returns fits the room it was given', () => {
+    for (let room = 24; room <= 120; room++) {
+      const shape = fitShape(24, room)
+      expect(24 * shape.width + 23 * shape.gap).toBeLessThanOrEqual(room)
+    }
+  })
 })
 
 describe('buildRuler', () => {
@@ -235,6 +273,19 @@ describe('buildRuler', () => {
     // Only one of the two fits once the second is pulled back.
     expect(ruler.includes('Jul 8')).toBe(true)
     expect(ruler.includes('Jul 9')).toBe(false)
+  })
+
+  test('the stride follows the bars — the hour ruler lands on its own columns', () => {
+    const labels = Array.from({ length: 24 }, (_, hour) =>
+      hour % 4 === 0 ? String(hour).padStart(2, '0') : ''
+    )
+    for (const stride of [1, 2, 3]) {
+      const ruler = buildRuler(labels, stride)
+      expect(ruler).toHaveLength(24 * stride)
+      // Every fourth hour keeps its label at its own column, at any stride.
+      expect(ruler.indexOf('04')).toBe(4 * stride)
+      expect(ruler.indexOf('20')).toBe(20 * stride)
+    }
   })
 })
 

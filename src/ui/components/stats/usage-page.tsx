@@ -14,21 +14,11 @@ import { summarizeDays } from '../../../services/usage-history/stats'
 import { localDay } from '../../../services/usage-history/store'
 import { formatCompact } from '../../format-number'
 import { useTheme } from '../../theme'
-import { chartColumns } from './chart'
+import { chartColumns, fitShape } from './chart'
 import { formatClock, formatCount, formatDayLabel, formatPercent } from './format'
 import { Heatmap, HeatmapLegend, useHeatmapRamp } from './heatmap'
 import { QuotaSection } from './quotas'
-import {
-  BarRow,
-  GLYPH,
-  HourChart,
-  Muted,
-  Rule,
-  Section,
-  StatTile,
-  TileRow,
-  VBarChart,
-} from './shared'
+import { BarRow, GLYPH, Muted, Rule, Section, StatTile, TileRow, VBarChart } from './shared'
 import { isEmpty, type StatsData } from './use-stats-data'
 
 /**
@@ -57,6 +47,19 @@ const TWO_COLUMN_MIN = 92
 const BORDER_LEFT: BorderSides[] = ['left']
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+
+/**
+ * Every fourth hour, at module scope so the ruler is not a fresh array each frame.
+ *
+ * Six labels rather than twenty-four: the reader is looking for where the mass
+ * of the day sits, and a number under every column would draw more ink than the
+ * columns do.
+ */
+const HOUR_LABELS = Array.from({ length: 24 }, (_, hour) =>
+  hour % 4 === 0 ? String(hour).padStart(2, '0') : ''
+)
+/** Tall enough to show the shape of a day, short enough to sit under Quotas. */
+const HOUR_HEIGHT = 6
 
 /**
  * `claude-haiku-4-5-20251001` as `haiku-4-5`. The vendor prefix is the same on
@@ -124,6 +127,9 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const weekdayMax = Math.max(...weekdays)
   const modelMax = summary.models[0]?.[1] ?? 0
 
+  // Both charts reserve the same eight columns for the axis and its gutter, so
+  // the hours and the days start on the same column of their sections.
+  const hourShape = fitShape(hours.length, leftWidth - 8)
   const chartDays = chartColumns(usable - 8)
   const dailyTokens = lastDays(data.claude, chartDays, data.todayDate, (day) => day.tokens.total)
   // A date every seventh bar, so the ruler reads as weeks and the labels have
@@ -173,7 +179,13 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
           <Muted>recorded from the next rollup onward</Muted>
         ) : (
           <>
-            <HourChart values={hours} />
+            <VBarChart
+              bar={hourShape}
+              format={formatCompact}
+              height={HOUR_HEIGHT}
+              labels={HOUR_LABELS}
+              values={hours}
+            />
             <Muted>
               {[
                 typical.days === 0

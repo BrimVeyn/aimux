@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
-import { buildChart, buildRuler } from './chart'
+import { type BarShape, buildChart, buildRuler, strideOf } from './chart'
 import { buildTable, type TableColumn } from './table'
 
 export type { TableColumn } from './table'
@@ -342,23 +342,28 @@ const AXIS_GUTTER = 2
  * one shade off the surface, so they frame the data without competing with it.
  */
 export function VBarChart({
+  bar,
   caption,
   format,
+  height = 10,
   labels,
   values,
 }: {
-  caption: string
+  /** Bar width and gap. Defaults to the two-wide, one-gap day column. */
+  bar?: BarShape
+  caption?: string
   format?: (value: number) => string
+  height?: number
   /** One per bar, blank where a bar goes unlabelled. */
   labels?: string[]
   values: number[]
 }) {
   const t = useTheme()
-  const chart = buildChart(values, 10, format)
+  const chart = buildChart(values, height, format, bar)
   const chartWidth = chart.bars[0]?.length ?? 0
   const axisWidth = chart.axis[0]?.length ?? 0
   const captionPad =
-    axisWidth + AXIS_GUTTER + Math.max(0, Math.floor((chartWidth - caption.length) / 2))
+    axisWidth + AXIS_GUTTER + Math.max(0, Math.floor((chartWidth - (caption?.length ?? 0)) / 2))
 
   return (
     <box flexDirection="column" flexShrink={0}>
@@ -382,12 +387,14 @@ export function VBarChart({
       </box>
       {labels === undefined ? null : (
         <box paddingLeft={axisWidth + AXIS_GUTTER} flexShrink={0}>
-          <Muted>{buildRuler(labels)}</Muted>
+          <Muted>{buildRuler(labels, strideOf(bar))}</Muted>
         </box>
       )}
-      <box paddingLeft={captionPad} flexShrink={0}>
-        <Muted>{caption}</Muted>
-      </box>
+      {caption === undefined ? null : (
+        <box paddingLeft={captionPad} flexShrink={0}>
+          <Muted>{caption}</Muted>
+        </box>
+      )}
     </box>
   )
 }
@@ -448,51 +455,6 @@ export function BarRow({
       <Bar color={t.primary} max={max} segments={bars} value={value} />
       <text fg={t.text} selectable={false} wrapMode="none">
         {valueText.padStart(VALUE_WIDTH + slack)}
-      </text>
-    </box>
-  )
-}
-
-/** Eight-step block ramp, tallest last — a column chart one row high. */
-const SPARK = [
-  '\u{2581}',
-  '\u{2582}',
-  '\u{2583}',
-  '\u{2584}',
-  '\u{2585}',
-  '\u{2586}',
-  '\u{2587}',
-  '\u{2588}',
-]
-
-/**
- * Hourly distribution with its own axis.
- *
- * Two cells per hour so the ruler beneath can label every fourth one without the
- * digits running together.
- */
-export function HourChart({ values }: { values: number[] }) {
-  const t = useTheme()
-  const max = Math.max(...values, 0)
-  const bars = values
-    .map((value) => {
-      if (max <= 0 || value <= 0) return '  '
-      const step = Math.min(SPARK.length - 1, Math.floor((value / max) * (SPARK.length - 1)))
-      return (SPARK[step] ?? ' ').repeat(2)
-    })
-    .join('')
-
-  const ruler = Array.from({ length: 24 }, (_, hour) =>
-    hour % 4 === 0 ? String(hour).padStart(2, '0') : '  '
-  ).join('')
-
-  return (
-    <box flexDirection="column" flexShrink={0}>
-      <text fg={t.primary} selectable={false} wrapMode="none">
-        {bars}
-      </text>
-      <text fg={t.textMuted} selectable={false} wrapMode="none">
-        {ruler}
       </text>
     </box>
   )
