@@ -1,8 +1,10 @@
 import { memo, useCallback, useState } from 'react'
 
+import { enqueueGitOp } from '../../../../git/command-queue'
 import { approveAndMergePr } from '../../../../git/pr-merge'
-import { type PrActionState, prActionState } from '../../../../git/pr-status'
+import { type PrActionState, prActionState, prCleanupKind } from '../../../../git/pr-status'
 import { refreshPrStatus } from '../../../../git/pr-status-poller'
+import { checkoutBranch } from '../../../../git/worktree'
 import { openUrl } from '../../../../platform/open-url'
 import { useAppStore } from '../../../../state/app-store'
 import { runSideEffectGlobal } from '../../../../state/dispatch-ref'
@@ -40,17 +42,19 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
   const project = projects.find((entry) => entry.id === currentProjectId)
   const workspace = getActiveWorkspace(project)
   const projectId = project?.id ?? null
-  // The repo checkout itself has no worktree to drop, so it gets no button.
   const removableWorkspaceId =
     workspace !== undefined && workspace.source !== 'primary' ? workspace.id : null
+
+  const base = pr?.base ?? ''
+  const cleanupKind =
+    pr === null ? null : prCleanupKind(status?.action ?? null, pr, removableWorkspaceId !== null)
 
   const openPr = useCallback(() => openUrl(prUrl), [prUrl])
   const askConfirm = useCallback(() => setConfirming(true), [])
   const cancel = useCallback(() => setConfirming(false), [])
-  const action = status?.action ?? null
   const confirm = useCallback(() => {
     setConfirming(false)
-    if (action === 'cleanup') {
+    if (cleanupKind === 'worktree') {
       if (projectId === null || removableWorkspaceId === null) return
       // closeTabs (not force) mirrors the sidebar's "Remove workspace": the
       // workspace's tabs are disposed, but a dirty worktree still re-prompts for
@@ -63,6 +67,22 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
       })
       return
     }
+    if (cleanupKind === 'branch') {
+      void (async () => {
+        try {
+          // Queued like every other mutating git op: the pollers read this same
+          // checkout, and a checkout mid-status is how you get a torn panel.
+          await enqueueGitOp(async () => checkoutBranch(projectPath, base))
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : String(error))
+          return
+        }
+        // The branch poller would catch up within its tick; refreshing here
+        // retires the row now instead of leaving a merged PR sitting on screen.
+        await refreshPrStatus(projectPath)
+      })()
+      return
+    }
     setMerging(true)
     void (async () => {
       const merged = await approveAndMergePr(projectPath)
@@ -71,15 +91,18 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
       else toast.error(merged.message)
       await refreshPrStatus(projectPath)
     })()
-  }, [action, projectId, projectPath, removableWorkspaceId])
+  }, [base, cleanupKind, projectId, projectPath, removableWorkspaceId])
 
   // Nothing known yet (or nothing to show): stay out of the layout entirely and
   // appear only once a fetch reports a PR.
   if (result?.kind !== 'ok' || pr === null || status === null) return null
-  const showCleanup = status.action === 'cleanup' && removableWorkspaceId !== null
-  const showAction = showCleanup || status.action === 'merge'
+  const showAction = cleanupKind !== null || status.action === 'merge'
   let label = status.label
-  if (confirming) label = showCleanup ? 'Remove this worktree?' : 'Merge this PR?'
+  if (confirming) {
+    if (cleanupKind === 'worktree') label = 'Remove this worktree?'
+    else if (cleanupKind === 'branch') label = `Switch to ${base}?`
+    else label = 'Merge this PR?'
+  }
   if (merging) label = `${spinner} merging…`
 
   return (
@@ -115,7 +138,7 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
       {showAction && !confirming && !merging ? (
         <box flexShrink={0}>
           <text selectable={false} fg={t.primary} bg={bg} wrapMode="none" onMouseDown={askConfirm}>
-            <strong>{showCleanup ? 'Clean up' : 'Merge'}</strong>
+            <strong>{cleanupKind === null ? 'Merge' : 'Clean up'}</strong>
           </text>
         </box>
       ) : null}

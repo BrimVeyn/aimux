@@ -186,6 +186,28 @@ export function prActionState(pr: PrSummary, checks: PrCheck[]): PrActionState {
   return { action: null, label: 'Checking…', tone: 'neutral' }
 }
 
+export type PrCleanupKind = 'branch' | 'worktree' | null
+
+/**
+ * What "clean up" means for a merged PR, which depends on where its branch
+ * lives. A linked workspace is disposable, so it goes. The repo checkout is not
+ * — the equivalent is leaving the merged branch for the one it landed on, which
+ * the PR names, so a PR into `develop` doesn't drop you on `main`.
+ *
+ * `gh pr view` resolves the PR from the checked-out branch, so a PR on screen
+ * means we're on its head — but a base already equal to it has nowhere to go.
+ */
+export function prCleanupKind(
+  action: PrAction,
+  pr: Pick<PrSummary, 'base' | 'head'>,
+  workspaceIsRemovable: boolean
+): PrCleanupKind {
+  if (action !== 'cleanup') return null
+  if (workspaceIsRemovable) return 'worktree'
+  if (pr.base === '' || pr.base === pr.head) return null
+  return 'branch'
+}
+
 export interface ClampedBody {
   text: string
   truncated: boolean
