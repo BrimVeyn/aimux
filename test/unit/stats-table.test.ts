@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 
-import { buildChart, chartColumns } from '../../src/ui/components/stats/chart'
+import {
+  buildChart,
+  buildRuler,
+  CHART_STRIDE,
+  chartColumns,
+} from '../../src/ui/components/stats/chart'
+import { placePopover } from '../../src/ui/components/stats/day-popover'
 import {
   formatClock,
   formatDayLabel,
@@ -139,18 +145,16 @@ describe('buildChart', () => {
   test('the tallest bar reaches the row its value earns and no further', () => {
     const chart = buildChart([8, 4], 8)
     // niceMax is 8: the first bar fills the top row, the second starts halfway.
-    expect(chart.bars[0]?.startsWith('\u{258C}')).toBe(true)
-    expect(chart.bars[0]?.endsWith(' ')).toBe(true)
-    expect(chart.bars[4]?.endsWith('\u{258C}')).toBe(true)
-    expect(chart.bars[3]?.endsWith(' ')).toBe(true)
+    expect(chart.bars[0]?.startsWith('\u{2588}\u{2588}')).toBe(true)
+    expect(chart.bars[0]?.endsWith('  ')).toBe(true)
+    expect(chart.bars[4]?.endsWith('\u{2588}\u{2588}')).toBe(true)
+    expect(chart.bars[3]?.endsWith('  ')).toBe(true)
   })
 
-  test('one column per bar, gap included', () => {
-    // The body paints half a cell, so the other half is the spacing: a bar and
-    // its gap cost one column together, not two.
+  test('a bar and its gap occupy one stride', () => {
     const chart = buildChart([1, 2, 3, 4], 8)
-    expect(chart.bars[0]).toHaveLength(4)
-    expect(chartColumns(60)).toBe(60)
+    // Four bars, each a stride wide, less the trailing gap the last one drops.
+    expect(chart.bars[0]).toHaveLength(4 * CHART_STRIDE - 1)
   })
 
   test('a non-zero day never disappears from the bottom row', () => {
@@ -165,10 +169,10 @@ describe('buildChart', () => {
     // it would round to a whole row and read as 8 or as 6.
     const chart = buildChart([13, 7], 8)
     expect(chart.niceMax).toBe(16)
-    expect(chart.bars.some((line) => line.includes('\u{2596}'))).toBe(true)
+    expect(chart.bars.some((line) => line.includes('\u{2584}'))).toBe(true)
 
     // And a value that does land on a row boundary gets no cap.
-    expect(buildChart([8, 4], 8).bars.some((line) => line.includes('\u{2596}'))).toBe(false)
+    expect(buildChart([8, 4], 8).bars.some((line) => line.includes('\u{2584}'))).toBe(false)
   })
 
   test('a column is filled solid below its top', () => {
@@ -176,7 +180,7 @@ describe('buildChart', () => {
     // Only the topmost cell may be a partial block; a gap under one would draw
     // a floating segment instead of a column.
     const drawn = chart.bars.filter((line) => line.trim() !== '')
-    for (const line of drawn.slice(1)) expect(line).toBe('\u{258C}')
+    for (const line of drawn.slice(1)) expect(line).toBe('\u{2588}\u{2588}')
   })
 
   test('an all-zero series draws an empty chart, not a crash', () => {
@@ -185,12 +189,93 @@ describe('buildChart', () => {
   })
 
   test('chartColumns fits bars to the width with a floor and a ceiling', () => {
-    expect(chartColumns(90)).toBe(60)
-    expect(chartColumns(45)).toBe(45)
-    // Capped: past two months the chart stops adding days and the heatmap is
+    expect(chartColumns(90)).toBe(30)
+    expect(chartColumns(45)).toBe(15)
+    // Capped: past six weeks the chart stops adding days and the heatmap is
     // where a longer span is read.
-    expect(chartColumns(200)).toBe(60)
+    expect(chartColumns(400)).toBe(45)
     expect(chartColumns(3)).toBe(4)
+  })
+})
+
+describe('buildRuler', () => {
+  test('a label sits under the bar it belongs to', () => {
+    const labels = ['Jul 6', '', '', '', 'Jul 9', '', '', '']
+    const ruler = buildRuler(labels)
+
+    // Bar 0 starts at column 0, bar 4 at four strides in.
+    expect(ruler.indexOf('Jul 6')).toBe(0)
+    expect(ruler.indexOf('Jul 9')).toBe(4 * CHART_STRIDE)
+  })
+
+  test('the ruler is exactly as wide as the chart', () => {
+    expect(buildRuler(['Jul 6', '', '', ''])).toHaveLength(4 * CHART_STRIDE)
+  })
+
+  test('a label that would collide with the one before it is dropped', () => {
+    // Two labels one bar apart cannot both fit: the second would start inside
+    // the first, so it goes rather than overlapping it.
+    const ruler = buildRuler(['Jul 6', 'Jul 7', '', ''])
+    expect(ruler.includes('Jul 7')).toBe(false)
+    expect(ruler.includes('Jul 6')).toBe(true)
+  })
+
+  test('a label at the right edge slides left instead of being clipped', () => {
+    // Four bars is twelve columns; a five-character label on the last one would
+    // start at nine and need fourteen. The last bar is today, so the label is
+    // pulled back to the edge rather than lost — but never truncated.
+    const ruler = buildRuler(['', '', '', 'Jul 9'])
+    expect(ruler).toHaveLength(4 * CHART_STRIDE)
+    expect(ruler.trimEnd()).toHaveLength(4 * CHART_STRIDE)
+    expect(ruler.includes('Jul 9')).toBe(true)
+  })
+
+  test('sliding a label left still never overlaps the one before it', () => {
+    const ruler = buildRuler(['', '', 'Jul 8', 'Jul 9'])
+    // Only one of the two fits once the second is pulled back.
+    expect(ruler.includes('Jul 8')).toBe(true)
+    expect(ruler.includes('Jul 9')).toBe(false)
+  })
+})
+
+describe('placePopover', () => {
+  const size = { height: 9, width: 72 }
+  const grid = { gridHeight: 11, gridWidth: 111 }
+
+  test('opens rightward from a cell in the left half', () => {
+    const { left } = placePopover({ cellX: 10, cellY: 3, ...grid, size })
+    expect(left).toBe(10)
+  })
+
+  test('opens leftward from a cell in the right half', () => {
+    // Its right edge lands on the cell instead of running past the grid.
+    const { left } = placePopover({ cellX: 100, cellY: 3, ...grid, size })
+    expect(left + size.width - 1).toBe(100)
+    expect(left + size.width).toBeLessThanOrEqual(grid.gridWidth)
+  })
+
+  test('opens downward from a cell in the top half and upward from the bottom', () => {
+    expect(placePopover({ cellX: 10, cellY: 3, ...grid, size }).top).toBe(2)
+    expect(placePopover({ cellX: 10, cellY: 9, ...grid, size }).top).toBe(0)
+  })
+
+  test('never places the popover outside the grid, at any anchor', () => {
+    for (let cellX = 0; cellX <= grid.gridWidth; cellX++) {
+      for (let cellY = 0; cellY <= grid.gridHeight; cellY++) {
+        const { left, top } = placePopover({ cellX, cellY, ...grid, size })
+        // A popover half off the pane is the failure this guards against, and
+        // it only shows at the edges — where clicks are least expected.
+        expect(left).toBeGreaterThanOrEqual(0)
+        expect(top).toBeGreaterThanOrEqual(0)
+        expect(left + size.width).toBeLessThanOrEqual(grid.gridWidth)
+        expect(top + size.height).toBeLessThanOrEqual(grid.gridHeight)
+      }
+    }
+  })
+
+  test('a popover wider than its grid is pinned to the left rather than pushed off', () => {
+    const { left } = placePopover({ cellX: 5, cellY: 3, gridHeight: 11, gridWidth: 40, size })
+    expect(left).toBe(0)
   })
 })
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
-import { buildChart } from './chart'
+import { buildChart, buildRuler } from './chart'
 import { buildTable, type TableColumn } from './table'
 
 export type { TableColumn } from './table'
@@ -235,15 +235,19 @@ export function Columns({
 }
 
 /**
- * Full block over light shade: the filled run and the track it sits in.
+ * A solid bar half a cell tall, resting on a hairline track.
  *
- * Solid rather than segmented. A segmented mark — a repeated part-width block
- * like `▍` — puts a gap at the same place in every cell, and once several bars
- * are stacked those gaps line up into vertical stripes running the height of
- * the block. The stripes win the eye and the rows stop reading as bars.
+ * Half height, not full: a full block fills its cell top to bottom, so stacked
+ * rows touch and seven bars merge into one shape with steps in it — you can see
+ * the outline of the data but not where one bar ends and the next begins. The
+ * empty top half of each cell is the gap between rows, for free.
+ *
+ * Solid rather than segmented, though. A repeated part-*width* block like `▍`
+ * puts a gap at the same place in every cell, and stacked those gaps line up
+ * into vertical stripes that win the eye.
  */
-const BAR_FILL = '\u{2588}'
-const BAR_TRACK = '\u{2591}'
+const BAR_FILL = '\u{2584}'
+const BAR_TRACK = '\u{2581}'
 
 export function Bar({
   color,
@@ -340,14 +344,17 @@ const AXIS_GUTTER = 2
 export function VBarChart({
   caption,
   format,
+  labels,
   values,
 }: {
   caption: string
   format?: (value: number) => string
+  /** One per bar, blank where a bar goes unlabelled. */
+  labels?: string[]
   values: number[]
 }) {
   const t = useTheme()
-  const chart = buildChart(values, 8, format)
+  const chart = buildChart(values, 10, format)
   const chartWidth = chart.bars[0]?.length ?? 0
   const axisWidth = chart.axis[0]?.length ?? 0
   const captionPad =
@@ -373,6 +380,11 @@ export function VBarChart({
           {`${' '.repeat(axisWidth)}${AXIS_FOOT}${AXIS_FLOOR.repeat(chartWidth + 1)}`}
         </text>
       </box>
+      {labels === undefined ? null : (
+        <box paddingLeft={axisWidth + AXIS_GUTTER} flexShrink={0}>
+          <Muted>{buildRuler(labels)}</Muted>
+        </box>
+      )}
       <box paddingLeft={captionPad} flexShrink={0}>
         <Muted>{caption}</Muted>
       </box>

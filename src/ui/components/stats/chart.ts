@@ -5,22 +5,24 @@
  */
 
 /**
- * One column per bar.
+ * Two columns of bar, one of gap.
  *
- * The body is LEFT HALF BLOCK, so it paints the left half of its cell and the
- * right half *is* the gap — a bar and its spacing cost one column together,
- * where a full block needs a second column of air beside it to stay separate.
- * Twice the days in the same width.
+ * A one-column bar packs twice the days in, but a bar you cannot point at is
+ * not worth the days: at that width there is no room to label which day is
+ * which, and every column looks like every other. Two columns is wide enough
+ * to carry a date ruler underneath and to read a single day off the chart.
  *
- * The cap is QUADRANT LOWER LEFT: half a cell wide like the body, half a cell
- * tall, which is the only glyph that can end a half-width bar part-way up a
- * row. It buys a second level per row — twenty over a ten-row chart.
+ * The cap is LOWER HALF BLOCK — the body's width, half its height — so a column
+ * can end part-way up a row. Twenty levels over a ten-row chart.
  */
-const BODY = '\u{258C}'
-const CAP = '\u{2596}'
-const BLANK = ' '
-/** Body plus its built-in gap. */
-const STRIDE = 1
+const BAR_WIDTH = 2
+const GAP = 1
+const BODY = '\u{2588}'.repeat(BAR_WIDTH)
+const CAP = '\u{2584}'.repeat(BAR_WIDTH)
+const BLANK = ' '.repeat(BAR_WIDTH)
+const SPACER = ' '.repeat(GAP)
+/** Bar plus gap: the columns one day occupies. */
+export const CHART_STRIDE = BAR_WIDTH + GAP
 
 export interface ChartLines {
   /** One label per row, top first, all the same width; blank on unlabelled rows. */
@@ -32,8 +34,33 @@ export interface ChartLines {
 }
 
 /** How many bars fit in `width` columns, capped at `max` days. */
-export function chartColumns(width: number, max = 60): number {
-  return Math.max(4, Math.min(max, Math.floor(width / STRIDE)))
+export function chartColumns(width: number, max = 45): number {
+  return Math.max(4, Math.min(max, Math.floor(width / CHART_STRIDE)))
+}
+
+/**
+ * A ruler under the columns: each label sits under the bar it belongs to.
+ *
+ * Labels come in one per bar, blank where a bar goes unlabelled — the caller
+ * decides the interval, because how often a date is worth repeating depends on
+ * what the dates are. A label that would run into the one before it is dropped
+ * rather than overlapping.
+ */
+export function buildRuler(labels: string[]): string {
+  const chars: string[] = Array.from({ length: labels.length * CHART_STRIDE }, () => ' ')
+  let usedUpTo = 0
+  for (const [index, label] of labels.entries()) {
+    if (label === '') continue
+    // Pulled back from the right edge rather than dropped: the last bar is
+    // today, and today is the one date on the ruler worth reading.
+    const offset = Math.min(index * CHART_STRIDE, chars.length - label.length)
+    if (offset < usedUpTo) continue
+    for (let position = 0; position < label.length; position++) {
+      chars[offset + position] = label[position] ?? ' '
+    }
+    usedUpTo = offset + label.length + 1
+  }
+  return chars.join('')
 }
 
 /**
@@ -91,7 +118,7 @@ export function buildChart(
           // quiet day.
           return row === 1 && value > 0 ? CAP : BLANK
         })
-        .join('')
+        .join(SPACER)
     )
   }
   return { axis, bars, niceMax }

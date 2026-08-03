@@ -104,16 +104,33 @@ describe('mergeUsageHistory', () => {
     expect(once.claude?.['2026-03-01']?.tokens.total).toBe(900)
   })
 
-  test('a pruned day keeps its stored tokens but takes the fresher prompt count', () => {
+  test('a pruned day keeps everything the transcripts gave it', () => {
     const stored: UsageTools = { claude: { '2026-01-20': day(40, 1000) } }
     const fresh: UsageTools = { claude: { '2026-01-20': day(50, 300) } }
 
     const merged = mergeUsageHistory(stored, fresh).claude?.['2026-01-20']
 
     // Transcripts were pruned between rollups, so the smaller fresh total is the
-    // impoverished one. Prompts come from history.jsonl, which outlives them.
+    // impoverished one. This is the promise the whole file rests on: once a day
+    // has been seen, pruning upstream can never take it back.
     expect(merged?.tokens.total).toBe(1000)
+    expect(merged?.models).toEqual({ 'claude-opus-5': 1000 })
+    expect(merged?.branches).toEqual({ main: 1000 })
+    // Prompts come from history.jsonl, which outlives the transcripts, so the
+    // fresher count wins there even as the tokens hold.
     expect(merged?.prompts).toBe(50)
+  })
+
+  test('a day pruned to nothing still keeps its stored tokens', () => {
+    // The end state of pruning: the transcripts are gone entirely and the fresh
+    // rollup finds only the prompt log. Zero must not read as "measured zero".
+    const stored: UsageTools = { claude: { '2026-01-20': day(40, 1000) } }
+    const fresh: UsageTools = { claude: { '2026-01-20': { ...emptyDay(), prompts: 40 } } }
+
+    const merged = mergeUsageHistory(stored, fresh).claude?.['2026-01-20']
+
+    expect(merged?.tokens.total).toBe(1000)
+    expect(merged?.models).toEqual({ 'claude-opus-5': 1000 })
   })
 
   test('a day the fresh rollup never saw survives untouched', () => {

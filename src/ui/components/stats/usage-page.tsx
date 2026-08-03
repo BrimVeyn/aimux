@@ -11,11 +11,12 @@ import {
   weekdayTotals,
 } from '../../../services/usage-history/insights'
 import { summarizeDays } from '../../../services/usage-history/stats'
+import { localDay } from '../../../services/usage-history/store'
 import { formatCompact } from '../../format-number'
 import { useTheme } from '../../theme'
 import { chartColumns } from './chart'
-import { formatClock, formatCount, formatPercent } from './format'
-import { Heatmap, HeatmapLegend, useMonthRamps } from './heatmap'
+import { formatClock, formatCount, formatDayLabel, formatPercent } from './format'
+import { Heatmap, HeatmapLegend, useHeatmapRamp } from './heatmap'
 import { QuotaSection } from './quotas'
 import {
   BarRow,
@@ -93,7 +94,7 @@ function monthToDate(data: StatsData): { cost: number; elapsed: number; inMonth:
 
 export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const t = useTheme()
-  const ramps = useMonthRamps()
+  const ramp = useHeatmapRamp()
   const now = new Date()
 
   const usable = Math.max(24, width - PAD * 2)
@@ -125,6 +126,14 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
 
   const chartDays = chartColumns(usable - 8)
   const dailyTokens = lastDays(data.claude, chartDays, data.todayDate, (day) => day.tokens.total)
+  // A date every seventh bar, so the ruler reads as weeks and the labels have
+  // room to breathe rather than colliding into a smear.
+  const chartLabels = Array.from({ length: chartDays }, (_, index) => {
+    if ((chartDays - 1 - index) % 7 !== 0) return ''
+    const date = new Date(data.todayDate)
+    date.setDate(date.getDate() - (chartDays - 1 - index))
+    return formatDayLabel(localDay(date))
+  })
 
   const tileWidth = Math.floor(usable / 4)
   const hasHistory = !isEmpty(data.claude)
@@ -262,11 +271,11 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
         <Section
           glyph={GLYPH.calendar}
           title="Activity"
-          note={<HeatmapLegend ramps={ramps} />}
+          note={<HeatmapLegend ramp={ramp} />}
           rule={false}
           width={usable}
         >
-          <Heatmap days={data.claude} ramps={ramps} today={data.todayDate} width={usable} />
+          <Heatmap days={data.claude} ramp={ramp} today={data.todayDate} width={usable} />
           <Muted>{calendarFacts}</Muted>
         </Section>
       ) : (
@@ -309,6 +318,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
           <VBarChart
             caption={`last ${chartDays} days`}
             format={formatCompact}
+            labels={chartLabels}
             values={dailyTokens}
           />
           <Muted>{costFacts}</Muted>

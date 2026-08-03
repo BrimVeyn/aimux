@@ -1,6 +1,6 @@
-import type { RGBA } from '@opentui/core'
+import type { BoxRenderable, MouseEvent, RGBA } from '@opentui/core'
 
-import { useMemo } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import type { UsageDays } from '../../../services/usage-history/store'
 
@@ -13,25 +13,19 @@ import {
   promptCounts,
 } from '../../../services/usage-history/stats'
 import { useTheme } from '../../theme'
+import { dayDetails, DayPopover, placePopover, popoverSize } from './day-popover'
 
 /**
  * The activity calendar.
  *
- * A cell is `md-square_rounded`, a filled rounded square that fills its terminal
- * cell. Unicode has no filled rounded square — `▢` U+25A2 is an outline — so
- * this is a nerd-font glyph, like the status bar's round separator and the usage
- * indicator's tool marks. One column of gap after each keeps the grid reading as
- * days rather than as one long bar.
+ * A cell is `md-square_rounded`, a filled rounded square that fills its
+ * terminal cell. Unicode has no filled rounded square — `▢` U+25A2 is an
+ * outline — so this is a nerd-font glyph, like the status bar's round separator.
  *
- * **Hue is the month, lightness is the value.** The four-hue cycle groups the
- * calendar into months without drawing gridlines between them, and within a
- * month the ramp runs light to dark on that hue. Colour is never alone: the
- * month's name sits above its columns in the same hue, which is what says the
- * hue means "March" and not "bad".
- *
- * The hues come from the theme's own `success`/`info`/`warning`/`error`, which
- * are the only four tokens reliably distinct across every bundled theme —
- * several themes resolve `primary`, `accent` and `info` to the same colour.
+ * One hue, light to dark, because the only thing a cell encodes is magnitude.
+ * A hue per month grouped the calendar prettily but spent the colour channel on
+ * something the month labels already say, and it borrowed the status colours,
+ * which on this page mean a quota is running out.
  */
 
 /** nf-md-square_rounded. Needs a nerd font, and measures one cell wide. */
@@ -42,11 +36,18 @@ const BLANK = ' '.repeat(CELL_WIDTH)
 const LABEL_WIDTH = 5
 
 const ROW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
-/** The swatch and the space after it, drawn before every month name. */
-const SWATCH_WIDTH = 2
 /** A constant, not an inline attribute: a JSX string does not process `\u` escapes. */
 const CHEVRON = '\u{00BB}'
 const RULE = '\u{2500}'
+
+/** Rows the grid draws above the first weekday: the month header and its rule. */
+const HEADER_ROWS = 2
+/** The box's own border and padding on the left. */
+const BOX_INSET = 2
+/** Border, header, seven weekdays, border. */
+const GRID_HEIGHT = 1 + HEADER_ROWS + 7 + 1
+/** Over the grid rather than under it. */
+const POPOVER_Z = 10
 
 type Ramp = (RGBA | string)[]
 
@@ -61,29 +62,15 @@ function rampOf(empty: string, hue: string): Ramp {
   ]
 }
 
-/** One ramp per month hue, cycling every four months. */
-export function useMonthRamps(): Ramp[] {
+export function useHeatmapRamp(): Ramp {
   const t = useTheme()
   // borderSubtle rather than a background token: backgrounds resolve to alpha 0
   // in transparent mode, which would erase the empty days entirely.
-  return useMemo(
-    () => [t.success, t.info, t.warning, t.error].map((hue) => rampOf(t.borderSubtle, hue)),
-    [t.borderSubtle, t.error, t.info, t.success, t.warning]
-  )
+  return useMemo(() => rampOf(t.borderSubtle, t.primary), [t.borderSubtle, t.primary])
 }
 
-function rampFor(ramps: Ramp[], month: number): Ramp {
-  return ramps[month % ramps.length] ?? ramps[0] ?? []
-}
-
-/**
- * One hue's ramp, so the legend reads as magnitude alone — the month hues are a
- * grouping and have no order, and a legend showing all four would invite reading
- * one month against another.
- */
-export function HeatmapLegend({ ramps }: { ramps: Ramp[] }) {
+export function HeatmapLegend({ ramp }: { ramp: Ramp }) {
   const t = useTheme()
-  const ramp = ramps[0] ?? []
   return (
     <box flexDirection="row" flexShrink={0}>
       <text fg={t.textMuted} selectable={false} wrapMode="none">
@@ -112,21 +99,31 @@ function Gutter({ label }: { label: string }) {
   )
 }
 
-function HeatRow({ cells, label, ramps }: { cells: HeatmapCell[]; label: string; ramps: Ramp[] }) {
+function HeatRow({
+  cells,
+  label,
+  ramp,
+  selected,
+}: {
+  cells: HeatmapCell[]
+  label: string
+  ramp: Ramp
+  selected: number
+}) {
+  const t = useTheme()
+
   // One <text> per colour run, not per cell: a year is 371 of them.
   const runs: { color: RGBA | string; start: number; text: string }[] = []
   for (const [index, cell] of cells.entries()) {
-    if (cell.day === '') {
-      const last = runs.at(-1)
-      if (last !== undefined && last.color === '') last.text += BLANK
-      else runs.push({ color: '', start: index, text: BLANK })
-      continue
+    let color: RGBA | string = ''
+    if (cell.day !== '') {
+      color = index === selected ? t.text : (ramp[cell.level] ?? t.borderSubtle)
     }
-    const month = Number(cell.day.slice(5, 7)) - 1
-    const color = rampFor(ramps, month)[cell.level] ?? ''
+    const glyph = cell.day === '' ? BLANK : `${CELL} `
     const last = runs.at(-1)
-    if (last !== undefined && last.color === color) last.text += `${CELL} `
-    else runs.push({ color, start: index, text: `${CELL} ` })
+    // The selected cell always starts its own run, so it keeps its own colour.
+    if (last !== undefined && last.color === color && index !== selected) last.text += glyph
+    else runs.push({ color, start: index, text: glyph })
   }
 
   return (
@@ -147,79 +144,49 @@ function HeatRow({ cells, label, ramps }: { cells: HeatmapCell[]; label: string;
   )
 }
 
-/**
- * Month names over their own columns, each behind a swatch in that month's hue.
- *
- * The swatch carries the colour and the name stays in a text token, rather than
- * colouring the name itself: a light hue — the yellow month, in most themes — is
- * markedly harder to read as text than as a filled mark, and the swatch is the
- * same glyph as the cells it stands for, which is what ties the two together.
- */
-function MonthHeader({
-  grid,
-  ramps,
-  weeks,
-}: {
-  grid: HeatmapCell[][]
-  ramps: Ramp[]
-  weeks: number
-}) {
+/** Month names over the columns they occupy. */
+function MonthHeader({ grid, weeks }: { grid: HeatmapCell[][]; weeks: number }) {
   const t = useTheme()
-  const labels = monthLabels(grid, weeks, CELL_WIDTH, SWATCH_WIDTH)
+  const labels = monthLabels(grid, weeks, CELL_WIDTH)
 
   let cursor = 0
-  const runs: { color: RGBA | string; key: string; text: string }[] = []
+  const parts: string[] = []
   for (const label of labels) {
-    if (label.offset > cursor) {
-      runs.push({
-        color: '',
-        key: `gap${String(label.offset)}`,
-        text: ' '.repeat(label.offset - cursor),
-      })
-    }
-    runs.push({
-      color: rampFor(ramps, label.month).at(-1) ?? t.text,
-      key: `swatch${String(label.offset)}`,
-      text: CELL,
-    })
-    runs.push({
-      color: t.textMuted,
-      key: `${label.name}${String(label.offset)}`,
-      text: ` ${label.name}`,
-    })
-    cursor = label.offset + label.name.length + SWATCH_WIDTH
+    parts.push(' '.repeat(Math.max(0, label.offset - cursor)), label.name)
+    cursor = label.offset + label.name.length
   }
 
   return (
     <box flexDirection="row" flexShrink={0}>
       <Gutter label={CHEVRON} />
-      {runs.map((run) =>
-        run.color === '' ? (
-          <text key={run.key} selectable={false} wrapMode="none">
-            {run.text}
-          </text>
-        ) : (
-          <text key={run.key} fg={run.color} selectable={false} wrapMode="none">
-            {run.text}
-          </text>
-        )
-      )}
+      <text fg={t.textMuted} selectable={false} wrapMode="none">
+        {parts.join('')}
+      </text>
     </box>
   )
 }
 
+interface Selection {
+  column: number
+  key: string
+  row: number
+}
+
 export function Heatmap({
   days,
-  ramps,
+  ramp,
   today,
   width,
 }: {
   days: UsageDays
-  ramps: Ramp[]
+  ramp: Ramp
   today: Date
   width: number
 }) {
   const t = useTheme()
+  const boxRef = useRef<BoxRenderable | null>(null)
+  const [selected, setSelected] = useState<Selection | null>(null)
+
   // Less the day-name column and the box's own border and padding, so the grid
   // sizes to what is actually left inside it.
   const usable = Math.max(CELL_WIDTH, width - LABEL_WIDTH - 4)
@@ -232,32 +199,82 @@ export function Heatmap({
   )
   const grid = buildHeatmap(promptCounts(days), weeks, today)
 
+  /**
+   * The grid is a fixed pitch, so where a click landed is arithmetic rather
+   * than a hit test: one handler on the box beats a handler on each of 371
+   * cells, and the cells stay batched into colour runs for rendering.
+   */
+  const handleClick = useCallback(
+    (event: MouseEvent) => {
+      const box = boxRef.current
+      if (box === null) return
+      const row = event.y - box.y - HEADER_ROWS - 1
+      const column = Math.floor((event.x - box.x - BOX_INSET - LABEL_WIDTH) / CELL_WIDTH)
+      const key = grid[row]?.[column]?.day
+      setSelected((current) => {
+        // A second click on the same cell closes it, and a click on a cell with
+        // no day behind it — the future, or before the first rollup — clears.
+        if (key == null || key === '') return null
+        if (current?.key === key) return null
+        return { column, key, row }
+      })
+    },
+    [grid]
+  )
+
+  const details = useMemo(
+    () => (selected === null ? null : dayDetails(selected.key, days[selected.key])),
+    [days, selected]
+  )
+  // Placed on the far side of the cell from the nearest edge, so the popover
+  // opens into the room there is and leaves the cell you clicked visible.
+  const size = details === null ? null : popoverSize(details)
+  const placement =
+    size === null || selected === null
+      ? null
+      : placePopover({
+          cellX: BOX_INSET + LABEL_WIDTH + selected.column * CELL_WIDTH,
+          cellY: 1 + HEADER_ROWS + selected.row,
+          gridHeight: GRID_HEIGHT,
+          gridWidth: BOX_INSET * 2 + LABEL_WIDTH + weeks * CELL_WIDTH,
+          size,
+        })
+
   return (
-    <box
-      border
-      borderStyle="rounded"
-      borderColor={t.border}
-      paddingLeft={1}
-      paddingRight={1}
-      flexDirection="column"
-      flexShrink={0}
-      alignSelf="flex-start"
-    >
-      <MonthHeader grid={grid} ramps={ramps} weeks={weeks} />
-      <box flexDirection="row" flexShrink={0}>
-        <Gutter label="" />
-        <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-          {RULE.repeat(weeks * CELL_WIDTH)}
-        </text>
+    <box flexDirection="column" flexShrink={0} alignSelf="flex-start">
+      <box
+        ref={boxRef}
+        border
+        borderStyle="rounded"
+        borderColor={t.border}
+        paddingLeft={1}
+        paddingRight={1}
+        flexDirection="column"
+        flexShrink={0}
+        onMouseDown={handleClick}
+      >
+        <MonthHeader grid={grid} weeks={weeks} />
+        <box flexDirection="row" flexShrink={0}>
+          <Gutter label="" />
+          <text fg={t.borderSubtle} selectable={false} wrapMode="none">
+            {RULE.repeat(weeks * CELL_WIDTH)}
+          </text>
+        </box>
+        {grid.map((cells, index) => (
+          <HeatRow
+            key={ROW_LABELS[index]}
+            cells={cells}
+            label={ROW_LABELS[index] ?? ''}
+            ramp={ramp}
+            selected={selected?.row === index ? selected.column : -1}
+          />
+        ))}
       </box>
-      {grid.map((cells, index) => (
-        <HeatRow
-          key={ROW_LABELS[index]}
-          cells={cells}
-          label={ROW_LABELS[index] ?? ''}
-          ramps={ramps}
-        />
-      ))}
+      {details === null || placement === null ? null : (
+        <box position="absolute" left={placement.left} top={placement.top} zIndex={POPOVER_Z}>
+          <DayPopover details={details} />
+        </box>
+      )}
     </box>
   )
 }
