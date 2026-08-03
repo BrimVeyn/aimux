@@ -219,7 +219,13 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // Modal: ai-usage (info-only)
     // -----------------------------------------------------------------------
     .mode('modal.ai-usage', (m) =>
-      m.map('<Esc>', actions.closeModal, 'Close').map('<Leader>u', actions.toggleAIUsage, 'Close')
+      m
+        .map('<Esc>', actions.closeModal, 'Close')
+        .map('<Leader>u', actions.toggleAIUsage, 'Close')
+        .map('l', actions.moveModalSelection(1), 'Next page')
+        .map('h', actions.moveModalSelection(-1), 'Prev page')
+        .map('<Right>', actions.moveModalSelection(1))
+        .map('<Left>', actions.moveModalSelection(-1))
     )
 
     // -----------------------------------------------------------------------

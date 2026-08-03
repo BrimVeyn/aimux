@@ -38,7 +38,7 @@ const DEFAULT_CHATGPT_BASE = 'https://chatgpt.com/backend-api'
 const USAGE_PATH = '/wham/usage'
 const AUTH_TIMEOUT_MS = 15_000
 
-function codexHome(): string {
+export function codexHome(): string {
   const env = process.env.CODEX_HOME?.trim()
   if (env != null && env !== '') return env
   return join(homedir(), '.codex')

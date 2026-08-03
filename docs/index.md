@@ -38,6 +38,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
   built-in variables, cursor placement, shell-backed variables, undo
 - `guide/claude-integration.md` - Claude Code hook bridge: what aimux adds to
   `~/.claude/settings.json`, how the hook server resolves PTYs, opt-out
+- `guide/usage-history.md` - long-term AI usage stats: activity heatmap, tokens
+  per model and per git branch, the daily rollup, and where the data lives
 
 ## Reference
 

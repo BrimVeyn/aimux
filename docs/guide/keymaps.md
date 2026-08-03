@@ -77,6 +77,7 @@ The runtime also defines modal modes such as:
 - `modal.split-picker`
 - `modal.git-commit`
 - `modal.update-available`
+- `modal.ai-usage`
 
 ## Builder API
 
