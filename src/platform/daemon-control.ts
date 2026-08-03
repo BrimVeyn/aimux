@@ -61,14 +61,23 @@ async function waitForSocket(socketPath: string): Promise<boolean> {
   return false
 }
 
-async function spawnDetachedProcess(command: 'daemon' | 'terminal-manager', socketPath: string) {
+/**
+ * Re-run this same aimux with another subcommand, detached and unwatched.
+ *
+ * The entrypoint is resolved from this module rather than `process.argv`, which
+ * points at whatever wrapper or shim launched us.
+ */
+export function spawnDetachedCommand(command: string): void {
   Bun.spawn([process.execPath, 'run', ENTRY_POINT, command], {
     detached: true,
     stderr: 'ignore',
     stdin: 'ignore',
     stdout: 'ignore',
   }).unref()
+}
 
+async function spawnDetachedProcess(command: 'daemon' | 'terminal-manager', socketPath: string) {
+  spawnDetachedCommand(command)
   return waitForSocket(socketPath)
 }
 

@@ -1,39 +1,25 @@
 import { readdirSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { logDebug } from '../../debug/input-log'
-import { codexHome } from '../ai-usage/adapters/codex'
-import { emptyDay, saveUsageHistory, type UsageDay, type UsageDays, type UsageTools } from './store'
+import { claudeHome, codexHome } from '../../platform/assistant-home'
+import {
+  emptyDay,
+  localDay,
+  saveUsageHistory,
+  type UsageDay,
+  type UsageDays,
+  type UsageTools,
+} from './store'
 
 /**
- * Rebuilds the usage aggregates from whatever the assistants still have on
- * disk, and merges them into the long-term store.
+ * Rebuilds the usage aggregates from what the assistants still have on disk.
  *
- * Runs as its own process (`aimux usage-rollup`, spawned detached from
- * `maybeSpawnUsageRollup`). Nothing in here may be imported from the startup
- * path: it walks hundreds of megabytes of JSONL.
+ * Its own process (`aimux usage-rollup`). Nothing here may be imported from the
+ * startup path: it walks hundreds of megabytes of JSONL.
  */
 
 const FILE_CONCURRENCY = 8
-
-function claudeHome(): string {
-  const env = process.env.CLAUDE_CONFIG_DIR?.trim()
-  if (env != null && env !== '') return env
-  return join(homedir(), '.claude')
-}
-
-/**
- * Local calendar day. `toISOString().slice(0, 10)` would bucket everything after
- * midnight UTC into tomorrow, which for anyone east of Greenwich shifts every
- * evening of the year one cell to the right.
- */
-export function localDay(ms: number): string {
-  const date = new Date(ms)
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
 
 function dayAt(days: UsageDays, date: string): UsageDay {
   const existing = days[date]
@@ -47,36 +33,28 @@ function bump(counts: Record<string, number>, key: string, amount: number): void
   counts[key] = (counts[key] ?? 0) + amount
 }
 
-/**
- * Every line of a JSONL file, streamed.
- *
- * The largest Claude transcript on a working machine is ~90 MB, and
- * `Bun.file().text()` materializes the whole thing plus its UTF-16 copy before
- * the first line can even be looked at.
- */
+/** Streamed: the largest transcript here is ~90 MB, which `Bun.file().text()` would materialize whole. */
 export async function readJsonlLines(path: string, onLine: (line: string) => void): Promise<void> {
   const decoder = new TextDecoder()
   let carry = ''
 
   for await (const chunk of Bun.file(path).stream()) {
-    // `stream: true` holds back a trailing partial UTF-8 sequence instead of
-    // replacing it with U+FFFD. Without it, any multi-byte character landing on
-    // a chunk boundary corrupts its line and JSON.parse throws on it.
+    // `stream: true` holds back a partial UTF-8 sequence at the chunk edge
+    // instead of replacing it with U+FFFD and corrupting the line.
     const parts = (carry + decoder.decode(chunk, { stream: true })).split('\n')
     carry = parts.pop() ?? ''
     for (const line of parts) onLine(line)
   }
 
   carry += decoder.decode()
-  // Files with no trailing newline, and files an assistant is appending to right
-  // now — the latter's last line is half-written and simply fails JSON.parse.
+  // No trailing newline, or a file being appended to right now — the half-written
+  // last line just fails JSON.parse downstream.
   if (carry !== '') onLine(carry)
 }
 
 function findJsonl(root: string): string[] {
   try {
-    // Recursive: transcript directories nest at varying depths, and a flat
-    // readdir silently misses close to half the corpus.
+    // Recursive: transcripts nest at varying depths and a flat readdir misses half.
     return readdirSync(root, { recursive: true })
       .filter((entry): entry is string => typeof entry === 'string' && entry.endsWith('.jsonl'))
       .map((entry) => join(root, entry))
@@ -87,8 +65,7 @@ function findJsonl(root: string): string[] {
 
 async function forEachFile(paths: string[], run: (path: string) => Promise<void>): Promise<void> {
   let cursor = 0
-  // `cursor++` needs no lock: there is no await between the read and the
-  // increment, and JS is single-threaded, so no two workers see the same index.
+  // `cursor++` needs no lock: no await between read and increment, single thread.
   const workers = Array.from({ length: Math.min(FILE_CONCURRENCY, paths.length) }, async () => {
     while (cursor < paths.length) {
       const path = paths[cursor++]
@@ -117,16 +94,10 @@ interface TranscriptLine {
   timestamp?: string
 }
 
-/**
- * One line of a Claude Code transcript.
- *
- * `seen` spans the whole run on purpose: Claude Code copies earlier turns into a
- * fresh transcript on resume or fork, and compaction re-emits them, so the same
- * billed request shows up in several files.
- */
+/** `seen` spans the whole run: resume, fork and compaction re-emit the same billed request across files. */
 export function consumeTranscriptLine(line: string, seen: Set<string>, days: UsageDays): void {
-  // Only ~23k of ~126k lines carry usage, and the rest include base64 thinking
-  // signatures hundreds of KB long. Rejecting them on a substring beats parsing.
+  // ~23k of ~126k lines carry usage; the rest hold base64 thinking blobs. A
+  // substring test beats parsing them.
   if (!line.includes('"output_tokens"')) return
 
   let entry: TranscriptLine
@@ -139,15 +110,14 @@ export function consumeTranscriptLine(line: string, seen: Set<string>, days: Usa
   const usage = entry.message?.usage
   if (usage === undefined || entry.timestamp == null) return
 
-  // Placeholder assistant messages (API errors, interrupted turns) carry junk
-  // usage under this model id.
+  // Placeholder messages (API errors, interrupted turns) carry junk usage.
   const model = entry.message?.model
   if (model === '<synthetic>') return
 
   const id = entry.message?.id
   const { requestId } = entry
-  // Only dedupe when both halves are present: without an id we cannot prove a
-  // duplicate, and for a stats page undercounting is worse than a rare double.
+  // Both halves or nothing: without an id a duplicate cannot be proven, and
+  // undercounting a stats page is worse than a rare double.
   if (id != null && id !== '' && requestId != null && requestId !== '') {
     const key = `${id}:${requestId}`
     if (seen.has(key)) return
@@ -164,7 +134,7 @@ export function consumeTranscriptLine(line: string, seen: Set<string>, days: Usa
   const total = input + output + cacheRead + cacheWrite
   if (total <= 0) return
 
-  const day = dayAt(days, localDay(ms))
+  const day = dayAt(days, localDay(new Date(ms)))
   day.tokens.cacheRead += cacheRead
   day.tokens.cacheWrite += cacheWrite
   day.tokens.input += input
@@ -176,10 +146,7 @@ export function consumeTranscriptLine(line: string, seen: Set<string>, days: Usa
   if (branch != null && branch !== '') bump(day.branches, branch, total)
 }
 
-/**
- * One line of `history.jsonl` — the prompt log. It is the only source that
- * survives transcript pruning, so it alone covers the full year.
- */
+/** `history.jsonl`, the prompt log — the only source that survives transcript pruning. */
 export function consumeHistoryLine(line: string, days: UsageDays): void {
   if (!line.includes('"timestamp"')) return
 
@@ -190,13 +157,12 @@ export function consumeHistoryLine(line: string, days: UsageDays): void {
     return
   }
 
-  // Stored as a number today, but Claude Code has shipped it quoted before.
-  // `Number()` covers both, where `new Date(raw)` on the quoted form returns
-  // Invalid Date and silently drops the entry.
+  // A number today, quoted in past releases. `Number()` covers both, where
+  // `new Date(quoted)` returns Invalid Date and drops the entry.
   const ms = Number(entry.timestamp)
   if (!Number.isFinite(ms) || ms <= 0) return
 
-  dayAt(days, localDay(ms)).prompts += 1
+  dayAt(days, localDay(new Date(ms))).prompts += 1
 }
 
 interface CodexLine {
@@ -218,12 +184,7 @@ export interface CodexFileState {
   model: string | null
 }
 
-/**
- * One line of a Codex rollout file.
- *
- * `last_token_usage` is the per-turn delta; the sibling `total_token_usage` is
- * cumulative over the session, so summing that one would overcount by n²/2.
- */
+/** `last_token_usage` is the per-turn delta; the sibling `total_token_usage` is cumulative — summing it overcounts by n²/2. */
 export function consumeCodexLine(line: string, state: CodexFileState, days: UsageDays): void {
   if (!line.includes('"model"') && !line.includes('"last_token_usage"')) return
 
@@ -247,10 +208,9 @@ export function consumeCodexLine(line: string, state: CodexFileState, days: Usag
   const total = usage.total_tokens ?? 0
   if (total <= 0) return
 
-  const day = dayAt(days, localDay(ms))
+  const day = dayAt(days, localDay(new Date(ms)))
   day.tokens.cacheRead += cacheRead
-  // cached_input_tokens ⊂ input_tokens and reasoning_output_tokens ⊂
-  // output_tokens, so the cached share is subtracted rather than added on top.
+  // cached_input_tokens ⊂ input_tokens, so the cached share is subtracted not added.
   day.tokens.input += Math.max(0, (usage.input_tokens ?? 0) - cacheRead)
   day.tokens.output += usage.output_tokens ?? 0
   day.tokens.total += total
@@ -301,14 +261,14 @@ export async function runUsageRollup(): Promise<number> {
     if (Object.keys(claude).length > 0) fresh.claude = claude
     if (Object.keys(codex).length > 0) fresh.codex = codex
 
-    // Nothing parsed at all means every source was missing or unreadable.
-    // Writing that would stamp lastRollupAt and skip retrying for a day.
+    // Nothing parsed means every source was missing. Writing would bump the
+    // mtime, which schedules the next run, and buy a day of not retrying.
     if (Object.keys(fresh).length === 0) {
       logDebug('usageHistory.rollupEmpty', {})
       return 1
     }
 
-    return saveUsageHistory(fresh, Date.now()) ? 0 : 1
+    return saveUsageHistory(fresh) ? 0 : 1
   } catch (error) {
     logDebug('usageHistory.rollupError', {
       error: error instanceof Error ? error.message : String(error),

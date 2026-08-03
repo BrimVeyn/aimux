@@ -1,4 +1,5 @@
 import type { AIUsageTool } from '@brimveyn/aimux-config'
+import type { RGBA } from '@opentui/core'
 
 import { useTerminalDimensions } from '@opentui/react'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
@@ -12,10 +13,8 @@ import type {
 import {
   buildHeatmap,
   coveredWeeks,
-  formatCompact,
-  groupDigits,
   type HeatmapCell,
-  mixHex,
+  mixColor,
   monthRuler,
   promptCounts,
   summarizeDays,
@@ -26,6 +25,7 @@ import {
   type UsageHistoryFile,
 } from '../../../../services/usage-history/store'
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
+import { formatCompact } from '../../../format-number'
 import { useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
 import { uiTokens } from '../../../ui-tokens'
@@ -77,11 +77,7 @@ function paceStageIsBehind(stage: UsagePaceStage): boolean {
 const TOOLS: AIUsageTool[] = ['claude', 'codex']
 const PAGE_LABELS = ['Live', 'History'] as const
 
-/**
- * A year of weeks plus the weekday gutter needs ~58 columns on its own, and the
- * model and branch tables want two readable columns under it. So the History
- * page takes the terminal, where the Live page stays a compact popover.
- */
+/** A year of weeks plus the gutter needs ~58 columns, so History takes the terminal where Live stays a popover. */
 const HISTORY_MAX_WIDTH = 104
 
 export function AIUsageModal({ page }: { page: number }) {
@@ -244,11 +240,7 @@ function PaceLine({ pace }: { pace: NonNullable<UsageWindow['pace']> }) {
   )
 }
 
-/**
- * One solid block per day, shaded by an interpolated ramp — the same idea as a
- * contributions graph. Earlier this varied the glyph (`░▒▓█`) instead, which on
- * a real palette produced a single indistinct mass.
- */
+/** One block per day, shaded by colour. Varying the glyph (`░▒▓█`) instead produced an indistinct mass. */
 const CELL = '\u{2588}'
 const ROW_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', ''] as const
 const ROW_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
@@ -256,12 +248,9 @@ const GUTTER = 5
 const COLUMN_GAP = 3
 
 /**
- * Fixed-width gutter in front of every grid row.
- *
- * The width lives on the box, never on the text: an empty <text> is not zero
- * columns wide, so a row labelled `Mon` and an unlabelled one padded to match
- * did not start at the same column, and the grid came out as a brick wall.
- * Inside a single string padding is fine — across sibling nodes it is not.
+ * Width on the box, never on the text: an empty <text> is not zero columns wide,
+ * so `Mon` and a padded blank did not start at the same column and the grid came
+ * out as a brick wall. Padding inside one string is fine; across siblings it is not.
  */
 function Gutter({ label }: { label: string }) {
   const t = useTheme()
@@ -290,11 +279,14 @@ function SectionHeader({ label, note }: { label: string; note?: string }) {
   )
 }
 
-function LabelledRow({ label, value, width }: { label: string; value: string; width: number }) {
+/** Width of the `input` / `output` / `cache` label column. */
+const LABEL_WIDTH = 11
+
+function LabelledRow({ label, value }: { label: string; value: string }) {
   const t = useTheme()
   return (
     <box flexDirection="row">
-      <box width={width} flexShrink={0}>
+      <box width={LABEL_WIDTH} flexShrink={0}>
         <text fg={t.textMuted} selectable={false}>
           {label}
         </text>
@@ -315,13 +307,12 @@ function HeatRow({
   cells: HeatmapCell[]
   cellWidth: number
   label: string
-  ramp: string[]
+  ramp: (string | RGBA)[]
 }) {
   const t = useTheme()
 
-  // One <text> per colour run rather than per cell: a full year is 371 cells a
-  // grid, and the renderer already batches its bars the same way.
-  const runs: { color: string; start: number; text: string }[] = []
+  // One <text> per colour run, not per cell: a full year is 371 cells.
+  const runs: { color: RGBA | string; start: number; text: string }[] = []
   for (const [index, cell] of cells.entries()) {
     const color = ramp[cell.level] ?? t.textMuted
     const glyph = (cell.day === '' ? ' ' : CELL).repeat(cellWidth)
@@ -342,7 +333,7 @@ function HeatRow({
   )
 }
 
-function Legend({ cellWidth, ramp }: { cellWidth: number; ramp: string[] }) {
+function Legend({ cellWidth, ramp }: { cellWidth: number; ramp: (string | RGBA)[] }) {
   const t = useTheme()
   return (
     <box flexDirection="row">
@@ -366,51 +357,44 @@ function Legend({ cellWidth, ramp }: { cellWidth: number; ramp: string[] }) {
 
 /** Right-hand `  2.8B  45%` block, fixed so values line up down the column. */
 const VALUE_WIDTH = 12
-/** Names longer than this are truncated rather than widening the whole table. */
-const NAME_CAP = 26
 
-/** `name ······ 2.8B  45%`, exactly `width` columns, padding kept interior. */
-function entryLine(name: string, value: number, total: number, width: number): string {
-  const share = total > 0 ? `${Math.round((value / total) * 100)}%` : ''
-  const right = `${formatCompact(value).padStart(7)}${share.padStart(5)}`
-  const nameWidth = Math.max(4, width - right.length)
-  return truncate(name, nameWidth).padEnd(nameWidth) + right
-}
-
-interface TopTableProps {
-  columnWidth: number
-  leftEntries: [string, number][]
-  leftTitle: string
-  leftTotal: number
-  rightEntries: [string, number][]
-  rightTitle: string
-  rightTotal: number
-}
-
-function TopTable(props: TopTableProps) {
+/**
+ * One ranked table. Columns are boxes, not padded strings; two side by side line
+ * up because they share a width. Sizing each to its own longest name gave the
+ * tables unrelated geometries and stranded `main` 45 columns from its number.
+ */
+function TopColumn({
+  entries,
+  title,
+  total,
+  width,
+}: {
+  entries: [string, number][]
+  title: string
+  total: number
+  width: number
+}) {
   const t = useTheme()
-  const { columnWidth, leftEntries, leftTotal, rightEntries, rightTotal } = props
-  const stride = columnWidth + COLUMN_GAP
-
-  const rowCount = Math.max(leftEntries.length, rightEntries.length)
-  const rows: string[] = []
-  for (let index = 0; index < rowCount; index++) {
-    const l = leftEntries[index]
-    const r = rightEntries[index]
-    const leftText = l === undefined ? '' : entryLine(l[0], l[1], leftTotal, columnWidth)
-    const rightText = r === undefined ? '' : entryLine(r[0], r[1], rightTotal, columnWidth)
-    rows.push(leftText.padEnd(stride) + rightText)
-  }
+  const nameWidth = Math.max(4, width - VALUE_WIDTH)
 
   return (
-    <box flexDirection="column">
+    <box flexDirection="column" width={width} flexShrink={0}>
       <text fg={t.textMuted} selectable={false}>
-        {props.leftTitle.padEnd(stride) + props.rightTitle}
+        {title}
       </text>
-      {rows.map((row, index) => (
-        <text key={`${String(index)}:${row.slice(0, 8)}`} fg={t.text} selectable={false}>
-          {row}
-        </text>
+      {entries.map(([name, value]) => (
+        <box key={name} flexDirection="row">
+          <box width={nameWidth} flexShrink={0}>
+            <text fg={t.text} selectable={false}>
+              {truncate(name, nameWidth)}
+            </text>
+          </box>
+          {/* Padding inside one node, so nothing here is a trailing space. */}
+          <text fg={t.text} selectable={false}>
+            {formatCompact(value).padStart(7) +
+              (total > 0 ? `${Math.round((value / total) * 100)}%` : '').padStart(5)}
+          </text>
+        </box>
       ))}
     </box>
   )
@@ -425,15 +409,14 @@ function HistoryPage({ width }: { width: number }) {
     setHistory(readUsageHistory())
   }, [])
 
-  // Anchored on borderSubtle rather than a background token so the empty cells
-  // stay visible in transparent mode, where backgrounds resolve to alpha 0.
-  // Above the early returns: hooks cannot sit behind a conditional.
+  // borderSubtle rather than a background token: backgrounds resolve to alpha 0
+  // in transparent mode. Above the early returns — hooks cannot be conditional.
   const ramp = useMemo(
     () => [
       t.borderSubtle,
-      mixHex(t.borderSubtle, t.success, 0.35),
-      mixHex(t.borderSubtle, t.success, 0.6),
-      mixHex(t.borderSubtle, t.success, 0.82),
+      mixColor(t.borderSubtle, t.success, 0.35),
+      mixColor(t.borderSubtle, t.success, 0.6),
+      mixColor(t.borderSubtle, t.success, 0.82),
       t.success,
     ],
     [t.borderSubtle, t.success]
@@ -460,11 +443,9 @@ function HistoryPage({ width }: { width: number }) {
 
   const inner = width - 4
   const today = new Date()
-  // Bounded by what is actually recorded: opening on a wall of empty cells for
-  // months that predate the first rollup reads as broken, not as "no data".
+  // Bounded by what is recorded: empty months predating the first rollup read as broken.
   const weeks = coveredWeeks(claude, today, Math.max(4, Math.min(53, inner - GUTTER)))
-  // Terminal cells are about twice as tall as they are wide, so a day drawn two
-  // columns across is roughly square. Worth it only while the grid still fits.
+  // Terminal cells are ~2x taller than wide, so a two-column day is roughly square.
   const cellWidth = weeks * 2 + GUTTER <= inner ? 2 : 1
   const grid = buildHeatmap(promptCounts(claude), weeks, today)
   const summary = summarizeDays(claude)
@@ -473,23 +454,15 @@ function HistoryPage({ width }: { width: number }) {
   const average =
     summary.promptDays === 0 ? 0 : Math.round(summary.totalPrompts / summary.promptDays)
   const { tokens } = summary
-  // Both columns the same width, driven by the longest name across the two and
-  // capped rather than stretched to the modal. Sizing each column to its own
-  // longest name gave the tables unrelated geometries and left `main` stranded
-  // 45 columns from its own number.
-  const affordable = Math.max(12, Math.floor((inner - COLUMN_GAP) / 2) - VALUE_WIDTH)
-  let longestName = 0
-  for (const [name] of summary.models) longestName = Math.max(longestName, name.length)
-  for (const [name] of summary.branches) longestName = Math.max(longestName, name.length)
-  const columnWidth = Math.max(12, Math.min(NAME_CAP, affordable, longestName)) + VALUE_WIDTH
-  const labelWidth = 11
+  // `2 * columnWidth + COLUMN_GAP <= inner` by construction.
+  const columnWidth = Math.max(16, Math.floor((inner - COLUMN_GAP) / 2))
 
   return (
     <box flexDirection="column" gap={1}>
       <box flexDirection="column">
         <SectionHeader
           label="ACTIVITY"
-          note={`${groupDigits(summary.totalPrompts)} prompts over ${summary.promptDays} days · ${average} avg · ${summary.peakPrompts} peak`}
+          note={`${summary.totalPrompts.toLocaleString('en-US').replaceAll(',', ' ')} prompts over ${summary.promptDays} days · ${average} avg · ${summary.peakPrompts} peak`}
         />
         <box flexDirection="row">
           <Gutter label="" />
@@ -514,31 +487,34 @@ function HistoryPage({ width }: { width: number }) {
           label="TOKENS"
           note={`${summary.tokenDays} days retained · ${formatCompact(tokens.total)} total`}
         />
-        <LabelledRow label="input" value={formatCompact(tokens.input)} width={labelWidth} />
-        <LabelledRow label="output" value={formatCompact(tokens.output)} width={labelWidth} />
+        <LabelledRow label="input" value={formatCompact(tokens.input)} />
+        <LabelledRow label="output" value={formatCompact(tokens.output)} />
         <LabelledRow
           label="cache"
           value={`${formatCompact(tokens.cacheRead)} read · ${formatCompact(tokens.cacheWrite)} written`}
-          width={labelWidth}
         />
         {codexSummary.tokens.total > 0 ? (
           <LabelledRow
             label="codex"
             value={`${formatCompact(codexSummary.tokens.total)} over ${codexSummary.tokenDays} days`}
-            width={labelWidth}
           />
         ) : null}
       </box>
 
-      <TopTable
-        columnWidth={columnWidth}
-        leftEntries={summary.models}
-        leftTitle="MODELS"
-        leftTotal={summary.modelTotal}
-        rightEntries={summary.branches}
-        rightTitle="BRANCHES"
-        rightTotal={summary.branchTotal}
-      />
+      <box flexDirection="row" gap={COLUMN_GAP}>
+        <TopColumn
+          entries={summary.models}
+          title="MODELS"
+          total={summary.modelTotal}
+          width={columnWidth}
+        />
+        <TopColumn
+          entries={summary.branches}
+          title="BRANCHES"
+          total={summary.branchTotal}
+          width={columnWidth}
+        />
+      </box>
     </box>
   )
 }

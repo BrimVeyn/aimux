@@ -6,11 +6,11 @@
 // Hooks reference: https://code.claude.com/docs/en/hooks.md
 
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { logDebug } from '../debug/input-log'
+import { claudeHome } from '../platform/assistant-home'
 
 const HOOK_EVENTS = [
   'UserPromptSubmit',
@@ -34,12 +34,8 @@ interface HookGroupEntry {
   hooks: HookCommandEntry[]
 }
 
-function claudeDir(): string {
-  return join(homedir(), '.claude')
-}
-
 function settingsFilePath(): string {
-  return join(claudeDir(), 'settings.json')
+  return join(claudeHome(), 'settings.json')
 }
 
 function writeAtomic(target: string, contents: string): void {
@@ -180,7 +176,7 @@ export function ensureClaudeSettingsHooks(): boolean {
   parsed.hooks = nextHooks
 
   try {
-    mkdirSync(claudeDir(), { recursive: true })
+    mkdirSync(claudeHome(), { recursive: true })
     writeAtomic(target, `${JSON.stringify(parsed, null, 2)}\n`)
     logDebug('claude-hooks-install:wrote', { events: HOOK_EVENTS, path: target, scriptPath })
     return true

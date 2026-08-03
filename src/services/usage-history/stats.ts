@@ -1,4 +1,6 @@
-import { emptyTokens, type UsageDays, type UsageTokens } from './store'
+import { parseColor, RGBA } from '@opentui/core'
+
+import { emptyTokens, localDay, type UsageDays, type UsageTokens } from './store'
 
 /** Pure shaping of stored usage days into what the History page renders. */
 
@@ -9,32 +11,19 @@ export interface HeatmapCell {
   value: number
 }
 
-function localDayOf(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${date.getFullYear()}-${month}-${day}`
-}
-
 function parseDay(key: string): Date {
   const [year, month, day] = key.split('-').map(Number)
   return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
 }
 
-/**
- * Whole days between two local dates. Normalizing through `Date.UTC` on the
- * calendar components sidesteps DST: a span crossing a clock change is not a
- * whole number of 24h periods, and plain millisecond division rounds it wrong.
- */
+/** Whole days apart. Via `Date.UTC` on the calendar parts: a DST span is not a whole number of 24h periods. */
 function daysBetween(from: Date, to: Date): number {
   const utcOf = (date: Date): number =>
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
   return Math.round((utcOf(to) - utcOf(from)) / 86_400_000)
 }
 
-/**
- * Quartiles of the non-empty days, which is what GitHub does. A linear
- * `value / max` ramp lets a single outlier day flatten a whole year to level 1.
- */
+/** Quartiles of the non-empty days: a linear `value / max` ramp lets one outlier flatten the year to level 1. */
 export function cutPoints(values: number[]): [number, number, number] {
   const sorted = values.filter((value) => value > 0).sort((left, right) => left - right)
   const at = (quantile: number): number =>
@@ -50,10 +39,7 @@ function levelOf(value: number, cuts: [number, number, number]): number {
   return 4
 }
 
-/**
- * How many week columns it takes to cover everything recorded, so the grid does
- * not open on a wall of empty cells for history that predates the first rollup.
- */
+/** Week columns needed to cover what is recorded, so the grid does not open on empty months. */
 export function coveredWeeks(days: UsageDays, today: Date, maxWeeks: number): number {
   const dates = Object.keys(days).sort()
   const first = dates[0]
@@ -62,11 +48,7 @@ export function coveredWeeks(days: UsageDays, today: Date, maxWeeks: number): nu
   return Math.max(4, Math.min(maxWeeks, Math.ceil((elapsed + 1) / 7) + 1))
 }
 
-/**
- * A contributions-style grid: 7 rows (Monday first) by `weeks` columns, oldest
- * week on the left. Cells after today come back empty so the last column stops
- * where the data does.
- */
+/** 7 rows (Monday first) by `weeks` columns, oldest left. Cells after today come back empty. */
 export function buildHeatmap(
   counts: Record<string, number>,
   weeks: number,
@@ -74,15 +56,13 @@ export function buildHeatmap(
 ): HeatmapCell[][] {
   const cuts = cutPoints(Object.values(counts))
 
-  // Anchor on the Sunday closing today's week, so the rightmost column is the
-  // week in progress rather than an arbitrary 7-day window.
+  // Anchored on the Sunday closing this week, so the last column is the week in progress.
   const mondayIndex = (today.getDay() + 6) % 7
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (6 - mondayIndex))
-  // Calendar arithmetic, never `getTime() - n * DAY_MS`: a span crossing a DST
-  // change is not a whole number of 24h days, so the millisecond form lands on
-  // 23:00 the previous day and rotates every weekday row by one.
+  // Calendar arithmetic, never `getTime() - n * DAY_MS`: across a DST change the
+  // millisecond form lands on 23:00 the day before and rotates every row by one.
   const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (weeks * 7 - 1))
-  const todayKey = localDayOf(today)
+  const todayKey = localDay(today)
 
   const rows: HeatmapCell[][] = []
   for (let row = 0; row < 7; row++) {
@@ -93,7 +73,7 @@ export function buildHeatmap(
         start.getMonth(),
         start.getDate() + column * 7 + row
       )
-      const key = localDayOf(date)
+      const key = localDay(date)
       if (key > todayKey) {
         cells.push({ day: '', level: 0, value: 0 })
         continue
@@ -106,11 +86,7 @@ export function buildHeatmap(
   return rows
 }
 
-/**
- * Month initial over each column that opens a new month, blanks elsewhere.
- * `cellWidth` mirrors how wide the grid draws a day, so the letters stay above
- * the right week.
- */
+/** Month initial over each column that opens a month. `cellWidth` mirrors the grid's own. */
 export function monthRuler(grid: HeatmapCell[][], weeks: number, cellWidth: number): string {
   const initials = 'JFMAMJJASOND'
   const chars: string[] = Array.from({ length: weeks * cellWidth }, () => ' ')
@@ -202,51 +178,16 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
   }
 }
 
-export function formatCompact(value: number): string {
-  if (value >= 1e9) return `${(value / 1e9).toFixed(1)}B`
-  if (value >= 1e6) return `${(value / 1e6).toFixed(1)}M`
-  if (value >= 1e3) return `${(value / 1e3).toFixed(1)}K`
-  return String(value)
-}
-
-/** Thin-space digit grouping — `22059` reads as `22 059`. */
-export function groupDigits(value: number): string {
-  const digits = String(value)
-  let out = ''
-  for (let index = 0; index < digits.length; index++) {
-    if (index > 0 && (digits.length - index) % 3 === 0) out += ' '
-    out += digits[index] ?? ''
-  }
-  return out
-}
-
-function parseHex(color: string): [number, number, number] | null {
-  const raw = color.startsWith('#') ? color.slice(1) : color
-  const full =
-    raw.length === 3
-      ? `${raw.charAt(0)}${raw.charAt(0)}${raw.charAt(1)}${raw.charAt(1)}${raw.charAt(2)}${raw.charAt(2)}`
-      : raw
-  if (full.length < 6) return null
-  const value = Number.parseInt(full.slice(0, 6), 16)
-  if (!Number.isFinite(value)) return null
-  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
-}
-
-/**
- * Blends two theme colours. The palette is 52 flat tokens with no shade helper,
- * so a five-step heatmap ramp has to be derived rather than looked up — and
- * deriving it from the active theme is what keeps the grid legible on every one.
- */
-export function mixHex(from: string, to: string, ratio: number): string {
-  const start = parseHex(from)
-  const end = parseHex(to)
-  if (start === null || end === null) return to
-  let out = '#'
-  for (let channel = 0; channel < 3; channel++) {
-    const a = start[channel] ?? 0
-    const b = end[channel] ?? 0
-    const mixed = Math.round(a + (b - a) * ratio)
-    out += Math.max(0, Math.min(255, mixed)).toString(16).padStart(2, '0')
-  }
-  return out
+/** Blends two theme colours: the palette is flat, so the five-step ramp has to be derived per theme. */
+export function mixColor(from: string, to: string, ratio: number): RGBA {
+  const start = parseColor(from)
+  const end = parseColor(to)
+  // A transparent anchor would fade the whole ramp out; keep the target instead.
+  if (start.a === 0) return end
+  return RGBA.fromValues(
+    start.r + (end.r - start.r) * ratio,
+    start.g + (end.g - start.g) * ratio,
+    start.b + (end.b - start.b) * ratio,
+    1
+  )
 }

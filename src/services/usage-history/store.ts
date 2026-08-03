@@ -1,23 +1,24 @@
 import type { AIUsageTool } from '@brimveyn/aimux-config'
 
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { logDebug } from '../../debug/input-log'
+import { spawnDetachedCommand } from '../../platform/daemon-control'
 
 /**
- * Long-term record of AI usage, aggregated per local calendar day.
+ * Long-term AI usage, per local calendar day.
  *
- * Claude Code prunes its own transcripts — roughly a month survives on disk —
- * and the `stats-cache.json` it used to keep alongside them stopped being
- * written in February 2026. So this file is not a cache of something we could
- * re-derive: once a day's transcripts are pruned, this is the only place that
- * day's numbers still exist. Everything here is written with that in mind.
+ * Claude Code prunes its transcripts after about a month, so this is not a cache
+ * of something re-derivable: once a day is pruned, this file is the only place
+ * its numbers still exist. Hence the refusal to overwrite anything it cannot
+ * fully round-trip.
  */
 
 export const HISTORY_VERSION = 1
-
+/** A file that exists but did not parse. Never equal to HISTORY_VERSION, so the save guard refuses it. */
+const UNREADABLE_VERSION = -1
 const ROLLUP_INTERVAL_MS = 20 * 60 * 60 * 1000
 
 export interface UsageTokens {
@@ -29,11 +30,11 @@ export interface UsageTokens {
 }
 
 export interface UsageDay {
-  /** git branch -> tokens. Recent window only; Codex transcripts carry no branch. */
+  /** git branch -> tokens. Recent window only; Codex carries no branch. */
   branches: Record<string, number>
-  /** model id -> tokens. Recent window only, for the same reason. */
+  /** model id -> tokens. Recent window only. */
   models: Record<string, number>
-  /** Prompts submitted. The only field with full-year coverage, and claude-only. */
+  /** The only field with full-year coverage, and claude-only. */
   prompts: number
   tokens: UsageTokens
 }
@@ -41,10 +42,16 @@ export interface UsageDay {
 /** 'YYYY-MM-DD' in the machine's local calendar -> that day's usage. */
 export type UsageDays = Record<string, UsageDay>
 
+/** The key format above — `toISOString()` would shift every evening east of Greenwich by one. */
+export function localDay(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
 export type UsageTools = Partial<Record<AIUsageTool, UsageDays>>
 
 export interface UsageHistoryFile {
-  lastRollupAt: number
   tools: UsageTools
   version: number
 }
@@ -57,52 +64,37 @@ export function emptyDay(): UsageDay {
   return { branches: {}, models: {}, prompts: 0, tokens: emptyTokens() }
 }
 
-/**
- * Resolved per call rather than at module scope: a module-level const freezes
- * the path at import time, which makes the whole store untestable through a
- * `HOME` override (see `services/ai-usage/cache.ts`, which has that problem).
- */
+/** Resolved per call, not at module scope, so a `HOME` override in tests reaches it. */
 export function usageHistoryPath(): string {
-  // `getConfigProfilesRootDir()` falls back to a literal '~' when HOME is unset,
-  // which would create an actual `./~/.config/aimux` directory. Tolerable for a
-  // marker file, not for the one copy of data nothing can regenerate.
   const home = process.env.HOME ?? homedir()
   return join(home, '.config', 'aimux', 'usage-history.json')
 }
 
-function emptyHistory(): UsageHistoryFile {
-  return { lastRollupAt: 0, tools: {}, version: HISTORY_VERSION }
-}
-
 export function readUsageHistory(): UsageHistoryFile {
+  let raw: string
   try {
-    const parsed = JSON.parse(readFileSync(usageHistoryPath(), 'utf8')) as unknown
-    if (typeof parsed !== 'object' || parsed === null) return emptyHistory()
-    const file = parsed as Partial<UsageHistoryFile>
-    if (typeof file.version !== 'number') return emptyHistory()
-    if (typeof file.tools !== 'object' || file.tools === null) return emptyHistory()
-    return {
-      lastRollupAt: typeof file.lastRollupAt === 'number' ? file.lastRollupAt : 0,
-      tools: file.tools,
-      version: file.version,
-    }
+    raw = readFileSync(usageHistoryPath(), 'utf8')
   } catch {
-    return emptyHistory()
+    return { tools: {}, version: HISTORY_VERSION } // no file yet; safe to create
+  }
+
+  try {
+    const file = JSON.parse(raw) as Partial<UsageHistoryFile>
+    if (typeof file.version !== 'number') return { tools: {}, version: UNREADABLE_VERSION }
+    if (typeof file.tools !== 'object' || file.tools === null) {
+      return { tools: {}, version: UNREADABLE_VERSION }
+    }
+    return { tools: file.tools, version: file.version }
+  } catch {
+    return { tools: {}, version: UNREADABLE_VERSION }
   }
 }
 
 function mergeDay(stored: UsageDay, fresh: UsageDay): UsageDay {
-  // Pruning only ever REMOVES data, never adds it. A fresh total smaller than
-  // the stored one therefore means the source was pruned between two rollups,
-  // and the stored value is the richer of the two. `>=` rather than `>` is what
-  // makes re-running a rollup over an unchanged day a no-op — with `>`, an
-  // identical re-parse would be discarded and the two would never converge.
+  // Pruning only removes data, so a smaller fresh total means the stored copy is
+  // the richer one. `>=` rather than `>` is what makes re-running converge.
   const keepFresh = fresh.tokens.total >= stored.tokens.total
-
-  // Tokens and prompts come from sources with different retention: a day old
-  // enough to have lost its transcripts still has its prompts in history.jsonl.
-  // Merging the whole record on the token comparison alone would throw away a
-  // fresher prompt count every time.
+  // Prompts merge separately: they outlive the transcripts the tokens came from.
   return {
     branches: keepFresh ? fresh.branches : stored.branches,
     models: keepFresh ? fresh.models : stored.models,
@@ -111,11 +103,7 @@ function mergeDay(stored: UsageDay, fresh: UsageDay): UsageDay {
   }
 }
 
-/**
- * Days present only in `stored` survive untouched — that is the entire point of
- * the file. Replacement, never accumulation: adding the two would double every
- * total on each rollup.
- */
+/** Replacement per day, never accumulation — adding would double every total per rollup. */
 export function mergeUsageHistory(stored: UsageTools, fresh: UsageTools): UsageTools {
   const merged: UsageTools = { ...stored }
 
@@ -132,32 +120,27 @@ export function mergeUsageHistory(stored: UsageTools, fresh: UsageTools): UsageT
   return merged
 }
 
-/**
- * Returns false when nothing was written. The caller treats that as a failed
- * rollup and leaves `lastRollupAt` alone so the next launch retries.
- */
-export function saveUsageHistory(fresh: UsageTools, now: number): boolean {
+/** False when nothing was written, which leaves the mtime alone so the next launch retries. */
+export function saveUsageHistory(fresh: UsageTools): boolean {
   const stored = readUsageHistory()
 
-  // A newer aimux (a dev build sharing the same HOME) owns a shape this one
-  // cannot round-trip. Reading it to render is harmless; writing it back would
-  // silently drop every field this version does not know about.
+  // A newer aimux owns a shape this build cannot round-trip; an unreadable file
+  // may still hold years this rollup can no longer see. Neither gets written over.
   if (stored.version !== HISTORY_VERSION) {
-    logDebug('usageHistory.foreignVersion', { version: stored.version })
+    logDebug('usageHistory.refusedWrite', { version: stored.version })
     return false
   }
 
   const path = usageHistoryPath()
   const file: UsageHistoryFile = {
-    lastRollupAt: now,
     tools: mergeUsageHistory(stored.tools, fresh),
     version: HISTORY_VERSION,
   }
 
   try {
     mkdirSync(dirname(path), { recursive: true })
-    // pid-suffixed: two aimux launches can roll up concurrently, and a shared
-    // tmp name would let one truncate the other's half-written file.
+    // pid-suffixed: two launches can roll up at once, and a shared tmp name would
+    // let one truncate the other's half-written file.
     const tmpPath = `${path}.${process.pid}.tmp`
     writeFileSync(tmpPath, `${JSON.stringify(file, null, 2)}\n`)
     renameSync(tmpPath, path)
@@ -171,30 +154,19 @@ export function saveUsageHistory(fresh: UsageTools, now: number): boolean {
 }
 
 /**
- * Spawns the rollup as a detached process, at most once per ~day.
- *
- * Detached because the parse is a second of solid CPU over hundreds of
- * megabytes of JSONL — in-process it would stall the render loop, and nothing
- * else in this app does sustained CPU work on the main thread.
- *
- * 20h rather than 24h: someone who opens aimux every morning at roughly the
- * same time sits exactly on a 24h boundary and would skip every other day.
+ * Detached because the parse is a second of CPU over hundreds of MB of JSONL.
+ * 20h rather than 24h so opening aimux at the same time each morning does not
+ * land exactly on the boundary and skip every other day.
  */
 export function maybeSpawnUsageRollup(): void {
   try {
     if (process.env.AIMUX_NO_USAGE_ROLLUP === '1') return
-    const { lastRollupAt } = readUsageHistory()
-    if (Date.now() - lastRollupAt < ROLLUP_INTERVAL_MS) return
-
-    const entryPoint = resolve(import.meta.dir, '..', '..', 'index.tsx')
-    Bun.spawn([process.execPath, 'run', entryPoint, 'usage-rollup'], {
-      detached: true,
-      stderr: 'ignore',
-      stdin: 'ignore',
-      stdout: 'ignore',
-    }).unref()
+    // mtime is the last successful rollup: the file is written on success and
+    // nothing else. Beats parsing an ever-growing JSON on the startup path.
+    const rolledUpAt = statSync(usageHistoryPath(), { throwIfNoEntry: false })?.mtimeMs ?? 0
+    if (Date.now() - rolledUpAt < ROLLUP_INTERVAL_MS) return
+    spawnDetachedCommand('usage-rollup')
   } catch (error) {
-    // Never let a stats rollup keep the app from starting.
     logDebug('usageHistory.spawnError', {
       error: error instanceof Error ? error.message : String(error),
     })

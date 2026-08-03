@@ -12,24 +12,20 @@ import {
   type ThemeMode,
 } from '@brimveyn/aimux-config'
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import { logDebug } from '../debug/input-log'
+import { claudeHome } from '../platform/assistant-home'
 
 const THEME_SLUG = 'aimux'
 const THEME_PREF_VALUE = `custom:${THEME_SLUG}`
 
-function claudeDir(): string {
-  return join(homedir(), '.claude')
-}
-
 function themeFilePath(): string {
-  return join(claudeDir(), 'themes', `${THEME_SLUG}.json`)
+  return join(claudeHome(), 'themes', `${THEME_SLUG}.json`)
 }
 
 function settingsFilePath(): string {
-  return join(claudeDir(), 'settings.json')
+  return join(claudeHome(), 'settings.json')
 }
 
 function writeAtomic(target: string, contents: string): void {
@@ -67,7 +63,7 @@ export function syncClaudeTheme(resolved: ResolvedTuiTheme, mode: ThemeMode): vo
 
   const target = themeFilePath()
   try {
-    mkdirSync(join(claudeDir(), 'themes'), { recursive: true })
+    mkdirSync(join(claudeHome(), 'themes'), { recursive: true })
     writeAtomic(target, `${JSON.stringify(theme, null, 2)}\n`)
   } catch (error) {
     logSyncWarn('write-failed', { err: String(error), path: target })
@@ -110,7 +106,7 @@ export function ensureClaudeSettingsThemePref(): void {
   parsed.theme = THEME_PREF_VALUE
 
   try {
-    mkdirSync(claudeDir(), { recursive: true })
+    mkdirSync(claudeHome(), { recursive: true })
     writeAtomic(target, `${JSON.stringify(parsed, null, 2)}\n`)
   } catch (error) {
     logSyncWarn('settings-write-failed', { err: String(error), path: target })

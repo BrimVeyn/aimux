@@ -1,11 +1,11 @@
 import type { AIUsageToolConfig } from '@brimveyn/aimux-config'
 
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { UsageSnapshot, UsageWindow, UsageWindowKind } from '../types'
 
+import { codexHome } from '../../../platform/assistant-home'
 import { computePace, formatTimeRemaining } from '../pace'
 
 interface CodexAuthFile {
@@ -37,12 +37,6 @@ interface CodexUsageResponse {
 const DEFAULT_CHATGPT_BASE = 'https://chatgpt.com/backend-api'
 const USAGE_PATH = '/wham/usage'
 const AUTH_TIMEOUT_MS = 15_000
-
-export function codexHome(): string {
-  const env = process.env.CODEX_HOME?.trim()
-  if (env != null && env !== '') return env
-  return join(homedir(), '.codex')
-}
 
 function parseChatGPTBaseFromConfig(contents: string): string | null {
   for (const rawLine of contents.split(/\r?\n/)) {

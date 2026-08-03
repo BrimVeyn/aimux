@@ -6,19 +6,18 @@ import { dirname, join } from 'node:path'
 import {
   consumeHistoryLine,
   consumeTranscriptLine,
-  localDay,
   readJsonlLines,
 } from '../../src/services/usage-history/rollup'
 import {
   buildHeatmap,
   coveredWeeks,
-  groupDigits,
-  mixHex,
+  mixColor,
   monthRuler,
   summarizeDays,
 } from '../../src/services/usage-history/stats'
 import {
   HISTORY_VERSION,
+  localDay,
   mergeUsageHistory,
   readUsageHistory,
   saveUsageHistory,
@@ -225,7 +224,7 @@ describe('consumeHistoryLine', () => {
 
     // Claude Code stores it as a number today but has shipped it quoted before;
     // `new Date(quoted)` returns Invalid Date and would drop the entry silently.
-    expect(days[localDay(ms)]?.prompts).toBe(2)
+    expect(days[localDay(new Date(ms))]?.prompts).toBe(2)
   })
 
   test('unparseable timestamps are skipped', () => {
@@ -242,7 +241,7 @@ describe('localDay', () => {
     // 23:30 local on the 5th is already the 6th in UTC for anyone east of
     // Greenwich, so a toISOString()-based implementation shifts every evening of
     // the year one cell to the right.
-    const evening = new Date(2026, 0, 5, 23, 30).getTime()
+    const evening = new Date(2026, 0, 5, 23, 30)
     expect(localDay(evening)).toBe('2026-01-05')
   })
 })
@@ -305,18 +304,14 @@ describe('grid presentation', () => {
     )
   })
 
-  test('mixHex interpolates and survives a colour it cannot parse', () => {
-    expect(mixHex('#000000', '#ffffff', 0)).toBe('#000000')
-    expect(mixHex('#000000', '#ffffff', 1)).toBe('#ffffff')
-    expect(mixHex('#000000', '#ffffff', 0.5)).toBe('#808080')
-    // Transparent-mode tokens are not always hex; falling back to the target
-    // keeps the grid drawn rather than blank.
-    expect(mixHex('transparent', '#00ff00', 0.5)).toBe('#00ff00')
-  })
-
-  test('digit grouping keeps long counts readable', () => {
-    expect(groupDigits(22_059)).toBe('22 059')
-    expect(groupDigits(315)).toBe('315')
+  test('mixColor interpolates and never fades the ramp out', () => {
+    const half = mixColor('#000000', '#ffffff', 0.5)
+    expect(Math.round(half.r * 255)).toBe(128)
+    expect(half.a).toBe(1)
+    expect(mixColor('#000000', '#ffffff', 0).r).toBe(0)
+    expect(mixColor('#000000', '#ffffff', 1).r).toBe(1)
+    // A transparent anchor must not drag the whole ramp to alpha 0 and blank the grid.
+    expect(mixColor('transparent', '#00ff00', 0.5).a).toBe(1)
   })
 })
 
@@ -325,28 +320,41 @@ describe('usage history file', () => {
     withHome()
     const fresh: UsageTools = { claude: { '2026-03-01': day(3, 300) } }
 
-    expect(saveUsageHistory(fresh, 1_700_000_000_000)).toBe(true)
+    expect(saveUsageHistory(fresh)).toBe(true)
 
     const read = readUsageHistory()
     expect(read.version).toBe(HISTORY_VERSION)
-    expect(read.lastRollupAt).toBe(1_700_000_000_000)
     expect(read.tools.claude?.['2026-03-01']?.prompts).toBe(3)
   })
 
   test('refuses to overwrite a file written by a newer version', () => {
     const path = withHome()
-    const foreign = `${JSON.stringify({ lastRollupAt: 1, tools: {}, version: 99 }, null, 2)}\n`
+    const foreign = `${JSON.stringify({ tools: {}, version: 99 }, null, 2)}\n`
     mkdirSync(dirname(path), { recursive: true })
     writeFileSync(path, foreign)
 
     // Reading it to render is harmless; writing it back would drop whatever
     // fields this build does not know about, and nothing can regenerate them.
-    expect(saveUsageHistory({ claude: { '2026-03-01': day(1, 1) } }, 2)).toBe(false)
+    expect(saveUsageHistory({ claude: { '2026-03-01': day(1, 1) } })).toBe(false)
     expect(readFileSync(path, 'utf8')).toBe(foreign)
   })
 
-  test('a missing file reads as empty rather than throwing', () => {
+  test('refuses to overwrite a file it cannot parse', () => {
+    const path = withHome()
+    const corrupt = '{"tools":{"claude":{"2026-01-13":'
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, corrupt)
+
+    // A truncated file may still hold years of days no rollup can reach any
+    // more. Treating "unparseable" as "empty" would replace all of it with the
+    // ~36 days still on disk, which is the one unrecoverable outcome here.
+    expect(saveUsageHistory({ claude: { '2026-03-01': day(1, 1) } })).toBe(false)
+    expect(readFileSync(path, 'utf8')).toBe(corrupt)
+  })
+
+  test('a missing file reads as empty and is writable', () => {
     withHome()
     expect(readUsageHistory().tools).toEqual({})
+    expect(saveUsageHistory({ claude: { '2026-03-01': day(1, 1) } })).toBe(true)
   })
 })
