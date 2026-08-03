@@ -37,7 +37,7 @@ export function coveredWeeks(days: UsageDays, today: Date, maxWeeks: number): nu
   return Math.max(4, Math.min(maxWeeks, Math.ceil((elapsed + 1) / 7) + 1))
 }
 
-/** 7 rows (Monday first) by `weeks` columns, oldest left. Cells after today come back empty. */
+/** 7 rows (Sunday first) by `weeks` columns, oldest left. Cells after today come back empty. */
 export function buildHeatmap(
   counts: Record<string, number>,
   weeks: number,
@@ -45,9 +45,13 @@ export function buildHeatmap(
 ): HeatmapCell[][] {
   const cuts = cutPoints(Object.values(counts))
 
-  // Anchored on the Sunday closing this week, so the last column is the week in progress.
-  const mondayIndex = (today.getDay() + 6) % 7
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (6 - mondayIndex))
+  // Anchored on the Saturday closing this week, so the last column is the week
+  // in progress. Weeks run Sunday to Saturday, which is what the row labels say.
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + (6 - today.getDay())
+  )
   // Calendar arithmetic, never `getTime() - n * DAY_MS`: across a DST change the
   // millisecond form lands on 23:00 the day before and rotates every row by one.
   const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (weeks * 7 - 1))
@@ -75,21 +79,63 @@ export function buildHeatmap(
   return rows
 }
 
-/** Month initial over each column that opens a month. `cellWidth` mirrors the grid's own. */
-export function monthRuler(grid: HeatmapCell[][], weeks: number, cellWidth: number): string {
-  const initials = 'JFMAMJJASOND'
-  const chars: string[] = Array.from({ length: weeks * cellWidth }, () => ' ')
-  let previous = ''
+export interface MonthLabel {
+  /** 0-based calendar month, so the caller can colour the label like its cells. */
+  month: number
+  name: string
+  /** Cell offset from the left edge of the grid where the name starts. */
+  offset: number
+}
+
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+/**
+ * One label per month present in the grid, centred over the columns that month
+ * occupies. `cellWidth` mirrors the grid's own so the offsets are in the same
+ * units the caller pads with.
+ *
+ * A column belongs to the month of its first recorded day: a week straddling a
+ * month boundary has to pick one, and the earlier one is where the column
+ * starts on screen.
+ */
+export function monthLabels(grid: HeatmapCell[][], weeks: number, cellWidth: number): MonthLabel[] {
+  const spans: { end: number; month: number; start: number }[] = []
   for (let column = 0; column < weeks; column++) {
-    const day = grid[0]?.[column]?.day
-    if (day == null || day === '') continue
-    const month = day.slice(5, 7)
-    if (month !== previous) {
-      chars[column * cellWidth] = initials[Number(month) - 1] ?? ' '
-      previous = month
-    }
+    const day = grid.map((row) => row[column]?.day ?? '').find((key) => key !== '')
+    if (day === undefined) continue
+    const month = Number(day.slice(5, 7)) - 1
+    const last = spans.at(-1)
+    if (last !== undefined && last.month === month) last.end = column
+    else spans.push({ end: column, month, start: column })
   }
-  return chars.join('')
+
+  const labels: MonthLabel[] = []
+  let usedUpTo = 0
+  for (const span of spans) {
+    const name = MONTH_NAMES[span.month] ?? ''
+    const width = (span.end - span.start + 1) * cellWidth
+    const centred = span.start * cellWidth + Math.floor((width - name.length) / 2)
+    // Never behind the previous label: a narrow leading month would otherwise
+    // centre its name on top of the one before it.
+    const offset = Math.max(usedUpTo, centred)
+    if (offset + name.length > weeks * cellWidth) continue
+    labels.push({ month: span.month, name, offset })
+    usedUpTo = offset + name.length + 1
+  }
+  return labels
 }
 
 export function promptCounts(days: UsageDays): Record<string, number> {

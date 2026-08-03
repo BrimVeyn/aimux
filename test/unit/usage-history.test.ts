@@ -22,7 +22,7 @@ import {
   buildHeatmap,
   coveredWeeks,
   mixColor,
-  monthRuler,
+  monthLabels,
   summarizeDays,
 } from '../../src/services/usage-history/stats'
 import {
@@ -276,20 +276,20 @@ describe('buildHeatmap', () => {
 
     expect(grid).toHaveLength(7)
     expect(grid[0]).toHaveLength(4)
-    // Today is Monday, so it sits in the top cell of the last column.
-    expect(grid[0]?.[3]?.day).toBe('2026-08-03')
-    expect(grid[0]?.[3]?.value).toBe(5)
+    // Weeks run Sunday to Saturday, so a Monday sits in the second row.
+    expect(grid[1]?.[3]?.day).toBe('2026-08-03')
+    expect(grid[1]?.[3]?.value).toBe(5)
   })
 
   test('cells past today are left empty', () => {
-    const today = new Date(2026, 7, 3) // Monday: Tue..Sun of this week are ahead
+    const today = new Date(2026, 7, 3) // Monday: Tue..Sat of this week are ahead
     const grid = buildHeatmap({}, 2, today)
 
-    expect(grid[1]?.[1]?.day).toBe('')
+    expect(grid[2]?.[1]?.day).toBe('')
     expect(grid[6]?.[1]?.day).toBe('')
   })
 
-  test('the top row stays Monday whatever span is asked for', () => {
+  test('the top row stays Sunday whatever span is asked for', () => {
     // A span crossing an odd number of DST changes is not a whole number of 24h
     // days. Computed in milliseconds it lands on 23:00 the day before and
     // rotates every weekday row by one — which only shows up at some widths,
@@ -300,7 +300,18 @@ describe('buildHeatmap', () => {
         if (cell.day === '') continue
         const [year, month, day] = cell.day.split('-').map(Number)
         const date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-        expect({ day: date.getDay(), weeks }).toEqual({ day: 1, weeks })
+        expect({ day: date.getDay(), weeks }).toEqual({ day: 0, weeks })
+      }
+    }
+  })
+
+  test('every row is the weekday its label claims', () => {
+    const grid = buildHeatmap({}, 12, new Date(2026, 7, 3))
+    for (const [row, cells] of grid.entries()) {
+      for (const cell of cells) {
+        if (cell.day === '') continue
+        const [year, month, day] = cell.day.split('-').map(Number)
+        expect(new Date(year ?? 0, (month ?? 1) - 1, day ?? 1).getDay()).toBe(row)
       }
     }
   })
@@ -317,14 +328,49 @@ describe('grid presentation', () => {
     expect(coveredWeeks({}, new Date(2026, 7, 3), 53)).toBeGreaterThan(0)
   })
 
-  test('the month ruler tracks the cell width', () => {
-    const grid = buildHeatmap({}, 6, new Date(2026, 7, 3))
-    expect(monthRuler(grid, 6, 1)).toHaveLength(6)
-    expect(monthRuler(grid, 6, 2)).toHaveLength(12)
-    // Same letters, twice the stride.
-    expect(monthRuler(grid, 6, 2).replaceAll(' ', '')).toBe(
-      monthRuler(grid, 6, 1).replaceAll(' ', '')
-    )
+  test('month labels stay inside the grid at any cell width', () => {
+    const grid = buildHeatmap({}, 12, new Date(2026, 7, 3))
+
+    for (const cellWidth of [1, 2, 3]) {
+      for (const label of monthLabels(grid, 12, cellWidth)) {
+        expect(label.offset).toBeGreaterThanOrEqual(0)
+        // A name running off the right edge would be clipped mid-word, which
+        // reads as a rendering bug rather than as a label.
+        expect(label.offset + label.name.length).toBeLessThanOrEqual(12 * cellWidth)
+      }
+    }
+  })
+
+  test('a narrow grid drops the labels it cannot fit rather than clipping them', () => {
+    const grid = buildHeatmap({}, 12, new Date(2026, 7, 3))
+    const wide = monthLabels(grid, 12, 3).map((label) => label.name)
+    const narrow = monthLabels(grid, 12, 1).map((label) => label.name)
+
+    // Fewer names, never different ones, and never a truncated one.
+    expect(narrow.length).toBeLessThanOrEqual(wide.length)
+    expect(wide).toEqual(expect.arrayContaining(narrow))
+    for (const name of narrow) expect(name).toHaveLength(3)
+  })
+
+  test('month labels never overlap each other', () => {
+    const grid = buildHeatmap({}, 53, new Date(2026, 7, 3))
+    const labels = monthLabels(grid, 53, 3)
+    expect(labels.length).toBeGreaterThan(6)
+
+    for (const [index, label] of labels.entries()) {
+      if (index === 0) continue
+      const previous = labels[index - 1]
+      if (previous === undefined) continue
+      expect(label.offset).toBeGreaterThan(previous.offset + previous.name.length - 1)
+    }
+  })
+
+  test('a label carries the month it belongs to, so it can be coloured like its cells', () => {
+    const grid = buildHeatmap({}, 12, new Date(2026, 7, 3))
+    for (const label of monthLabels(grid, 12, 3)) {
+      expect(label.month).toBeGreaterThanOrEqual(0)
+      expect(label.month).toBeLessThan(12)
+    }
   })
 
   test('mixColor interpolates and never fades the ramp out', () => {

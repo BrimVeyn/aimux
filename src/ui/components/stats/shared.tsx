@@ -112,12 +112,16 @@ export function Section({
   children,
   glyph,
   note,
+  rule = true,
   title,
   width,
 }: {
   children: ReactNode
   glyph: string
-  note?: string
+  /** A string, or a component when the note is itself a legend. */
+  note?: ReactNode
+  /** Off when the content draws its own box — a rule over a border is two lines saying one thing. */
+  rule?: boolean
   title: string
   width: number
 }) {
@@ -133,13 +137,17 @@ export function Section({
         </text>
         {note != null && note !== '' ? (
           <box flexGrow={1} flexDirection="row" justifyContent="flex-end">
-            <text fg={t.textMuted} selectable={false} wrapMode="none">
-              {note}
-            </text>
+            {typeof note === 'string' ? (
+              <text fg={t.textMuted} selectable={false} wrapMode="none">
+                {note}
+              </text>
+            ) : (
+              note
+            )}
           </box>
         ) : null}
       </box>
-      <Rule width={width} />
+      {rule ? <Rule width={width} /> : null}
       {children}
     </box>
   )

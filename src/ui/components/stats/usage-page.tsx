@@ -15,7 +15,7 @@ import { formatCompact } from '../../format-number'
 import { useTheme } from '../../theme'
 import { chartColumns } from './chart'
 import { formatClock, formatCount, formatPercent } from './format'
-import { Heatmap, HeatmapLegend, useHeatmapRamp } from './heatmap'
+import { Heatmap, HeatmapLegend, useMonthRamps } from './heatmap'
 import { QuotaSection } from './quotas'
 import {
   BarRow,
@@ -84,7 +84,7 @@ function monthToDate(data: StatsData): { cost: number; elapsed: number; inMonth:
 
 export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const t = useTheme()
-  const ramp = useHeatmapRamp()
+  const ramps = useMonthRamps()
   const now = new Date()
 
   const usable = Math.max(24, width - PAD * 2)
@@ -252,11 +252,15 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
       </box>
 
       {hasHistory ? (
-        <Section glyph={GLYPH.calendar} title="Activity" note={calendarFacts} width={usable}>
-          <Heatmap days={data.claude} ramp={ramp} today={data.todayDate} width={usable} />
-          <box paddingTop={1} paddingLeft={4} flexShrink={0}>
-            <HeatmapLegend ramp={ramp} />
-          </box>
+        <Section
+          glyph={GLYPH.calendar}
+          title="Activity"
+          note={<HeatmapLegend ramps={ramps} />}
+          rule={false}
+          width={usable}
+        >
+          <Heatmap days={data.claude} ramps={ramps} today={data.todayDate} width={usable} />
+          <Muted>{calendarFacts}</Muted>
         </Section>
       ) : (
         <Muted>no history yet — the first rollup runs in the background</Muted>
