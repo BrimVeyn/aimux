@@ -34,11 +34,19 @@ export async function listGhAccounts(): Promise<GhAccount[]> {
   return parseGhAuthStatus(`${result.stdout}\n${result.stderr}`)
 }
 
-/** Where a "switch account" button goes next: the following account, cycling. */
+/**
+ * Where a "switch account" button goes next: the following account, cycling.
+ * The order has to come from the names, not from `gh auth status`, which lists
+ * the active account first — cycling that puts you back on the account you just
+ * left, so a third account is never reachable.
+ */
 export function nextGhAccount(accounts: readonly GhAccount[]): GhAccount | null {
   if (accounts.length < 2) return null
-  const index = accounts.findIndex((account) => account.active)
-  return accounts[(index + 1) % accounts.length] ?? null
+  const sorted = [...accounts].sort(
+    (a, b) => a.host.localeCompare(b.host) || a.user.localeCompare(b.user)
+  )
+  const index = sorted.findIndex((account) => account.active)
+  return sorted[(index + 1) % sorted.length] ?? null
 }
 
 /** Returns an error message, or null when the switch landed. */

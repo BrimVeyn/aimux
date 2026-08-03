@@ -44,6 +44,24 @@ test('nextGhAccount cycles past the active account and wraps', () => {
   expect(nextGhAccount(last)?.user).toBe('nbardavid')
 })
 
+// `gh auth status` reprints with the active account first, so cycling its raw
+// order bounced between two accounts and never reached the third.
+test('nextGhAccount reaches every account when gh reorders active-first', () => {
+  const seen: string[] = []
+  let accounts = parseGhAuthStatus(REAL_STATUS)
+  for (let i = 0; i < 3; i++) {
+    const next = nextGhAccount(accounts)
+    expect(next).not.toBeNull()
+    seen.push(next?.user ?? '')
+    // What the next `gh auth status` would print: the new active account first.
+    accounts = [
+      { ...(next as GhAccount), active: true },
+      ...accounts.filter((a) => a.user !== next?.user).map((a) => ({ ...a, active: false })),
+    ]
+  }
+  expect(new Set(seen).size).toBe(3)
+})
+
 test('nextGhAccount has nowhere to go with a single account', () => {
   expect(nextGhAccount(parseGhAuthStatus(REAL_STATUS).slice(0, 1))).toBeNull()
 })
