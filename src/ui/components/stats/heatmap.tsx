@@ -42,6 +42,8 @@ const BLANK = ' '.repeat(CELL_WIDTH)
 const LABEL_WIDTH = 5
 
 const ROW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+/** The swatch and the space after it, drawn before every month name. */
+const SWATCH_WIDTH = 2
 /** A constant, not an inline attribute: a JSX string does not process `\u` escapes. */
 const CHEVRON = '\u{00BB}'
 const RULE = '\u{2500}'
@@ -74,7 +76,11 @@ function rampFor(ramps: Ramp[], month: number): Ramp {
   return ramps[month % ramps.length] ?? ramps[0] ?? []
 }
 
-/** The ramp a legend should show: one hue, so it reads as magnitude alone. */
+/**
+ * One hue's ramp, so the legend reads as magnitude alone — the month hues are a
+ * grouping and have no order, and a legend showing all four would invite reading
+ * one month against another.
+ */
 export function HeatmapLegend({ ramps }: { ramps: Ramp[] }) {
   const t = useTheme()
   const ramp = ramps[0] ?? []
@@ -141,7 +147,14 @@ function HeatRow({ cells, label, ramps }: { cells: HeatmapCell[]; label: string;
   )
 }
 
-/** Month names over their own columns, each in that month's hue. */
+/**
+ * Month names over their own columns, each behind a swatch in that month's hue.
+ *
+ * The swatch carries the colour and the name stays in a text token, rather than
+ * colouring the name itself: a light hue — the yellow month, in most themes — is
+ * markedly harder to read as text than as a filled mark, and the swatch is the
+ * same glyph as the cells it stands for, which is what ties the two together.
+ */
 function MonthHeader({
   grid,
   ramps,
@@ -152,7 +165,7 @@ function MonthHeader({
   weeks: number
 }) {
   const t = useTheme()
-  const labels = monthLabels(grid, weeks, CELL_WIDTH)
+  const labels = monthLabels(grid, weeks, CELL_WIDTH, SWATCH_WIDTH)
 
   let cursor = 0
   const runs: { color: RGBA | string; key: string; text: string }[] = []
@@ -166,10 +179,15 @@ function MonthHeader({
     }
     runs.push({
       color: rampFor(ramps, label.month).at(-1) ?? t.text,
-      key: `${label.name}${String(label.offset)}`,
-      text: label.name,
+      key: `swatch${String(label.offset)}`,
+      text: CELL,
     })
-    cursor = label.offset + label.name.length
+    runs.push({
+      color: t.textMuted,
+      key: `${label.name}${String(label.offset)}`,
+      text: ` ${label.name}`,
+    })
+    cursor = label.offset + label.name.length + SWATCH_WIDTH
   }
 
   return (

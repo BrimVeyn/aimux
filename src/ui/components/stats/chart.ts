@@ -4,12 +4,23 @@
  * string-level test catches that.
  */
 
-const BAR_WIDTH = 2
-const GAP = 1
-const FULL = '\u{2588}'.repeat(BAR_WIDTH)
-const HALF = '\u{2584}'.repeat(BAR_WIDTH)
-const BLANK = ' '.repeat(BAR_WIDTH)
-const SPACER = ' '.repeat(GAP)
+/**
+ * One column per bar.
+ *
+ * The body is LEFT HALF BLOCK, so it paints the left half of its cell and the
+ * right half *is* the gap — a bar and its spacing cost one column together,
+ * where a full block needs a second column of air beside it to stay separate.
+ * Twice the days in the same width.
+ *
+ * The cap is QUADRANT LOWER LEFT: half a cell wide like the body, half a cell
+ * tall, which is the only glyph that can end a half-width bar part-way up a
+ * row. It buys a second level per row — twenty over a ten-row chart.
+ */
+const BODY = '\u{258C}'
+const CAP = '\u{2596}'
+const BLANK = ' '
+/** Body plus its built-in gap. */
+const STRIDE = 1
 
 export interface ChartLines {
   /** One label per row, top first, all the same width; blank on unlabelled rows. */
@@ -21,8 +32,8 @@ export interface ChartLines {
 }
 
 /** How many bars fit in `width` columns, capped at `max` days. */
-export function chartColumns(width: number, max = 32): number {
-  return Math.max(4, Math.min(max, Math.floor(width / (BAR_WIDTH + GAP))))
+export function chartColumns(width: number, max = 60): number {
+  return Math.max(4, Math.min(max, Math.floor(width / STRIDE)))
 }
 
 /**
@@ -51,7 +62,7 @@ function niceStep(raw: number): number {
  */
 export function buildChart(
   values: number[],
-  height = 8,
+  height = 10,
   format: (value: number) => string = String
 ): ChartLines {
   const max = Math.max(...values, 0)
@@ -70,14 +81,17 @@ export function buildChart(
     bars.push(
       values
         .map((value) => {
-          const scaled = (value / niceMax) * height
-          if (scaled >= row - 0.25) return FULL
+          // How much of *this* row the column fills, 0 to 1, rounded to the
+          // nearest half — the two levels the body and the cap can express.
+          const fill = Math.min(1, Math.max(0, (value / niceMax) * height - (row - 1)))
+          if (fill >= 0.75) return BODY
+          if (fill >= 0.25) return CAP
           // The bottom row keeps any non-zero day visible: a recorded day that
-          // renders as nothing reads as a gap in the data.
-          if (scaled >= row - 0.75 || (row === 1 && value > 0)) return HALF
-          return BLANK
+          // renders as nothing reads as a gap in the data rather than as a
+          // quiet day.
+          return row === 1 && value > 0 ? CAP : BLANK
         })
-        .join(SPACER)
+        .join('')
     )
   }
   return { axis, bars, niceMax }

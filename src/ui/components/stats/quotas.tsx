@@ -9,7 +9,7 @@ import { useAIUsageStore } from '../../../state/ai-usage-store'
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
 import { formatClock } from './format'
-import { GLYPH, Muted, Section, TickBar } from './shared'
+import { Bar, GLYPH, Muted, Section } from './shared'
 
 /**
  * The live quota block.
@@ -85,7 +85,7 @@ function WindowRow({ now, width, window }: { now: Date; width: number; window: U
             {truncate(window.label, LABEL_WIDTH - 1)}
           </text>
         </box>
-        <TickBar color={barColor} max={100} segments={SEGMENTS} value={Math.min(100, percent)} />
+        <Bar color={barColor} max={100} segments={SEGMENTS} value={Math.min(100, percent)} />
         <text fg={t.text} selectable={false} wrapMode="none">
           {(window.percent === null ? '—' : `${Math.round(percent)}%`).padStart(PERCENT_WIDTH)}
         </text>

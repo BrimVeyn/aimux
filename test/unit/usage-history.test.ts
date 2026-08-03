@@ -352,6 +352,24 @@ describe('grid presentation', () => {
     for (const name of narrow) expect(name).toHaveLength(3)
   })
 
+  test('decoration widens the spacing, so a swatch cannot collide with the next name', () => {
+    const grid = buildHeatmap({}, 53, new Date(2026, 7, 3))
+    const decoration = 2
+    const labels = monthLabels(grid, 53, 2, decoration)
+
+    for (const [index, label] of labels.entries()) {
+      if (index === 0) continue
+      const previous = labels[index - 1]
+      if (previous === undefined) continue
+      // The caller draws `decoration` extra cells per label; without accounting
+      // for them the gap looks fine here and the swatch lands on the last
+      // letter of the month before it.
+      expect(label.offset).toBeGreaterThanOrEqual(
+        previous.offset + previous.name.length + decoration
+      )
+    }
+  })
+
   test('month labels never overlap each other', () => {
     const grid = buildHeatmap({}, 53, new Date(2026, 7, 3))
     const labels = monthLabels(grid, 53, 3)

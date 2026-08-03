@@ -139,16 +139,44 @@ describe('buildChart', () => {
   test('the tallest bar reaches the row its value earns and no further', () => {
     const chart = buildChart([8, 4], 8)
     // niceMax is 8: the first bar fills the top row, the second starts halfway.
-    expect(chart.bars[0]?.startsWith('\u{2588}\u{2588}')).toBe(true)
-    expect(chart.bars[0]?.endsWith('  ')).toBe(true)
-    expect(chart.bars[4]?.endsWith('\u{2588}\u{2588}')).toBe(true)
-    expect(chart.bars[3]?.endsWith('  ')).toBe(true)
+    expect(chart.bars[0]?.startsWith('\u{258C}')).toBe(true)
+    expect(chart.bars[0]?.endsWith(' ')).toBe(true)
+    expect(chart.bars[4]?.endsWith('\u{258C}')).toBe(true)
+    expect(chart.bars[3]?.endsWith(' ')).toBe(true)
+  })
+
+  test('one column per bar, gap included', () => {
+    // The body paints half a cell, so the other half is the spacing: a bar and
+    // its gap cost one column together, not two.
+    const chart = buildChart([1, 2, 3, 4], 8)
+    expect(chart.bars[0]).toHaveLength(4)
+    expect(chartColumns(60)).toBe(60)
   })
 
   test('a non-zero day never disappears from the bottom row', () => {
     const chart = buildChart([1, 800], 8)
-    // 1/800 rounds to nothing, but the day happened: it keeps a half block.
-    expect(chart.bars.at(-1)?.startsWith('\u{2584}\u{2584}')).toBe(true)
+    // 1/800 rounds to nothing, but the day happened: it keeps the smallest mark
+    // there is rather than rendering as a gap in the data.
+    expect(chart.bars.at(-1)?.startsWith(' ')).toBe(false)
+  })
+
+  test('a half-height cap gives a second level inside each row', () => {
+    // The top rounds up to 16, so 7 is three and a half rows. Without the cap
+    // it would round to a whole row and read as 8 or as 6.
+    const chart = buildChart([13, 7], 8)
+    expect(chart.niceMax).toBe(16)
+    expect(chart.bars.some((line) => line.includes('\u{2596}'))).toBe(true)
+
+    // And a value that does land on a row boundary gets no cap.
+    expect(buildChart([8, 4], 8).bars.some((line) => line.includes('\u{2596}'))).toBe(false)
+  })
+
+  test('a column is filled solid below its top', () => {
+    const chart = buildChart([100], 8)
+    // Only the topmost cell may be a partial block; a gap under one would draw
+    // a floating segment instead of a column.
+    const drawn = chart.bars.filter((line) => line.trim() !== '')
+    for (const line of drawn.slice(1)) expect(line).toBe('\u{258C}')
   })
 
   test('an all-zero series draws an empty chart, not a crash', () => {
@@ -156,9 +184,12 @@ describe('buildChart', () => {
     expect(chart.bars.every((row) => row.trim() === '')).toBe(true)
   })
 
-  test('chartColumns fits bars to the width with a floor', () => {
-    expect(chartColumns(90)).toBe(30)
-    expect(chartColumns(200)).toBe(32)
+  test('chartColumns fits bars to the width with a floor and a ceiling', () => {
+    expect(chartColumns(90)).toBe(60)
+    expect(chartColumns(45)).toBe(45)
+    // Capped: past two months the chart stops adding days and the heatmap is
+    // where a longer span is read.
+    expect(chartColumns(200)).toBe(60)
     expect(chartColumns(3)).toBe(4)
   })
 })

@@ -4,7 +4,6 @@ import type { ReactNode } from 'react'
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
 import { buildChart } from './chart'
-import { formatPercent } from './format'
 import { buildTable, type TableColumn } from './table'
 
 export type { TableColumn } from './table'
@@ -236,14 +235,17 @@ export function Columns({
 }
 
 /**
- * Left-three-eighths block: repeated, it draws thin vertical ticks with a
- * natural gap between them, which is what makes a segmented gauge read as
- * segments instead of a solid bar.
+ * Full block over light shade: the filled run and the track it sits in.
+ *
+ * Solid rather than segmented. A segmented mark — a repeated part-width block
+ * like `▍` — puts a gap at the same place in every cell, and once several bars
+ * are stacked those gaps line up into vertical stripes running the height of
+ * the block. The stripes win the eye and the rows stop reading as bars.
  */
-const TICK = '\u{258D}'
+const BAR_FILL = '\u{2588}'
+const BAR_TRACK = '\u{2591}'
 
-/** A segmented gauge — filled ticks in the given colour, the rest kept faint. */
-export function TickBar({
+export function Bar({
   color,
   max,
   segments = 24,
@@ -263,10 +265,10 @@ export function TickBar({
   return (
     <box flexDirection="row" flexShrink={0}>
       <text fg={color} selectable={false} wrapMode="none">
-        {TICK.repeat(filled)}
+        {BAR_FILL.repeat(filled)}
       </text>
       <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {TICK.repeat(segments - filled)}
+        {BAR_TRACK.repeat(segments - filled)}
       </text>
     </box>
   )
@@ -320,9 +322,20 @@ export function TileRow({ children }: { children: ReactNode }) {
   )
 }
 
+const AXIS_WALL = '\u{2502}'
+const AXIS_FOOT = '\u{2514}'
+const AXIS_FLOOR = '\u{2500}'
+/** The wall and the space between it and the first column. */
+const AXIS_GUTTER = 2
+
 /**
- * A column chart with its own integer axis and a caption beneath — the caption
- * is the title, so the chart stands on its own without a panel header.
+ * A column chart: an integer axis down the left, a rule under the columns, and
+ * a caption beneath that.
+ *
+ * The L of wall and floor is what makes the columns read as measured against
+ * something. Without it a column chart is a row of blocks floating on the
+ * surface, and the eye has nothing to judge a height against. Both are drawn
+ * one shade off the surface, so they frame the data without competing with it.
  */
 export function VBarChart({
   caption,
@@ -337,20 +350,29 @@ export function VBarChart({
   const chart = buildChart(values, 8, format)
   const chartWidth = chart.bars[0]?.length ?? 0
   const axisWidth = chart.axis[0]?.length ?? 0
-  const captionPad = axisWidth + 1 + Math.max(0, Math.floor((chartWidth - caption.length) / 2))
+  const captionPad =
+    axisWidth + AXIS_GUTTER + Math.max(0, Math.floor((chartWidth - caption.length) / 2))
 
   return (
     <box flexDirection="column" flexShrink={0}>
       {chart.bars.map((line, index) => (
         <box key={`${String(index)}:${line}`} flexDirection="row" flexShrink={0}>
           <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {`${chart.axis[index] ?? ''} `}
+            {chart.axis[index] ?? ''}
           </text>
-          <text fg={t.success} selectable={false} wrapMode="none">
+          <text fg={t.borderSubtle} selectable={false} wrapMode="none">
+            {`${AXIS_WALL} `}
+          </text>
+          <text fg={t.primary} selectable={false} wrapMode="none">
             {line}
           </text>
         </box>
       ))}
+      <box flexDirection="row" flexShrink={0}>
+        <text fg={t.borderSubtle} selectable={false} wrapMode="none">
+          {`${' '.repeat(axisWidth)}${AXIS_FOOT}${AXIS_FLOOR.repeat(chartWidth + 1)}`}
+        </text>
+      </box>
       <box paddingLeft={captionPad} flexShrink={0}>
         <Muted>{caption}</Muted>
       </box>
@@ -358,24 +380,31 @@ export function VBarChart({
   )
 }
 
-const BAR_FULL = '\u{2588}'
-const BAR_EMPTY = '\u{2591}'
+/** The column every bar row's value ends on. */
+const VALUE_WIDTH = 10
+/**
+ * Longest a bar is allowed to get, however wide the terminal.
+ *
+ * Past this the bar stops carrying information and starts carrying distance:
+ * comparing two lengths gets harder as they grow, and on a wide terminal a row
+ * that fills its column separates its own label from its own value.
+ */
+const BAR_MAX = 32
 
 /**
- * Horizontal magnitude bar, sized against the largest value in its group.
+ * A labelled magnitude bar, scaled against the largest value in its group.
  *
- * One hue for every row: these are one series split by category, not several
- * series, so a second colour would encode a difference that is not there.
+ * The same tick mark as the quota gauges, so one mark means one thing across
+ * the screen: a proportion. It carries the value at its tip and nothing else —
+ * a second number per row would be read against a different denominator than
+ * the bar (share of the total, where the bar is scaled to the largest), which
+ * is two scales in one row.
  */
-/** Value and share, right-aligned: the column every bar row ends on. */
-const VALUE_WIDTH = 15
-
 export function BarRow({
   barWidth = 12,
   label,
   labelWidth = 14,
   max,
-  total,
   value,
   valueText,
   width,
@@ -384,7 +413,6 @@ export function BarRow({
   label: string
   labelWidth?: number
   max: number
-  total?: number
   value: number
   valueText: string
   /** Fill exactly this many columns — the bar takes whatever the label and value leave. */
@@ -392,9 +420,11 @@ export function BarRow({
 }) {
   const t = useTheme()
   const labels = width === undefined ? labelWidth : Math.max(6, Math.min(20, Math.round(width / 3)))
-  const bars = width === undefined ? barWidth : Math.max(4, width - labels - VALUE_WIDTH)
-  const filled = max <= 0 ? 0 : Math.max(value > 0 ? 1 : 0, Math.round((value / max) * bars))
-  const share = total != null ? formatPercent(value, total) : ''
+  const room = width === undefined ? barWidth : Math.max(4, width - labels - VALUE_WIDTH)
+  const bars = Math.min(BAR_MAX, room)
+  // Whatever the cap leaves over goes between the bar and its value, so the
+  // values stay on the column's right edge and every row still ends together.
+  const slack = room - bars
 
   return (
     <box flexDirection="row" flexShrink={0}>
@@ -403,14 +433,9 @@ export function BarRow({
           {truncate(label, labels - 1)}
         </text>
       </box>
-      <text fg={t.success} selectable={false} wrapMode="none">
-        {BAR_FULL.repeat(filled)}
-      </text>
-      <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {BAR_EMPTY.repeat(Math.max(0, bars - filled))}
-      </text>
+      <Bar color={t.primary} max={max} segments={bars} value={value} />
       <text fg={t.text} selectable={false} wrapMode="none">
-        {`${valueText.padStart(VALUE_WIDTH - 6)}${share.padStart(6)}`}
+        {valueText.padStart(VALUE_WIDTH + slack)}
       </text>
     </box>
   )
@@ -451,7 +476,7 @@ export function HourChart({ values }: { values: number[] }) {
 
   return (
     <box flexDirection="column" flexShrink={0}>
-      <text fg={t.success} selectable={false} wrapMode="none">
+      <text fg={t.primary} selectable={false} wrapMode="none">
         {bars}
       </text>
       <text fg={t.textMuted} selectable={false} wrapMode="none">

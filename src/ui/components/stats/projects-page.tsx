@@ -113,7 +113,6 @@ export function ProjectsPage({ data, width }: { data: StatsData; width: number }
                 key={path}
                 label={shortenPath(path)}
                 max={projectMax}
-                total={projects.total}
                 value={value}
                 valueText={formatCount(value)}
               />
@@ -134,7 +133,6 @@ export function ProjectsPage({ data, width }: { data: StatsData; width: number }
                 key={branch}
                 label={branch}
                 max={branchMax}
-                total={summary.branchTotal}
                 value={value}
                 valueText={formatCompact(value)}
               />

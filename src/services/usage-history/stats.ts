@@ -111,7 +111,13 @@ const MONTH_NAMES = [
  * month boundary has to pick one, and the earlier one is where the column
  * starts on screen.
  */
-export function monthLabels(grid: HeatmapCell[][], weeks: number, cellWidth: number): MonthLabel[] {
+export function monthLabels(
+  grid: HeatmapCell[][],
+  weeks: number,
+  cellWidth: number,
+  /** Cells the caller draws around each name — a swatch, a space — so the spacing accounts for them. */
+  decoration = 0
+): MonthLabel[] {
   const spans: { end: number; month: number; start: number }[] = []
   for (let column = 0; column < weeks; column++) {
     const day = grid.map((row) => row[column]?.day ?? '').find((key) => key !== '')
@@ -126,14 +132,15 @@ export function monthLabels(grid: HeatmapCell[][], weeks: number, cellWidth: num
   let usedUpTo = 0
   for (const span of spans) {
     const name = MONTH_NAMES[span.month] ?? ''
+    const rendered = name.length + decoration
     const width = (span.end - span.start + 1) * cellWidth
-    const centred = span.start * cellWidth + Math.floor((width - name.length) / 2)
+    const centred = span.start * cellWidth + Math.floor((width - rendered) / 2)
     // Never behind the previous label: a narrow leading month would otherwise
     // centre its name on top of the one before it.
     const offset = Math.max(usedUpTo, centred)
-    if (offset + name.length > weeks * cellWidth) continue
+    if (offset + rendered > weeks * cellWidth) continue
     labels.push({ month: span.month, name, offset })
-    usedUpTo = offset + name.length + 1
+    usedUpTo = offset + rendered + 1
   }
   return labels
 }

@@ -57,6 +57,15 @@ const BORDER_LEFT: BorderSides[] = ['left']
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
 
+/**
+ * `claude-haiku-4-5-20251001` as `haiku-4-5`. The vendor prefix is the same on
+ * every row and the release date is a build stamp, not something a reader is
+ * comparing models on.
+ */
+function modelLabel(model: string): string {
+  return model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
+}
+
 /** Tokens and notional cost per day over the last `span` recorded days. */
 function recentBurn(data: StatsData, span = 7): { cost: number; days: number } {
   let cost = 0
@@ -185,7 +194,6 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
             key={label}
             label={label}
             max={weekdayMax}
-            total={weekTotal}
             value={weekdays[index] ?? 0}
             valueText={formatCount(weekdays[index] ?? 0)}
             width={rightWidth}
@@ -205,9 +213,8 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
           summary.models.map(([model, value]) => (
             <BarRow
               key={model}
-              label={model.replace('claude-', '')}
+              label={modelLabel(model)}
               max={modelMax}
-              total={summary.modelTotal}
               value={value}
               valueText={formatCompact(value)}
               width={rightWidth}
