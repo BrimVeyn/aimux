@@ -231,6 +231,23 @@ export function clampPrBody(body: string, maxLines = 5, maxChars = 260): Clamped
   return { text, truncated: text.length < full.length }
 }
 
+/**
+ * `gh`'s failure in one line. The raw spawn error is a binary path, an exit
+ * code and a GraphQL dump — accurate, unreadable, and far wider than the pane.
+ */
+export function ghErrorMessage(detail: string): string {
+  const repo = /could not resolve to a repository with the name '([^']+)'/i.exec(detail)
+  if (repo !== null) return `No access to ${repo[1]}`
+  if (/gh auth login|not logged in|authentication failed|bad credentials/i.test(detail)) {
+    return 'Not logged in to GitHub'
+  }
+  const first = detail
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line !== '')
+  return (first ?? 'gh failed').replace(/^(error|gh):\s*/i, '').slice(0, 160)
+}
+
 export async function collectPrStatus(cwd: string): Promise<PrStatusResult> {
   const gh = Bun.which('gh')
   if (gh === null) return { kind: 'no-gh' }
@@ -242,7 +259,9 @@ export async function collectPrStatus(cwd: string): Promise<PrStatusResult> {
     // at all (aimux projects can point anywhere). None of those is an error.
     const stderr = result.stderr.toLowerCase()
     if (NOT_AN_ERROR.some((needle) => stderr.includes(needle))) return { kind: 'no-pr' }
-    return { kind: 'error', message: (result.error ?? 'gh failed').slice(0, 200) }
+    // A spawn that never started (missing cwd) reports on `error`, not stderr.
+    const detail = result.stderr.trim() !== '' ? result.stderr : (result.error ?? '')
+    return { kind: 'error', message: ghErrorMessage(detail) }
   }
 
   try {
