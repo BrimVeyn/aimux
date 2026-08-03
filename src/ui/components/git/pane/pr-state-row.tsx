@@ -44,18 +44,9 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
     })()
   }, [projectPath])
 
-  // First fetch still in flight: hold the band empty so the tabs below don't
-  // jump a row once the PR lands.
-  if (result === null) {
-    return (
-      <box backgroundColor={bg} paddingLeft={1} paddingRight={1}>
-        <text selectable={false} bg={bg} wrapMode="none">
-          {' '}
-        </text>
-      </box>
-    )
-  }
-  if (result.kind !== 'ok' || pr === null) return null
+  // Nothing known yet (or nothing to show): stay out of the layout entirely and
+  // appear only once a fetch reports a PR.
+  if (result?.kind !== 'ok' || pr === null) return null
   const status = prActionState(pr, result.checks)
   let label = status.label
   if (confirming) label = 'Merge this PR?'

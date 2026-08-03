@@ -15,14 +15,16 @@ interface Options {
 
 /** One-shot refetch, for when an action we took just invalidated the state. */
 export async function refreshPrStatus(projectPath: string): Promise<void> {
-  prStatusStore.getState().setResult(await collectPrStatus(projectPath))
+  prStatusStore.getState().setResult(projectPath, await collectPrStatus(projectPath))
 }
 
 export function usePrStatusPolling({ enabled, projectPath }: Options): void {
   useEffect(() => {
     if (!enabled || !(projectPath != null && projectPath !== '')) return
 
-    prStatusStore.getState().reset()
+    // Show what we last knew about this path while the fetch runs in the
+    // background, rather than blanking the row on every workspace switch.
+    prStatusStore.getState().selectPath(projectPath)
 
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -36,7 +38,7 @@ export function usePrStatusPolling({ enabled, projectPath }: Options): void {
     const tick = async () => {
       const result = await collectPrStatus(projectPath)
       if (cancelled) return
-      prStatusStore.getState().setResult(result)
+      prStatusStore.getState().setResult(projectPath, result)
       if (result.kind === 'error') {
         delay = Math.min(delay * 2, MAX_INTERVAL_MS)
       } else if (result.kind === 'ok' && result.checks.some((c) => c.state === 'pending')) {
