@@ -21,8 +21,13 @@ export function getAimuxWorktreeRoot(): string {
   return root != null && root !== '' ? root : defaultWorktreeRoot()
 }
 
+/** `améliorer` → `ameliorer`, so accents slug as letters instead of separators. */
+export function foldDiacritics(input: string): string {
+  return input.normalize('NFD').replaceAll(/\p{Diacritic}/gu, '')
+}
+
 export function sanitizePathSegment(input: string, maxLength = MAX_SLUG_LENGTH): string {
-  const sanitized = input
+  const sanitized = foldDiacritics(input)
     .trim()
     .replaceAll(/[^A-Za-z0-9._-]+/g, '-')
     .replaceAll(/\.\.+/g, '-')

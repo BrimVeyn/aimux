@@ -1,6 +1,11 @@
 import { expect, test } from 'bun:test'
 
-import { generateTabTitle, sanitizeGeneratedTitle } from '../../src/auto-rename/title-runner'
+import {
+  generateTabTitle,
+  generateWorkspaceNaming,
+  sanitizeGeneratedBranch,
+  sanitizeGeneratedTitle,
+} from '../../src/auto-rename/title-runner'
 
 test('sanitizes a concise generated title', () => {
   expect(sanitizeGeneratedTitle('TITLE: "Corriger le cache utilisateur."\nextra')).toBe(
@@ -22,6 +27,59 @@ test('rejects malformed one-word output', () => {
 
 test('accepts concise titles in scripts that do not separate words with spaces', () => {
   expect(sanitizeGeneratedTitle('キャッシュ修正')).toBe('キャッシュ修正')
+})
+
+test('sanitizes a generated branch through the wrappers a model adds anyway', () => {
+  expect(sanitizeGeneratedBranch('2. `Fix/Scroll Drift On Resize.`')).toBe(
+    'fix/scroll-drift-on-resize'
+  )
+})
+
+test('keeps generated branch subjects to whole words', () => {
+  expect(sanitizeGeneratedBranch('feat/one-two-three-four-five-six-seven')).toBe(
+    'feat/one-two-three-four-five'
+  )
+})
+
+test('folds accents in a generated branch instead of cutting words at them', () => {
+  expect(sanitizeGeneratedBranch('fix/améliorer-le-naming')).toBe('fix/ameliorer-le-naming')
+})
+
+test('refuses a branch outside the conventional types', () => {
+  expect(sanitizeGeneratedBranch('scroll drift fix')).toBeNull()
+  expect(sanitizeGeneratedBranch('wip/scroll-drift')).toBeNull()
+  expect(sanitizeGeneratedBranch('fix/')).toBeNull()
+})
+
+test('workspace naming reads the title and the branch from one call', async () => {
+  let calls = 0
+  const result = await generateWorkspaceNaming({
+    firstPrompt: 'corrige le décalage du scroll',
+    provider: 'claude',
+    signal: new AbortController().signal,
+    spawn: async () => {
+      calls++
+      return { exitCode: 0, stdout: 'Corriger le décalage du scroll\nfix/scroll-drift-on-resize\n' }
+    },
+    timeoutMs: 1_000,
+  })
+  expect(result).toEqual({
+    branch: 'fix/scroll-drift-on-resize',
+    status: 'ok',
+    title: 'Corriger le décalage du scroll',
+  })
+  expect(calls).toBe(1)
+})
+
+test('workspace naming keeps the title when only the branch is unusable', async () => {
+  const result = await generateWorkspaceNaming({
+    firstPrompt: 'fix the scroll drift',
+    provider: 'claude',
+    signal: new AbortController().signal,
+    spawn: async () => ({ exitCode: 0, stdout: 'Fix scroll drift' }),
+    timeoutMs: 1_000,
+  })
+  expect(result).toEqual({ branch: null, status: 'ok', title: 'Fix scroll drift' })
 })
 
 test('runs the matching provider and model', async () => {

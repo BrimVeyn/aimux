@@ -120,7 +120,11 @@ export async function createAimuxTempWorkspace(
   const branchName =
     trimmedBranch != null && trimmedBranch !== ''
       ? trimmedBranch
-      : `aimux/${sanitizePathSegment(workspaceName, 40)}-${Date.now().toString(36)}`
+      : // Placeholder only: the model replaces it with a conventional
+        // `<type>/<subject>` branch seconds later. Kept in the `aimux/`
+        // namespace and lowercased so what survives a failed generation still
+        // reads as a throwaway branch rather than a shouted prompt.
+        `aimux/${sanitizePathSegment(workspaceName, 40).toLowerCase()}-${Date.now().toString(36)}`
   const targetPath = makeWorktreePath({ repoRoot, workspaceId, workspaceName })
 
   const existingWorkspace = (await listGitWorktrees(repoRoot)).find(
@@ -209,12 +213,15 @@ export async function runDeleteWorkspace(
 
   const repoPath = resolveWorkspaceGitDir(project, workspace)
   const isAimuxTemp = workspace.source === 'aimux-temp' && workspace.createdByAimux
-  // Drop the throwaway aimux branch alongside the workspace so deleted temp
-  // workspaces don't accumulate in the repo or haunt the base picker. Scoped to
-  // the `aimux/` namespace (matches the picker filter); best-effort.
+  // Drop the throwaway branch alongside the workspace so deleted temp
+  // workspaces don't accumulate in the repo. Scoped by the record rather than by
+  // a name prefix: auto-naming renames the branch to a conventional
+  // `<type>/<subject>`, indistinguishable from a hand-made one, and
+  // `aimux-temp` + `createdByAimux` is exactly "aimux created this branch".
+  // Best-effort; git refuses while another worktree still has it checked out.
   const cleanupAimuxBranch = async (): Promise<void> => {
     const branch = workspace.branch
-    if (isAimuxTemp && branch != null && branch !== '' && branch.startsWith('aimux/')) {
+    if (isAimuxTemp && branch != null && branch !== '') {
       await deleteGitBranch(repoPath, branch)
     }
   }

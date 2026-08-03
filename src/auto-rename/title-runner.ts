@@ -1,4 +1,5 @@
 import { buildHeadlessInvocation, type HeadlessInvocation } from '../auto-commit/headless-commands'
+import { foldDiacritics } from '../platform/worktree-paths'
 import { clampTitle } from './title-format'
 
 export type TitleSpawnFn = (
@@ -16,6 +17,33 @@ export type TitleResult =
   | { status: 'failed' }
   | { status: 'unavailable' }
 
+/**
+ * A workspace needs two different names from one request: a tab title in the
+ * user's own language, and a branch name — which is read by git, by reviewers
+ * and by CI, so it follows the repo's conventions instead: English, a
+ * conventional-commit type, kebab-case. `branch` is null when the model gave
+ * nothing that qualifies; the caller keeps the branch it already has.
+ */
+export type NamingResult =
+  | { status: 'ok'; title: string; branch: string | null }
+  | { status: 'failed' }
+  | { status: 'unavailable' }
+
+/** Conventional-commit types a generated branch may use; anything else is refused. */
+const BRANCH_TYPES = new Set([
+  'build',
+  'chore',
+  'ci',
+  'docs',
+  'feat',
+  'fix',
+  'perf',
+  'refactor',
+  'style',
+  'test',
+])
+const BRANCH_SUBJECT_WORDS = 5
+
 export function buildTitlePrompt(firstPrompt: string): string {
   return [
     'Create a concise tab title for the user request below.',
@@ -26,15 +54,56 @@ export function buildTitlePrompt(firstPrompt: string): string {
   ].join('\n')
 }
 
-export function sanitizeGeneratedTitle(raw: string): string | null {
-  const first = raw
+export function buildWorkspaceNamingPrompt(firstPrompt: string): string {
+  return [
+    'Name a workspace for the user request below.',
+    'Return exactly two lines and nothing else.',
+    'Line 1 — a tab title: 2 to 6 words, at most 48 characters, in the same language as the request.',
+    'Line 2 — a git branch named <type>/<subject>, always in English whatever the language of the request.',
+    '<type> is one of: feat, fix, refactor, perf, docs, test, chore, ci, style, build.',
+    '<subject> is 2 to 5 lowercase words joined by hyphens, naming what changes rather than restating the request.',
+    'Example line 2: fix/scroll-drift-on-resize',
+    'No quotes, no labels, no numbering, no markdown, no ending punctuation.',
+    '',
+    firstPrompt.slice(0, 8_000),
+  ].join('\n')
+}
+
+function nonEmptyLines(raw: string): string[] {
+  return raw
     .split(/\r?\n/u)
     .map((line) => line.trim())
-    .find(Boolean)
-  if (first == null || first === '') return null
+    .filter(Boolean)
+}
 
-  const unlabelled = first.replace(/^TITLE\s*:\s*/iu, '').replaceAll(/^["'“”‘’]+|["'“”‘’]+$/gu, '')
-  return clampTitle(unlabelled)
+/** Strip the wrappers a model reaches for even when told not to: labels, list markers, quotes. */
+function unwrapLine(line: string, label: RegExp): string {
+  return line
+    .replace(label, '')
+    .replace(/^(?:\d+[.)]|[-*])\s*/u, '')
+    .replaceAll(/^["'`“”‘’]+|["'`“”‘’]+$/gu, '')
+}
+
+export function sanitizeGeneratedTitle(raw: string): string | null {
+  const first = nonEmptyLines(raw)[0]
+  if (first == null) return null
+  return clampTitle(unwrapLine(first, /^TITLE\s*:\s*/iu))
+}
+
+export function sanitizeGeneratedBranch(raw: string): string | null {
+  const line = unwrapLine(raw.trim(), /^BRANCH\s*:\s*/iu)
+  const slash = line.indexOf('/')
+  if (slash < 0) return null
+  const type = line.slice(0, slash).trim().toLowerCase()
+  if (!BRANCH_TYPES.has(type)) return null
+  // Whole words only: a mid-word cut ("...-bran") names nothing.
+  const subject = foldDiacritics(line.slice(slash + 1))
+    .toLowerCase()
+    .split(/[^a-z0-9]+/u)
+    .filter(Boolean)
+    .slice(0, BRANCH_SUBJECT_WORDS)
+    .join('-')
+  return subject === '' ? null : `${type}/${subject}`
 }
 
 function executableOnPath(executable: string): boolean {
@@ -46,7 +115,7 @@ function executableOnPath(executable: string): boolean {
   }
 }
 
-export async function generateTabTitle(options: {
+export interface NamingOptions {
   provider: string
   model?: string
   firstPrompt: string
@@ -54,12 +123,13 @@ export async function generateTabTitle(options: {
   signal: AbortSignal
   spawn?: TitleSpawnFn
   isExecutableAvailable?: (executable: string) => boolean
-}): Promise<TitleResult> {
-  const invocation = buildHeadlessInvocation(
-    options.provider,
-    buildTitlePrompt(options.firstPrompt),
-    options.model
-  )
+}
+
+async function runNamingModel(
+  options: NamingOptions,
+  prompt: string
+): Promise<{ status: 'ok'; stdout: string } | { status: 'failed' } | { status: 'unavailable' }> {
+  const invocation = buildHeadlessInvocation(options.provider, prompt, options.model)
   if (!invocation) return { status: 'unavailable' }
 
   // A caller-supplied spawn does not go through PATH, so only probe it for the
@@ -72,10 +142,30 @@ export async function generateTabTitle(options: {
   try {
     const result = await (options.spawn ?? defaultSpawn)(invocation, signal)
     if (!result || result.exitCode !== 0 || signal.aborted) return { status: 'failed' }
-    const title = sanitizeGeneratedTitle(result.stdout)
-    return title == null ? { status: 'failed' } : { status: 'ok', title }
+    return { status: 'ok', stdout: result.stdout }
   } catch {
     return { status: 'failed' }
+  }
+}
+
+export async function generateTabTitle(options: NamingOptions): Promise<TitleResult> {
+  const run = await runNamingModel(options, buildTitlePrompt(options.firstPrompt))
+  if (run.status !== 'ok') return run
+  const title = sanitizeGeneratedTitle(run.stdout)
+  return title == null ? { status: 'failed' } : { status: 'ok', title }
+}
+
+/** One model call for both names — a workspace must not wait on two. */
+export async function generateWorkspaceNaming(options: NamingOptions): Promise<NamingResult> {
+  const run = await runNamingModel(options, buildWorkspaceNamingPrompt(options.firstPrompt))
+  if (run.status !== 'ok') return run
+  const [titleLine, branchLine] = nonEmptyLines(run.stdout)
+  const title = titleLine == null ? null : sanitizeGeneratedTitle(titleLine)
+  if (title == null) return { status: 'failed' }
+  return {
+    branch: branchLine == null ? null : sanitizeGeneratedBranch(branchLine),
+    status: 'ok',
+    title,
   }
 }
 
