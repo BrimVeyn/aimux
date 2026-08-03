@@ -6,8 +6,13 @@ import {
   spawnDaemonReexec,
   spawnDetachedIpcDaemon,
 } from './platform/daemon-control'
+import { recordOnce } from './services/aimux-counters'
 
 export async function runRestartDaemon(): Promise<number> {
+  // Written immediately: this runs as its own short-lived process, so there is
+  // no flush loop to hand it to.
+  recordOnce('daemonRestarts')
+
   const socketPath = getDaemonSocketPath()
   const pid = await findIpcDaemonPid()
 

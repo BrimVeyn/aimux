@@ -104,7 +104,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
       m
         .map('<Leader>b', actions.toggleProjectBar, 'Toggle project bar')
         .map('<Leader>B', actions.toggleBar('right'), 'Toggle right bar')
-        .map('<Leader>u', actions.toggleAIUsage, 'Toggle AI usage')
+        .map('<Leader>u', actions.toggleStats, 'Stats')
         .map('<Leader>,', actions.enterSettings, 'Settings')
         .map('<Leader>1', actions.switchTabByIndex(1), 'Tab 1')
         .map('<Leader>2', actions.switchTabByIndex(2), 'Tab 2')
@@ -216,16 +216,26 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
-    // Modal: ai-usage (info-only)
+    // Stats screen (read-only)
+    //
+    // `h`/`l` change page and `j`/`k` scroll it — the same split the settings
+    // screen uses, where the horizontal pair never touches content.
     // -----------------------------------------------------------------------
-    .mode('modal.ai-usage', (m) =>
+    .mode('stats', (m) =>
       m
-        .map('<Esc>', actions.closeModal, 'Close')
-        .map('<Leader>u', actions.toggleAIUsage, 'Close')
-        .map('l', actions.moveModalSelection(1), 'Next page')
-        .map('h', actions.moveModalSelection(-1), 'Prev page')
-        .map('<Right>', actions.moveModalSelection(1))
-        .map('<Left>', actions.moveModalSelection(-1))
+        .map('<Esc>', actions.exitStats, 'Close stats')
+        .map('<Leader>u', actions.exitStats, 'Close stats')
+        .map('l', actions.moveStatsPage(1), 'Next page')
+        .map('h', actions.moveStatsPage(-1), 'Prev page')
+        .map('<Right>', actions.moveStatsPage(1))
+        .map('<Left>', actions.moveStatsPage(-1))
+        .map('j', actions.scrollStats(1), 'Scroll down', { repeatable: true })
+        .map('k', actions.scrollStats(-1), 'Scroll up', { repeatable: true })
+        .map('<Down>', actions.scrollStats(1), undefined, { repeatable: true })
+        .map('<Up>', actions.scrollStats(-1), undefined, { repeatable: true })
+        .map('<C-d>', actions.scrollStats(10), 'Page down')
+        .map('<C-u>', actions.scrollStats(-10), 'Page up')
+        .map('?', actions.helpModal('stats'), 'Help')
     )
 
     // -----------------------------------------------------------------------

@@ -14,6 +14,31 @@ import { ListItem } from '../primitives/list-item'
 import { SettingsRow } from './settings-row'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+
+/**
+ * One glyph per section, same visual language as the stats pages: the eye finds
+ * a section by shape before it reads the label. Constants because JSX string
+ * attributes do not process `\u` escapes.
+ */
+const SECTION_GLYPHS: Record<string, string> = {
+  about: '\u{00A7}',
+  appearance: '\u{25D1}',
+  automation: '\u{27F3}',
+  commands: '\u{276F}',
+  editor: '\u{270E}',
+  experimental: '\u{2727}',
+  git: '\u{2387}',
+  integrations: '\u{21C4}',
+  layout: '\u{25A6}',
+  notifications: '\u{25CE}',
+  setup: '\u{2726}',
+  statusBar: '\u{25AC}',
+  workspace: '\u{2302}',
+}
+
+function sectionGlyph(id: string): string {
+  return SECTION_GLYPHS[id] ?? '\u{00B7}'
+}
 /**
  * Share of the window the settings themselves are allowed. Without a cap the
  * value sits on the far edge of a wide terminal, a hundred columns from the label
@@ -103,7 +128,7 @@ export const SettingsView = memo(function SettingsView() {
                 onClickIndex={handleSectionClick}
                 title={
                   <text fg={section.id === settings.sectionId ? t.text : t.textMuted}>
-                    {section.label}
+                    {`${sectionGlyph(section.id)} ${section.label}`}
                   </text>
                 }
                 trailing={
@@ -127,7 +152,7 @@ export const SettingsView = memo(function SettingsView() {
       <box
         border
         borderColor={settings.pane === 'rows' ? t.borderActive : t.border}
-        title={sectionLabel}
+        title={`${sectionGlyph(settings.sectionId)} ${sectionLabel}`}
         padding={0}
         flexDirection="column"
         flexGrow={1}

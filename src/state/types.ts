@@ -69,6 +69,7 @@ export type FocusMode =
   | 'command-edit'
   | 'git'
   | 'settings'
+  | 'stats'
 
 export type ModalType =
   | 'new-tab'
@@ -85,7 +86,6 @@ export type ModalType =
   | 'split-picker'
   | 'git-commit'
   | 'update-available'
-  | 'ai-usage'
   | 'workspace-move'
   | 'workspace-move-confirm'
   | 'workspace-delete-confirm'
@@ -580,10 +580,6 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
-export interface ModalAIUsage extends ModalBase {
-  type: 'ai-usage'
-}
-
 export interface ModalWorkspaceMove extends ModalBase {
   type: 'workspace-move'
   /** The workspace being moved (may differ from the active one, e.g. a tab menu). */
@@ -686,7 +682,6 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
-  | ModalAIUsage
   | ModalWorkspaceMove
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
@@ -738,6 +733,16 @@ export interface SettingsUIState {
   rowIndex: number
 }
 
+/**
+ * Where the cursor is on the stats screen. Nothing measured lives here — the
+ * numbers are read from disk by the pages that render them.
+ */
+export interface StatsUIState {
+  pageIndex: number
+  /** Rows scrolled from the top of the current page. Reset when the page changes. */
+  scrollTop: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -759,6 +764,7 @@ export interface AppState {
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
   settings: SettingsUIState
+  stats: StatsUIState
   /**
    * Commits each workspace's branch is ahead/behind the ref it forked from,
    * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.

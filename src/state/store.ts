@@ -8,6 +8,7 @@ import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
 import { reduceProjectState } from './reducers/project-state'
 import { emptySettingsUI, reduceSettingsState } from './reducers/settings-state'
+import { emptyStatsUI, reduceStatsState } from './reducers/stats-state'
 import { reduceTabState } from './reducers/tab-state'
 import { reduceUIState } from './reducers/ui-state'
 import { filterSnippets } from './selectors'
@@ -139,6 +140,7 @@ export function createInitialState(
     projectStatuses: {},
     settings: emptySettingsUI(),
     snippets,
+    stats: emptyStatsUI(),
     tabGroupMap: {},
     tabs: [],
     workspaceActivity: {},
@@ -173,6 +175,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const settingsState = reduceSettingsState(state, action)
   if (settingsState) return settingsState
+
+  const statsState = reduceStatsState(state, action)
+  if (statsState) return statsState
 
   switch (action.type) {
     case 'set-snippets':

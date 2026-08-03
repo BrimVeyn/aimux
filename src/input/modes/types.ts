@@ -30,9 +30,9 @@ export type ModeId =
   | 'modal.update-available'
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
-  | 'modal.ai-usage'
   | 'modal.flash-jump'
   | 'settings'
+  | 'stats'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }

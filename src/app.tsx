@@ -38,6 +38,7 @@ import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claud
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
+import { bump } from './services/aimux-counters'
 import {
   useAIUsageConfig,
   useAutoCommitConfig,
@@ -553,6 +554,11 @@ export function App({
   }, [flashPendingJump])
 
   useKeyboard((key) => {
+    // Every key in every mode passes here, terminal-input included, which makes
+    // it the one honest place to count them. A count and nothing else — no key
+    // identity is recorded anywhere.
+    bump('keys')
+
     const currentState = stateRef.current
     // Global quit: Ctrl+C in any mode except terminal-input
     if (key.ctrl && key.name === 'c' && currentState.focusMode !== 'terminal-input') {

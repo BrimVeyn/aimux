@@ -12,6 +12,7 @@ import { logInputDebug } from '../debug/input-log'
 import { MultiClickDetector } from '../input/multi-click-detector'
 import { extractStreamText, getLineText } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
+import { bump } from '../services/aimux-counters'
 import {
   type ClickSelectionResult,
   computeRangeFromLineText,
@@ -306,6 +307,7 @@ export function useMouseHandlers({
       return
     }
 
+    bump('scrollLines', Math.abs(delta))
     backend.scrollViewport(targetTabId, delta)
   }
 

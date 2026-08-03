@@ -37,6 +37,12 @@ const HEADER_TITLE = 'Projects'
  * the one button that opens the settings.
  */
 const SETTINGS_GLYPH = '⚙'
+/**
+ * U+25A4, chosen on the same rule as the gear above: one cell, text presentation,
+ * present in the base fonts. A ▁▄█ mini bar chart reads better but is three cells
+ * wide, which pushes this row past a narrow sidebar.
+ */
+const STATS_GLYPH = '▤'
 
 interface DragState {
   id: string
@@ -183,7 +189,19 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     dispatchGlobal({ type: 'enter-settings' })
   }, [])
 
+  // Stats sits beside it for the same reason, and because the two are the only
+  // full-screen views the panes step aside for that a mouse can reach at all.
+  const handleOpenStats = useCallback((e: OtuiMouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    dispatchGlobal({ type: 'enter-stats' })
+  }, [])
+
   const rule = RULE.repeat(Math.max(1, contentWidth))
+  // `⚙ Settings` + a two-column gap + `▤ Stats` needs 19 columns inside the row's
+  // own padding. The bar clamps down to 18 wide, so below that the second entry
+  // drops to its glyph rather than being sliced mid-word by the overflow.
+  const statsLabel = contentWidth - 2 >= 19 ? `${STATS_GLYPH} Stats` : STATS_GLYPH
 
   return (
     // Drag and release are handled here, not on the row that started them:
@@ -293,9 +311,15 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           {rule}
         </text>
       </box>
+      {/* Each entry is its own <text>, with a spacer box between them: one string
+          holding both would make the whole footer a single click target. */}
       <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
         <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
           {`${SETTINGS_GLYPH} Settings`}
+        </text>
+        <box width={2} flexShrink={1} />
+        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenStats}>
+          {statsLabel}
         </text>
       </box>
     </box>

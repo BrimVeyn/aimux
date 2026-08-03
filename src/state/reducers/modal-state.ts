@@ -62,9 +62,6 @@ function getCreateWorkspaceBaseOptions(state: AppState, queryOverride?: string):
 function getModalOptionCount(state: AppState): number {
   const { modal } = state
   switch (modal.type) {
-    // Not a list: the two pages of the AI usage modal, Live and History.
-    case 'ai-usage':
-      return 2
     case 'create-project':
       return modal.directoryResults.length
     case 'help':
@@ -142,19 +139,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: current.length,
           editBuffer: current,
           editingCommand: action.assistantId,
-        },
-      }
-    }
-    case 'open-ai-usage-modal': {
-      return {
-        ...state,
-        focusMode: 'modal',
-        modal: {
-          cursorPos: 0,
-          editBuffer: '',
-          projectTargetId: null,
-          selectedIndex: 0,
-          type: 'ai-usage',
         },
       }
     }
@@ -540,7 +524,6 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         return { ...state, modal: { ...state.modal, selectedIndex: nextIndex } }
       }
       if (
-        state.modal.type !== 'ai-usage' &&
         state.modal.type !== 'new-tab' &&
         state.modal.type !== 'project-picker' &&
         state.modal.type !== 'snippet-picker' &&

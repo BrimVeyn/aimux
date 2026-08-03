@@ -61,11 +61,15 @@ export function toggleWidget(widgetId: string): KeyResult {
 }
 export const toggleGitPane: KeyResult = toggleWidget('git')
 export const toggleProjectBar: KeyResult = r([{ type: 'toggle-project-bar' }])
-export const toggleAIUsage: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.modal.type === 'ai-usage') {
-    return r([{ type: 'close-modal' }], [], 'navigation')
+/**
+ * The stats screen, which replaced the AI-usage popover: the quota windows it
+ * showed are now its first page.
+ */
+export const toggleStats: ActionFn = (ctx: ModeContext) => {
+  if (ctx.state.focusMode === 'stats') {
+    return r([{ type: 'exit-stats' }], [], 'navigation')
   }
-  return r([{ type: 'open-ai-usage-modal' }], [], 'modal.ai-usage')
+  return r([{ type: 'enter-stats' }], [], 'stats')
 }
 
 export const enterGitMode: KeyResult = r([{ type: 'enter-git-mode' }], [], 'git-mode')
@@ -950,6 +954,21 @@ export const gitCommitReturnKey: ActionFn = (ctx: ModeContext) => {
 
 export const enterSettings: KeyResult = r([{ type: 'enter-settings' }], [], 'settings')
 export const exitSettings: KeyResult = r([{ type: 'exit-settings' }], [], 'navigation')
+
+// ---------------------------------------------------------------------------
+// Stats screen
+// ---------------------------------------------------------------------------
+
+export const enterStats: KeyResult = r([{ type: 'enter-stats' }], [], 'stats')
+export const exitStats: KeyResult = r([{ type: 'exit-stats' }], [], 'navigation')
+
+export function moveStatsPage(delta: -1 | 1): KeyResult {
+  return r([{ delta, type: 'stats-move-page' }])
+}
+
+export function scrollStats(delta: number): KeyResult {
+  return r([{ delta, type: 'stats-scroll' }])
+}
 
 export function focusSettingsPane(pane: 'nav' | 'rows'): KeyResult {
   return r([{ pane, type: 'settings-focus-pane' }])

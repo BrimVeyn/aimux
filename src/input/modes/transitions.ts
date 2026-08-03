@@ -2,7 +2,6 @@ import type { ModeId } from './types'
 
 const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'git-mode': ['navigation', 'modal.git-commit', 'modal.workspace-move'],
-  'modal.ai-usage': ['navigation', 'terminal-input'],
   'modal.create-project': ['navigation', 'modal.project-picker.filtering'],
   'modal.create-workspace': ['navigation', 'terminal-input'],
   'modal.flash-jump': ['navigation'],
@@ -40,12 +39,12 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.rename-tab',
     'modal.rename-workspace',
     'modal.update-available',
-    'modal.ai-usage',
     'modal.workspace-delete-confirm',
     'modal.workspace-move-confirm',
     'modal.flash-jump',
     'git-mode',
     'settings',
+    'stats',
   ],
   // The help overlay opens over settings without a transition (it leaves
   // focusMode alone). The two pickers an action row hands over to are dispatched
@@ -58,7 +57,10 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.theme-picker.filtering',
     'modal.snippet-picker.filtering',
   ],
-  'terminal-input': ['navigation', 'modal.split-picker', 'modal.ai-usage', 'settings'],
+  // Read-only screen: the only way out is back to the panes. The help overlay
+  // opens on top of it without a transition, the same way it does over settings.
+  'stats': ['navigation'],
+  'terminal-input': ['navigation', 'modal.split-picker', 'settings', 'stats'],
 }
 
 export function isValidTransition(from: ModeId, to: ModeId): boolean {

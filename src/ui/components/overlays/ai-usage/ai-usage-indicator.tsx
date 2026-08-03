@@ -18,11 +18,11 @@ export function AIUsageIndicator() {
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
-  const openModal = useCallback(
+  const openStats = useCallback(
     (e: { preventDefault: () => void; stopPropagation: () => void }) => {
       e.preventDefault()
       e.stopPropagation()
-      dispatchGlobal({ type: 'open-ai-usage-modal' })
+      dispatchGlobal({ type: 'enter-stats' })
     },
     []
   )
@@ -36,7 +36,7 @@ export function AIUsageIndicator() {
 
   if (entries.length === 0) {
     return (
-      <box flexDirection="row" onMouseDown={openModal}>
+      <box flexDirection="row" onMouseDown={openStats}>
         <text fg={t.textMuted} selectable={false}>
           …
         </text>
@@ -45,7 +45,7 @@ export function AIUsageIndicator() {
   }
 
   return (
-    <box flexDirection="row" gap={2} onMouseDown={openModal}>
+    <box flexDirection="row" gap={2} onMouseDown={openStats}>
       {entries.map(({ snap, tool }) => {
         if (!snap) return null
 

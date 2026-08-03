@@ -1,5 +1,6 @@
 import { parseColor, RGBA } from '@opentui/core'
 
+import { daysBetween, parseDayKey } from './insights'
 import { emptyTokens, localDay, type UsageDays, type UsageTokens } from './store'
 
 /** Pure shaping of stored usage days into what the History page renders. */
@@ -9,18 +10,6 @@ export interface HeatmapCell {
   day: string
   level: number
   value: number
-}
-
-function parseDay(key: string): Date {
-  const [year, month, day] = key.split('-').map(Number)
-  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-}
-
-/** Whole days apart. Via `Date.UTC` on the calendar parts: a DST span is not a whole number of 24h periods. */
-function daysBetween(from: Date, to: Date): number {
-  const utcOf = (date: Date): number =>
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  return Math.round((utcOf(to) - utcOf(from)) / 86_400_000)
 }
 
 /** Quartiles of the non-empty days: a linear `value / max` ramp lets one outlier flatten the year to level 1. */
@@ -44,7 +33,7 @@ export function coveredWeeks(days: UsageDays, today: Date, maxWeeks: number): nu
   const dates = Object.keys(days).sort()
   const first = dates[0]
   if (first === undefined) return Math.min(maxWeeks, 12)
-  const elapsed = daysBetween(parseDay(first), today)
+  const elapsed = daysBetween(parseDayKey(first), today)
   return Math.max(4, Math.min(maxWeeks, Math.ceil((elapsed + 1) / 7) + 1))
 }
 
