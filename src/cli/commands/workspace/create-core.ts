@@ -2,6 +2,7 @@ import type { ProjectRecord, WorkspaceRecord } from '../../../state/types'
 import type { DaemonClient } from '../../client/daemon-client'
 
 import { createGitWorktree, removeGitWorktree, resolveGitRef } from '../../../git/worktree'
+import { copyWorktreeFiles } from '../../../git/worktree-files'
 import { IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
@@ -10,7 +11,7 @@ import {
   makeWorktreePath,
   pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
-import { shouldRefreshBase } from '../../../settings/flags'
+import { shouldRefreshBase, worktreeCopyPatterns } from '../../../settings/flags'
 
 export interface CreateWorkspaceParams {
   /** Base ref for the branch (callers default to 'HEAD'). */
@@ -84,6 +85,7 @@ export async function createProjectWorkspace(
     await pruneEmptyWorktreeParent(targetPath)
     throw error
   }
+  await copyWorktreeFiles(primary.repoRoot, targetPath, worktreeCopyPatterns())
 
   const now = new Date().toISOString()
   const record: WorkspaceRecord = {

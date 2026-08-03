@@ -6,6 +6,8 @@ import type { SettingSection, SettingValue } from '../types'
 import { dispatchGlobal, runSideEffectGlobal } from '../../state/dispatch-ref'
 
 export const FETCH_BASE = 'git.fetchBase'
+export const COPY_FILES = 'git.worktreeCopyFiles'
+export const COPY_FILES_DEFAULT = '.env'
 
 function isFileListMode(value: SettingValue): value is GitFileListMode {
   return value === 'tree' || value === 'flat'
@@ -91,6 +93,18 @@ export const GIT_SECTION: SettingSection = {
       id: FETCH_BASE,
       kind: 'toggle',
       label: 'Refresh the base branch',
+      storage: 'settings',
+    },
+    {
+      // No `apply`, same reason as the row above: `worktreeCopyPatterns` reads
+      // this off the file so `aimux workspace create` honours it too.
+      description:
+        'Untracked files copied into each new workspace. Globs from the repo root: **/.env for nested ones.',
+      fallback: COPY_FILES_DEFAULT,
+      id: COPY_FILES,
+      kind: 'text',
+      label: 'Seed new workspaces with',
+      placeholder: 'nothing',
       storage: 'settings',
     },
     {
