@@ -145,7 +145,7 @@ export function parsePrView(raw: unknown): PrStatusResult {
   }
 }
 
-export type PrAction = 'merge' | null
+export type PrAction = 'cleanup' | 'merge' | null
 
 export interface PrActionState {
   label: string
@@ -160,7 +160,11 @@ export interface PrActionState {
  * offer an action for still gets an honest label rather than a dead button.
  */
 export function prActionState(pr: PrSummary, checks: PrCheck[]): PrActionState {
-  if (pr.state === 'MERGED') return { action: null, label: 'Merged', tone: 'neutral' }
+  // Merged is the one terminal state with something left to do: the workspace
+  // that carried the branch is now dead weight. The row offers the removal
+  // right where the merge happened; whether it's actually removable (not the
+  // primary workspace) is the caller's call, not the PR's.
+  if (pr.state === 'MERGED') return { action: 'cleanup', label: 'Merged', tone: 'ok' }
   if (pr.state === 'CLOSED') return { action: null, label: 'Closed', tone: 'blocked' }
   if (pr.isDraft) return { action: null, label: 'Draft', tone: 'neutral' }
   if (pr.mergeable === 'CONFLICTING') {
