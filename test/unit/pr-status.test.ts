@@ -223,6 +223,16 @@ describe('prActionState', () => {
     expect(prActionState(pr({ state: 'CLOSED' }), []).label).toBe('Closed')
   })
 
+  test('offers cleanup once merged, and only then', () => {
+    expect(prActionState(pr({ state: 'MERGED' }), PENDING)).toEqual({
+      action: 'cleanup',
+      label: 'Merged',
+      tone: 'ok',
+    })
+    expect(prActionState(pr({ state: 'CLOSED' }), []).action).toBeNull()
+    expect(prActionState(pr(), []).action).toBe('merge')
+  })
+
   test('never offers merge on a draft', () => {
     expect(prActionState(pr({ isDraft: true }), [])).toEqual({
       action: null,
