@@ -181,6 +181,15 @@ export async function pruneGitWorktrees(repoPath: string): Promise<void> {
   await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
 }
 
+// Switch a checkout to an existing branch. Throws git's own message rather than
+// a paraphrase: "local changes would be overwritten" is the one thing the user
+// needs to read, and no wording of ours beats it.
+export async function checkoutBranch(cwd: string, branch: string): Promise<void> {
+  const result = await $`git -C ${cwd} checkout ${branch}`.quiet().nothrow()
+  if (result.exitCode === 0) return
+  throw new Error(result.stderr.toString().trim() || `failed to check out ${branch}`)
+}
+
 // Drop every `aimux/` branch left behind by deleted temp worktrees. git refuses
 // to delete branches still checked out in a live worktree, so this only removes
 // true orphans. Returns the number of branches removed.
