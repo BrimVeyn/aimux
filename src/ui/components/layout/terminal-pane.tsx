@@ -44,32 +44,6 @@ interface TerminalPaneProps {
   junctionEdges?: JunctionEdges
 }
 
-function getTitle(
-  tab: TabSession | undefined,
-  isActive: boolean,
-  focusMode: TerminalPaneProps['focusMode'],
-  emptyContext: { projectName: string; workspaceName: string }
-): string {
-  if (!tab) {
-    const { projectName, workspaceName } = emptyContext
-    if (projectName === '' && workspaceName === '') return 'No active project'
-    if (workspaceName === '' || workspaceName === projectName) {
-      return `${projectName} · no tabs`
-    }
-    return `${projectName} / ${workspaceName} · no tabs`
-  }
-
-  if (isActive && focusMode === 'terminal-input') {
-    return `● ${tab.title} · ${tab.status}`
-  }
-
-  if (isActive) {
-    return `▸ ${tab.title} · ${tab.status}`
-  }
-
-  return `${tab.title} · ${tab.status}`
-}
-
 function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
   const t = getCurrentTheme()
   if (!isActive) return t.border
@@ -526,10 +500,6 @@ export function TerminalPane({
       <ContextMenuBox
         border
         borderColor={getBorderColor(paneIsActive, focusMode)}
-        title={getTitle(tab, paneIsActive, focusMode, {
-          projectName: emptyProjectName,
-          workspaceName: emptyWorkspaceName,
-        })}
         padding={0}
         flexDirection="column"
         flexGrow={1}
