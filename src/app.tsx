@@ -82,12 +82,18 @@ export function App({
   resolvedConfig: ResolvedConfig
   userConfig: AimuxUserConfig
 }) {
-  // Publish the auto-commit enabled flag before any children render so
-  // actions (which live outside React) can read it synchronously.
-  setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
-  setMultiRepoConfig(resolvedConfig.multiRepo)
-  setExternalEditorConfig(resolvedConfig.externalEditor)
-  setStatusBarSeparator(resolvedConfig.statusBar?.separator)
+  // Publish the config-file baseline into the runtime singletons before any
+  // children render, so actions (which live outside React) can read them
+  // synchronously. Lazy initializer, not the render body: this component
+  // re-renders on every dispatch, and re-running these would overwrite what the
+  // settings screen has since applied on top of the baseline (`hydrateSettings`).
+  useState(() => {
+    setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+    setMultiRepoConfig(resolvedConfig.multiRepo)
+    setExternalEditorConfig(resolvedConfig.externalEditor)
+    setStatusBarSeparator(resolvedConfig.statusBar?.separator)
+    return null
+  })
 
   const keymapHandlers = useMemo(
     () => {
