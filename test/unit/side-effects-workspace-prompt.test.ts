@@ -114,6 +114,8 @@ test('the chained launch pins the tab and hands the prompt over at spawn', async
   const { ctx, started, writes } = harness(seed())
 
   executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+  // The chained launch waits on the worktree being cut before it spawns.
+  await Bun.sleep(0)
 
   const tab = ctx.getState().tabs[0]
   if (!tab) throw new Error('expected the launch to create a tab')
@@ -138,6 +140,7 @@ test('an assistant without a prompt argument still gets the prompt pasted', asyn
   )
 
   executeSideEffect({ type: 'launch-selected-assistant' }, ctx)
+  await Bun.sleep(0)
 
   const tab = ctx.getState().tabs[0]
   if (!tab) throw new Error('expected the launch to create a tab')
