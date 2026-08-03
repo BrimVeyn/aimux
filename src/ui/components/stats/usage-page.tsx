@@ -16,7 +16,7 @@ import { formatCompact } from '../../format-number'
 import { useTheme } from '../../theme'
 import { chartColumns, fitShape } from './chart'
 import { formatClock, formatCount, formatDayLabel, formatPercent } from './format'
-import { Heatmap, HeatmapLegend, useHeatmapRamp } from './heatmap'
+import { Heatmap, HeatmapLegend, heatmapWidth, useHeatmapRamp } from './heatmap'
 import { QuotaSection } from './quotas'
 import { BarRow, GLYPH, Muted, Rule, Section, StatTile, TileRow, VBarChart } from './shared'
 import { isEmpty, type StatsData } from './use-stats-data'
@@ -285,10 +285,18 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
           title="Activity"
           note={<HeatmapLegend ramp={ramp} />}
           rule={false}
-          width={usable}
+          // The calendar's own width, not the pane's: the legend belongs over
+          // the grid's top-right corner, and the grid is only as wide as the
+          // history is long. This section draws no rule, so nothing else uses it.
+          width={heatmapWidth(data.claude, data.todayDate, usable)}
         >
-          <Heatmap days={data.claude} ramp={ramp} today={data.todayDate} width={usable} />
-          <Muted>{calendarFacts}</Muted>
+          <Heatmap
+            days={data.claude}
+            ramp={ramp}
+            summary={calendarFacts}
+            today={data.todayDate}
+            width={usable}
+          />
         </Section>
       ) : (
         <Muted>no history yet — the first rollup runs in the background</Muted>

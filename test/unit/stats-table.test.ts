@@ -7,7 +7,7 @@ import {
   chartColumns,
   fitShape,
 } from '../../src/ui/components/stats/chart'
-import { placePopover } from '../../src/ui/components/stats/day-popover'
+import { packFacts } from '../../src/ui/components/stats/day-facts'
 import {
   formatClock,
   formatDayLabel,
@@ -289,44 +289,40 @@ describe('buildRuler', () => {
   })
 })
 
-describe('placePopover', () => {
-  const size = { height: 9, width: 72 }
-  const grid = { gridHeight: 11, gridWidth: 111 }
+describe('packFacts', () => {
+  const rows: [string, string][] = [
+    ['Prompts', '42'],
+    ['Busiest hour', '14:00 · 12'],
+    ['Active', '09:12 → 21:40'],
+    ['Sessions', '3'],
+    ['Tokens', '900'],
+    ['Cost', '$1.20 estimated'],
+  ]
 
-  test('opens rightward from a cell in the left half', () => {
-    const { left } = placePopover({ cellX: 10, cellY: 3, ...grid, size })
-    expect(left).toBe(10)
+  test('facts run together until the line is full', () => {
+    const lines = packFacts(rows, 40)
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(40)
+    // Nothing is dropped: every label still appears somewhere.
+    const joined = lines.join(' ')
+    for (const [label] of rows) expect(joined).toContain(label)
   })
 
-  test('opens leftward from a cell in the right half', () => {
-    // Its right edge lands on the cell instead of running past the grid.
-    const { left } = placePopover({ cellX: 100, cellY: 3, ...grid, size })
-    expect(left + size.width - 1).toBe(100)
-    expect(left + size.width).toBeLessThanOrEqual(grid.gridWidth)
+  test('a wide slot needs one line, a narrow one needs more', () => {
+    expect(packFacts(rows, 200)).toHaveLength(1)
+    expect(packFacts(rows, 30).length).toBeGreaterThan(1)
   })
 
-  test('opens downward from a cell in the top half and upward from the bottom', () => {
-    expect(placePopover({ cellX: 10, cellY: 3, ...grid, size }).top).toBe(2)
-    expect(placePopover({ cellX: 10, cellY: 9, ...grid, size }).top).toBe(0)
+  test('the last line takes the remainder rather than dropping facts', () => {
+    // Two lines of room for six facts that want four: the overflow rides the
+    // last line, where it truncates visibly, instead of vanishing.
+    const lines = packFacts(rows, 20, 2)
+    expect(lines).toHaveLength(2)
+    const joined = lines.join(' ')
+    for (const [label] of rows) expect(joined).toContain(label)
   })
 
-  test('never places the popover outside the grid, at any anchor', () => {
-    for (let cellX = 0; cellX <= grid.gridWidth; cellX++) {
-      for (let cellY = 0; cellY <= grid.gridHeight; cellY++) {
-        const { left, top } = placePopover({ cellX, cellY, ...grid, size })
-        // A popover half off the pane is the failure this guards against, and
-        // it only shows at the edges — where clicks are least expected.
-        expect(left).toBeGreaterThanOrEqual(0)
-        expect(top).toBeGreaterThanOrEqual(0)
-        expect(left + size.width).toBeLessThanOrEqual(grid.gridWidth)
-        expect(top + size.height).toBeLessThanOrEqual(grid.gridHeight)
-      }
-    }
-  })
-
-  test('a popover wider than its grid is pinned to the left rather than pushed off', () => {
-    const { left } = placePopover({ cellX: 5, cellY: 3, gridHeight: 11, gridWidth: 40, size })
-    expect(left).toBe(0)
+  test('no rows means no lines, not a blank one', () => {
+    expect(packFacts([], 80)).toEqual([])
   })
 })
 
