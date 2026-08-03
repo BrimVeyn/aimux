@@ -1,13 +1,21 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 
+import {
+  type GhAccount,
+  listGhAccounts,
+  nextGhAccount,
+  switchGhAccount,
+} from '../../../../git/gh-auth'
 import {
   clampPrBody,
   type PrCheck,
   type PrCheckState,
   type PrStatusResult,
 } from '../../../../git/pr-status'
+import { refreshPrStatus } from '../../../../git/pr-status-poller'
 import { openUrl } from '../../../../platform/open-url'
 import { usePrStatusStore } from '../../../../state/pr-status-store'
+import { toast } from '../../../../state/toast-store'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { type ResolvedTuiTheme, useTheme, useTransparent } from '../../../theme'
 
@@ -47,9 +55,92 @@ function placeholder(
   if (result === null) return { color: t.textMuted, label: '…' }
   if (result.kind === 'no-gh') return { color: t.textMuted, label: 'gh CLI not found' }
   if (result.kind === 'no-pr') return { color: t.textMuted, label: 'No pull request' }
-  if (result.kind === 'error') return { color: t.error, label: result.message }
   return null
 }
+
+/**
+ * Nearly every `gh` failure the pane can hit is really "the active account
+ * can't see this repo", so the error state carries the one fix worth a click:
+ * cycle to the next authenticated account and refetch.
+ */
+const GhErrorState = memo(function GhErrorState({
+  bg,
+  message,
+  projectPath,
+}: {
+  bg: string | undefined
+  message: string
+  projectPath: string | undefined
+}) {
+  const t = useTheme()
+  const [accounts, setAccounts] = useState<readonly GhAccount[]>([])
+  const [switching, setSwitching] = useState(false)
+  const spinner = useBusySpinner(switching)
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const list = await listGhAccounts()
+      if (!cancelled) setAccounts(list)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const active = accounts.find((account) => account.active)
+  const next = nextGhAccount(accounts)
+
+  const onSwitch = useCallback(() => {
+    if (next === null || switching) return
+    setSwitching(true)
+    void (async () => {
+      const error = await switchGhAccount(next)
+      setSwitching(false)
+      if (error !== null) {
+        toast.error(error)
+        return
+      }
+      setAccounts(await listGhAccounts())
+      // The poller backs off to two minutes on errors; don't make the user wait
+      // it out to find out whether the account they picked was the right one.
+      if (projectPath != null && projectPath !== '') await refreshPrStatus(projectPath)
+    })()
+  }, [next, projectPath, switching])
+
+  return (
+    <box
+      flexGrow={1}
+      flexDirection="column"
+      alignItems="center"
+      gap={1}
+      backgroundColor={bg}
+      padding={1}
+    >
+      <box flexDirection="column" alignItems="center">
+        <text selectable={false} fg={t.error} bg={bg}>
+          ✗ {message}
+        </text>
+        {active !== undefined ? (
+          <text selectable={false} fg={t.textMuted} bg={bg}>
+            signed in as {active.user}
+          </text>
+        ) : null}
+      </box>
+      {next !== null ? (
+        <text
+          selectable={false}
+          fg={switching ? t.warning : t.primary}
+          bg={bg}
+          wrapMode="none"
+          onMouseDown={onSwitch}
+        >
+          {switching ? `${spinner} switching…` : `↺ Switch to ${next.user}`}
+        </text>
+      ) : null}
+    </box>
+  )
+})
 
 const CheckRow = memo(function CheckRow({
   bg,
@@ -97,8 +188,10 @@ const CheckRow = memo(function CheckRow({
 
 export const PrChecksPanel = memo(function PrChecksPanel({
   contentWidth,
+  projectPath,
 }: {
   contentWidth: number
+  projectPath: string | undefined
 }) {
   const t = useTheme()
   // A tone apart from the PR state row above, so the two zones read as
@@ -112,6 +205,10 @@ export const PrChecksPanel = memo(function PrChecksPanel({
 
   const checks = result?.kind === 'ok' ? result.checks : []
   const spinner = useBusySpinner(checks.some((c) => c.state === 'pending'))
+
+  if (result?.kind === 'error') {
+    return <GhErrorState bg={bg} message={result.message} projectPath={projectPath} />
+  }
 
   const status = placeholder(result, t)
   if (status !== null || result?.kind !== 'ok') {
