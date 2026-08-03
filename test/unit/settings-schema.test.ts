@@ -140,6 +140,7 @@ const FROZEN_ROW_IDS = [
   'git.fileListMode',
   'git.prefetchRadius',
   'git.treeCompaction',
+  'git.worktreeCopyFiles',
   'integrations.claudeHooks',
   'layout.leftBar',
   'layout.leftBarWidth',

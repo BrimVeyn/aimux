@@ -1,5 +1,5 @@
 import { loadConfig } from '../config'
-import { FETCH_BASE } from './sections/git'
+import { COPY_FILES, COPY_FILES_DEFAULT, FETCH_BASE } from './sections/git'
 
 /**
  * Settings read outside the screen, off the file rather than the store.
@@ -12,4 +12,14 @@ import { FETCH_BASE } from './sections/git'
 /** Whether a new workspace forks from the base as pushed, or as last pulled. */
 export function shouldRefreshBase(): boolean {
   return loadConfig().settings?.[FETCH_BASE] !== false
+}
+
+/** Untracked files a new workspace is seeded with, as globs relative to the repo. */
+export function worktreeCopyPatterns(): string[] {
+  const value = loadConfig().settings?.[COPY_FILES]
+  // Only an explicit empty string disables it; an untouched setting gets `.env`.
+  return String(value ?? COPY_FILES_DEFAULT)
+    .split(',')
+    .map((pattern) => pattern.trim())
+    .filter((pattern) => pattern !== '')
 }

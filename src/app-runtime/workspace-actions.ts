@@ -16,6 +16,7 @@ import {
   pruneGitWorktrees,
   removeGitWorktree,
 } from '../git/worktree'
+import { copyWorktreeFiles } from '../git/worktree-files'
 import { createPrefixedId } from '../platform/id'
 import {
   assertSafeAimuxWorktreePath,
@@ -23,7 +24,7 @@ import {
   makeWorktreePath,
   sanitizePathSegment,
 } from '../platform/worktree-paths'
-import { shouldRefreshBase } from '../settings/flags'
+import { shouldRefreshBase, worktreeCopyPatterns } from '../settings/flags'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -151,6 +152,7 @@ export async function createAimuxTempWorkspace(
     repoPath: repoRoot,
     targetPath,
   })
+  await copyWorktreeFiles(repoRoot, targetPath, worktreeCopyPatterns())
   const now = new Date().toISOString()
 
   const workspace: WorkspaceRecord = {
