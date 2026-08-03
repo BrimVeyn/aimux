@@ -266,14 +266,22 @@ export function Bar({
       ? 0
       : Math.min(segments, Math.max(value > 0 ? 1 : 0, Math.round((value / max) * segments)))
 
+  // Each half is dropped when it is empty rather than rendered as `''`: opentui
+  // floors a text node at one column (`Math.max(1, widthColsMax)`), so an empty
+  // node is a column wide. A full bar would push its value one column right and
+  // off the end of the row, and an empty one would indent its own track.
   return (
     <box flexDirection="row" flexShrink={0}>
-      <text fg={color} selectable={false} wrapMode="none">
-        {BAR_FILL.repeat(filled)}
-      </text>
-      <text fg={t.borderSubtle} selectable={false} wrapMode="none">
-        {BAR_TRACK.repeat(segments - filled)}
-      </text>
+      {filled === 0 ? null : (
+        <text fg={color} selectable={false} wrapMode="none">
+          {BAR_FILL.repeat(filled)}
+        </text>
+      )}
+      {filled >= segments ? null : (
+        <text fg={t.borderSubtle} selectable={false} wrapMode="none">
+          {BAR_TRACK.repeat(segments - filled)}
+        </text>
+      )}
     </box>
   )
 }
