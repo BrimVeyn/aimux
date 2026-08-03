@@ -249,7 +249,7 @@ function renderModal(
         />
       )
     case 'ai-usage':
-      return <AIUsageModal />
+      return <AIUsageModal page={modal.selectedIndex} />
     case 'workspace-delete-confirm':
       return (
         <WorkspaceDeleteConfirm

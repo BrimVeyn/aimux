@@ -51,6 +51,13 @@ if (command === 'update') {
   process.exit(await runUpdate())
 }
 
+// Spawned detached by `maybeSpawnUsageRollup` below. Walks hundreds of MB of
+// assistant JSONL, so it gets its own process and never shares one with the UI.
+if (command === 'usage-rollup') {
+  const { runUsageRollup } = await import('./services/usage-history/rollup')
+  process.exit(await runUsageRollup())
+}
+
 const { logDebug } = await import('./debug/input-log')
 const { getRuntimeProfile } = await import('./daemon/runtime-paths')
 const runtimeProfile = getRuntimeProfile()
@@ -87,6 +94,7 @@ const [
   { setHostPalette },
   { createSessionBackend },
   { maybeAutoInstallCompletion },
+  { maybeSpawnUsageRollup },
 ] = await Promise.all([
   import('@opentui/react'),
   import('./app'),
@@ -95,6 +103,7 @@ const [
   import('./ui/host-palette'),
   import('./session-backend/bootstrap'),
   import('./cli/completion/install'),
+  import('./services/usage-history/store'),
 ])
 const { resolved: resolvedConfig, user: userConfig } = await loadUserConfig()
 
@@ -103,6 +112,12 @@ const { resolved: resolvedConfig, user: userConfig } = await loadUserConfig()
 // file, never a dotfile, and never blocks the TUI. Opt out with
 // AIMUX_NO_COMPLETION_INSTALL=1; `aimux doctor` reports what landed where.
 maybeAutoInstallCompletion()
+
+// Snapshot today's AI usage before Claude Code prunes the transcripts it came
+// from — roughly a month survives on disk, so the aggregates aimux keeps are
+// the only long-term record. Detached subprocess, at most once per ~day, never
+// blocking. Opt out with AIMUX_NO_USAGE_ROLLUP=1.
+maybeSpawnUsageRollup()
 
 const renderer = await createCliRenderer({
   autoFocus: true,

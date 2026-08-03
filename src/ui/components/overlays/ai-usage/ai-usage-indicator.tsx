@@ -4,18 +4,13 @@ import { useCallback } from 'react'
 
 import { useAIUsageStore } from '../../../../state/ai-usage-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
+import { formatCompact } from '../../../format-number'
 import { useTheme } from '../../../theme'
 
 /** nf-cod-claude / nf-cod-openai. Needs a nerd font, like the status bar separators. */
 const ICON: Record<AIUsageTool, string> = {
   claude: '\u{ec82}',
   codex: '\u{ec81}',
-}
-
-function formatTokens(total: number): string {
-  if (total >= 1_000_000) return `${(total / 1_000_000).toFixed(1)}M`
-  if (total >= 1_000) return `${(total / 1_000).toFixed(1)}k`
-  return String(total)
 }
 
 export function AIUsageIndicator() {
@@ -65,7 +60,7 @@ export function AIUsageIndicator() {
         }
 
         const value =
-          snap.percent !== null ? `${Math.round(snap.percent)}%` : formatTokens(snap.tokens.total)
+          snap.percent !== null ? `${Math.round(snap.percent)}%` : formatCompact(snap.tokens.total)
 
         return (
           <box key={tool} flexDirection="row">

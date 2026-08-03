@@ -1,11 +1,11 @@
 import type { AIUsageToolConfig } from '@brimveyn/aimux-config'
 
 import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 
 import type { UsageSnapshot, UsageWindow, UsageWindowKind } from '../types'
 
+import { claudeHome } from '../../../platform/assistant-home'
 import { computePace, formatTimeRemaining } from '../pace'
 import { runCli } from '../spawn'
 
@@ -81,15 +81,9 @@ function planTierFromPayload(payload: ClaudeCredentialsPayload): string | null {
   return null
 }
 
-function claudeConfigDir(): string {
-  const env = process.env.CLAUDE_CONFIG_DIR?.trim()
-  if (env != null && env !== '') return env
-  return join(homedir(), '.claude')
-}
-
 async function readCredsFromFile(): Promise<string | null> {
   try {
-    const raw = await readFile(join(claudeConfigDir(), '.credentials.json'), 'utf8')
+    const raw = await readFile(join(claudeHome(), '.credentials.json'), 'utf8')
     return raw.trim() || null
   } catch {
     return null
