@@ -1,6 +1,29 @@
 import { describe, expect, test } from 'bun:test'
 
-import { moveIdToIdPosition } from '../../src/ui/project-ordering'
+import { moveIdToIdPosition, moveIdToInsertIndex } from '../../src/ui/project-ordering'
+
+describe('moveIdToInsertIndex', () => {
+  test('moves to the top and to the bottom gap', () => {
+    expect(moveIdToInsertIndex(['a', 'b', 'c'], 'c', 0)).toEqual(['c', 'a', 'b'])
+    expect(moveIdToInsertIndex(['a', 'b', 'c'], 'a', 3)).toEqual(['b', 'c', 'a'])
+  })
+
+  test('gap index counts slots before removal', () => {
+    expect(moveIdToInsertIndex(['a', 'b', 'c', 'd'], 'a', 3)).toEqual(['b', 'c', 'a', 'd'])
+    expect(moveIdToInsertIndex(['a', 'b', 'c'], 'c', 1)).toEqual(['a', 'c', 'b'])
+  })
+
+  test('both gaps around the dragged id are no-ops, by reference', () => {
+    const input = ['a', 'b', 'c']
+    expect(moveIdToInsertIndex(input, 'b', 1)).toBe(input)
+    expect(moveIdToInsertIndex(input, 'b', 2)).toBe(input)
+  })
+
+  test('missing id returns the input reference unchanged', () => {
+    const input = ['a', 'b', 'c']
+    expect(moveIdToInsertIndex(input, 'z', 0)).toBe(input)
+  })
+})
 
 describe('moveIdToIdPosition', () => {
   test('moves earlier id to a later slot, shifting the displaced id left', () => {

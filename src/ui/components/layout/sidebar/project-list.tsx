@@ -13,7 +13,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-
 import { getPrimaryWorkspace } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_PROJECT_STATUS } from '../../../../state/types'
-import { moveIdToIdPosition, orderProjectsForDisplay } from '../../../project-ordering'
+import { moveIdToInsertIndex, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
 import { FlashLabelBadge } from '../../flash/flash-label-badge'
@@ -28,6 +28,8 @@ interface ProjectListProps {
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
 const RULE = '─'
+/** Heavier than the chrome rules, so the drop preview never reads as a border. */
+const DROP_BAR = '━'
 const HEADER_TITLE = 'Projects'
 /**
  * U+2699, not the nerd-font gear: its Emoji_Presentation is No, so a conforming
@@ -36,12 +38,10 @@ const HEADER_TITLE = 'Projects'
  */
 const SETTINGS_GLYPH = '⚙'
 
-function arraysEqual(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false
-  }
-  return true
+interface DragState {
+  id: string
+  /** Gap the drop would land in, or null while the pointer is off the list. */
+  dropIndex: number | null
 }
 
 export function ProjectList({ contentWidth }: ProjectListProps) {
@@ -50,10 +50,18 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const statusMap = useAppStore((s) => s.projectStatuses)
 
+  // The drag lives in a ref because mouse events can arrive before React has
+  // committed the state they set — reading `draggingId` out of a handler
+  // closure saw `null` for the whole gesture. The two state copies below exist
+  // only so the row highlight and the drop bar redraw.
+  const dragRef = useRef<DragState | null>(null)
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
-  const lastSwapWithRef = useRef<string | null>(null)
-  const rowRefs = useRef(new Map<string, BoxRenderable>())
+  // Where the drop would land, as a gap index (0 = above the first project,
+  // projects.length = below the last). The list itself never moves while
+  // dragging — only this bar does, so rows can't slide out from under the
+  // pointer and make the drag oscillate.
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const gapRefs = useRef(new Map<number, BoxRenderable>())
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
 
   const ordered = useMemo(() => orderProjectsForDisplay(projects), [projects])
@@ -83,58 +91,64 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     visible: true,
   })
 
-  const setRowRef = useCallback((id: string, ref: BoxRenderable | null): void => {
-    if (ref) rowRefs.current.set(id, ref)
-    else rowRefs.current.delete(id)
+  const setGapRef = useCallback((index: number, ref: BoxRenderable | null): void => {
+    if (ref) gapRefs.current.set(index, ref)
+    else gapRefs.current.delete(index)
   }, [])
 
-  const findRowAtY = useCallback((y: number): string | null => {
-    for (const [id, ref] of rowRefs.current) {
-      if (y >= ref.y && y < ref.y + ref.height) return id
+  // The gaps *are* the insertion points, so the nearest one to the pointer is
+  // the drop slot — no row-height arithmetic, which matters because a workspace
+  // row is one line or two depending on whether it has a branch.
+  const findDropIndex = useCallback((event: OtuiMouseEvent): number | null => {
+    const box = scrollRef.current
+    if (box && (event.x < box.x || event.x >= box.x + box.width)) return null
+    let best: number | null = null
+    let bestDistance = Number.POSITIVE_INFINITY
+    for (const [index, ref] of gapRefs.current) {
+      const distance = Math.abs(event.y - ref.y)
+      if (distance < bestDistance) {
+        bestDistance = distance
+        best = index
+      }
     }
-    return null
+    return best
   }, [])
 
-  const handleRowDragStart = useCallback(
-    (id: string) => {
-      setDraggingId(id)
-      setDragOrder(baselineOrder)
-      lastSwapWithRef.current = null
-    },
-    [baselineOrder]
-  )
+  const handleRowDragStart = useCallback((id: string) => {
+    dragRef.current = { dropIndex: null, id }
+    setDraggingId(id)
+    setDropIndex(null)
+  }, [])
 
-  const handleRowDrag = useCallback(
+  const handleDrag = useCallback(
     (event: OtuiMouseEvent) => {
-      if (!(draggingId != null && draggingId !== '')) return
-      const hit = findRowAtY(event.y)
-      if (hit === null) {
-        lastSwapWithRef.current = null
-        return
-      }
-      if (hit === draggingId) {
-        lastSwapWithRef.current = null
-        return
-      }
-      if (hit === lastSwapWithRef.current) return
-      setDragOrder((prev) => (prev ? moveIdToIdPosition(prev, draggingId, hit) : prev))
-      lastSwapWithRef.current = hit
+      const drag = dragRef.current
+      if (!drag) return
+      drag.dropIndex = findDropIndex(event)
+      setDropIndex(drag.dropIndex)
     },
-    [draggingId, findRowAtY]
+    [findDropIndex]
   )
 
+  // Bound to both `up` and `drag-end`: a plain click only ever sends `up`,
+  // while a released drag sends `drag-end` first. Clearing the ref makes the
+  // second one a no-op, so either order does the same thing once.
   const commitDrop = useCallback(() => {
-    const source = draggingId
-    const finalOrder = dragOrder
+    const drag = dragRef.current
+    dragRef.current = null
     setDraggingId(null)
-    setDragOrder(null)
-    lastSwapWithRef.current = null
+    setDropIndex(null)
 
-    if (source == null || source === '' || !finalOrder) return
+    if (!drag) return
+    const source = drag.id
 
-    const changed = !arraysEqual(finalOrder, baselineOrder)
-    if (changed) {
-      dispatchGlobal({ orderedIds: finalOrder, type: 'reorder-projects' })
+    if (drag.dropIndex !== null) {
+      const nextOrder = moveIdToInsertIndex(baselineOrder, source, drag.dropIndex)
+      // Identity means the drop landed back where it started — a released drag,
+      // not a click, so it must not fall through to switching project.
+      if (nextOrder !== baselineOrder) {
+        dispatchGlobal({ orderedIds: nextOrder, type: 'reorder-projects' })
+      }
       return
     }
 
@@ -152,13 +166,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
         workspaceId: sourcePrimaryId,
       })
     }
-  }, [baselineOrder, dragOrder, draggingId, ordered])
-
-  const cancelDrag = useCallback(() => {
-    setDraggingId(null)
-    setDragOrder(null)
-    lastSwapWithRef.current = null
-  }, [])
+  }, [baselineOrder, ordered])
 
   const handleNewProject = useCallback((e: OtuiMouseEvent) => {
     e.stopPropagation()
@@ -175,17 +183,22 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     dispatchGlobal({ type: 'enter-settings' })
   }, [])
 
-  const visibleProjects =
-    dragOrder !== null
-      ? dragOrder
-          .map((id) => ordered.find((s) => s.id === id))
-          .filter((s): s is ProjectRecord => !!s)
-      : ordered
-
   const rule = RULE.repeat(Math.max(1, contentWidth))
 
   return (
-    <box flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+    // Drag and release are handled here, not on the row that started them:
+    // opentui captures the pointer at the first drag event, wherever it lands,
+    // and a one-line heading is left the moment the pointer moves down. Any row
+    // that captures is a descendant of this box, so the events bubble here.
+    <box
+      flexDirection="column"
+      flexGrow={1}
+      flexShrink={1}
+      overflow="hidden"
+      onMouseDrag={handleDrag}
+      onMouseUp={commitDrop}
+      onMouseDragEnd={commitDrop}
+    >
       <box flexShrink={0}>
         <text fg={t.border} selectable={false} wrapMode="none">
           {rule}
@@ -212,8 +225,8 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           // one of its workspaces. One map, one React keypath per visible row;
           // transitions are a single atomic reconciliation.
           const rows: ReactNode[] = []
-          for (const project of visibleProjects) {
-            const projectIndex = baselineOrder.indexOf(project.id) + 1
+          for (const [index, project] of ordered.entries()) {
+            const projectIndex = index + 1
             const isCurrentProject = project.id === currentProjectId
             const workspaces = project.workspaces ?? []
             // Every workspace gets a row, the checkout included. Folding it into
@@ -225,6 +238,18 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 ? project.activeWorkspaceId
                 : getPrimaryWorkspace(workspaces)?.id
             rows.push(
+              // Every project already had a blank line above it, which doubles
+              // as the gap under the header. The drop bar is drawn *in* that
+              // line, so previewing a slot never shifts a single row.
+              <DropGap
+                key={`gap:${project.id}`}
+                index={index}
+                active={dropIndex === index}
+                contentWidth={contentWidth}
+                setGapRef={setGapRef}
+              />
+            )
+            rows.push(
               <ProjectRow
                 key={`ws:${project.id}`}
                 project={project}
@@ -233,15 +258,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
-                // Every project gets a blank line above it, which doubles as
-                // the gap under the header — one rule instead of a spacer row
-                // that would shift the list every time the header changes.
-                marginTop={1}
-                setRowRef={setRowRef}
                 onDragStart={handleRowDragStart}
-                onDrag={handleRowDrag}
-                onDrop={commitDrop}
-                onDragCancel={cancelDrag}
               />
             )
             for (const workspace of workspaces) {
@@ -258,6 +275,16 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
               )
             }
           }
+          // Trailing slot, so "after the last project" is reachable.
+          rows.push(
+            <DropGap
+              key="gap:end"
+              index={ordered.length}
+              active={dropIndex === ordered.length}
+              contentWidth={contentWidth}
+              setGapRef={setGapRef}
+            />
+          )
           return rows
         })()}
       </scrollbox>
@@ -271,6 +298,32 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           {`${SETTINGS_GLYPH} Settings`}
         </text>
       </box>
+    </box>
+  )
+}
+
+interface DropGapProps {
+  /** Insertion slot this gap stands for: 0 is above the first project. */
+  index: number
+  active: boolean
+  contentWidth: number
+  setGapRef: (index: number, ref: BoxRenderable | null) => void
+}
+
+/** The one-line gap above a project — blank, or the drop preview mid-drag. */
+function DropGap({ active, contentWidth, index, setGapRef }: DropGapProps) {
+  const t = useTheme()
+  const handleRef = useCallback(
+    (r: BoxRenderable | null) => setGapRef(index, r),
+    [setGapRef, index]
+  )
+  return (
+    <box ref={handleRef} flexShrink={0} height={1}>
+      {active ? (
+        <text fg={t.primary} selectable={false} wrapMode="none">
+          {DROP_BAR.repeat(Math.max(1, contentWidth))}
+        </text>
+      ) : null}
     </box>
   )
 }
@@ -289,27 +342,17 @@ interface ProjectRowProps {
   status: ProjectStatus
   dragging: boolean
   contentWidth: number
-  /** Vertical spacing above this row — used to separate project blocks. */
-  marginTop: number
-  setRowRef: (id: string, ref: BoxRenderable | null) => void
+  /** Only the gesture's start lives here — the list owns drag and release. */
   onDragStart: (id: string) => void
-  onDrag: (event: OtuiMouseEvent) => void
-  onDrop: () => void
-  onDragCancel: () => void
 }
 
 const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
   inCurrentGroup,
-  marginTop,
-  onDrag,
-  onDragCancel,
   onDragStart,
-  onDrop,
   project,
   projectIndex,
-  setRowRef,
   status,
 }: ProjectRowProps) {
   const t = useTheme()
@@ -340,10 +383,6 @@ const ProjectRow = memo(function ProjectRow({
   const waitingColor = t.warning
   const currentProjectId = useAppStore((s) => s.currentProjectId)
 
-  const handleRef = useCallback(
-    (r: BoxRenderable | null) => setRowRef(project.id, r),
-    [setRowRef, project.id]
-  )
   const handleMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
       e.preventDefault()
@@ -351,13 +390,6 @@ const ProjectRow = memo(function ProjectRow({
       onDragStart(project.id)
     },
     [onDragStart, project.id]
-  )
-  const handleMouseUp = useCallback(
-    (e: OtuiMouseEvent) => {
-      e.preventDefault()
-      onDrop()
-    },
-    [onDrop]
   )
   const handleNewWorkspace = useCallback(
     (e: OtuiMouseEvent) => {
@@ -412,19 +444,14 @@ const ProjectRow = memo(function ProjectRow({
 
   return (
     <ContextMenuBox
-      ref={handleRef}
       id={`sidebar-ws-${project.id}`}
       flexDirection="column"
       flexShrink={0}
-      marginTop={marginTop}
       paddingLeft={1}
       paddingRight={1}
       backgroundColor={bgColor}
       rightClickMenu={rightClickMenu}
       onMouseDown={handleMouseDown}
-      onMouseDrag={onDrag}
-      onMouseUp={handleMouseUp}
-      onMouseDragEnd={onDragCancel}
     >
       <box flexDirection="row" alignItems="center">
         <text fg={leadingColor} selectable={false} wrapMode="none">
