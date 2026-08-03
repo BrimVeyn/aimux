@@ -3,7 +3,6 @@ import { expect, test } from 'bun:test'
 import type { WorkspaceRecord } from '../../src/state/types'
 
 import {
-  branchNameFor,
   placeholderWorkspaceName,
   renameWorkspaceFromPrompt,
 } from '../../src/app-runtime/workspace-naming'
@@ -46,35 +45,53 @@ test('placeholderWorkspaceName gives up on a prompt with no usable words', () =>
   expect(placeholderWorkspaceName('   ')).toBeUndefined()
 })
 
-test('branchNameFor slugifies under the aimux prefix', () => {
-  expect(branchNameFor('Fix Scroll Drift')).toBe('aimux/fix-scroll-drift')
-})
-
-test('a generated name renames both the workspace and its branch', async () => {
+test('a generated name renames the workspace, and the branch to the conventional one', async () => {
   const renames: string[][] = []
   const rec = recorder()
   await renameWorkspaceFromPrompt(
-    { projectId: 'p1', prompt: 'fix the scroll drift', provider: 'claude', workspace: workspace() },
+    {
+      projectId: 'p1',
+      prompt: 'corrige le décalage du scroll',
+      provider: 'claude',
+      workspace: workspace(),
+    },
     {
       applyName: rec.applyName,
       renameBranch: async (repo, from, to) => {
         renames.push([repo, from, to])
         return true
       },
-      spawn: modelReturning('Fix scroll drift\n'),
+      // The title keeps the user's language; the branch does not.
+      spawn: modelReturning('Corriger le décalage du scroll\nfix/scroll-drift-on-resize\n'),
     }
   )
 
   // Renamed from inside the worktree, where the branch is the current one.
   expect(renames).toEqual([
-    ['/tmp/aimux-wt/repo/placeholder-abc', 'aimux/placeholder-abc', 'aimux/fix-scroll-drift'],
+    ['/tmp/aimux-wt/repo/placeholder-abc', 'aimux/placeholder-abc', 'fix/scroll-drift-on-resize'],
   ])
   expect(rec.patches).toEqual([
     {
-      patch: { branch: 'aimux/fix-scroll-drift', name: 'Fix scroll drift' },
+      patch: { branch: 'fix/scroll-drift-on-resize', name: 'Corriger le décalage du scroll' },
       workspaceId: 'workspace-1',
     },
   ])
+})
+
+test('a branch line in no known convention leaves the branch alone', async () => {
+  const rec = recorder()
+  await renameWorkspaceFromPrompt(
+    { projectId: 'p1', prompt: 'fix the scroll drift', provider: 'claude', workspace: workspace() },
+    {
+      applyName: rec.applyName,
+      renameBranch: async () => {
+        throw new Error('must not rename to an unconventional branch')
+      },
+      spawn: modelReturning('Fix scroll drift\nscroll drift fix\n'),
+    }
+  )
+
+  expect(rec.patches).toEqual([{ patch: { name: 'Fix scroll drift' }, workspaceId: 'workspace-1' }])
 })
 
 test('a refused branch rename still applies the name, and never claims the new branch', async () => {
@@ -84,7 +101,7 @@ test('a refused branch rename still applies the name, and never claims the new b
     {
       applyName: rec.applyName,
       renameBranch: async () => false,
-      spawn: modelReturning('Fix scroll drift\n'),
+      spawn: modelReturning('Fix scroll drift\nfix/scroll-drift\n'),
     }
   )
 

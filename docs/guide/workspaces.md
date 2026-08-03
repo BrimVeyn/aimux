@@ -48,18 +48,33 @@ aimux confirms with a **Created workspace** toast.
 
 ### Naming
 
-The workspace and its branch are both named after your prompt.
+The workspace and its branch are both named after your prompt — but not with
+the same name. The workspace name is yours to read, in the language you wrote
+the prompt in. The branch is read by git, by reviewers and by CI, so it is
+always English, kebab-case, and under a conventional-commit type:
+
+```
+Corriger le décalage du scroll     ← workspace
+fix/scroll-drift-on-resize         ← branch
+```
 
 A name derived locally from the prompt appears immediately, so the sidebar
-never reads `wt-myrepo`. In the background the assistant you picked generates a
-better one; when it lands, the workspace is renamed on screen **and** its branch
-is renamed with `git branch -m`. The directory under `AIMUX_WORKTREE_ROOT` keeps
-its original slug — git registers worktrees by absolute path, so renaming the
-directory would orphan them.
+never reads `wt-myrepo`, on a throwaway `aimux/…` branch. In the background the
+assistant you picked generates both real names in one call; when they land, the
+workspace is renamed on screen **and** its branch is renamed with
+`git branch -m`. The directory under `AIMUX_WORKTREE_ROOT` keeps its original
+slug — git registers worktrees by absolute path, so renaming the directory
+would orphan them.
 
 If no headless CLI is available, or the model call fails or times out, the local
 name simply stays. Nothing is retried and nothing is reported: it is already a
-name derived from what you asked for.
+name derived from what you asked for. The branch is renamed only when the model
+answers with one of `feat` `fix` `refactor` `perf` `docs` `test` `chore` `ci`
+`style` `build` followed by `/` and a subject — keeping the `aimux/`
+placeholder beats inventing a convention.
+
+Deleting a temp workspace deletes its branch with it, whatever it ended up
+called.
 
 `Ctrl+N` never creates a workspace — it only opens a tab in the workspace you
 are already in.
@@ -156,7 +171,7 @@ on the right.
   root
     main
 ? scroll drift fix                   +142 -37
-    aimux/scroll-drift-fix
+    fix/scroll-drift-on-resize
 ```
 
 The heading is not a place the cursor stops. `j` / `k` move between workspace

@@ -5,23 +5,21 @@
 // the generated one replaces it in place when it arrives. The heuristic result
 // is not a stopgap to be embarrassed about — when no headless CLI is installed
 // it is the final name, and it is still derived from what the user asked for.
+//
+// The branch is not a slug of that name. A tab title belongs to the user and
+// speaks their language; a branch name is read by git, by reviewers and by CI,
+// so the model is asked for it separately, in English and under a
+// conventional-commit type. A branch is only renamed when the model returns one
+// in that shape — the placeholder is a better outcome than a bad convention.
 
 import type { AssistantId, WorkspaceRecord } from '../state/types'
 
 import { heuristicTitle } from '../auto-rename/heuristic-title'
-import { generateTabTitle, type TitleSpawnFn } from '../auto-rename/title-runner'
+import { generateWorkspaceNaming, type TitleSpawnFn } from '../auto-rename/title-runner'
 import { renameGitBranch } from '../git/worktree'
-import { sanitizePathSegment } from '../platform/worktree-paths'
 
 /** Model naming is best-effort background work; it must never outlive the app. */
 const NAMING_TIMEOUT_MS = 30_000
-
-export const BRANCH_PREFIX = 'aimux/'
-const BRANCH_SLUG_MAX = 40
-
-export function branchNameFor(name: string): string {
-  return `${BRANCH_PREFIX}${sanitizePathSegment(name, BRANCH_SLUG_MAX).toLowerCase()}`
-}
 
 /**
  * The name a workspace carries until the model answers. Undefined when the
@@ -60,7 +58,7 @@ export async function renameWorkspaceFromPrompt(
   target: WorkspaceNamingTarget,
   deps: WorkspaceNamingDeps
 ): Promise<void> {
-  const result = await generateTabTitle({
+  const result = await generateWorkspaceNaming({
     firstPrompt: target.prompt,
     provider: target.provider,
     signal: deps.signal ?? new AbortController().signal,
@@ -70,21 +68,24 @@ export async function renameWorkspaceFromPrompt(
   if (result.status !== 'ok') return
 
   const { workspace } = target
-  if (result.title === workspace.name) return
-
-  const branch = branchNameFor(result.title)
+  const { branch } = result
   const rename = deps.renameBranch ?? renameGitBranch
   // Renamed from inside the workspace, not the main checkout: the branch is
   // that worktree's current branch, which is the form git always accepts.
   // Renaming first means a refusal (the name is taken) leaves the record
   // pointing at the branch that actually exists.
-  const branchRenamed =
-    workspace.branch != null && workspace.branch !== '' && branch !== workspace.branch
-      ? await rename(workspace.path, workspace.branch, branch)
-      : false
+  const renamedBranch =
+    branch != null &&
+    workspace.branch != null &&
+    workspace.branch !== '' &&
+    branch !== workspace.branch &&
+    (await rename(workspace.path, workspace.branch, branch))
+      ? branch
+      : undefined
 
+  if (result.title === workspace.name && renamedBranch == null) return
   deps.applyName(target.projectId, workspace.id, {
     name: result.title,
-    ...(branchRenamed ? { branch } : null),
+    ...(renamedBranch == null ? null : { branch: renamedBranch }),
   })
 }
