@@ -30,6 +30,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
+  'quotas': 'modal.quotas',
   'update-available': 'modal.update-available',
   'workspace-delete-confirm': 'modal.workspace-delete-confirm',
   'workspace-move': 'modal.workspace-move',

@@ -239,6 +239,11 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // Modal: quotas (read-only — the status bar indicator, expanded)
+    // -----------------------------------------------------------------------
+    .mode('modal.quotas', (m) => m.map('<Esc>', actions.closeModal, 'Close'))
+
+    // -----------------------------------------------------------------------
     // Modal: update-available
     // -----------------------------------------------------------------------
     .mode('modal.update-available', (m) =>

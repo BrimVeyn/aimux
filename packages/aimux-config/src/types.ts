@@ -35,6 +35,7 @@ export type ModeId =
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
   | 'modal.flash-jump'
+  | 'modal.quotas'
   | 'settings'
   | 'stats'
 
@@ -442,6 +443,11 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
+/** The status bar's usage indicator, expanded. Carries nothing: it is a readout. */
+export interface ModalQuotas extends ModalBase {
+  type: 'quotas'
+}
+
 export interface ModalWorkspaceMove extends ModalBase {
   type: 'workspace-move'
   /** The workspace being moved (may differ from the active one, e.g. a tab menu). */
@@ -524,6 +530,7 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
+  | ModalQuotas
   | ModalWorkspaceMove
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
@@ -656,6 +663,7 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'open-quotas-modal' }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-workspace-move-modal'; sourceWorkspaceId: string }

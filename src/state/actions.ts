@@ -73,6 +73,7 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'open-quotas-modal' }
   | { type: 'set-modal-selection-index'; index: number }
   | { type: 'open-workspace-move-modal'; sourceWorkspaceId: string }
   | { type: 'toggle-workspace-move-delete' }

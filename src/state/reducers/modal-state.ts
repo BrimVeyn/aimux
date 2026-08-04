@@ -460,6 +460,18 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'theme-picker',
         },
       }
+    case 'open-quotas-modal':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          projectTargetId: null,
+          selectedIndex: 0,
+          type: 'quotas',
+        },
+      }
     case 'open-update-available-modal':
       return {
         ...state,

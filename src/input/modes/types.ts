@@ -31,6 +31,7 @@ export type ModeId =
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
   | 'modal.flash-jump'
+  | 'modal.quotas'
   | 'settings'
   | 'stats'
 

@@ -13,6 +13,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],
   'modal.project-name': ['modal.project-picker.filtering', 'navigation'],
   'modal.project-picker.filtering': ['navigation', 'modal.project-name', 'modal.create-project'],
+  'modal.quotas': ['navigation', 'terminal-input'],
   'modal.rename-tab': ['navigation'],
   'modal.rename-workspace': ['navigation'],
   'modal.setting-text': ['settings'],
@@ -39,6 +40,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
     'modal.rename-tab',
     'modal.rename-workspace',
     'modal.update-available',
+    'modal.quotas',
     'modal.workspace-delete-confirm',
     'modal.workspace-move-confirm',
     'modal.flash-jump',
@@ -60,7 +62,7 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   // Read-only screen: the only way out is back to the panes. The help overlay
   // opens on top of it without a transition, the same way it does over settings.
   'stats': ['navigation'],
-  'terminal-input': ['navigation', 'modal.split-picker', 'settings', 'stats'],
+  'terminal-input': ['navigation', 'modal.split-picker', 'modal.quotas', 'settings', 'stats'],
 }
 
 export function isValidTransition(from: ModeId, to: ModeId): boolean {

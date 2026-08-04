@@ -26,6 +26,7 @@ import { StatusBar } from './components/layout/status-bar'
 import { TerminalPane } from './components/layout/terminal-pane'
 import { TopTabBar } from './components/layout/top-tab-bar'
 import { HelpModal } from './components/modals/app/help-modal'
+import { QuotasModal } from './components/modals/app/quotas-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
 import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
@@ -206,6 +207,8 @@ function renderModal(
           cursorPos={modal.cursorPos}
         />
       )
+    case 'quotas':
+      return <QuotasModal />
     case 'update-available':
       return (
         <UpdateAvailableModal

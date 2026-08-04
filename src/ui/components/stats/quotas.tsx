@@ -57,7 +57,17 @@ function formatProjectedTime(at: Date, now: Date): string {
  * what is left. The pace takes a second line only when there is a pace to
  * report, so an ordinary window costs one row rather than three.
  */
-function WindowRow({ now, width, window }: { now: Date; width: number; window: UsageWindow }) {
+function WindowRow({
+  now,
+  projection,
+  width,
+  window,
+}: {
+  now: Date
+  projection: boolean
+  width: number
+  window: UsageWindow
+}) {
   const t = useTheme()
   const percent = window.percent ?? 0
 
@@ -67,13 +77,13 @@ function WindowRow({ now, width, window }: { now: Date; width: number; window: U
     else if (percent >= 60) barColor = t.warning
   }
 
-  const projection = projectWindow(window, now)
   const meta: string[] = []
   if (window.timeRemaining != null && window.timeRemaining !== '') {
     meta.push(`resets in ${window.timeRemaining}`)
   }
-  if (projection.kind === 'exhausted') {
-    meta.push(`empty ~${formatProjectedTime(projection.at, now)}`)
+  if (projection) {
+    const verdict = projectWindow(window, now)
+    if (verdict.kind === 'exhausted') meta.push(`empty ~${formatProjectedTime(verdict.at, now)}`)
   }
   const metaRoom = width - LABEL_WIDTH - SEGMENTS - PERCENT_WIDTH - 1
 
@@ -108,11 +118,13 @@ function WindowRow({ now, width, window }: { now: Date; width: number; window: U
 
 function ToolQuotas({
   now,
+  projection,
   snap,
   tool,
   width,
 }: {
   now: Date
+  projection: boolean
   snap: UsageSnapshot
   tool: AIUsageTool
   width: number
@@ -122,7 +134,7 @@ function ToolQuotas({
   const plan = snap.planTier != null && snap.planTier !== '' ? ` \u{00B7} ${snap.planTier}` : ''
 
   let body: ReactNode = snap.windows.map((window) => (
-    <WindowRow key={window.kind} now={now} width={width} window={window} />
+    <WindowRow key={window.kind} now={now} projection={projection} width={width} window={window} />
   ))
   if (isHardError) {
     body = (
@@ -149,21 +161,50 @@ function ToolQuotas({
   )
 }
 
-export function QuotaSection({ now, width }: { now: Date; width: number }) {
+/**
+ * The windows themselves, without the section chrome.
+ *
+ * Split out so the status bar's modal can show exactly this and nothing else.
+ *
+ * `projection` is passed at both call sites rather than defaulted: the page has
+ * the room to say when a window runs dry, and the modal is a glance at what is
+ * left — a default would make one of those two an accident.
+ */
+export function QuotaWindows({
+  now,
+  projection,
+  width,
+}: {
+  now: Date
+  projection: boolean
+  width: number
+}) {
   const snapshots = useAIUsageStore((s) => s.snapshots)
   const tools = TOOLS.map((tool) => ({ snap: snapshots[tool], tool })).filter(
     (entry): entry is { snap: UsageSnapshot; tool: AIUsageTool } => entry.snap !== undefined
   )
 
+  if (tools.length === 0) return <Muted>no data yet — collecting…</Muted>
+  return (
+    <>
+      {tools.map(({ snap, tool }) => (
+        <ToolQuotas
+          key={tool}
+          now={now}
+          projection={projection}
+          snap={snap}
+          tool={tool}
+          width={width}
+        />
+      ))}
+    </>
+  )
+}
+
+export function QuotaSection({ now, width }: { now: Date; width: number }) {
   return (
     <Section glyph={GLYPH.quota} title="Quotas" note="live" width={width}>
-      {tools.length === 0 ? (
-        <Muted>no data yet — collecting…</Muted>
-      ) : (
-        tools.map(({ snap, tool }) => (
-          <ToolQuotas key={tool} now={now} snap={snap} tool={tool} width={width} />
-        ))
-      )}
+      <QuotaWindows now={now} projection width={width} />
     </Section>
   )
 }

@@ -18,11 +18,11 @@ export function AIUsageIndicator() {
   const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
-  const openStats = useCallback(
+  const openQuotas = useCallback(
     (e: { preventDefault: () => void; stopPropagation: () => void }) => {
       e.preventDefault()
       e.stopPropagation()
-      dispatchGlobal({ type: 'enter-stats' })
+      dispatchGlobal({ type: 'open-quotas-modal' })
     },
     []
   )
@@ -36,7 +36,7 @@ export function AIUsageIndicator() {
 
   if (entries.length === 0) {
     return (
-      <box flexDirection="row" onMouseDown={openStats}>
+      <box flexDirection="row" onMouseDown={openQuotas}>
         <text fg={t.textMuted} selectable={false}>
           …
         </text>
@@ -45,7 +45,7 @@ export function AIUsageIndicator() {
   }
 
   return (
-    <box flexDirection="row" gap={2} onMouseDown={openStats}>
+    <box flexDirection="row" gap={2} onMouseDown={openQuotas}>
       {entries.map(({ snap, tool }) => {
         if (!snap) return null
 

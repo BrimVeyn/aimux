@@ -86,6 +86,7 @@ export type ModalType =
   | 'split-picker'
   | 'git-commit'
   | 'update-available'
+  | 'quotas'
   | 'workspace-move'
   | 'workspace-move-confirm'
   | 'workspace-delete-confirm'
@@ -580,6 +581,11 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
+/** The status bar's usage indicator, expanded. Carries nothing: it is a readout. */
+export interface ModalQuotas extends ModalBase {
+  type: 'quotas'
+}
+
 export interface ModalWorkspaceMove extends ModalBase {
   type: 'workspace-move'
   /** The workspace being moved (may differ from the active one, e.g. a tab menu). */
@@ -682,6 +688,7 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
+  | ModalQuotas
   | ModalWorkspaceMove
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
