@@ -11,6 +11,7 @@ import { settingsStore } from '../settings-store'
  * files are, and how many settings your own config file is holding onto.
  */
 export const ABOUT_SECTION: SettingSection = {
+  glyph: '\u{00A7}',
   id: 'about',
   label: 'About',
   rows: [

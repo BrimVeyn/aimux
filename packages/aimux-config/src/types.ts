@@ -34,9 +34,10 @@ export type ModeId =
   | 'modal.update-available'
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
-  | 'modal.ai-usage'
   | 'modal.flash-jump'
+  | 'modal.quotas'
   | 'settings'
+  | 'stats'
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ export type FocusMode =
   | 'command-edit'
   | 'git'
   | 'settings'
+  | 'stats'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────
@@ -441,8 +443,9 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
-export interface ModalAIUsage extends ModalBase {
-  type: 'ai-usage'
+/** The status bar's usage indicator, expanded. Carries nothing: it is a readout. */
+export interface ModalQuotas extends ModalBase {
+  type: 'quotas'
 }
 
 export interface ModalWorkspaceMove extends ModalBase {
@@ -527,7 +530,7 @@ export type ModalState =
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
-  | ModalAIUsage
+  | ModalQuotas
   | ModalWorkspaceMove
   | ModalWorkspaceMoveConfirm
   | ModalWorkspaceDeleteConfirm
@@ -584,6 +587,12 @@ export interface SettingsUIState {
   rowIndex: number
 }
 
+/** Mirror of the CLI's `StatsUIState`. */
+export interface StatsUIState {
+  pageIndex: number
+  scrollTop: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
@@ -605,6 +614,7 @@ export interface AppState {
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
   settings: SettingsUIState
+  stats: StatsUIState
   workspaceDivergence: Record<string, BranchDivergence>
   workspaceActivity: Record<string, WorkspaceActivity>
   lastActiveTabByWorkspace: Record<string, string>
@@ -653,8 +663,8 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'open-quotas-modal' }
   | { type: 'set-modal-selection-index'; index: number }
-  | { type: 'open-ai-usage-modal' }
   | { type: 'open-edit-custom-command'; assistantId: AssistantId }
   | { type: 'open-workspace-move-modal'; sourceWorkspaceId: string }
   | { type: 'toggle-workspace-move-delete' }
@@ -782,6 +792,16 @@ export type SettingsAction =
   | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
 
+export type StatsAction =
+  | { type: 'enter-stats' }
+  | { type: 'exit-stats' }
+  | { type: 'stats-move-page'; delta: -1 | 1 }
+  | { type: 'stats-select-page'; pageIndex: number }
+  /** Rows, not pixels: the view holds a scroll offset the page applies to its box. */
+  | { type: 'stats-scroll'; delta: number }
+  /** The offset the scrollbox actually accepted, sent back so the state cannot run past the page. */
+  | { type: 'stats-scroll-settled'; scrollTop: number }
+
 export interface GitRefreshPayload {
   branch: string | null
   ahead: number
@@ -878,6 +898,7 @@ export type AppAction =
   | LayoutAction
   | UIAction
   | SettingsAction
+  | StatsAction
   | DataAction
   | GitPanelAction
   | GitModeAction

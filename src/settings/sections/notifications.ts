@@ -53,6 +53,7 @@ export function playNotificationSound(): boolean {
 
 export const NOTIFICATIONS_SECTION: SettingSection = {
   description: 'Plays when an assistant needs an answer, or finishes a turn.',
+  glyph: '\u{25CE}',
   id: 'notifications',
   label: 'Notifications',
   rows: [

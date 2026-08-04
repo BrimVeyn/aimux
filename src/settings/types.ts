@@ -86,6 +86,16 @@ export type SettingRow =
 
 export interface SettingSection {
   id: string
+  /**
+   * One cell, text presentation, present in the base fonts — the same rule the
+   * stats screen's section glyphs follow, so the eye finds a section by shape
+   * before it reads the label.
+   *
+   * Required, and on the section rather than in a lookup keyed by id: a map
+   * would need a fallback, and a fallback turns a renamed or added section into
+   * a silent placeholder instead of a compile error.
+   */
+  glyph: string
   label: string
   /** Shown once under the section's title, for a caveat that covers every row. */
   description?: string

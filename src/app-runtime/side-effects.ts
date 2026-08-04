@@ -8,6 +8,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
+import { countEffect } from '../services/aimux-counters/observe'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -211,6 +212,10 @@ function hoistBranch(branches: string[], first: string | undefined): string[] {
 
 export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): void {
   const { backend, dispatch, state } = ctx
+
+  // Every effect path funnels through here, including the mouse and IPC ones,
+  // so this is the one place that sees them all.
+  countEffect(effect)
 
   switch (effect.type) {
     case 'quit': {

@@ -73,8 +73,8 @@ export type ModalAction =
   | { type: 'set-theme-entry-count'; count: number }
   | { type: 'open-theme-picker'; returnTo?: FocusMode }
   | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
+  | { type: 'open-quotas-modal' }
   | { type: 'set-modal-selection-index'; index: number }
-  | { type: 'open-ai-usage-modal' }
   | { type: 'open-workspace-move-modal'; sourceWorkspaceId: string }
   | { type: 'toggle-workspace-move-delete' }
   | { type: 'set-workspace-move-stats'; dirtyFiles: Record<string, number> }
@@ -226,6 +226,16 @@ export type SettingsAction =
   | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
 
+export type StatsAction =
+  | { type: 'enter-stats' }
+  | { type: 'exit-stats' }
+  | { type: 'stats-move-page'; delta: -1 | 1 }
+  | { type: 'stats-select-page'; pageIndex: number }
+  /** Rows, not pixels: the view holds a scroll offset the page applies to its box. */
+  | { type: 'stats-scroll'; delta: number }
+  /** The offset the scrollbox actually accepted, sent back so the state cannot run past the page. */
+  | { type: 'stats-scroll-settled'; scrollTop: number }
+
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
   | { type: 'git-refresh-error'; kind: GitPanelError }
@@ -335,6 +345,7 @@ export type AppAction =
   | LayoutAction
   | UIAction
   | SettingsAction
+  | StatsAction
   | DataAction
   | GitPanelAction
   | GitModeAction

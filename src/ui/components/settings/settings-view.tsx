@@ -14,6 +14,7 @@ import { ListItem } from '../primitives/list-item'
 import { SettingsRow } from './settings-row'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
+
 /**
  * Share of the window the settings themselves are allowed. Without a cap the
  * value sits on the far edge of a wide terminal, a hundred columns from the label
@@ -81,7 +82,9 @@ export const SettingsView = memo(function SettingsView() {
   }, [])
 
   const section = SETTING_SECTIONS.find((s) => s.id === settings.sectionId)
-  const sectionLabel = section?.label ?? 'Settings'
+  // The glyph rides with the label: a section that could not be found has
+  // neither, and the fallback title stands on its own.
+  const sectionTitle = section === undefined ? 'Settings' : `${section.glyph} ${section.label}`
   const sectionNote = section?.description
   // Same 1-cell seam the bar draws between itself and the terminal, so the two
   // views line up to the column.
@@ -103,7 +106,7 @@ export const SettingsView = memo(function SettingsView() {
                 onClickIndex={handleSectionClick}
                 title={
                   <text fg={section.id === settings.sectionId ? t.text : t.textMuted}>
-                    {section.label}
+                    {`${section.glyph} ${section.label}`}
                   </text>
                 }
                 trailing={
@@ -127,7 +130,7 @@ export const SettingsView = memo(function SettingsView() {
       <box
         border
         borderColor={settings.pane === 'rows' ? t.borderActive : t.border}
-        title={sectionLabel}
+        title={sectionTitle}
         padding={0}
         flexDirection="column"
         flexGrow={1}

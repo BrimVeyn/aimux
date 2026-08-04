@@ -25,8 +25,8 @@ import { SplitLayout } from './components/layout/split-layout'
 import { StatusBar } from './components/layout/status-bar'
 import { TerminalPane } from './components/layout/terminal-pane'
 import { TopTabBar } from './components/layout/top-tab-bar'
-import { AIUsageModal } from './components/modals/app/ai-usage-modal'
 import { HelpModal } from './components/modals/app/help-modal'
+import { QuotasModal } from './components/modals/app/quotas-modal'
 import { UpdateAvailableModal } from './components/modals/app/update-available-modal'
 import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
@@ -45,6 +45,7 @@ import { ContextMenuOverlay } from './components/overlays/context-menu/context-m
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { SettingsView } from './components/settings/settings-view'
+import { StatsView } from './components/stats/stats-view'
 import { useTheme } from './theme'
 
 const EMPTY_WORKSPACES: WorkspaceRecord[] = []
@@ -206,6 +207,8 @@ function renderModal(
           cursorPos={modal.cursorPos}
         />
       )
+    case 'quotas':
+      return <QuotasModal />
     case 'update-available':
       return (
         <UpdateAvailableModal
@@ -248,8 +251,6 @@ function renderModal(
           cursorPos={modal.cursorPos}
         />
       )
-    case 'ai-usage':
-      return <AIUsageModal page={modal.selectedIndex} />
     case 'workspace-delete-confirm':
       return (
         <WorkspaceDeleteConfirm
@@ -434,6 +435,9 @@ export function RootView({
   let replacesPanes: ReactNode = null
   if (inGitMode) replacesPanes = <GitView themeId={themeId} />
   else if (inSettings) replacesPanes = <SettingsView />
+  // Read-only, so unlike settings it has no modal that belongs to it and no
+  // second condition: the screen is up exactly while focus is on it.
+  else if (focusMode === 'stats') replacesPanes = <StatsView />
 
   const center =
     replacesPanes !== null ? (

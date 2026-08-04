@@ -20,6 +20,7 @@ function isFileListMode(value: SettingValue): value is GitFileListMode {
  * `AppState` on change; multi-repo is a module singleton, like auto-commit.
  */
 export const GIT_SECTION: SettingSection = {
+  glyph: '\u{2387}',
   id: 'git',
   label: 'Git',
   rows: [

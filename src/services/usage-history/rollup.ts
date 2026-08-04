@@ -94,8 +94,24 @@ interface TranscriptLine {
   timestamp?: string
 }
 
+export interface TranscriptFileState {
+  /** ms epoch of the previous billed assistant message in this file, for the turn gap. */
+  previousMs: number | null
+}
+
+/**
+ * Anything longer than this is the user walking away, not the model working.
+ * Included, the median turn becomes a measure of lunch breaks.
+ */
+const MAX_TURN_GAP_MS = 5 * 60 * 1000
+
 /** `seen` spans the whole run: resume, fork and compaction re-emit the same billed request across files. */
-export function consumeTranscriptLine(line: string, seen: Set<string>, days: UsageDays): void {
+export function consumeTranscriptLine(
+  line: string,
+  seen: Set<string>,
+  days: UsageDays,
+  state: TranscriptFileState
+): void {
   // ~23k of ~126k lines carry usage; the rest hold base64 thinking blobs. A
   // substring test beats parsing them.
   if (!line.includes('"output_tokens"')) return
@@ -144,15 +160,40 @@ export function consumeTranscriptLine(line: string, seen: Set<string>, days: Usa
   if (model != null && model !== '') bump(day.models, model, total)
   const branch = entry.gitBranch
   if (branch != null && branch !== '') bump(day.branches, branch, total)
+
+  // The gap to the previous billed message in this file. Not prompt-to-response
+  // latency: the user turns in a transcript are mostly tool results, so isolating
+  // a real prompt would mean parsing lines this rollup deliberately skips. What
+  // this measures is the pace of the work cycle, and it is labelled as such.
+  const { previousMs } = state
+  if (previousMs !== null && ms > previousMs && ms - previousMs <= MAX_TURN_GAP_MS) {
+    const gap = ms - previousMs
+    day.turnMs.sum += gap
+    day.turnMs.count += 1
+    day.turnMs.max = Math.max(day.turnMs.max, gap)
+  }
+  state.previousMs = ms
 }
 
-/** `history.jsonl`, the prompt log — the only source that survives transcript pruning. */
+interface HistoryLine {
+  display?: string
+  project?: string
+  sessionId?: string
+  timestamp?: number | string
+}
+
+/**
+ * `history.jsonl`, the prompt log — the only source that survives transcript
+ * pruning, and the source of everything on the Activity and Projects pages. Each
+ * line carries the prompt text, its project path and its session id, not just a
+ * timestamp, and the file stays small where the transcripts run to ~90 MB.
+ */
 export function consumeHistoryLine(line: string, days: UsageDays): void {
   if (!line.includes('"timestamp"')) return
 
-  let entry: { timestamp?: number | string }
+  let entry: HistoryLine
   try {
-    entry = JSON.parse(line) as { timestamp?: number | string }
+    entry = JSON.parse(line) as HistoryLine
   } catch {
     return
   }
@@ -162,7 +203,36 @@ export function consumeHistoryLine(line: string, days: UsageDays): void {
   const ms = Number(entry.timestamp)
   if (!Number.isFinite(ms) || ms <= 0) return
 
-  dayAt(days, localDay(new Date(ms))).prompts += 1
+  const at = new Date(ms)
+  const day = dayAt(days, localDay(at))
+  day.prompts += 1
+
+  const hour = at.getHours()
+  day.hours[hour] = (day.hours[hour] ?? 0) + 1
+
+  const { project } = entry
+  if (project != null && project !== '') bump(day.projects, project, 1)
+
+  const { display } = entry
+  if (display != null) {
+    day.promptChars.sum += display.length
+    day.promptChars.count += 1
+    day.promptChars.max = Math.max(day.promptChars.max, display.length)
+  }
+
+  const { sessionId } = entry
+  if (sessionId != null && sessionId !== '') {
+    const session = day.sessions[sessionId]
+    if (session === undefined) {
+      day.sessions[sessionId] = { first: ms, last: ms, prompts: 1 }
+    } else {
+      // A session can span midnight, and each half is recorded against its own
+      // day — so `first` is the first prompt of this session *on this day*.
+      session.first = Math.min(session.first, ms)
+      session.last = Math.max(session.last, ms)
+      session.prompts += 1
+    }
+  }
 }
 
 interface CodexLine {
@@ -224,8 +294,10 @@ async function collectClaude(): Promise<UsageDays> {
   const root = claudeHome()
 
   await forEachFile(findJsonl(join(root, 'projects')), async (path) => {
+    // Per file: a turn gap only means anything inside one transcript.
+    const state: TranscriptFileState = { previousMs: null }
     await readJsonlLines(path, (line) => {
-      consumeTranscriptLine(line, seen, days)
+      consumeTranscriptLine(line, seen, days, state)
     })
   })
 

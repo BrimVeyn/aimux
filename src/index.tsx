@@ -95,6 +95,7 @@ const [
   { createSessionBackend },
   { maybeAutoInstallCompletion },
   { maybeSpawnUsageRollup },
+  { startCounters },
 ] = await Promise.all([
   import('@opentui/react'),
   import('./app'),
@@ -104,6 +105,7 @@ const [
   import('./session-backend/bootstrap'),
   import('./cli/completion/install'),
   import('./services/usage-history/store'),
+  import('./services/aimux-counters'),
 ])
 const { resolved: resolvedConfig, user: userConfig } = await loadUserConfig()
 
@@ -118,6 +120,10 @@ maybeAutoInstallCompletion()
 // the only long-term record. Detached subprocess, at most once per ~day, never
 // blocking. Opt out with AIMUX_NO_USAGE_ROLLUP=1.
 maybeSpawnUsageRollup()
+
+// Start counting what aimux knows about its own use — uptime, keystrokes,
+// workspaces, tabs. Local file, counts only, flushed on a timer and on exit.
+startCounters()
 
 const renderer = await createCliRenderer({
   autoFocus: true,

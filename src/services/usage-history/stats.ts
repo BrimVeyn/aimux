@@ -1,5 +1,6 @@
 import { parseColor, RGBA } from '@opentui/core'
 
+import { daysBetween, parseDayKey } from './insights'
 import { emptyTokens, localDay, type UsageDays, type UsageTokens } from './store'
 
 /** Pure shaping of stored usage days into what the History page renders. */
@@ -9,18 +10,6 @@ export interface HeatmapCell {
   day: string
   level: number
   value: number
-}
-
-function parseDay(key: string): Date {
-  const [year, month, day] = key.split('-').map(Number)
-  return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1)
-}
-
-/** Whole days apart. Via `Date.UTC` on the calendar parts: a DST span is not a whole number of 24h periods. */
-function daysBetween(from: Date, to: Date): number {
-  const utcOf = (date: Date): number =>
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
-  return Math.round((utcOf(to) - utcOf(from)) / 86_400_000)
 }
 
 /** Quartiles of the non-empty days: a linear `value / max` ramp lets one outlier flatten the year to level 1. */
@@ -44,11 +33,11 @@ export function coveredWeeks(days: UsageDays, today: Date, maxWeeks: number): nu
   const dates = Object.keys(days).sort()
   const first = dates[0]
   if (first === undefined) return Math.min(maxWeeks, 12)
-  const elapsed = daysBetween(parseDay(first), today)
+  const elapsed = daysBetween(parseDayKey(first), today)
   return Math.max(4, Math.min(maxWeeks, Math.ceil((elapsed + 1) / 7) + 1))
 }
 
-/** 7 rows (Monday first) by `weeks` columns, oldest left. Cells after today come back empty. */
+/** 7 rows (Sunday first) by `weeks` columns, oldest left. Cells after today come back empty. */
 export function buildHeatmap(
   counts: Record<string, number>,
   weeks: number,
@@ -56,9 +45,13 @@ export function buildHeatmap(
 ): HeatmapCell[][] {
   const cuts = cutPoints(Object.values(counts))
 
-  // Anchored on the Sunday closing this week, so the last column is the week in progress.
-  const mondayIndex = (today.getDay() + 6) % 7
-  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + (6 - mondayIndex))
+  // Anchored on the Saturday closing this week, so the last column is the week
+  // in progress. Weeks run Sunday to Saturday, which is what the row labels say.
+  const end = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate() + (6 - today.getDay())
+  )
   // Calendar arithmetic, never `getTime() - n * DAY_MS`: across a DST change the
   // millisecond form lands on 23:00 the day before and rotates every row by one.
   const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (weeks * 7 - 1))
@@ -86,21 +79,64 @@ export function buildHeatmap(
   return rows
 }
 
-/** Month initial over each column that opens a month. `cellWidth` mirrors the grid's own. */
-export function monthRuler(grid: HeatmapCell[][], weeks: number, cellWidth: number): string {
-  const initials = 'JFMAMJJASOND'
-  const chars: string[] = Array.from({ length: weeks * cellWidth }, () => ' ')
-  let previous = ''
+export interface MonthLabel {
+  /** 0-based calendar month, so the caller can colour the label like its cells. */
+  month: number
+  name: string
+  /** Cell offset from the left edge of the grid where the name starts. */
+  offset: number
+}
+
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+/**
+ * One label per month present in the grid, centred over the columns that month
+ * occupies. `cellWidth` mirrors the grid's own so the offsets are in the same
+ * units the caller pads with.
+ *
+ * A column belongs to the month of its first recorded day: a week straddling a
+ * month boundary has to pick one, and the earlier one is where the column
+ * starts on screen.
+ */
+export function monthLabels(grid: HeatmapCell[][], weeks: number, cellWidth: number): MonthLabel[] {
+  const spans: { end: number; month: number; start: number }[] = []
   for (let column = 0; column < weeks; column++) {
-    const day = grid[0]?.[column]?.day
-    if (day == null || day === '') continue
-    const month = day.slice(5, 7)
-    if (month !== previous) {
-      chars[column * cellWidth] = initials[Number(month) - 1] ?? ' '
-      previous = month
-    }
+    const day = grid.map((row) => row[column]?.day ?? '').find((key) => key !== '')
+    if (day === undefined) continue
+    const month = Number(day.slice(5, 7)) - 1
+    const last = spans.at(-1)
+    if (last !== undefined && last.month === month) last.end = column
+    else spans.push({ end: column, month, start: column })
   }
-  return chars.join('')
+
+  const labels: MonthLabel[] = []
+  let usedUpTo = 0
+  for (const span of spans) {
+    const name = MONTH_NAMES[span.month] ?? ''
+    const rendered = name.length
+    const width = (span.end - span.start + 1) * cellWidth
+    const centred = span.start * cellWidth + Math.floor((width - rendered) / 2)
+    // Never behind the previous label: a narrow leading month would otherwise
+    // centre its name on top of the one before it.
+    const offset = Math.max(usedUpTo, centred)
+    if (offset + rendered > weeks * cellWidth) continue
+    labels.push({ month: span.month, name, offset })
+    usedUpTo = offset + rendered + 1
+  }
+  return labels
 }
 
 export function promptCounts(days: UsageDays): Record<string, number> {
@@ -117,8 +153,6 @@ export interface UsageSummary {
   modelTotal: number
   peakPrompts: number
   promptDays: number
-  /** Days carrying token data — a shorter span than `promptDays` once pruning starts. */
-  tokenDays: number
   tokens: UsageTokens
   totalPrompts: number
 }
@@ -137,7 +171,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
   const branches: Record<string, number> = {}
   let peakPrompts = 0
   let promptDays = 0
-  let tokenDays = 0
   let totalPrompts = 0
 
   for (const day of Object.values(days)) {
@@ -147,7 +180,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
     tokens.output += day.tokens.output
     tokens.total += day.tokens.total
 
-    if (day.tokens.total > 0) tokenDays += 1
     if (day.prompts > 0) {
       promptDays += 1
       totalPrompts += day.prompts
@@ -172,7 +204,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
     modelTotal: rankedModels.total,
     peakPrompts,
     promptDays,
-    tokenDays,
     tokens,
     totalPrompts,
   }
