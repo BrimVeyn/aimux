@@ -15,6 +15,7 @@ import { ListItem } from '../primitives/list-item'
 import { Muted, Rule, Section, TileRow } from '../stats/shared'
 import { SettingsFooter } from './settings-footer'
 import { CONFIG_FILE_MARK, SettingsRow, TOUCHED_MARK } from './settings-row'
+import { SettingsSearchBar } from './settings-search-bar'
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
@@ -197,6 +198,11 @@ export const SettingsView = memo(function SettingsView() {
         flexGrow={1}
         backgroundColor={t.background}
       >
+        {/* Outside the scroll: the way to find a setting should not be a thing
+            you have to scroll back up to. */}
+        <box flexShrink={0} paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD} paddingTop={1}>
+          <SettingsSearchBar width={usable} />
+        </box>
         <scrollbox
           ref={scrollRef}
           scrollY
