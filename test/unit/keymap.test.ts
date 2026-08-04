@@ -244,6 +244,27 @@ describe('mode handlers', () => {
     expect(result.transition).toBe('navigation')
   })
 
+  test('settings: across a row changes its value, return hands over to a field', () => {
+    const handler = requireValue(getHandler('settings'), 'Missing settings handler')
+    // The screen is one list, so `h`/`l` and the arrows are free to mean what
+    // they read like — drag the gauge, step the enum — rather than "change
+    // column". Losing this is losing the only way to set a number without
+    // typing it.
+    for (const [name, delta] of [
+      ['l', 1],
+      ['right', 1],
+      ['h', -1],
+      ['left', -1],
+    ] as const) {
+      const result = requireValue(handler.handleKey(key(name), ctx()), `Expected ${name} result`)
+      expect(`${name}: ${JSON.stringify(result.effects)}`).toBe(
+        `${name}: ${JSON.stringify([{ delta, type: 'adjust-settings-row' }])}`
+      )
+    }
+    const enter = requireValue(handler.handleKey(key('return'), ctx()), 'Expected return result')
+    expect(enter.effects).toEqual([{ type: 'activate-settings-row' }])
+  })
+
   test('modal.theme-picker: return confirms theme', () => {
     const handler = requireValue(
       getHandler('modal.theme-picker.filtering'),

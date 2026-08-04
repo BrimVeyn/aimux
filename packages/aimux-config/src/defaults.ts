@@ -159,19 +159,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     // -----------------------------------------------------------------------
     // Settings screen
     //
-    // `h`/`l` always mean "change column", never "change value": a number row
-    // would otherwise make them ambiguous. Values move on <Space>/<CR> (toggle,
-    // next option) and on -/+ (step a number).
+    // One list, sections included, so every key here moves a single cursor:
+    // `j`/`k` a row, `}`/`{` a section, `/` searches the same list from a
+    // picker.
+    //
+    // The two axes are the whole grammar: across a row changes its value —
+    // `h`/`l`, the arrows and -/+ all drag the gauge, step the enum, set the
+    // checkbox — and <CR> hands over to a field for the value you would rather
+    // type than aim at. Nothing here is a column any more, which is what freed
+    // `h`/`l` to mean what they read like.
     // -----------------------------------------------------------------------
     .mode('settings', (m) =>
       m
         .map('<Esc>', actions.exitSettings, 'Close settings')
         .map('<Leader>,', actions.exitSettings, 'Close settings')
-        .map('h', actions.focusSettingsPane('nav'), 'Sections')
-        .map('<Left>', actions.focusSettingsPane('nav'))
-        .map('l', actions.activateSettingsRow, 'Settings of the section')
-        .map('<Right>', actions.activateSettingsRow)
-        .map('<CR>', actions.activateSettingsRow, 'Change')
+        .map('<CR>', actions.activateSettingsRow, 'Change, or type a value')
         .map('<Space>', actions.activateSettingsRow, 'Change')
         .map('j', actions.moveSettingsSelection(1), 'Next', { repeatable: true })
         .map('k', actions.moveSettingsSelection(-1), 'Prev', { repeatable: true })
@@ -179,8 +181,14 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Up>', actions.moveSettingsSelection(-1), undefined, { repeatable: true })
         .map('<C-n>', actions.moveSettingsSelection(1))
         .map('<C-p>', actions.moveSettingsSelection(-1))
-        .map('+', actions.adjustSettingsRow(1), 'Increase', { repeatable: true })
-        .map('-', actions.adjustSettingsRow(-1), 'Decrease', { repeatable: true })
+        .map('}', actions.jumpSettingsSection(1), 'Next section', { repeatable: true })
+        .map('{', actions.jumpSettingsSection(-1), 'Prev section', { repeatable: true })
+        .map('l', actions.adjustSettingsRow(1), 'Increase', { repeatable: true })
+        .map('<Right>', actions.adjustSettingsRow(1), undefined, { repeatable: true })
+        .map('+', actions.adjustSettingsRow(1), undefined, { repeatable: true })
+        .map('h', actions.adjustSettingsRow(-1), 'Decrease', { repeatable: true })
+        .map('<Left>', actions.adjustSettingsRow(-1), undefined, { repeatable: true })
+        .map('-', actions.adjustSettingsRow(-1), undefined, { repeatable: true })
         .map('r', actions.resetSettingsRow, 'Reset to default')
         .map('/', actions.openSettingsSearch, 'Search settings')
         .map('?', actions.helpModal('settings'), 'Help')

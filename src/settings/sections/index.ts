@@ -44,8 +44,6 @@ export const ALL_SETTING_ROWS: readonly SettingRow[] = SETTING_SECTIONS.flatMap(
   Array.isArray(section.rows) ? section.rows : []
 )
 
-export const DEFAULT_SECTION_ID = SETTING_SECTIONS[0]?.id ?? 'about'
-
 export function getSection(sectionId: string): SettingSection | undefined {
   return SETTING_SECTIONS.find((section) => section.id === sectionId)
 }
@@ -70,18 +68,31 @@ export function sectionRowCount(
   return Array.isArray(section.rows) ? section.rows.length : section.rows(projects).length
 }
 
-/** Rows of the given section, or an empty list when the id is unknown. */
-export function getSectionRows(
-  sectionId: string,
-  projects: readonly ProjectRecord[]
-): readonly SettingRow[] {
-  const section = getSection(sectionId)
-  return section ? sectionRows(section, projects) : []
+/**
+ * How many rows the screen holds in total. The screen is one list, so this is
+ * what clamps its cursor — and like `sectionRowCount`, it counts without
+ * building, which is what keeps the reducer off the disk.
+ */
+export function totalRowCount(projects: readonly ProjectRecord[]): number {
+  let total = 0
+  for (const section of SETTING_SECTIONS) total += sectionRowCount(section, projects)
+  return total
 }
 
-export function getSectionRowCount(sectionId: string, projects: readonly ProjectRecord[]): number {
-  const section = getSection(sectionId)
-  return section ? sectionRowCount(section, projects) : 0
+/**
+ * The flat index of each section's first row, in screen order. What `}` and `{`
+ * jump between, and the reason they can: an empty section contributes no index,
+ * so the cursor never lands on a heading with nothing under it.
+ */
+export function sectionStartIndexes(projects: readonly ProjectRecord[]): number[] {
+  const starts: number[] = []
+  let index = 0
+  for (const section of SETTING_SECTIONS) {
+    const count = sectionRowCount(section, projects)
+    if (count > 0) starts.push(index)
+    index += count
+  }
+  return starts
 }
 
 /** The row with this id, dynamic ones included. */

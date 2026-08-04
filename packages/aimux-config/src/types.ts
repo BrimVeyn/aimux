@@ -582,8 +582,6 @@ export interface MultiRepoState {
 
 /** Where the cursor is in the settings screen — the cursor only, not the values. */
 export interface SettingsUIState {
-  sectionId: string
-  pane: 'nav' | 'rows'
   rowIndex: number
 }
 
@@ -785,9 +783,8 @@ export type UIAction =
 export type SettingsAction =
   | { type: 'enter-settings' }
   | { type: 'exit-settings' }
-  | { type: 'settings-focus-pane'; pane: 'nav' | 'rows' }
   | { type: 'settings-move-selection'; delta: -1 | 1 }
-  | { type: 'settings-select-section'; sectionId: string }
+  | { type: 'settings-jump-section'; delta: -1 | 1 }
   | { type: 'settings-select-row'; rowIndex: number }
   | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }

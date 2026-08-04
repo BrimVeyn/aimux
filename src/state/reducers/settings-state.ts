@@ -1,10 +1,10 @@
 import type { AppAction } from '../actions'
 import type { AppState, SettingsUIState } from '../types'
 
-import { DEFAULT_SECTION_ID, getSectionRowCount, SETTING_SECTIONS } from '../../settings/sections'
+import { sectionStartIndexes, totalRowCount } from '../../settings/sections'
 
 export function emptySettingsUI(): SettingsUIState {
-  return { pane: 'nav', rowIndex: 0, sectionId: DEFAULT_SECTION_ID }
+  return { rowIndex: 0 }
 }
 
 function clamp(value: number, max: number): number {
@@ -12,68 +12,46 @@ function clamp(value: number, max: number): number {
   return Math.max(0, Math.min(max, value))
 }
 
-function withSettings(state: AppState, patch: Partial<SettingsUIState>): AppState {
-  return { ...state, settings: { ...state.settings, ...patch } }
+function withRowIndex(state: AppState, rowIndex: number): AppState {
+  return {
+    ...state,
+    settings: { ...state.settings, rowIndex: clamp(rowIndex, totalRowCount(state.projects) - 1) },
+  }
 }
 
-function moveSelection(state: AppState, delta: -1 | 1): AppState {
-  const { pane, rowIndex, sectionId } = state.settings
-
-  if (pane === 'nav') {
-    const index = SETTING_SECTIONS.findIndex((section) => section.id === sectionId)
-    const next = clamp((index === -1 ? 0 : index) + delta, SETTING_SECTIONS.length - 1)
-    const nextId = SETTING_SECTIONS[next]?.id
-    if (nextId == null || nextId === sectionId) return state
-    // A new section has its own rows, so the row cursor from the old one means
-    // nothing here.
-    return withSettings(state, { rowIndex: 0, sectionId: nextId })
-  }
-
-  return withSettings(state, {
-    rowIndex: clamp(rowIndex + delta, getSectionRowCount(sectionId, state.projects) - 1),
-  })
+/**
+ * The first row of the next section down, or of the one the cursor is already
+ * inside when going up and it is not on its first row — the paragraph motion `}`
+ * and `{` are named after, rather than a plain "section ± 1" that would skip the
+ * heading you were standing under.
+ */
+function jumpSection(state: AppState, delta: -1 | 1): AppState {
+  const starts = sectionStartIndexes(state.projects)
+  const current = state.settings.rowIndex
+  const next =
+    delta === 1
+      ? starts.find((start) => start > current)
+      : starts.filter((start) => start < current).at(-1)
+  if (next === undefined) return state
+  return withRowIndex(state, next)
 }
 
 export function reduceSettingsState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
     case 'enter-settings':
       if (state.focusMode === 'settings') return state
-      // The section is remembered across a close/open within the session; the
-      // cursor inside it is not — reopening lands you at the top of it.
-      return {
-        ...state,
-        focusMode: 'settings',
-        settings: { ...state.settings, pane: 'nav', rowIndex: 0 },
-      }
+      // Reopening lands at the top: the list is one column now, so the top of it
+      // is where the search and the first section both are.
+      return { ...state, focusMode: 'settings', settings: { ...state.settings, rowIndex: 0 } }
     case 'exit-settings':
       if (state.focusMode !== 'settings') return state
       return { ...state, focusMode: 'navigation' }
-    case 'settings-focus-pane': {
-      // A section with no rows has nothing to focus, so `l` stays put rather
-      // than parking the cursor in an empty column.
-      if (
-        action.pane === 'rows' &&
-        getSectionRowCount(state.settings.sectionId, state.projects) === 0
-      ) {
-        return state
-      }
-      return withSettings(state, { pane: action.pane })
-    }
     case 'settings-move-selection':
-      return moveSelection(state, action.delta)
-    case 'settings-select-section':
-      if (action.sectionId === state.settings.sectionId) {
-        return withSettings(state, { pane: 'nav' })
-      }
-      return withSettings(state, { pane: 'nav', rowIndex: 0, sectionId: action.sectionId })
+      return withRowIndex(state, state.settings.rowIndex + action.delta)
+    case 'settings-jump-section':
+      return jumpSection(state, action.delta)
     case 'settings-select-row':
-      return withSettings(state, {
-        pane: 'rows',
-        rowIndex: clamp(
-          action.rowIndex,
-          getSectionRowCount(state.settings.sectionId, state.projects) - 1
-        ),
-      })
+      return withRowIndex(state, action.rowIndex)
     default:
       return null
   }

@@ -6,7 +6,8 @@ import { truncate } from '../../truncate'
 import { type BarShape, buildChart, buildRuler, strideOf } from './chart'
 
 /**
- * The stats screen's building blocks.
+ * The building blocks of a full-screen view — the stats pages, and the settings
+ * screen, which is laid out against the same grid so the two read as one app.
  *
  * Every page is the same grid: a headline row of tiles, a rule, then sections
  * measured against the page's own width rather than against their content. A
@@ -419,6 +420,28 @@ export interface PageTile {
 }
 
 /**
+ * The headline row: equal slots across the page's width, the last one taking
+ * whatever the division left over so the row ends on the page's right edge
+ * rather than a column or two short.
+ */
+export function TileRow({ tiles, usable }: { tiles: PageTile[]; usable: number }) {
+  const tileWidth = Math.floor(usable / Math.max(1, tiles.length))
+  return (
+    <box flexDirection="row" flexShrink={0}>
+      {tiles.map((tile, index) => (
+        <StatTile
+          key={tile.label}
+          glyph={tile.glyph}
+          label={tile.label}
+          value={tile.value}
+          width={index === tiles.length - 1 ? usable - tileWidth * (tiles.length - 1) : tileWidth}
+        />
+      ))}
+    </box>
+  )
+}
+
+/**
  * Every page's frame: the headline row, the rule under it, and the padding they
  * both sit in.
  *
@@ -436,23 +459,9 @@ export function StatsPage({
   tiles: PageTile[]
   usable: number
 }) {
-  const tileWidth = Math.floor(usable / Math.max(1, tiles.length))
-
   return (
     <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-      <box flexDirection="row" flexShrink={0}>
-        {tiles.map((tile, index) => (
-          <StatTile
-            key={tile.label}
-            glyph={tile.glyph}
-            label={tile.label}
-            value={tile.value}
-            // The last slot takes whatever the division left over, so the row
-            // ends on the page's right edge rather than a column or two short.
-            width={index === tiles.length - 1 ? usable - tileWidth * (tiles.length - 1) : tileWidth}
-          />
-        ))}
-      </box>
+      <TileRow tiles={tiles} usable={usable} />
       <box paddingTop={1} paddingBottom={1} flexShrink={0}>
         <Rule width={usable} />
       </box>

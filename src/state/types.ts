@@ -734,9 +734,11 @@ export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] 
  * two of them.
  */
 export interface SettingsUIState {
-  sectionId: string
-  /** Which of the two columns has the keyboard: the section list, or its rows. */
-  pane: 'nav' | 'rows'
+  /**
+   * Where the cursor is in the screen's one list, counted across every section.
+   * The sections are headings in that list, not a column you move into, so this
+   * is the whole of the screen's state.
+   */
   rowIndex: number
 }
 
