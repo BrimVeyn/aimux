@@ -13,6 +13,7 @@ export const ACTIVITY_SPRITES = 'theme.beta.experimentalActivitySprites'
  */
 export const EXPERIMENTAL_SECTION: SettingSection = {
   description: 'Unfinished. These can change behaviour, or go away, in any release.',
+  glyph: '\u{2727}',
   id: 'experimental',
   label: 'Experimental',
   rows: [

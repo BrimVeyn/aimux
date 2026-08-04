@@ -81,7 +81,11 @@ function scale(tokens: UsageTokens, factor: number): UsageTokens {
 export interface CostBreakdown {
   saved: number
   total: number
-  /** Tokens belonging to models with no published rate, so a page can say so. */
+  /**
+   * Tokens `total` does not cover, so a page can say so instead of presenting a
+   * partial sum as the whole bill. Two ways in: a model with no published rate
+   * (every Codex model, today), and tokens no model claimed at all.
+   */
   unpricedTokens: number
 }
 
@@ -104,7 +108,9 @@ export function dayCost(day: UsageDay): CostBreakdown {
   const { total } = day.tokens
   if (total <= 0) return result
 
+  let attributed = 0
   for (const [model, modelTotal] of Object.entries(day.models)) {
+    attributed += modelTotal
     const rate = rateFor(model)
     if (rate === null) {
       result.unpricedTokens += modelTotal
@@ -114,6 +120,13 @@ export function dayCost(day: UsageDay): CostBreakdown {
     result.total += costOf(share, rate)
     result.saved += savedByCache(share, rate)
   }
+
+  // Tokens no model claimed: a Codex transcript whose `model` line never
+  // appeared, or a day whose attribution was pruned out from under its totals.
+  // Unpriced for the same reason a missing rate is — nothing here knows what
+  // they cost — and counting them is what keeps the loop above from silently
+  // dropping a day's tokens out of the accounting altogether.
+  result.unpricedTokens += Math.max(0, total - attributed)
 
   return result
 }

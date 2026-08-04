@@ -791,6 +791,8 @@ export type StatsAction =
   | { type: 'stats-select-page'; pageIndex: number }
   /** Rows, not pixels: the view holds a scroll offset the page applies to its box. */
   | { type: 'stats-scroll'; delta: number }
+  /** The offset the scrollbox actually accepted, sent back so the state cannot run past the page. */
+  | { type: 'stats-scroll-settled'; scrollTop: number }
 
 export interface GitRefreshPayload {
   branch: string | null

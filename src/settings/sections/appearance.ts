@@ -10,6 +10,7 @@ import { getCurrentMode, getCurrentThemeId, getTransparent } from '../../ui/them
  * re-renders them all and these reads never go stale.
  */
 export const APPEARANCE_SECTION: SettingSection = {
+  glyph: '\u{25D1}',
   id: 'appearance',
   label: 'Appearance',
   rows: [

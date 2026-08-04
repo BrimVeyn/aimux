@@ -20,6 +20,7 @@ const SEPARATORS: { value: StatusBarSeparator; label: string }[] = [
  * worse than no row.
  */
 export const STATUS_BAR_SECTION: SettingSection = {
+  glyph: '\u{25AC}',
   id: 'statusBar',
   label: 'Status bar',
   rows: [

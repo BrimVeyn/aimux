@@ -370,24 +370,6 @@ describe('grid presentation', () => {
     for (const name of narrow) expect(name).toHaveLength(3)
   })
 
-  test('decoration widens the spacing, so a swatch cannot collide with the next name', () => {
-    const grid = buildHeatmap({}, 53, new Date(2026, 7, 3))
-    const decoration = 2
-    const labels = monthLabels(grid, 53, 2, decoration)
-
-    for (const [index, label] of labels.entries()) {
-      if (index === 0) continue
-      const previous = labels[index - 1]
-      if (previous === undefined) continue
-      // The caller draws `decoration` extra cells per label; without accounting
-      // for them the gap looks fine here and the swatch lands on the last
-      // letter of the month before it.
-      expect(label.offset).toBeGreaterThanOrEqual(
-        previous.offset + previous.name.length + decoration
-      )
-    }
-  })
-
   test('month labels never overlap each other', () => {
     const grid = buildHeatmap({}, 53, new Date(2026, 7, 3))
     const labels = monthLabels(grid, 53, 3)
@@ -758,6 +740,34 @@ describe('cost', () => {
     // missing from it, so the pages can render the caveat.
     expect(cost.total).toBe(0)
     expect(cost.unpricedTokens).toBe(1_000_000)
+  })
+
+  test('tokens no model claimed are unpriced too, not zero-cost', () => {
+    // A Codex transcript whose `model` line never appeared leaves tokens behind
+    // with no model attached. Iterating `models` alone would price them at
+    // nothing and report nothing missing — the day would just vanish.
+    const target = day(0, 0, {
+      models: {},
+      tokens: { cacheRead: 0, cacheWrite: 0, input: 900, output: 100, total: 1000 },
+    })
+
+    const cost = dayCost(target)
+
+    expect(cost.total).toBe(0)
+    expect(cost.unpricedTokens).toBe(1000)
+  })
+
+  test('a day split between a priced and an unattributed half reports both', () => {
+    const target = day(0, 0, {
+      models: { 'claude-opus-5': 600 },
+      tokens: { cacheRead: 0, cacheWrite: 0, input: 1000, output: 0, total: 1000 },
+    })
+
+    const cost = dayCost(target)
+
+    // 60% of 1000 input tokens at $5/M.
+    expect(cost.total).toBeCloseTo((600 * 5) / 1_000_000, 9)
+    expect(cost.unpricedTokens).toBe(400)
   })
 })
 

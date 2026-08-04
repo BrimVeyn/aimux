@@ -6,6 +6,7 @@ import type { SettingSection } from '../types'
  * take effect before the next launch.
  */
 export const INTEGRATIONS_SECTION: SettingSection = {
+  glyph: '\u{21C4}',
   id: 'integrations',
   label: 'Integrations',
   rows: [

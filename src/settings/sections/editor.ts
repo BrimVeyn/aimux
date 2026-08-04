@@ -11,6 +11,7 @@ const AUTO = 'auto'
  * really need to be.
  */
 export const EDITOR_SECTION: SettingSection = {
+  glyph: '\u{270E}',
   id: 'editor',
   label: 'Editor',
   rows: [

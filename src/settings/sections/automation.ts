@@ -15,6 +15,7 @@ export const AUTO_COMMIT_TIMEOUT = 'autoCommit.timeoutMs'
  * what `restart` puts on the row.
  */
 export const AUTOMATION_SECTION: SettingSection = {
+  glyph: '\u{27F3}',
   id: 'automation',
   label: 'Automation',
   rows: [

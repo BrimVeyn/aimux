@@ -46,6 +46,7 @@ function setupRow(projectId: string, projectName: string): SettingRow {
 }
 
 export const SETUP_SECTION: SettingSection = {
+  glyph: '\u{2726}',
   id: 'setup',
   label: 'Setup',
   rowCount: (projects) => projects.length,

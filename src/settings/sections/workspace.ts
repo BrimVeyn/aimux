@@ -36,6 +36,7 @@ function defaultBaseRefRow(project: ProjectRecord): SettingRow {
 }
 
 export const WORKSPACE_SECTION: SettingSection = {
+  glyph: '\u{2302}',
   id: 'workspace',
   label: 'Workspaces',
   rowCount: (projects) => projects.length,

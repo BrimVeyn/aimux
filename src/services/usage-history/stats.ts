@@ -111,13 +111,7 @@ const MONTH_NAMES = [
  * month boundary has to pick one, and the earlier one is where the column
  * starts on screen.
  */
-export function monthLabels(
-  grid: HeatmapCell[][],
-  weeks: number,
-  cellWidth: number,
-  /** Cells the caller draws around each name — a swatch, a space — so the spacing accounts for them. */
-  decoration = 0
-): MonthLabel[] {
+export function monthLabels(grid: HeatmapCell[][], weeks: number, cellWidth: number): MonthLabel[] {
   const spans: { end: number; month: number; start: number }[] = []
   for (let column = 0; column < weeks; column++) {
     const day = grid.map((row) => row[column]?.day ?? '').find((key) => key !== '')
@@ -132,7 +126,7 @@ export function monthLabels(
   let usedUpTo = 0
   for (const span of spans) {
     const name = MONTH_NAMES[span.month] ?? ''
-    const rendered = name.length + decoration
+    const rendered = name.length
     const width = (span.end - span.start + 1) * cellWidth
     const centred = span.start * cellWidth + Math.floor((width - rendered) / 2)
     // Never behind the previous label: a narrow leading month would otherwise
@@ -159,8 +153,6 @@ export interface UsageSummary {
   modelTotal: number
   peakPrompts: number
   promptDays: number
-  /** Days carrying token data — a shorter span than `promptDays` once pruning starts. */
-  tokenDays: number
   tokens: UsageTokens
   totalPrompts: number
 }
@@ -179,7 +171,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
   const branches: Record<string, number> = {}
   let peakPrompts = 0
   let promptDays = 0
-  let tokenDays = 0
   let totalPrompts = 0
 
   for (const day of Object.values(days)) {
@@ -189,7 +180,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
     tokens.output += day.tokens.output
     tokens.total += day.tokens.total
 
-    if (day.tokens.total > 0) tokenDays += 1
     if (day.prompts > 0) {
       promptDays += 1
       totalPrompts += day.prompts
@@ -214,7 +204,6 @@ export function summarizeDays(days: UsageDays, limit = 6): UsageSummary {
     modelTotal: rankedModels.total,
     peakPrompts,
     promptDays,
-    tokenDays,
     tokens,
     totalPrompts,
   }

@@ -46,6 +46,7 @@ function autoCommitModelRow(assistant: (typeof MODEL_ASSISTANTS)[number]): Setti
 }
 
 export const COMMANDS_SECTION: SettingSection = {
+  glyph: '\u{276F}',
   id: 'commands',
   label: 'Commands',
   rows: [

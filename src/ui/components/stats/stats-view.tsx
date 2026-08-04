@@ -35,12 +35,20 @@ export const StatsView = memo(function StatsView() {
   const page = statsPageAt(stats.pageIndex)
 
   // The reducer owns the offset but cannot know how tall the page renders, so
-  // the scrollbox is what actually bounds it: push the requested offset in and
-  // let it clamp.
+  // the scrollbox is what actually bounds it: push the requested offset in, read
+  // back what it accepted, and tell the reducer. Without the read-back the
+  // offset keeps climbing past the bottom of the page and the way up is a dead
+  // zone as long as the overshoot.
   useEffect(() => {
     const box = scrollRef.current
     if (box === null) return
     box.scrollTop = stats.scrollTop
+    // A box that has not been laid out yet reports no height, and its clamp
+    // would snap every offset to zero. Wait for the frame that measures it.
+    if (box.scrollHeight <= 0) return
+    if (box.scrollTop !== stats.scrollTop) {
+      dispatchGlobal({ scrollTop: box.scrollTop, type: 'stats-scroll-settled' })
+    }
   }, [stats.scrollTop, stats.pageIndex])
 
   const handlePageClick = useCallback((index: number) => {

@@ -4,7 +4,7 @@ import { dayCost, formatUsd } from '../../../services/usage-history/cost'
 import { formatCompact } from '../../format-number'
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
-import { formatClock, formatCount, formatDuration } from './format'
+import { formatClock, formatCount, formatDuration, shortenPath } from './format'
 
 /**
  * Everything recorded about one day, for the readout under the calendar.
@@ -48,15 +48,6 @@ function top(counts: Record<string, number>): { name: string; share: number } | 
   }
   if (best === null || total <= 0) return null
   return { name: best[0], share: Math.round((best[1] / total) * 100) }
-}
-
-/** The last two path segments — `Documents/aimux` says more than `aimux`. */
-function shortenPath(path: string): string {
-  return path
-    .split('/')
-    .filter((part) => part !== '')
-    .slice(-2)
-    .join('/')
 }
 
 /** First prompt to last, and the time actually inside a session — not their gap. */

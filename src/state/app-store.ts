@@ -13,10 +13,16 @@ export interface AppStore extends AppState {
 
 export const appStore = createStore<AppStore>((set) => ({
   ...createInitialState(),
-  // Counting happens here rather than inside the reducers, which stay pure.
+  // Counting happens here rather than inside the reducers, which stay pure —
+  // and after the reducer, on the outcome rather than the intent: an `add-tab`
+  // or a `split-pane` the reducer declines is not a tab or a split, and
+  // counting it would report something that never happened.
   dispatch: (action: AppAction) => {
-    countAction(action)
-    set((state) => appReducer(state, action))
+    set((state) => {
+      const next = appReducer(state, action)
+      if (next !== state) countAction(action)
+      return next
+    })
   },
 }))
 

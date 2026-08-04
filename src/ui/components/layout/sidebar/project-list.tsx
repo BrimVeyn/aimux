@@ -43,6 +43,13 @@ const SETTINGS_GLYPH = '⚙'
  * wide, which pushes this row past a narrow sidebar.
  */
 const STATS_GLYPH = '▤'
+const SETTINGS_LABEL = `${SETTINGS_GLYPH} Settings`
+const STATS_LABEL = `${STATS_GLYPH} Stats`
+/** The two entries and the gap between them, so a renamed label re-measures itself. */
+const FOOTER_GAP = 2
+const FOOTER_FULL_WIDTH = SETTINGS_LABEL.length + FOOTER_GAP + STATS_LABEL.length
+/** The row's own left and right padding. */
+const FOOTER_PAD = 2
 
 interface DragState {
   id: string
@@ -198,10 +205,10 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
   }, [])
 
   const rule = RULE.repeat(Math.max(1, contentWidth))
-  // `⚙ Settings` + a two-column gap + `▤ Stats` needs 19 columns inside the row's
-  // own padding. The bar clamps down to 18 wide, so below that the second entry
-  // drops to its glyph rather than being sliced mid-word by the overflow.
-  const statsLabel = contentWidth - 2 >= 19 ? `${STATS_GLYPH} Stats` : STATS_GLYPH
+  // The bar clamps down to 18 columns, narrower than both labels together, so
+  // below that the second entry drops to its glyph rather than being sliced
+  // mid-word by the overflow.
+  const statsLabel = contentWidth - FOOTER_PAD >= FOOTER_FULL_WIDTH ? STATS_LABEL : STATS_GLYPH
 
   return (
     // Drag and release are handled here, not on the row that started them:
@@ -315,9 +322,9 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           holding both would make the whole footer a single click target. */}
       <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
         <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
-          {`${SETTINGS_GLYPH} Settings`}
+          {SETTINGS_LABEL}
         </text>
-        <box width={2} flexShrink={1} />
+        <box width={FOOTER_GAP} flexShrink={1} />
         <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenStats}>
           {statsLabel}
         </text>

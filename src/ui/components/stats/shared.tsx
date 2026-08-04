@@ -126,8 +126,12 @@ export function Muted({ children }: { children: string }) {
 /**
  * The page's grid: one padding column either side, two content columns, and a
  * three-cell gutter carrying the vertical rule.
+ *
+ * Private on purpose. Every page gets its padding from `StatsPage` and its
+ * widths from `pageLayout`, so there is one place that knows this number and no
+ * way for a page to disagree with the others about it.
  */
-export const PAGE_PAD = 1
+const PAGE_PAD = 1
 /** The spacer, the rule, and the right column's own padding. */
 const GUTTER = 3
 /** Below this the two columns collide, and a collided section is worse than a tall page. */
@@ -140,10 +144,28 @@ export interface Split {
 }
 
 /** The two content columns of `usable`, or one column's worth twice over when narrow. */
-export function splitWidths(usable: number): Split {
+function splitWidths(usable: number): Split {
   const twoUp = usable >= TWO_COLUMN_MIN
   const leftWidth = twoUp ? Math.floor((usable - GUTTER) / 2) : usable
   return { leftWidth, rightWidth: twoUp ? usable - GUTTER - leftWidth : usable, twoUp }
+}
+
+export interface PageLayout {
+  split: Split
+  /** Columns inside the page's own padding — what every section is measured against. */
+  usable: number
+}
+
+/**
+ * The widths a page lays itself out against.
+ *
+ * One function rather than three copies of the same three lines: the pages only
+ * read as one screen for as long as they agree on this arithmetic, and three
+ * copies is three chances to disagree.
+ */
+export function pageLayout(width: number): PageLayout {
+  const usable = Math.max(24, width - PAGE_PAD * 2)
+  return { split: splitWidths(usable), usable }
 }
 
 /** Module scope: a fresh array every render would repaint the divider each frame. */
@@ -238,6 +260,24 @@ export function FactGrid({
   )
 }
 
+export interface StatRecord {
+  label: string
+  value: string
+  /** Blank for a record no single day owns, like a streak or a lifetime total. */
+  when: string
+}
+
+/**
+ * Drops the records that were not set.
+ *
+ * A page lists every record it could hold and marks the ones with nothing behind
+ * them `null`, rather than pushing into an array through a closure: what the
+ * section can contain then reads as one list instead of as a run of `if`s.
+ */
+export function recordsOf(entries: (StatRecord | null)[]): StatRecord[] {
+  return entries.filter((entry): entry is StatRecord => entry !== null)
+}
+
 /**
  * One record: what it is, what it was, and when.
  *
@@ -245,7 +285,7 @@ export function FactGrid({
  * the middle, the page's right edge on the right — so a records section lines up
  * with the bars above it instead of reading as a table someone pasted in.
  */
-export function RecordRow({
+function RecordRow({
   label,
   value,
   when,
@@ -253,7 +293,6 @@ export function RecordRow({
 }: {
   label: string
   value: string
-  /** Blank for a record no single day owns, like a streak or a lifetime total. */
   when: string
   width: number
 }) {
@@ -345,7 +384,7 @@ export function Bar({
  * that: the record is not a target, so the bar would encode a comparison nobody
  * is making and read as progress toward nothing.
  */
-export function StatTile({
+function StatTile({
   glyph,
   label,
   value,
@@ -373,10 +412,60 @@ export function StatTile({
   )
 }
 
-export function TileRow({ children }: { children: ReactNode }) {
+export interface PageTile {
+  glyph: string
+  label: string
+  value: string
+}
+
+/**
+ * Every page's frame: the headline row, the rule under it, and the padding they
+ * both sit in.
+ *
+ * The pages differ in what they measure and agree on how they are laid out, so
+ * the layout lives here. Left to each page, the agreement held only for as long
+ * as nobody edited one of them — which is how the three drifted apart the first
+ * time.
+ */
+export function StatsPage({
+  children,
+  tiles,
+  usable,
+}: {
+  children: ReactNode
+  tiles: PageTile[]
+  usable: number
+}) {
+  const tileWidth = Math.floor(usable / Math.max(1, tiles.length))
+
   return (
-    <box flexDirection="row" flexShrink={0}>
+    <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
+      <box flexDirection="row" flexShrink={0}>
+        {tiles.map((tile, index) => (
+          <StatTile
+            key={tile.label}
+            glyph={tile.glyph}
+            label={tile.label}
+            value={tile.value}
+            // The last slot takes whatever the division left over, so the row
+            // ends on the page's right edge rather than a column or two short.
+            width={index === tiles.length - 1 ? usable - tileWidth * (tiles.length - 1) : tileWidth}
+          />
+        ))}
+      </box>
+      <box paddingTop={1} paddingBottom={1} flexShrink={0}>
+        <Rule width={usable} />
+      </box>
       {children}
+    </box>
+  )
+}
+
+/** A whole page that has nothing to show yet, in the page's own padding. */
+export function PageNotice({ children }: { children: string }) {
+  return (
+    <box paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
+      <Muted>{children}</Muted>
     </box>
   )
 }
@@ -512,5 +601,45 @@ export function BarRow({
         {valueText.padStart(VALUE_WIDTH + slack)}
       </text>
     </box>
+  )
+}
+
+/**
+ * The records a page closes on.
+ *
+ * A records page of its own was mostly empty and every row on it belonged to
+ * data another page already showed, so each page keeps its own — which only
+ * works if they all draw it the same way.
+ */
+export function RecordsSection({
+  empty,
+  records,
+  width,
+}: {
+  empty: string
+  records: StatRecord[]
+  width: number
+}) {
+  return (
+    <Section
+      glyph={GLYPH.records}
+      title="Records"
+      note={records.length === 0 ? '' : `${records.length} set`}
+      width={width}
+    >
+      {records.length === 0 ? (
+        <Muted>{empty}</Muted>
+      ) : (
+        records.map((record) => (
+          <RecordRow
+            key={record.label}
+            label={record.label}
+            value={record.value}
+            when={record.when}
+            width={width}
+          />
+        ))
+      )}
+    </Section>
   )
 }

@@ -45,8 +45,9 @@ export function flushCounters(now = Date.now()): void {
   if (elapsed > 0) deltas.uptimeMs = (deltas.uptimeMs ?? 0) + elapsed
   const maxima: MaxCounters = { longestRunMs: now - runStartMs }
 
-  const hasWork = Object.values(deltas).some((value) => value !== 0)
-  if (!hasWork && elapsed === 0) return
+  // `elapsed` is already folded into `deltas` above, so this covers the idle
+  // case too: nothing pending and no time accrued means nothing to write.
+  if (!Object.values(deltas).some((value) => value !== 0)) return
 
   if (saveCounters(todayKey(new Date(now)), deltas, maxima)) {
     pending = {}

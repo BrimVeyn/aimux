@@ -40,9 +40,16 @@ export function reduceStatsState(state: AppState, action: AppAction): AppState |
     }
     case 'stats-scroll':
       // No upper clamp here: the reducer does not know how tall the rendered
-      // page is. The scrollbox is what actually bounds it, and the view feeds
-      // the clamped value back.
+      // page is. The scrollbox is what bounds it, and `stats-scroll-settled`
+      // brings its answer back — without that round trip this offset climbs for
+      // as long as the key is held and the way back up is a dead zone the same
+      // length.
       return withStats(state, { scrollTop: Math.max(0, state.stats.scrollTop + action.delta) })
+    case 'stats-scroll-settled': {
+      const scrollTop = Math.max(0, action.scrollTop)
+      if (scrollTop === state.stats.scrollTop) return state
+      return withStats(state, { scrollTop })
+    }
     default:
       return null
   }

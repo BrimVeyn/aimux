@@ -14,18 +14,18 @@ import {
 import { summarizeDays } from '../../../services/usage-history/stats'
 import { formatCompact } from '../../format-number'
 import { chartColumns } from './chart'
-import { formatCount, formatDayLabel, formatDuration, weeklyLabels } from './format'
+import { formatCount, formatDayLabel, formatDuration, shortenPath, weeklyLabels } from './format'
 import {
   BarRow,
   GLYPH,
   Muted,
-  PAGE_PAD,
-  RecordRow,
-  Rule,
+  pageLayout,
+  PageNotice,
+  type PageTile,
+  recordsOf,
+  RecordsSection,
   Section,
-  splitWidths,
-  StatTile,
-  TileRow,
+  StatsPage,
   TwoColumn,
   VBarChart,
 } from './shared'
@@ -56,18 +56,27 @@ function medianLabel(count: number, medianMs: number): string {
   return medianMs <= 0 ? '< 1 min' : formatDuration(medianMs)
 }
 
-/** The last two path segments — `Documents/aimux` says more than `aimux` and still fits. */
-function shortenPath(path: string): string {
-  return path
-    .split('/')
-    .filter((part) => part !== '')
-    .slice(-2)
-    .join('/')
+function projectTiles(
+  projects: number,
+  branches: number,
+  sessions: number,
+  typical: string
+): PageTile[] {
+  return [
+    { glyph: GLYPH.projects, label: 'Projects', value: formatCount(projects) },
+    { glyph: GLYPH.branches, label: 'Branches', value: formatCount(branches) },
+    { glyph: GLYPH.sessions, label: 'Sessions', value: formatCount(sessions) },
+    { glyph: GLYPH.clock, label: 'Typical', value: typical },
+  ]
 }
 
 export function ProjectsPage({ data, width }: { data: StatsData; width: number }) {
-  const usable = Math.max(24, width - PAGE_PAD * 2)
-  const split = splitWidths(usable)
+  // First, before the derivations it would make pointless.
+  if (isEmpty(data.claude)) {
+    return <PageNotice>no history yet — the first rollup runs in the background</PageNotice>
+  }
+
+  const { split, usable } = pageLayout(width)
   const { leftWidth, rightWidth } = split
 
   const projects = projectTotals(data.claude, 8)
@@ -98,43 +107,49 @@ export function ProjectsPage({ data, width }: { data: StatsData; width: number }
   const lateNight = lateNightPrompts(data.claude)
 
   // Only records that exist. A row of `—` teaches nothing and reads as broken.
-  const records: [string, string, string][] = []
-  const record = (label: string, value: string, when: string): void => {
-    records.push([label, value, when])
-  }
-  if (busiest.value > 0) {
-    record('Busiest day', `${formatCount(busiest.value)} prompts`, formatDayLabel(busiest.day))
-  }
-  if (streak.longest > 0) record('Longest streak', `${streak.longest} days`, '')
-  if (sessions.longestMs > 0) {
-    record(
-      'Longest session',
-      formatDuration(sessions.longestMs),
-      formatDayLabel(sessions.longestDay)
-    )
-  }
-  if (richest.value > 0) {
-    record('Most tokens', `${formatCompact(richest.value)} in a day`, formatDayLabel(richest.day))
-  }
-  if (priciest.value > 0) {
-    record('Priciest day', `${formatUsd(priciest.value)} est.`, formatDayLabel(priciest.day))
-  }
-  if (promptChars.max > 0) {
-    record('Longest prompt', `${formatCount(promptChars.max)} chars`, '')
-  }
-  if (lateNight > 0) {
-    record('Late nights', `${formatCount(lateNight)} prompts`, 'between 02:00 and 05:00')
-  }
-
-  const tileWidth = Math.floor(usable / 4)
-
-  if (isEmpty(data.claude)) {
-    return (
-      <box paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-        <Muted>no history yet — the first rollup runs in the background</Muted>
-      </box>
-    )
-  }
+  const records = recordsOf([
+    busiest.value === 0
+      ? null
+      : {
+          label: 'Busiest day',
+          value: `${formatCount(busiest.value)} prompts`,
+          when: formatDayLabel(busiest.day),
+        },
+    streak.longest === 0
+      ? null
+      : { label: 'Longest streak', value: `${streak.longest} days`, when: '' },
+    sessions.longestMs === 0
+      ? null
+      : {
+          label: 'Longest session',
+          value: formatDuration(sessions.longestMs),
+          when: formatDayLabel(sessions.longestDay),
+        },
+    richest.value === 0
+      ? null
+      : {
+          label: 'Most tokens',
+          value: `${formatCompact(richest.value)} in a day`,
+          when: formatDayLabel(richest.day),
+        },
+    priciest.value === 0
+      ? null
+      : {
+          label: 'Priciest day',
+          value: `${formatUsd(priciest.value)} est.`,
+          when: formatDayLabel(priciest.day),
+        },
+    promptChars.max === 0
+      ? null
+      : { label: 'Longest prompt', value: `${formatCount(promptChars.max)} chars`, when: '' },
+    lateNight === 0
+      ? null
+      : {
+          label: 'Late nights',
+          value: `${formatCount(lateNight)} prompts`,
+          when: 'between 02:00 and 05:00',
+        },
+  ])
 
   const left = (
     <>
@@ -254,57 +269,25 @@ export function ProjectsPage({ data, width }: { data: StatsData; width: number }
   )
 
   return (
-    <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-      <TileRow>
-        <StatTile
-          glyph={GLYPH.projects}
-          label="Projects"
-          value={formatCount(projects.entries.length)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.branches}
-          label="Branches"
-          value={formatCount(summary.branches.length)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.sessions}
-          label="Sessions"
-          value={formatCount(sessions.count)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.clock}
-          label="Typical"
-          value={medianLabel(sessions.count, sessions.medianMs)}
-          width={usable - tileWidth * 3}
-        />
-      </TileRow>
-
-      <box paddingTop={1} paddingBottom={1} flexShrink={0}>
-        <Rule width={usable} />
-      </box>
-
+    <StatsPage
+      tiles={projectTiles(
+        projects.entries.length,
+        summary.branches.length,
+        sessions.count,
+        medianLabel(sessions.count, sessions.medianMs)
+      )}
+      usable={usable}
+    >
       <TwoColumn split={split}>
         {left}
         {right}
       </TwoColumn>
 
-      <Section
-        glyph={GLYPH.records}
-        title="Records"
-        note={records.length === 0 ? '' : `${records.length} set`}
+      <RecordsSection
+        empty="nothing to beat yet — records appear as history accumulates"
+        records={records}
         width={usable}
-      >
-        {records.length === 0 ? (
-          <Muted>nothing to beat yet — records appear as history accumulates</Muted>
-        ) : (
-          records.map(([label, value, when]) => (
-            <RecordRow key={label} label={label} value={value} when={when} width={usable} />
-          ))
-        )}
-      </Section>
-    </box>
+      />
+    </StatsPage>
   )
 }

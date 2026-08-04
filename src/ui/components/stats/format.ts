@@ -48,6 +48,15 @@ export function formatClock(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes % MINUTES_IN_HOUR).padStart(2, '0')}`
 }
 
+/** The last two path segments — `Documents/aimux` says more than `aimux` and still fits. */
+export function shortenPath(path: string): string {
+  return path
+    .split('/')
+    .filter((part) => part !== '')
+    .slice(-2)
+    .join('/')
+}
+
 /** `2026-03-14` as `Mar 14`. Empty in, empty out — a record with no day shows none. */
 export function formatDayLabel(key: string): string {
   if (key === '') return ''

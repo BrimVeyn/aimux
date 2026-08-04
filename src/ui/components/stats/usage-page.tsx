@@ -1,4 +1,4 @@
-import { formatUsd, totalCost } from '../../../services/usage-history/cost'
+import { dayCost, formatUsd, totalCost } from '../../../services/usage-history/cost'
 import {
   daysBetween,
   hourTotals,
@@ -18,12 +18,10 @@ import {
   BarRow,
   GLYPH,
   Muted,
-  PAGE_PAD,
-  Rule,
+  pageLayout,
+  type PageTile,
   Section,
-  splitWidths,
-  StatTile,
-  TileRow,
+  StatsPage,
   TwoColumn,
   VBarChart,
 } from './shared'
@@ -66,37 +64,41 @@ function modelLabel(model: string): string {
   return model.replace(/^claude-/, '').replace(/-\d{8}$/, '')
 }
 
-/** Tokens and notional cost per day over the last `span` recorded days. */
+/** Notional cost per day over the last `span` recorded days. */
 function recentBurn(data: StatsData, span = 7): { cost: number; days: number } {
   let cost = 0
   let days = 0
   for (const [key, day] of Object.entries(data.claude)) {
     if (daysBetween(parseDayKey(key), data.todayDate) >= span) continue
     days += 1
-    cost += totalCost({ [key]: day }).total
+    cost += dayCost(day).total
   }
   return { cost: days === 0 ? 0 : cost / days, days }
 }
 
-function monthToDate(data: StatsData): { cost: number; elapsed: number; inMonth: number } {
+function monthCost(data: StatsData): number {
   const prefix = data.today.slice(0, 7)
   let cost = 0
   for (const [key, day] of Object.entries(data.claude)) {
-    if (key.startsWith(prefix)) cost += totalCost({ [key]: day }).total
+    if (key.startsWith(prefix)) cost += dayCost(day).total
   }
-  return {
-    cost,
-    elapsed: data.todayDate.getDate(),
-    inMonth: new Date(data.todayDate.getFullYear(), data.todayDate.getMonth() + 1, 0).getDate(),
-  }
+  return cost
+}
+
+function usageTiles(prompts: number, perDay: number, streak: number, month: number): PageTile[] {
+  return [
+    { glyph: GLYPH.calendar, label: 'Prompts', value: formatCount(prompts) },
+    { glyph: GLYPH.clock, label: 'Per day', value: formatCount(perDay) },
+    { glyph: GLYPH.streak, label: 'Streak', value: `${streak}d` },
+    { glyph: GLYPH.cost, label: 'Month', value: `${formatUsd(month)} est.` },
+  ]
 }
 
 export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const ramp = useHeatmapRamp()
   const now = new Date()
 
-  const usable = Math.max(24, width - PAGE_PAD * 2)
-  const split = splitWidths(usable)
+  const { split, usable } = pageLayout(width)
   const { leftWidth, rightWidth } = split
 
   const summary = summarizeDays(data.claude)
@@ -108,7 +110,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
 
   const claudeCost = totalCost(data.claude)
   const codexCost = totalCost(data.codex)
-  const month = monthToDate(data)
+  const month = monthCost(data)
   const burn = recentBurn(data)
 
   const average =
@@ -128,8 +130,8 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const dailyTokens = lastDays(data.claude, chartDays, data.todayDate, (day) => day.tokens.total)
   const chartLabels = weeklyLabels(chartDays, data.todayDate)
 
-  const tileWidth = Math.floor(usable / 4)
   const hasHistory = !isEmpty(data.claude)
+  const tiles = usageTiles(summary.totalPrompts, average, streak.current, month)
 
   // The calendar facts, as one muted line rather than a table: nobody reads
   // "busiest day" against "longest gap", they just want to know each.
@@ -142,11 +144,15 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
     .filter((part) => part !== '')
     .join(' \u{00B7} ')
 
+  // Both tools, and what the estimate does not cover. Every Codex model is
+  // unpriced today, so reporting its cost as `$0.00` would present the absence
+  // of a published rate as a measurement of zero.
+  const unpriced = claudeCost.unpricedTokens + codexCost.unpricedTokens
   const costFacts = [
-    `${formatCompact(summary.tokens.total)} tokens`,
+    `${formatCompact(summary.tokens.total + codexSummary.tokens.total)} tokens`,
     `${formatUsd(claudeCost.total + codexCost.total)} estimated`,
     `${formatUsd(claudeCost.saved + codexCost.saved)} saved by cache`,
-    codexSummary.tokens.total > 0 ? `codex ${formatUsd(codexCost.total)}` : '',
+    unpriced === 0 ? '' : `${formatCompact(unpriced)} at no published price`,
     'not metered',
   ]
     .filter((part) => part !== '')
@@ -234,38 +240,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   )
 
   return (
-    <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-      <TileRow>
-        <StatTile
-          glyph={GLYPH.calendar}
-          label="Prompts"
-          value={formatCount(summary.totalPrompts)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.clock}
-          label="Per day"
-          value={formatCount(average)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.streak}
-          label="Streak"
-          value={`${streak.current}d`}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.cost}
-          label="Month"
-          value={`${formatUsd(month.cost)} est.`}
-          width={usable - tileWidth * 3}
-        />
-      </TileRow>
-
-      <box paddingTop={1} paddingBottom={1} flexShrink={0}>
-        <Rule width={usable} />
-      </box>
-
+    <StatsPage tiles={tiles} usable={usable}>
       {hasHistory ? (
         <Section
           glyph={GLYPH.calendar}
@@ -310,6 +285,6 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
           <Muted>{costFacts}</Muted>
         </Section>
       ) : null}
-    </box>
+    </StatsPage>
   )
 }

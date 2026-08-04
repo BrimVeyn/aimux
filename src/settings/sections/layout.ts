@@ -10,6 +10,7 @@ import { dispatchGlobal } from '../../state/dispatch-ref'
  * value it already has.
  */
 export const LAYOUT_SECTION: SettingSection = {
+  glyph: '\u{25A6}',
   id: 'layout',
   label: 'Layout',
   rows: [

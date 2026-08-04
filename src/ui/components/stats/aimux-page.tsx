@@ -21,13 +21,13 @@ import {
   FactGrid,
   GLYPH,
   Muted,
-  PAGE_PAD,
-  RecordRow,
-  Rule,
+  pageLayout,
+  PageNotice,
+  type PageTile,
+  recordsOf,
+  RecordsSection,
   Section,
-  splitWidths,
-  StatTile,
-  TileRow,
+  StatsPage,
   TwoColumn,
   VBarChart,
 } from './shared'
@@ -83,11 +83,26 @@ function builtFacts(counters: CounterDays): [string, string][] {
   ]
 }
 
+function aimuxTiles(uptimeMs: number, keys: number, runs: number): PageTile[] {
+  return [
+    { glyph: GLYPH.clock, label: 'In aimux', value: formatSpan(uptimeMs) },
+    { glyph: GLYPH.keyboard, label: 'Keys', value: formatCount(keys) },
+    { glyph: GLYPH.distance, label: 'Distance', value: formatFingerDistance(keys) },
+    { glyph: GLYPH.aimux, label: 'Runs', value: formatCount(runs) },
+  ]
+}
+
 export function AimuxPage({ data, width }: { data: StatsData; width: number }) {
   const { counters, today, todayDate } = data
 
-  const usable = Math.max(24, width - PAGE_PAD * 2)
-  const split = splitWidths(usable)
+  // First, before the derivations it would make pointless.
+  if (Object.keys(counters).length === 0) {
+    return (
+      <PageNotice>nothing counted yet — this starts the first time aimux runs with it</PageNotice>
+    )
+  }
+
+  const { split, usable } = pageLayout(width)
   const { leftWidth, rightWidth } = split
 
   const uptime = summarizeCounter(counters, 'uptimeMs', today)
@@ -107,35 +122,43 @@ export function AimuxPage({ data, width }: { data: StatsData; width: number }) {
   const built = builtFacts(counters)
 
   // Only records that exist. A row of `—` teaches nothing and reads as broken.
-  const records: [string, string, string][] = []
-  const record = (label: string, value: string, when: string): void => {
-    records.push([label, value, when])
-  }
-  if (longestRun.value > 0) {
-    record('Longest run', formatDuration(longestRun.value), formatDayLabel(longestRun.day))
-  }
-  if (uptime.best.value > 0) {
-    record('Longest day', formatDuration(uptime.best.value), formatDayLabel(uptime.best.day))
-  }
-  if (keys.best.value > 0) {
-    record('Most keystrokes', formatCount(keys.best.value), formatDayLabel(keys.best.day))
-  }
-  if (tabs.best.value > 0) {
-    record('Most tabs', `${formatCount(tabs.best.value)} opened`, formatDayLabel(tabs.best.day))
-  }
-  if (keys.total > 0) {
-    record('Finger mileage', formatFingerDistance(keys.total), 'at 0.8 mm a key')
-  }
-
-  const tileWidth = Math.floor(usable / 4)
-
-  if (Object.keys(counters).length === 0) {
-    return (
-      <box paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-        <Muted>nothing counted yet — this starts the first time aimux runs with it</Muted>
-      </box>
-    )
-  }
+  const records = recordsOf([
+    longestRun.value === 0
+      ? null
+      : {
+          label: 'Longest run',
+          value: formatDuration(longestRun.value),
+          when: formatDayLabel(longestRun.day),
+        },
+    uptime.best.value === 0
+      ? null
+      : {
+          label: 'Longest day',
+          value: formatDuration(uptime.best.value),
+          when: formatDayLabel(uptime.best.day),
+        },
+    keys.best.value === 0
+      ? null
+      : {
+          label: 'Most keystrokes',
+          value: formatCount(keys.best.value),
+          when: formatDayLabel(keys.best.day),
+        },
+    tabs.best.value === 0
+      ? null
+      : {
+          label: 'Most tabs',
+          value: `${formatCount(tabs.best.value)} opened`,
+          when: formatDayLabel(tabs.best.day),
+        },
+    keys.total === 0
+      ? null
+      : {
+          label: 'Finger mileage',
+          value: formatFingerDistance(keys.total),
+          when: 'at 0.8 mm a key',
+        },
+  ])
 
   const left = (
     <Section
@@ -198,38 +221,10 @@ export function AimuxPage({ data, width }: { data: StatsData; width: number }) {
   )
 
   return (
-    <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
-      <TileRow>
-        <StatTile
-          glyph={GLYPH.clock}
-          label="In aimux"
-          value={formatSpan(uptime.total)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.keyboard}
-          label="Keys"
-          value={formatCount(keys.total)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.distance}
-          label="Distance"
-          value={formatFingerDistance(keys.total)}
-          width={tileWidth}
-        />
-        <StatTile
-          glyph={GLYPH.aimux}
-          label="Runs"
-          value={formatCount(sumOf(counters, 'runsStarted'))}
-          width={usable - tileWidth * 3}
-        />
-      </TileRow>
-
-      <box paddingTop={1} paddingBottom={1} flexShrink={0}>
-        <Rule width={usable} />
-      </box>
-
+    <StatsPage
+      tiles={aimuxTiles(uptime.total, keys.total, sumOf(counters, 'runsStarted'))}
+      usable={usable}
+    >
       <TwoColumn split={split}>
         {left}
         {right}
@@ -239,23 +234,12 @@ export function AimuxPage({ data, width }: { data: StatsData; width: number }) {
         <FactGrid columns={split.twoUp ? 2 : 1} facts={built} width={usable} />
       </Section>
 
-      <Section
-        glyph={GLYPH.records}
-        title="Records"
-        note={records.length === 0 ? '' : `${records.length} set`}
+      <RecordsSection
+        empty="nothing to beat yet — records appear as aimux is used"
+        records={records}
         width={usable}
-      >
-        {records.length === 0 ? (
-          <Muted>nothing to beat yet — records appear as aimux is used</Muted>
-        ) : (
-          records.map(([label, value, when]) => (
-            <RecordRow key={label} label={label} value={value} when={when} width={usable} />
-          ))
-        )}
-        <box paddingTop={1} flexShrink={0}>
-          <Muted>A count and nothing else — no key identity is recorded.</Muted>
-        </box>
-      </Section>
-    </box>
+      />
+      <Muted>A count and nothing else — no key identity is recorded.</Muted>
+    </StatsPage>
   )
 }
