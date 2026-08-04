@@ -47,22 +47,22 @@ test('nothing matches nothing', () => {
   expect(ids('zzzznope')).toEqual([])
 })
 
-test('a hit knows where it lives, in that section own numbering', () => {
+test('a hit knows where it lives, in the screen own numbering', () => {
   const hit = filterSettingRows(PROJECTS, 'prefetchRadius')[0]
   if (!hit) throw new Error('expected a hit')
 
   expect(hit.sectionId).toBe('git')
-  // The index is within its section, because that is what the cursor holds.
+  // The index counts every row of every section, because that is what the
+  // cursor holds — so jumping to a result is the index it already carries.
   const state = { ...createInitialState(), projects: PROJECTS }
-  const jumped = appReducer(
-    appReducer(appReducer(state, { type: 'enter-settings' }), {
-      sectionId: hit.sectionId,
-      type: 'settings-select-section',
-    }),
-    { rowIndex: hit.rowIndex, type: 'settings-select-row' }
-  )
-  expect(jumped.settings.sectionId).toBe('git')
+  const jumped = appReducer(appReducer(state, { type: 'enter-settings' }), {
+    rowIndex: hit.rowIndex,
+    type: 'settings-select-row',
+  })
   expect(jumped.settings.rowIndex).toBe(hit.rowIndex)
+  expect(filterSettingRows(PROJECTS, null)[jumped.settings.rowIndex]?.row.id).toBe(
+    'git.prefetchRadius'
+  )
 })
 
 test('rows built from the projects are searchable too', () => {

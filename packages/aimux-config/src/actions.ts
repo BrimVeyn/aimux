@@ -970,12 +970,13 @@ export function scrollStats(delta: number): KeyResult {
   return r([{ delta, type: 'stats-scroll' }])
 }
 
-export function focusSettingsPane(pane: 'nav' | 'rows'): KeyResult {
-  return r([{ pane, type: 'settings-focus-pane' }])
-}
-
 export function moveSettingsSelection(delta: -1 | 1): KeyResult {
   return r([{ delta, type: 'settings-move-selection' }])
+}
+
+/** To the first row of the next section, the way `}` moves by paragraph. */
+export function jumpSettingsSection(delta: -1 | 1): KeyResult {
+  return r([{ delta, type: 'settings-jump-section' }])
 }
 
 /**
@@ -983,10 +984,7 @@ export function moveSettingsSelection(delta: -1 | 1): KeyResult {
  * whatever the row does. Which one is the row's business, not the keymap's — so
  * there is no per-kind binding to keep in sync with the schema.
  */
-export const activateSettingsRow: ActionFn = (ctx: ModeContext) => {
-  if (ctx.state.settings.pane !== 'rows') return r([{ pane: 'rows', type: 'settings-focus-pane' }])
-  return r([], [{ type: 'activate-settings-row' }])
-}
+export const activateSettingsRow: KeyResult = r([], [{ type: 'activate-settings-row' }])
 
 export function adjustSettingsRow(delta: 1 | -1): KeyResult {
   return r([], [{ delta, type: 'adjust-settings-row' }])

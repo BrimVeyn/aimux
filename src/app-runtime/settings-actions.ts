@@ -3,7 +3,7 @@ import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
 import { filterSettingRows } from '../settings/search'
-import { findSettingRow, getSectionRows } from '../settings/sections'
+import { findSettingRow } from '../settings/sections'
 import { readRow, resetRow, settingsStore, writeRow } from '../settings/settings-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { toast } from '../state/toast-store'
@@ -30,14 +30,20 @@ function nextOptionValue(
   return options[(index + delta + size) % size]?.value
 }
 
+/**
+ * One press, one step. Deliberately not a fraction of the range: every number
+ * row here crosses its own range in under sixty presses, because each declares
+ * a `step` scaled to what it measures — so a "drag the gauge" stride would be
+ * arithmetic wrapped around a number the row already got right.
+ */
 function nextNumberValue(
   row: Extract<SettingRow, { kind: 'number' }>,
   current: SettingValue,
   delta: 1 | -1
 ): number {
   const base = typeof current === 'number' ? current : row.min
-  // Clamped, never wrapped: `-`/`+` name a direction, and holding + on a width
-  // until it snaps to the narrowest is not what anyone meant.
+  // Clamped, never wrapped: a direction is a direction, and holding `l` on a
+  // width until it snaps to the narrowest is not what anyone meant.
   return Math.min(row.max, Math.max(row.min, round(base + delta * row.step)))
 }
 
@@ -56,15 +62,22 @@ function readCtx(state: AppState): SettingCtx {
 }
 
 /**
+ * The row under the cursor. Unfiltered, because the cursor counts every row on
+ * the screen — the same list `filterSettingRows` numbers its hits against.
+ */
+function selectedRow(state: AppState): SettingRow | undefined {
+  if (state.focusMode !== 'settings') return undefined
+  return filterSettingRows(state.projects, null)[state.settings.rowIndex]?.row
+}
+
+/**
  * One entry point for every kind of row. `delta` is the direction asked for
  * (`-`/`+`); without it the row advances the way activating it should — a toggle
  * flips, an enum steps forward, a number steps up, a text field opens.
  */
 export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1): void {
   const state = runtime.getState()
-  if (state.focusMode !== 'settings' || state.settings.pane !== 'rows') return
-
-  const row = getSectionRows(state.settings.sectionId, state.projects)[state.settings.rowIndex]
+  const row = selectedRow(state)
   if (!row || row.kind === 'info') return
 
   const ctx = readCtx(state)
@@ -102,9 +115,10 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
 }
 
 /**
- * Move the screen's cursor onto the setting the search had highlighted, wherever
- * it turned out to live. The list is recomputed from the same filter the picker
- * drew, so the index still means what it meant.
+ * Move the screen's cursor onto the setting the search had highlighted. The hit
+ * carries its position in the screen's list, so there is nothing to look up —
+ * and the list is recomputed from the same filter the picker drew, so the index
+ * still means what it meant.
  */
 export function confirmSettingsSearch(runtime: SettingsContext): void {
   const state = runtime.getState()
@@ -112,15 +126,12 @@ export function confirmSettingsSearch(runtime: SettingsContext): void {
   const hit = filterSettingRows(state.projects, state.modal.editBuffer)[state.modal.selectedIndex]
   dispatchGlobal({ type: 'close-modal' })
   if (!hit) return
-  dispatchGlobal({ sectionId: hit.sectionId, type: 'settings-select-section' })
   dispatchGlobal({ rowIndex: hit.rowIndex, type: 'settings-select-row' })
 }
 
 /** Puts the selected row back to what it would be if this screen had never run. */
 export function resetSelectedSetting(runtime: SettingsContext): void {
-  const state = runtime.getState()
-  if (state.focusMode !== 'settings' || state.settings.pane !== 'rows') return
-  const row = getSectionRows(state.settings.sectionId, state.projects)[state.settings.rowIndex]
+  const row = selectedRow(runtime.getState())
   if (row) resetRow(row)
 }
 

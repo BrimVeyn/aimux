@@ -5,6 +5,7 @@ import type { SettingRow, SettingValue } from '../../../settings/types'
 import { readRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
 import { type ResolvedTuiTheme, useTheme } from '../../theme'
+import { truncate } from '../../truncate'
 
 /** Filled means on. Both are one cell wide in a Latin-width terminal. */
 const ON = '●'
@@ -51,11 +52,17 @@ export function describeValue(row: SettingRow, value: SettingValue): string {
   }
 }
 
+/**
+ * Text wears text tokens, the way it does on the stats screen — a value is not a
+ * status. The two exceptions earn it: a toggle whose colour *is* its state, and
+ * an action row, where the colour is the affordance saying it does something.
+ */
 function valueColor(row: SettingRow, value: SettingValue, t: ResolvedTuiTheme): string {
   // A toggle is read at a glance or not at all, so its state is the colour as much
   // as the glyph: lit when on, as quiet as the rest of the row when off.
   if (row.kind === 'toggle') return value === true ? t.success : t.textMuted
-  return row.kind === 'info' ? t.textMuted : t.primary
+  if (row.kind === 'action') return t.primary
+  return row.kind === 'info' ? t.textMuted : t.text
 }
 
 /**
@@ -66,9 +73,21 @@ function valueColor(row: SettingRow, value: SettingValue, t: ResolvedTuiTheme): 
  * renders nothing. A parent subscribing to the whole store for every row in the
  * list would repaint it at the rate the terminals print.
  */
-export const RowValue = memo(function RowValue({ row }: { row: SettingRow }) {
+export const RowValue = memo(function RowValue({
+  maxWidth,
+  row,
+}: {
+  /** Cropped rather than wrapped: a row that grows a line shifts the list. */
+  maxWidth?: number
+  row: SettingRow
+}) {
   const t = useTheme()
   const values = useSettingsStore((s) => s.values)
   const value = useAppStore((s) => readRow(row, { state: s, values }))
-  return <text fg={valueColor(row, value, t)}>{formatValue(row, value)}</text>
+  const text = formatValue(row, value)
+  return (
+    <text fg={valueColor(row, value, t)} wrapMode="none">
+      {maxWidth === undefined ? text : truncate(text, maxWidth)}
+    </text>
+  )
 })

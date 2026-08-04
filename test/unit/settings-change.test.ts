@@ -8,7 +8,8 @@ import type { AppState } from '../../src/state/types'
 
 import { changeSelectedSetting } from '../../src/app-runtime/settings-actions'
 import { getConfigPath } from '../../src/config'
-import { ALL_SETTING_ROWS, getSectionRows } from '../../src/settings/sections'
+import { filterSettingRows } from '../../src/settings/search'
+import { ALL_SETTING_ROWS } from '../../src/settings/sections'
 import { hydrateSettings, settingsStore } from '../../src/settings/settings-store'
 import { appReducer, createInitialState } from '../../src/state/store'
 
@@ -18,19 +19,17 @@ const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
 const STATE = createInitialState()
-const SEPARATOR_ROW = getSectionRows('statusBar', STATE.projects).find(
-  (row) => row.id === SEPARATOR_ID
-)
-const SEPARATOR_INDEX = getSectionRows('statusBar', STATE.projects).findIndex(
-  (row) => row.id === SEPARATOR_ID
-)
+/** Where the row sits in the screen's one list, which is what the cursor holds. */
+const ROWS = filterSettingRows(STATE.projects, null)
+const SEPARATOR_INDEX = ROWS.findIndex((hit) => hit.row.id === SEPARATOR_ID)
+const SEPARATOR_ROW = ROWS[SEPARATOR_INDEX]?.row
 if (!SEPARATOR_ROW || SEPARATOR_ROW.kind !== 'select') {
   throw new Error('expected a select row for the status bar separator')
 }
 const OPTIONS = SEPARATOR_ROW.options.map((option) => option.value)
 
 /** A state parked on the separator row, which is what the effect reads. */
-function onSeparatorRow(pane: 'nav' | 'rows' = 'rows'): AppState {
+function onSeparatorRow(): AppState {
   const home = mkdtempSync(join(tmpdir(), 'aimux-settings-change-'))
   dirs.push(home)
   process.env.HOME = home
@@ -39,10 +38,7 @@ function onSeparatorRow(pane: 'nav' | 'rows' = 'rows'): AppState {
   hydrateSettings(ALL_SETTING_ROWS, {})
 
   const base = appReducer(createInitialState(), { type: 'enter-settings' })
-  return {
-    ...base,
-    settings: { pane, rowIndex: SEPARATOR_INDEX, sectionId: 'statusBar' },
-  }
+  return { ...base, settings: { rowIndex: SEPARATOR_INDEX } }
 }
 
 function change(state: AppState, delta?: 1 | -1): void {
@@ -88,8 +84,8 @@ test('minus walks the options backwards', () => {
   expect(stored()).toBe(OPTIONS.at(-1))
 })
 
-test('nothing changes while the focus is on the section list', () => {
-  const state = onSeparatorRow('nav')
+test('nothing changes while the screen is closed', () => {
+  const state = { ...onSeparatorRow(), focusMode: 'navigation' as const }
 
   change(state)
 
@@ -97,12 +93,9 @@ test('nothing changes while the focus is on the section list', () => {
 })
 
 test('an info row is not a setting and is left alone', () => {
-  const rows = getSectionRows('about', STATE.projects)
-  const state = {
-    ...onSeparatorRow(),
-    settings: { pane: 'rows' as const, rowIndex: 0, sectionId: 'about' },
-  }
-  expect(rows[0]?.kind).toBe('info')
+  const infoIndex = ROWS.findIndex((hit) => hit.row.kind === 'info')
+  expect(infoIndex).toBeGreaterThan(-1)
+  const state = { ...onSeparatorRow(), settings: { rowIndex: infoIndex } }
 
   change(state)
 

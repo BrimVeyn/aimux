@@ -8,7 +8,8 @@ import type { AppState } from '../../src/state/types'
 
 import { changeSelectedSetting, commitSettingText } from '../../src/app-runtime/settings-actions'
 import { getConfigPath } from '../../src/config'
-import { ALL_SETTING_ROWS, getSectionRows } from '../../src/settings/sections'
+import { filterSettingRows } from '../../src/settings/search'
+import { ALL_SETTING_ROWS } from '../../src/settings/sections'
 import { hydrateSettings, settingsStore } from '../../src/settings/settings-store'
 import { setActiveDispatch } from '../../src/state/dispatch-ref'
 import { appReducer, createInitialState } from '../../src/state/store'
@@ -19,8 +20,8 @@ const originalProfile = process.env.AIMUX_PROFILE
 const dirs: string[] = []
 
 const STATE = createInitialState()
-const ROW_INDEX = getSectionRows('commands', STATE.projects).findIndex(
-  (row) => row.id === TRIGGER_ID
+const ROW_INDEX = filterSettingRows(STATE.projects, null).findIndex(
+  (hit) => hit.row.id === TRIGGER_ID
 )
 if (ROW_INDEX === -1) throw new Error('expected a snippet trigger row in the commands section')
 
@@ -34,7 +35,7 @@ function onTriggerRow(): AppState {
   hydrateSettings(ALL_SETTING_ROWS, {})
 
   const base = appReducer(createInitialState(), { type: 'enter-settings' })
-  return { ...base, settings: { pane: 'rows', rowIndex: ROW_INDEX, sectionId: 'commands' } }
+  return { ...base, settings: { rowIndex: ROW_INDEX } }
 }
 
 afterEach(() => {
