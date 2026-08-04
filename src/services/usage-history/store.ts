@@ -251,6 +251,22 @@ export function saveUsageHistory(fresh: UsageTools): boolean {
 }
 
 /**
+ * Whether what is on disk predates this build's schema.
+ *
+ * Without this an upgrade waits out the whole interval before the new fields
+ * exist, and until then the pages report them as "recorded from the next rollup
+ * onward" — which reads as a bug and costs whoever hits it a diagnosis.
+ *
+ * ponytail: a regex over the raw text rather than a parse. 1.2 MB parses in 6 ms
+ * and this runs before the first frame; no `UsageDay` carries a `version` key,
+ * so the first match is the file's own. Parse it properly if one ever does.
+ */
+export function storedVersionIsStale(raw: string): boolean {
+  const version = Number(/"version":\s*(\d+)/.exec(raw)?.[1])
+  return Number.isFinite(version) && version < HISTORY_VERSION
+}
+
+/**
  * Detached because the parse is a second of CPU over hundreds of MB of JSONL.
  * 20h rather than 24h so opening aimux at the same time each morning does not
  * land exactly on the boundary and skip every other day.
@@ -260,8 +276,14 @@ export function maybeSpawnUsageRollup(): void {
     if (process.env.AIMUX_NO_USAGE_ROLLUP === '1') return
     // mtime is the last successful rollup: the file is written on success and
     // nothing else. Beats parsing an ever-growing JSON on the startup path.
-    const rolledUpAt = statSync(usageHistoryPath(), { throwIfNoEntry: false })?.mtimeMs ?? 0
-    if (Date.now() - rolledUpAt < ROLLUP_INTERVAL_MS) return
+    const path = usageHistoryPath()
+    const rolledUpAt = statSync(path, { throwIfNoEntry: false })?.mtimeMs ?? 0
+    if (
+      Date.now() - rolledUpAt < ROLLUP_INTERVAL_MS &&
+      !storedVersionIsStale(readFileSync(path, 'utf8'))
+    ) {
+      return
+    }
     spawnDetachedCommand('usage-rollup')
   } catch (error) {
     logDebug('usageHistory.spawnError', {

@@ -135,6 +135,11 @@ describe('RemoteSessionBackend', () => {
 
     let server = await startServer()
     const backend = new RemoteSessionBackend()
+    // A write that lands while the socket is down reports the failure through
+    // `error`, and an EventEmitter throws on an `error` nobody listens for. The
+    // app has a listener; without one here the reconnect window turned into an
+    // unhandled throw, which is what made this test fail once in three runs.
+    backend.on('error', () => {})
 
     try {
       await backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })
@@ -150,12 +155,18 @@ describe('RemoteSessionBackend', () => {
         return attachRequests.length >= 2 ? attachRequests : undefined
       }, 3_000)
 
-      backend.write('tab-1', 'after\nrestart')
-      await waitFor(() =>
-        requests.find(
+      // Written on every tick rather than once. The wait above ends when the
+      // *server* receives the attach, which is one round trip before the client
+      // sets itself attached — and a write before that is dropped by design
+      // (`skipWriteBeforeAttach`), there being nowhere to send it. Writing once
+      // in that window meant waiting out the timeout for a keystroke that was
+      // never going to arrive.
+      await waitFor(() => {
+        backend.write('tab-1', 'after\nrestart')
+        return requests.find(
           (message) => message.type === 'write' && message.payload.data === 'after\nrestart'
         )
-      )
+      })
 
       const helloRequests = requests.filter((message) => message.type === 'hello')
       const attachRequests = requests.filter((message) => message.type === 'attach')

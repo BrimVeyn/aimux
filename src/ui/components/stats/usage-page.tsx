@@ -40,7 +40,8 @@ import { isEmpty, type StatsData } from './use-stats-data'
  * better on the headline row or in the charts that show how they got there.
  */
 
-const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const
+/** Sunday first, like the calendar's rows — one week order on the page. */
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 /**
  * Every fourth hour, at module scope so the ruler is not a fresh array each frame.
@@ -118,7 +119,7 @@ export function UsagePage({ data, width }: { data: StatsData; width: number }) {
   const hoursTotal = hours.reduce((sum, value) => sum + value, 0)
   const lateHours = hours.slice(22).reduce((sum, value) => sum + value, 0)
   const peakHour = hours.indexOf(Math.max(...hours))
-  const weekendPrompts = (weekdays[5] ?? 0) + (weekdays[6] ?? 0)
+  const weekendPrompts = (weekdays[0] ?? 0) + (weekdays[6] ?? 0)
   const weekTotal = weekdays.reduce((sum, value) => sum + value, 0)
   const weekdayMax = Math.max(...weekdays)
   const modelMax = summary.models[0]?.[1] ?? 0

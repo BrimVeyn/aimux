@@ -568,11 +568,11 @@ describe('hour, weekday and typical-day derivations', () => {
     expect(totals[0]).toBe(0)
   })
 
-  test('weekdays are Monday-first, matching the heatmap rows', () => {
-    // 2026-08-03 is a Monday, 2026-08-09 the Sunday that closes that week.
-    const totals = weekdayTotals({ '2026-08-03': day(4, 0), '2026-08-09': day(7, 0) })
+  test('weekdays are Sunday-first, matching the heatmap rows', () => {
+    // 2026-08-03 is a Monday, 2026-08-08 the Saturday that closes that week.
+    const totals = weekdayTotals({ '2026-08-03': day(4, 0), '2026-08-08': day(7, 0) })
 
-    expect(totals[0]).toBe(4)
+    expect(totals[1]).toBe(4)
     expect(totals[6]).toBe(7)
   })
 

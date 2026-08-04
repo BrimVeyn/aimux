@@ -111,13 +111,17 @@ export function hourTotals(days: UsageDays): number[] {
   return totals
 }
 
-/** 7 buckets of prompts, Monday first — matching the heatmap's row order. */
+/**
+ * 7 buckets of prompts, Sunday first — the order `buildHeatmap` draws its rows
+ * in, so the bars and the calendar on the same page mean the same thing by
+ * "the top row".
+ */
 export function weekdayTotals(days: UsageDays): number[] {
   const totals = Array.from({ length: 7 }, () => 0)
   for (const [key, day] of Object.entries(days)) {
     if (day.prompts === 0) continue
-    const mondayIndex = (parseDayKey(key).getDay() + 6) % 7
-    totals[mondayIndex] = (totals[mondayIndex] ?? 0) + day.prompts
+    const index = parseDayKey(key).getDay()
+    totals[index] = (totals[index] ?? 0) + day.prompts
   }
   return totals
 }

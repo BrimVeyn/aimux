@@ -7,6 +7,8 @@ export interface StatsData {
   claude: UsageDays
   codex: UsageDays
   counters: CounterDays
+  /** The history file exists but did not parse, so every number here is missing one. */
+  unreadable: boolean
   /** Local day key for "today", captured once so every page agrees on it. */
   today: string
   todayDate: Date
@@ -31,6 +33,9 @@ export function useStatsData(): StatsData | null {
       counters: readCounters().days,
       today: localDay(todayDate),
       todayDate,
+      // Below every real version: the file is there and unparseable, which also
+      // means the rollup is refusing to write over it. Silent until now.
+      unreadable: history.version < 1,
     })
   }, [])
 

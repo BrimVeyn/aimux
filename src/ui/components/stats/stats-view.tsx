@@ -131,6 +131,13 @@ export const StatsView = memo(function StatsView() {
         flexGrow={1}
         backgroundColor={t.background}
       >
+        {data?.unreadable === true ? (
+          <box paddingLeft={2} flexShrink={0}>
+            <text fg={t.error} selectable={false}>
+              usage-history.json did not parse — nothing is being recorded over it
+            </text>
+          </box>
+        ) : null}
         <scrollbox
           ref={scrollRef}
           scrollY
