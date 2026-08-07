@@ -102,6 +102,31 @@ function requireCleanTree(): void {
   }
 }
 
+/**
+ * Refuse a root-only release when `packages/aimux-config/src` has moved since
+ * the last commit that touched its package.json — i.e. since the version npm
+ * has. `workspace:*` resolves to that published version, so shipping like this
+ * pairs a new app with an old config package: v1.23.1 shipped the settings
+ * rewrite against aimux-config 0.10.2, whose keymap still bound `h`/`←` to a
+ * pane that no longer existed, and the whole screen went dead to the arrows.
+ */
+function requireConfigReleased(configVersion: string): void {
+  const lastRelease = sh('git', ['log', '-1', '--format=%H', '--', CONFIG_PKG], { capture: true })
+  if (lastRelease === '') return
+  const diff = spawnSync(
+    'git',
+    ['diff', '--quiet', lastRelease, '--', 'packages/aimux-config/src'],
+    {
+      cwd: ROOT,
+    }
+  )
+  if (diff.status === 0) return
+  fail(
+    `packages/aimux-config/src changed since v${configVersion} was cut — pass a config-kind ` +
+      `(e.g. \`bun bump patch patch\`), or the release ships against the published ${configVersion}`
+  )
+}
+
 function currentBranch(): string {
   return sh('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { capture: true })
 }
@@ -122,6 +147,11 @@ async function confirm(question: string): Promise<boolean> {
   const answer = await new Promise<string>((resolve) => {
     const onData = (chunk: string) => {
       process.stdin.off('data', onData)
+      // Dropping the listener does not stop the stream: a TTY never EOFs, so a
+      // resumed stdin stays a live handle and the process hangs after the last
+      // push instead of exiting. This is the Ctrl-C everyone was typing at the
+      // end of a release.
+      process.stdin.pause()
       resolve(chunk)
     }
     process.stdin.on('data', onData)
@@ -155,7 +185,9 @@ async function main() {
   if (tagExists(tag)) fail(`tag ${tag} already exists`)
 
   let configPlan: { prev: string; next: string; name: string; raw: string } | null = null
-  if (configArg !== 'none') {
+  if (configArg === 'none') {
+    requireConfigReleased(readPackage(CONFIG_PKG).version)
+  } else {
     const configPkg = readPackage(CONFIG_PKG)
     configPlan = {
       name: configPkg.name,
