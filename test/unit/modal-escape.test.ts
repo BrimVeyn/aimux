@@ -1,8 +1,8 @@
 import { getDefaultKeymapConfig } from '@brimveyn/aimux-config'
 import { expect, test } from 'bun:test'
 
-import type { KeyInput } from '../../src/input/modes/types'
-import type { Action } from '../../src/state/actions'
+import type { KeyInput, ModeId } from '../../src/input/modes/types'
+import type { AppAction } from '../../src/state/actions'
 import type { AppState } from '../../src/state/types'
 
 import { deriveModeId } from '../../src/input/modes/bridge'
@@ -15,7 +15,7 @@ registerAllModes(getDefaultKeymapConfig())
 const ESC: KeyInput = { ctrl: false, meta: false, name: 'escape', sequence: '\x1b', shift: false }
 
 /** Open the modal, press Esc, apply everything the app would apply. */
-function pressEscape(open: Action[]): AppState {
+function pressEscape(open: AppAction[]): AppState {
   let state: AppState = { ...createInitialState(), currentProjectId: 'sess-1' }
   for (const action of open) state = appReducer(state, action)
   expect(state.modal.type).not.toBeNull()
@@ -34,10 +34,10 @@ function pressEscape(open: Action[]): AppState {
 }
 
 /** Modals Esc dismisses outright. */
-const CLOSES: [string, Action[]][] = [
+const CLOSES: [string, AppAction[]][] = [
   ['new-tab', [{ type: 'open-new-tab-modal' }]],
   ['help', [{ type: 'open-help-modal' }]],
-  ['split-picker', [{ direction: 'right', type: 'open-split-picker' }]],
+  ['split-picker', [{ direction: 'horizontal', type: 'open-split-picker' }]],
   ['project-picker', [{ type: 'open-project-picker' }]],
   ['create-project', [{ returnToProjectPicker: false, type: 'open-create-project-modal' }]],
   ['create-workspace', [{ type: 'open-create-workspace-modal' }]],
@@ -54,7 +54,14 @@ const CLOSES: [string, Action[]][] = [
   ['workspace-move', [{ sourceWorkspaceId: 'ws-1', type: 'open-workspace-move-modal' }]],
   [
     'rename-workspace',
-    [{ initialName: 'w', type: 'open-rename-workspace-modal', workspaceId: 'ws-1' }],
+    [
+      {
+        initialName: 'w',
+        projectId: 'sess-1',
+        type: 'open-rename-workspace-modal',
+        workspaceId: 'ws-1',
+      },
+    ],
   ],
   [
     'update-available',
@@ -69,7 +76,7 @@ for (const [label, open] of CLOSES) {
 }
 
 /** Sub-states Esc steps back out of — never into a mode that cannot handle keys. */
-const STEPS_BACK: [string, Action[], string][] = [
+const STEPS_BACK: [string, AppAction[], ModeId][] = [
   [
     'new-tab editing-command',
     [{ type: 'open-new-tab-modal' }, { assistantId: 'claude', type: 'open-edit-custom-command' }],
@@ -90,7 +97,7 @@ const STEPS_BACK: [string, Action[], string][] = [
     'git-commit generating',
     [
       { projectId: 'sess-1', type: 'open-git-commit-modal' },
-      { type: 'git-commit-enter-generating' },
+      { projectId: 'sess-1', type: 'git-commit-enter-generating' },
     ],
     'modal.git-commit',
   ],
