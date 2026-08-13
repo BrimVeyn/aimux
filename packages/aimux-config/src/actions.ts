@@ -105,7 +105,13 @@ export const closeModal: KeyResult = r([{ type: 'close-modal' }], [], 'navigatio
 
 export const closeOverlayModal: KeyResult = r([{ type: 'close-modal' }])
 
-export const cancelNewTabModal: KeyResult = r([{ type: 'cancel-command-edit' }])
+/**
+ * The picker has no separate filter mode to fall back to, so `cancel-command-edit`
+ * would only drop focus to `modal` — a focusMode the new-tab modal has no handler
+ * for, leaving it on screen and deaf to every key. Esc closes it, like every other
+ * picker. (Esc while editing a custom command is `cancelEditCustomCommand`.)
+ */
+export const cancelNewTabModal: KeyResult = closeModal
 
 // ---------------------------------------------------------------------------
 // Dynamic actions (need ctx at runtime — ActionFn)
