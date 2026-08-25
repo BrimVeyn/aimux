@@ -70,11 +70,11 @@ export function CreateWorkspaceModal({
         <box flexDirection="column">
           <TextField
             active={activeField === 'prompt'}
-            label="What do you want to work on?"
-            description="Sent to the assistant, and names the workspace and its branch."
+            label="What do you want to work on? (optional)"
+            description="Sent to the assistant, and names the workspace and its branch. Leave empty for a bare workspace."
             value={prompt}
             cursorPos={activeField === 'prompt' ? cursorPos : undefined}
-            placeholder="Describe the task..."
+            placeholder="Describe the task, or leave empty..."
             minLines={PROMPT_LINES}
           />
           {branchError != null && branchError !== '' ? (

@@ -250,14 +250,11 @@ export const createWorkspaceModal: KeyResult = r(
 export const switchCreateWorkspaceField: KeyResult = r([{ type: 'switch-create-workspace-field' }])
 
 /**
- * An empty prompt is not a workspace: it names nothing, branches nothing and
- * gives the assistant nothing to do, so Enter is simply inert until it is typed.
+ * The prompt is optional: left empty, the workspace still gets cut and the
+ * assistant still launches — it is simply handed nothing, and the workspace
+ * keeps its `wt-<project>` placeholder name.
  */
-export const confirmCreateWorkspace: ActionFn = (ctx: ModeContext) => {
-  const { modal } = ctx.state
-  if (modal.type === 'create-workspace' && modal.prompt.trim() === '') return r([])
-  return r([], [{ type: 'create-workspace' }])
-}
+export const confirmCreateWorkspace: KeyResult = r([], [{ type: 'create-workspace' }])
 
 /**
  * `Enter` creates, so the prompt needs another way to break a line. Inverted
