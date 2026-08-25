@@ -19,6 +19,9 @@ interface BackendRuntimeOptions {
   syntaxOverlayEnabled: () => boolean
 }
 
+/** Below the eye's notice on a deliberate switch; wide enough to swallow key repeat. */
+const ATTACH_SETTLE_MS = 90
+
 export interface TabRuntimeControls {
   clearIdleTimer: (tabId: string) => void
   clearStartupGrace: (tabId: string) => void
@@ -45,14 +48,28 @@ export function useBackendRuntime({
       return
     }
 
-    return attachCurrentSession({
-      attachRequestIdRef,
-      backend,
-      currentProjectId,
-      currentProjectProjectSnapshot,
-      dispatch,
-      layoutRef,
-    })
+    // Settle before attaching. An attach is a socket teardown + reconnect +
+    // handshake to the daemon, which then re-attaches every PTY of the project
+    // and classifies them — and holding `j`/`k` across the sidebar walks
+    // through projects at key-repeat rate. Firing one per keypress meant every
+    // intermediate project paid that round trip only to have its result
+    // discarded by the next. Only where the cursor comes to rest attaches.
+    let detach: (() => void) | null = null
+    const timer = setTimeout(() => {
+      detach = attachCurrentSession({
+        attachRequestIdRef,
+        backend,
+        currentProjectId,
+        currentProjectProjectSnapshot,
+        dispatch,
+        layoutRef,
+      })
+    }, ATTACH_SETTLE_MS)
+
+    return () => {
+      clearTimeout(timer)
+      detach?.()
+    }
   }, [backend, currentProjectId, currentProjectProjectSnapshot, dispatch, layoutRef])
 
   useEffect(() => {

@@ -93,8 +93,13 @@ export function useAutoCommitDriver({
   const lastGitHashRef = useRef<string | null>(null)
   const gitStabilizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // `state.gitPanel`, not `state`: the payload is built from the git panel and
+  // nothing else, while `state` changes on every PTY frame. Keyed on the whole
+  // state this ran — and JSON.stringify'd the changed-file list — at the rate
+  // the assistants print.
   useEffect(() => {
     if (!configRef.current.enabled) return
+    const state = stateRef.current
     const projectId = state.currentProjectId
     if (!(projectId != null && projectId !== '')) return
     const payload = gitPayloadFromState(state)
@@ -126,7 +131,7 @@ export function useAutoCommitDriver({
         tabId: activeTab.id,
       })
     }, GIT_STABILIZATION_DEBOUNCE_MS)
-  }, [state])
+  }, [state.gitPanel, stateRef])
 
   useEffect(
     () => () => {
