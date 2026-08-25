@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 
 import type { BranchDivergence } from '../state/types'
 
-import { useAppStore } from '../state/app-store'
+import { appStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { getBranchDivergence, getWorkspaceDiffStat } from './divergence'
 
@@ -14,25 +14,30 @@ const INTERVAL_MS = 4000
 // never forked, so they fall back to their own upstream — for a root checkout on
 // main that reads as "unpushed commits + dirty work". A branch with no upstream
 // makes git fail, which the poller already renders as nothing.
+//
+// Runs once when enabled; reads projects from the store on each tick so project
+// updates do NOT re-create the effect. Taking `projects` as a dependency meant
+// every workspace switch tore the loop down and fired a fresh tick — holding
+// `j` in the sidebar launched a full git fan-out per keypress (~200ms of
+// subprocesses each) and the machine spent the whole time spawning `git`.
 export function useWorkspaceDivergencePolling(enabled: boolean): void {
-  const projects = useAppStore((s) => s.projects)
-
   useEffect(() => {
     if (!enabled) return
-    // Every project, not just the current one: each dispatch replaces the whole
-    // map, so polling one project's workspaces blanks the stats of every other
-    // project's rows — which the sidebar shows all of at once.
-    // ponytail: one unbounded fan-out per tick, two `git` spawns per workspace.
-    // Batch or stagger if a machine with many projects feels it.
-    const targets = projects
-      .flatMap((project) => project.workspaces ?? [])
-      .filter((w) => w.branch != null && w.branch !== '')
-    if (targets.length === 0) return
 
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
     const tick = async () => {
+      // Every project, not just the current one: each dispatch replaces the
+      // whole map, so polling one project's workspaces blanks the stats of
+      // every other project's rows — which the sidebar shows all of at once.
+      // ponytail: one unbounded fan-out per tick, two `git` spawns per
+      // workspace. Batch or stagger if a machine with many projects feels it.
+      const targets = appStore
+        .getState()
+        .projects.flatMap((project) => project.workspaces ?? [])
+        .filter((w) => w.branch != null && w.branch !== '')
+
       const entries = await Promise.all(
         targets.map(async (workspace) => {
           const branch = workspace.branch
@@ -54,11 +59,15 @@ export function useWorkspaceDivergencePolling(enabled: boolean): void {
         })
       )
       if (cancelled) return
-      const next: Record<string, BranchDivergence> = {}
-      for (const entry of entries) {
-        if (entry != null) next[entry[0]] = entry[1]
+      // Only when there was something to measure: an empty dispatch on a tick
+      // that found no branches would blank rows the previous tick filled.
+      if (targets.length > 0) {
+        const next: Record<string, BranchDivergence> = {}
+        for (const entry of entries) {
+          if (entry != null) next[entry[0]] = entry[1]
+        }
+        dispatchGlobal({ divergence: next, type: 'set-workspace-divergence' })
       }
-      dispatchGlobal({ divergence: next, type: 'set-workspace-divergence' })
       timer = setTimeout(() => void tick(), INTERVAL_MS)
     }
 
@@ -68,5 +77,5 @@ export function useWorkspaceDivergencePolling(enabled: boolean): void {
       cancelled = true
       if (timer != null) clearTimeout(timer)
     }
-  }, [enabled, projects])
+  }, [enabled])
 }

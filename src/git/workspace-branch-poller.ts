@@ -18,36 +18,29 @@ export function useWorkspaceBranchPolling(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return
 
-    let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
 
-    const tick = async () => {
-      const projects = appStore.getState().projects
-      await Promise.all(
-        projects.flatMap((project) =>
-          (project.workspaces ?? []).map(async (workspace) => {
-            if (workspace.path == null || workspace.path === '') return
-            const branch = await getCurrentBranch(workspace.path)
-            if (cancelled) return
-            if (branch != null && branch !== workspace.branch) {
-              dispatchGlobal({
-                patch: { branch },
-                projectId: project.id,
-                type: 'update-workspace-record',
-                workspaceId: workspace.id,
-              })
-            }
-          })
-        )
-      )
-      if (cancelled) return
-      timer = setTimeout(() => void tick(), INTERVAL_MS)
+    const tick = () => {
+      for (const project of appStore.getState().projects) {
+        for (const workspace of project.workspaces ?? []) {
+          if (workspace.path == null || workspace.path === '') continue
+          const branch = getCurrentBranch(workspace.path)
+          if (branch != null && branch !== workspace.branch) {
+            dispatchGlobal({
+              patch: { branch },
+              projectId: project.id,
+              type: 'update-workspace-record',
+              workspaceId: workspace.id,
+            })
+          }
+        }
+      }
+      timer = setTimeout(tick, INTERVAL_MS)
     }
 
-    void tick()
+    tick()
 
     return () => {
-      cancelled = true
       if (timer != null) clearTimeout(timer)
     }
   }, [enabled])

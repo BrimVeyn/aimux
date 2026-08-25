@@ -7,9 +7,13 @@ import { usePrStatusPolling } from '../../../../git/pr-status-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
 import { getActiveWorkspacePath } from '../../../../state/project-workspaces'
+import { useSettled } from '../../../hooks/use-settled'
 import { GitPanel } from '../git-panel'
 import { GitPaneHeader, type GitPaneTab } from './git-pane-header'
 import { PrChecksPanel } from './pr-checks-panel'
+
+/** Long enough to swallow key repeat, short enough to read as instant. */
+const PATH_SETTLE_MS = 150
 
 interface GitPaneWidgetProps {
   pollingEnabled: boolean
@@ -32,7 +36,9 @@ export const GitPaneWidget = memo(function GitPaneWidget({
     currentProjectId != null && currentProjectId !== ''
       ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getActiveWorkspacePath(currentProject)
+  // Settled: every poller below keys off this path and fires an immediate tick
+  // when it changes, and holding `j`/`k` in the sidebar changes it per keypress.
+  const projectPath = useSettled(getActiveWorkspacePath(currentProject), PATH_SETTLE_MS)
 
   const [tab, setTab] = useState<GitPaneTab>('diff')
 
