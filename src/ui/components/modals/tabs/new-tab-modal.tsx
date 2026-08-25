@@ -17,8 +17,12 @@ interface NewTabModalProps {
   cursorPos?: number
   editingCommand: AssistantId | null
   editBuffer: string
-  /** Chained from `<C-p>`: a shell cannot take the prompt, so Terminal is hidden. */
-  excludeTerminal: boolean
+  /**
+   * Chained from `<C-p>`: the prompt waiting for the picked assistant, `''` when
+   * the workspace was created without one, `null` when this is a plain new tab.
+   * A shell cannot take a prompt, so Terminal is hidden only when there is one.
+   */
+  pendingPrompt: string | null
 }
 
 export function NewTabModal({
@@ -26,11 +30,16 @@ export function NewTabModal({
   customCommands,
   editBuffer,
   editingCommand,
-  excludeTerminal,
   filter,
+  pendingPrompt,
   selectedIndex,
 }: NewTabModalProps) {
   const t = useTheme()
+  const excludeTerminal = pendingPrompt != null && pendingPrompt.trim() !== ''
+  const footerText =
+    pendingPrompt == null
+      ? 'Enter launches in the active workspace'
+      : `Enter launches in the new workspace${excludeTerminal ? ' and sends your prompt' : ''}`
   const options = useMemo(() => getAllAssistantOptions(customCommands), [customCommands])
   const filtered = useMemo(
     () => getNewTabAssistantOptions(customCommands, filter, excludeTerminal),
@@ -100,13 +109,7 @@ export function NewTabModal({
       selectedIndex={selectedIndex}
       emptyState={<text fg={t.textMuted}>No matching assistants.</text>}
       onHover={handleHover}
-      footer={
-        <text fg={t.textMuted}>
-          {excludeTerminal
-            ? 'Enter launches in the new workspace and sends your prompt'
-            : 'Enter launches in the active workspace'}
-        </text>
-      }
+      footer={<text fg={t.textMuted}>{footerText}</text>}
     />
   )
 }

@@ -109,7 +109,7 @@ function renderModal(
           cursorPos={modal.cursorPos}
           editingCommand={modal.type === 'new-tab' ? modal.editingCommand : null}
           editBuffer={modal.editBuffer ?? ''}
-          excludeTerminal={modal.type === 'new-tab' && modal.pendingWorkspace != null}
+          pendingPrompt={modal.type === 'new-tab' ? (modal.pendingWorkspace?.prompt ?? null) : null}
         />
       )
     case 'create-workspace':

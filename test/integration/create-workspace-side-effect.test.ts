@@ -46,7 +46,7 @@ afterEach(() => {
   rmSync(base, { force: true, recursive: true })
 })
 
-function harness() {
+function harness(prompt = 'fix the scroll drift') {
   const project: ProjectRecord = {
     activeWorkspaceId: 'wt-main',
     createdAt: NOW,
@@ -79,7 +79,7 @@ function harness() {
       cursorPos: 0,
       editBuffer: '',
       projectTargetId: null,
-      prompt: 'fix the scroll drift',
+      prompt,
       selectedIndex: 0,
       type: 'create-workspace',
     },
@@ -129,4 +129,25 @@ test('the assistant picker opens before git has cut the worktree', async () => {
   if (!created) throw new Error('the pending workspace id never materialized')
   expect(existsSync(created.path)).toBe(true)
   expect(git(created.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim()).toBe(created.branch ?? '')
+})
+
+test('an empty prompt still cuts the worktree, and hands the assistant nothing', async () => {
+  const { ctx, getState } = harness('')
+
+  executeSideEffect({ type: 'create-workspace' }, ctx)
+
+  const modal = getState().modal
+  expect(modal.type).toBe('new-tab')
+  if (modal.type !== 'new-tab') return
+  expect(modal.pendingWorkspace?.prompt).toBe('')
+
+  await enqueueGitOp(async () => {})
+
+  const created = (getState().projects[0]?.workspaces ?? []).find(
+    (entry) => entry.id === modal.pendingWorkspace?.workspaceId
+  )
+  if (!created) throw new Error('the pending workspace id never materialized')
+  expect(existsSync(created.path)).toBe(true)
+  // Nothing to name it after, so the `wt-<project>` placeholder stands.
+  expect(created.name).toBe('wt-repo')
 })

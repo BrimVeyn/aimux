@@ -73,6 +73,9 @@ export function startWorkspaceCreation(
  * conclusion. Only prefixed when a setup is actually live.
  */
 function buildWorkspacePrompt(ctx: SideEffectContext, pending: PendingWorkspaceLaunch): string {
+  // No prompt is a valid choice: the user wanted the worktree, not a task. Send
+  // nothing — not even the setup note, which would arrive as a prompt of its own.
+  if (pending.prompt.trim() === '') return ''
   const setupTab = findSetupTab(ctx.getState().tabs, pending.workspaceId)
   // No setup tab yet does not mean no setup: the workspace can land in the
   // store the same tick the user picks, and the runner only spawns on the next
@@ -95,6 +98,8 @@ function renameWorkspaceFromLaunch(
   workspace: WorkspaceRecord,
   assistant: AssistantId
 ): void {
+  // Nothing to name it after; the `wt-<project>` placeholder stands.
+  if (pending.prompt.trim() === '') return
   void renameWorkspaceFromPrompt(
     { projectId: pending.projectId, prompt: pending.prompt, provider: assistant, workspace },
     {
