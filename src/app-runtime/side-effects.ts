@@ -69,6 +69,7 @@ import {
   runDeleteWorkspace,
   runMoveWorkspace,
   setProjectDefaultBaseRef,
+  toggleProjectCollapsed,
 } from './workspace-actions'
 import { launchPendingWorkspace, startWorkspaceCreation } from './workspace-launch'
 
@@ -584,6 +585,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'set-project-default-base-ref': {
       setProjectDefaultBaseRef(ctx, effect.projectId, effect.baseRef)
+      return
+    }
+    case 'toggle-project-collapsed': {
+      toggleProjectCollapsed(ctx, effect.projectId)
       return
     }
     case 'ask-agent-for-setup-script': {

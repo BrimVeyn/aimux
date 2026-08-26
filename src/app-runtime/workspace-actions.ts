@@ -87,6 +87,17 @@ export function setProjectDefaultBaseRef(
   ctx.dispatch({ projects, type: 'set-projects' })
 }
 
+/** Fold or unfold a project's workspace rows in the sidebar. */
+export function toggleProjectCollapsed(ctx: SideEffectContext, projectId: string): void {
+  const projects = replaceProject(ctx, projectId, (entry) => ({
+    ...entry,
+    collapsed: entry.collapsed !== true ? true : undefined,
+    updatedAt: new Date().toISOString(),
+  }))
+  saveProjectCatalog(projects)
+  ctx.dispatch({ projects, type: 'set-projects' })
+}
+
 function normalizeBranchName(branch: string | undefined): string | undefined {
   return branch?.replace(/^refs\/heads\//, '').trim()
 }

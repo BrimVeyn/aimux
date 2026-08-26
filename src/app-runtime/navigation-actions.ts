@@ -7,6 +7,7 @@ import { saveProjectCatalog } from '../state/project-catalog'
 import {
   filterTabsForActiveWorkspace,
   getPrimaryWorkspace,
+  getSidebarWorkspaces,
   withActiveWorkspace,
 } from '../state/project-workspaces'
 import { appReducer } from '../state/store'
@@ -103,7 +104,9 @@ function buildSidebarItems(state: AppState): SidebarItem[] {
   )
   const items: SidebarItem[] = []
   for (const project of ordered) {
-    for (const workspace of project.workspaces ?? []) {
+    // `true`, for every project: a folded one keeps exactly the row j/k would
+    // land on, and that row is on screen the moment the cursor gets there.
+    for (const workspace of getSidebarWorkspaces(project, true)) {
       items.push({ projectId: project.id, workspaceId: workspace.id })
     }
   }

@@ -293,13 +293,13 @@ export function findWorkspace(
   return undefined
 }
 
+/** The workspace a project's cursor sits on: its active one, else the checkout. */
 export function getActiveWorkspace(
   project: ProjectRecord | undefined
 ): WorkspaceRecord | undefined {
-  if (!(project?.workspaces?.length != null && project?.workspaces?.length !== 0)) return undefined
   return (
-    project.workspaces.find((workspace) => workspace.id === project.activeWorkspaceId) ??
-    project.workspaces[0]
+    project?.workspaces?.find((workspace) => workspace.id === project.activeWorkspaceId) ??
+    getPrimaryWorkspace(project?.workspaces)
   )
 }
 
@@ -389,4 +389,24 @@ export function orderTabsByWorkspace(
       return a.index - b.index
     })
     .map((entry) => entry.tab)
+}
+
+/**
+ * The workspace rows a folded project still shows: just the one the cursor is
+ * on, so folding never hides the row you are standing on — and, for a project
+ * you are not in, nothing at all.
+ *
+ * Sidebar navigation calls this with `isCurrent: true` for every project: the
+ * moment j/k crosses into one it *is* current, and a project whose rows all
+ * vanished from the item list would be unreachable by keyboard.
+ */
+export function getSidebarWorkspaces(
+  project: ProjectRecord,
+  isCurrent: boolean
+): WorkspaceRecord[] {
+  const workspaces = project.workspaces ?? []
+  if (project.collapsed !== true) return workspaces
+  if (!isCurrent) return []
+  const active = getActiveWorkspace(project)
+  return active ? [active] : []
 }

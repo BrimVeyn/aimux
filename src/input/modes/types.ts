@@ -116,6 +116,7 @@ export type SideEffect =
   | { type: 'stop-setup' }
   | { type: 'configure-setup-script'; projectId?: string }
   | { type: 'set-project-default-base-ref'; projectId: string; baseRef: string }
+  | { type: 'toggle-project-collapsed'; projectId: string }
   | { type: 'ask-agent-for-setup-script' }
   | { type: 'promote-setup-tab' }
   /** Toggle a checkbox, cycle an enum, run a row's action — whatever the row is. */
