@@ -11,6 +11,7 @@ import { useTheme } from '../../theme'
 import { WIDGET_RENDERERS } from '../../widgets/registry'
 import { buildBarContextMenu, buildWidgetContextMenu } from '../../widgets/widget-context-menu'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
+import { BarFooter } from './bar-footer'
 
 export interface BarBoundaryResizeInfo {
   containerStart: number
@@ -119,6 +120,7 @@ export function Bar({
       {side === 'right' ? edge : null}
       <box width={contentWidth} flexGrow={1} flexDirection="column" overflow="hidden">
         {body}
+        {side === 'left' ? <BarFooter contentWidth={contentWidth} /> : null}
       </box>
       {side === 'left' ? edge : null}
     </ContextMenuBox>
