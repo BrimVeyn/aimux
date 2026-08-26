@@ -6,13 +6,15 @@ import type {
 
 import { memo, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
-import type { ProjectRecord, ProjectStatus } from '../../../../state/types'
+import type { ProjectRecord } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { getPrimaryWorkspace } from '../../../../state/project-workspaces'
-// eslint-disable-next-line no-duplicate-imports
-import { IDLE_PROJECT_STATUS } from '../../../../state/types'
+import {
+  getActiveWorkspace,
+  getPrimaryWorkspace,
+  getSidebarWorkspaces,
+} from '../../../../state/project-workspaces'
 import { moveIdToInsertIndex, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'
@@ -31,6 +33,9 @@ const RULE = '─'
 /** Heavier than the chrome rules, so the drop preview never reads as a border. */
 const DROP_BAR = '━'
 const HEADER_TITLE = 'Projects'
+/** Same pair the git panel folds its directories with, so the gesture reads once. */
+const COLLAPSED_GLYPH = '▸ '
+const EXPANDED_GLYPH = '▾ '
 
 interface DragState {
   id: string
@@ -42,7 +47,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
   const t = useTheme()
   const projects = useAppStore((s) => s.projects)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
-  const statusMap = useAppStore((s) => s.projectStatuses)
 
   // The drag lives in a ref because mouse events can arrive before React has
   // committed the state they set — reading `draggingId` out of a handler
@@ -71,11 +75,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
   // The cursor is always on a workspace row now, so there is one id to scroll
   // to instead of two — otherwise it visually "disappears" off-screen when a
   // key press crosses a project boundary.
-  const rawActiveWorkspaceId = currentProject?.activeWorkspaceId
-  const activeWorkspaceId =
-    rawActiveWorkspaceId != null && rawActiveWorkspaceId !== ''
-      ? rawActiveWorkspaceId
-      : getPrimaryWorkspace(currentProject?.workspaces)?.id
+  const activeWorkspaceId = getActiveWorkspace(currentProject)?.id
   const activeRowId =
     activeWorkspaceId != null && activeWorkspaceId !== '' ? `sidebar-wt-${activeWorkspaceId}` : null
 
@@ -213,15 +213,11 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           for (const [index, project] of ordered.entries()) {
             const projectIndex = index + 1
             const isCurrentProject = project.id === currentProjectId
-            const workspaces = project.workspaces ?? []
             // Every workspace gets a row, the checkout included. Folding it into
             // the project row made one row mean two things — a project you
             // switch to and a workspace you run tabs in — and left the checkout
             // the only workspace with no branch and no churn on screen.
-            const activeWorkspaceId =
-              project.activeWorkspaceId != null && project.activeWorkspaceId !== ''
-                ? project.activeWorkspaceId
-                : getPrimaryWorkspace(workspaces)?.id
+            const activeWorkspaceId = getActiveWorkspace(project)?.id
             rows.push(
               // Every project already had a blank line above it, which doubles
               // as the gap under the header. The drop bar is drawn *in* that
@@ -240,13 +236,12 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                 project={project}
                 inCurrentGroup={isCurrentProject}
                 projectIndex={projectIndex}
-                status={statusMap[project.id] ?? IDLE_PROJECT_STATUS}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
                 onDragStart={handleRowDragStart}
               />
             )
-            for (const workspace of workspaces) {
+            for (const workspace of getSidebarWorkspaces(project, isCurrentProject)) {
               rows.push(
                 <WorkspaceRow
                   key={`wt:${workspace.id}`}
@@ -314,7 +309,6 @@ interface ProjectRowProps {
   inCurrentGroup: boolean
   /** 1-based index in the visible order, so the "+" can switch projects first. */
   projectIndex: number
-  status: ProjectStatus
   dragging: boolean
   contentWidth: number
   /** Only the gesture's start lives here — the list owns drag and release. */
@@ -328,25 +322,11 @@ const ProjectRow = memo(function ProjectRow({
   onDragStart,
   project,
   projectIndex,
-  status,
 }: ProjectRowProps) {
   const t = useTheme()
   // Selection highlight must stay opaque in transparent mode — otherwise the
   // cursor row visually disappears against the see-through chrome.
   const base = useBaseTheme()
-  // State belongs on the workspace rows: they say *which* one is working or
-  // waiting, and this heading can only say "somewhere below". So the heading
-  // speaks only when none of its workspaces can — a tab whose workspace this
-  // client doesn't know, which today means a daemon still running a pre-v18
-  // protocol. Without that fallback the sidebar would go silent instead of
-  // degrading.
-  const workspacesSpeak = useAppStore((s) =>
-    (project.workspaces ?? []).some((workspace) => {
-      const activity = s.workspaceActivity[workspace.id]
-      return activity !== undefined && (activity.working || activity.waiting || activity.done)
-    })
-  )
-  const showWaiting = status.waiting && !workspacesSpeak
   // Only the drag highlight is "selected"-strength here. A heading that lights
   // up like a cursor row is what made the project look like a workspace.
   let bgColor: string | undefined
@@ -355,7 +335,6 @@ const ProjectRow = memo(function ProjectRow({
   } else if (inCurrentGroup) {
     bgColor = base.backgroundPanel
   }
-  const waitingColor = t.warning
   const currentProjectId = useAppStore((s) => s.currentProjectId)
 
   const handleMouseDown = useCallback(
@@ -365,6 +344,16 @@ const ProjectRow = memo(function ProjectRow({
       onDragStart(project.id)
     },
     [onDragStart, project.id]
+  )
+  // stopPropagation keeps the row's own mousedown from starting a drag, so the
+  // release never falls through to switching project — same trick as the "+".
+  const handleToggleCollapsed = useCallback(
+    (e: OtuiMouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      runSideEffectGlobal({ projectId: project.id, type: 'toggle-project-collapsed' })
+    },
+    [project.id]
   )
   const handleNewWorkspace = useCallback(
     (e: OtuiMouseEvent) => {
@@ -401,17 +390,11 @@ const ProjectRow = memo(function ProjectRow({
     [project.id, project.name]
   )
 
-  // Neutral muted marker, and a question when a workspace of this project needs
-  // an answer. No progress indicator: a heading can only say "somewhere below",
-  // and the row that actually knows is one line down. Keeping a glyph in the slot
-  // avoids name shifts when the question comes and goes — which is also why the
-  // gap after it is part of the glyph.
-  let leadingGlyph = '• '
-  let leadingColor = t.textMuted
-  if (showWaiting) {
-    leadingGlyph = '? '
-    leadingColor = waitingColor
-  }
+  // The slot used to carry a status marker, which only ever said "somewhere
+  // below" — the workspace rows one line down say it precisely. It now carries
+  // the fold arrow instead, and the trailing space is part of the glyph so the
+  // name never shifts.
+  const leadingGlyph = project.collapsed === true ? COLLAPSED_GLYPH : EXPANDED_GLYPH
 
   // No branch line: the repo checkout is not somewhere aimux works, so naming
   // it under every project only ever read as "you are on main".
@@ -429,7 +412,12 @@ const ProjectRow = memo(function ProjectRow({
       onMouseDown={handleMouseDown}
     >
       <box flexDirection="row" alignItems="center">
-        <text fg={leadingColor} selectable={false} wrapMode="none">
+        <text
+          fg={t.textMuted}
+          selectable={false}
+          wrapMode="none"
+          onMouseDown={handleToggleCollapsed}
+        >
           {leadingGlyph}
         </text>
         <FlashLabelBadge rowKey={`ws:${project.id}`} />

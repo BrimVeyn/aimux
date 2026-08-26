@@ -42,8 +42,6 @@ export interface ProjectStatus {
   waiting: boolean
 }
 
-export const IDLE_PROJECT_STATUS: ProjectStatus = { waiting: false, working: false }
-
 /**
  * A workspace's status, as the sidebar draws it. `working`/`waiting` mirror
  * `ProjectStatus` one level down; `done` is a latch — an assistant here
@@ -226,6 +224,12 @@ export interface ProjectRecord {
    * answers. Unset means the repo's default branch.
    */
   defaultBaseRef?: string
+  /**
+   * Folded in the sidebar: the project's workspace rows are hidden, bar the one
+   * the cursor is on. Persisted, because a fold you have to redo on every start
+   * is worse than no fold at all.
+   */
+  collapsed?: boolean
 }
 
 export interface ProjectBarState {
