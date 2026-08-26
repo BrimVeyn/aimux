@@ -156,6 +156,7 @@ const FROZEN_ROW_IDS = [
   'snippets.triggerChar',
   'statusBar.aiUsage.enabled',
   'statusBar.aiUsage.pollSeconds',
+  'statusBar.hints',
   'statusBar.separator',
   'experimental.spriteFolder',
   'theme.beta.experimentalActivitySprites',
