@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import {
@@ -199,6 +199,27 @@ describe('assistant session args', () => {
     } finally {
       rmSync(dir, { force: true, recursive: true })
     }
+  })
+
+  test('treats a machine that has never run the vendor CLI as having no conversation', () => {
+    // The regression CI caught and a dev box cannot: `~/.claude/projects` is
+    // missing on a fresh install, and the glob reports that by throwing rather
+    // than yielding nothing.
+    //
+    // In a subprocess because Bun resolves `os.homedir()` once at startup — a
+    // HOME reassigned mid-test is silently ignored, which is exactly how the
+    // first version of this test passed against the unfixed code. The
+    // alternative was reading the env directly in production purely to be
+    // testable; a spawn is cheaper than a seam.
+    const probe = `
+      import { buildAssistantSessionArgs } from '${join(import.meta.dir, '../../src/pty/command-registry.ts')}'
+      process.stdout.write(JSON.stringify(buildAssistantSessionArgs('claude', {}, 'probe-id')))
+    `
+    const run = Bun.spawnSync(['bun', '-e', probe], {
+      env: { ...process.env, HOME: join(tmpdir(), `aimux-no-claude-${crypto.randomUUID()}`) },
+    })
+    expect(run.stderr.toString()).toBe('')
+    expect(JSON.parse(run.stdout.toString())).toEqual(['--session-id', 'probe-id'])
   })
 
   test('stays out of the way when the assistant has no session support', () => {

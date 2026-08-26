@@ -71,8 +71,21 @@ export interface AssistantOption {
   acceptsPromptArg?: boolean
 }
 
-function claudeProjectsDir(): string {
-  return join(homedir(), '.claude', 'projects')
+/**
+ * A machine that has never run `claude` has no `~/.claude/projects`, and
+ * `scanSync` reports a missing cwd by throwing ENOENT rather than yielding
+ * nothing. "No directory" and "directory without this transcript" are the same
+ * answer here — there is no conversation to resume — so the throw is folded back
+ * into the false it should have been. Without this, the very first assistant tab
+ * on a fresh install dies at spawn.
+ */
+function hasClaudeTranscript(sessionId: string): boolean {
+  const cwd = join(homedir(), '.claude', 'projects')
+  try {
+    return new Bun.Glob(`*/${sessionId}.jsonl`).scanSync({ cwd }).next().done !== true
+  } catch {
+    return false
+  }
 }
 
 const DEFAULT_SHELL =
@@ -96,9 +109,7 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
       // `~/.claude/projects/<cwd-slug>/<uuid>.jsonl`. Globbing the slug away
       // beats deriving it: the uuid alone is unique, so we never have to model
       // how the vendor mangles a path into a directory name.
-      hasConversation: (sessionId) =>
-        new Bun.Glob(`*/${sessionId}.jsonl`).scanSync({ cwd: claudeProjectsDir() }).next().done !==
-        true,
+      hasConversation: (sessionId) => hasClaudeTranscript(sessionId),
     },
   },
   {
