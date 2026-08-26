@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 import {
   ASSISTANT_OPTIONS,
   assistantAcceptsPromptArg,
   buildAssistantModelArgs,
+  buildAssistantSessionArgs,
   getAssistantOption,
   parseCommand,
   shellQuote,
@@ -171,5 +175,76 @@ describe('buildAssistantModelArgs', () => {
     expect(() => buildAssistantModelArgs(option('terminal'), { effort: 'high' })).toThrow(
       'does not support --effort'
     )
+  })
+})
+
+describe('assistant session args', () => {
+  const NO_CUSTOM: Record<string, string> = {}
+
+  test('claims a fresh id when the vendor has no conversation for it', () => {
+    const id = crypto.randomUUID()
+    expect(buildAssistantSessionArgs('claude', NO_CUSTOM, id)).toEqual(['--session-id', id])
+  })
+
+  test('resumes once a transcript exists under that id', () => {
+    // The real lookup, against the real directory layout — the whole point of
+    // the flag flip is that the filesystem decides it, so stubbing it would
+    // test nothing. Scoped to a uuid-named file in a directory of our own.
+    const id = crypto.randomUUID()
+    const dir = join(homedir(), '.claude', 'projects', 'aimux-session-args-test')
+    try {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, `${id}.jsonl`), '{}\n')
+      expect(buildAssistantSessionArgs('claude', NO_CUSTOM, id)).toEqual(['--resume', id])
+    } finally {
+      rmSync(dir, { force: true, recursive: true })
+    }
+  })
+
+  test('treats a machine that has never run the vendor CLI as having no conversation', () => {
+    // The regression CI caught and a dev box cannot: `~/.claude/projects` is
+    // missing on a fresh install, and the glob reports that by throwing rather
+    // than yielding nothing.
+    //
+    // In a subprocess because Bun resolves `os.homedir()` once at startup — a
+    // HOME reassigned mid-test is silently ignored, which is exactly how the
+    // first version of this test passed against the unfixed code. The
+    // alternative was reading the env directly in production purely to be
+    // testable; a spawn is cheaper than a seam.
+    const probe = `
+      import { buildAssistantSessionArgs } from '${join(import.meta.dir, '../../src/pty/command-registry.ts')}'
+      process.stdout.write(JSON.stringify(buildAssistantSessionArgs('claude', {}, 'probe-id')))
+    `
+    const run = Bun.spawnSync(['bun', '-e', probe], {
+      env: { ...process.env, HOME: join(tmpdir(), `aimux-no-claude-${crypto.randomUUID()}`) },
+    })
+    expect(run.stderr.toString()).toBe('')
+    expect(JSON.parse(run.stdout.toString())).toEqual(['--session-id', 'probe-id'])
+  })
+
+  test('stays out of the way when the assistant has no session support', () => {
+    expect(buildAssistantSessionArgs('codex', NO_CUSTOM, crypto.randomUUID())).toEqual([])
+    expect(buildAssistantSessionArgs('terminal', NO_CUSTOM, crypto.randomUUID())).toEqual([])
+  })
+
+  test('declines a wrapper command, whose flags are not the vendor CLI’s', () => {
+    expect(
+      buildAssistantSessionArgs('claude', { claude: 'my-wrapper.sh' }, crypto.randomUUID())
+    ).toEqual([])
+  })
+
+  test('extra flags are fine as long as the program is still claude', () => {
+    const id = crypto.randomUUID()
+    expect(
+      buildAssistantSessionArgs('claude', { claude: 'claude --dangerously-skip-permissions' }, id)
+    ).toEqual(['--session-id', id])
+  })
+
+  test('declines a command that already manages its own session', () => {
+    for (const custom of ['claude --resume abc', 'claude -c', 'claude --session-id fixed']) {
+      expect(buildAssistantSessionArgs('claude', { claude: custom }, crypto.randomUUID())).toEqual(
+        []
+      )
+    }
   })
 })

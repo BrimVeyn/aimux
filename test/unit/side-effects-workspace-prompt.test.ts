@@ -123,8 +123,10 @@ test('the chained launch pins the tab and hands the prompt over at spawn', async
 
   // `claude` takes an interactive positional prompt, so it arrives in argv. No
   // readiness poll, no screen probe, no retries — and nothing typed into the pty.
+  // The session flag has to precede it: the prompt is positional, so a flag
+  // after it would be swallowed as part of the prompt text.
   expect(started).toHaveLength(1)
-  expect(started[0]?.args).toEqual(['fix the scroll drift'])
+  expect(started[0]?.args).toEqual(['--session-id', tab.sessionId ?? '', 'fix the scroll drift'])
 
   // The prompt must not leak into `command`: that string is shown in the UI,
   // persisted in the snapshot, and round-tripped by the custom-command editor.

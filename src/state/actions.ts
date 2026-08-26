@@ -153,6 +153,7 @@ export type TabAction =
   | { type: 'reorder-active-tab'; delta: number }
   | { type: 'reorder-tabs'; orderedTabIds: string[] }
   | { type: 'reset-tab-project'; tabId: string }
+  | { type: 'hibernate-tab'; tabId: string }
   | {
       type: 'rename-tab'
       tabId: string

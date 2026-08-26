@@ -214,6 +214,50 @@ function disposeWorkspaceTabs(ctx: SideEffectContext, workspaceId: string): void
   }
 }
 
+/**
+ * Put every idle assistant tab in a workspace to sleep: kill the PTY, keep the
+ * frozen screen, resume on focus. The RAM a workspace holds is its assistant
+ * processes — several hundred MB each — and none of it is aimux's own.
+ *
+ * A tab mid-turn is never touched. The lot is deliberately partial rather than
+ * all-or-nothing: one busy tab should not veto the other three, and the toast
+ * says what stayed up so the skip is never silent.
+ *
+ * ponytail: `activity` comes from reading the assistant's screen, so it sees a
+ * turn in progress but not a background task the assistant spawned. Manual-only
+ * for exactly that reason — you know what you left running; a timer would not.
+ */
+export function hibernateWorkspace(ctx: SideEffectContext, workspaceId: string): void {
+  const tabs = ctx.state.tabs.filter(
+    (tab) => tab.workspaceId === workspaceId && tab.role !== 'setup'
+  )
+  const sleepable = tabs.filter(
+    (tab) => (tab.status === 'running' || tab.status === 'starting') && tab.activity === 'idle'
+  )
+  const busy = tabs.filter(
+    (tab) => (tab.status === 'running' || tab.status === 'starting') && tab.activity !== 'idle'
+  )
+
+  for (const tab of sleepable) {
+    ctx.clearIdleTimer(tab.id)
+    ctx.clearStartupGrace(tab.id)
+    ctx.backend.disposeSession(tab.id)
+    ctx.dispatch({ tabId: tab.id, type: 'hibernate-tab' })
+  }
+
+  if (sleepable.length === 0) {
+    toast.info(
+      busy.length > 0 ? `Nothing to hibernate — ${busy.length} tab(s) busy` : 'Nothing to hibernate'
+    )
+    return
+  }
+  toast.success(
+    busy.length > 0
+      ? `Hibernated ${sleepable.length} tab(s), skipped ${busy.length} busy`
+      : `Hibernated ${sleepable.length} tab(s)`
+  )
+}
+
 export async function runDeleteWorkspace(
   ctx: SideEffectContext,
   projectId: string,

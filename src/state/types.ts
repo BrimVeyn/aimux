@@ -151,6 +151,8 @@ export interface PersistedTabSnapshot {
   assistant: AssistantId
   title: string
   command: string
+  /** Optional and additive: an older build ignores it and spawns fresh. */
+  sessionId?: string
   status: Exclude<LegacyPersistedTabStatus, 'disconnected'>
   buffer: string
   viewport?: TerminalSnapshot
@@ -246,6 +248,25 @@ export interface TabSession {
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
   command: string
+  /**
+   * Names the assistant conversation this tab owns, so a respawn reopens it
+   * instead of starting over. Minted when the tab is created and handed to the
+   * CLI at spawn — we pick the id rather than discover it afterwards, because
+   * discovery cannot tell two tabs sharing a cwd apart.
+   *
+   * Absent on tabs created before this existed, and on assistants with no
+   * session support; both spawn exactly as they always did.
+   */
+  sessionId?: string
+  /**
+   * Deliberately put to sleep: the PTY is gone, the frozen viewport stays, and
+   * focusing the tab resumes it. Distinct from the `disconnected` it rides on —
+   * that also means "restored from a snapshot after a restart" — and only used
+   * to tell the two apart in the sidebar glyph, the pane overlay, and the wake.
+   * Ephemeral — never persisted, never on the wire: a restart turns every tab
+   * disconnected anyway, and Ctrl+r resumes them just the same.
+   */
+  hibernated?: boolean
   errorMessage?: string
   exitCode?: number
   workspaceId?: string

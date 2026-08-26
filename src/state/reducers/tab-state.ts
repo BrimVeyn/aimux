@@ -531,6 +531,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
             buffer: '',
             errorMessage: undefined,
             exitCode: undefined,
+            hibernated: undefined,
             status: 'starting',
             terminalModes: createDefaultTerminalModes(),
             viewport: undefined,
@@ -538,6 +539,20 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         },
         action.tabId
       )
+    case 'hibernate-tab':
+      // Deliberately keeps `buffer` and `viewport`: the frozen screen is the
+      // whole point — you should still see what the assistant last said. That is
+      // the one thing separating this from `reset-tab-project`, which wipes both
+      // because it is about to draw a live PTY over them.
+      return {
+        ...state,
+        tabs: updateTab(state.tabs, action.tabId, (tab) => ({
+          ...tab,
+          activity: 'idle',
+          hibernated: true,
+          status: 'disconnected',
+        })),
+      }
     case 'append-tab-buffer':
       return {
         ...state,

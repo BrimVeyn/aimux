@@ -49,7 +49,11 @@ import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
-import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
+import {
+  runSideEffectGlobal,
+  setActiveDispatch,
+  setActiveSideEffectRunner,
+} from './state/dispatch-ref'
 import { findMostRecentProject, loadProjectCatalog } from './state/project-catalog'
 import { getActiveWorkspacePath } from './state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
@@ -483,6 +487,19 @@ export function App({
   }
 
   useSetupRunner(state, sideEffectCtx)
+
+  // Waking is the counterpart of hibernating, and focus is the only signal it
+  // needs: you looked at the tab, so you want it back. Keyed on the id as well
+  // as the flag so switching between two sleeping tabs wakes the second one.
+  // `restart-tab` already does the whole job — dispose, reset, respawn — and the
+  // respawn now carries `--resume`, so the conversation comes back with it.
+  const wakeTabRef = useRef(activeTab)
+  wakeTabRef.current = activeTab
+  useEffect(() => {
+    const tab = wakeTabRef.current
+    if (tab?.hibernated !== true) return
+    runSideEffectGlobal({ tab, type: 'restart-tab' })
+  }, [activeTab?.id, activeTab?.hibernated])
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
     for (const action of result.actions) {

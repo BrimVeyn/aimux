@@ -108,6 +108,7 @@ export type SideEffect =
       keepConflicts?: boolean
     }
   | { type: 'load-workspace-move-stats' }
+  | { type: 'hibernate-workspace'; workspaceId: string }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }

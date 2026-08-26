@@ -65,6 +65,7 @@ import {
   startExistingTab,
 } from './tab-actions'
 import {
+  hibernateWorkspace,
   isForceableWorkspaceDeleteError,
   runDeleteWorkspace,
   runMoveWorkspace,
@@ -390,6 +391,9 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       backend.disposeSession(effect.tabId)
       return
     }
+    case 'hibernate-workspace':
+      hibernateWorkspace(ctx, effect.workspaceId)
+      return
     case 'restart-tab':
       restartTabSession(
         backend,
