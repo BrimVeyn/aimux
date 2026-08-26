@@ -31,25 +31,6 @@ const RULE = '─'
 /** Heavier than the chrome rules, so the drop preview never reads as a border. */
 const DROP_BAR = '━'
 const HEADER_TITLE = 'Projects'
-/**
- * U+2699, not the nerd-font gear: its Emoji_Presentation is No, so a conforming
- * terminal draws it text-style in one cell and no font has to be installed for
- * the one button that opens the settings.
- */
-const SETTINGS_GLYPH = '⚙'
-/**
- * U+25A4, chosen on the same rule as the gear above: one cell, text presentation,
- * present in the base fonts. A ▁▄█ mini bar chart reads better but is three cells
- * wide, which pushes this row past a narrow sidebar.
- */
-const STATS_GLYPH = '▤'
-const SETTINGS_LABEL = `${SETTINGS_GLYPH} Settings`
-const STATS_LABEL = `${STATS_GLYPH} Stats`
-/** The two entries and the gap between them, so a renamed label re-measures itself. */
-const FOOTER_GAP = 2
-const FOOTER_FULL_WIDTH = SETTINGS_LABEL.length + FOOTER_GAP + STATS_LABEL.length
-/** The row's own left and right padding. */
-const FOOTER_PAD = 2
 
 interface DragState {
   id: string
@@ -187,28 +168,7 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     dispatchGlobal({ returnToProjectPicker: false, type: 'open-create-project-modal' })
   }, [])
 
-  // The settings screen's only mouse-reachable way in. It lives here because this
-  // header is on screen whenever the left bar is, and because the `+` beside it
-  // already taught the same gesture.
-  const handleOpenSettings = useCallback((e: OtuiMouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    dispatchGlobal({ type: 'enter-settings' })
-  }, [])
-
-  // Stats sits beside it for the same reason, and because the two are the only
-  // full-screen views the panes step aside for that a mouse can reach at all.
-  const handleOpenStats = useCallback((e: OtuiMouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    dispatchGlobal({ type: 'enter-stats' })
-  }, [])
-
   const rule = RULE.repeat(Math.max(1, contentWidth))
-  // The bar clamps down to 18 columns, narrower than both labels together, so
-  // below that the second entry drops to its glyph rather than being sliced
-  // mid-word by the overflow.
-  const statsLabel = contentWidth - FOOTER_PAD >= FOOTER_FULL_WIDTH ? STATS_LABEL : STATS_GLYPH
 
   return (
     // Drag and release are handled here, not on the row that started them:
@@ -313,22 +273,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
           return rows
         })()}
       </scrollbox>
-      <box flexShrink={0}>
-        <text fg={t.border} selectable={false} wrapMode="none">
-          {rule}
-        </text>
-      </box>
-      {/* Each entry is its own <text>, with a spacer box between them: one string
-          holding both would make the whole footer a single click target. */}
-      <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
-        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenSettings}>
-          {SETTINGS_LABEL}
-        </text>
-        <box width={FOOTER_GAP} flexShrink={1} />
-        <text fg={t.textMuted} selectable={false} wrapMode="none" onMouseDown={handleOpenStats}>
-          {statsLabel}
-        </text>
-      </box>
     </box>
   )
 }
