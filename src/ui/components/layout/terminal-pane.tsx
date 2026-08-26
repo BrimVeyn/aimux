@@ -573,7 +573,11 @@ export function TerminalPane({
         // re-introducing the shifted-content / dead-row bug.
         <box position="absolute" bottom={0} left={0} backgroundColor={editorBg}>
           {tab?.status === 'disconnected' ? (
-            <text fg={t.warning}>Restored snapshot. Press Ctrl+r to restart this project.</text>
+            <text fg={t.warning}>
+              {tab.hibernated === true
+                ? 'Hibernated. Resuming…'
+                : 'Restored snapshot. Press Ctrl+r to restart this tab.'}
+            </text>
           ) : null}
           {tab?.errorMessage != null && tab?.errorMessage !== '' ? (
             <text fg={t.error}>{tab.errorMessage}</text>

@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'bun:test'
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 import {
   ASSISTANT_OPTIONS,
   assistantAcceptsPromptArg,
   buildAssistantModelArgs,
+  buildAssistantSessionArgs,
   getAssistantOption,
   parseCommand,
   shellQuote,
@@ -171,5 +175,55 @@ describe('buildAssistantModelArgs', () => {
     expect(() => buildAssistantModelArgs(option('terminal'), { effort: 'high' })).toThrow(
       'does not support --effort'
     )
+  })
+})
+
+describe('assistant session args', () => {
+  const NO_CUSTOM: Record<string, string> = {}
+
+  test('claims a fresh id when the vendor has no conversation for it', () => {
+    const id = crypto.randomUUID()
+    expect(buildAssistantSessionArgs('claude', NO_CUSTOM, id)).toEqual(['--session-id', id])
+  })
+
+  test('resumes once a transcript exists under that id', () => {
+    // The real lookup, against the real directory layout — the whole point of
+    // the flag flip is that the filesystem decides it, so stubbing it would
+    // test nothing. Scoped to a uuid-named file in a directory of our own.
+    const id = crypto.randomUUID()
+    const dir = join(homedir(), '.claude', 'projects', 'aimux-session-args-test')
+    try {
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, `${id}.jsonl`), '{}\n')
+      expect(buildAssistantSessionArgs('claude', NO_CUSTOM, id)).toEqual(['--resume', id])
+    } finally {
+      rmSync(dir, { force: true, recursive: true })
+    }
+  })
+
+  test('stays out of the way when the assistant has no session support', () => {
+    expect(buildAssistantSessionArgs('codex', NO_CUSTOM, crypto.randomUUID())).toEqual([])
+    expect(buildAssistantSessionArgs('terminal', NO_CUSTOM, crypto.randomUUID())).toEqual([])
+  })
+
+  test('declines a wrapper command, whose flags are not the vendor CLI’s', () => {
+    expect(
+      buildAssistantSessionArgs('claude', { claude: 'my-wrapper.sh' }, crypto.randomUUID())
+    ).toEqual([])
+  })
+
+  test('extra flags are fine as long as the program is still claude', () => {
+    const id = crypto.randomUUID()
+    expect(
+      buildAssistantSessionArgs('claude', { claude: 'claude --dangerously-skip-permissions' }, id)
+    ).toEqual(['--session-id', id])
+  })
+
+  test('declines a command that already manages its own session', () => {
+    for (const custom of ['claude --resume abc', 'claude -c', 'claude --session-id fixed']) {
+      expect(buildAssistantSessionArgs('claude', { claude: custom }, crypto.randomUUID())).toEqual(
+        []
+      )
+    }
   })
 })

@@ -62,6 +62,10 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // Only the working case animates, so the timer is off for every other row —
   // and off entirely when a sprite is drawing this row instead.
   const spinner = useBusySpinner(activity.working && sprite === null)
+  // A primitive, so the selector stays referentially stable across renders.
+  const hasSleepingTabs = useAppStore((s) =>
+    s.tabs.some((tab) => tab.workspaceId === workspace.id && tab.hibernated === true)
+  )
 
   const handleMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
@@ -102,6 +106,10 @@ export const WorkspaceRow = memo(function WorkspaceRow({
           }),
       ],
     ]
+    entries.push([
+      'Hibernate',
+      () => runSideEffectGlobal({ type: 'hibernate-workspace', workspaceId: workspace.id }),
+    ])
     if (workspace.source !== 'primary') {
       entries.push([
         'Remove workspace',
@@ -184,6 +192,12 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   } else if (activity.done) {
     statusGlyph = '● '
     statusColor = t.success
+  } else if (hasSleepingTabs) {
+    // Last, because anything else is news and this is the absence of it. Without
+    // a marker a hibernated workspace is indistinguishable from an idle one, and
+    // you would not know which rows still hold a running assistant.
+    statusGlyph = 'z '
+    statusColor = t.textMuted
   }
 
   return (

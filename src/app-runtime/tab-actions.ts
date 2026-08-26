@@ -5,6 +5,7 @@ import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import {
   assistantAcceptsPromptArg,
+  buildAssistantSessionArgs,
   getAllAssistantOptions,
   getAssistantOption,
   isCommandAvailable,
@@ -65,6 +66,10 @@ export function createTabSession(
     buffer: '',
     command: customCommand ?? option.command,
     id: createTabId(),
+    // Minted up front, before the CLI has ever run, so the very first spawn can
+    // claim it. Only for assistants that can be told their session id — a shell
+    // tab would just carry a uuid nothing reads.
+    sessionId: option.session ? crypto.randomUUID() : undefined,
     status: 'starting',
     terminalModes: createDefaultTerminalModes(),
     title: option.label,
@@ -75,7 +80,7 @@ export function createTabSession(
 /** Everything `startTabSession` needs from the side-effect context. */
 type StartTabSessionContext = Pick<
   SideEffectContext,
-  'backend' | 'clearStartupGrace' | 'dispatch' | 'startStartupGrace'
+  'backend' | 'clearStartupGrace' | 'dispatch' | 'startStartupGrace' | 'state'
 >
 
 export interface StartTabSessionOptions {
@@ -95,7 +100,7 @@ export interface StartTabSessionOptions {
 
 export function startTabSession(
   ctx: StartTabSessionContext,
-  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'workspaceId'>,
+  tab: Pick<TabSession, 'id' | 'assistant' | 'title' | 'command' | 'sessionId' | 'workspaceId'>,
   { autoRenameCandidate = true, cols, cwd, extraArgs, rows }: StartTabSessionOptions
 ): void {
   const { backend, clearStartupGrace, dispatch } = ctx
@@ -111,6 +116,12 @@ export function startTabSession(
   ctx.startStartupGrace(tab.id, STARTUP_GRACE_MS)
 
   const { args, executable } = parseCommand(tab.command)
+  // Ahead of `extraArgs` because that is where an initial prompt goes, and the
+  // prompt is positional — a flag after it would be read as part of it.
+  const sessionArgs =
+    tab.sessionId == null
+      ? []
+      : buildAssistantSessionArgs(tab.assistant, ctx.state.customCommands, tab.sessionId)
 
   if (!isCommandAvailable(executable)) {
     clearStartupGrace(tab.id)
@@ -123,7 +134,7 @@ export function startTabSession(
   }
 
   backend.createSession({
-    args: extraArgs ? [...args, ...extraArgs] : args,
+    args: [...args, ...sessionArgs, ...(extraArgs ?? [])],
     assistant: tab.assistant,
     autoRenameCandidate,
     cols,
