@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 jobs:
   check:
@@ -36,7 +37,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # workflow_dispatch runs from a branch, where there is no tag to attach a
+      # GitHub release to. Dispatch is the manual recovery path for a tag push
+      # that Actions never picked up: republish npm, skip the release page.
       - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           generate_release_notes: true
 
