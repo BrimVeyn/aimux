@@ -1,5 +1,6 @@
 import { $ } from 'bun'
 import { existsSync } from 'node:fs'
+import { rm } from 'node:fs/promises'
 
 import { isInsideAimuxWorktreeRoot } from '../platform/worktree-paths'
 
@@ -227,7 +228,22 @@ export async function removeGitWorktree({
     await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
     return
   }
-  throw new Error(result.stderr.toString().trim() || 'failed to remove git worktree')
+  // git refuses on states it cannot repair — a half-finished removal or a moved
+  // repo leaves a directory git no longer links to ("is not a working tree"),
+  // and no retry ever fixes it, so the row was undeletable forever. Force means
+  // "delete it regardless": finish the job ourselves. The path guard above
+  // already pinned the target inside the Aimux worktree root.
+  if (force) {
+    await rm(targetPath, { force: true, recursive: true })
+    await $`git -C ${repoPath} worktree prune`.quiet().nothrow()
+    return
+  }
+  // Every refusal git can raise here is force-recoverable — the directory lives
+  // under the Aimux worktree root and nothing else owns it — so the message
+  // carries the offer, and `isForceableWorkspaceDeleteError` keys off that
+  // phrase instead of trying to enumerate git's wording.
+  const stderr = result.stderr.toString().trim() || 'failed to remove git worktree'
+  throw new Error(`${stderr} — force delete to remove it anyway`)
 }
 
 export async function listGitWorktrees(repoPath: string): Promise<GitWorktreeInfo[]> {
