@@ -415,7 +415,11 @@ export function removeWorkspaceRecordFromProject(
 }
 
 export function isForceableWorkspaceDeleteError(message: string): boolean {
-  return /active assistant tabs|dirty|uncommitted|modified|untracked|not clean|contains.*changes/i.test(
+  // `force delete` is the marker `removeGitWorktree` appends to every refusal
+  // git raises: matching git's own wording never worked, since a broken worktree
+  // link fatals differently ("is not a working tree", "validation failed", …)
+  // depending on which part of the link broke.
+  return /active assistant tabs|dirty|uncommitted|modified|untracked|not clean|contains.*changes|force delete/i.test(
     message
   )
 }
