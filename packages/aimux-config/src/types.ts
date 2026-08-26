@@ -1252,6 +1252,8 @@ export type StatusBarSeparator = 'arrow' | 'round' | 'slant' | 'flame' | 'none'
 
 export interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
+  /** Second row of keybinding hints under the bar. Default `true`. */
+  hints?: boolean
   /**
    * Powerline-style glyph used between status bar sections.
    * - `arrow` (default): solid triangles (    / )

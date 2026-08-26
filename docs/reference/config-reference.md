@@ -529,6 +529,7 @@ Type:
 ```ts
 interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
+  hints?: boolean // default true
   separator?: 'arrow' | 'round' | 'slant' | 'flame' | 'none' // default 'arrow'
 }
 
@@ -551,6 +552,13 @@ Runtime behavior:
 - Codex data comes from `chatgpt.com/backend-api/wham/usage` using the OAuth
   token stored in `~/.codex/auth.json`
 - all colors are pulled from the active theme palette; no hardcoded colors
+
+### `hints`
+
+The second row under the bar, listing the keybindings of the current mode. Set
+`false` to drop it — the bar becomes one line tall and the terminal gets the
+other one back. Also togglable from the settings screen (Status bar →
+Keybinding hints).
 
 ### `separator`
 

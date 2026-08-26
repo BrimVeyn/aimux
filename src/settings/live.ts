@@ -5,7 +5,7 @@ import { useMemo } from 'react'
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
 import { ACTIVITY_SPRITES, HARMONIZE_CLAUDE_THEME } from './sections/experimental'
-import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS } from './sections/status-bar'
+import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS, HINTS_ENABLED } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 
 /**
@@ -87,4 +87,9 @@ export function useActivitySprites(): boolean {
 export function useHarmonizeClaudeTheme(fromConfigFile: boolean | undefined): boolean {
   const stored = useSettingsStore((s) => s.values[HARMONIZE_CLAUDE_THEME])
   return typeof stored === 'boolean' ? stored : fromConfigFile === true
+}
+
+/** Whether the status bar draws its second row of keybinding hints. */
+export function useStatusBarHints(): boolean {
+  return useSettingsStore((s) => s.values[HINTS_ENABLED] !== false)
 }

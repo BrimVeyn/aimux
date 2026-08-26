@@ -7,6 +7,7 @@ import {
 import type { AppState } from '../../../state/types'
 
 import { version as APP_VERSION } from '../../../../package.json'
+import { useStatusBarHints } from '../../../settings/live'
 import { useAIUsageStore } from '../../../state/ai-usage-store'
 import { useAppStore } from '../../../state/app-store'
 import { useKeymap } from '../../keymap-context'
@@ -124,6 +125,7 @@ export function StatusBar() {
   const modeColor = getModeColor(state.focusMode, t)
   const ambient = composeAmbient(model.right, model.help)
   const aiEnabled = useAIUsageStore((s) => s.enabled)
+  const showHints = useStatusBarHints()
 
   const glyphs = SEPARATOR_GLYPHS[getStatusBarSeparator()]
 
@@ -137,7 +139,7 @@ export function StatusBar() {
 
   return (
     <box
-      height={2}
+      height={showHints ? 2 : 1}
       flexShrink={0}
       overflow="hidden"
       flexDirection="column"
@@ -201,20 +203,22 @@ export function StatusBar() {
       </box>
 
       {/* Row 2 — ambient hints */}
-      <box
-        height={1}
-        flexShrink={0}
-        flexDirection="row"
-        paddingLeft={ROW2_INDENT}
-        paddingRight={1}
-        overflow="hidden"
-      >
-        {ambient !== '' ? (
-          <text fg={t.textMuted} wrapMode="none" selectable={false}>
-            {ambient}
-          </text>
-        ) : null}
-      </box>
+      {showHints ? (
+        <box
+          height={1}
+          flexShrink={0}
+          flexDirection="row"
+          paddingLeft={ROW2_INDENT}
+          paddingRight={1}
+          overflow="hidden"
+        >
+          {ambient !== '' ? (
+            <text fg={t.textMuted} wrapMode="none" selectable={false}>
+              {ambient}
+            </text>
+          ) : null}
+        </box>
+      ) : null}
     </box>
   )
 }

@@ -2,6 +2,7 @@ import { setStatusBarSeparator, type StatusBarSeparator } from '@brimveyn/aimux-
 
 import type { SettingSection } from '../types'
 
+export const HINTS_ENABLED = 'statusBar.hints'
 export const AI_USAGE_ENABLED = 'statusBar.aiUsage.enabled'
 export const AI_USAGE_POLL_SECONDS = 'statusBar.aiUsage.pollSeconds'
 
@@ -33,6 +34,15 @@ export const STATUS_BAR_SECTION: SettingSection = {
       kind: 'select',
       label: 'Separator',
       options: SEPARATORS,
+      storage: 'settings',
+    },
+    {
+      description: 'The keybinding row under the bar. Off frees a line.',
+      fallback: true,
+      fromConfig: (config) => config.statusBar?.hints,
+      id: HINTS_ENABLED,
+      kind: 'toggle',
+      label: 'Keybinding hints',
       storage: 'settings',
     },
     {
