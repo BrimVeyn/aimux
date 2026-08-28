@@ -291,9 +291,14 @@ export const PrChecksPanel = memo(function PrChecksPanel({
               No checks
             </text>
           ) : (
-            checks.map((check) => (
+            // GitHub can list the same workflow/name twice (a job that ran on
+            // both `push` and `pull_request`), so the pair is not a unique key
+            // and the duplicate crashes the reconciler. The rows hold no state
+            // and the list is the API's own order, so the index is the key.
+            checks.map((check, i) => (
               <CheckRow
-                key={`${check.workflow}/${check.name}`}
+                // oxlint-disable-next-line no-array-index-key
+                key={`${i}:${check.workflow}/${check.name}`}
                 bg={bg}
                 check={check}
                 showWorkflow={innerWidth >= WORKFLOW_MIN_WIDTH}
