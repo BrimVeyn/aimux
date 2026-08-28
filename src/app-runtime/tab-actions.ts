@@ -10,6 +10,7 @@ import {
   getAssistantOption,
   isCommandAvailable,
   parseCommand,
+  stripInjectedSessionArgs,
 } from '../pty/command-registry'
 import { createTerminalBounds } from '../state/layout-resize'
 import {
@@ -116,6 +117,11 @@ export function startTabSession(
   ctx.startStartupGrace(tab.id, STARTUP_GRACE_MS)
 
   const { args, executable } = parseCommand(tab.command)
+  // `tab.command` is not always the string this client wrote: a hydrate from the
+  // daemon (or a snapshot taken after one) hands back the whole argv of the last
+  // spawn, session flags included. Strip ours back out before adding this
+  // spawn's, or claude exits on the duplicate and takes the tab with it.
+  const baseArgs = stripInjectedSessionArgs(tab.assistant, ctx.state.customCommands, args)
   // Ahead of `extraArgs` because that is where an initial prompt goes, and the
   // prompt is positional — a flag after it would be read as part of it.
   const sessionArgs =
@@ -134,7 +140,7 @@ export function startTabSession(
   }
 
   backend.createSession({
-    args: [...args, ...sessionArgs, ...(extraArgs ?? [])],
+    args: [...baseArgs, ...sessionArgs, ...(extraArgs ?? [])],
     assistant: tab.assistant,
     autoRenameCandidate,
     cols,

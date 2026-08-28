@@ -106,6 +106,21 @@ function pruneOrphanedTabs(
   )
 }
 
+/**
+ * Recover a session id a snapshot lost. Until the client stopped adopting the
+ * daemon's tabs wholesale, `sessionId` was wiped on every attach while the
+ * daemon's argv echo left the uuid sitting in `command` — so the conversation
+ * these tabs own is still recoverable from the very string that broke them.
+ *
+ * ponytail: a migration, not a mechanism. Delete it once no snapshot in the
+ * wild predates the fix.
+ */
+function recoverSessionId(command: string): string | undefined {
+  return /(?:^|\s)(?:-r|--resume|--session-id)\s+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\s|$)/i.exec(
+    command
+  )?.[1]
+}
+
 export function restoreTabsFromProject(
   snapshot: ProjectSnapshotV1 | undefined,
   options: RestoreOptions = {}
@@ -130,7 +145,7 @@ export function restoreTabsFromProject(
       errorMessage: tab.errorMessage,
       exitCode: tab.exitCode,
       id: tab.id,
-      sessionId: tab.sessionId,
+      sessionId: tab.sessionId ?? recoverSessionId(tab.command),
       status: forceDisconnected ? getDisconnectedStatus(tab.status) : tab.status,
       terminalModes: tab.terminalModes,
       title: tab.title,

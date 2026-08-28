@@ -357,7 +357,18 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         state.currentProjectId != null && state.currentProjectId !== ''
           ? state.projects.find((s) => s.id === state.currentProjectId)
           : undefined
-      const visibleForWorkspace = filterTabsForActiveWorkspace(action.tabs, currentProject)
+      // The daemon rebuilds `command` as `[command, ...args].join(' ')` and has
+      // no `sessionId` on the wire at all. Adopting its tabs wholesale bakes this
+      // spawn's `--session-id <uuid>` into the string the *next* spawn parses —
+      // claude exits on "Session ID … is already in use" and takes the tab with
+      // it — and drops the id the resume depends on. Both fields belong to the
+      // client, so keep what it already holds for the tabs it knows.
+      const ownedById = new Map(state.tabs.map((entry) => [entry.id, entry]))
+      const hydratedTabs = action.tabs.map((entry) => {
+        const owned = ownedById.get(entry.id)
+        return owned ? { ...entry, command: owned.command, sessionId: owned.sessionId } : entry
+      })
+      const visibleForWorkspace = filterTabsForActiveWorkspace(hydratedTabs, currentProject)
       const visibleIds = new Set(visibleForWorkspace.map((t) => t.id))
       const hydratedActiveTabId =
         action.activeTabId != null &&
@@ -365,7 +376,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         visibleIds.has(action.activeTabId)
           ? action.activeTabId
           : (visibleForWorkspace[0]?.id ?? null)
-      const tabIds = new Set(action.tabs.map((t) => t.id))
+      const tabIds = new Set(hydratedTabs.map((t) => t.id))
 
       // Restore from new multi-tree format or migrate from legacy single tree
       const hydratedTrees: Record<string, LayoutNode> = {}
@@ -402,7 +413,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           focusMode: 'navigation',
           layoutTrees: hydratedTrees,
           tabGroupMap: hydratedGroupMap,
-          tabs: normalizeGroupedTabOrder(action.tabs, hydratedTrees, hydratedGroupMap),
+          tabs: normalizeGroupedTabOrder(hydratedTabs, hydratedTrees, hydratedGroupMap),
         },
         hydratedActiveTabId,
         { onlyIfMissing: true }

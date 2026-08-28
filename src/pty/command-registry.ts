@@ -251,6 +251,41 @@ export function buildAssistantSessionArgs(
     : option.session.buildSessionArgs(sessionId)
 }
 
+const SESSION_FLAG = /^(?:-r|--resume|--session-id)$/
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Drop the session flags an earlier spawn left inside `tab.command`.
+ *
+ * The daemon stores its tabs as `[command, ...args].join(' ')`, so a client that
+ * hydrated from it — or a snapshot written by one — carries this tab's own
+ * `--session-id <uuid>` in the string the next spawn parses. Re-spawning that
+ * verbatim is `Error: Session ID … is already in use`, and an exiting PTY takes
+ * the tab with it.
+ *
+ * Only a uuid-shaped value is ours, and only when the user's own custom command
+ * does not declare that flag — a `--resume` they wrote themselves is theirs to
+ * keep, and `buildAssistantSessionArgs` already stands aside for it.
+ */
+export function stripInjectedSessionArgs(
+  assistant: AssistantId,
+  customCommands: Record<string, string>,
+  args: string[]
+): string[] {
+  const custom = customCommands[assistant] ?? ''
+  if (/(^|\s)(-r|--resume|--session-id|--continue|-c)(\s|$)/.test(custom)) return args
+  const kept: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] as string
+    if (SESSION_FLAG.test(arg) && UUID.test(args[i + 1] ?? '')) {
+      i++
+      continue
+    }
+    kept.push(arg)
+  }
+  return kept
+}
+
 export function isCommandAvailable(command: string): boolean {
   return Bun.which(command) !== null
 }
