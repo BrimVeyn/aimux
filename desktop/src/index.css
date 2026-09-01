@@ -80,73 +80,49 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
+/* shadcn's tokens, pointed at the live aimux palette. Everything shadcn draws
+   — buttons, menus, popovers — then follows the theme the host pushes, instead
+   of shipping its own greyscale beside it. `--radius: 0` because the chrome is
+   a transcription of a terminal: nothing in it has a rounded corner.
 
+   Both `:root` and `.dark` get the same values: the aimux theme already
+   carries its own light/dark resolution (see use-theme.ts), so a second
+   light/dark switch here would fight it. */
+:root,
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: var(--aimux-background);
+    --foreground: var(--aimux-text);
+    --card: var(--aimux-backgroundPanel);
+    --card-foreground: var(--aimux-text);
+    --popover: var(--aimux-backgroundPanel);
+    --popover-foreground: var(--aimux-text);
+    --primary: var(--aimux-primary);
+    --primary-foreground: var(--aimux-background);
+    --secondary: var(--aimux-backgroundElement);
+    --secondary-foreground: var(--aimux-text);
+    --muted: var(--aimux-backgroundElement);
+    --muted-foreground: var(--aimux-textMuted);
+    --accent: var(--aimux-backgroundElement);
+    --accent-foreground: var(--aimux-text);
+    --destructive: var(--aimux-error);
+    --destructive-foreground: var(--aimux-background);
+    --border: var(--aimux-border);
+    --input: var(--aimux-border);
+    --ring: var(--aimux-primary);
+    --chart-1: var(--aimux-primary);
+    --chart-2: var(--aimux-success);
+    --chart-3: var(--aimux-warning);
+    --chart-4: var(--aimux-error);
+    --chart-5: var(--aimux-textMuted);
+    --radius: 0rem;
+    --sidebar: var(--aimux-background);
+    --sidebar-foreground: var(--aimux-text);
+    --sidebar-primary: var(--aimux-primary);
+    --sidebar-primary-foreground: var(--aimux-background);
+    --sidebar-accent: var(--aimux-backgroundElement);
+    --sidebar-accent-foreground: var(--aimux-text);
+    --sidebar-border: var(--aimux-border);
+    --sidebar-ring: var(--aimux-primary);
 }
 
 @layer base {
@@ -194,5 +170,28 @@
     font-size: 10.5px;
     font-weight: 400;
     line-height: 1.3;
+  }
+}
+/* TUI-parity chrome. The sidebar and the tab strip are transcriptions of
+   `project-list.tsx` / `workspace-row.tsx` / `top-tab-bar.tsx`, so they are
+   laid out the way those are: one terminal cell is one `ch`, one row is one
+   `--tui-row`, corners are square and nothing animates. Anything that reads as
+   a web widget here — a pill, a rounded button, a hover transition — is a
+   place where the two halves have started to disagree. */
+@layer components {
+  :root {
+    --tui-row: 1.35rem;
+  }
+  .tui {
+    font-family: 'JetBrainsMono Nerd Font Mono', ui-monospace, monospace;
+    font-size: 12.5px;
+    line-height: var(--tui-row);
+    white-space: pre;
+  }
+  .tui-row {
+    display: flex;
+    align-items: center;
+    height: var(--tui-row);
+    flex-shrink: 0;
   }
 }

@@ -2,6 +2,7 @@ import type { MouseEvent, ReactNode } from "react";
 
 import type { GitTreeFileRow, GitTreeFolderRow } from "@aimux/state/git-tree";
 
+import { Button } from "@/components/ui/button";
 import { theme } from "@/lib/theme";
 import type { GitFileEntryLite } from "@/lib/types";
 
@@ -40,30 +41,23 @@ interface FolderRowProps {
 }
 
 export function FolderRow({ isSelected, onToggleFolder, row }: FolderRowProps): ReactNode {
-  const handleClick = (e: MouseEvent<HTMLDivElement>): void => {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>): void => {
     if (onToggleFolder === undefined) return;
     e.preventDefault();
     onToggleFolder(row.key);
   };
   const title = row.isCollapsed ? "Click to expand" : "Click to collapse";
   return (
-    <div
-      className="group relative flex items-center gap-1.5 whitespace-nowrap px-1 py-[2px] transition-[background-color] duration-150 ease-out"
+    <Button
+      variant="ghost"
+      size="tui"
+      disabled={onToggleFolder === undefined}
+      aria-expanded={!row.isCollapsed}
+      className="group relative w-full justify-start gap-1.5 whitespace-nowrap px-1 disabled:opacity-100"
       onClick={onToggleFolder !== undefined ? handleClick : undefined}
       style={{
         backgroundColor: isSelected ? theme.backgroundElement : "transparent",
-        cursor: onToggleFolder !== undefined ? "pointer" : undefined,
         paddingLeft: `calc(${row.depth * 1.25}rem + 4px)`,
-      }}
-      onMouseEnter={(e) => {
-        if (!isSelected && onToggleFolder !== undefined) {
-          e.currentTarget.style.backgroundColor = `color-mix(in oklab, ${theme.backgroundElement} 40%, transparent)`;
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isSelected) {
-          e.currentTarget.style.backgroundColor = "transparent";
-        }
       }}
       title={onToggleFolder !== undefined ? title : undefined}
     >
@@ -87,7 +81,7 @@ export function FolderRow({ isSelected, onToggleFolder, row }: FolderRowProps): 
       >
         {row.name}
       </span>
-    </div>
+    </Button>
   );
 }
 

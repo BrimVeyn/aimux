@@ -13,6 +13,7 @@ import { UpdateAvailableModal } from "@/components/modals/UpdateAvailableModal";
 import { WorkspaceMoveModal } from "@/components/modals/WorkspaceMoveModal";
 import { allAssistants, filterAssistants } from "@/lib/assistants";
 import { formatDivergence } from "@/lib/git";
+import { Button } from "@/components/ui/button";
 import { theme } from "@/lib/theme";
 import type {
   AIUsageTool,
@@ -230,7 +231,7 @@ export function Row({
   onSelect?: () => void;
   onConfirm?: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const ref = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (selected) {
       ref.current?.scrollIntoView({ block: "nearest" });
@@ -238,9 +239,13 @@ export function Row({
   }, [selected]);
   const interactive = onSelect !== undefined || onConfirm !== undefined;
   return (
-    <div
+    <Button
       ref={ref}
-      className={`flex items-center gap-2 rounded px-2 py-1${interactive ? " cursor-pointer" : ""}`}
+      variant="ghost"
+      size="tui"
+      disabled={!interactive}
+      aria-current={selected ? "true" : undefined}
+      className="w-full justify-start gap-2 px-2 disabled:opacity-100"
       onMouseEnter={onSelect}
       onClick={onConfirm}
       style={{ backgroundColor: selected ? theme.backgroundElement : "transparent" }}
@@ -254,7 +259,7 @@ export function Row({
           {hint}
         </span>
       ) : null}
-    </div>
+    </Button>
   );
 }
 

@@ -6,7 +6,7 @@ import type { AppAction } from '../state/actions'
 import type { AppState } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
-import { getActiveWorkspacePath } from '../state/project-workspaces'
+import { getActiveWorkspacePath } from '../state/workspace-view'
 
 // The GUI has no shared TTY. executeSideEffect only touches the renderer in
 // `quit`, `runUpdateFromTui`, and `openEditorInline`; a no-op stub satisfies

@@ -4,13 +4,10 @@ import type { SideEffectContext } from './side-effect-context'
 import { logInputDebug } from '../debug/input-log'
 import { appStore } from '../state/app-store'
 import { saveProjectCatalog } from '../state/project-catalog'
-import {
-  getPrimaryWorkspace,
-  getSidebarWorkspaces,
-  withActiveWorkspace,
-} from '../state/project-workspaces'
+import { withActiveWorkspace } from '../state/project-workspaces'
 import { appReducer } from '../state/store'
 import { buildTabEntries, filterTabsForActiveWorkspace } from '../state/tab-entries'
+import { getPrimaryWorkspace, getSidebarWorkspaces } from '../state/workspace-view'
 import { switchProjectRecords } from './project-actions'
 
 export function handleSwitchProjectByIndex(

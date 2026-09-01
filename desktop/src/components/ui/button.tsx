@@ -27,6 +27,12 @@ const buttonVariants = cva(
         sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         icon: "size-8",
+        // One terminal row tall, one cell of padding either side, monospace and
+        // square — the size the chrome transcription needs. It inherits its
+        // colour so a row can keep colouring its own glyphs, and it is still a
+        // real button: focus ring, disabled state, and a hitbox the full height
+        // of the row rather than the two cells the glyph occupies.
+        tui: "h-(--tui-row) rounded-none px-[1ch] font-mono text-[12.5px] font-normal text-inherit whitespace-pre transition-none",
         "icon-xs":
           "size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
         "icon-sm":

@@ -14,7 +14,7 @@ import {
   getActiveWorkspace,
   getPrimaryWorkspace,
   getSidebarWorkspaces,
-} from '../../../../state/project-workspaces'
+} from '../../../../state/workspace-view'
 import { moveIdToInsertIndex, orderProjectsForDisplay } from '../../../project-ordering'
 import { useBaseTheme, useTheme } from '../../../theme'
 import { truncate } from '../../../truncate'

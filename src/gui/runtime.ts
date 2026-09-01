@@ -31,9 +31,9 @@ import {
   loadProjectCatalog,
   saveProjectCatalog,
 } from '../state/project-catalog'
-import { getActiveWorkspacePath } from '../state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
+import { getActiveWorkspacePath } from '../state/workspace-view'
 import { getStatusBarModel } from '../ui/status-bar-model'
 import {
   applyTheme,

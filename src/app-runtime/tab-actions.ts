@@ -21,8 +21,9 @@ import {
   type SplitDirection,
   splitNode,
 } from '../state/layout-tree'
-import { getActiveWorkspace, getCurrentProject } from '../state/project-workspaces'
+import { getCurrentProject } from '../state/project-workspaces'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
+import { getActiveWorkspace } from '../state/workspace-view'
 import { injectPromptWhenReady } from './prompt-injection'
 import { getSelectedAssistantOption } from './selection'
 

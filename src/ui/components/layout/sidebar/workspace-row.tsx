@@ -6,9 +6,9 @@ import type { SpriteState } from '../../../terminal-graphics/sprites'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
-import { formatDiffStat } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
+import { formatDiffStat } from '../../../../state/workspace-view'
 import { useActivitySprite } from '../../../hooks/use-activity-sprite'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 // eslint-disable-next-line no-duplicate-imports

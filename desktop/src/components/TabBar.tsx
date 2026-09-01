@@ -12,6 +12,7 @@ import {
   type TabEntry,
 } from "@aimux/state/tab-entries";
 
+import { Button } from "@/components/ui/button";
 import { theme } from "@/lib/theme";
 
 import { Spinner } from "./Spinner";
@@ -32,10 +33,11 @@ interface TabBarProps {
 }
 
 /**
- * The strip above the panes: the ACTIVE workspace's tabs, splits collapsed into
- * a single entry. Mirrors `src/ui/components/layout/top-tab-bar.tsx` — same
- * entries, same `[N]` range, same drag-to-reorder — by calling the same two
- * host functions rather than restating the rules here.
+ * Transcription of `src/ui/components/layout/top-tab-bar.tsx`: one row tall,
+ * the active workspace's tabs, splits collapsed into one entry. Same
+ * indicators, same `[N]` range, same drag-to-reorder — and it calls the host's
+ * own `buildTabEntries` / `filterTabsForActiveWorkspace` so the two strips
+ * cannot disagree about what an entry is.
  */
 export function TabBar({
   activeTabId,
@@ -114,16 +116,13 @@ export function TabBar({
 
   return (
     <div
-      className="relative z-[60] flex h-10 shrink-0 items-center gap-1 overflow-x-auto border-b px-3"
-      style={{
-        backgroundColor: theme.backgroundPanel,
-        borderColor: theme.border,
-      }}
+      className="tui tui-row w-full overflow-x-auto overflow-y-hidden"
+      style={{ backgroundColor: theme.backgroundPanel }}
     >
       {visibleEntries.map((entry, index) => {
         // `[N]` only for the first nine — that is the range Leader+1..9 can
         // address, and a label you cannot type is noise.
-        const indexLabel = index < 9 ? index + 1 : null;
+        const indexLabel = index < 9 ? `[${index + 1}]` : null;
         const isActive =
           entry.kind === "single"
             ? entry.tab.id === activeTabId
@@ -144,10 +143,21 @@ export function TabBar({
           />
         );
       })}
-      <div className="flex-1" />
       {/* Not while a full-screen view is up: a `+` that quietly starts a tab
-          and drops you out of the screen you were reading is noise. */}
-      {panesReplaced ? null : <NewTabButton onClick={onNew} />}
+          and drops you out of the screen you were reading is noise, and on the
+          settings screen it is not even about anything on it. */}
+      {panesReplaced ? null : (
+        <Button
+          variant="ghost"
+          size="tui"
+          aria-label="New tab"
+          title="New tab"
+          onClick={onNew}
+          style={{ color: theme.textMuted }}
+        >
+          +
+        </Button>
+      )}
     </div>
   );
 }
@@ -168,7 +178,7 @@ function TabCell({
   active: boolean;
   dragging: boolean;
   focused: boolean;
-  indexLabel: number | null;
+  indexLabel: string | null;
   onActivate: (tabId: string) => void;
   onClose: (tabId: string) => void;
   onDragStart: (entryId: string) => void;
@@ -177,7 +187,7 @@ function TabCell({
 }) {
   const targetTabId =
     entry.kind === "single" ? entry.tab.id : entry.activeLeafId;
-  const closeAll = useCallback(() => {
+  const closeEntry = useCallback(() => {
     if (entry.kind === "single") {
       onClose(entry.tab.id);
       return;
@@ -185,177 +195,132 @@ function TabCell({
     for (const tab of entry.tabs) onClose(tab.id);
   }, [entry, onClose]);
 
+  const indicator =
+    entry.kind === "group"
+      ? groupIndicator(active, focused)
+      : tabIndicator(active, focused);
+  const indicatorColor =
+    entry.kind === "group"
+      ? groupIndicatorColor(active, focused)
+      : tabIndicatorColor(active, focused);
+
   return (
-    <div
+    // The row is the drag source and carries the active background; the two
+    // targets on it are siblings, so each gets the strip's full height as its
+    // hitbox instead of the width of its glyph.
+    <span
       draggable
       onDragStart={() => onDragStart(entry.id)}
       onDragEnter={() => onDragEnter(entry.id)}
       onDragOver={(e) => e.preventDefault()}
       onDragEnd={onDragEnd}
       onDrop={onDragEnd}
-      onMouseDown={() => onActivate(targetTabId)}
-      title={
-        entry.kind === "single"
-          ? entry.tab.title
-          : entry.tabs.map((t) => t.title).join(" | ")
-      }
-      className="group relative flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 transition-[background-color,opacity] duration-150 ease-out"
+      className="flex h-full shrink-0 items-center"
       style={{
         backgroundColor:
           active || dragging ? theme.backgroundElement : "transparent",
-        opacity: dragging ? 0.6 : 1,
       }}
     >
-      {active ? (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-0 right-3 left-3 h-[1.5px] rounded-full"
-          style={{ backgroundColor: focused ? theme.primary : theme.text }}
-        />
-      ) : null}
+      <Button
+        variant="ghost"
+        size="tui"
+        aria-current={active ? "true" : undefined}
+        onClick={() => onActivate(targetTabId)}
+        className="pr-0"
+      >
+        <span style={{ color: indicatorColor }}>{indicator} </span>
+        {indexLabel !== null ? (
+          <span style={{ color: theme.textMuted }}>{indexLabel} </span>
+        ) : null}
 
-      {indexLabel !== null ? (
-        <span className="chrome-code" style={{ color: theme.textMuted }}>
-          {indexLabel}
-        </span>
-      ) : null}
-
-      {entry.kind === "single" ? (
-        <TabLabel tab={entry.tab} active={active} />
-      ) : (
-        entry.tabs.map((tab, i) => (
-          <span key={tab.id} className="flex items-center">
-            {i > 0 ? (
+        {entry.kind === "single" ? (
+          <>
+            <span style={{ color: active ? theme.text : theme.textMuted }}>
+              {entry.tab.title}
+            </span>
+            <ActivityGlyph tab={entry.tab} />
+          </>
+        ) : (
+          entry.tabs.map((tab, i) => (
+            <span key={tab.id}>
+              {i > 0 ? (
+                <span style={{ color: theme.textMuted }}> | </span>
+              ) : null}
               <span
-                className="chrome-label px-1"
-                style={{ color: theme.textMuted }}
+                style={{
+                  color:
+                    tab.id === entry.activeLeafId ? theme.text : theme.textMuted,
+                }}
               >
-                |
+                {tab.title}
               </span>
-            ) : null}
-            <TabLabel tab={tab} active={tab.id === entry.activeLeafId} />
-          </span>
-        ))
-      )}
-
-      <button
-        type="button"
+            </span>
+          ))
+        )}
+      </Button>
+      <Button
+        variant="ghost"
+        size="tui"
         aria-label="Close tab"
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          closeAll();
-        }}
-        className="flex h-[18px] w-[18px] scale-90 items-center justify-center rounded-full opacity-0 transition-[opacity,background-color,transform] duration-150 ease-out group-hover:opacity-100 hover:scale-100"
+        title="Close tab"
+        onClick={closeEntry}
         style={{ color: theme.textMuted }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = `color-mix(in oklab, ${theme.error} 18%, transparent)`;
-          e.currentTarget.style.color = theme.text;
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-          e.currentTarget.style.color = theme.textMuted;
-        }}
       >
-        <svg
-          width="10"
-          height="10"
-          viewBox="0 0 10 10"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-        >
-          <path d="M2 2 L8 8 M8 2 L2 8" />
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-/** Title plus the one glyph that says what the tab is doing. */
-function TabLabel({ active, tab }: { tab: ProjectedTab; active: boolean }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <ActivityGlyph tab={tab} />
-      <span
-        className="chrome-label max-w-[180px] truncate"
-        style={{ color: active ? theme.text : theme.textMuted }}
-      >
-        {tab.title}
-      </span>
+        ×
+      </Button>
     </span>
   );
 }
 
+function tabIndicator(active: boolean, focused: boolean): string {
+  if (!active) return " ";
+  return focused ? "›" : "•";
+}
+
+function tabIndicatorColor(active: boolean, focused: boolean): string {
+  if (!active) return theme.textMuted;
+  return focused ? theme.primary : theme.text;
+}
+
+function groupIndicator(active: boolean, focused: boolean): string {
+  if (!active) return "·";
+  return focused ? "›" : "•";
+}
+
+function groupIndicatorColor(active: boolean, focused: boolean): string {
+  if (!active) return theme.textMuted;
+  return focused ? theme.primary : theme.text;
+}
+
+/**
+ * One marker, always two cells wide so a tab never resizes when its agent
+ * starts or stops. Nothing for a plain idle tab: "not busy" is the resting
+ * state of every tab you are not watching, so a mark that is always on cannot
+ * also mean "this one rang".
+ */
 function ActivityGlyph({ tab }: { tab: ProjectedTab }) {
-  if (tab.status === "error") {
-    return <Glyph color={theme.error}>✗</Glyph>;
-  }
-  if (tab.status === "disconnected") {
-    return <Glyph color={theme.warning}>⏸</Glyph>;
-  }
+  if (tab.status === "error") return <Cell color={theme.error}>✗</Cell>;
+  if (tab.status === "disconnected")
+    return <Cell color={theme.warning}>⏸</Cell>;
   if (tab.activity === "working") {
     return (
-      <span className="inline-flex h-2 w-2 items-center justify-center">
+      <span className="inline-flex w-[2ch] justify-end">
         <Spinner color={theme.primary} />
       </span>
     );
   }
-  if (tab.activity === "waiting-input") {
-    return <Glyph color={theme.warning}>?</Glyph>;
-  }
-  // Nothing for a plain idle tab, on purpose: "not busy" is the resting state
-  // of every tab you are not watching, so a dot that is always lit cannot also
-  // mean "this one rang".
-  if (tab.unseen === true) {
-    return <Glyph color={theme.success}>●</Glyph>;
-  }
-  return null;
+  if (tab.activity === "waiting-input")
+    return <Cell color={theme.warning}>?</Cell>;
+  if (tab.unseen === true) return <Cell color={theme.success}>●</Cell>;
+  return <span className="w-[2ch]"> </span>;
 }
 
-function Glyph({
+function Cell({
   children,
   color,
 }: {
   color: string;
   children: React.ReactNode;
 }) {
-  return (
-    <span aria-hidden className="chrome-code" style={{ color }}>
-      {children}
-    </span>
-  );
-}
-
-function NewTabButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onMouseDown={onClick}
-      aria-label="New tab"
-      className="group flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 transition-[background-color,color] duration-150 ease-out"
-      style={{ color: theme.textMuted }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = theme.backgroundElement;
-        e.currentTarget.style.color = theme.text;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "transparent";
-        e.currentTarget.style.color = theme.textMuted;
-      }}
-    >
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      >
-        <path d="M6 2 L6 10 M2 6 L10 6" />
-      </svg>
-      <span className="chrome-label">New tab</span>
-    </button>
-  );
+  return <span style={{ color }}> {children}</span>;
 }

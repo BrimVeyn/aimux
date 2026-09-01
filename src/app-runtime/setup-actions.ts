@@ -7,13 +7,9 @@ import { shellQuote } from '../pty/command-registry'
 import { appStore } from '../state/app-store'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { ensureSetupScriptStub, getProjectDataDir, getSetupScriptPath } from '../state/project-data'
-import {
-  findWorkspace,
-  getActiveWorkspace,
-  getActiveWorkspacePath,
-  getCurrentProject,
-} from '../state/project-workspaces'
+import { findWorkspace, getCurrentProject } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+import { getActiveWorkspace, getActiveWorkspacePath } from '../state/workspace-view'
 import { launchEditorOnFile } from './editor-actions'
 import { createTabSession, startTabSession } from './tab-actions'
 

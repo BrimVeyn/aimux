@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { ProjectRecord, WorkspaceRecord } from '../../src/state/types'
 
-import { getSidebarWorkspaces } from '../../src/state/project-workspaces'
+import { getSidebarWorkspaces } from '../../src/state/workspace-view'
 
 function makeWorkspace(id: string, source: WorkspaceRecord['source']): WorkspaceRecord {
   return {

@@ -1,4 +1,3 @@
-import { open } from '@tauri-apps/plugin-dialog'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Bar } from '@/components/Bar'
@@ -274,14 +273,6 @@ function App() {
     [dismissModalIfOpen]
   )
 
-  const deleteProject = useCallback(
-    (projectId: string) => {
-      dismissModalIfOpen()
-      socketRef.current?.send({ projectId, t: 'deleteProject' })
-    },
-    [dismissModalIfOpen]
-  )
-
   const selectModal = useCallback((index: number) => {
     socketRef.current?.send({ index, t: 'modalSelect' })
   }, [])
@@ -290,20 +281,11 @@ function App() {
     socketRef.current?.send({ index, t: 'modalConfirm' })
   }, [])
 
+  // The `+` opens the host's create-project modal, the way the TUI's does —
+  // a native folder dialog would be a second way to make a project.
   const newProject = useCallback(() => {
     dismissModalIfOpen()
-    void (async () => {
-      let path: string | null = null
-      try {
-        const picked = await open({ directory: true, multiple: false })
-        path = typeof picked === 'string' ? picked : null
-      } catch {
-        path = window.prompt('Folder path for new project:')
-      }
-      if (path !== null && path !== '') {
-        socketRef.current?.send({ path, t: 'createProject' })
-      }
-    })()
+    socketRef.current?.send({ intent: { kind: 'project.new' }, t: 'intent' })
   }, [dismissModalIfOpen])
 
   const resizeTab = useCallback((tabId: string, cols: number, rows: number) => {
@@ -330,6 +312,28 @@ function App() {
 
   const reorderTabs = useCallback((orderedTabIds: string[]) => {
     socketRef.current?.send({ intent: { kind: 'tabs.reorder', orderedTabIds }, t: 'intent' })
+  }, [])
+
+  const toggleProjectCollapsed = useCallback((projectId: string) => {
+    socketRef.current?.send({
+      intent: { kind: 'project.toggleCollapsed', projectId },
+      t: 'intent',
+    })
+  }, [])
+
+  const newWorkspace = useCallback(
+    (projectId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({
+        intent: { kind: 'project.newWorkspace', projectId },
+        t: 'intent',
+      })
+    },
+    [dismissModalIfOpen]
+  )
+
+  const reorderProjects = useCallback((orderedIds: string[]) => {
+    socketRef.current?.send({ intent: { kind: 'projects.reorder', orderedIds }, t: 'intent' })
   }, [])
 
   const activateWorkspace = useCallback(
@@ -391,17 +395,15 @@ function App() {
   const sidebarElement =
     projection !== null ? (
       <Sidebar
-        activeTabId={activeTabId}
         currentProjectId={projection.currentProjectId}
         onInteract={leaveInsertMode}
-        onDeleteProject={deleteProject}
         onNewProject={newProject}
-        onNewTab={newTab}
-        onSelectTab={activateTab}
+        onNewWorkspace={newWorkspace}
+        onReorderProjects={reorderProjects}
         onSelectWorkspace={activateWorkspace}
         onSwitchProject={switchProject}
+        onToggleCollapsed={toggleProjectCollapsed}
         projects={projection.projects}
-        projectStatuses={projection.projectStatuses}
         tabs={projection.tabs}
         workspaceActivity={projection.workspaceActivity}
         workspaceDivergence={projection.workspaceDivergence}

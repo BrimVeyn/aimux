@@ -55,10 +55,10 @@ import {
   setActiveSideEffectRunner,
 } from './state/dispatch-ref'
 import { findMostRecentProject, loadProjectCatalog } from './state/project-catalog'
-import { getActiveWorkspacePath } from './state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
+import { getActiveWorkspacePath } from './state/workspace-view'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import {

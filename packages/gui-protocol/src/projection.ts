@@ -54,6 +54,10 @@ export interface ProjectedTab {
   activity?: TabActivity
   /** The tab rang while you were looking elsewhere. Drawn as a dot. */
   unseen?: boolean
+  /** Its PTY was released; the workspace row marks it with a `z`. */
+  hibernated?: boolean
+  /** Filtered out of every strip and list — see `filterTabsForActiveWorkspace`. */
+  hidden?: boolean
   /**
    * Workspace the tab lives in. The tab strip shows the ACTIVE workspace's
    * tabs only, so without this the renderer cannot filter and would show
@@ -83,6 +87,8 @@ export interface ProjectRecordLite {
   activeWorkspaceId?: string
   projectPath?: string
   workspaces?: WorkspaceLite[]
+  /** Folded in the sidebar: only the active workspace shows, and only if current. */
+  collapsed?: boolean
 }
 
 export interface GuiHelpEntry {
@@ -321,6 +327,7 @@ export interface ModalProjection {
 export interface AppStateProjection {
   tabs: ProjectedTab[]
   activeTabId: string | null
+  /** Already in display order — the renderer must not re-sort. */
   projects: ProjectRecordLite[]
   currentProjectId: string | null
   projectStatuses: Record<string, ProjectStatus>

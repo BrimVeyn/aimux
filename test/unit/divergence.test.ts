@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 
 import { parseDivergenceCount, parseShortstat } from '../../src/git/divergence'
-import { formatDiffCount, formatDiffStat } from '../../src/state/project-workspaces'
+import { formatDiffCount, formatDiffStat } from '../../src/state/workspace-view'
 
 test('parseDivergenceCount reads left as behind, right as ahead', () => {
   expect(parseDivergenceCount('1\t3')).toEqual({ ahead: 3, behind: 1 })

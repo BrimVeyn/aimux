@@ -13,11 +13,8 @@ import {
   makeWorktreePath,
   pruneEmptyWorktreeParent,
 } from '../../src/platform/worktree-paths'
-import {
-  ensureProjectWorkspaces,
-  getActiveWorkspacePath,
-  withActiveWorkspace,
-} from '../../src/state/project-workspaces'
+import { ensureProjectWorkspaces, withActiveWorkspace } from '../../src/state/project-workspaces'
+import { getActiveWorkspacePath } from '../../src/state/workspace-view'
 
 function makeProject(projectPath = '/repo/main'): ProjectRecord {
   return {

@@ -3,7 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
-import { getActiveWorkspacePath } from '../state/project-workspaces'
+import { getActiveWorkspacePath } from '../state/workspace-view'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
 

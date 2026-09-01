@@ -28,6 +28,7 @@ import type {
 } from '../state/types'
 import type { GuiHelpEntry } from './gui-help-entries'
 
+import { orderProjectsForDisplay } from '../ui/project-ordering'
 import { encodeDiffImages } from './encode-diff-images'
 
 export type { AIUsageProjection, AppStateProjection, ProjectedTab, StatusBarProjection }
@@ -37,6 +38,8 @@ function projectTab(tab: TabSession): ProjectedTab {
     activity: tab.activity,
     assistant: tab.assistant,
     command: tab.command,
+    hibernated: tab.hibernated,
+    hidden: tab.hidden,
     id: tab.id,
     status: tab.status,
     title: tab.title,
@@ -65,6 +68,7 @@ function projectWorkspace(w: WorkspaceRecord): WorkspaceLite {
 function projectProject(p: ProjectRecord): ProjectRecordLite {
   return {
     activeWorkspaceId: p.activeWorkspaceId,
+    collapsed: p.collapsed,
     id: p.id,
     name: p.name,
     projectPath: p.projectPath,
@@ -211,7 +215,7 @@ export function projectAppState(
     modal: projectModal(state.modal),
     multiRepo: state.multiRepo,
     projectBar: { visible: state.projectBar.visible },
-    projects: state.projects.map(projectProject),
+    projects: orderProjectsForDisplay(state.projects).map(projectProject),
     projectStatuses: state.projectStatuses,
     snippets: state.snippets,
     statusBar: options.statusBar,

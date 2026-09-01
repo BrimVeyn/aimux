@@ -1,5 +1,5 @@
 import { Row } from "@/components/ModalHost";
-import { AimuxButton } from "@/components/ui/AimuxButton";
+import { Button } from "@/components/ui/button";
 import { formatDivergence } from "@/lib/git";
 import { theme } from "@/lib/theme";
 import type { ModalProjection, ProjectRecordLite } from "@/lib/types";
@@ -70,16 +70,18 @@ export function WorkspaceMoveModal({
         )}
       </div>
       <div className="flex flex-col gap-1 pt-1">
-        <AimuxButton
-          className="px-2 py-1 text-left"
-          onClick={onToggleDeleteSource}
+        <Button
           variant="ghost"
+          size="tui"
+          aria-pressed={deleteSource}
+          className="w-full justify-start px-2"
+          onClick={onToggleDeleteSource}
         >
           <span style={{ color: theme.textMuted }}>delete source after move: </span>
           <span style={{ color: deleteSource ? theme.warning : theme.text }}>
             {deleteSource ? "on" : "off"}
           </span>
-        </AimuxButton>
+        </Button>
         <div className="pt-1" style={{ color: theme.textMuted }}>
           {MOVE_HINTS.map(([key, label]) => (
             <div key={key} className="flex gap-2">

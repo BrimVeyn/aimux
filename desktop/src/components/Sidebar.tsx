@@ -1,32 +1,45 @@
+import { useCallback, useMemo, useState } from "react";
+
 import type {
   ProjectedTab,
   ProjectRecordLite,
-  ProjectStatus,
   WorkspaceActivity,
   WorkspaceLite,
 } from "@aimux/gui-protocol";
 
+import { formatDiffStat, getSidebarWorkspaces } from "@aimux/state/workspace-view";
+
+import { Button } from "@/components/ui/button";
 import { theme } from "@/lib/theme";
 
 import { Spinner } from "./Spinner";
 
+/** Same pair the git panel folds its directories with, so the gesture reads once. */
+const COLLAPSED_GLYPH = "▸";
+const EXPANDED_GLYPH = "▾";
+/** Nerd-font git branch glyph, the one the TUI hangs under a workspace name. */
+const BRANCH_GLYPH = "\u{e702}";
+
+type Divergence = {
+  ahead: number;
+  behind: number;
+  added?: number;
+  removed?: number;
+};
+
 interface SidebarProps {
+  /** In display order, as the host sends it. */
   projects: ProjectRecordLite[];
   currentProjectId: string | null;
-  projectStatuses: Record<string, ProjectStatus>;
   workspaceActivity: Record<string, WorkspaceActivity>;
-  workspaceDivergence: Record<
-    string,
-    { ahead: number; behind: number; added?: number; removed?: number }
-  >;
+  workspaceDivergence: Record<string, Divergence>;
   tabs: ProjectedTab[];
-  activeTabId: string | null;
-  onSelectTab: (id: string) => void;
   onSelectWorkspace: (projectId: string, workspaceId: string) => void;
   onSwitchProject: (projectId: string) => void;
-  onDeleteProject: (projectId: string) => void;
+  onToggleCollapsed: (projectId: string) => void;
+  onNewWorkspace: (projectId: string) => void;
   onNewProject: () => void;
-  onNewTab: () => void;
+  onReorderProjects: (orderedIds: string[]) => void;
   // Fires before any button inside the sidebar. The shell wires this to
   // leaveInsertMode so any sidebar interaction drops out of terminal-input,
   // including clicks on whitespace / labels that aren't buttons themselves.
@@ -34,322 +47,333 @@ interface SidebarProps {
 }
 
 /**
- * The projects widget: projects → workspaces → tabs, the same three levels the
- * TUI's `project-list` / `workspace-row` / `tab-item` draw. Only the current
- * project expands — the others are one row you click to switch to.
+ * Transcription of `project-list.tsx`: a rule, a header, then one flat list of
+ * project headings each followed by its workspaces. Deliberately no tabs — the
+ * strip above the panes owns those, and a row that listed them too would make
+ * the sidebar mean two things.
+ *
+ * Every target is a real `<Button>`, laid out as siblings rather than nested:
+ * a row's own action and the small ones on it are separate buttons in one flex
+ * line, so each gets the full row height to be clicked in. A glyph wrapped in a
+ * span was two cells tall and impossible to hit.
  */
 export function Sidebar({
-  activeTabId,
   currentProjectId,
-  onDeleteProject,
   onInteract,
   onNewProject,
-  onNewTab,
-  onSelectTab,
+  onNewWorkspace,
+  onReorderProjects,
   onSelectWorkspace,
   onSwitchProject,
+  onToggleCollapsed,
   projects,
-  projectStatuses,
   tabs,
   workspaceActivity,
   workspaceDivergence,
 }: SidebarProps) {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  // Where the drop would land, as a gap index (0 = above the first project,
+  // projects.length = below the last). The list itself never moves while
+  // dragging — only this bar does, so rows can't slide out from under the
+  // pointer and make the drag oscillate.
+  const [dropIndex, setDropIndex] = useState<number | null>(null);
+
+  const order = useMemo(() => projects.map((p) => p.id), [projects]);
+
+  const commitDrop = useCallback(() => {
+    const source = draggingId;
+    const slot = dropIndex;
+    setDraggingId(null);
+    setDropIndex(null);
+    if (source === null || slot === null) return;
+    const from = order.indexOf(source);
+    if (from < 0) return;
+    const next = order.filter((id) => id !== source);
+    next.splice(slot > from ? slot - 1 : slot, 0, source);
+    if (next.every((id, i) => id === order[i])) return;
+    onReorderProjects(next);
+  }, [draggingId, dropIndex, onReorderProjects, order]);
+
+  const workspacesWithSleepingTabs = useMemo(() => {
+    const ids = new Set<string>();
+    for (const tab of tabs) {
+      if (tab.hibernated === true && tab.workspaceId !== undefined) {
+        ids.add(tab.workspaceId);
+      }
+    }
+    return ids;
+  }, [tabs]);
+
   return (
     <div
-      className="relative z-[60] flex h-full flex-col overflow-hidden"
+      className="tui flex h-full flex-col overflow-hidden"
       style={{ backgroundColor: theme.background }}
       onMouseDownCapture={onInteract}
+      onDragEnd={commitDrop}
     >
-      <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <span className="chrome-meta" style={{ color: theme.textMuted }}>
-          Projects
-        </span>
-        <IconButton label="New project" onClick={onNewProject} />
+      <div
+        className="tui-row overflow-hidden"
+        style={{ color: theme.border }}
+        aria-hidden
+      >
+        {"─".repeat(400)}
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-2">
-        {projects.map((project) => (
-          <ProjectRow
-            key={project.id}
-            activeTabId={activeTabId}
-            current={project.id === currentProjectId}
-            onDelete={onDeleteProject}
-            onNewTab={onNewTab}
-            onSelectTab={onSelectTab}
-            onSelectWorkspace={onSelectWorkspace}
-            onSwitchProject={onSwitchProject}
-            project={project}
-            status={projectStatuses[project.id]}
-            tabs={tabs}
-            workspaceActivity={workspaceActivity}
-            workspaceDivergence={workspaceDivergence}
-          />
-        ))}
+      <div className="tui-row pl-[1ch]">
+        <span style={{ color: theme.text }}>Projects</span>
+        <span className="flex-1" />
+        <Button
+          variant="ghost"
+          size="tui"
+          aria-label="New project"
+          title="New project"
+          onClick={onNewProject}
+          style={{ color: theme.textMuted }}
+        >
+          +
+        </Button>
       </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {projects.map((project, index) => {
+          const isCurrent = project.id === currentProjectId;
+          return (
+            <div key={project.id}>
+              <DropGap
+                active={dropIndex === index}
+                index={index}
+                onEnter={setDropIndex}
+              />
+              <ProjectRow
+                current={isCurrent}
+                dragging={draggingId === project.id}
+                onDragStart={setDraggingId}
+                onNewWorkspace={onNewWorkspace}
+                onSwitchProject={onSwitchProject}
+                onToggleCollapsed={onToggleCollapsed}
+                project={project}
+              />
+              {getSidebarWorkspaces(project, isCurrent).map((workspace) => (
+                <WorkspaceRow
+                  key={workspace.id}
+                  activity={workspaceActivity[workspace.id]}
+                  divergence={workspaceDivergence[workspace.id]}
+                  hasSleepingTabs={workspacesWithSleepingTabs.has(workspace.id)}
+                  inCurrentGroup={isCurrent}
+                  isActiveItem={
+                    isCurrent && workspace.id === project.activeWorkspaceId
+                  }
+                  onSelect={() => onSelectWorkspace(project.id, workspace.id)}
+                  workspace={workspace}
+                />
+              ))}
+            </div>
+          );
+        })}
+        {/* Trailing slot, so "after the last project" is reachable. */}
+        <DropGap
+          active={dropIndex === projects.length}
+          index={projects.length}
+          onEnter={setDropIndex}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** The one-row gap above a project — blank, or the drop preview mid-drag. */
+function DropGap({
+  active,
+  index,
+  onEnter,
+}: {
+  index: number;
+  active: boolean;
+  onEnter: (index: number) => void;
+}) {
+  return (
+    <div
+      className="tui-row overflow-hidden"
+      onDragEnter={() => onEnter(index)}
+      onDragOver={(e) => e.preventDefault()}
+      style={{ color: theme.primary }}
+    >
+      {/* Heavier than the chrome rules, so the drop preview never reads as a
+          border. */}
+      {active ? "━".repeat(400) : ""}
     </div>
   );
 }
 
 function ProjectRow({
-  activeTabId,
   current,
-  onDelete,
-  onNewTab,
-  onSelectTab,
-  onSelectWorkspace,
+  dragging,
+  onDragStart,
+  onNewWorkspace,
   onSwitchProject,
+  onToggleCollapsed,
   project,
-  status,
-  tabs,
-  workspaceActivity,
-  workspaceDivergence,
 }: {
   project: ProjectRecordLite;
   current: boolean;
-  status: ProjectStatus | undefined;
-  tabs: ProjectedTab[];
-  activeTabId: string | null;
-  workspaceActivity: Record<string, WorkspaceActivity>;
-  workspaceDivergence: Record<
-    string,
-    { ahead: number; behind: number; added?: number; removed?: number }
-  >;
-  onSelectTab: (id: string) => void;
-  onSelectWorkspace: (projectId: string, workspaceId: string) => void;
+  dragging: boolean;
+  onDragStart: (id: string) => void;
   onSwitchProject: (projectId: string) => void;
-  onDelete: (projectId: string) => void;
-  onNewTab: () => void;
+  onToggleCollapsed: (projectId: string) => void;
+  onNewWorkspace: (projectId: string) => void;
 }) {
-  const workspaces = project.workspaces ?? [];
-  return (
-    <div className="mb-1">
-      <div
-        onMouseDown={() => {
-          if (!current) onSwitchProject(project.id);
-        }}
-        className="group flex cursor-pointer items-center gap-2 px-4 py-1.5 transition-[background-color] duration-150 ease-out"
-        style={{
-          backgroundColor: current ? theme.backgroundElement : "transparent",
-        }}
-      >
-        <StatusDot status={status} />
-        <span
-          className="chrome-title truncate"
-          style={{ color: current ? theme.text : theme.textMuted }}
-        >
-          {project.name}
-        </span>
-        <button
-          type="button"
-          aria-label="Close project"
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            onDelete(project.id);
-          }}
-          className="ml-auto flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full opacity-0 transition-opacity duration-150 group-hover:opacity-100"
-          style={{ color: theme.textMuted }}
-        >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 10 10"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          >
-            <path d="M2 2 L8 8 M8 2 L2 8" />
-          </svg>
-        </button>
-      </div>
+  // Only the drag highlight is "selected"-strength here. A heading that lights
+  // up like a cursor row is what made the project look like a workspace.
+  let background: string | undefined;
+  if (dragging) background = theme.backgroundElement;
+  else if (current) background = theme.backgroundPanel;
 
-      {current
-        ? workspaces.map((workspace) => (
-            <WorkspaceRow
-              key={workspace.id}
-              activeTabId={activeTabId}
-              activity={workspaceActivity[workspace.id]}
-              active={workspace.id === project.activeWorkspaceId}
-              divergence={workspaceDivergence[workspace.id]}
-              onNewTab={onNewTab}
-              onSelect={() => onSelectWorkspace(project.id, workspace.id)}
-              onSelectTab={onSelectTab}
-              tabs={tabs.filter((tab) => tab.workspaceId === workspace.id)}
-              workspace={workspace}
-            />
-          ))
-        : null}
+  const collapsed = project.collapsed === true;
+
+  return (
+    <div
+      className="tui-row"
+      draggable
+      onDragStart={() => onDragStart(project.id)}
+      style={{ backgroundColor: background }}
+    >
+      <Button
+        variant="ghost"
+        size="tui"
+        aria-expanded={!collapsed}
+        aria-label={collapsed ? "Expand project" : "Collapse project"}
+        onClick={() => onToggleCollapsed(project.id)}
+        style={{ color: theme.textMuted }}
+      >
+        {collapsed ? COLLAPSED_GLYPH : EXPANDED_GLYPH}
+      </Button>
+      {/* The heading stands for the project itself, not for whichever workspace
+          was last active in it, so clicking it lands on the checkout. */}
+      <Button
+        variant="ghost"
+        size="tui"
+        className="min-w-0 flex-1 justify-start"
+        onClick={() => onSwitchProject(project.id)}
+        style={{ color: theme.text }}
+      >
+        <span className="truncate">{project.name}</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="tui"
+        aria-label="New workspace"
+        title="New workspace"
+        onClick={() => onNewWorkspace(project.id)}
+        style={{ color: theme.textMuted }}
+      >
+        +
+      </Button>
     </div>
   );
 }
 
 function WorkspaceRow({
-  active,
-  activeTabId,
   activity,
   divergence,
-  onNewTab,
+  hasSleepingTabs,
+  inCurrentGroup,
+  isActiveItem,
   onSelect,
-  onSelectTab,
-  tabs,
   workspace,
 }: {
   workspace: WorkspaceLite;
-  active: boolean;
+  isActiveItem: boolean;
+  inCurrentGroup: boolean;
   activity: WorkspaceActivity | undefined;
-  divergence: { ahead: number; behind: number } | undefined;
-  tabs: ProjectedTab[];
-  activeTabId: string | null;
+  divergence: Divergence | undefined;
+  hasSleepingTabs: boolean;
   onSelect: () => void;
-  onSelectTab: (id: string) => void;
-  onNewTab: () => void;
 }) {
+  let background: string | undefined;
+  if (isActiveItem) background = theme.backgroundElement;
+  else if (inCurrentGroup) background = theme.backgroundPanel;
+
+  // The cursor: a full-height accent bar down the left of the row, both lines
+  // of it. The background alone is one step of grey and gets lost among rows
+  // that carry colour of their own.
+  const cursor = isActiveItem ? "▌" : " ";
+  const hasBranch = workspace.branch != null && workspace.branch !== "";
+  const { added, removed } = formatDiffStat(divergence);
+  const marker = statusMarker(activity, hasSleepingTabs);
+
   return (
-    <div>
-      <div
-        onMouseDown={onSelect}
-        className="group flex cursor-pointer items-center gap-1.5 py-1 pr-3 pl-6"
-        style={{
-          backgroundColor: active
-            ? `color-mix(in oklab, ${theme.primary} 12%, transparent)`
-            : "transparent",
-        }}
-      >
-        <ActivityGlyph activity={activity} />
+    // One button for the whole row, both lines of it — the branch line belongs
+    // to the same target as the name above it.
+    <Button
+      variant="ghost"
+      size="tui"
+      aria-current={isActiveItem ? "true" : undefined}
+      onClick={onSelect}
+      className="h-auto w-full flex-col items-stretch gap-0 py-0 pr-[1ch] pl-0"
+      style={{ backgroundColor: background }}
+    >
+      <span className="tui-row w-full">
+        <span style={{ color: theme.primary }}>{cursor}</span>
+        <span style={{ color: marker.color }}>{marker.glyph}</span>
+        {/* Full strength only under the cursor. Every name at full strength
+            reads as a wall of white; every name muted leaves the selected row
+            with nothing but a shade of grey to say so. */}
         <span
-          className="chrome-label flex-1 truncate"
-          style={{ color: active ? theme.text : theme.textMuted }}
+          className="truncate"
+          style={{
+            color: isActiveItem ? theme.text : theme.textMuted,
+            fontWeight: isActiveItem ? 700 : 400,
+          }}
         >
           {workspace.name}
         </span>
-        <Divergence divergence={divergence} />
-        {active ? <IconButton label="New tab" onClick={onNewTab} /> : null}
-      </div>
-
-      {active
-        ? tabs.map((tab) => (
-            <div
-              key={tab.id}
-              onMouseDown={() => onSelectTab(tab.id)}
-              className="cursor-pointer py-0.5 pr-3 pl-10"
-            >
-              <span
-                className="chrome-label truncate"
-                style={{
-                  color: tab.id === activeTabId ? theme.text : theme.textMuted,
-                }}
-              >
-                {tab.title}
-              </span>
-            </div>
-          ))
-        : null}
-    </div>
+        <span className="flex-1" />
+        {added !== "" ? (
+          <span style={{ color: theme.success }}>{added}</span>
+        ) : null}
+        {added !== "" && removed !== "" ? <span> </span> : null}
+        {removed !== "" ? (
+          <span style={{ color: theme.error }}>{removed}</span>
+        ) : null}
+      </span>
+      {/* Second line, hanging under the name, and where the branch glyph lives
+          — it labels the branch, not the workspace. Only workspaces that own a
+          branch get one. */}
+      {hasBranch ? (
+        <span className="tui-row w-full">
+          <span style={{ color: theme.primary }}>{cursor}</span>
+          <span>{"  "}</span>
+          <span className="truncate" style={{ color: theme.textMuted }}>
+            {BRANCH_GLYPH} {workspace.branch}
+          </span>
+        </span>
+      ) : null}
+    </Button>
   );
 }
 
-/** Ahead/behind the ref this workspace forked from. Nothing when in sync. */
-function Divergence({
-  divergence,
-}: {
-  divergence: { ahead: number; behind: number } | undefined;
-}) {
-  if (divergence === undefined) return null;
-  const { ahead, behind } = divergence;
-  if (ahead === 0 && behind === 0) return null;
-  return (
-    <span className="chrome-code shrink-0" style={{ color: theme.textMuted }}>
-      {ahead > 0 ? `↑${ahead}` : ""}
-      {behind > 0 ? `↓${behind}` : ""}
-    </span>
-  );
-}
-
-function ActivityGlyph({ activity }: { activity: WorkspaceActivity | undefined }) {
+/**
+ * Two cells, always: the glyph and the gap after it, so nothing shifts when an
+ * agent starts or stops. A question outranks work in progress, which outranks
+ * "it finished and you haven't looked"; hibernation comes last, because
+ * anything else is news and that is the absence of it.
+ */
+function statusMarker(
+  activity: WorkspaceActivity | undefined,
+  hasSleepingTabs: boolean,
+): { glyph: React.ReactNode; color: string } {
+  if (activity?.waiting === true) return { color: theme.warning, glyph: "? " };
   if (activity?.working === true) {
-    return (
-      <span className="inline-flex h-2 w-2 items-center justify-center">
-        <Spinner color={theme.primary} />
-      </span>
-    );
+    return {
+      color: theme.primary,
+      glyph: (
+        <span className="inline-flex w-[2ch]">
+          <Spinner color={theme.primary} />
+        </span>
+      ),
+    };
   }
-  const color =
-    activity?.waiting === true
-      ? theme.warning
-      : activity?.done === true
-        ? theme.success
-        : null;
-  if (color === null) {
-    // Keeps the labels aligned with the rows that do carry a glyph.
-    return <span className="inline-block h-1.5 w-1.5 shrink-0" />;
-  }
-  return (
-    <span
-      aria-hidden
-      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-      style={{ backgroundColor: color }}
-    />
-  );
-}
-
-function StatusDot({ status }: { status: ProjectStatus | undefined }) {
-  if (status?.working === true) {
-    return (
-      <span className="inline-flex h-2 w-2 items-center justify-center">
-        <Spinner color={theme.primary} />
-      </span>
-    );
-  }
-  return (
-    <span
-      aria-hidden
-      className="inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-      style={{
-        backgroundColor:
-          status?.waiting === true ? theme.warning : theme.textMuted,
-      }}
-    />
-  );
-}
-
-function IconButton({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onMouseDown={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md transition-[background-color,color] duration-150 ease-out"
-      style={{ color: theme.textMuted }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.backgroundColor = theme.backgroundElement;
-        e.currentTarget.style.color = theme.text;
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.backgroundColor = "transparent";
-        e.currentTarget.style.color = theme.textMuted;
-      }}
-    >
-      <svg
-        width="12"
-        height="12"
-        viewBox="0 0 12 12"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      >
-        <path d="M6 2 L6 10 M2 6 L10 6" />
-      </svg>
-    </button>
-  );
+  if (activity?.done === true) return { color: theme.success, glyph: "● " };
+  if (hasSleepingTabs) return { color: theme.textMuted, glyph: "z " };
+  return { color: theme.textMuted, glyph: "  " };
 }

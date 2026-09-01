@@ -27,8 +27,8 @@ import {
 import { shouldRefreshBase, worktreeCopyPatterns } from '../settings/flags'
 import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
-import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+import { getActiveWorkspace, getActiveWorkspacePath } from '../state/workspace-view'
 
 /**
  * Rewrite one project and hand back the whole list, ready for `set-projects`.

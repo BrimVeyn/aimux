@@ -37,6 +37,15 @@ export type GuiIntent =
   // `set-active-workspace`, or a project switch carrying the workspace — is
   // the host's call, since only it knows which project is current.
   | { kind: 'workspace.activate'; projectId: string; workspaceId: string }
+  // The fold arrow on a project heading.
+  | { kind: 'project.toggleCollapsed'; projectId: string }
+  // The `+` on a project heading. The modal always targets the current
+  // project, so the host switches first when the click landed on another one.
+  | { kind: 'project.newWorkspace'; projectId: string }
+  // The `+` in the sidebar header.
+  | { kind: 'project.new' }
+  // Dragging a project heading to a new slot in the sidebar.
+  | { kind: 'projects.reorder'; orderedIds: string[] }
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -92,6 +101,18 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
         projectId: obj.projectId,
         workspaceId: obj.workspaceId,
       }
+    case 'project.toggleCollapsed':
+      if (typeof obj.projectId !== 'string') return null
+      return { kind: 'project.toggleCollapsed', projectId: obj.projectId }
+    case 'project.newWorkspace':
+      if (typeof obj.projectId !== 'string') return null
+      return { kind: 'project.newWorkspace', projectId: obj.projectId }
+    case 'project.new':
+      return { kind: 'project.new' }
+    case 'projects.reorder':
+      if (!Array.isArray(obj.orderedIds)) return null
+      if (!obj.orderedIds.every((id) => typeof id === 'string')) return null
+      return { kind: 'projects.reorder', orderedIds: obj.orderedIds as string[] }
     default:
       return null
   }

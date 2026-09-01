@@ -58,6 +58,21 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'workspace.activate':
       handleWorkspaceActivate(intent, runtime)
       return
+    case 'project.toggleCollapsed':
+      runtime.pipeline.runEffect({
+        projectId: intent.projectId,
+        type: 'toggle-project-collapsed',
+      })
+      return
+    case 'project.newWorkspace':
+      handleNewWorkspace(intent, runtime)
+      return
+    case 'project.new':
+      runtime.dispatch({ returnToProjectPicker: false, type: 'open-create-project-modal' })
+      return
+    case 'projects.reorder':
+      runtime.dispatch({ orderedIds: intent.orderedIds, type: 'reorder-projects' })
+      return
   }
 }
 
@@ -87,6 +102,25 @@ function handleWorkspaceActivate(
     type: 'switch-project-by-index',
     workspaceId: intent.workspaceId,
   })
+}
+
+/**
+ * `project-list.tsx`'s `handleNewWorkspace`: the create-workspace modal always
+ * targets the current project, so a click on another project's `+` has to
+ * switch first. Both go through the store synchronously.
+ */
+function handleNewWorkspace(
+  intent: Extract<GuiIntent, { kind: 'project.newWorkspace' }>,
+  runtime: GuiRuntime
+): void {
+  const state = runtime.getState()
+  if (state.currentProjectId !== intent.projectId) {
+    const index = state.projects.findIndex((project) => project.id === intent.projectId)
+    if (index < 0) return
+    runtime.pipeline.runEffect({ index: index + 1, type: 'switch-project-by-index' })
+  }
+  runtime.dispatch({ type: 'open-create-workspace-modal' })
+  runtime.pipeline.runEffect({ type: 'load-create-workspace-base-branches' })
 }
 
 function handleSnippetSubmit(
