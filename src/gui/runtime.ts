@@ -1,5 +1,4 @@
-import type { ResolvedConfig } from '@brimveyn/aimux-config'
-
+import { getStatusBarSeparator, type ResolvedConfig } from '@brimveyn/aimux-config'
 import { basename } from 'node:path'
 
 import type { SessionBackend } from '../session-backend/types'
@@ -21,6 +20,8 @@ import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from '../integrations/claude-theme-sync'
 import { startAIUsageService } from '../services/ai-usage/provider'
+import { HINTS_ENABLED } from '../settings/sections/status-bar'
+import { settingsStore } from '../settings/settings-store'
 import { aiUsageStore } from '../state/ai-usage-store'
 import { appStore } from '../state/app-store'
 import { getBarWidth } from '../state/bars'
@@ -223,6 +224,8 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
       // renders identical content; it needs the keymap config the host owns.
       statusBar: {
         ...getStatusBarModel(state, resolvedConfig.keymaps),
+        hints: settingsStore.getState().values[HINTS_ENABLED] !== false,
+        separator: getStatusBarSeparator(),
         version: APP_VERSION,
       },
       themeId: getCurrentThemeId(),

@@ -4,224 +4,222 @@ import type {
   AppStateProjection,
   FocusMode,
   IdentitySegment,
+  StatusBarSeparatorKind,
 } from "@/lib/types";
 
-// Single-line, ambient status bar. No card background, no pill chips, no
-// inline hint dump — keybind hints and version live behind a hover popover
-// triggered by a discreet `?` button on the right. The focus mode is
-// communicated by typography alone (the word itself is colored), pairing
-// with the FocusModeRail above for a peripheral signal.
-//
-// The host pre-renders right/help/version strings (it owns the keymap config)
-// and sends the identity breadcrumb as toned segments.
+/**
+ * Transcription of `src/ui/components/layout/status-bar.tsx`: a lualine-style
+ * row of tiles — mode, identity, filler, AI usage, version — joined by
+ * powerline glyphs, with an optional second row of ambient hints.
+ *
+ * Everything it draws is one terminal row tall, on the same cell grid as the
+ * panes above it.
+ */
 
-// Mirror of FocusModeRail's color mapping so the label and the rail
-// communicate the focus mode with the same color, not two different ones.
-function modeColor(focusMode: FocusMode): string {
+// Powerline-style separator glyph pairs.
+// `right` is rendered between left-anchored tiles (A→B, B→filler).
+// `left` is rendered between right-anchored tiles (filler→Y, X→Y).
+// `none` uses empty strings so bare background transitions remain visible.
+const SEPARATOR_GLYPHS: Record<
+  StatusBarSeparatorKind,
+  { left: string; right: string }
+> = {
+  arrow: { left: "\u{E0B2}", right: "\u{E0B0}" },
+  flame: { left: "\u{E0C2}", right: "\u{E0C0}" },
+  none: { left: "", right: "" },
+  round: { left: "\u{E0B6}", right: "\u{E0B4}" },
+  slant: { left: "\u{E0BA}", right: "\u{E0BC}" },
+};
+
+// Mode label is padded to a fixed width so the A tile never resizes
+// when switching modes — keeps the rest of the bar visually stable.
+const MODE_LABEL_WIDTH = 6;
+// A tile width = padded label (6) + paddingLeft (1) + paddingRight (1).
+// Row 2 indents past A + separator glyph + B's paddingLeft so the
+// hints line up with the start of B's content.
+const ROW2_INDENT = MODE_LABEL_WIDTH + 2 + 1 + 1;
+
+function getModeLabel(focusMode: FocusMode): string {
   switch (focusMode) {
     case "terminal-input":
-      return theme.accent;
+      return "INSERT";
+    case "modal":
+      return "MODAL";
+    case "command-edit":
+      return "EDIT";
+    case "git":
+      return "GIT";
+    case "settings":
+      return "SET";
+    default:
+      return "NORMAL";
+  }
+}
+
+function getModeBadge(focusMode: FocusMode): string {
+  const label = getModeLabel(focusMode);
+  const totalPad = Math.max(0, MODE_LABEL_WIDTH - label.length);
+  const left = Math.floor(totalPad / 2);
+  return " ".repeat(left) + label + " ".repeat(totalPad - left);
+}
+
+function getModeColor(focusMode: FocusMode): string {
+  switch (focusMode) {
+    case "terminal-input":
+      return theme.primary;
     case "modal":
     case "command-edit":
       return theme.warning;
     case "git":
       return theme.success;
+    case "settings":
+      return theme.secondary;
     default:
-      return theme.primary;
+      return theme.text;
   }
 }
 
-function modeLabel(focusMode: FocusMode): string {
-  switch (focusMode) {
-    case "terminal-input":
-      return "input";
-    case "modal":
-      return "modal";
-    case "command-edit":
-      return "edit";
-    case "git":
-      return "git";
-    default:
-      return "nav";
-  }
+function composeAmbient(right: string, help: string): string {
+  if (right === "" && help === "") return "";
+  if (right === "") return help;
+  if (help === "") return right;
+  return `${right}  ·  ${help}`;
 }
 
-function ConnectionDot({ connecting }: { connecting: boolean }) {
-  const color = connecting ? theme.warning : theme.success;
+function Segments({ segments }: { segments: IdentitySegment[] }) {
   return (
-    <span
-      aria-hidden
-      className="inline-block h-[5px] w-[5px] rounded-full transition-[background-color] duration-300 ease-out"
-      style={{
-        backgroundColor: color,
-        animation: connecting
-          ? "aimux-status-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite"
-          : undefined,
-      }}
-      title={connecting ? "Connecting…" : "Connected"}
-    />
-  );
-}
-
-function ModeLabel({ focusMode }: { focusMode: FocusMode }) {
-  const color = modeColor(focusMode);
-  const label = modeLabel(focusMode);
-  return (
-    <span
-      className="chrome-label transition-[color] duration-200 ease-out"
-      style={{ color, fontWeight: 600, letterSpacing: "0.005em" }}
-    >
-      {label}
-    </span>
-  );
-}
-
-/**
- * The identity breadcrumb. The host sends toned segments, so this no longer
- * splits a string on a nerd-font glyph to guess where one ends: `primary` is
- * the project, `muted` is everything trailing it, separators included.
- */
-function ProjectBreadcrumb({ segments }: { segments: IdentitySegment[] }) {
-  if (segments.length === 0) return null;
-  return (
-    <span
-      className="chrome-meta flex min-w-0 items-baseline truncate"
-      title={segments.map((seg) => seg.text).join("")}
-    >
+    <>
       {segments.map((seg) => (
         <span
           key={seg.id}
-          className="truncate whitespace-pre"
           style={{
             color: seg.tone === "primary" ? theme.text : theme.textMuted,
-            opacity: seg.tone === "primary" ? 1 : 0.75,
           }}
         >
           {seg.text}
         </span>
       ))}
-    </span>
+    </>
   );
 }
 
-function HintsTrigger({
-  hint,
-  version,
+function Separator({
+  bg,
+  fg,
+  glyph,
 }: {
-  hint: string;
-  version: string;
+  bg: string;
+  fg: string;
+  glyph: string;
 }) {
-  const empty = hint.trim() === "";
+  if (glyph === "") return null;
   return (
-    <span className="group relative inline-flex">
-      <button
-        type="button"
-        aria-label="Show keybind hints"
-        className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full transition-[background-color,opacity,color] duration-150 ease-out"
-        style={{ color: theme.textMuted, opacity: 0.55 }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = `color-mix(in oklab, ${theme.text} 8%, transparent)`;
-          e.currentTarget.style.opacity = "1";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = "transparent";
-          e.currentTarget.style.opacity = "0.55";
-        }}
-      >
-        <svg
-          width="11"
-          height="11"
-          viewBox="0 0 11 11"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-        >
-          <circle cx="5.5" cy="5.5" r="4.2" />
-          <path d="M4.2 4.2 c0.4 -1 1.6 -1 2.1 -0.4 c0.5 0.6 0 1.2 -0.5 1.6 c-0.4 0.3 -0.6 0.7 -0.6 1.1" />
-          <circle cx="5.5" cy="8.2" r="0.35" fill="currentColor" stroke="none" />
-        </svg>
-      </button>
-
-      <div
-        role="tooltip"
-        className="pointer-events-none absolute right-0 bottom-[calc(100%+8px)] z-[80] w-[280px] origin-bottom-right scale-[0.96] opacity-0 transition-[opacity,transform] duration-150 ease-out group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100"
-        style={{
-          backgroundColor: theme.background,
-          border: `1px solid ${theme.border}`,
-          borderRadius: 10,
-          boxShadow:
-            "0 10px 30px -10px rgb(0 0 0 / 0.35), 0 2px 6px -2px rgb(0 0 0 / 0.25)",
-        }}
-      >
-        <div className="flex flex-col gap-2 p-3">
-          {empty ? (
-            <span
-              className="chrome-meta italic"
-              style={{ color: theme.textMuted }}
-            >
-              No hints in this mode
-            </span>
-          ) : (
-            <span
-              className="chrome-meta leading-relaxed whitespace-normal break-words"
-              style={{ color: theme.text }}
-            >
-              {hint}
-            </span>
-          )}
-          <div
-            className="-mx-3 mt-1 border-t pt-2 pr-3 pl-3 text-right"
-            style={{ borderColor: theme.border }}
-          >
-            <span
-              className="chrome-code"
-              style={{ color: theme.textMuted, opacity: 0.6 }}
-            >
-              aimux v{version}
-            </span>
-          </div>
-        </div>
-      </div>
+    <span aria-hidden style={{ backgroundColor: bg, color: fg }}>
+      {glyph}
     </span>
   );
 }
 
 export function StatusBar({
-  projection,
   connecting,
   onOpenUsage,
+  projection,
 }: {
   projection: AppStateProjection;
   connecting: boolean;
   onOpenUsage: () => void;
 }) {
-  const { statusBar, aiUsage, focusMode } = projection;
+  const { aiUsage, focusMode, statusBar } = projection;
+  const modeColor = getModeColor(focusMode);
+  const ambient = composeAmbient(statusBar.right, statusBar.help);
+  const glyphs = SEPARATOR_GLYPHS[statusBar.separator];
+
+  const tileB = theme.backgroundElement;
+  const tileFiller = theme.backgroundPanel;
+  const tileX = theme.backgroundElement;
+  const tileY = modeColor;
+
+  const hasB = statusBar.projectSegments.length > 0;
+  const hasX = aiUsage.enabled;
 
   return (
     <div
-      className="relative z-[60] flex h-8 shrink-0 items-center gap-3 overflow-visible px-3"
-      style={{ backgroundColor: theme.backgroundPanel }}
+      className="tui flex shrink-0 flex-col overflow-hidden"
+      style={{ backgroundColor: tileFiller }}
     >
-      <div className="flex shrink-0 items-center gap-2">
-        <ConnectionDot connecting={connecting} />
-        <ModeLabel focusMode={focusMode} />
-      </div>
-
-      <div className="h-3 w-px shrink-0" style={{ backgroundColor: theme.border, opacity: 0.6 }} />
-
-      <ProjectBreadcrumb segments={statusBar.projectSegments} />
-
-      <div className="flex-1" />
-
-      <div className="flex shrink-0 items-center gap-3">
-        <span className="font-mono">
-          <AIUsageIndicator aiUsage={aiUsage} onOpen={onOpenUsage} />
+      {/* Row 1 — lualine tiles */}
+      <div className="tui-row overflow-hidden">
+        {/* A: mode. The badge is padded to a fixed width, so the tiles after it
+            never shift when the mode changes. */}
+        <span
+          className="px-[1ch]"
+          style={{ backgroundColor: modeColor, color: theme.background }}
+        >
+          {getModeBadge(focusMode)}
         </span>
-        <HintsTrigger hint={statusBar.right} version={statusBar.version} />
+
+        <Separator
+          glyph={glyphs.right}
+          bg={hasB ? tileB : tileFiller}
+          fg={modeColor}
+        />
+
+        {hasB ? (
+          <>
+            <span
+              className="flex min-w-0 shrink truncate px-[1ch]"
+              style={{ backgroundColor: tileB }}
+            >
+              <Segments segments={statusBar.projectSegments} />
+            </span>
+            <Separator glyph={glyphs.right} bg={tileFiller} fg={tileB} />
+          </>
+        ) : null}
+
+        <span className="flex-1" style={{ backgroundColor: tileFiller }}>
+          {/* The one thing the TUI has no equivalent for: a socket that is not
+              open yet. It lives in the filler because it is about the link, not
+              about any tile's content. */}
+          {connecting ? (
+            <span className="pl-[1ch]" style={{ color: theme.warning }}>
+              connecting…
+            </span>
+          ) : null}
+        </span>
+
+        {hasX ? (
+          <>
+            <Separator glyph={glyphs.left} bg={tileFiller} fg={tileX} />
+            <span
+              className="flex shrink-0 px-[1ch]"
+              style={{ backgroundColor: tileX }}
+            >
+              <AIUsageIndicator aiUsage={aiUsage} onOpen={onOpenUsage} />
+            </span>
+            <Separator glyph={glyphs.left} bg={tileX} fg={tileY} />
+          </>
+        ) : (
+          <Separator glyph={glyphs.left} bg={tileFiller} fg={tileY} />
+        )}
+
+        {/* Y: version */}
+        <span
+          className="shrink-0 px-[1ch]"
+          style={{ backgroundColor: tileY, color: theme.background }}
+        >
+          v{statusBar.version}
+        </span>
       </div>
+
+      {/* Row 2 — ambient hints, indented to line up with B's content */}
+      {statusBar.hints ? (
+        <div
+          className="tui-row overflow-hidden pr-[1ch]"
+          style={{ color: theme.textMuted, paddingLeft: `${ROW2_INDENT}ch` }}
+        >
+          {ambient}
+        </div>
+      ) : null}
     </div>
   );
 }

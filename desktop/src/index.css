@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @font-face {
@@ -22,6 +21,16 @@
 
 /* Fallback aimux palette so the app renders before the first WS projection.
    useTheme overrides these once the host pushes the active theme. */
+/* The cell metric. NOT a design choice: it is the xterm.js config in
+   `lib/terminal-registry.ts` (13px, line-height 1.1). The chrome sits on the
+   same grid as the terminal it wraps, so a row of chrome is exactly as tall as
+   a row of output. Change one and change the other. */
+:root {
+    --tui-font-size: 13px;
+    --tui-line-height: 1.1;
+    --tui-row: calc(var(--tui-font-size) * var(--tui-line-height));
+}
+
 :root {
     --aimux-background: #11151b;
     --aimux-backgroundPanel: #161b22;
@@ -30,6 +39,7 @@
     --aimux-textMuted: #8a97a9;
     --aimux-border: #2a3340;
     --aimux-primary: #7cd1b8;
+    --aimux-secondary: #9ccfd8;
     --aimux-success: #8bd5ca;
     --aimux-warning: #f6c177;
     --aimux-error: #f38ba8;
@@ -133,58 +143,63 @@
     @apply bg-background text-foreground;
     }
   html {
-    @apply font-sans;
+    /* Every unstyled element in a terminal transcription is a cell, so this is
+       the default rather than the browser's 16px sans. */
+    font-family: 'JetBrainsMono Nerd Font Mono', ui-monospace, monospace;
+    font-size: var(--tui-font-size);
+    line-height: var(--tui-line-height);
     }
 }
 
-@keyframes aimux-status-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
+/* A terminal repaints; it does not ease, slide or bounce. This kills every
+   transition and CSS animation in the app, shadcn's included — the one moving
+   thing left is the braille spinner, which advances by re-rendering a frame
+   (see Spinner.tsx) rather than by animating. Chasing them class by class had
+   already missed shadcn's `transition-all` and its `active:translate-y-px`,
+   which is the press-bounce on every button. */
+*,
+*::before,
+*::after {
+  transition: none !important;
+  animation: none !important;
 }
 
-/* Chrome typography system. Sans-serif inherits from --font-sans (system UI
-   stack: SF Pro on macOS, Segoe UI on Windows). Mono stays on JetBrains for
-   continuity with the terminal. Natural casing everywhere — no uppercase
-   tracking, no shouty caps. */
+/* The chrome type scale, collapsed onto the cell. Four sizes in three fonts is
+   a web type system; the TUI has one cell, and only weight and colour separate
+   a title from a label. The class names stay so the call sites don't all have
+   to change. */
 @layer components {
-  .chrome-title {
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 1.2;
-  }
-  .chrome-label {
-    font-family: var(--font-sans);
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 1.25;
-  }
-  .chrome-meta {
-    font-family: var(--font-sans);
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1.3;
-  }
+  .chrome-title,
+  .chrome-label,
+  .chrome-meta,
   .chrome-code {
     font-family: 'JetBrainsMono Nerd Font Mono', ui-monospace, monospace;
-    font-size: 10.5px;
+    font-size: var(--tui-font-size);
     font-weight: 400;
-    line-height: 1.3;
+    line-height: var(--tui-line-height);
+  }
+  .chrome-title {
+    font-weight: 700;
   }
 }
-/* TUI-parity chrome. The sidebar and the tab strip are transcriptions of
-   `project-list.tsx` / `workspace-row.tsx` / `top-tab-bar.tsx`, so they are
-   laid out the way those are: one terminal cell is one `ch`, one row is one
-   `--tui-row`, corners are square and nothing animates. Anything that reads as
-   a web widget here — a pill, a rounded button, a hover transition — is a
-   place where the two halves have started to disagree. */
+/* TUI-parity chrome. The sidebar, the tab strip and the status bar are
+   transcriptions of `project-list.tsx` / `workspace-row.tsx` /
+   `top-tab-bar.tsx` / `status-bar.tsx`, so they are laid out the way those
+   are: one terminal cell is one `ch`, one row is one `--tui-row`, corners are
+   square and nothing animates.
+
+   The cell metric is NOT a design choice — it is the xterm.js config in
+   `lib/terminal-registry.ts` (13px, line-height 1.1). The chrome sits on the
+   same grid as the terminal it wraps, so a row of chrome is exactly as tall as
+   a row of output. Change one and change the other.
+
+   Anything that reads as a web widget here — a pill, a rounded button, a hover
+   transition, a 32px-tall bar — is a place where the two halves have started
+   to disagree. */
 @layer components {
-  :root {
-    --tui-row: 1.35rem;
-  }
   .tui {
     font-family: 'JetBrainsMono Nerd Font Mono', ui-monospace, monospace;
-    font-size: 12.5px;
+    font-size: var(--tui-font-size);
     line-height: var(--tui-row);
     white-space: pre;
   }

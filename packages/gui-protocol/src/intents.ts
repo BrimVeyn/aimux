@@ -37,6 +37,9 @@ export type GuiIntent =
   // `set-active-workspace`, or a project switch carrying the workspace — is
   // the host's call, since only it knows which project is current.
   | { kind: 'workspace.activate'; projectId: string; workspaceId: string }
+  // Clicking a project heading. It lands on the checkout, so the host has to
+  // resolve the primary workspace — the renderer does not decide that.
+  | { kind: 'project.activate'; projectId: string }
   // The fold arrow on a project heading.
   | { kind: 'project.toggleCollapsed'; projectId: string }
   // The `+` on a project heading. The modal always targets the current
@@ -46,6 +49,10 @@ export type GuiIntent =
   | { kind: 'project.new' }
   // Dragging a project heading to a new slot in the sidebar.
   | { kind: 'projects.reorder'; orderedIds: string[] }
+  // The bar footer's two entries. Both are full-screen views the panes step
+  // aside for, and the only ones a mouse can reach at all.
+  | { kind: 'view.settings' }
+  | { kind: 'view.stats' }
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -101,6 +108,9 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
         projectId: obj.projectId,
         workspaceId: obj.workspaceId,
       }
+    case 'project.activate':
+      if (typeof obj.projectId !== 'string') return null
+      return { kind: 'project.activate', projectId: obj.projectId }
     case 'project.toggleCollapsed':
       if (typeof obj.projectId !== 'string') return null
       return { kind: 'project.toggleCollapsed', projectId: obj.projectId }
@@ -113,6 +123,10 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
       if (!Array.isArray(obj.orderedIds)) return null
       if (!obj.orderedIds.every((id) => typeof id === 'string')) return null
       return { kind: 'projects.reorder', orderedIds: obj.orderedIds as string[] }
+    case 'view.settings':
+      return { kind: 'view.settings' }
+    case 'view.stats':
+      return { kind: 'view.stats' }
     default:
       return null
   }

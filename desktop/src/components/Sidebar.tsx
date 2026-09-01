@@ -35,7 +35,7 @@ interface SidebarProps {
   workspaceDivergence: Record<string, Divergence>;
   tabs: ProjectedTab[];
   onSelectWorkspace: (projectId: string, workspaceId: string) => void;
-  onSwitchProject: (projectId: string) => void;
+  onActivateProject: (projectId: string) => void;
   onToggleCollapsed: (projectId: string) => void;
   onNewWorkspace: (projectId: string) => void;
   onNewProject: () => void;
@@ -64,7 +64,7 @@ export function Sidebar({
   onNewWorkspace,
   onReorderProjects,
   onSelectWorkspace,
-  onSwitchProject,
+  onActivateProject,
   onToggleCollapsed,
   projects,
   tabs,
@@ -149,7 +149,7 @@ export function Sidebar({
                 dragging={draggingId === project.id}
                 onDragStart={setDraggingId}
                 onNewWorkspace={onNewWorkspace}
-                onSwitchProject={onSwitchProject}
+                onActivateProject={onActivateProject}
                 onToggleCollapsed={onToggleCollapsed}
                 project={project}
               />
@@ -210,7 +210,7 @@ function ProjectRow({
   dragging,
   onDragStart,
   onNewWorkspace,
-  onSwitchProject,
+  onActivateProject,
   onToggleCollapsed,
   project,
 }: {
@@ -218,7 +218,7 @@ function ProjectRow({
   current: boolean;
   dragging: boolean;
   onDragStart: (id: string) => void;
-  onSwitchProject: (projectId: string) => void;
+  onActivateProject: (projectId: string) => void;
   onToggleCollapsed: (projectId: string) => void;
   onNewWorkspace: (projectId: string) => void;
 }) {
@@ -252,8 +252,8 @@ function ProjectRow({
       <Button
         variant="ghost"
         size="tui"
-        className="min-w-0 flex-1 justify-start"
-        onClick={() => onSwitchProject(project.id)}
+        className="min-w-0 flex-1 justify-start pl-0"
+        onClick={() => onActivateProject(project.id)}
         style={{ color: theme.text }}
       >
         <span className="truncate">{project.name}</span>
@@ -293,10 +293,6 @@ function WorkspaceRow({
   if (isActiveItem) background = theme.backgroundElement;
   else if (inCurrentGroup) background = theme.backgroundPanel;
 
-  // The cursor: a full-height accent bar down the left of the row, both lines
-  // of it. The background alone is one step of grey and gets lost among rows
-  // that carry colour of their own.
-  const cursor = isActiveItem ? "▌" : " ";
   const hasBranch = workspace.branch != null && workspace.branch !== "";
   const { added, removed } = formatDiffStat(divergence);
   const marker = statusMarker(activity, hasSleepingTabs);
@@ -309,11 +305,20 @@ function WorkspaceRow({
       size="tui"
       aria-current={isActiveItem ? "true" : undefined}
       onClick={onSelect}
-      className="h-auto w-full flex-col items-stretch gap-0 py-0 pr-[1ch] pl-0"
+      className="relative h-auto w-full flex-col items-stretch gap-0 py-0 pr-[1ch] pl-0"
       style={{ backgroundColor: background }}
     >
-      <span className="tui-row w-full">
-        <span style={{ color: theme.primary }}>{cursor}</span>
+      {/* The cursor: ONE bar down the left of the row, spanning both lines. Set
+          as a `▌` per line it broke in two — the glyph is shorter than the row,
+          so the leading between the lines showed through it. */}
+      {isActiveItem ? (
+        <span
+          aria-hidden
+          className="absolute top-0 bottom-0 left-0 w-[1ch]"
+          style={{ backgroundColor: theme.primary }}
+        />
+      ) : null}
+      <span className="tui-row w-full pl-[1ch]">
         <span style={{ color: marker.color }}>{marker.glyph}</span>
         {/* Full strength only under the cursor. Every name at full strength
             reads as a wall of white; every name muted leaves the selected row
@@ -340,8 +345,7 @@ function WorkspaceRow({
           — it labels the branch, not the workspace. Only workspaces that own a
           branch get one. */}
       {hasBranch ? (
-        <span className="tui-row w-full">
-          <span style={{ color: theme.primary }}>{cursor}</span>
+        <span className="tui-row w-full pl-[1ch]">
           <span>{"  "}</span>
           <span className="truncate" style={{ color: theme.textMuted }}>
             {BRANCH_GLYPH} {workspace.branch}

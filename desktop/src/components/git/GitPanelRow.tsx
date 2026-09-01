@@ -152,7 +152,7 @@ export function FileRow({
   };
   return (
     <div
-      className="group relative flex items-center gap-1.5 whitespace-nowrap py-[2px] pr-1 transition-[background-color] duration-150 ease-out"
+      className="group relative flex items-center gap-1.5 whitespace-nowrap py-[2px] pr-1"
       onDoubleClick={handleDoubleClick}
       style={{
         backgroundColor: isSelected ? theme.backgroundElement : "transparent",

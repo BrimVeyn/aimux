@@ -106,6 +106,9 @@ export interface IdentitySegment {
   tone: 'primary' | 'muted'
 }
 
+/** Powerline glyph pair the status bar separates its tiles with. */
+export type StatusBarSeparatorKind = 'arrow' | 'flame' | 'none' | 'round' | 'slant'
+
 // Mirror of the host's status-bar model plus the app version. The host owns the
 // keymap config, so it computes right/help; the identity breadcrumb arrives as
 // real segments, which is why the renderer no longer splits a string on a
@@ -115,6 +118,10 @@ export interface StatusBarProjection {
   right: string
   help: string
   version: string
+  /** Which glyph pair joins the tiles — a user setting, so the host owns it. */
+  separator: StatusBarSeparatorKind
+  /** Whether the bar draws its second row of keybinding hints. */
+  hints: boolean
 }
 
 export type AIUsageTool = 'claude' | 'codex'

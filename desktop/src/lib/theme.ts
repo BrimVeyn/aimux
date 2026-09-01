@@ -11,6 +11,7 @@ export const theme = {
   diffRemoved: "var(--aimux-diffRemoved)",
   error: "var(--aimux-error)",
   primary: "var(--aimux-primary)",
+  secondary: "var(--aimux-secondary)",
   success: "var(--aimux-success)",
   text: "var(--aimux-text)",
   textMuted: "var(--aimux-textMuted)",

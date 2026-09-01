@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Bar } from '@/components/Bar'
-import { FocusModeRail } from '@/components/FocusModeRail'
 import { GitPanel } from '@/components/git/GitPanel'
 import { GitView } from '@/components/git/GitView'
 import { ModalHost } from '@/components/ModalHost'
@@ -265,10 +264,12 @@ function App() {
     socketRef.current?.send({ t: 'openAiUsageModal' })
   }, [dismissModalIfOpen])
 
-  const switchProject = useCallback(
+  // Not the plain `switchProject` message: a heading click lands on the
+  // project's checkout, and only the host can resolve which workspace that is.
+  const activateProject = useCallback(
     (projectId: string) => {
       dismissModalIfOpen()
-      socketRef.current?.send({ projectId, t: 'switchProject' })
+      socketRef.current?.send({ intent: { kind: 'project.activate', projectId }, t: 'intent' })
     },
     [dismissModalIfOpen]
   )
@@ -332,6 +333,16 @@ function App() {
     [dismissModalIfOpen]
   )
 
+  const openSettings = useCallback(() => {
+    dismissModalIfOpen()
+    socketRef.current?.send({ intent: { kind: 'view.settings' }, t: 'intent' })
+  }, [dismissModalIfOpen])
+
+  const openStats = useCallback(() => {
+    dismissModalIfOpen()
+    socketRef.current?.send({ intent: { kind: 'view.stats' }, t: 'intent' })
+  }, [dismissModalIfOpen])
+
   const reorderProjects = useCallback((orderedIds: string[]) => {
     socketRef.current?.send({ intent: { kind: 'projects.reorder', orderedIds }, t: 'intent' })
   }, [])
@@ -391,6 +402,13 @@ function App() {
   const bars = projection?.bars ?? { left: EMPTY_BAR, right: EMPTY_BAR }
   const gitPane = projection?.gitPane
   const inGitMode = projection?.focusMode === 'git' || projection?.modal.type === 'git-commit'
+  // Settings and stats replace the pane tree the same way git mode does. The
+  // screens themselves are not ported yet, so the panes step aside for a line
+  // saying so rather than for a blank column — Esc returns, the host's keymap
+  // owns that either way.
+  const replacedByScreen =
+    projection?.focusMode === 'settings' || projection?.focusMode === 'stats'
+  const panesReplaced = inGitMode || replacedByScreen
 
   const sidebarElement =
     projection !== null ? (
@@ -401,7 +419,7 @@ function App() {
         onNewWorkspace={newWorkspace}
         onReorderProjects={reorderProjects}
         onSelectWorkspace={activateWorkspace}
-        onSwitchProject={switchProject}
+        onActivateProject={activateProject}
         onToggleCollapsed={toggleProjectCollapsed}
         projects={projection.projects}
         tabs={projection.tabs}
@@ -482,6 +500,8 @@ function App() {
       <div className="flex min-h-0 flex-1">
         <Bar
           bar={bars.left}
+          onOpenSettings={openSettings}
+          onOpenStats={openStats}
           side="left"
           widgets={{ git: gitPanelElement, projects: sidebarElement }}
         />
@@ -500,12 +520,20 @@ function App() {
             onClose={closeTab}
             onNew={newTab}
             onReorder={reorderTabs}
-            panesReplaced={inGitMode}
+            panesReplaced={panesReplaced}
             project={currentProject}
             tabGroupMap={projection?.tabGroupMap ?? {}}
             tabs={projection?.tabs ?? []}
           />
-          {inGitMode ? (
+          {replacedByScreen ? (
+            <div
+              className="tui flex min-h-0 flex-1 items-center justify-center"
+              style={{ color: theme.textMuted }}
+            >
+              {projection?.focusMode === 'settings' ? 'Settings' : 'Stats'} is a TUI screen
+              still — press Esc to come back
+            </div>
+          ) : inGitMode ? (
             <div className="min-h-0 flex-1">{gitViewElement}</div>
           ) : (
             <>
@@ -539,12 +567,13 @@ function App() {
                   />
                 ) : null}
               </div>
-              <FocusModeRail focusMode={projection?.focusMode ?? 'navigation'} />
             </>
           )}
         </main>
         <Bar
           bar={bars.right}
+          onOpenSettings={openSettings}
+          onOpenStats={openStats}
           side="right"
           widgets={{ git: gitPanelElement, projects: sidebarElement }}
         />
@@ -552,8 +581,10 @@ function App() {
       {projection ? (
         <StatusBar projection={projection} connecting={status !== 'open'} onOpenUsage={openUsage} />
       ) : (
+        // Same one-row bar as the real one, so the layout does not jump when
+        // the first projection lands.
         <div
-          className="flex shrink-0 flex-row justify-end px-2 py-0.5 font-mono text-xs"
+          className="tui tui-row shrink-0 justify-end px-[1ch]"
           style={{ backgroundColor: theme.backgroundPanel, color: theme.textMuted }}
         >
           {status}

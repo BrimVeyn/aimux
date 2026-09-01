@@ -6,6 +6,8 @@ import type { GuiRuntime } from './runtime'
 
 import { createPrefixedId } from '../platform/id'
 import { isConfigSnippetId, saveSnippetCatalog } from '../state/snippet-catalog'
+import { getPrimaryWorkspace } from '../state/workspace-view'
+import { orderProjectsForDisplay } from '../ui/project-ordering'
 
 // Discriminated intent → existing reducer-action / pipeline-call dispatch.
 // Hard rule (roadmap, DB1): "Tout intent GUI doit aboutir à une action du
@@ -58,6 +60,9 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'workspace.activate':
       handleWorkspaceActivate(intent, runtime)
       return
+    case 'project.activate':
+      handleProjectActivate(intent, runtime)
+      return
     case 'project.toggleCollapsed':
       runtime.pipeline.runEffect({
         projectId: intent.projectId,
@@ -73,7 +78,26 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'projects.reorder':
       runtime.dispatch({ orderedIds: intent.orderedIds, type: 'reorder-projects' })
       return
+    case 'view.settings':
+      runtime.dispatch({ type: 'enter-settings' })
+      return
+    case 'view.stats':
+      runtime.dispatch({ type: 'enter-stats' })
+      return
   }
+}
+
+/**
+ * `switch-project-by-index` addresses projects by their **1-based position in
+ * display order** (see `handleSwitchProjectByIndex`), not by their position in
+ * `state.projects`. Getting that wrong is why clicking a workspace in another
+ * project did nothing: the effect looked up `ordered[index - 1]` and either
+ * missed or landed on a neighbour.
+ */
+function displayIndexOf(runtime: GuiRuntime, projectId: string): number | null {
+  const ordered = orderProjectsForDisplay(runtime.getState().projects)
+  const index = ordered.findIndex((project) => project.id === projectId)
+  return index < 0 ? null : index + 1
 }
 
 /**
@@ -86,8 +110,7 @@ function handleWorkspaceActivate(
   intent: Extract<GuiIntent, { kind: 'workspace.activate' }>,
   runtime: GuiRuntime
 ): void {
-  const state = runtime.getState()
-  if (state.currentProjectId === intent.projectId) {
+  if (runtime.getState().currentProjectId === intent.projectId) {
     runtime.dispatch({
       projectId: intent.projectId,
       type: 'set-active-workspace',
@@ -95,12 +118,31 @@ function handleWorkspaceActivate(
     })
     return
   }
-  const index = state.projects.findIndex((project) => project.id === intent.projectId)
-  if (index < 0) return
+  const index = displayIndexOf(runtime, intent.projectId)
+  if (index === null) return
   runtime.pipeline.runEffect({
     index,
     type: 'switch-project-by-index',
     workspaceId: intent.workspaceId,
+  })
+}
+
+/**
+ * `project-list.tsx`'s release handler. The heading stands for the project
+ * itself, not for whichever workspace was last active in it, so it lands on
+ * the checkout — the one workspace every project is guaranteed to have.
+ */
+function handleProjectActivate(
+  intent: Extract<GuiIntent, { kind: 'project.activate' }>,
+  runtime: GuiRuntime
+): void {
+  const index = displayIndexOf(runtime, intent.projectId)
+  if (index === null) return
+  const target = runtime.getState().projects.find((project) => project.id === intent.projectId)
+  runtime.pipeline.runEffect({
+    index,
+    type: 'switch-project-by-index',
+    workspaceId: getPrimaryWorkspace(target?.workspaces)?.id,
   })
 }
 
@@ -113,11 +155,10 @@ function handleNewWorkspace(
   intent: Extract<GuiIntent, { kind: 'project.newWorkspace' }>,
   runtime: GuiRuntime
 ): void {
-  const state = runtime.getState()
-  if (state.currentProjectId !== intent.projectId) {
-    const index = state.projects.findIndex((project) => project.id === intent.projectId)
-    if (index < 0) return
-    runtime.pipeline.runEffect({ index: index + 1, type: 'switch-project-by-index' })
+  if (runtime.getState().currentProjectId !== intent.projectId) {
+    const index = displayIndexOf(runtime, intent.projectId)
+    if (index === null) return
+    runtime.pipeline.runEffect({ index, type: 'switch-project-by-index' })
   }
   runtime.dispatch({ type: 'open-create-workspace-modal' })
   runtime.pipeline.runEffect({ type: 'load-create-workspace-base-branches' })

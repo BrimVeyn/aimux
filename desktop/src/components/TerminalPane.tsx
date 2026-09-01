@@ -10,10 +10,6 @@ interface TerminalPaneProps {
   onEnterInsert: () => void;
   onRequestBytes: (tabId: string) => void;
   onResizeTab: (tabId: string, cols: number, rows: number) => void;
-  // Show a thin left-edge accent on the active pane, so split layouts can
-  // disambiguate which pane has keyboard focus. Pure pane-level info: the
-  // global focus mode (nav vs input) is communicated by FocusModeRail at
-  // the top of <main>, on a different axis to avoid visual conflict.
   showActiveIndicator?: boolean;
   tab: ProjectedTab | undefined;
   tabId: string;
@@ -33,25 +29,22 @@ export function TerminalPane({
   tabId,
   themeId,
 }: TerminalPaneProps) {
-  void focusMode;
   void tab;
-  const showLeftRail = showActiveIndicator && isActive;
+  void showActiveIndicator;
 
   return (
+    // The pane is framed, and the frame says which one has focus and in which
+    // mode — same three colours `terminal-pane.tsx` uses. It replaces the rail
+    // the GUI used to draw above the status bar: two things saying the same
+    // thing on two axes is one more than the TUI has.
     <div
-      className="relative flex h-full w-full flex-col overflow-hidden"
+      className="relative flex h-full w-full flex-col overflow-hidden border"
+      style={{ borderColor: getBorderColor(isActive, focusMode) }}
       onMouseDown={() => {
         onActivate(tabId);
         onEnterInsert();
       }}
     >
-      {showLeftRail ? (
-        <span
-          aria-hidden
-          className="pointer-events-none absolute top-1 bottom-1 left-0 z-10 w-[2px] rounded-r-full"
-          style={{ backgroundColor: theme.primary, opacity: 0.6 }}
-        />
-      ) : null}
       <div className="min-h-0 flex-1 overflow-hidden">
         {/* key={tabId}: when the active tab changes, mount a fresh xterm.js
             instance bound to the new tabId. The XtermPane effect captures the
@@ -69,4 +62,9 @@ export function TerminalPane({
       </div>
     </div>
   );
+}
+
+function getBorderColor(isActive: boolean, focusMode: FocusMode): string {
+  if (!isActive) return theme.border;
+  return focusMode === "terminal-input" ? theme.accent : theme.primary;
 }

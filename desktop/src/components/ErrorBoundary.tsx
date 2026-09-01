@@ -61,7 +61,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
               cursor: "pointer",
               marginTop: 16,
               padding: "4px 12px",
-              transition: "background-color 150ms",
             }}
           >
             Retry
