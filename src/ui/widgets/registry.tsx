@@ -13,9 +13,3 @@ export const WIDGET_RENDERERS: Record<string, (contentWidth: number) => ReactNod
   projects: (contentWidth) => <ProjectList contentWidth={contentWidth} />,
   setup: () => <SetupWidget />,
 }
-
-export const WIDGET_LABELS: Record<string, string> = {
-  git: 'Git',
-  projects: 'Projects',
-  setup: 'Setup',
-}

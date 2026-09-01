@@ -4,9 +4,23 @@ import type { AppAction } from '../state/actions'
 import type { AppState, GitFileSection, SnippetRecord } from '../state/types'
 import type { GuiRuntime } from './runtime'
 
+import { enqueueGitOp } from '../git/command-queue'
+import { listGhAccounts, nextGhAccount, switchGhAccount } from '../git/gh-auth'
+import { approveAndMergePr } from '../git/pr-merge'
+import { prActionState, prCleanupKind } from '../git/pr-status'
+import { refreshPrStatus } from '../git/pr-status-poller'
+import { checkoutBranch } from '../git/worktree'
 import { createPrefixedId } from '../platform/id'
+import { openUrl } from '../platform/open-url'
+import { prStatusStore } from '../state/pr-status-store'
+import { getCurrentProject } from '../state/project-workspaces'
 import { isConfigSnippetId, saveSnippetCatalog } from '../state/snippet-catalog'
-import { getPrimaryWorkspace } from '../state/workspace-view'
+import { toast } from '../state/toast-store'
+import {
+  getActiveWorkspace,
+  getActiveWorkspacePath,
+  getPrimaryWorkspace,
+} from '../state/workspace-view'
 import { orderProjectsForDisplay } from '../ui/project-ordering'
 
 // Discriminated intent → existing reducer-action / pipeline-call dispatch.
@@ -84,6 +98,36 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
     case 'view.stats':
       runtime.dispatch({ type: 'enter-stats' })
       return
+    case 'url.open':
+      openUrl(intent.url)
+      return
+    case 'pr.act':
+      handlePrAction(runtime)
+      return
+    case 'gh.switchAccount':
+      handleGhSwitchAccount(runtime)
+      return
+    case 'setup.action': {
+      const effects = {
+        'ask-agent': { type: 'ask-agent-for-setup-script' },
+        'configure': { type: 'configure-setup-script' },
+        'promote': { type: 'promote-setup-tab' },
+        'run': { type: 'run-setup' },
+        'stop': { type: 'stop-setup' },
+      } as const
+      runtime.pipeline.runEffect(effects[intent.action])
+      return
+    }
+    case 'bar.menuAction':
+      // The action is one of the store's own, already narrowed by the parser.
+      runtime.dispatch(intent.action)
+      return
+    case 'git.toggleFileListMode': {
+      const next = runtime.getState().gitPane.fileListMode === 'tree' ? 'flat' : 'tree'
+      runtime.dispatch({ type: 'git-mode-toggle-file-list-mode' })
+      runtime.pipeline.runEffect({ mode: next, type: 'persist-git-file-list-mode' })
+      return
+    }
   }
 }
 
@@ -162,6 +206,83 @@ function handleNewWorkspace(
   }
   runtime.dispatch({ type: 'open-create-workspace-modal' })
   runtime.pipeline.runEffect({ type: 'load-create-workspace-base-branches' })
+}
+
+/**
+ * The PR row's button, as `pr-state-row.tsx` performs it. The renderer sends no
+ * argument: what the action means is re-derived here from the same PR the
+ * projection was built from, so a stale button cannot merge the wrong thing.
+ */
+function handlePrAction(runtime: GuiRuntime): void {
+  const state = runtime.getState()
+  const project = getCurrentProject(state)
+  const workspace = getActiveWorkspace(project)
+  const projectPath = getActiveWorkspacePath(project)
+  if (projectPath == null || projectPath === '') return
+
+  const result = prStatusStore.getState().result
+  if (result?.kind !== 'ok') return
+  const action = prActionState(result.pr, result.checks)
+  const removableWorkspaceId =
+    workspace !== undefined && workspace.source !== 'primary' ? workspace.id : null
+  const cleanup = prCleanupKind(action.action, result.pr, removableWorkspaceId !== null)
+
+  if (cleanup === 'worktree') {
+    if (project === undefined || removableWorkspaceId === null) return
+    // closeTabs (not force) mirrors the sidebar's "Remove workspace": the
+    // workspace's tabs are disposed, but a dirty worktree still re-prompts for
+    // an explicit force-delete instead of silently discarding work.
+    runtime.pipeline.runEffect({
+      closeTabs: true,
+      projectId: project.id,
+      type: 'delete-workspace',
+      workspaceId: removableWorkspaceId,
+    })
+    return
+  }
+
+  if (cleanup === 'branch') {
+    void (async () => {
+      try {
+        // Queued like every other mutating git op: the pollers read this same
+        // checkout, and a checkout mid-status is how you get a torn panel.
+        await enqueueGitOp(async () => checkoutBranch(projectPath, result.pr.base))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : String(error))
+        return
+      }
+      await refreshPrStatus(projectPath)
+    })()
+    return
+  }
+
+  if (action.action !== 'merge') return
+  void (async () => {
+    const merged = await approveAndMergePr(projectPath)
+    if (merged.ok) toast.success('Pull request merged')
+    else toast.error(merged.message)
+    await refreshPrStatus(projectPath)
+  })()
+}
+
+/** `gh-error-state`'s one affordance: cycle to the next account and refetch. */
+function handleGhSwitchAccount(runtime: GuiRuntime): void {
+  const projectPath = getActiveWorkspacePath(getCurrentProject(runtime.getState()))
+  void (async () => {
+    const next = nextGhAccount(await listGhAccounts())
+    if (next === null) {
+      toast.error('No other GitHub account is signed in')
+      return
+    }
+    const error = await switchGhAccount(next)
+    if (error !== null) {
+      toast.error(error)
+      return
+    }
+    // The poller backs off to two minutes on errors; don't make the user wait
+    // it out to find out whether the account they picked was the right one.
+    if (projectPath != null && projectPath !== '') await refreshPrStatus(projectPath)
+  })()
 }
 
 function handleSnippetSubmit(

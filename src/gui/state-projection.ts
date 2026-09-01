@@ -3,12 +3,14 @@ import type {
   AppStateProjection,
   BarLite,
   GitFileEntryLite,
+  GitHubProjection,
   GitModeLite,
   GitPaneLite,
   GitPanelLite,
   ModalProjection,
   ProjectedTab,
   ProjectRecordLite,
+  SetupProjection,
   StatusBarProjection,
   WorkspaceLite,
 } from '@aimux/gui-protocol'
@@ -28,6 +30,12 @@ import type {
 } from '../state/types'
 import type { GuiHelpEntry } from './gui-help-entries'
 
+import { findSetupTab } from '../app-runtime/setup-actions'
+import { clampPrBody, prActionState, prCleanupKind } from '../git/pr-status'
+import { prStatusStore } from '../state/pr-status-store'
+import { hasSetupScript } from '../state/project-data'
+import { getCurrentProject } from '../state/project-workspaces'
+import { getActiveWorkspace } from '../state/workspace-view'
 import { orderProjectsForDisplay } from '../ui/project-ordering'
 import { encodeDiffImages } from './encode-diff-images'
 
@@ -103,6 +111,82 @@ function projectGitPane(g: GitPaneState): GitPaneLite {
     fileListMode: g.fileListMode,
     prefetchRadius: g.prefetchRadius,
     treeCompaction: g.treeCompaction,
+  }
+}
+
+/**
+ * The `github` tab, resolved here rather than on the wire as raw `gh` output:
+ * `prActionState`, `prCleanupKind` and `clampPrBody` live beside the `gh`
+ * spawn, so the renderer cannot run them. What it gets is the label, the tone
+ * and the one action worth a button — the same three the TUI row draws.
+ */
+function projectGitHub(state: AppState): GitHubProjection {
+  const { result, stale } = prStatusStore.getState()
+  if (result === null) return { stale, status: null }
+  if (result.kind !== 'ok') {
+    return {
+      stale,
+      status:
+        result.kind === 'error'
+          ? { kind: 'error', message: result.message }
+          : { kind: result.kind },
+    }
+  }
+  const { checks, pr } = result
+  const action = prActionState(pr, checks)
+  // The PR is polled against the active workspace's path, so its branch is this
+  // workspace's branch — which is what makes offering the removal honest.
+  const project = getCurrentProject(state)
+  const workspace = getActiveWorkspace(project)
+  const removable = workspace !== undefined && workspace.source !== 'primary'
+  const clamped = clampPrBody(pr.body)
+  return {
+    stale,
+    status: {
+      checks: checks.map((check) => ({
+        durationMs: check.durationMs,
+        name: check.name,
+        state: check.state,
+        url: check.url,
+        workflow: check.workflow,
+      })),
+      kind: 'ok',
+      pr: {
+        additions: pr.additions,
+        body: pr.body.trimEnd(),
+        bodyPreview: clamped.text,
+        bodyTruncated: clamped.truncated,
+        changedFiles: pr.changedFiles,
+        deletions: pr.deletions,
+        number: pr.number,
+        title: pr.title,
+        url: pr.url,
+      },
+      row: {
+        action: action.action,
+        base: pr.base,
+        cleanup: prCleanupKind(action.action, pr, removable),
+        label: action.label,
+        tone: action.tone,
+      },
+    },
+  }
+}
+
+/** The setup widget's state, resolved against the active workspace. */
+function projectSetup(state: AppState): SetupProjection {
+  const project = getCurrentProject(state)
+  const workspace = getActiveWorkspace(project)
+  const tab = findSetupTab(state.tabs, workspace?.id)
+  const ranAt = workspace?.setupRanAt
+  const finished = ranAt != null && ranAt !== ''
+  return {
+    exitCode: workspace?.setupExitCode,
+    hasTab: tab !== undefined,
+    ranAt,
+    running: tab !== undefined && !finished,
+    scriptExists: project === undefined ? false : hasSetupScript(project.id),
+    workspaceName: workspace?.name,
   }
 }
 
@@ -207,6 +291,7 @@ export function projectAppState(
     currentProjectId: state.currentProjectId,
     customCommands: state.customCommands,
     focusMode: state.focusMode,
+    github: projectGitHub(state),
     gitMode: projectGitMode(state.gitMode),
     gitPane: projectGitPane(state.gitPane),
     gitPanel: projectGitPanel(state.gitPanel),
@@ -217,6 +302,7 @@ export function projectAppState(
     projectBar: { visible: state.projectBar.visible },
     projects: orderProjectsForDisplay(state.projects).map(projectProject),
     projectStatuses: state.projectStatuses,
+    setup: projectSetup(state),
     snippets: state.snippets,
     statusBar: options.statusBar,
     tabGroupMap: state.tabGroupMap,

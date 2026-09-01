@@ -66,6 +66,20 @@ export interface ProjectedTab {
   workspaceId?: string
 }
 
+export interface SetupProjection {
+  /** Whether this project has a setup script on disk. Polled host-side. */
+  scriptExists: boolean
+  /** The hidden setup tab for the active workspace is running. */
+  running: boolean
+  /** The active workspace has a finished run recorded. */
+  ranAt?: string
+  exitCode?: number
+  /** Active workspace name, shown on the right of the status line. */
+  workspaceName?: string
+  /** There is a setup tab to promote into a real one. */
+  hasTab: boolean
+}
+
 export interface WorkspaceLite {
   id: string
   name: string
@@ -280,6 +294,64 @@ export interface BarLite {
   widgets: BarWidgetLite[]
 }
 
+export type PrCheckState = 'pass' | 'fail' | 'pending' | 'skipping' | 'cancel'
+
+export interface PrCheckLite {
+  name: string
+  workflow: string
+  state: PrCheckState
+  url: string
+  durationMs: number | null
+}
+
+export interface PrSummaryLite {
+  number: number
+  title: string
+  url: string
+  additions: number
+  deletions: number
+  changedFiles: number
+  /** Raw markdown, as the author wrote it — the pane does not render it. */
+  body: string
+  /** `body` clamped to the pane's preview length, plus whether it was cut. */
+  bodyPreview: string
+  bodyTruncated: boolean
+}
+
+/**
+ * The headline GitHub puts on the merge box and the one action worth wiring to
+ * it, resolved host-side: it depends on `prActionState` / `prCleanupKind`,
+ * which live next to the `gh` spawn and cannot be imported by a browser.
+ */
+export interface PrRowLite {
+  label: string
+  tone: 'ok' | 'blocked' | 'neutral'
+  /** What the row's button does, or null when there is nothing to offer. */
+  action: 'merge' | 'cleanup' | null
+  /** For a cleanup: which kind, and what confirming it will say. */
+  cleanup: 'branch' | 'worktree' | null
+  /** Base branch a `branch` cleanup would switch to. */
+  base: string
+}
+
+export type PrStatusLite =
+  | {
+      kind: 'ok'
+      pr: PrSummaryLite
+      checks: PrCheckLite[]
+      row: PrRowLite
+    }
+  | { kind: 'no-pr' }
+  | { kind: 'no-gh' }
+  | { kind: 'error'; message: string }
+
+export interface GitHubProjection {
+  /** null until the first poll resolves for the active workspace. */
+  status: PrStatusLite | null
+  /** A fetch failed and this is the last good snapshot. */
+  stale: boolean
+}
+
 export interface MultiRepoLite {
   prefixes: Record<string, string>
   repos: { isRoot: boolean; name: string; path: string }[]
@@ -359,6 +431,10 @@ export interface AppStateProjection {
   gitMode: GitModeLite
   gitPane: GitPaneLite
   gitPanel: GitPanelLite
+  /** The `setup` bar widget. */
+  setup: SetupProjection
+  /** The git pane's `github` tab: the PR, its checks, and the row above them. */
+  github: GitHubProjection
   helpEntries: GuiHelpEntry[]
   statusBar: StatusBarProjection
   aiUsage: AIUsageProjection

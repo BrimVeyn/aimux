@@ -18,9 +18,13 @@ export async function refreshPrStatus(projectPath: string): Promise<void> {
   prStatusStore.getState().setResult(projectPath, await collectPrStatus(projectPath))
 }
 
-export function usePrStatusPolling({ enabled, projectPath }: Options): void {
-  useEffect(() => {
-    if (!enabled || !(projectPath != null && projectPath !== '')) return
+/**
+ * Headless PR-status poll. Returns a disposer. The GUI host has no React root,
+ * so it drives the same loop directly; the hook below is the TUI's.
+ */
+export function startPrStatusPolling({ enabled, projectPath }: Options): () => void {
+  {
+    if (!enabled || !(projectPath != null && projectPath !== '')) return () => {}
 
     // Show what we last knew about this path while the fetch runs in the
     // background, rather than blanking the row on every workspace switch.
@@ -55,5 +59,9 @@ export function usePrStatusPolling({ enabled, projectPath }: Options): void {
       cancelled = true
       if (timer) clearTimeout(timer)
     }
-  }, [enabled, projectPath])
+  }
+}
+
+export function usePrStatusPolling({ enabled, projectPath }: Options): void {
+  useEffect(() => startPrStatusPolling({ enabled, projectPath }), [enabled, projectPath])
 }

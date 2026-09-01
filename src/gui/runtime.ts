@@ -15,6 +15,7 @@ import { loadConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { startDiffOnDemandPipeline } from '../git/diff-orchestration'
 import { startGitPanelPolling } from '../git/git-poller'
+import { startPrStatusPolling } from '../git/pr-status-poller'
 import { startWorkspaceDivergencePolling } from '../git/workspace-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
@@ -398,6 +399,12 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   let lastPanelHeadOffset = getState().gitMode.headOffset
   let lastPanelRepos = getState().multiRepo.repos
   let panelDispose: (() => void) | null = null
+  let prDispose: (() => void) | null = null
+  // The PR state row and the github tab poll the same path the file list does.
+  const restartPrPoll = (): void => {
+    prDispose?.()
+    prDispose = startPrStatusPolling({ enabled: true, projectPath: lastPanelProjectPath })
+  }
   const restartPanelPoll = (): void => {
     panelDispose?.()
     panelDispose = startGitPanelPolling({
@@ -427,8 +434,10 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   multiRepoDriver.update(lastPanelProjectPath)
   disposers.add(() => multiRepoDriver.dispose())
   restartPanelPoll()
+  restartPrPoll()
   restartDivergencePoll()
   disposers.add(() => panelDispose?.())
+  disposers.add(() => prDispose?.())
   disposers.add(() => divergenceDispose?.())
 
   // Workspace autosave — TUI uses useWorkspaceAutosave (debounce 250ms) to
@@ -545,6 +554,7 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
       lastPanelHeadOffset = nextOffset
       lastPanelRepos = nextRepos
       restartPanelPoll()
+      restartPrPoll()
       multiRepoDriver.update(nextPath)
     }
     // Divergence poller — restart when session identity or sessions array changes

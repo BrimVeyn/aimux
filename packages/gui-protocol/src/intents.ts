@@ -53,6 +53,32 @@ export type GuiIntent =
   // aside for, and the only ones a mouse can reach at all.
   | { kind: 'view.settings' }
   | { kind: 'view.stats' }
+  // Opening a link belongs to the host: aimux runs on the machine with the
+  // browser the user actually uses, which the renderer may not be on.
+  | { kind: 'url.open'; url: string }
+  // The PR row's one button. Which of merge / branch-checkout / workspace
+  // removal it means is `row.action` + `row.cleanup` in the projection; the
+  // host re-derives it rather than trusting the renderer's copy.
+  | { kind: 'pr.act' }
+  // Almost every `gh` failure is "this account can't see this repo", so the
+  // error state offers the one fix worth a click.
+  | { kind: 'gh.switchAccount' }
+  | { kind: 'git.toggleFileListMode' }
+  // The setup widget's buttons. Each maps to the side effect of the same name.
+  | {
+      kind: 'setup.action'
+      action: 'run' | 'stop' | 'configure' | 'ask-agent' | 'promote'
+    }
+  // A bar / widget context-menu entry. The renderer builds the menu from the
+  // shared descriptors in `state/bar-menu.ts` and sends the chosen action back
+  // verbatim, so both front-ends offer the same items under the same guards.
+  | {
+      kind: 'bar.menuAction'
+      action:
+        | { type: 'move-widget'; widgetId: string; side: 'left' | 'right'; index: number }
+        | { type: 'toggle-widget'; widgetId: string }
+        | { type: 'toggle-bar'; side: 'left' | 'right' }
+    }
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -127,6 +153,43 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
       return { kind: 'view.settings' }
     case 'view.stats':
       return { kind: 'view.stats' }
+    case 'url.open':
+      if (typeof obj.url !== 'string') return null
+      return { kind: 'url.open', url: obj.url }
+    case 'pr.act':
+      return { kind: 'pr.act' }
+    case 'gh.switchAccount':
+      return { kind: 'gh.switchAccount' }
+    case 'git.toggleFileListMode':
+      return { kind: 'git.toggleFileListMode' }
+    case 'setup.action': {
+      const actions = ['run', 'stop', 'configure', 'ask-agent', 'promote'] as const
+      const action = actions.find((candidate) => candidate === obj.action)
+      return action === undefined ? null : { action, kind: 'setup.action' }
+    }
+    case 'bar.menuAction': {
+      const action = obj.action as Record<string, unknown> | undefined
+      if (typeof action?.type !== 'string') return null
+      const side = action.side
+      const sideOk = side === 'left' || side === 'right'
+      if (action.type === 'toggle-bar') {
+        return sideOk ? { action: { side, type: 'toggle-bar' }, kind: 'bar.menuAction' } : null
+      }
+      if (typeof action.widgetId !== 'string') return null
+      if (action.type === 'toggle-widget') {
+        return {
+          action: { type: 'toggle-widget', widgetId: action.widgetId },
+          kind: 'bar.menuAction',
+        }
+      }
+      if (action.type === 'move-widget' && sideOk && typeof action.index === 'number') {
+        return {
+          action: { index: action.index, side, type: 'move-widget', widgetId: action.widgetId },
+          kind: 'bar.menuAction',
+        }
+      }
+      return null
+    }
     default:
       return null
   }

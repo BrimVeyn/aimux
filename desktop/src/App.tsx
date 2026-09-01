@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { Bar } from '@/components/Bar'
-import { GitPanel } from '@/components/git/GitPanel'
+import { GitPaneWidget } from '@/components/git/GitPaneWidget'
 import { GitView } from '@/components/git/GitView'
 import { ModalHost } from '@/components/ModalHost'
+import { SetupWidget } from '@/components/SetupWidget'
 import { Sidebar } from '@/components/Sidebar'
 import { SplitLayout } from '@/components/SplitLayout'
 import { StatusBar } from '@/components/StatusBar'
@@ -13,7 +14,7 @@ import { normalizeKey } from '@/lib/keys'
 import { disposeTerminal, liveTerminalIds } from '@/lib/terminal-registry'
 import { theme } from '@/lib/theme'
 import { useTheme } from '@/lib/use-theme'
-import type { AppStateProjection, LayoutNode, ProjectedTab } from '@/lib/types'
+import type { AppStateProjection, GuiIntent, LayoutNode, ProjectedTab } from '@/lib/types'
 import { PROTOCOL_VERSION } from '@/lib/types'
 import { type ConnectionStatus, GuiSocket } from '@/lib/ws'
 
@@ -343,6 +344,38 @@ function App() {
     socketRef.current?.send({ intent: { kind: 'view.stats' }, t: 'intent' })
   }, [dismissModalIfOpen])
 
+  // Opening a link goes through the host: aimux runs on the machine whose
+  // browser the user actually uses, which the renderer may not be on.
+  const openUrl = useCallback((url: string) => {
+    socketRef.current?.send({ intent: { kind: 'url.open', url }, t: 'intent' })
+  }, [])
+
+  const prAction = useCallback(() => {
+    socketRef.current?.send({ intent: { kind: 'pr.act' }, t: 'intent' })
+  }, [])
+
+  const switchGhAccount = useCallback(() => {
+    socketRef.current?.send({ intent: { kind: 'gh.switchAccount' }, t: 'intent' })
+  }, [])
+
+  const setupAction = useCallback(
+    (action: Extract<GuiIntent, { kind: 'setup.action' }>['action']) => {
+      socketRef.current?.send({ intent: { action, kind: 'setup.action' }, t: 'intent' })
+    },
+    []
+  )
+
+  const barMenuAction = useCallback(
+    (action: Extract<GuiIntent, { kind: 'bar.menuAction' }>['action']) => {
+      socketRef.current?.send({ intent: { action, kind: 'bar.menuAction' }, t: 'intent' })
+    },
+    []
+  )
+
+  const toggleFileListMode = useCallback(() => {
+    socketRef.current?.send({ intent: { kind: 'git.toggleFileListMode' }, t: 'intent' })
+  }, [])
+
   const reorderProjects = useCallback((orderedIds: string[]) => {
     socketRef.current?.send({ intent: { kind: 'projects.reorder', orderedIds }, t: 'intent' })
   }, [])
@@ -410,6 +443,11 @@ function App() {
     projection?.focusMode === 'settings' || projection?.focusMode === 'stats'
   const panesReplaced = inGitMode || replacedByScreen
 
+  const setupElement =
+    projection !== null ? (
+      <SetupWidget onAction={setupAction} setup={projection.setup} />
+    ) : null
+
   const sidebarElement =
     projection !== null ? (
       <Sidebar
@@ -429,21 +467,24 @@ function App() {
     ) : null
 
   const gitPanelElement =
-    projection !== null && gitPane !== undefined ? (
-      <div
-        className="h-full overflow-hidden"
-        style={{ backgroundColor: theme.backgroundPanel, padding: 8 }}
-      >
-        <GitPanel
-          gitMode={projection.gitMode}
-          gitPane={gitPane}
-          gitPanel={projection.gitPanel}
-          onStageFile={stageGitFile}
-          onToggleFolder={toggleGitFolder}
-          onUnstageFile={unstageGitFile}
-          projectPath={currentProject?.projectPath}
-        />
-      </div>
+    projection !== null ? (
+      <GitPaneWidget
+        contentWidth={bars.left.widgets.some((w) => w.id === 'git' && w.visible)
+          ? bars.left.width - 1
+          : bars.right.width - 1}
+        github={projection.github}
+        gitMode={projection.gitMode}
+        gitPane={projection.gitPane}
+        gitPanel={projection.gitPanel}
+        onOpenUrl={openUrl}
+        onPrAction={prAction}
+        onStageFile={stageGitFile}
+        onSwitchAccount={switchGhAccount}
+        onToggleFileListMode={toggleFileListMode}
+        onToggleFolder={toggleGitFolder}
+        onUnstageFile={unstageGitFile}
+        projectPath={currentProject?.projectPath}
+      />
     ) : null
 
 
@@ -500,10 +541,12 @@ function App() {
       <div className="flex min-h-0 flex-1">
         <Bar
           bar={bars.left}
+          bars={bars}
+          onMenuAction={barMenuAction}
           onOpenSettings={openSettings}
           onOpenStats={openStats}
           side="left"
-          widgets={{ git: gitPanelElement, projects: sidebarElement }}
+          widgets={{ git: gitPanelElement, projects: sidebarElement, setup: setupElement }}
         />
         <main className="flex min-w-0 flex-1 flex-col">
           {/* The strip sits inside the pane column, not above the bars — same
@@ -572,10 +615,12 @@ function App() {
         </main>
         <Bar
           bar={bars.right}
+          bars={bars}
+          onMenuAction={barMenuAction}
           onOpenSettings={openSettings}
           onOpenStats={openStats}
           side="right"
-          widgets={{ git: gitPanelElement, projects: sidebarElement }}
+          widgets={{ git: gitPanelElement, projects: sidebarElement, setup: setupElement }}
         />
       </div>
       {projection ? (

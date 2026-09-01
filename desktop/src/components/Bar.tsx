@@ -1,11 +1,28 @@
-import type { BarLite } from "@aimux/gui-protocol";
+import type { BarLite, GuiIntent } from "@aimux/gui-protocol";
+
+import type { BarMenuItem, BarsShape } from "@aimux/state/bar-menu";
+import {
+  buildBarContextMenu,
+  buildWidgetContextMenu,
+} from "@aimux/state/bar-menu";
 
 import { Button } from "@/components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import { theme } from "@/lib/theme";
+
+type MenuAction = Extract<GuiIntent, { kind: "bar.menuAction" }>["action"];
 
 interface BarProps {
   bar: BarLite;
+  /** Both bars — the menus offer moving a widget across and unhiding one. */
+  bars: BarsShape;
   side: "left" | "right";
+  onMenuAction: (action: MenuAction) => void;
   /** Element to render per widget id. A widget with no element is skipped. */
   widgets: Record<string, React.ReactNode>;
   onOpenSettings: () => void;
@@ -25,6 +42,8 @@ interface BarProps {
  */
 export function Bar({
   bar,
+  bars,
+  onMenuAction,
   onOpenSettings,
   onOpenStats,
   side,
@@ -62,18 +81,28 @@ export function Bar({
               className="flex min-h-0 flex-col overflow-hidden"
               style={{ flexBasis: 0, flexGrow: widget.grow }}
             >
-              <div className="min-h-0 flex-1 overflow-hidden">
+              <Menu
+                className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                items={buildWidgetContextMenu(bars, side, widget.id)}
+                onAction={onMenuAction}
+              >
                 {widgets[widget.id]}
-              </div>
+              </Menu>
               {index === visible.length - 1 ? null : <Rule />}
             </div>
           ))}
         </div>
         {side === "left" ? (
-          <BarFooter
-            onOpenSettings={onOpenSettings}
-            onOpenStats={onOpenStats}
-          />
+          <Menu
+            className="shrink-0"
+            items={buildBarContextMenu(bars, side)}
+            onAction={onMenuAction}
+          >
+            <BarFooter
+              onOpenSettings={onOpenSettings}
+              onOpenStats={onOpenStats}
+            />
+          </Menu>
         ) : null}
       </div>
       {side === "left" ? edge : null}
@@ -138,5 +167,44 @@ function BarFooter({
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * A right-click menu over `children`, built from the shared descriptors.
+ *
+ * The trigger needs a real element to attach to, so it becomes a box in the
+ * layout — which means the caller has to say how that box participates. It had
+ * a hardcoded `flex-1` here, and the footer's copy then competed with the
+ * widget body for the column's height and took half of it.
+ */
+function Menu({
+  children,
+  className,
+  items,
+  onAction,
+}: {
+  items: BarMenuItem[];
+  onAction: (action: MenuAction) => void;
+  className: string;
+  children: React.ReactNode;
+}) {
+  if (items.length === 0) return <>{children}</>;
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className={className}>{children}</div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {items.map((item) => (
+          <ContextMenuItem
+            key={item.label}
+            onSelect={() => onAction(item.action)}
+          >
+            {item.label}
+          </ContextMenuItem>
+        ))}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
