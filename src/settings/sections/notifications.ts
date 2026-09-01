@@ -1,0 +1,100 @@
+import type { SettingOption, SettingSection } from '../types'
+
+import {
+  BUILTIN_SOUND_IDS,
+  DEFAULT_VOLUME,
+  getCustomSoundsDir,
+  listCustomSoundIds,
+  playSoundFile,
+  resolveSoundPath,
+  SOUND_OFF,
+} from '../../platform/play-sound'
+import { toast } from '../../state/toast-store'
+import { settingsStore } from '../settings-store'
+
+/** Spelled once, here, next to the rows that own them. */
+const NOTIFICATION_SOUND = 'notifications.sound'
+const NOTIFICATION_VOLUME = 'notifications.volume'
+
+/**
+ * `off` plus the shipped three plus whatever is in the drop-in directory. Built
+ * once, at import: a settings row's options are part of the schema (hydration
+ * validates the stored value against them), so they cannot depend on a scan that
+ * happens per render. A newly dropped file therefore shows up on the next
+ * launch, which the row's description says out loud.
+ */
+const SOUND_OPTIONS: SettingOption[] = [
+  { label: 'off', value: SOUND_OFF },
+  ...BUILTIN_SOUND_IDS.map((id) => ({ label: id, value: id })),
+  ...listCustomSoundIds().map((id) => ({ label: id, value: id })),
+]
+
+/** The selected sound id, or `off`. */
+function selectedSoundId(): string {
+  const value = settingsStore.getState().values[NOTIFICATION_SOUND]
+  return typeof value === 'string' ? value : SOUND_OFF
+}
+
+function selectedVolume(): number {
+  const value = settingsStore.getState().values[NOTIFICATION_VOLUME]
+  return typeof value === 'number' ? value : DEFAULT_VOLUME
+}
+
+/**
+ * Play the configured notification sound, if any. Silent — and cheap — when the
+ * user has set the row to `off`, which is what makes it safe to call on every
+ * status edge.
+ */
+export function playNotificationSound(): boolean {
+  const path = resolveSoundPath(selectedSoundId())
+  if (path == null) return false
+  return playSoundFile(path, { volume: selectedVolume() })
+}
+
+export const NOTIFICATIONS_SECTION: SettingSection = {
+  description: 'Plays when an assistant needs an answer, or finishes a turn.',
+  glyph: '\u{25CE}',
+  id: 'notifications',
+  label: 'Notifications',
+  rows: [
+    {
+      description: `"off" disables it. Drop your own in ${getCustomSoundsDir()} — picked up at the next launch.`,
+      fallback: 'plane',
+      id: NOTIFICATION_SOUND,
+      kind: 'select',
+      label: 'Sound',
+      options: SOUND_OPTIONS,
+      storage: 'settings',
+    },
+    {
+      description:
+        "Percent of the file's own level. Ignored by `aplay` and by Windows, which play at the system volume.",
+      fallback: DEFAULT_VOLUME,
+      id: NOTIFICATION_VOLUME,
+      kind: 'number',
+      label: 'Volume',
+      max: 100,
+      min: 0,
+      step: 5,
+      storage: 'settings',
+    },
+    {
+      // The one way to find out that this machine has no audio player before a
+      // notification you actually cared about goes silent.
+      description: 'Play the selected sound now.',
+      id: 'notifications.test',
+      kind: 'action',
+      label: 'Test sound',
+      run: () => {
+        if (selectedSoundId() === SOUND_OFF) {
+          toast.info('Notification sound is off')
+          return
+        }
+        if (!playNotificationSound()) {
+          toast.error('Could not play that sound — no audio player found')
+        }
+      },
+      value: () => selectedSoundId(),
+    },
+  ],
+}

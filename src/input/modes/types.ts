@@ -1,7 +1,8 @@
 import type { KeyEvent } from '@opentui/core'
 
+import type { AppAction } from '../../state/actions'
 import type { SplitDirection } from '../../state/layout-tree'
-import type { AppAction, AppState, GitFileListMode, TabSession } from '../../state/types'
+import type { AppState, GitFileListMode, TabSession } from '../../state/types'
 
 export type ModeId =
   | 'navigation'
@@ -9,10 +10,15 @@ export type ModeId =
   | 'git-mode'
   | 'modal.new-tab.command-edit'
   | 'modal.new-tab.editing-command'
-  | 'modal.session-picker.filtering'
-  | 'modal.session-name'
-  | 'modal.create-session'
+  | 'modal.workspace-delete-confirm'
+  | 'modal.project-picker.filtering'
+  | 'modal.project-name'
+  | 'modal.create-project'
+  | 'modal.create-workspace'
   | 'modal.rename-tab'
+  | 'modal.rename-workspace'
+  | 'modal.setting-text'
+  | 'modal.settings-search.filtering'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
   | 'modal.theme-picker.filtering'
@@ -22,17 +28,24 @@ export type ModeId =
   | 'modal.git-commit.confirm'
   | 'modal.git-commit.generating'
   | 'modal.update-available'
-  | 'modal.worktree-move'
-  | 'modal.ai-usage'
+  | 'modal.workspace-move'
+  | 'modal.workspace-move-confirm'
+  | 'modal.flash-jump'
+  | 'modal.quotas'
+  | 'settings'
+  | 'stats'
 
 export type SideEffect =
   | { type: 'quit'; state: AppState }
+  | { type: 'open-new-tab' }
   | { type: 'launch-selected-assistant' }
   | { type: 'edit-selected-assistant' }
-  | { type: 'confirm-selected-session' }
-  | { type: 'delete-selected-session' }
-  | { type: 'open-rename-selected-session' }
-  | { type: 'create-session'; name: string; projectPath?: string }
+  | { type: 'confirm-selected-project' }
+  | { type: 'delete-selected-project' }
+  | { type: 'open-rename-selected-project' }
+  | { type: 'create-project'; name: string; projectPath?: string }
+  | { type: 'create-workspace' }
+  | { type: 'load-create-workspace-base-branches' }
   | { type: 'close-tab'; tabId: string }
   | { type: 'restart-tab'; tab: TabSession }
   | { type: 'paste-selected-snippet' }
@@ -44,8 +57,9 @@ export type SideEffect =
   | { type: 'apply-theme'; action: 'open' }
   | { type: 'apply-theme'; action: 'restore' }
   | { type: 'apply-theme'; action: 'confirm' }
-  | { type: 'apply-theme'; action: 'preview' }
-  | { type: 'rename-session'; sessionId: string; name: string }
+  | { type: 'apply-theme'; action: 'preview'; delta: 1 | -1 }
+  | { type: 'rename-project'; projectId: string; name: string }
+  | { type: 'rename-tab'; tabId: string; title: string }
   | {
       type: 'split-pane'
       direction: SplitDirection
@@ -64,23 +78,54 @@ export type SideEffect =
   | { type: 'git-rm'; path: string }
   | { type: 'git-commit'; title: string; body: string }
   | { type: 'git-commit-auto'; title: string; body: string }
-  | { type: 'generate-auto-commit-now'; sessionId: string }
+  | { type: 'generate-auto-commit-now'; projectId: string }
   | { type: 'git-push' }
   | { type: 'confirm-update-selection' }
-  | { type: 'switch-session-by-index'; index: number }
-  | { type: 'delete-session'; sessionId: string }
-  | { type: 'delete-worktree'; sessionId: string; worktreeId: string; force?: boolean }
+  | { type: 'switch-project-by-index'; index: number; workspaceId?: string }
+  | { type: 'cycle-sidebar-item'; direction: 1 | -1 }
+  | { type: 'switch-tab-by-index'; index: number }
+  | { type: 'delete-project'; projectId: string }
   | {
-      type: 'move-worktree'
-      sessionId: string
-      sourceWorktreeId: string
-      targetWorktreeId: string
-      deleteSource?: boolean
+      type: 'delete-workspace'
+      projectId: string
+      workspaceId: string
+      // Force the git worktree removal (discards uncommitted changes in the
+      // workspace). Also implies closing the workspace's tabs.
+      force?: boolean
+      // Close the workspace's tabs without forcing the git removal. Lets the
+      // sidebar "Remove workspace" clean up tabs (avoiding orphans) while still
+      // refusing to discard uncommitted work in a temp workspace.
+      closeTabs?: boolean
     }
+  | {
+      type: 'move-workspace'
+      projectId: string
+      sourceWorkspaceId: string
+      targetWorkspaceId: string
+      deleteSource?: boolean
+      // Retry flags set by the workspace-move-confirm dialog.
+      stashTarget?: boolean
+      keepConflicts?: boolean
+    }
+  | { type: 'load-workspace-move-stats' }
+  | { type: 'hibernate-workspace'; workspaceId: string }
   | { type: 'toggle-transparent' }
   | { type: 'toggle-mode' }
   | { type: 'open-file-in-editor'; path: string }
   | { type: 'open-selected-snippet-source-in-editor' }
+  | { type: 'run-setup' }
+  | { type: 'stop-setup' }
+  | { type: 'configure-setup-script'; projectId?: string }
+  | { type: 'set-project-default-base-ref'; projectId: string; baseRef: string }
+  | { type: 'toggle-project-collapsed'; projectId: string }
+  | { type: 'ask-agent-for-setup-script' }
+  | { type: 'promote-setup-tab' }
+  /** Toggle a checkbox, cycle an enum, run a row's action — whatever the row is. */
+  | { type: 'activate-settings-row' }
+  | { type: 'adjust-settings-row'; delta: 1 | -1 }
+  | { type: 'reset-settings-row' }
+  | { type: 'confirm-settings-search' }
+  | { type: 'commit-setting-text'; settingId: string; value: string }
 
 export interface KeyResult {
   actions: AppAction[]

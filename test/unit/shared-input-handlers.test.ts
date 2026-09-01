@@ -106,15 +106,16 @@ describe('handleModalSelectionKeys', () => {
 
   test('up moves selection up with derived effects', () => {
     expect(
-      handleModalSelectionKeys(key({ name: 'up' }), () => [
+      handleModalSelectionKeys(key({ name: 'up' }), (delta) => [
         {
           action: 'preview',
+          delta,
           type: 'apply-theme',
         },
       ])
     ).toEqual({
       actions: [{ delta: -1, type: 'move-modal-selection' }],
-      effects: [{ action: 'preview', type: 'apply-theme' }],
+      effects: [{ action: 'preview', delta: -1, type: 'apply-theme' }],
     })
   })
 

@@ -11,7 +11,7 @@ Each profile has its own:
 
 - typed config
 - app-managed config
-- workspace catalog
+- project catalog
 - snippet catalog
 - daemon socket
 - terminal-manager socket
@@ -74,7 +74,7 @@ Typical contents:
 ~/.config/aimux/default/
 |- aimux.config.ts
 |- aimux.json
-|- aimux-sessions.json
+|- aimux-projects.json
 `- aimux-snippets.json
 ```
 
@@ -103,7 +103,7 @@ Common uses:
 
 - a normal `default` profile for daily use
 - a `dev` profile for source builds
-- a `work` profile for a separate workspace catalog and snippet set
+- a `work` profile for a separate project catalog and snippet set
 - a temporary profile for testing a risky config change
 
 ## Repository Development Profile

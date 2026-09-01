@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 
-import type { GitFileListMode, SessionBarPosition, WorkspaceSnapshotV1 } from './state/types'
+import type { StoredSettings } from './settings/types'
+import type { GitFileListMode, ProjectSnapshotV1 } from './state/types'
 
 import { logDebug } from './debug/input-log'
 import { getProfileConfigDir } from './profile-paths'
-import { isWorkspaceSnapshotV1 } from './state/validation'
+import { isProjectSnapshotV1 } from './state/validation'
 import { migrateThemeId as resolveLegacyThemeId, type ThemeId, type ThemeMode } from './ui/themes'
 
 function migrateThemeId(value: unknown): ThemeId | undefined {
@@ -12,24 +13,55 @@ function migrateThemeId(value: unknown): ThemeId | undefined {
   return resolveLegacyThemeId(value)
 }
 
-export const CONFIG_PATH = `${getProfileConfigDir()}/aimux.json`
+/**
+ * Path to the active profile's config file, resolved at CALL time. It must not
+ * be a module-level constant: `runCli` applies `--profile` (via `AIMUX_PROFILE`)
+ * after this module is imported, so a frozen path would read the wrong profile.
+ */
+export function getConfigPath(): string {
+  return `${getProfileConfigDir()}/aimux.json`
+}
 
+/**
+ * `visible` / `mode` / `position` / `*Ratio` are legacy placement fields, read
+ * once by `deriveBarsFromLegacy` and no longer written. They must stay
+ * optional: rejecting the whole block would silently drop the git *content*
+ * preferences (`fileListMode`, `diffModeRatio`, `treeCompaction`).
+ */
 export interface PersistedGitPane {
   diffModeRatio?: number
   fileListMode?: GitFileListMode
   treeCompaction?: boolean
   prefetchRadius?: number
-  visible: boolean
-  mode: 'embedded' | 'pane'
-  position: 'top' | 'bottom' | 'left' | 'right'
+  visible?: boolean
+  mode?: 'embedded' | 'pane'
+  position?: 'top' | 'bottom' | 'left' | 'right'
   paneRatio?: number
   embeddedRatio?: number
   ratio?: number
 }
 
+/** Legacy; still written for downgrade safety, read only as a bars fallback. */
 export interface PersistedSidebar {
   visible: boolean
   width: number
+}
+
+export interface PersistedBarWidget {
+  id: string
+  grow: number
+  visible: boolean
+}
+
+export interface PersistedBar {
+  visible: boolean
+  width: number
+  widgets: PersistedBarWidget[]
+}
+
+export interface PersistedBars {
+  left: PersistedBar
+  right: PersistedBar
 }
 
 export interface AimuxConfig {
@@ -39,18 +71,28 @@ export interface AimuxConfig {
   themeTransparent?: boolean
   themeMode?: ThemeMode
   gitPane?: PersistedGitPane
+  bars?: PersistedBars
   sidebar?: PersistedSidebar
-  sessionBarVisible?: boolean
-  sessionBarPosition?: SessionBarPosition
-  workspaceSnapshot?: WorkspaceSnapshotV1
+  projectBarVisible?: boolean
+  projectSnapshot?: ProjectSnapshotV1
+  /**
+   * What the settings screen has written, keyed by row id. Sparse: an absent key
+   * means the user never touched that row, which is not the same as `false`.
+   * Keys this build doesn't know are kept as-is so a downgrade doesn't erase
+   * settings a newer one wrote.
+   */
+  settings?: StoredSettings
   skippedUpdateVersion?: string
+  /** One-shot guard: orphan `aimux/` branches were pruned from existing repos. */
+  prunedOrphanAimuxBranches?: boolean
 }
 
 function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  const modeOk = v.mode === 'embedded' || v.mode === 'pane'
+  const modeOk = v.mode === undefined || v.mode === 'embedded' || v.mode === 'pane'
   const positionOk =
+    v.position === undefined ||
     v.position === 'top' ||
     v.position === 'bottom' ||
     v.position === 'left' ||
@@ -76,7 +118,7 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
       Number.isFinite(v.diffModeRatio) &&
       v.diffModeRatio > 0 &&
       v.diffModeRatio < 1)
-  const visibleOk = typeof v.visible === 'boolean'
+  const visibleOk = v.visible === undefined || typeof v.visible === 'boolean'
   const fileListModeOk =
     v.fileListMode === undefined || v.fileListMode === 'tree' || v.fileListMode === 'flat'
   const treeCompactionOk = v.treeCompaction === undefined || typeof v.treeCompaction === 'boolean'
@@ -100,10 +142,89 @@ function isPersistedGitPane(value: unknown): value is PersistedGitPane {
   ) {
     return false
   }
-  // cross-field coherence: embedded => top|bottom; pane => left|right
-  if (v.mode === 'embedded' && v.position !== 'top' && v.position !== 'bottom') return false
-  if (v.mode === 'pane' && v.position !== 'left' && v.position !== 'right') return false
   return true
+}
+
+function isPersistedBar(value: unknown): value is PersistedBar {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  if (typeof v.visible !== 'boolean') return false
+  if (typeof v.width !== 'number' || !Number.isFinite(v.width) || v.width <= 0) return false
+  if (!Array.isArray(v.widgets)) return false
+  return v.widgets.every((raw) => {
+    if (typeof raw !== 'object' || raw === null) return false
+    const widget = raw as Record<string, unknown>
+    return (
+      typeof widget.id === 'string' &&
+      widget.id.length > 0 &&
+      typeof widget.grow === 'number' &&
+      Number.isFinite(widget.grow) &&
+      widget.grow > 0 &&
+      typeof widget.visible === 'boolean'
+    )
+  })
+}
+
+export function isPersistedBars(value: unknown): value is PersistedBars {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return isPersistedBar(v.left) && isPersistedBar(v.right)
+}
+
+/**
+ * One-time upgrade from the pre-bars layout (a left sidebar plus a git pane
+ * with its own mode/position). Runs whenever `bars` is absent so an existing
+ * install keeps the layout it had.
+ */
+export function deriveBarsFromLegacy(
+  sidebar: PersistedSidebar | undefined,
+  gitPane: PersistedGitPane | undefined
+): PersistedBars {
+  const gitVisible = gitPane?.visible ?? true
+  const embeddedRatio = gitPane?.embeddedRatio ?? gitPane?.ratio ?? 0.5
+  const gitGrow = Math.max(1, Math.round(embeddedRatio * 100))
+  const git = { grow: gitGrow, id: 'git', visible: gitVisible }
+  const projects = { grow: Math.max(1, 100 - gitGrow), id: 'projects', visible: true }
+
+  const left: PersistedBar = {
+    visible: sidebar?.visible ?? true,
+    widgets: gitPane?.position === 'top' ? [git, projects] : [projects, git],
+    width: sidebar?.width ?? 28,
+  }
+  const right: PersistedBar = { visible: false, widgets: [], width: 40 }
+
+  // A legacy `pane` git panel on the right was already its own right-hand
+  // column — it maps straight onto the right bar. On the left it shared the
+  // edge with the sidebar, which the single-bar model expresses as a stack.
+  if (gitPane?.mode === 'pane' && gitPane.position === 'right') {
+    left.widgets = [{ ...projects, grow: 100 }]
+    right.visible = true
+    right.widgets = [{ ...git, grow: 100 }]
+    right.width = Math.round((gitPane.paneRatio ?? gitPane.ratio ?? 0.5) * 80)
+  }
+  return { left, right }
+}
+
+/**
+ * Keeps the entries it understands and drops the rest, rather than rejecting the
+ * whole block: this record grows one independent key per setting, so one bad
+ * value has no business resetting every other one.
+ */
+function parseStoredSettings(value: unknown): { settings: StoredSettings; dropped: number } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return { dropped: 0, settings: {} }
+  }
+  const settings: StoredSettings = {}
+  let dropped = 0
+  for (const [key, entry] of Object.entries(value)) {
+    const ok =
+      typeof entry === 'boolean' ||
+      typeof entry === 'string' ||
+      (typeof entry === 'number' && Number.isFinite(entry))
+    if (ok) settings[key] = entry
+    else dropped++
+  }
+  return { dropped, settings }
 }
 
 function isPersistedSidebar(value: unknown): value is PersistedSidebar {
@@ -144,12 +265,13 @@ function isCustomCommandsRecord(value: unknown): value is Record<string, string>
 }
 
 export function loadConfigResult(): ConfigLoadResult {
+  const configPath = getConfigPath()
   try {
-    if (!existsSync(CONFIG_PATH)) {
+    if (!existsSync(configPath)) {
       return { config: DEFAULT_CONFIG, issues: [], source: 'defaults' }
     }
 
-    const raw = readFileSync(CONFIG_PATH, 'utf8')
+    const raw = readFileSync(configPath, 'utf8')
     const parsed = JSON.parse(raw) as {
       version?: number
       customCommands?: unknown
@@ -157,13 +279,20 @@ export function loadConfigResult(): ConfigLoadResult {
       themeTransparent?: unknown
       themeMode?: unknown
       gitPane?: unknown
+      bars?: unknown
       sidebar?: unknown
       gitPanelVisible?: unknown
       gitPanelRatio?: unknown
+      projectBarVisible?: unknown
+      /** ponytail: pre-rename spelling, honoured for one release. */
       sessionBarVisible?: unknown
-      sessionBarPosition?: unknown
-      workspaceSnapshot?: unknown
+      projectSnapshot?: unknown
+      settings?: unknown
       skippedUpdateVersion?: unknown
+      prunedOrphanAimuxBranches?: unknown
+      /** Removed; still detected so the doctor can say so. */
+      workspaceTemplates?: unknown
+      worktreeTemplates?: unknown
     }
 
     const issues: string[] = []
@@ -202,6 +331,11 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid sidebar')
     }
 
+    const validBars = isPersistedBars(parsed.bars) ? parsed.bars : undefined
+    if (parsed.bars !== undefined && validBars === undefined) {
+      issues.push('ignored invalid bars')
+    }
+
     // Legacy migration: previous schema stored gitPanelVisible/gitPanelRatio at
     // top level. If the new `gitPane` field is absent, synthesize it from legacy
     // keys so users don't lose their toggle/ratio on upgrade.
@@ -227,25 +361,28 @@ export function loadConfigResult(): ConfigLoadResult {
       }
     }
 
-    const validSessionBarVisible =
-      typeof parsed.sessionBarVisible === 'boolean' ? parsed.sessionBarVisible : undefined
-    if (parsed.sessionBarVisible !== undefined && validSessionBarVisible === undefined) {
-      issues.push('ignored invalid sessionBarVisible')
+    // `sessionBarVisible` was the pre-rename key; without the fallback the bar
+    // would silently reset to its default on the first launch after upgrading.
+    const rawProjectBarVisible = parsed.projectBarVisible ?? parsed.sessionBarVisible
+    const validProjectBarVisible =
+      typeof rawProjectBarVisible === 'boolean' ? rawProjectBarVisible : undefined
+    if (rawProjectBarVisible !== undefined && validProjectBarVisible === undefined) {
+      issues.push('ignored invalid projectBarVisible')
     }
 
-    const validSessionBarPosition =
-      parsed.sessionBarPosition === 'top' || parsed.sessionBarPosition === 'bottom'
-        ? parsed.sessionBarPosition
-        : undefined
-    if (parsed.sessionBarPosition !== undefined && validSessionBarPosition === undefined) {
-      issues.push('ignored invalid sessionBarPosition')
+    if (parsed.projectSnapshot !== undefined && !isProjectSnapshotV1(parsed.projectSnapshot)) {
+      issues.push('ignored invalid projectSnapshot')
     }
 
-    if (
-      parsed.workspaceSnapshot !== undefined &&
-      !isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-    ) {
-      issues.push('ignored invalid workspaceSnapshot')
+    const storedSettings = parseStoredSettings(parsed.settings)
+    const settingsIsRecord =
+      typeof parsed.settings === 'object' &&
+      parsed.settings !== null &&
+      !Array.isArray(parsed.settings)
+    if (parsed.settings !== undefined && !settingsIsRecord) {
+      issues.push('ignored invalid settings')
+    } else if (storedSettings.dropped > 0) {
+      issues.push(`ignored ${String(storedSettings.dropped)} invalid setting(s)`)
     }
 
     const validSkippedUpdateVersion =
@@ -256,32 +393,41 @@ export function loadConfigResult(): ConfigLoadResult {
       issues.push('ignored invalid skippedUpdateVersion')
     }
 
+    // Templates are gone, and an unknown key parses fine — so a config that
+    // still declares them would silently stop doing anything. The doctor is the
+    // only place that can say so.
+    if (parsed.workspaceTemplates !== undefined || parsed.worktreeTemplates !== undefined) {
+      issues.push('workspaceTemplates was removed — use a per-project setup script instead')
+    }
+
     if (issues.length > 0) {
-      logDebug('config.load.validationIssue', { issues, path: CONFIG_PATH })
+      logDebug('config.load.validationIssue', { issues, path: configPath })
     }
 
     return {
       config: {
+        bars: validBars ?? deriveBarsFromLegacy(validSidebar, validGitPane),
         customCommands: isCustomCommandsRecord(parsed.customCommands) ? parsed.customCommands : {},
         gitPane: validGitPane,
-        sessionBarPosition: validSessionBarPosition,
-        sessionBarVisible: validSessionBarVisible,
+        projectBarVisible: validProjectBarVisible,
+        projectSnapshot: isProjectSnapshotV1(parsed.projectSnapshot)
+          ? parsed.projectSnapshot
+          : undefined,
+        prunedOrphanAimuxBranches: parsed.prunedOrphanAimuxBranches === true ? true : undefined,
+        settings: storedSettings.settings,
         sidebar: validSidebar,
         skippedUpdateVersion: validSkippedUpdateVersion,
         themeId: migrateThemeId(parsed.themeId),
         themeMode: validThemeMode,
         themeTransparent: validThemeTransparent,
         version: 2,
-        workspaceSnapshot: isWorkspaceSnapshotV1(parsed.workspaceSnapshot)
-          ? parsed.workspaceSnapshot
-          : undefined,
       },
       issues,
       source: 'file',
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logDebug('config.load.error', { error: message, path: CONFIG_PATH })
+    logDebug('config.load.error', { error: message, path: configPath })
     return {
       config: DEFAULT_CONFIG,
       issues: [`failed to load config: ${message}`],
@@ -295,14 +441,15 @@ export function loadConfig(): AimuxConfig {
 }
 
 export function saveConfig(config: AimuxConfig): boolean {
+  const configPath = getConfigPath()
   try {
     mkdirSync(getProfileConfigDir(), { recursive: true })
-    writeFileSync(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`)
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`)
     return true
   } catch (error) {
     logDebug('config.save.error', {
       error: error instanceof Error ? error.message : String(error),
-      path: CONFIG_PATH,
+      path: configPath,
     })
     return false
   }

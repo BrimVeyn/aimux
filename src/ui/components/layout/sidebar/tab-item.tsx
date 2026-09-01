@@ -7,6 +7,7 @@ import type { TabSession } from '../../../../state/types'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { getCurrentTheme, useTheme } from '../../../theme'
+import { FlashLabelBadge } from '../../flash/flash-label-badge'
 import { ContextMenuBox } from '../../overlays/context-menu/context-menu-box'
 
 interface TabItemProps {
@@ -15,8 +16,12 @@ interface TabItemProps {
   active: boolean
   focused: boolean
   inLayout?: boolean
-  /** When set, this tab's worktree can be moved — adds a "Move worktree" entry. */
-  moveWorktreeId?: string
+  /** When set, this tab's workspace can be moved — adds a "Move workspace" entry. */
+  moveWorkspaceId?: string
+  /** 1-based position in the visible tab list — rendered as `[N]` and matches Leader+N. */
+  indexLabel?: string
+  /** Render the close × unconditionally instead of only on hover. */
+  alwaysShowClose?: boolean
 }
 
 function getStatusColor(status: TabSession['status']): string {
@@ -50,31 +55,36 @@ function getIndicatorColor(active: boolean, focused: boolean, inLayout: boolean)
   return inLayout ? t.textMuted : t.textMuted
 }
 
-function BusyIndicator() {
+function BusyGlyph() {
   const t = useTheme()
-  const frame = useBusySpinner()
+  const spinner = useBusySpinner()
   return (
     <text fg={t.primary} selectable={false}>
-      {frame} working
+      {' '}
+      {spinner}
     </text>
   )
 }
 
-function WaitingIndicator() {
+function WaitingGlyph() {
   const t = useTheme()
   return (
     <text fg={t.warning} selectable={false}>
-      ? waiting
+      {' '}
+      ?
     </text>
   )
 }
 
-function ActivityIndicator({ tab }: { tab: TabSession }) {
+function ActivityGlyph({ tab }: { tab: TabSession }) {
   const t = useTheme()
+  // No sprite here on purpose: a tab is one line, and a sprite placed at a
+  // second size would give a cell two images it could resolve to.
   if (tab.status === 'error') {
     return (
       <text fg={t.error} selectable={false}>
-        ✗ error
+        {' '}
+        ✗
       </text>
     )
   }
@@ -82,37 +92,61 @@ function ActivityIndicator({ tab }: { tab: TabSession }) {
   if (tab.status === 'disconnected') {
     return (
       <text fg={t.warning} selectable={false}>
-        ⏸ restore
+        {' '}
+        ⏸
       </text>
     )
   }
 
   if (tab.activity === 'working') {
-    return <BusyIndicator />
+    return <BusyGlyph />
   }
 
   if (tab.activity === 'waiting-input') {
-    return <WaitingIndicator />
+    return <WaitingGlyph />
+  }
+
+  // The tab that rang. There is deliberately no glyph for a plain idle tab:
+  // "not busy" is the resting state of every tab you are not watching, and a
+  // dot that is always on cannot also mean "read this one".
+  if (tab.unseen === true) {
+    return (
+      <text fg={t.success} selectable={false}>
+        {' '}
+        ●
+      </text>
+    )
   }
 
   if (tab.activity === 'idle') {
+    // Blank, but the same width as every other state — a tab must not resize
+    // when its agent stops.
     return (
-      <text fg={t.success} selectable={false}>
-        ● idle
+      <text fg={t.textMuted} selectable={false}>
+        {'  '}
       </text>
     )
   }
 
   return (
     <text fg={getStatusColor(tab.status)} selectable={false}>
-      {tab.status}
+      {' '}
+      ·
     </text>
   )
 }
 
-export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: TabItemProps) {
+export function TabItem({
+  active,
+  alwaysShowClose,
+  focused,
+  id,
+  indexLabel,
+  inLayout,
+  moveWorkspaceId,
+  tab,
+}: TabItemProps) {
   const t = useTheme()
-  const label = tab.command.split(' ')[0]
   const isInLayout = inLayout ?? false
   const indicator = getIndicator(active, focused, isInLayout)
   const indicatorColor = getIndicatorColor(active, focused, isInLayout)
@@ -135,35 +169,35 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
         },
       ],
       [
-        'Move up',
+        'Move left',
         () => {
           dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
           dispatchGlobal({ delta: -1, type: 'reorder-active-tab' })
         },
       ],
       [
-        'Move down',
+        'Move right',
         () => {
           dispatchGlobal({ tabId: tab.id, type: 'set-active-tab' })
           dispatchGlobal({ delta: 1, type: 'reorder-active-tab' })
         },
       ],
-      // Move this tab's worktree into another one. Opened from here it overlays
-      // the normal view (no git mode) since the open action doesn't touch focus.
-      ...(moveWorktreeId != null && moveWorktreeId !== ''
+      ...(moveWorkspaceId != null && moveWorkspaceId !== ''
         ? [
             [
-              'Move worktree',
-              () =>
+              'Move workspace',
+              () => {
                 dispatchGlobal({
-                  sourceWorktreeId: moveWorktreeId,
-                  type: 'open-worktree-move-modal',
-                }),
+                  sourceWorkspaceId: moveWorkspaceId,
+                  type: 'open-workspace-move-modal',
+                })
+                runSideEffectGlobal({ type: 'load-workspace-move-stats' })
+              },
             ] as [string, () => void],
           ]
         : []),
     ],
-    [moveWorktreeId, tab.id]
+    [moveWorkspaceId, tab.id]
   )
   const handleMouseOver = useCallback(() => setHovered(true), [])
   const handleMouseOut = useCallback(() => setHovered(false), [])
@@ -181,38 +215,32 @@ export function TabItem({ active, focused, id, inLayout, moveWorktreeId, tab }: 
       id={id}
       paddingLeft={1}
       paddingRight={1}
-      paddingTop={0}
-      paddingBottom={0}
-      flexDirection="column"
-      gap={0}
+      flexDirection="row"
+      alignItems="center"
       rightClickMenu={rightClickMenu}
       onMouseOver={handleMouseOver}
       onMouseOut={handleMouseOut}
     >
-      <box flexDirection="row" alignItems="center">
-        <text fg={indicatorColor} selectable={false}>
-          {indicator}{' '}
+      <text fg={indicatorColor} selectable={false}>
+        {indicator}{' '}
+      </text>
+      {indexLabel != null && indexLabel !== '' ? (
+        <text fg={t.textMuted} selectable={false} wrapMode="none">
+          {indexLabel}{' '}
         </text>
-        <box flexGrow={1}>
-          <text fg={active ? t.text : t.textMuted} selectable={false}>
-            {tab.title}
+      ) : null}
+      <FlashLabelBadge rowKey={`tab:${tab.id}`} />
+      <text fg={active ? t.text : t.textMuted} selectable={false} wrapMode="none">
+        {tab.title}
+      </text>
+      <ActivityGlyph tab={tab} />
+      {alwaysShowClose === true || hovered ? (
+        <box paddingLeft={1} onMouseDown={handleCloseMouseDown}>
+          <text fg={t.textMuted} selectable={false}>
+            ×
           </text>
         </box>
-        {hovered ? (
-          <box onMouseDown={handleCloseMouseDown}>
-            <text fg={t.textMuted} selectable={false}>
-              ×
-            </text>
-          </box>
-        ) : null}
-      </box>
-      <box flexDirection="row">
-        <text fg={t.textMuted} selectable={false}>
-          {' '}
-          {label}{' '}
-        </text>
-        <ActivityIndicator tab={tab} />
-      </box>
+      ) : null}
     </ContextMenuBox>
   )
 }

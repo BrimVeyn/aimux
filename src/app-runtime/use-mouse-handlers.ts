@@ -4,13 +4,15 @@ import { useEffect, useRef } from 'react'
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
+import type { AppAction } from '../state/actions'
 import type { SplitDirection } from '../state/layout-tree'
-import type { AppAction, AppState, TabSession, TerminalLine } from '../state/types'
+import type { AppState, BarSide, TabSession, TerminalLine } from '../state/types'
 
 import { logInputDebug } from '../debug/input-log'
 import { MultiClickDetector } from '../input/multi-click-detector'
 import { extractStreamText, getLineText } from '../input/terminal-text-extraction'
 import { copyToSystemClipboard } from '../platform/clipboard'
+import { bump } from '../services/aimux-counters'
 import {
   type ClickSelectionResult,
   computeRangeFromLineText,
@@ -21,21 +23,21 @@ import {
 } from './click-selection-resolver'
 import { recordMultiClickClipboardWrite } from './multi-click-clipboard-guard'
 import { requestRenderUpTree } from './render-invalidation'
+import { shouldWriteSelectionToClipboard } from './selection-clipboard-dedup'
 import {
-  type AnchoredRatioDragState,
   type AxisDragState,
-  getAnchoredRatioFromDrag,
   getAxisDeltaFromDrag,
+  getRatioFromDrag,
   getSplitRatioFromDrag,
+  type RatioDragState,
   type SplitDragState,
 } from './split-drag-controller'
 import { getForwardedMouseSequence, getScrollViewportDelta } from './terminal-mouse-adapter'
 
 type ResizeDragState =
   | ({ kind: 'split' } & SplitDragState)
-  | ({ initialWidth: number; kind: 'sidebar' } & AxisDragState)
-  | ({ initialWidth: number; kind: 'git-pane'; side: 'left' | 'right' } & AxisDragState)
-  | ({ kind: 'embedded-git'; position: 'top' | 'bottom' } & AnchoredRatioDragState)
+  | ({ initialWidth: number; kind: 'bar'; side: BarSide } & AxisDragState)
+  | ({ index: number; kind: 'bar-boundary'; side: BarSide } & RatioDragState)
 
 interface MultiClickDragState {
   mode: MultiClickMode
@@ -146,7 +148,9 @@ function applyMultiClickInitialSelection(
     finishDragging: false,
   })
   requestRenderUpTree(selection.target)
-  copyToSystemClipboard(selection.selectedText)
+  if (shouldWriteSelectionToClipboard(selection.selectedText)) {
+    copyToSystemClipboard(selection.selectedText)
+  }
 }
 
 export function useMouseHandlers({
@@ -303,6 +307,7 @@ export function useMouseHandlers({
       return
     }
 
+    bump('scrollLines', Math.abs(delta))
     backend.scrollViewport(targetTabId, delta)
   }
 
@@ -319,40 +324,32 @@ export function useMouseHandlers({
     separatorDragRef.current = { kind: 'split', ...info }
   }
 
-  const handleSidebarResizeStart = (info: { initialWidth: number; screenStart: number }) => {
-    separatorDragRef.current = {
-      axis: 'x',
-      initialWidth: info.initialWidth,
-      kind: 'sidebar',
-      screenStart: info.screenStart,
-    }
-  }
-
-  const handleGitPaneResizeStart = (info: {
+  const handleBarResizeStart = (info: {
     initialWidth: number
     screenStart: number
-    side: 'left' | 'right'
+    side: BarSide
   }) => {
     separatorDragRef.current = {
       axis: 'x',
       initialWidth: info.initialWidth,
-      kind: 'git-pane',
+      kind: 'bar',
       screenStart: info.screenStart,
       side: info.side,
     }
   }
 
-  const handleEmbeddedGitResizeStart = (info: {
+  const handleBarBoundaryResizeStart = (info: {
     containerStart: number
-    position: 'top' | 'bottom'
+    index: number
+    side: BarSide
     totalSize: number
   }) => {
     separatorDragRef.current = {
-      anchor: info.position === 'top' ? 'start' : 'end',
       axis: 'y',
-      kind: 'embedded-git',
-      position: info.position,
+      index: info.index,
+      kind: 'bar-boundary',
       screenStart: info.containerStart,
+      side: info.side,
       totalSize: info.totalSize,
     }
   }
@@ -374,27 +371,22 @@ export function useMouseHandlers({
         })
         break
       }
-      case 'sidebar': {
-        const nextWidth = Math.round(drag.initialWidth + getAxisDeltaFromDrag(event, drag))
-        dispatch({ type: 'set-sidebar-width', width: nextWidth })
-        break
-      }
-      case 'git-pane': {
-        const delta = getAxisDeltaFromDrag(event, drag)
-        const direction = drag.side === 'left' ? 1 : -1
-        const nextWidth = drag.initialWidth + delta * direction
+      case 'bar': {
+        // The right bar grows as the cursor moves left, hence the flipped sign.
+        const delta = getAxisDeltaFromDrag(event, drag) * (drag.side === 'left' ? 1 : -1)
         dispatch({
-          ratio: nextWidth / 80,
-          target: 'pane',
-          type: 'set-git-pane-ratio',
+          side: drag.side,
+          type: 'set-bar-width',
+          width: Math.round(drag.initialWidth + delta),
         })
         break
       }
-      case 'embedded-git': {
+      case 'bar-boundary': {
         dispatch({
-          ratio: getAnchoredRatioFromDrag(event, drag),
-          target: 'embedded',
-          type: 'set-git-pane-ratio',
+          index: drag.index,
+          ratio: getRatioFromDrag(event, drag),
+          side: drag.side,
+          type: 'set-bar-boundary',
         })
         break
       }
@@ -573,7 +565,7 @@ export function useMouseHandlers({
     const anchorIdx = drag.anchorAbsRow - startAbs
     const focusIdx = drag.focusAbsRow - startAbs
     const text = extractStreamText(lines, anchorIdx, anchorCol, focusIdx, drag.focusCol)
-    if (text.length > 0) {
+    if (text.length > 0 && shouldWriteSelectionToClipboard(text)) {
       copyToSystemClipboard(text)
       recordMultiClickClipboardWrite()
     }
@@ -583,13 +575,12 @@ export function useMouseHandlers({
   }
 
   return {
-    handleEmbeddedGitResizeStart,
-    handleGitPaneResizeStart,
+    handleBarBoundaryResizeStart,
+    handleBarResizeStart,
     handlePaneActivate,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
     handleSeparatorDragStart,
-    handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
     handleTerminalDrag,

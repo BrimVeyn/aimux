@@ -16,8 +16,7 @@ export interface AxisDragState {
   screenStart: number
 }
 
-export interface AnchoredRatioDragState {
-  anchor: 'start' | 'end'
+export interface RatioDragState {
   axis: ScreenAxis
   screenStart: number
   totalSize: number
@@ -29,17 +28,16 @@ function getScreenPosition(event: OtuiMouseEvent, axis: ScreenAxis): number {
 
 export function getSplitRatioFromDrag(event: OtuiMouseEvent, drag: SplitDragState): number {
   const position = getScreenPosition(event, drag.direction === 'vertical' ? 'x' : 'y')
-  return (position - drag.screenStart) / drag.totalSize
+  const total = Math.max(1, drag.totalSize)
+  const cells = Math.round(position - drag.screenStart)
+  return cells / total
 }
 
 export function getAxisDeltaFromDrag(event: OtuiMouseEvent, drag: AxisDragState): number {
   return getScreenPosition(event, drag.axis) - drag.screenStart
 }
 
-export function getAnchoredRatioFromDrag(
-  event: OtuiMouseEvent,
-  drag: AnchoredRatioDragState
-): number {
-  const offset = getScreenPosition(event, drag.axis) - drag.screenStart
-  return drag.anchor === 'start' ? offset / drag.totalSize : 1 - offset / drag.totalSize
+/** Cursor position as a 0..1 fraction of the dragged container. */
+export function getRatioFromDrag(event: OtuiMouseEvent, drag: RatioDragState): number {
+  return (getScreenPosition(event, drag.axis) - drag.screenStart) / drag.totalSize
 }

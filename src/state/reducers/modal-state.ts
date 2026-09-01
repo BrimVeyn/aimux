@@ -1,20 +1,29 @@
 import { basename } from 'node:path'
 
-import type { AppAction, AppState } from '../types'
+import type { AppAction } from '../actions'
+import type { AppState } from '../types'
 
 import { collectHelpEntries } from '../../input/keymap/help-entries'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
 import { getAllAssistantOptions } from '../../pty/command-registry'
+import { filterSettingRows } from '../../settings/search'
 import { filterThemeIds } from '../../ui/filter-themes'
-import { filterAssistants, filterSessions, filterSnippets } from '../selectors'
-import { reduceAutoCommitState } from './auto-commit-state'
+import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
+import {
+  type BaseRefOption,
+  buildBaseRefOptions,
+  filterProjects,
+  filterSnippets,
+  getNewTabAssistantOptions,
+} from '../selectors'
+import { reduceGitCommitModalState } from './git-commit-modal-state'
 
 function emptyModal() {
   return {
     cursorPos: 0,
     editBuffer: null,
+    projectTargetId: null,
     selectedIndex: 0,
-    sessionTargetId: null,
     type: null,
   } as const
 }
@@ -25,151 +34,97 @@ function clampCursor(value: number, max: number): number {
   return Math.max(0, Math.min(max, value))
 }
 
-function getCurrentWorktreeCount(state: AppState): number {
-  if (!(state.currentSessionId != null && state.currentSessionId !== '')) return 0
-  return state.sessions.find((entry) => entry.id === state.currentSessionId)?.worktrees?.length ?? 0
-}
-
-function getCurrentWorktreeIndex(state: AppState): number {
-  if (!(state.currentSessionId != null && state.currentSessionId !== '')) return 0
-  const session = state.sessions.find((entry) => entry.id === state.currentSessionId)
-  return Math.max(
-    0,
-    (session?.worktrees ?? []).findIndex((worktree) => worktree.id === session?.activeWorktreeId)
+function getCurrentWorkspaceCount(state: AppState): number {
+  if (!(state.currentProjectId != null && state.currentProjectId !== '')) return 0
+  return (
+    state.projects.find((entry) => entry.id === state.currentProjectId)?.workspaces?.length ?? 0
   )
 }
 
-function getSelectedNewTabAssistant(state: AppState, assistantId?: string) {
-  if (assistantId != null && assistantId !== '') {
-    return getAllAssistantOptions(state.customCommands).find((entry) => entry.id === assistantId)
+function getCreateWorkspaceBaseOptions(state: AppState, queryOverride?: string): BaseRefOption[] {
+  if (state.modal.type !== 'create-workspace') return []
+  const workspaces =
+    state.projects.find((entry) => entry.id === state.currentProjectId)?.workspaces ?? []
+  return buildBaseRefOptions(
+    workspaces,
+    state.modal.baseBranches,
+    queryOverride ?? state.modal.baseQuery
+  )
+}
+
+/**
+ * How many rows the open modal's list has, for the two cases that move the
+ * selection through it. They read the same list, so they read it from here:
+ * two copies of this chain drift apart the moment one modal's list changes.
+ * Modals whose list is not indexed this way (create-workspace's own fields,
+ * flash-jump) return 0 and are handled by their case before it gets here.
+ */
+function getModalOptionCount(state: AppState): number {
+  const { modal } = state
+  switch (modal.type) {
+    case 'create-project':
+      return modal.directoryResults.length
+    case 'help':
+      return modal.entryCount
+    case 'new-tab':
+      return getNewTabAssistantOptions(
+        state.customCommands,
+        modal.editBuffer,
+        modal.pendingWorkspace != null
+      ).length
+    case 'project-picker':
+      // `+1` for the "create a project" row the picker appends, and at least
+      // that row exists even when nothing matches the filter.
+      return Math.max(1, filterProjects(state.projects, modal.editBuffer).length + 1)
+    case 'settings-search':
+      return filterSettingRows(state.projects, modal.editBuffer).length
+    case 'snippet-picker':
+      return filterSnippets(state.snippets, modal.editBuffer).length
+    case 'split-picker':
+      return getAllAssistantOptions(state.customCommands).length
+    case 'theme-picker':
+      return filterThemeIds(modal.editBuffer).length
+    case 'update-available':
+      return 2
+    case 'workspace-move':
+      // Every workspace but the one being moved.
+      return Math.max(0, getCurrentWorkspaceCount(state) - 1)
+    default:
+      return 0
   }
-  if (state.modal.type !== 'new-tab') return
-  return filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)[
-    state.modal.selectedIndex
-  ]
+}
+
+const CREATE_WORKSPACE_FIELDS = ['prompt', 'base'] as const
+
+type CreateWorkspaceField = (typeof CREATE_WORKSPACE_FIELDS)[number]
+
+/** The buffer a create-workspace field edits, so cursor math has one source. */
+function getCreateWorkspaceFieldValue(
+  modal: { prompt: string; baseQuery: string },
+  field: CreateWorkspaceField
+): string {
+  return field === 'prompt' ? modal.prompt : modal.baseQuery
 }
 
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
+  // The one modal with a stage machine of its own, in its own file.
+  const gitCommit = reduceGitCommitModalState(state, action)
+  if (gitCommit) return gitCommit
+
   switch (action.type) {
     case 'open-new-tab-modal': {
-      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
-          activeField: 'assistant',
-          branchError: null,
-          branchName: '',
-          createWorktree: false,
           cursorPos: 0,
           editBuffer: '',
           editingCommand: null,
-          selectedAssistantId: null,
+          pendingPrompt: action.pendingPrompt,
+          pendingWorkspace: action.pendingWorkspace,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          step: 'assistant',
-          targetWorktreeIndex,
           type: 'new-tab',
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
-          worktreeName: '',
-        },
-      }
-    }
-    case 'enter-new-tab-worktree-create': {
-      if (state.modal.type !== 'new-tab') return state
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          activeField: 'worktree-name',
-          createWorktree: true,
-          cursorPos: state.modal.worktreeName.length,
-          selectedIndex: 0,
-          step: 'worktree-create',
-        },
-      }
-    }
-    case 'set-new-tab-worktree-delete-state': {
-      if (state.modal.type !== 'new-tab') return state
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          worktreeDeleteConfirmId: action.confirmWorktreeId ?? null,
-          worktreeDeleteMessage: action.message,
-        },
-      }
-    }
-    case 'set-new-tab-branch-error': {
-      if (state.modal.type !== 'new-tab') return state
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          activeField: 'branch-name',
-          branchError: action.message,
-          cursorPos: state.modal.branchName.length,
-        },
-      }
-    }
-    case 'select-new-tab-assistant': {
-      if (state.modal.type !== 'new-tab' || state.modal.editingCommand !== null) return state
-      const option = getSelectedNewTabAssistant(state, action.assistantId)
-      if (!option) return state
-      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
-      const worktreeCount = getCurrentWorktreeCount(state)
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          activeField: 'target-worktree',
-          branchError: null,
-          createWorktree: worktreeCount === 0,
-          cursorPos: 0,
-          selectedAssistantId: option.id,
-          selectedIndex: worktreeCount === 0 ? 0 : targetWorktreeIndex,
-          step: 'worktree',
-          targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
-          worktreeName: state.modal.worktreeName || `wt-${option.label}`,
-        },
-      }
-    }
-    case 'toggle-new-tab-worktree': {
-      if (state.modal.type !== 'new-tab' || state.modal.editingCommand !== null) return state
-      const createWorktree = !state.modal.createWorktree
-      const option = getSelectedNewTabAssistant(state, action.assistantId)
-      const defaultName = state.modal.worktreeName || `wt-${option?.label ?? 'assistant'}`
-      const worktreeCount = getCurrentWorktreeCount(state)
-      const targetWorktreeIndex = getCurrentWorktreeIndex(state)
-      let activeField = state.modal.activeField
-      if (createWorktree) {
-        activeField = state.modal.step === 'worktree' || option ? 'target-worktree' : activeField
-      } else if (activeField === 'worktree-name') {
-        activeField = 'target-worktree'
-      }
-      const cursorPos =
-        createWorktree && worktreeCount <= 0
-          ? defaultName.length
-          : (state.modal.editBuffer?.length ?? 0)
-      return {
-        ...state,
-        modal: {
-          ...state.modal,
-          activeField,
-          createWorktree,
-          cursorPos,
-          selectedAssistantId: option?.id ?? state.modal.selectedAssistantId,
-          selectedIndex: createWorktree
-            ? worktreeCount
-            : Math.min(state.modal.selectedIndex, Math.max(0, worktreeCount - 1)),
-          step: option && createWorktree ? 'worktree' : state.modal.step,
-          targetWorktreeIndex,
-          worktreeDeleteConfirmId: null,
-          worktreeDeleteMessage: null,
-          worktreeName: defaultName,
         },
       }
     }
@@ -187,20 +142,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
-    case 'open-ai-usage-modal': {
-      return {
-        ...state,
-        focusMode: 'modal',
-        modal: {
-          cursorPos: 0,
-          editBuffer: '',
-          selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'ai-usage',
-        },
-      }
-    }
-    case 'open-worktree-move-modal': {
+    case 'open-workspace-move-modal': {
       // Overlay: keep focusMode (git when opened via `m`, navigation when opened
       // from a tab menu) so the view underneath stays mounted, like the help
       // modal. deriveModeId routes input to the picker while open.
@@ -209,19 +151,89 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           deleteSource: false,
           editBuffer: null,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          sourceWorktreeId: action.sourceWorktreeId,
-          type: 'worktree-move',
+          sourceWorkspaceId: action.sourceWorkspaceId,
+          stats: { kind: 'loading' },
+          type: 'workspace-move',
         },
       }
     }
-    case 'toggle-worktree-move-delete': {
-      if (state.modal.type !== 'worktree-move') return state
+    case 'toggle-workspace-move-delete': {
+      if (state.modal.type !== 'workspace-move') return state
       return {
         ...state,
         modal: { ...state.modal, deleteSource: !state.modal.deleteSource },
       }
+    }
+    case 'set-workspace-move-stats': {
+      if (state.modal.type !== 'workspace-move') return state
+      return {
+        ...state,
+        modal: { ...state.modal, stats: { dirtyFiles: action.dirtyFiles, kind: 'ready' } },
+      }
+    }
+    case 'open-workspace-move-confirm': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          deleteSource: action.deleteSource,
+          editBuffer: null,
+          files: action.files,
+          projectId: action.projectId,
+          projectTargetId: null,
+          selectedIndex: 0,
+          sourceLabel: action.sourceLabel,
+          sourceWorkspaceId: action.sourceWorkspaceId,
+          targetLabel: action.targetLabel,
+          targetWorkspaceId: action.targetWorkspaceId,
+          type: 'workspace-move-confirm',
+          variant: action.variant,
+        },
+      }
+    }
+    case 'open-workspace-delete-confirm': {
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          closeTabs: action.closeTabs,
+          editBuffer: null,
+          force: action.force,
+          projectId: action.projectId,
+          projectTargetId: null,
+          reason: action.reason,
+          selectedIndex: 0,
+          type: 'workspace-delete-confirm',
+          workspaceId: action.workspaceId,
+          workspaceLabel: action.workspaceLabel,
+        },
+      }
+    }
+    case 'open-flash-jump-modal': {
+      const labels = buildFlashJumpLabels(state)
+      // Even when there are zero jump targets we still open the overlay (the
+      // user pressed `S` expecting it); the next keystroke that matches
+      // nothing closes it via the empty-match path in update-command-edit.
+      return {
+        ...state,
+        modal: {
+          buffer: '',
+          cursorPos: 0,
+          editBuffer: '',
+          labels,
+          pendingJump: null,
+          projectTargetId: null,
+          selectedIndex: 0,
+          type: 'flash-jump',
+        },
+      }
+    }
+    case 'clear-flash-jump-pending': {
+      if (state.modal.type !== 'flash-jump') return state
+      if (state.modal.pendingJump === null) return state
+      return { ...state, modal: { ...state.modal, pendingJump: null } }
     }
     case 'open-help-modal': {
       const keymap = getActiveKeymap()
@@ -234,9 +246,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           entryCount: scopedEntries.length,
+          projectTargetId: null,
           scope,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'help',
         },
       }
@@ -248,25 +260,25 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           splitDirection: action.direction,
           type: 'split-picker',
         },
       }
-    case 'open-session-picker':
+    case 'open-project-picker':
       return {
         ...state,
         focusMode: 'command-edit',
         modal: {
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'session-picker',
+          type: 'project-picker',
         },
       }
-    case 'open-session-name-modal': {
+    case 'open-project-name-modal': {
       const initialName = action.initialName ?? ''
       return {
         ...state,
@@ -274,14 +286,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: initialName.length,
           editBuffer: initialName,
-          returnToSessionPicker: action.returnToSessionPicker ?? true,
+          projectTargetId: action.projectTargetId ?? null,
+          returnToProjectPicker: action.returnToProjectPicker ?? true,
           selectedIndex: 0,
-          sessionTargetId: action.sessionTargetId ?? null,
-          type: 'session-name',
+          type: 'project-name',
         },
       }
     }
-    case 'open-create-session-modal':
+    case 'open-create-project-modal':
       return {
         ...state,
         focusMode: 'command-edit',
@@ -292,14 +304,14 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           editBuffer: '',
           nameBuffer: '',
           pendingProjectPath: null,
-          returnToSessionPicker: action.returnToSessionPicker,
+          projectTargetId: null,
+          returnToProjectPicker: action.returnToProjectPicker,
           selectedIndex: 0,
-          sessionTargetId: null,
-          type: 'create-session',
+          type: 'create-project',
         },
       }
     case 'set-directory-results': {
-      if (state.modal.type !== 'create-session') {
+      if (state.modal.type !== 'create-project') {
         return state
       }
       return {
@@ -311,6 +323,88 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-create-workspace-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          activeField: 'prompt',
+          baseBranches: [],
+          baseQuery: '',
+          // Left empty on purpose: `load-create-workspace-base-branches`
+          // resolves the repo's default branch and backfills it below. Seeding
+          // the active workspace's branch here would win over that.
+          baseRef: '',
+          branchError: null,
+          cursorPos: 0,
+          editBuffer: '',
+          projectTargetId: null,
+          prompt: '',
+          selectedIndex: 0,
+          type: 'create-workspace',
+        },
+      }
+    case 'switch-create-workspace-field': {
+      if (state.modal.type !== 'create-workspace') return state
+      const next =
+        CREATE_WORKSPACE_FIELDS[
+          (CREATE_WORKSPACE_FIELDS.indexOf(state.modal.activeField) + 1) %
+            CREATE_WORKSPACE_FIELDS.length
+        ] ?? 'prompt'
+      const buffer = getCreateWorkspaceFieldValue(state.modal, next)
+      // Entering the base field highlights the row matching the resolved ref,
+      // so the picker opens on what the form already says it will fork from.
+      const baseIndex =
+        next === 'base'
+          ? Math.max(
+              0,
+              getCreateWorkspaceBaseOptions(state).findIndex(
+                (option) => option.ref === (state.modal as { baseRef: string }).baseRef
+              )
+            )
+          : 0
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          activeField: next,
+          cursorPos: buffer.length,
+          selectedIndex: baseIndex,
+        },
+      }
+    }
+    case 'set-create-workspace-base-branches': {
+      if (state.modal.type !== 'create-workspace') return state
+      const modalWithBranches = { ...state.modal, baseBranches: action.branches }
+      const withBranches: AppState = { ...state, modal: modalWithBranches }
+      // The user may already have typed a base while this was in flight.
+      if (state.modal.baseRef !== '') return withBranches
+      // Fork from the repo's default branch, falling back to the most recently
+      // committed one when the repo has neither an origin/HEAD nor a main.
+      const fallback = getCreateWorkspaceBaseOptions(withBranches)[0]?.ref ?? ''
+      const defaultBranch =
+        action.defaultBranch != null && action.branches.includes(action.defaultBranch)
+          ? action.defaultBranch
+          : fallback
+      return {
+        ...withBranches,
+        modal: { ...modalWithBranches, baseRef: defaultBranch },
+      }
+    }
+    case 'set-create-workspace-branch-error': {
+      if (state.modal.type !== 'create-workspace') return state
+      return {
+        ...state,
+        modal: {
+          ...state.modal,
+          // The branch is generated now, so there is no branch field to focus:
+          // send the user back to the prompt, which is what produced the name.
+          activeField: 'prompt',
+          branchError: action.message,
+          cursorPos: state.modal.prompt.length,
+        },
+      }
+    }
     case 'open-snippet-picker':
       return {
         ...state,
@@ -319,8 +413,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           actionMessage: null,
           cursorPos: 0,
           editBuffer: '',
+          projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'snippet-picker',
         },
       }
@@ -344,8 +439,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: initialName.length,
           editBuffer: initialName,
           nameBuffer: initialName,
+          projectTargetId: snippet?.id ?? null,
           selectedIndex: 0,
-          sessionTargetId: snippet?.id ?? null,
           triggerBuffer: snippet?.trigger ?? '',
           type: 'snippet-editor',
         },
@@ -359,9 +454,22 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: '',
           entryCount: 0,
+          projectTargetId: null,
+          returnTo: action.returnTo,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'theme-picker',
+        },
+      }
+    case 'open-quotas-modal':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          projectTargetId: null,
+          selectedIndex: 0,
+          type: 'quotas',
         },
       }
     case 'open-update-available-modal':
@@ -373,128 +481,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           cursorPos: 0,
           editBuffer: null,
           latestVersion: action.latestVersion,
+          projectTargetId: null,
           selectedIndex: 0,
-          sessionTargetId: null,
           type: 'update-available',
         },
       }
-    case 'open-git-commit-modal': {
-      const sessionId = action.sessionId
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: {
-          activeField: 'title',
-          contentBuffer: '',
-          cursorPos: 0,
-          editBuffer: '',
-          selectedIndex: 0,
-          sessionTargetId: sessionId ?? null,
-          stage: 'edit',
-          type: 'git-commit',
-        },
-      }
-    }
-    case 'git-commit-enter-confirm': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'confirm' },
-      }
-    }
-    case 'git-commit-leave-confirm': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
-    case 'git-commit-enter-generating': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'modal',
-        modal: { ...state.modal, sessionTargetId: action.sessionId, stage: 'generating' },
-      }
-    }
-    case 'git-commit-leave-generating': {
-      if (state.modal.type !== 'git-commit') return state
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
-    case 'auto-commit-generation-ready': {
-      if (
-        state.modal.type !== 'git-commit' ||
-        state.modal.stage !== 'generating' ||
-        state.modal.sessionTargetId !== action.sessionId
-      ) {
-        return null
-      }
-      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
-      if (!nextAutoCommit) {
-        // Stale result (hash mismatch or slice was cleared mid-flight): don't
-        // strand the modal in `generating` — flip back to edit so the user
-        // isn't stuck staring at a spinner that will never resolve.
-        return {
-          ...state,
-          focusMode: 'command-edit',
-          modal: { ...state.modal, stage: 'edit' },
-        }
-      }
-      return {
-        ...state,
-        autoCommit: nextAutoCommit,
-        focusMode: 'command-edit',
-        modal: {
-          ...state.modal,
-          activeField: 'title',
-          contentBuffer: action.body,
-          cursorPos: action.title.length,
-          editBuffer: action.title,
-          stage: 'confirm',
-        },
-      }
-    }
-    case 'git-commit-use-background-suggestion': {
-      if (state.modal.type !== 'git-commit' || state.modal.sessionTargetId !== action.sessionId) {
-        return null
-      }
-      const suggestion = state.autoCommit.bySession[action.sessionId]
-      if (!suggestion || suggestion.kind !== 'ready') return null
-      return {
-        ...state,
-        focusMode: 'command-edit',
-        modal: {
-          ...state.modal,
-          activeField: 'title',
-          contentBuffer: suggestion.body,
-          cursorPos: suggestion.title.length,
-          editBuffer: suggestion.title,
-          stage: 'confirm',
-        },
-      }
-    }
-    case 'auto-commit-clear': {
-      if (
-        state.modal.type !== 'git-commit' ||
-        state.modal.stage !== 'generating' ||
-        state.modal.sessionTargetId !== action.sessionId
-      ) {
-        return null
-      }
-      const nextAutoCommit = reduceAutoCommitState(state.autoCommit, action)
-      return {
-        ...state,
-        autoCommit: nextAutoCommit ?? state.autoCommit,
-        focusMode: 'command-edit',
-        modal: { ...state.modal, stage: 'edit' },
-      }
-    }
     case 'set-help-entry-count': {
       if (state.modal.type !== 'help') return state
       if (state.modal.entryCount === action.count) {
@@ -524,11 +515,16 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const closingType = state.modal.type
       // Pure overlays never flipped focusMode (they render on top of git mode),
       // so leave it alone — closing returns to whatever was underneath.
-      if (closingType === 'help' || closingType === 'worktree-move') {
+      if (
+        closingType === 'help' ||
+        closingType === 'workspace-move' ||
+        closingType === 'flash-jump'
+      ) {
         return { ...state, modal: emptyModal() }
       }
-      const nextFocus: AppState['focusMode'] = closingType === 'git-commit' ? 'git' : 'navigation'
-      return { ...state, focusMode: nextFocus, modal: emptyModal() }
+      // Whoever opened it said where to go back to, because that is who knows
+      // what is drawn behind it. Everything else came from the panes.
+      return { ...state, focusMode: state.modal.returnTo ?? 'navigation', modal: emptyModal() }
     }
     case 'move-modal-selection': {
       if (state.modal.type === 'help') {
@@ -541,50 +537,35 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       if (
         state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'session-picker' &&
+        state.modal.type !== 'project-picker' &&
         state.modal.type !== 'snippet-picker' &&
         state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-session' &&
+        state.modal.type !== 'create-project' &&
+        state.modal.type !== 'create-workspace' &&
         state.modal.type !== 'split-picker' &&
         state.modal.type !== 'update-available' &&
-        state.modal.type !== 'worktree-move'
+        state.modal.type !== 'workspace-move'
       ) {
         return state
       }
-      if (state.modal.type === 'create-session' && state.modal.activeField !== 'directory') {
+      if (state.modal.type === 'create-project' && state.modal.activeField !== 'directory') {
         return state
       }
-      if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
-        return state
-      }
-      let optionCount: number
-      if (state.modal.type === 'new-tab') {
-        if (state.modal.step === 'worktree') {
-          if (state.modal.activeField === 'worktree-name') return state
-          optionCount = getCurrentWorktreeCount(state) + 1
-        } else {
-          optionCount = filterAssistants(
-            getAllAssistantOptions(state.customCommands),
-            state.modal.editBuffer
-          ).length
+      if (state.modal.type === 'create-workspace') {
+        if (state.modal.activeField !== 'base') return state
+        const options = getCreateWorkspaceBaseOptions(state)
+        if (options.length === 0) return state
+        const next = (state.modal.selectedIndex + action.delta + options.length) % options.length
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseRef: options[next]?.ref ?? state.modal.baseRef,
+            selectedIndex: next,
+          },
         }
-      } else if (state.modal.type === 'split-picker') {
-        optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-session') {
-        optionCount = state.modal.directoryResults.length
-      } else if (state.modal.type === 'snippet-picker') {
-        const filtered = filterSnippets(state.snippets, state.modal.editBuffer)
-        optionCount = filtered.length
-      } else if (state.modal.type === 'theme-picker') {
-        optionCount = filterThemeIds(state.modal.editBuffer).length
-      } else if (state.modal.type === 'update-available') {
-        optionCount = 2
-      } else if (state.modal.type === 'worktree-move') {
-        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
-      } else {
-        const filtered = filterSessions(state.sessions, state.modal.editBuffer)
-        optionCount = Math.max(1, filtered.length + 1)
       }
+      const optionCount = getModalOptionCount(state)
       if (optionCount === 0) {
         return state
       }
@@ -593,96 +574,38 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           ...state.modal,
           selectedIndex: (state.modal.selectedIndex + action.delta + optionCount) % optionCount,
-          ...(state.modal.type === 'new-tab' && state.modal.step === 'worktree'
-            ? {
-                createWorktree:
-                  (state.modal.selectedIndex + action.delta + optionCount) % optionCount ===
-                  optionCount - 1,
-                worktreeDeleteConfirmId: null,
-                worktreeDeleteMessage: null,
-              }
-            : null),
         },
       }
     }
     case 'set-modal-selection-index': {
-      if (
-        state.modal.type !== 'new-tab' &&
-        state.modal.type !== 'session-picker' &&
-        state.modal.type !== 'snippet-picker' &&
-        state.modal.type !== 'theme-picker' &&
-        state.modal.type !== 'create-session' &&
-        state.modal.type !== 'split-picker' &&
-        state.modal.type !== 'update-available' &&
-        state.modal.type !== 'worktree-move' &&
-        state.modal.type !== 'help'
-      ) {
-        return state
-      }
-      if (state.modal.type === 'new-tab' && state.modal.step === 'worktree-create') {
-        return state
-      }
-      let optionCount: number
-      if (state.modal.type === 'help') {
-        optionCount = state.modal.entryCount
-      } else if (state.modal.type === 'new-tab') {
-        optionCount =
-          state.modal.step === 'worktree'
-            ? getCurrentWorktreeCount(state) + 1
-            : filterAssistants(getAllAssistantOptions(state.customCommands), state.modal.editBuffer)
-                .length
-      } else if (state.modal.type === 'split-picker') {
-        optionCount = getAllAssistantOptions(state.customCommands).length
-      } else if (state.modal.type === 'create-session') {
-        optionCount = state.modal.directoryResults.length
-      } else if (state.modal.type === 'snippet-picker') {
-        optionCount = filterSnippets(state.snippets, state.modal.editBuffer).length
-      } else if (state.modal.type === 'theme-picker') {
-        optionCount = filterThemeIds(state.modal.editBuffer).length
-      } else if (state.modal.type === 'update-available') {
-        optionCount = 2
-      } else if (state.modal.type === 'worktree-move') {
-        optionCount = Math.max(0, getCurrentWorktreeCount(state) - 1)
-      } else {
-        optionCount = Math.max(1, filterSessions(state.sessions, state.modal.editBuffer).length + 1)
-      }
-      if (optionCount === 0) return state
-      const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
-      if (state.modal.type === 'new-tab' && state.modal.step === 'worktree') {
+      // Which modals have an indexed list is `getModalOptionCount`'s question,
+      // and it answers 0 for the ones that don't. It used to be asked twice —
+      // here as a list of types to keep in step by hand, which the settings
+      // search promptly wasn't on, leaving its rows unhoverable.
+      if (state.modal.type === 'create-workspace') {
+        if (state.modal.activeField !== 'base') return state
+        const options = getCreateWorkspaceBaseOptions(state)
+        if (options.length === 0) return state
+        const clamped = Math.max(0, Math.min(options.length - 1, action.index))
         if (clamped === state.modal.selectedIndex) return state
         return {
           ...state,
           modal: {
             ...state.modal,
-            createWorktree: clamped === optionCount - 1,
+            baseRef: options[clamped]?.ref ?? state.modal.baseRef,
             selectedIndex: clamped,
-            worktreeDeleteConfirmId: null,
-            worktreeDeleteMessage: null,
           },
         }
       }
+      const optionCount = getModalOptionCount(state)
+      if (optionCount === 0) return state
+      const clamped = Math.max(0, Math.min(optionCount - 1, action.index))
       if (clamped === state.modal.selectedIndex) return state
       return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
     }
     case 'move-modal-cursor': {
       if (state.modal.editBuffer === null) return state
-      let editableValue = state.modal.editBuffer
-      if (state.modal.type === 'new-tab' && state.modal.editingCommand === null) {
-        if (state.modal.activeField === 'worktree-name') {
-          editableValue = state.modal.worktreeName
-        } else if (state.modal.activeField === 'branch-name') {
-          editableValue = state.modal.branchName
-        }
-      }
-      if (
-        state.modal.type === 'new-tab' &&
-        state.modal.editingCommand === null &&
-        state.modal.step === 'worktree' &&
-        state.modal.activeField === 'target-worktree'
-      ) {
-        return state
-      }
-      const len = editableValue.length
+      const len = state.modal.editBuffer.length
       const current = state.modal.cursorPos ?? len
       let next = current
       if (action.to === 'home') next = 0
@@ -693,25 +616,79 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return { ...state, modal: { ...state.modal, cursorPos: next } }
     }
     case 'update-command-edit': {
+      // Flash-jump: each letter narrows the matching label set. Closing the
+      // modal on no-match mirrors the flash.nvim "miss = cancel" UX, and a
+      // unique match exposes a pendingJump for app.tsx to execute.
+      if (state.modal.type === 'flash-jump') {
+        const buffer = state.modal.buffer
+        if (action.char === '\b') {
+          if (buffer.length === 0) return state
+          return {
+            ...state,
+            modal: { ...state.modal, buffer: buffer.slice(0, -1), pendingJump: null },
+          }
+        }
+        // Restrict to single lowercase ASCII letters — anything else (digits,
+        // shift+letter, control sequences) closes the overlay rather than
+        // poisoning the buffer.
+        const ch = action.char.toLowerCase()
+        if (ch.length !== 1 || ch < 'a' || ch > 'z') {
+          return { ...state, focusMode: 'navigation', modal: emptyModal() }
+        }
+        const nextBuffer = buffer + ch
+        const matches = state.modal.labels.filter((l) => l.label.startsWith(nextBuffer))
+        if (matches.length === 0) {
+          return { ...state, focusMode: 'navigation', modal: emptyModal() }
+        }
+        const onlyMatch = matches[0]
+        if (matches.length === 1 && onlyMatch && onlyMatch.label === nextBuffer) {
+          // Single full match: keep the modal open one tick with pendingJump
+          // set — app.tsx consumes it, performs the jump, then clears the
+          // modal. Storing it on the modal keeps a single source of truth.
+          return {
+            ...state,
+            modal: { ...state.modal, buffer: nextBuffer, pendingJump: onlyMatch.target },
+          }
+        }
+        return { ...state, modal: { ...state.modal, buffer: nextBuffer, pendingJump: null } }
+      }
+      if (state.modal.type === 'create-workspace') {
+        const field = state.modal.activeField
+        const current = getCreateWorkspaceFieldValue(state.modal, field)
+        const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)
+        let text: string
+        let pos: number
+        if (action.char === '\b') {
+          if (at === 0) return state
+          text = current.slice(0, at - 1) + current.slice(at)
+          pos = at - 1
+        } else {
+          text = current.slice(0, at) + action.char + current.slice(at)
+          pos = at + action.char.length
+        }
+        if (field === 'prompt') {
+          return {
+            ...state,
+            modal: { ...state.modal, branchError: null, cursorPos: pos, prompt: text },
+          }
+        }
+        // Re-filter and snap the base to the top match as the query changes.
+        const topOption = getCreateWorkspaceBaseOptions(state, text)[0]
+        return {
+          ...state,
+          modal: {
+            ...state.modal,
+            baseQuery: text,
+            baseRef: topOption?.ref ?? state.modal.baseRef,
+            cursorPos: pos,
+            selectedIndex: 0,
+          },
+        }
+      }
       if (state.modal.editBuffer === null) {
         return state
       }
-      let buffer = state.modal.editBuffer
-      if (state.modal.type === 'new-tab' && state.modal.editingCommand === null) {
-        if (state.modal.activeField === 'worktree-name') {
-          buffer = state.modal.worktreeName
-        } else if (state.modal.activeField === 'branch-name') {
-          buffer = state.modal.branchName
-        }
-      }
-      if (
-        state.modal.type === 'new-tab' &&
-        state.modal.editingCommand === null &&
-        state.modal.step === 'worktree' &&
-        state.modal.activeField === 'target-worktree'
-      ) {
-        return state
-      }
+      const buffer = state.modal.editBuffer
       const cursor = clampCursor(state.modal.cursorPos ?? buffer.length, buffer.length)
       let nextBuffer: string
       let nextCursor: number
@@ -724,38 +701,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         nextCursor = cursor + action.char.length
       }
       const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
-      if (
-        state.modal.type === 'new-tab' &&
-        state.modal.editingCommand === null &&
-        state.modal.activeField === 'worktree-name'
-      ) {
-        return {
-          ...state,
-          modal: {
-            ...state.modal,
-            cursorPos: nextCursor,
-            worktreeName: nextBuffer,
-          },
-        }
-      }
-      if (
-        state.modal.type === 'new-tab' &&
-        state.modal.editingCommand === null &&
-        state.modal.activeField === 'branch-name'
-      ) {
-        return {
-          ...state,
-          modal: {
-            ...state.modal,
-            branchError: null,
-            branchName: nextBuffer,
-            cursorPos: nextCursor,
-          },
-        }
-      }
       const resetIndex =
         !isNewTabEditing &&
-        (state.modal.type === 'session-picker' ||
+        (state.modal.type === 'project-picker' ||
           state.modal.type === 'snippet-picker' ||
           state.modal.type === 'theme-picker' ||
           state.modal.type === 'new-tab' ||
@@ -784,56 +732,12 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'new-tab') {
-        if (state.modal.step === 'worktree-create') {
-          const optionCount = getCurrentWorktreeCount(state) + 1
-          return {
-            ...state,
-            modal: {
-              ...state.modal,
-              activeField: 'target-worktree',
-              branchError: null,
-              createWorktree: false,
-              cursorPos: 0,
-              selectedIndex: Math.min(
-                state.modal.targetWorktreeIndex,
-                Math.max(0, optionCount - 1)
-              ),
-              step: 'worktree',
-            },
-          }
-        }
-        if (state.modal.step === 'worktree') {
-          const selectedAssistantId = state.modal.selectedAssistantId
-          const assistants = filterAssistants(
-            getAllAssistantOptions(state.customCommands),
-            state.modal.editBuffer
-          )
-          const assistantIndex = assistants.findIndex(
-            (assistant) => assistant.id === selectedAssistantId
-          )
-          return {
-            ...state,
-            modal: {
-              ...state.modal,
-              activeField: 'assistant',
-              createWorktree: false,
-              cursorPos: state.modal.editBuffer?.length ?? 0,
-              selectedIndex: Math.max(0, assistantIndex),
-              step: 'assistant',
-              worktreeDeleteConfirmId: null,
-              worktreeDeleteMessage: null,
-            },
-          }
-        }
-        return { ...state, focusMode: 'navigation', modal: emptyModal() }
-      }
-      if (state.modal.type === 'create-session' || state.modal.type === 'snippet-editor') {
+      if (state.modal.type === 'create-project' || state.modal.type === 'snippet-editor') {
         return { ...state, focusMode: 'navigation', modal: emptyModal() }
       }
       // Pickers and overlays with auto-filter — Esc closes the modal entirely.
       if (
-        state.modal.type === 'session-picker' ||
+        state.modal.type === 'project-picker' ||
         state.modal.type === 'snippet-picker' ||
         state.modal.type === 'theme-picker' ||
         state.modal.type === 'help'
@@ -846,8 +750,8 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: { ...state.modal, cursorPos: 0, editBuffer: null },
       }
     }
-    case 'switch-create-session-field': {
-      if (state.modal.type === 'create-session') {
+    case 'switch-create-project-field': {
+      if (state.modal.type === 'create-project') {
         const nextField = state.modal.activeField === 'directory' ? 'name' : 'directory'
         const nextEdit = state.modal.nameBuffer
         return {
@@ -908,42 +812,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
-      if (state.modal.type === 'new-tab') {
-        if (state.modal.step === 'assistant') return state
-        if (state.modal.step === 'worktree-create') {
-          const nextField: typeof state.modal.activeField =
-            state.modal.activeField === 'worktree-name' ? 'branch-name' : 'worktree-name'
-          const nextValue =
-            nextField === 'branch-name' ? state.modal.branchName : state.modal.worktreeName
-          return {
-            ...state,
-            modal: {
-              ...state.modal,
-              activeField: nextField,
-              cursorPos: nextValue.length,
-              selectedIndex: 0,
-            },
-          }
-        }
-        let nextField: typeof state.modal.activeField = 'target-worktree'
-        if (state.modal.activeField === 'target-worktree' && state.modal.createWorktree) {
-          nextField = 'worktree-name'
-        }
-        const nextValue =
-          nextField === 'worktree-name' ? state.modal.worktreeName : (state.modal.editBuffer ?? '')
-        return {
-          ...state,
-          modal: {
-            ...state.modal,
-            activeField: nextField,
-            cursorPos: nextValue.length,
-          },
-        }
-      }
       return state
     }
     case 'select-directory': {
-      if (state.modal.type !== 'create-session') {
+      if (state.modal.type !== 'create-project') {
         return state
       }
       const selected = state.modal.directoryResults[state.modal.selectedIndex]
@@ -970,6 +842,34 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         },
       }
     }
+    case 'open-settings-search':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: 0,
+          editBuffer: '',
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          type: 'settings-search',
+        },
+      }
+    case 'open-setting-text-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: action.value.length,
+          editBuffer: action.value,
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          settingId: action.settingId,
+          settingLabel: action.label,
+          type: 'setting-text',
+        },
+      }
     case 'open-rename-tab-modal': {
       const activeTab =
         state.activeTabId != null && state.activeTabId !== ''
@@ -984,9 +884,23 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         modal: {
           cursorPos: activeTab.title.length,
           editBuffer: activeTab.title,
+          projectTargetId: activeTab.id,
           selectedIndex: 0,
-          sessionTargetId: activeTab.id,
           type: 'rename-tab',
+        },
+      }
+    }
+    case 'open-rename-workspace-modal': {
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          cursorPos: action.initialName.length,
+          editBuffer: action.initialName,
+          projectTargetId: action.workspaceId,
+          selectedIndex: 0,
+          type: 'rename-workspace',
+          workspaceProjectId: action.projectId,
         },
       }
     }

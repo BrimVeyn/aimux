@@ -7,6 +7,7 @@ import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
+import { MAX_DIFF_BYTES } from '../../../git/diff-limits'
 import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
@@ -14,13 +15,15 @@ import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
-import { getActiveWorktree, getSessionProjectPath } from '../../../state/session-worktrees'
+import { getActiveWorkspace, getActiveWorkspacePath } from '../../../state/project-workspaces'
 import { setGitDiffScroller } from '../../git-view-controls'
+import { formatBytes } from '../../terminal-graphics/dimensions'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
+import { GitPaneHeader } from './pane/git-pane-header'
 
 interface DiffStageProps {
   diff: DiffData | undefined
@@ -32,6 +35,12 @@ interface DiffStageProps {
 }
 
 function placeholderText(diff: DiffData): string | null {
+  if (diff.status === 'too-large') {
+    const before = diff.binarySizeBefore ?? 0
+    const after = diff.binarySizeAfter ?? 0
+    const largest = Math.max(before, after)
+    return `(file too large to diff — ${formatBytes(largest)}, limit ${formatBytes(MAX_DIFF_BYTES)})`
+  }
   if (diff.status === 'binary') {
     const before = diff.binarySizeBefore ?? 0
     const after = diff.binarySizeAfter ?? 0
@@ -122,23 +131,23 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const gitPane = useAppStore((s) => s.gitPane)
   const gitPanel = useAppStore((s) => s.gitPanel)
   const gitMode = useAppStore((s) => s.gitMode)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
   const focusMode = useAppStore((s) => s.focusMode)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
-  const currentSession =
-    currentSessionId != null && currentSessionId !== ''
-      ? sessions.find((s) => s.id === currentSessionId)
+  const currentProject =
+    currentProjectId != null && currentProjectId !== ''
+      ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getSessionProjectPath(currentSession)
+  const projectPath = getActiveWorkspacePath(currentProject)
 
-  // Review-vs-base: when toggled on for a worktree that records a baseRef,
+  // Review-vs-base: when toggled on for a workspace that records a baseRef,
   // resolve the fork point and diff the working tree against it.
-  const activeWorktree = getActiveWorktree(currentSession)
+  const activeWorkspace = getActiveWorkspace(currentProject)
   const reviewBaseRef =
-    gitMode.reviewBase && activeWorktree?.baseRef != null && activeWorktree.baseRef !== ''
-      ? activeWorktree.baseRef
+    gitMode.reviewBase && activeWorkspace?.baseRef != null && activeWorkspace.baseRef !== ''
+      ? activeWorkspace.baseRef
       : null
   const [compareRef, setCompareRef] = useState<string | undefined>(undefined)
   useEffect(() => {
@@ -287,34 +296,12 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
           gap={0}
           overflow="hidden"
         >
-          <box flexDirection="column" flexShrink={0}>
-            <text fg={t.text}>
-              <strong>aimux · git</strong>
-            </text>
-            {gitPanel.branch != null && gitPanel.branch !== '' ? (
-              <box flexDirection="row">
-                <text fg={t.text}>{'\u{e702}'} </text>
-                <text fg={t.text}>{gitPanel.branch}</text>
-              </box>
-            ) : null}
-            {gitMode.headOffset > 0 ? (
-              <box flexDirection="row" gap={1}>
-                <text fg={t.warning}>
-                  <strong>HEAD~{gitMode.headOffset}</strong>
-                </text>
-                <text fg={t.textMuted}>[ newer · ] older</text>
-              </box>
-            ) : null}
-            {baseLabel != null ? (
-              <box flexDirection="row" gap={1}>
-                <text fg={t.primary}>
-                  <strong>{baseLabel}</strong>
-                </text>
-                <text fg={t.textMuted}>b: back</text>
-              </box>
-            ) : null}
-            <text fg={t.textMuted}>{'·'.repeat(Math.max(0, fileBarWidth - 2))}</text>
-          </box>
+          <GitPaneHeader
+            baseLabel={baseLabel}
+            gitPanel={gitPanel}
+            headOffset={gitMode.headOffset}
+            projectPath={projectPath}
+          />
           <GitPanel
             baseLabel={baseLabel}
             collapsedFolders={gitMode.collapsedFolders}
@@ -324,6 +311,8 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             headOffset={gitMode.headOffset}
             projectPath={projectPath}
             selectedEntryKey={gitMode.selectedEntryKey}
+            showFileListToggle={false}
+            showRemoteTracking={false}
           />
         </box>
         <box flexDirection="column" flexGrow={1} overflow="hidden">

@@ -3,33 +3,35 @@ import type { ResolvedConfig } from '@brimveyn/aimux-config'
 import { basename } from 'node:path'
 
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, LayoutState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { LayoutState } from '../state/types'
 
 import { version as APP_VERSION } from '../../package.json'
 import { attachCurrentSession } from '../app-runtime/backend-attach-runtime'
 import { bindBackendRuntimeEvents } from '../app-runtime/backend-runtime-events'
-import { createSessionFromCurrentState } from '../app-runtime/session-actions'
+import { createProjectFromCurrentState } from '../app-runtime/project-actions'
+import { startProjectAutosave } from '../app-runtime/use-project-autosave'
 import { resizeSplitTabs } from '../app-runtime/use-terminal-resize'
-import { startWorkspaceAutosave } from '../app-runtime/use-workspace-autosave'
 import { loadConfig } from '../config'
 import { logDebug } from '../debug/input-log'
 import { startDiffOnDemandPipeline } from '../git/diff-orchestration'
 import { startGitPanelPolling } from '../git/git-poller'
-import { startWorktreeDivergencePolling } from '../git/worktree-divergence-poller'
+import { startWorkspaceDivergencePolling } from '../git/workspace-divergence-poller'
 import { setActiveKeymap } from '../input/keymap/keymap-ref'
 import { registerAllModes } from '../input/modes/handlers'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from '../integrations/claude-theme-sync'
 import { startAIUsageService } from '../services/ai-usage/provider'
 import { aiUsageStore } from '../state/ai-usage-store'
 import { appStore } from '../state/app-store'
+import { getBarWidth } from '../state/bars'
 import { setActiveDispatch, setActiveSideEffectRunner } from '../state/dispatch-ref'
 import { gitFileKey } from '../state/git-tree'
 import {
-  findMostRecentSession,
-  loadSessionCatalog,
-  saveSessionCatalog,
-} from '../state/session-catalog'
-import { getSessionProjectPath } from '../state/session-worktrees'
+  findMostRecentProject,
+  loadProjectCatalog,
+  saveProjectCatalog,
+} from '../state/project-catalog'
+import { getActiveWorkspacePath } from '../state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from '../state/snippet-catalog'
 import { createInitialState } from '../state/store'
 import { getStatusBarModel } from '../ui/status-bar-model'
@@ -146,12 +148,12 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   }
 
   // Initial AppState (port of app.tsx's lazy init, trimmed for the GUI).
-  let sessionCatalog = loadSessionCatalog()
+  let sessionCatalog = loadProjectCatalog()
   const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
   const initial = createInitialState(json.customCommands, sessionCatalog, mergedSnippets, false, {
+    projectBarVisible: resolvedConfig.projectBar?.initialVisible ?? json.projectBarVisible ?? true,
     sessionBarPosition:
-      resolvedConfig.sessionBar?.initialPosition ?? json.sessionBarPosition ?? 'top',
-    sessionBarVisible: resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true,
+      resolvedConfig.projectBar?.initialPosition ?? json.sessionBarPosition ?? 'top',
     sidebar: json.sidebar,
   })
   appStore.setState(initial)
@@ -160,18 +162,18 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   const getState = () => appStore.getState()
 
   // Resolve the initial session: most recent, else a fresh one for the cwd.
-  let initialSession = findMostRecentSession(sessionCatalog)
+  let initialSession = findMostRecentProject(sessionCatalog)
   if (initialSession === undefined) {
     const cwd = process.cwd()
-    const created = createSessionFromCurrentState(getState(), basename(cwd) || cwd, cwd)
+    const created = createProjectFromCurrentState(getState(), basename(cwd) || cwd, cwd)
     sessionCatalog = created.sessions
-    saveSessionCatalog(sessionCatalog)
-    dispatch({ sessions: sessionCatalog, type: 'set-sessions' })
+    saveProjectCatalog(sessionCatalog)
+    dispatch({ sessions: sessionCatalog, type: 'set-projects' })
     initialSession = created.session
   }
   dispatch({
     sessionId: initialSession.id,
-    type: 'load-session',
+    type: 'load-project',
     workspaceSnapshot: initialSession.workspaceSnapshot,
   })
 
@@ -361,14 +363,14 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   // React to session/active-tab changes (attach + setActiveTab), like the TUI runtime.
   const layoutRef: { current: LayoutState } = { current: getState().layout }
   const attachRequestIdRef = { current: 0 }
-  let lastSessionId = getState().currentSessionId
+  let lastSessionId = getState().currentProjectId
   let lastActiveTabId = getState().activeTabId
   const attachSession = (sessionId: string): void => {
-    const session = getState().sessions.find((entry) => entry.id === sessionId)
+    const session = getState().projects.find((entry) => entry.id === sessionId)
     attachCurrentSession({
       attachRequestIdRef,
       backend,
-      currentSessionId: sessionId,
+      currentProjectId: sessionId,
       currentSessionWorkspaceSnapshot: session?.workspaceSnapshot,
       dispatch,
       layoutRef,
@@ -386,9 +388,9 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   // Stage 2a (read-only panel). It will be wired in Stage 2b alongside the diff
   // viewer.
   const projectPathOf = (state: ReturnType<typeof getState>): string | undefined => {
-    const id = state.currentSessionId
-    const session = id != null && id !== '' ? state.sessions.find((s) => s.id === id) : undefined
-    return getSessionProjectPath(session)
+    const id = state.currentProjectId
+    const session = id != null && id !== '' ? state.projects.find((s) => s.id === id) : undefined
+    return getActiveWorkspacePath(session)
   }
   let lastPanelProjectPath = projectPathOf(getState())
   let lastPanelHeadOffset = getState().gitMode.headOffset
@@ -403,8 +405,8 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
       projectPath: lastPanelProjectPath,
     })
   }
-  let lastDivergenceSessionId = getState().currentSessionId
-  let lastDivergenceSessions = getState().sessions
+  let lastDivergenceSessionId = getState().currentProjectId
+  let lastDivergenceSessions = getState().projects
   // Prefetch driver tracks — the queue dedupes by key so we just need to
   // call `update()` whenever any input might have changed. These four
   // references cover all the hook's deps: `gitMode` carries selectedEntryKey
@@ -417,11 +419,7 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   let divergenceDispose: (() => void) | null = null
   const restartDivergencePoll = (): void => {
     divergenceDispose?.()
-    divergenceDispose = startWorktreeDivergencePolling({
-      enabled: true,
-      getCurrentSessionId: () => appStore.getState().currentSessionId,
-      getSessions: () => appStore.getState().sessions,
-    })
+    divergenceDispose = startWorkspaceDivergencePolling(true)
   }
   const multiRepoDriver = startMultiRepoDiscoveryDriver({ dispatch })
   multiRepoDriver.update(lastPanelProjectPath)
@@ -436,7 +434,7 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   // as the pollers: drive it from the host so the GUI restores the last
   // workspace snapshot on next launch.
   disposers.add(
-    startWorkspaceAutosave({
+    startProjectAutosave({
       debounceMs: 250,
       getState: () => appStore.getState(),
       subscribe: (listener) => appStore.subscribe(listener),
@@ -508,12 +506,11 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   const initialLayout = getState().layout
   let lastLayoutCols = initialLayout.terminalCols
   let lastLayoutRows = initialLayout.terminalRows
-  let lastSidebarVisible = getState().sidebar.visible
-  let lastSidebarWidth = getState().sidebar.width
-  let lastGitPaneMode = getState().gitPane.mode
-  let lastGitPaneVisible = getState().gitPane.visible
-  let lastGitPanePosition = getState().gitPane.position
-  let lastGitPaneRatio = getState().gitPane.paneRatio
+  // Chrome that steals columns from the panes is now the two bars — the git
+  // pane became a bar widget, and git mode replaces the pane tree outright, so
+  // neither changes the terminal's usable size any more.
+  let lastLeftBarWidth = getBarWidth(getState().bars.left)
+  let lastRightBarWidth = getBarWidth(getState().bars.right)
   let lastLayoutTrees = getState().layoutTrees
   let lastTabsRef = getState().tabs
   let terminalSizeKnown = false
@@ -521,15 +518,15 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   const unsubscribeStore = appStore.subscribe(() => {
     const state = getState()
     layoutRef.current = state.layout
-    if (state.currentSessionId !== lastSessionId) {
-      lastSessionId = state.currentSessionId
-      if (state.currentSessionId !== null && state.currentSessionId !== '') {
-        attachSession(state.currentSessionId)
+    if (state.currentProjectId !== lastSessionId) {
+      lastSessionId = state.currentProjectId
+      if (state.currentProjectId !== null && state.currentProjectId !== '') {
+        attachSession(state.currentProjectId)
       }
     }
     if (state.activeTabId !== lastActiveTabId) {
       lastActiveTabId = state.activeTabId
-      if (state.currentSessionId !== null && state.currentSessionId !== '') {
+      if (state.currentProjectId !== null && state.currentProjectId !== '') {
         backend.setActiveTab(state.activeTabId)
       }
     }
@@ -552,11 +549,11 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
     // (worktrees live inside sessions, so any worktree change comes with a new
     // sessions reference via the reducer's immutable updates).
     if (
-      state.currentSessionId !== lastDivergenceSessionId ||
-      state.sessions !== lastDivergenceSessions
+      state.currentProjectId !== lastDivergenceSessionId ||
+      state.projects !== lastDivergenceSessions
     ) {
-      lastDivergenceSessionId = state.currentSessionId
-      lastDivergenceSessions = state.sessions
+      lastDivergenceSessionId = state.currentProjectId
+      lastDivergenceSessions = state.projects
       restartDivergencePoll()
     }
     // Diff radius prefetch — recompute the window whenever any tracked input
@@ -583,13 +580,10 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
     const nextRows = state.layout.terminalRows
     const colsChanged = nextCols !== lastLayoutCols
     const rowsChanged = nextRows !== lastLayoutRows
-    const sidebarChanged =
-      state.sidebar.visible !== lastSidebarVisible || state.sidebar.width !== lastSidebarWidth
-    const gitPaneChanged =
-      state.gitPane.mode !== lastGitPaneMode ||
-      state.gitPane.visible !== lastGitPaneVisible ||
-      state.gitPane.position !== lastGitPanePosition ||
-      state.gitPane.paneRatio !== lastGitPaneRatio
+    const nextLeftBarWidth = getBarWidth(state.bars.left)
+    const nextRightBarWidth = getBarWidth(state.bars.right)
+    const barsChanged =
+      nextLeftBarWidth !== lastLeftBarWidth || nextRightBarWidth !== lastRightBarWidth
     const treesChanged = state.layoutTrees !== lastLayoutTrees
     const tabsChanged = state.tabs !== lastTabsRef
     if (colsChanged || rowsChanged) {
@@ -600,21 +594,12 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
     }
     if (
       terminalSizeKnown &&
-      (colsChanged ||
-        rowsChanged ||
-        sidebarChanged ||
-        gitPaneChanged ||
-        treesChanged ||
-        tabsChanged)
+      (colsChanged || rowsChanged || barsChanged || treesChanged || tabsChanged)
     ) {
       lastLayoutCols = nextCols
       lastLayoutRows = nextRows
-      lastSidebarVisible = state.sidebar.visible
-      lastSidebarWidth = state.sidebar.width
-      lastGitPaneMode = state.gitPane.mode
-      lastGitPaneVisible = state.gitPane.visible
-      lastGitPanePosition = state.gitPane.position
-      lastGitPaneRatio = state.gitPane.paneRatio
+      lastLeftBarWidth = nextLeftBarWidth
+      lastRightBarWidth = nextRightBarWidth
       lastLayoutTrees = state.layoutTrees
       lastTabsRef = state.tabs
       const trees = Object.values(state.layoutTrees)

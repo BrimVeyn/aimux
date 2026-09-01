@@ -2,7 +2,11 @@ import { describe, expect, test } from 'bun:test'
 
 import type { TerminalLine, TerminalSnapshot } from '../../src/state/types'
 
-import { type DaemonTabEntry, mergeTabRegistryEntry } from '../../src/daemon/daemon'
+import {
+  type DaemonTabEntry,
+  findWorkerNameConflict,
+  mergeTabRegistryEntry,
+} from '../../src/daemon/daemon'
 
 function snapshot(tag: string): TerminalSnapshot {
   const line: TerminalLine = { spans: [{ text: tag }] }
@@ -34,7 +38,7 @@ describe('mergeTabRegistryEntry', () => {
     registry.set('t1', {
       assistant: 'claude',
       command: 'claude',
-      sessionId: 'S',
+      projectId: 'S',
       viewport: fresh,
       viewportSeq: 42,
     })
@@ -55,7 +59,7 @@ describe('mergeTabRegistryEntry', () => {
     registry.set('t1', {
       assistant: 'claude',
       command: 'old-cmd',
-      sessionId: 'S-old',
+      projectId: 'S-old',
       viewport: snapshot('preserved'),
       viewportSeq: 7,
     })
@@ -69,9 +73,36 @@ describe('mergeTabRegistryEntry', () => {
       makeAllocator()
     )
     const entry = registry.get('t1')
-    expect(entry?.sessionId).toBe('S-new')
+    expect(entry?.projectId).toBe('S-new')
     expect(entry?.assistant).toBe('codex')
     expect(entry?.command).toBe('new-cmd')
+  })
+
+  test('does not regress completed auto-rename metadata from a stale attach', () => {
+    const registry = new Map<string, DaemonTabEntry>()
+    registry.set('t1', {
+      assistant: 'claude',
+      autoRenameStatus: 'attempted',
+      command: 'claude',
+      projectId: 'S',
+      title: 'Generated title',
+      viewport: undefined,
+      viewportSeq: 0,
+    })
+
+    const entry = mergeTabRegistryEntry(
+      registry,
+      'S',
+      't1',
+      'claude',
+      'claude',
+      undefined,
+      makeAllocator(),
+      { autoRenameStatus: 'eligible', title: 'Claude' }
+    )
+
+    expect(entry.autoRenameStatus).toBe('attempted')
+    expect(entry.title).toBe('Generated title')
   })
 
   test('no viewport anywhere yields seq=0 placeholder (never bumps the allocator)', () => {
@@ -85,5 +116,38 @@ describe('mergeTabRegistryEntry', () => {
     expect(registry.get('t1')?.viewport).toBeUndefined()
     expect(registry.get('t1')?.viewportSeq).toBe(0)
     expect(allocCalls).toBe(0)
+  })
+})
+
+describe('findWorkerNameConflict', () => {
+  test('scopes worker names to a project project', () => {
+    const registry = new Map<string, DaemonTabEntry>([
+      [
+        'tab-a',
+        {
+          assistant: 'claude',
+          command: 'claude',
+          projectId: 'project-a',
+          viewport: undefined,
+          viewportSeq: 0,
+          workerName: 'api',
+        },
+      ],
+      [
+        'tab-b',
+        {
+          assistant: 'codex',
+          command: 'codex',
+          projectId: 'project-b',
+          viewport: undefined,
+          viewportSeq: 0,
+          workerName: 'api',
+        },
+      ],
+    ])
+
+    expect(findWorkerNameConflict(registry, 'project-a', 'api')).toBe('tab-a')
+    expect(findWorkerNameConflict(registry, 'project-b', 'api')).toBe('tab-b')
+    expect(findWorkerNameConflict(registry, 'project-a', 'web')).toBeUndefined()
   })
 })

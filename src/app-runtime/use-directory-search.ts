@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 
-import type { AppAction, ModalState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { ModalState } from '../state/types'
 
 import { searchProjectDirectories, warmDirectoryCache } from '../platform/project-search'
 
 const DEFAULT_DIRECTORY_SEARCH_DEBOUNCE_MS = 200
 
 function getDirectoryQuery(modal: ModalState): string {
-  if (modal.type !== 'create-session') {
+  if (modal.type !== 'create-project') {
     return ''
   }
 
@@ -26,12 +27,12 @@ export function useDirectorySearch(
   const directoryQuery = getDirectoryQuery(modal)
 
   useEffect(() => {
-    if (modal.type !== 'create-session') return
+    if (modal.type !== 'create-project') return
     void warmDirectoryCache()
   }, [modal.type])
 
   useEffect(() => {
-    if (modal.type !== 'create-session') {
+    if (modal.type !== 'create-project') {
       return
     }
 

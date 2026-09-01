@@ -1,6 +1,7 @@
 import type {
   AimuxUserConfig,
   AutoCommitConfig,
+  AutoRenameConfig,
   ModeId,
   ModeKeymapDef,
   MultiRepoConfig,
@@ -10,6 +11,7 @@ import type {
 
 import {
   DEFAULT_AUTO_COMMIT_CONFIG,
+  DEFAULT_AUTO_RENAME_CONFIG,
   DEFAULT_MULTI_REPO_CONFIG,
   getDefaultKeymapConfig,
 } from './defaults'
@@ -28,6 +30,21 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     timeoutMs: userConfig.autoCommit?.timeoutMs ?? DEFAULT_AUTO_COMMIT_CONFIG.timeoutMs,
   }
 
+  const autoRename: AutoRenameConfig = {
+    enabled: userConfig.autoRename?.enabled ?? DEFAULT_AUTO_RENAME_CONFIG.enabled,
+    maxAttempts: Math.max(
+      1,
+      userConfig.autoRename?.maxAttempts ?? DEFAULT_AUTO_RENAME_CONFIG.maxAttempts
+    ),
+    minPromptWords: Math.max(
+      1,
+      userConfig.autoRename?.minPromptWords ?? DEFAULT_AUTO_RENAME_CONFIG.minPromptWords
+    ),
+    models: { ...DEFAULT_AUTO_RENAME_CONFIG.models, ...userConfig.autoRename?.models },
+    settleMs: Math.max(0, userConfig.autoRename?.settleMs ?? DEFAULT_AUTO_RENAME_CONFIG.settleMs),
+    timeoutMs: userConfig.autoRename?.timeoutMs ?? DEFAULT_AUTO_RENAME_CONFIG.timeoutMs,
+  }
+
   const multiRepo: MultiRepoConfig = {
     enabled: userConfig.multiRepo?.enabled ?? DEFAULT_MULTI_REPO_CONFIG.enabled,
     maxDepth: Math.max(1, userConfig.multiRepo?.maxDepth ?? DEFAULT_MULTI_REPO_CONFIG.maxDepth),
@@ -35,18 +52,30 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
 
   return {
     autoCommit,
+    autoRename,
     backends: userConfig.backends ?? {},
     externalEditor: userConfig.externalEditor ?? {},
     gitPane: resolveGitPane(userConfig.gitPane),
     hooks: userConfig.hooks ?? {},
+    integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
-    sessionBar: resolveSessionBar(userConfig.sessionBar),
+    // ponytail: `sessionBar` is the pre-rename key. Unknown keys parse
+    // silently, so without the fallback the setting just vanishes.
+    projectBar: resolveProjectBar(userConfig.projectBar ?? userConfig.sessionBar),
     sidebar: userConfig.sidebar ?? {},
     snippets: userConfig.snippets ?? [],
     snippetTriggerChar: resolveSnippetTriggerChar(userConfig.snippetTriggerChar),
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
+  }
+}
+
+function resolveIntegrations(
+  userConfig: AimuxUserConfig['integrations']
+): ResolvedConfig['integrations'] {
+  return {
+    claudeHooks: userConfig?.claudeHooks === true,
   }
 }
 
@@ -68,69 +97,25 @@ function resolveTheme(userConfig: AimuxUserConfig['theme']): ResolvedConfig['the
   }
 }
 
-function resolveSessionBar(
-  userConfig: AimuxUserConfig['sessionBar']
-): ResolvedConfig['sessionBar'] {
+function resolveProjectBar(
+  userConfig: AimuxUserConfig['projectBar']
+): ResolvedConfig['projectBar'] {
   if (!userConfig) return {}
   return {
-    initialPosition: userConfig.initialPosition ?? userConfig.position,
     initialVisible: userConfig.initialVisible ?? userConfig.visible,
   }
 }
 
-function resolvePaneInitialPosition(
-  userConfig: NonNullable<AimuxUserConfig['gitPane']>
-): 'left' | 'right' | undefined {
-  if (userConfig.initialPosition === 'left' || userConfig.initialPosition === 'right') {
-    return userConfig.initialPosition
-  }
-  if (userConfig.position === 'left' || userConfig.position === 'right') {
-    return userConfig.position
-  }
-  return undefined
-}
-
-function resolveEmbeddedInitialPosition(
-  userConfig: NonNullable<AimuxUserConfig['gitPane']>
-): 'top' | 'bottom' | undefined {
-  if (userConfig.initialPosition === 'top' || userConfig.initialPosition === 'bottom') {
-    return userConfig.initialPosition
-  }
-  if (userConfig.position === 'top' || userConfig.position === 'bottom') {
-    return userConfig.position
-  }
-  return undefined
-}
-
+/** Placement fields are accepted for backwards compatibility but dropped here. */
 function resolveGitPane(userConfig: AimuxUserConfig['gitPane']): ResolvedConfig['gitPane'] {
   if (!userConfig) return {}
-
-  const initialMode = userConfig.initialMode ?? userConfig.mode
-  const paneInitialPosition = resolvePaneInitialPosition(userConfig)
-  const embeddedInitialPosition = resolveEmbeddedInitialPosition(userConfig)
-  const shared = {
+  return {
     diffCount: userConfig.diffCount,
     initialDiffModeRatio: userConfig.initialDiffModeRatio ?? userConfig.diffModeRatio,
     initialFileListMode: userConfig.initialFileListMode ?? userConfig.fileListMode,
-    initialRatio: userConfig.initialRatio ?? userConfig.ratio,
     initialTreeCompaction: userConfig.initialTreeCompaction ?? userConfig.treeCompaction,
-    initialVisible: userConfig.initialVisible ?? userConfig.visible,
     path: userConfig.path,
     prefetchRadius: userConfig.prefetchRadius,
-  }
-
-  if (initialMode === 'pane') {
-    return {
-      ...shared,
-      initialMode: 'pane',
-      initialPosition: paneInitialPosition,
-    }
-  }
-
-  return {
-    ...shared,
-    ...(initialMode === 'embedded' ? { initialMode: 'embedded' as const } : {}),
-    initialPosition: embeddedInitialPosition,
   }
 }
 

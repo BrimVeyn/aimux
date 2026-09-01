@@ -1,4 +1,5 @@
-import type { AppAction, ModalState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { ModalState } from '../state/types'
 
 import { searchProjectDirectories, warmDirectoryCache } from '../platform/project-search'
 

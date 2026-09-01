@@ -65,8 +65,8 @@ Actions on the selected file:
 | `d`   | Unstage / delete (two-press for destructive ops) |
 | `c`   | Open the commit modal                            |
 | `p`   | Push                                             |
-| `b`   | Toggle review vs base (worktrees)                |
-| `m`   | Move this worktree's changes into another        |
+| `b`   | Toggle review vs base (workspaces)               |
+| `m`   | Move this workspace's changes into another       |
 | `v`   | Toggle split / stacked diff                      |
 | `t`   | Toggle flat / tree list                          |
 | `]`   | Older commit (HEAD~N → N+1)                      |
@@ -113,15 +113,15 @@ While the offset is non-zero:
 
 Leaving git mode (`Esc`) resets the offset back to `0`.
 
-## Worktree review & move
+## Workspace review & move
 
-Two git-mode bindings act on [worktrees](worktrees.md):
+Two git-mode bindings act on [workspaces](workspaces.md):
 
-- `b` toggles **review vs base** — the diff against the worktree's fork point
+- `b` toggles **review vs base** — the diff against the workspace's fork point
   (everything it changed since branching) instead of vs `HEAD`.
-- `m` opens the **move picker** to squash this worktree's changes into another.
+- `m` opens the **move picker** to squash this workspace's changes into another.
 
-See the [Worktrees guide](worktrees.md) for the full flow.
+See the [Workspaces guide](workspaces.md) for the full flow.
 
 ## Help Modal
 
@@ -146,10 +146,10 @@ cancels and returns to git mode.
 
 `p` pushes the current branch.
 
-## Multi-repo Workspaces
+## Multi-repo Projects
 
 When a session's `projectPath` contains nested git repositories — for
-example a workspace folder holding several sibling repos — aimux discovers
+example a project folder holding several sibling repos — aimux discovers
 them automatically and aggregates their status into a single git panel.
 
 ### What you see
@@ -204,7 +204,7 @@ export default defineConfig({
 - `maxDepth: 1` scans the direct children of `projectPath`. Use `2` (or
   more) to descend further for deeply nested layouts.
 - Discovery is performed **once per session** (cached by `projectPath` +
-  `maxDepth`) so opening a workspace with many repos remains cheap.
+  `maxDepth`) so opening a project with many repos remains cheap.
 - Directory names starting with `.` and common build directories
   (`node_modules`, `target`, `dist`, `build`) are skipped.
 

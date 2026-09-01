@@ -1,5 +1,50 @@
-import type { AssistantOption } from '../pty/command-registry'
-import type { SessionRecord, SnippetRecord } from './types'
+import type { ProjectRecord, SnippetRecord, WorkspaceRecord } from './types'
+
+import { type AssistantOption, getAllAssistantOptions } from '../pty/command-registry'
+
+export interface BaseRefOption {
+  /** Git ref the new workspace is forked from. */
+  ref: string
+  label: string
+  kind: 'workspace' | 'branch'
+  /** Workspace name, for the 'workspace' kind. */
+  detail?: string
+}
+
+/**
+ * Ordered, filtered base-ref candidates for the workspace-create "Base" picker:
+ * branches checked out in the project's workspaces first (labelled with the
+ * workspace name), then the remaining local branches. A branch already surfaced
+ * via a workspace is not repeated. Throwaway `aimux/` branches are skipped unless
+ * a live workspace is on them — `git worktree remove` leaves the branch behind,
+ * so deleted temp workspaces would otherwise haunt the list as orphan branches.
+ */
+export function buildBaseRefOptions(
+  workspaces: WorkspaceRecord[],
+  localBranches: string[],
+  query: string
+): BaseRefOption[] {
+  const seen = new Set<string>()
+  const options: BaseRefOption[] = []
+  for (const workspace of workspaces) {
+    if (workspace.branch == null || workspace.branch === '' || seen.has(workspace.branch)) continue
+    seen.add(workspace.branch)
+    options.push({
+      detail: workspace.name,
+      kind: 'workspace',
+      label: workspace.branch,
+      ref: workspace.branch,
+    })
+  }
+  for (const branch of localBranches) {
+    if (seen.has(branch) || branch.startsWith('aimux/')) continue
+    seen.add(branch)
+    options.push({ kind: 'branch', label: branch, ref: branch })
+  }
+  const trimmed = query.trim().toLowerCase()
+  if (trimmed === '') return options
+  return options.filter((option) => option.label.toLowerCase().includes(trimmed))
+}
 
 export function filterAssistants(
   options: AssistantOption[],
@@ -12,18 +57,39 @@ export function filterAssistants(
   )
 }
 
-export function filterSessions(sessions: SessionRecord[], filter: string | null): SessionRecord[] {
+/**
+ * Assistants offered by the new-tab picker. One source of truth on purpose: the
+ * modal renders this list while `launch-selected-assistant` indexes into it, so
+ * a divergence launches the row above or below the one the user highlighted.
+ *
+ * Chained from `<C-p>`, the prompt is pasted into the assistant and drives the
+ * workspace's name — neither of which a plain shell can do — so Terminal is not
+ * offered there. A bare `<C-n>` still lists it.
+ */
+export function getNewTabAssistantOptions(
+  customCommands: Record<string, string>,
+  filter: string | null,
+  excludeTerminal: boolean
+): AssistantOption[] {
+  const all = getAllAssistantOptions(customCommands)
+  return filterAssistants(
+    excludeTerminal ? all.filter((option) => option.id !== 'terminal') : all,
+    filter
+  )
+}
+
+export function filterProjects(projects: ProjectRecord[], filter: string | null): ProjectRecord[] {
   if (!(filter != null && filter !== '')) {
-    return sessions
+    return projects
   }
 
   const lower = filter.toLowerCase()
-  return sessions.filter(
-    (session) =>
-      session.name.toLowerCase().includes(lower) ||
-      (session.projectPath != null &&
-        session.projectPath !== '' &&
-        session.projectPath.toLowerCase().includes(lower))
+  return projects.filter(
+    (project) =>
+      project.name.toLowerCase().includes(lower) ||
+      (project.projectPath != null &&
+        project.projectPath !== '' &&
+        project.projectPath.toLowerCase().includes(lower))
   )
 }
 

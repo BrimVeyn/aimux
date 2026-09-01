@@ -1,11 +1,12 @@
 import { expect, test } from 'bun:test'
 
-import type { AppAction, AutoCommitState, GitRefreshPayload } from '../../src/state/types'
+import type { AppAction } from '../../src/state/actions'
+import type { AutoCommitState, GitRefreshPayload } from '../../src/state/types'
 
 import { workingTreeHash } from '../../src/auto-commit/working-tree-hash'
 import { reduceAutoCommitState } from '../../src/state/reducers/auto-commit-state'
 
-const SESSION = 's1'
+const PROJECT = 's1'
 const TAB = 't1'
 
 function expectNonNull<T>(value: T | null | undefined): T {
@@ -30,12 +31,12 @@ test('generating → ready → invalidated by diff change', () => {
   const h2 = workingTreeHash(gitAfter)
   expect(h1).not.toBe(h2)
 
-  let state: AutoCommitState = { bySession: {} }
+  let state: AutoCommitState = { byProject: {} }
   const ctrl = new AbortController()
   state = expectNonNull(
     reduceAutoCommitState(state, {
       abortController: ctrl,
-      sessionId: SESSION,
+      projectId: PROJECT,
       startedAt: 1,
       tabId: TAB,
       type: 'auto-commit-generation-started',
@@ -47,24 +48,24 @@ test('generating → ready → invalidated by diff change', () => {
     reduceAutoCommitState(state, {
       body: '',
       generatedAt: 2,
-      sessionId: SESSION,
+      projectId: PROJECT,
       title: 'feat',
       type: 'auto-commit-generation-ready',
       workingTreeHash: h1,
     } as AppAction)
   )
-  expect(state.bySession[SESSION]?.kind).toBe('ready')
+  expect(state.byProject[PROJECT]?.kind).toBe('ready')
 
-  const current = state.bySession[SESSION]
+  const current = state.byProject[PROJECT]
   if (current?.kind === 'ready' && h2 !== current.workingTreeHash) {
     state = expectNonNull(
       reduceAutoCommitState(state, {
-        sessionId: SESSION,
+        projectId: PROJECT,
         type: 'auto-commit-clear',
       } as AppAction)
     )
   }
-  expect(state.bySession[SESSION]).toEqual({ kind: 'idle' })
+  expect(state.byProject[PROJECT]).toEqual({ kind: 'idle' })
 })
 
 test('late-arriving generation-ready with stale hash is dropped', () => {
@@ -75,12 +76,12 @@ test('late-arriving generation-ready with stale hash is dropped', () => {
     files: [{ added: 1, path: 'a.ts', removed: 0, section: 'unstaged', status: 'M' }],
   }
   const h1 = workingTreeHash(git)
-  let state: AutoCommitState = { bySession: {} }
+  let state: AutoCommitState = { byProject: {} }
   const ctrl = new AbortController()
   state = expectNonNull(
     reduceAutoCommitState(state, {
       abortController: ctrl,
-      sessionId: SESSION,
+      projectId: PROJECT,
       startedAt: 1,
       tabId: TAB,
       type: 'auto-commit-generation-started',
@@ -90,7 +91,7 @@ test('late-arriving generation-ready with stale hash is dropped', () => {
 
   state = expectNonNull(
     reduceAutoCommitState(state, {
-      sessionId: SESSION,
+      projectId: PROJECT,
       type: 'auto-commit-clear',
     } as AppAction)
   )
@@ -98,7 +99,7 @@ test('late-arriving generation-ready with stale hash is dropped', () => {
   const next = reduceAutoCommitState(state, {
     body: '',
     generatedAt: 3,
-    sessionId: SESSION,
+    projectId: PROJECT,
     title: 'stale',
     type: 'auto-commit-generation-ready',
     workingTreeHash: h1,

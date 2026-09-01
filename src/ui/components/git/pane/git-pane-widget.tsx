@@ -1,34 +1,51 @@
-import { memo, useRef } from 'react'
+import { memo, useRef, useState } from 'react'
 
 import type { GitPanelState } from '../../../../state/types'
 
 import { useGitPanelPolling } from '../../../../git/git-poller'
+import { usePrStatusPolling } from '../../../../git/pr-status-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
-import { getSessionProjectPath } from '../../../../state/session-worktrees'
+import { getActiveWorkspacePath } from '../../../../state/project-workspaces'
+import { useSettled } from '../../../hooks/use-settled'
 import { GitPanel } from '../git-panel'
+import { GitPaneHeader, type GitPaneTab } from './git-pane-header'
+import { PrChecksPanel } from './pr-checks-panel'
+
+/** Long enough to swallow key repeat, short enough to read as instant. */
+const PATH_SETTLE_MS = 150
 
 interface GitPaneWidgetProps {
   pollingEnabled: boolean
+  contentWidth: number
 }
 
-export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: GitPaneWidgetProps) {
+export const GitPaneWidget = memo(function GitPaneWidget({
+  contentWidth,
+  pollingEnabled,
+}: GitPaneWidgetProps) {
   const gitPanel = useAppStore((s) => s.gitPanel)
   const gitMode = useAppStore((s) => s.gitMode)
   const gitFileListMode = useAppStore((s) => s.gitPane.fileListMode)
   const treeCompaction = useAppStore((s) => s.gitPane.treeCompaction)
   const pathConfig = useAppStore((s) => s.gitPane.path)
   const diffCountConfig = useAppStore((s) => s.gitPane.diffCount)
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
-  const sessions = useAppStore((s) => s.sessions)
-  const currentSession =
-    currentSessionId != null && currentSessionId !== ''
-      ? sessions.find((s) => s.id === currentSessionId)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
+  const projects = useAppStore((s) => s.projects)
+  const currentProject =
+    currentProjectId != null && currentProjectId !== ''
+      ? projects.find((s) => s.id === currentProjectId)
       : undefined
-  const projectPath = getSessionProjectPath(currentSession)
+  // Settled: every poller below keys off this path and fires an immediate tick
+  // when it changes, and holding `j`/`k` in the sidebar changes it per keypress.
+  const projectPath = useSettled(getActiveWorkspacePath(currentProject), PATH_SETTLE_MS)
+
+  const [tab, setTab] = useState<GitPaneTab>('diff')
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })
+  // The PR state row sits above the tabs, so this has to run on both of them.
+  usePrStatusPolling({ enabled: pollingEnabled, projectPath })
 
   const lastGoodRef = useRef<GitPanelState | null>(null)
   const prevProjectPathRef = useRef(projectPath)
@@ -43,15 +60,24 @@ export const GitPaneWidget = memo(function GitPaneWidget({ pollingEnabled }: Git
   const display = lastGoodRef.current ?? gitPanel
 
   return (
-    <GitPanel
-      collapsedFolders={gitMode.collapsedFolders}
-      compact={treeCompaction}
-      diffCountConfig={diffCountConfig}
-      fileListMode={gitFileListMode}
-      gitPanel={display}
-      pathConfig={pathConfig}
-      projectPath={projectPath}
-      selectedEntryKey={gitMode.selectedEntryKey}
-    />
+    <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden">
+      <GitPaneHeader gitPanel={display} onTabChange={setTab} projectPath={projectPath} tab={tab} />
+      {tab === 'github' ? (
+        <PrChecksPanel contentWidth={contentWidth} projectPath={projectPath} />
+      ) : (
+        <GitPanel
+          collapsedFolders={gitMode.collapsedFolders}
+          compact={treeCompaction}
+          diffCountConfig={diffCountConfig}
+          fileListMode={gitFileListMode}
+          gitPanel={display}
+          pathConfig={pathConfig}
+          projectPath={projectPath}
+          selectedEntryKey={gitMode.selectedEntryKey}
+          showFileListToggle={false}
+          showRemoteTracking={false}
+        />
+      )}
+    </box>
   )
 })

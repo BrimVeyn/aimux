@@ -25,27 +25,63 @@ const themeStore = createStore<ThemeStore>(() => ({
 
 let cachedId: ThemeId | null = null
 let cachedMode: ThemeMode | null = null
-let cachedResolved: ResolvedTuiTheme | null = null
+let cachedBase: ResolvedTuiTheme | null = null
+let cachedOverlay: ResolvedTuiTheme | null = null
 
-function derive(id: ThemeId, mode: ThemeMode): ResolvedTuiTheme {
-  if (cachedResolved && cachedId === id && cachedMode === mode) return cachedResolved
-  cachedId = id
-  cachedMode = mode
-  const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
-  if (!json) throw new Error(`No theme JSON for ${id}`)
-  cachedResolved = resolveTuiTheme(json, mode)
-  return cachedResolved
+// Chrome surface tokens: when transparent mode is on we replace these with
+// 'transparent' so opentui's BoxRenderable skips its fill (alpha=0 early-returns
+// in setCellWithAlphaBlending) and the host terminal background shows through
+// every chrome site (root, sidebar, tabs, status bar, modals, …) without
+// patching ~30 components one-by-one.
+const CHROME_BG_TOKENS = [
+  'background',
+  'backgroundPanel',
+  'backgroundElement',
+  'backgroundMenu',
+] as const
+
+// Both the opaque base and the transparent overlay are cached side-by-side
+// (both keyed by id+mode). A single-slot cache would thrash when useTheme() and
+// useBaseTheme() are both mounted with different transparent values — each call
+// would invalidate the other's cache, hand React a fresh object reference every
+// render, and drive an infinite update loop.
+function derive(id: ThemeId, mode: ThemeMode, transparent: boolean): ResolvedTuiTheme {
+  if (!cachedBase || cachedId !== id || cachedMode !== mode) {
+    const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
+    if (!json) throw new Error(`No theme JSON for ${id}`)
+    cachedBase = resolveTuiTheme(json, mode)
+    cachedOverlay = null
+    cachedId = id
+    cachedMode = mode
+  }
+  if (!transparent) return cachedBase
+  if (!cachedOverlay) {
+    const overlay: ResolvedTuiTheme = { ...cachedBase }
+    for (const key of CHROME_BG_TOKENS) overlay[key] = 'transparent'
+    cachedOverlay = overlay
+  }
+  return cachedOverlay
 }
 
-/** Subscribe to the resolved TUI theme for the active id+mode. */
+/** Subscribe to the resolved TUI theme for the active id+mode (+transparent overlay). */
 export function useTheme(): ResolvedTuiTheme {
-  return useStore(themeStore, (s) => derive(s.id, s.mode))
+  return useStore(themeStore, (s) => derive(s.id, s.mode, s.transparent))
+}
+
+/**
+ * Resolved TUI theme WITHOUT the transparent chrome overlay. Use for the rare
+ * chrome sites that must stay opaque even in transparent mode — e.g. the
+ * sidebar selection highlight (would otherwise vanish) and the status-bar
+ * badge foregrounds (would otherwise render as transparent-on-color).
+ */
+export function useBaseTheme(): ResolvedTuiTheme {
+  return useStore(themeStore, (s) => derive(s.id, s.mode, false))
 }
 
 /** Synchronous snapshot of the resolved theme for non-React callers. */
 export function getCurrentTheme(): ResolvedTuiTheme {
   const s = themeStore.getState()
-  return derive(s.id, s.mode)
+  return derive(s.id, s.mode, s.transparent)
 }
 
 export function getCurrentThemeId(): ThemeId {
@@ -96,6 +132,9 @@ export function subscribeThemeChanges(
     if (s.id === lastId && s.mode === lastMode) return
     lastId = s.id
     lastMode = s.mode
-    listener(derive(s.id, s.mode), s.mode)
+    // Pass base theme (transparent=false): the only subscriber today is the
+    // Claude Code theme bridge, which has no transparency concept and wants
+    // the resolved palette.
+    listener(derive(s.id, s.mode, false), s.mode)
   })
 }

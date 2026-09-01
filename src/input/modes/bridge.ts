@@ -6,17 +6,23 @@ type SupportedModalType = Exclude<ModalType, null>
 const DIRECT_FOCUS_MODE_IDS: Partial<Record<FocusMode, ModeId>> = {
   'git': 'git-mode',
   'navigation': 'navigation',
+  'settings': 'settings',
+  'stats': 'stats',
   'terminal-input': 'terminal-input',
 }
 
 const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
-  'create-session': 'modal.create-session',
+  'create-project': 'modal.create-project',
+  'create-workspace': 'modal.create-workspace',
   'git-commit': 'modal.git-commit',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
+  'project-name': 'modal.project-name',
+  'project-picker': 'modal.project-picker.filtering',
   'rename-tab': 'modal.rename-tab',
-  'session-name': 'modal.session-name',
-  'session-picker': 'modal.session-picker.filtering',
+  'rename-workspace': 'modal.rename-workspace',
+  'setting-text': 'modal.setting-text',
+  'settings-search': 'modal.settings-search.filtering',
   'snippet-editor': 'modal.snippet-editor',
   'snippet-picker': 'modal.snippet-picker.filtering',
   'split-picker': 'modal.split-picker',
@@ -24,9 +30,11 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
 }
 
 const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
-  'ai-usage': 'modal.ai-usage',
+  'quotas': 'modal.quotas',
   'update-available': 'modal.update-available',
-  'worktree-move': 'modal.worktree-move',
+  'workspace-delete-confirm': 'modal.workspace-delete-confirm',
+  'workspace-move': 'modal.workspace-move',
+  'workspace-move-confirm': 'modal.workspace-move-confirm',
 }
 
 export function deriveModeId(state: AppState): ModeId {
@@ -38,8 +46,14 @@ export function deriveModeId(state: AppState): ModeId {
 
   // Overlay on top of git mode without flipping focusMode (like help) — route
   // input to the picker while it's open even though focus stays 'git'.
-  if (state.modal.type === 'worktree-move') {
-    return 'modal.worktree-move'
+  if (state.modal.type === 'workspace-move') {
+    return 'modal.workspace-move'
+  }
+
+  // Flash-jump overlay: same pattern — renders on top of navigation, all
+  // letter keys are passthrough'd to update-command-edit for buffer matching.
+  if (state.modal.type === 'flash-jump') {
+    return 'modal.flash-jump'
   }
 
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]

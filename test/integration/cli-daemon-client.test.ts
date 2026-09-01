@@ -1,0 +1,384 @@
+import { afterEach, describe, expect, test } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { createServer, type Socket } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { DaemonClient } from '../../src/cli/client/daemon-client'
+import {
+  type ClientRequest,
+  encodeMessage,
+  IPC_CAPABILITY_LIST_TABS,
+  IPC_CAPABILITY_PROJECT_LIFECYCLE,
+  IPC_CAPABILITY_THIN_ATTACH,
+  IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS,
+  IPC_PROTOCOL_MIN_VERSION,
+  IPC_PROTOCOL_VERSION,
+  MessageDecoder,
+  parseClientRequest,
+  type ServerEvent,
+  type ServerResponse,
+} from '../../src/ipc/protocol'
+
+function tempSocketPath(): string {
+  return join(mkdtempSync(join(tmpdir(), 'aimux-cli-')), 'test.sock')
+}
+
+interface MockDaemon {
+  received: ClientRequest[]
+  emit: (event: ServerEvent) => void
+  close: () => void
+}
+
+async function startMockDaemon(socketPath: string, capabilities: string[]): Promise<MockDaemon> {
+  const received: ClientRequest[] = []
+  let activeSocket: Socket | null = null
+
+  const server = createServer((socket) => {
+    activeSocket = socket
+    const decoder = new MessageDecoder<ClientRequest>(parseClientRequest)
+    socket.on('data', (chunk) => {
+      for (const message of decoder.push(chunk)) {
+        received.push(message)
+        if (message.type === 'hello') {
+          const response: ServerResponse = {
+            id: message.id,
+            payload: {
+              capabilities: [...capabilities],
+              maxVersion: IPC_PROTOCOL_VERSION,
+              minVersion: IPC_PROTOCOL_MIN_VERSION,
+              processVersion: 'test',
+              selectedVersion: IPC_PROTOCOL_VERSION,
+            },
+            type: 'helloResult',
+          }
+          socket.write(encodeMessage(response))
+        } else if (message.type === 'listTabs') {
+          socket.write(
+            encodeMessage({
+              id: message.id,
+              payload: {
+                activeTabId: 'tab-1',
+                tabs: [
+                  {
+                    activity: 'idle',
+                    assistant: 'claude',
+                    command: 'claude',
+                    id: 'tab-1',
+                    status: 'running',
+                    title: 'Claude',
+                  },
+                ],
+              },
+              type: 'listTabsResult',
+            })
+          )
+        } else if (message.type === 'attach') {
+          socket.write(
+            encodeMessage({
+              id: message.id,
+              payload: {
+                activeTabId: null,
+                initialProjectStatuses: [],
+                protocolVersion: IPC_PROTOCOL_VERSION,
+                tabs: [],
+              },
+              type: 'attachResult',
+            })
+          )
+        } else if (
+          message.type === 'write' ||
+          message.type === 'closeTab' ||
+          message.type === 'setActiveTab'
+        ) {
+          socket.write(encodeMessage({ id: message.id, payload: {}, type: 'ok' }))
+        } else {
+          socket.write(encodeMessage({ id: message.id, payload: {}, type: 'ok' }))
+        }
+      }
+    })
+  })
+
+  return new Promise((resolve) => {
+    server.listen(socketPath, () => {
+      resolve({
+        close: () => {
+          activeSocket?.destroy()
+          server.close()
+          try {
+            rmSync(socketPath)
+          } catch {
+            // best effort
+          }
+        },
+        emit: (event) => {
+          if (activeSocket) activeSocket.write(encodeMessage(event))
+        },
+        received,
+      })
+    })
+  })
+}
+
+describe('CLI DaemonClient', () => {
+  const cleanups: (() => void)[] = []
+  afterEach(() => {
+    while (cleanups.length > 0) cleanups.pop()?.()
+  })
+
+  test('connect + hello populates capabilities', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_LIST_TABS])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    expect(client.hasCapability(IPC_CAPABILITY_LIST_TABS)).toBe(true)
+    expect(client.hasCapability(IPC_CAPABILITY_THIN_ATTACH)).toBe(false)
+  })
+
+  test('listTabs returns the daemon-side summary', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_LIST_TABS])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const result = await client.listTabs('project-1')
+    expect(result.activeTabId).toBe('tab-1')
+    expect(result.tabs).toHaveLength(1)
+    expect(result.tabs[0]).toMatchObject({
+      assistant: 'claude',
+      id: 'tab-1',
+      status: 'running',
+      title: 'Claude',
+    })
+
+    const listTabsRequest = mock.received.find((m) => m.type === 'listTabs')
+    expect(listTabsRequest?.payload).toEqual({ projectId: 'project-1' })
+  })
+
+  test('attach with thin:true sends the flag on the wire', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [
+      IPC_CAPABILITY_LIST_TABS,
+      IPC_CAPABILITY_THIN_ATTACH,
+    ])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
+    const attach = mock.received.find((m) => m.type === 'attach')
+    expect(attach?.payload).toMatchObject({ cols: 0, rows: 0, thin: true })
+  })
+
+  test('tabAdded events deliver the synthesized TabSession to subscribers', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const seen: { projectId: string; tabId: string; workspaceId: string | undefined }[] = []
+    client.on('tabAdded', (payload) => {
+      seen.push({
+        projectId: payload.projectId,
+        tabId: payload.tab.id,
+        workspaceId: payload.tab.workspaceId,
+      })
+    })
+
+    mock.emit({
+      payload: {
+        projectId: 'project-1',
+        tab: {
+          assistant: 'claude',
+          buffer: '',
+          command: 'claude',
+          id: 'tab-fresh',
+          status: 'starting',
+          terminalModes: {
+            alternateScrollMode: false,
+            bracketedPasteMode: false,
+            isAlternateBuffer: false,
+            mouseTrackingMode: 'none',
+            sendFocusMode: false,
+          },
+          title: 'Claude',
+          workspaceId: 'wt-42',
+        },
+      },
+      type: 'tabAdded',
+    })
+
+    const deadline = Date.now() + 500
+    while (seen.length === 0 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(seen).toEqual([{ projectId: 'project-1', tabId: 'tab-fresh', workspaceId: 'wt-42' }])
+  })
+
+  test('createProject request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('createProject', { name: 'ws', projectPath: '/tmp/x', switch: true })
+    const req = mock.received.find((m) => m.type === 'createProject')
+    expect(req?.payload).toEqual({ name: 'ws', projectPath: '/tmp/x', switch: true })
+  })
+
+  test('switchProject request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('switchProject', { targetProjectId: 'project-2' })
+    const req = mock.received.find((m) => m.type === 'switchProject')
+    expect(req?.payload).toEqual({ targetProjectId: 'project-2' })
+  })
+
+  test('closeProject request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    await client.expectOk('closeProject', { targetProjectId: 'project-3' })
+    const req = mock.received.find((m) => m.type === 'closeProject')
+    expect(req?.payload).toEqual({ targetProjectId: 'project-3' })
+  })
+
+  test('projectSwitched broadcast lands on the subscriber', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_PROJECT_LIFECYCLE])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const seen: string[] = []
+    client.on('projectSwitched', (payload) => seen.push(payload.projectId))
+
+    mock.emit({
+      payload: { projectId: 'project-9' },
+      type: 'projectSwitched',
+    })
+
+    const deadline = Date.now() + 500
+    while (seen.length === 0 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(seen).toEqual(['project-9'])
+  })
+
+  test('addWorkspaceRecord request round-trips (v12)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_WORKSPACE_LIFECYCLE_EVENTS])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const workspace = {
+      createdAt: '2026-07-01T00:00:00.000Z',
+      createdByAimux: true,
+      id: 'wt-1',
+      name: 'feat/x',
+      path: '/tmp/wt/feat-x',
+      repoRoot: '/tmp/repo',
+      source: 'aimux-temp' as const,
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    }
+    await client.expectOk('addWorkspaceRecord', { projectId: 'project-1', workspace })
+    const req = mock.received.find((m) => m.type === 'addWorkspaceRecord')
+    expect(req?.payload).toMatchObject({ projectId: 'project-1', workspace: { id: 'wt-1' } })
+  })
+
+  test('tabRender + tabExit stream through to subscribers (tab tail)', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const events: string[] = []
+    client.on('tabRender', (payload) => {
+      events.push(`render:${payload.tabId}:${payload.viewport.lines.length}`)
+    })
+    client.on('tabExit', (payload) => {
+      events.push(`exit:${payload.tabId}:${payload.exitCode}`)
+    })
+
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
+
+    mock.emit({
+      payload: {
+        tabId: 'tab-1',
+        terminalModes: {
+          alternateScrollMode: false,
+          bracketedPasteMode: false,
+          isAlternateBuffer: false,
+          mouseTrackingMode: 'none',
+          sendFocusMode: false,
+        },
+        viewport: {
+          baseY: 0,
+          cursorVisible: true,
+          lines: [{ spans: [{ text: 'hi' }] }, { spans: [{ text: 'there' }] }],
+          viewportY: 0,
+        },
+      },
+      type: 'tabRender',
+    })
+    mock.emit({
+      payload: { exitCode: 0, tabId: 'tab-1' },
+      type: 'tabExit',
+    })
+
+    const deadline = Date.now() + 500
+    while (events.length < 2 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(events).toEqual(['render:tab-1:2', 'exit:tab-1:0'])
+  })
+
+  test('tabStatus events fan out to subscribers', async () => {
+    const socketPath = tempSocketPath()
+    const mock = await startMockDaemon(socketPath, [IPC_CAPABILITY_THIN_ATTACH])
+    cleanups.push(mock.close)
+
+    const client = await DaemonClient.connect(socketPath)
+    cleanups.push(() => client.close())
+
+    const seen: string[] = []
+    client.on('tabStatus', (payload) => seen.push(payload.status))
+    // Attach so the mock has an active socket to fan an event back through.
+    await client.attach({ cols: 0, projectId: 'project-1', rows: 0, thin: true })
+
+    mock.emit({
+      payload: { projectId: 'project-1', status: 'idle', tabId: 'tab-1' },
+      type: 'tabStatus',
+    })
+
+    const deadline = Date.now() + 500
+    while (seen.length === 0 && Date.now() < deadline) {
+      await Bun.sleep(10)
+    }
+    expect(seen).toEqual(['idle'])
+  })
+})

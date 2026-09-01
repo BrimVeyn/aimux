@@ -33,6 +33,7 @@ function startMockDaemon() {
           const response: ServerResponse = {
             id: message.id,
             payload: {
+              capabilities: [],
               maxVersion: IPC_PROTOCOL_VERSION,
               minVersion: IPC_PROTOCOL_VERSION,
               processVersion: 'test-daemon',
@@ -46,7 +47,7 @@ function startMockDaemon() {
             id: message.id,
             payload: {
               activeTabId: null,
-              initialSessionStatuses: [],
+              initialProjectStatuses: [],
               protocolVersion: IPC_PROTOCOL_VERSION,
               tabs: [],
             },
@@ -172,9 +173,9 @@ describe('IPC round-trip integration', () => {
       id: 'req-1',
       payload: {
         cols: 80,
+        projectId: 'project-test',
         protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
-        sessionId: 'session-test',
       },
       type: 'attach',
     })
@@ -241,9 +242,9 @@ describe('IPC round-trip integration', () => {
       id: 'req-attach',
       payload: {
         cols: 80,
+        projectId: 'project-write',
         protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
-        sessionId: 'session-write',
       },
       type: 'attach',
     })
@@ -307,9 +308,9 @@ describe('IPC round-trip integration', () => {
       id: 'req-1',
       payload: {
         cols: 80,
+        projectId: 'project-custom',
         protocolVersion: IPC_PROTOCOL_VERSION,
         rows: 24,
-        sessionId: 'session-custom',
       },
       type: 'attach',
     })

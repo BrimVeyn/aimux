@@ -29,6 +29,7 @@ export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
 export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
+export { getStatusBarSeparator, setStatusBarSeparator } from './status-bar-runtime'
 export {
   DEFAULT_EDITOR_ARGS,
   getExternalEditorConfig,
@@ -37,7 +38,7 @@ export {
 } from './external-editor-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
-// User-facing config types (keymap/backends/sessions/etc.).
+// User-facing config types (keymap/backends/projects/etc.).
 export type {
   Action,
   ActionFn,
@@ -48,6 +49,7 @@ export type {
   AppAction,
   AppState,
   AutoCommitConfig,
+  AutoRenameConfig,
   BackendConfig,
   BindingDef,
   DiscoveredRepo,
@@ -73,9 +75,9 @@ export type {
   ModeKeymapDef,
   MultiRepoConfig,
   MultiRepoState,
+  ProjectRecord,
   ResolvedConfig,
   ResolvedKeymapConfig,
-  SessionRecord,
   SidebarConfig,
   SideEffect,
   SnippetDef,
@@ -84,5 +86,6 @@ export type {
   SnippetVar,
   SplitDirection,
   StatusBarConfig,
+  StatusBarSeparator,
   TabSession,
 } from './types'

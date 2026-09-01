@@ -55,15 +55,20 @@ The most important modes are:
 - `navigation`
 - `terminal-input`
 - `git-mode`
+- `settings`
 
 The runtime also defines modal modes such as:
 
 - `modal.new-tab`
 - `modal.new-tab.command-edit`
-- `modal.session-picker`
-- `modal.session-picker.filtering`
-- `modal.create-session`
+- `modal.project-picker.filtering`
+- `modal.project-name`
+- `modal.create-project`
+- `modal.create-workspace`
+- `modal.workspace-move`
 - `modal.rename-tab`
+- `modal.setting-text`
+- `modal.settings-search.filtering`
 - `modal.snippet-picker`
 - `modal.snippet-picker.filtering`
 - `modal.snippet-editor`
@@ -72,6 +77,7 @@ The runtime also defines modal modes such as:
 - `modal.split-picker`
 - `modal.git-commit`
 - `modal.update-available`
+- `modal.ai-usage`
 
 ## Builder API
 
@@ -86,7 +92,7 @@ export default defineConfig({
       .timeout(300)
       .mode('navigation', (m) =>
         m
-          .map('<C-p>', actions.sessionPicker, 'Workspace picker')
+          .map('<C-g>', actions.projectPicker, 'Project picker')
           .unmap('r')
           .group('<leader>t', 'tabs', (g) => g.map('n', actions.newTab, 'New tab'))
       )
@@ -168,10 +174,11 @@ Document your own configs accordingly.
 - `i` - focus terminal
 - `r` - rename tab
 - `dd` - close tab
-- `Ctrl+N` - new tab
+- `Ctrl+N` - new tab (in the active workspace, the repo checkout included)
+- `Ctrl+P` - create workspace (asks what you want to work on, then names it)
 - `Ctrl+R` - restart tab
-- `Ctrl+G` - workspace picker
-- `Ctrl+B` - toggle sidebar
+- `Ctrl+G` - project picker
+- `Ctrl+B` - toggle left bar
 - `Ctrl+S` - snippet picker
 - `Ctrl+T` - theme picker
 - `G` - toggle git panel
@@ -182,7 +189,7 @@ Document your own configs accordingly.
 ### `terminal-input`
 
 - `Ctrl+Z` - leave terminal-input mode
-- `Ctrl+B` - toggle sidebar
+- `Ctrl+B` - toggle left bar
 - `Leader+h/j/k/l` - focus panes
 - `Leader+H/J/K/L` - resize panes
 - `Leader+|` - split vertical
@@ -191,8 +198,10 @@ Document your own configs accordingly.
 
 ### Shared between `navigation` and `terminal-input`
 
-- `Leader+b` - toggle workspace bar
-- `Leader+1` through `Leader+9` - switch workspaces by index
+- `Leader+b` - toggle project bar
+- `Leader+B` - toggle right bar
+- `Leader+,` - open the settings screen
+- `Leader+1` through `Leader+9` - switch projects by index
 
 ### `git-mode`
 
@@ -210,6 +219,21 @@ Enter with `Ctrl+D` from `navigation`. Leading action keys:
 Navigation and diff scroll keys (`j`/`k`, `Ctrl+N`/`Ctrl+P`, `h`/`l`, arrows,
 `Ctrl+D`/`Ctrl+U`, `Backspace`/`Ctrl+H`/`Ctrl+L`) are documented in
 [`git-mode.md`](git-mode.md).
+
+### `settings`
+
+Enter with `Leader+,` from `navigation` or `terminal-input`.
+
+- `h` / `l` - move between the section list and its settings; always a column
+  change, never a value change
+- `j` / `k` - move within the focused column
+- `Space` / `Enter` - change the setting under the cursor
+- `-` / `+` - step a number
+- `/` - search every setting
+- `r` - put the setting back to its default
+- `Esc` - close
+
+Fully documented in [`settings.md`](settings.md).
 
 ## Help Modal
 
@@ -252,7 +276,7 @@ See `snippets.md` for the full picker UX.
 
 ### Universal selection alternates
 
-Every picker / modal that supports a selection (new tab, workspace picker,
+Every picker / modal that supports a selection (new tab, project picker,
 snippet picker, theme picker, split picker, update-available, help, and their
 filter sub-modes) accepts **all** of the following as equivalent prev / next
 shortcuts: `j` / `k` (where the mode isn't already bound), arrow `Up` /

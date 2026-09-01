@@ -1,3 +1,3 @@
 - For any file search or grep in the current git indexed directory use fff tools
-- Always run bun lint && bun fmt before ending the execution of a plan
+- Always run bun lint && bun format before ending the execution of a plan
 - When asked about tickets / tasks / todos, use plane mcp to gather informations

@@ -1,11 +1,11 @@
 import type {
-  SessionRecord,
+  ProjectRecord,
+  ProjectSnapshotV1,
   SnippetRecord,
   TerminalLine,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from './types'
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -45,6 +45,10 @@ function isTerminalLine(value: unknown): value is TerminalLine {
   })
 }
 
+function isTerminalCursorStyle(value: unknown): boolean {
+  return value === 'block' || value === 'underline' || value === 'bar' || value === 'default'
+}
+
 function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
   return (
     isObjectRecord(value) &&
@@ -52,7 +56,11 @@ function isTerminalSnapshot(value: unknown): value is TerminalSnapshot {
     value.lines.every(isTerminalLine) &&
     isFiniteNumber(value.viewportY) &&
     isFiniteNumber(value.baseY) &&
-    isBoolean(value.cursorVisible)
+    isBoolean(value.cursorVisible) &&
+    (value.cursorStyle === undefined || isTerminalCursorStyle(value.cursorStyle)) &&
+    (value.cursorBlink === undefined || isBoolean(value.cursorBlink)) &&
+    (value.cursorRow === undefined || isFiniteNumber(value.cursorRow)) &&
+    (value.cursorCol === undefined || isFiniteNumber(value.cursorCol))
   )
 }
 
@@ -99,7 +107,7 @@ function isStringRecord(value: unknown): boolean {
   return Object.values(value).every(isString)
 }
 
-function isWorktreeRecord(value: unknown): value is WorktreeRecord {
+export function isWorkspaceRecord(value: unknown): value is WorkspaceRecord {
   return (
     isObjectRecord(value) &&
     isString(value.id) &&
@@ -113,11 +121,13 @@ function isWorktreeRecord(value: unknown): value is WorktreeRecord {
     isBoolean(value.createdByAimux) &&
     (value.color === undefined || isString(value.color)) &&
     isString(value.createdAt) &&
-    isString(value.updatedAt)
+    isString(value.updatedAt) &&
+    (value.setupRanAt === undefined || isString(value.setupRanAt)) &&
+    (value.setupExitCode === undefined || isFiniteNumber(value.setupExitCode))
   )
 }
 
-export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapshotV1 {
+export function isProjectSnapshotV1(value: unknown): value is ProjectSnapshotV1 {
   return (
     isObjectRecord(value) &&
     value.version === 1 &&
@@ -144,7 +154,11 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
         (tab.viewport === undefined || isTerminalSnapshot(tab.viewport)) &&
         (tab.errorMessage === undefined || isString(tab.errorMessage)) &&
         (tab.exitCode === undefined || isFiniteNumber(tab.exitCode)) &&
-        (tab.worktreeId === undefined || isString(tab.worktreeId))
+        (tab.workspaceId === undefined || isString(tab.workspaceId)) &&
+        (tab.workerName === undefined || isString(tab.workerName)) &&
+        (tab.autoRenameStatus === undefined ||
+          tab.autoRenameStatus === 'eligible' ||
+          tab.autoRenameStatus === 'attempted')
     ) &&
     (value.layoutTree === undefined || isLayoutNode(value.layoutTree)) &&
     (value.layoutTrees === undefined || isLayoutTreesMap(value.layoutTrees)) &&
@@ -152,7 +166,7 @@ export function isWorkspaceSnapshotV1(value: unknown): value is WorkspaceSnapsho
   )
 }
 
-export function isSessionRecord(value: unknown): value is SessionRecord {
+export function isProjectRecord(value: unknown): value is ProjectRecord {
   return (
     isObjectRecord(value) &&
     isString(value.id) &&
@@ -163,10 +177,12 @@ export function isSessionRecord(value: unknown): value is SessionRecord {
     isString(value.lastOpenedAt) &&
     (value.order === undefined ||
       (typeof value.order === 'number' && Number.isFinite(value.order))) &&
-    (value.workspaceSnapshot === undefined || isWorkspaceSnapshotV1(value.workspaceSnapshot)) &&
-    (value.worktrees === undefined ||
-      (Array.isArray(value.worktrees) && value.worktrees.every(isWorktreeRecord))) &&
-    (value.activeWorktreeId === undefined || isString(value.activeWorktreeId))
+    (value.projectSnapshot === undefined || isProjectSnapshotV1(value.projectSnapshot)) &&
+    (value.workspaces === undefined ||
+      (Array.isArray(value.workspaces) && value.workspaces.every(isWorkspaceRecord))) &&
+    (value.activeWorkspaceId === undefined || isString(value.activeWorkspaceId)) &&
+    (value.defaultBaseRef === undefined || isString(value.defaultBaseRef)) &&
+    (value.collapsed === undefined || isBoolean(value.collapsed))
   )
 }
 

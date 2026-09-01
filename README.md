@@ -1,7 +1,7 @@
 # aimux
 
 A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode, and normal
-shell tabs side by side in one TUI with persistent workspaces, split panes,
+shell tabs side by side in one TUI with persistent projects, split panes,
 snippets, themes, and fully configurable keymaps.
 
 ![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
@@ -12,19 +12,19 @@ snippets, themes, and fully configurable keymaps.
 
 ## Features
 
-- multi-workspace workflow with a dedicated workspace picker
-- tabs for `claude`, `codex`, `opencode`, and `terminal`
+- multi-project workflow with a dedicated project picker
+- tabs for `claude`, `codex`, `opencode`, `grok`, `kimi`, and `terminal`
 - split panes with pane focus and resize shortcuts
-- persistent workspaces with saved layout and tab state
+- persistent projects with saved layout and tab state
 - profile-isolated config, catalogs, daemon sockets, and runtime state
 - typed keymap customization through `@brimveyn/aimux-config`
 - snippets catalog and snippet picker
 - configurable git pane (embedded in the sidebar or as a standalone pane) and a
   dedicated [git mode](docs/guide/git-mode.md) for review / stage / commit /
   push with a split or stacked diff view and shiki-powered highlighting
-- [git worktrees](docs/guide/worktrees.md) for running agents on parallel
-  branches — create per-branch worktrees, review each against its base, and
-  squash-move a worktree's work into another
+- [git worktrees](docs/guide/workspaces.md) for running agents on parallel
+  branches — create per-branch workspaces, review each against its base, and
+  squash-move a workspace's work into another
 - built-in help generated from the resolved keymap
 - theme picker with 67 built-in themes (shiki catalog + aimux house themes) and a `/` filter
 
@@ -35,6 +35,12 @@ bun install -g @brimveyn/aimux
 ```
 
 Requires [Bun](https://bun.sh).
+
+Shell completion (bash, zsh, fish) installs itself the first time you launch
+the TUI — one file in your shell's completions directory, no dotfile edits.
+Run `aimux doctor` to see where it landed, or
+`aimux completion install --shell zsh` to place it yourself. Opt out with
+`AIMUX_NO_COMPLETION_INSTALL=1`. See [docs/reference/cli.md](docs/reference/cli.md#aimux-completion).
 
 ## Quick Start
 
@@ -53,18 +59,18 @@ Create `~/.config/aimux/default/aimux.config.ts`:
 import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  sessionBar: {
+  projectBar: {
     initialPosition: 'top',
     initialVisible: true,
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
+    k.mode('navigation', (m) => m.map('<C-g>', actions.projectPicker, 'Project picker')),
 })
 ```
 
 Typed config is startup intent, not app-managed persisted state. Fields like
-`sessionBar.initialVisible` and `sessionBar.initialPosition` are reapplied on
+`projectBar.initialVisible` and `projectBar.initialPosition` are reapplied on
 every launch, so runtime UI changes for those fields do not stick while the
 config entry remains set.
 
@@ -74,7 +80,7 @@ Then start the app:
 aimux
 ```
 
-On first launch, use the workspace picker flow to create your first workspace.
+On first launch, use the project picker flow to create your first project.
 
 For the full setup path, see [`docs/getting-started.md`](docs/getting-started.md).
 
@@ -103,7 +109,7 @@ profile. See [`docs/concepts/profiles.md`](docs/concepts/profiles.md).
 
 - `aimux.config.ts` or `aimux.config.js` - typed user config
 - `aimux.json` - app-managed preferences and runtime state
-- `aimux-sessions.json` - workspace catalog and workspace snapshots
+- `aimux-projects.json` - project catalog and project snapshots
 - `aimux-snippets.json` - snippet catalog
 
 Rule of thumb:
@@ -114,17 +120,19 @@ Rule of thumb:
 
 See [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md).
 
-### Workspaces
+### Projects
 
-Workspaces are the top-level user-facing concept in `aimux`. Internally, the
-runtime still uses `session` naming for compatibility. A workspace can have:
+A project is a repository you add by picking a folder. Inside it live
+workspaces (git worktrees), and inside those live tabs — one creation action
+per level: `Ctrl+G` for a project, `Ctrl+P` for a workspace, `Ctrl+N` for a
+tab. A project can have:
 
 - a name
 - an optional project directory
-- a persisted workspace snapshot
-- an order in the workspace bar and workspace picker
+- a persisted project snapshot
+- an order in the project bar and project picker
 
-See [`docs/guide/sessions.md`](docs/guide/sessions.md).
+See [`docs/guide/projects.md`](docs/guide/projects.md).
 
 ### Keymaps
 
@@ -143,13 +151,13 @@ See [`docs/guide/keymaps.md`](docs/guide/keymaps.md).
 - `i` - focus terminal
 - `Ctrl+Z` - leave terminal-input mode
 - `Ctrl+N` - open new-tab modal
-- `Ctrl+G` - open workspace picker
+- `Ctrl+G` - open project picker
 - `Ctrl+S` - open snippet picker
 - `Ctrl+T` - open theme picker
 - `Ctrl+B` - toggle sidebar
 - `Ctrl+D` - enter git mode
-- `Ctrl+W b` - toggle workspace bar
-- `Ctrl+W 1` through `Ctrl+W 9` - switch workspaces by index
+- `Ctrl+W b` - toggle project bar
+- `Ctrl+W 1` through `Ctrl+W 9` - switch projects by index
 
 The help modal reflects the resolved keymap, so it includes your overrides.
 
@@ -157,6 +165,8 @@ The help modal reflects the resolved keymap, so it includes your overrides.
 
 ```bash
 aimux
+aimux worker doctor
+aimux worker run --name investigate --assistant claude "inspect this repository"
 aimux version
 aimux doctor
 aimux update
@@ -165,6 +175,12 @@ aimux restart-terminal-manager
 ```
 
 See [`docs/reference/cli.md`](docs/reference/cli.md) for behavior details.
+
+For agent orchestration, prefer the named `aimux worker` commands. They combine
+isolated workspace creation, prompt dispatch, authoritative turn waiting, fleet
+inspection, and guarded cleanup without shell wrappers or `jq`. Pin the target
+with `--project` (or `AIMUX_PROJECT`) for anything long-running: the default
+follows whichever project the UI opened last.
 
 ## Runtime Model
 
@@ -184,7 +200,7 @@ See [`docs/developer/architecture.md`](docs/developer/architecture.md).
 - [`docs/getting-started.md`](docs/getting-started.md)
 - [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md)
 - [`docs/concepts/profiles.md`](docs/concepts/profiles.md)
-- [`docs/guide/sessions.md`](docs/guide/sessions.md)
+- [`docs/guide/projects.md`](docs/guide/projects.md)
 - [`docs/guide/keymaps.md`](docs/guide/keymaps.md)
 - [`docs/guide/themes.md`](docs/guide/themes.md)
 - [`docs/reference/cli.md`](docs/reference/cli.md)
@@ -219,7 +235,7 @@ not collide with a globally installed `aimux` instance.
   and the source of the bundled theme catalog.
 - [herdr](https://github.com/ogulcancelik/herdr) by @ogulcancelik — the
   per-CLI assistant status heuristics (working / waiting-input / idle)
-  used in the workspace bar are adapted from herdr's `detect.rs` rule tables.
+  used in the project bar are adapted from herdr's `detect.rs` rule tables.
 
 ## License
 

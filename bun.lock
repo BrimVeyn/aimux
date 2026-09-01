@@ -32,7 +32,7 @@
     },
     "packages/aimux-config": {
       "name": "@brimveyn/aimux-config",
-      "version": "0.6.3",
+      "version": "0.10.7",
       "dependencies": {
         "shiki": "^4.0.2",
       },

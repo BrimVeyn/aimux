@@ -1,4 +1,4 @@
-import type { AppAction } from '../../../state/types'
+import type { AppAction } from '../../../state/actions'
 import type { KeyInput, KeyResult, ModeId, SideEffect } from '../types'
 
 type SelectionDelta = -1 | 1

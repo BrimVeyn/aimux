@@ -1,5 +1,5 @@
+import type { AppAction } from '../actions'
 import type {
-  AppAction,
   AppState,
   BranchDivergence,
   GitFileEntry,
@@ -105,58 +105,15 @@ function sameFiles(a: GitFileEntry[], b: GitFileEntry[]): boolean {
 
 export function reduceGitPanelState(state: AppState, action: AppAction): AppState | null {
   switch (action.type) {
-    case 'toggle-git-pane': {
-      const nextVisible = !state.gitPane.visible
-      const sidebarMustShow = state.gitPane.mode === 'embedded' && nextVisible
-      return {
-        ...state,
-        gitPane: { ...state.gitPane, visible: nextVisible },
-        sidebar: sidebarMustShow ? { ...state.sidebar, visible: true } : state.sidebar,
-      }
-    }
-    case 'resize-git-pane': {
-      const target = state.gitPane.mode === 'pane' ? 'paneRatio' : 'embeddedRatio'
-      const nextRatio = clampRatio(state.gitPane[target] + action.delta)
-      if (nextRatio === state.gitPane[target]) return state
-      return { ...state, gitPane: { ...state.gitPane, [target]: nextRatio } }
-    }
-    case 'set-git-pane-ratio': {
-      const key = action.target === 'pane' ? 'paneRatio' : 'embeddedRatio'
-      const nextRatio = clampRatio(action.ratio)
-      if (nextRatio === state.gitPane[key]) return state
-      return { ...state, gitPane: { ...state.gitPane, [key]: nextRatio } }
-    }
     case 'resize-git-diff-pane': {
       const nextRatio = clampRatio(state.gitPane.diffModeRatio + action.delta)
       if (nextRatio === state.gitPane.diffModeRatio) return state
       return { ...state, gitPane: { ...state.gitPane, diffModeRatio: nextRatio } }
     }
-    case 'set-git-pane-mode': {
-      if (state.gitPane.mode === action.mode) return state
-      const isEmbedded = action.mode === 'embedded'
-      const isValidEmbedded =
-        state.gitPane.position === 'top' || state.gitPane.position === 'bottom'
-      const isValidPane = state.gitPane.position === 'left' || state.gitPane.position === 'right'
-      let nextPosition: typeof state.gitPane.position
-      if (isEmbedded) {
-        nextPosition = isValidEmbedded ? state.gitPane.position : 'bottom'
-      } else {
-        nextPosition = isValidPane ? state.gitPane.position : 'left'
-      }
-      return {
-        ...state,
-        gitPane: { ...state.gitPane, mode: action.mode, position: nextPosition },
-      }
-    }
-    case 'set-git-pane-position': {
-      const validForMode =
-        state.gitPane.mode === 'embedded'
-          ? action.position === 'top' || action.position === 'bottom'
-          : action.position === 'left' || action.position === 'right'
-      if (!validForMode) return state
-      if (state.gitPane.position === action.position) return state
-      return { ...state, gitPane: { ...state.gitPane, position: action.position } }
-    }
+    // The preferences with no toggle of their own: the settings screen sets them
+    // outright rather than each one growing its own action.
+    case 'set-git-pane':
+      return { ...state, gitPane: { ...state.gitPane, ...action.patch } }
     case 'git-refresh-success': {
       const prev = state.gitPanel
       const next = action.payload
@@ -209,9 +166,9 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
         gitPanel: { ...prev, error: action.kind, files: [] },
       }
     }
-    case 'set-worktree-divergence': {
-      if (sameDivergence(state.worktreeDivergence, action.divergence)) return state
-      return { ...state, worktreeDivergence: action.divergence }
+    case 'set-workspace-divergence': {
+      if (sameDivergence(state.workspaceDivergence, action.divergence)) return state
+      return { ...state, workspaceDivergence: action.divergence }
     }
     case 'git-panel-reset': {
       const prev = state.gitPanel
@@ -226,9 +183,9 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       }
       return {
         ...state,
-        // A reset means the underlying worktree/ref changed, so cached diffs are
+        // A reset means the underlying workspace/ref changed, so cached diffs are
         // stale — drop them (keyed by section:path, they'd otherwise serve a
-        // previous worktree's diff for a same-named file after a move/switch).
+        // previous workspace's diff for a same-named file after a move/switch).
         gitMode: {
           ...state.gitMode,
           diffs: {},

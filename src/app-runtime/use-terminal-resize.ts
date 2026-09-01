@@ -10,15 +10,17 @@ import {
 
 import type { TerminalContentOrigin } from '../input/raw-input-handler'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState } from '../state/types'
 import type { MeasuredPaneRect } from './use-pane-size-report'
 
-import { getGitPaneWidthFromRatio } from '../state/git-pane-sizing'
+import { getBarWidth } from '../state/bars'
 import {
   createTerminalBounds,
   forEachSplitPaneRect,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { getTreeForTab } from '../state/layout-tree'
 
 const MAIN_AREA_HORIZONTAL_CHROME = 2
 const MAIN_AREA_VERTICAL_PADDING = 0
@@ -44,21 +46,26 @@ export function resizeSplitTabs(
   tabIds: string[],
   cols: number,
   rows: number,
-  options?: { sync?: boolean }
+  options?: { sync?: boolean },
+  skipTabId?: string | null
 ): void {
   const bounds = getTerminalBounds(cols, rows)
   const resizedTabIds = new Set<string>()
 
   forEachSplitPaneRect(Object.values(layoutTrees), bounds, (tabId, rect) => {
+    if (skipTabId != null && tabId === skipTabId) {
+      resizedTabIds.add(tabId)
+      return
+    }
     const size = toTerminalContentSize(rect)
     backend.resizeTab(tabId, size.cols, size.rows, options)
     resizedTabIds.add(tabId)
   })
 
   for (const id of tabIds) {
-    if (!resizedTabIds.has(id)) {
-      backend.resizeTab(id, cols, rows, options)
-    }
+    if (resizedTabIds.has(id)) continue
+    if (skipTabId != null && id === skipTabId) continue
+    backend.resizeTab(id, cols, rows, options)
   }
 }
 
@@ -81,6 +88,12 @@ interface RunResizeCascadeArgs {
   layoutTrees: AppState['layoutTrees']
   stableTabIds: string[]
   sync: boolean
+  /** Tab whose backend resize is owned exclusively by `usePaneSizeReport`. The
+   *  cascade still dispatches the global terminal-size update and resizes every
+   *  other tab, but the active pane is left to be sized by its measurement —
+   *  preventing the open-loop chrome estimate from competing with the closed
+   *  measurement loop and tearing the rendered viewport. */
+  skipTabId: string | null
 }
 
 function runResizeCascade({
@@ -91,6 +104,7 @@ function runResizeCascade({
   resizingRef,
   resizingTimerRef,
   rows,
+  skipTabId,
   stableTabIds,
   sync,
 }: RunResizeCascadeArgs): void {
@@ -104,9 +118,14 @@ function runResizeCascade({
       clearTimeout(resizingTimerRef.current)
     }
     if (hasSplits) {
-      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, options)
-    } else {
+      resizeSplitTabs(backend, layoutTrees, stableTabIds, cols, rows, options, skipTabId)
+    } else if (skipTabId == null) {
       backend.resizeAll(cols, rows, options)
+    } else {
+      for (const id of stableTabIds) {
+        if (id === skipTabId) continue
+        backend.resizeTab(id, cols, rows, options)
+      }
     }
     resizingTimerRef.current = setTimeout(() => {
       resizingRef.current = false
@@ -133,7 +152,10 @@ export function useTerminalResize({
   const handledBySyncRef = useRef(false)
   const sidebarMountedRef = useRef(false)
 
-  const currentTabIds = state.tabs.map((t) => t.id)
+  // Hidden tabs are excluded from the open-loop cascade: their host (the setup
+  // widget) measures its own box, and the cascade would overwrite that with the
+  // main terminal area's size on every terminal or bar resize.
+  const currentTabIds = state.tabs.filter((t) => t.hidden !== true).map((t) => t.id)
   const tabIdsChanged =
     currentTabIds.length !== tabIdsRef.current.length ||
     currentTabIds.some((id, i) => id !== tabIdsRef.current[i])
@@ -144,9 +166,34 @@ export function useTerminalResize({
 
   const activeTabIdRef = useRef(state.activeTabId)
   activeTabIdRef.current = state.activeTabId
+  // Whether the active tab is part of a split. contentOriginRef must hold the
+  // whole terminal-area origin (root.tsx derives splitContentOrigin from it and
+  // SplitLayout re-adds each pane's bounds offset). When split, the active
+  // pane's measured box is pane-relative, so adopting it as the area origin
+  // would double-count the pane offset and push the hardware cursor off along
+  // the split axis. Track it so handleMeasure can skip the x/y overwrite.
+  const activeIsSplitRef = useRef(false)
+  {
+    const id = state.activeTabId
+    const tree =
+      id != null && id !== '' ? getTreeForTab(state.layoutTrees, state.tabGroupMap, id) : null
+    activeIsSplitRef.current = tree?.type === 'split'
+  }
   // Last size we pushed to the backend per tab, used to dedupe the measurement
   // loop so an unchanged box never re-triggers a resize.
   const measuredRef = useRef(new Map<string, { cols: number; rows: number }>())
+
+  // Drop the dedupe cache when the project changes. attach() re-gates every
+  // restored tab's paneReady to false; if a tabId carries the same dimensions
+  // across projects, handleMeasure's prev-match would short-circuit and
+  // never call resizeTab({confirmedFromMeasurement:true}), leaving the gate
+  // closed forever — the new pane then paints a stale buffered snapshot from
+  // the old project, which is the 2–3 row offset users see.
+  const lastProjectIdRef = useRef(state.currentProjectId)
+  if (lastProjectIdRef.current !== state.currentProjectId) {
+    lastProjectIdRef.current = state.currentProjectId
+    measuredRef.current.clear()
+  }
 
   // Closed measurement loop: the rendered terminal content box reports its
   // real geometry; that — not the hardcoded chrome model below — is the
@@ -158,43 +205,52 @@ export function useTerminalResize({
       const cols = Math.max(PTY_MIN_COLS, rect.cols)
       const rows = Math.max(PTY_MIN_ROWS, rect.rows)
       const isActive = tabId === activeTabIdRef.current
-      if (isActive) {
+      // Only adopt the measured box as the terminal-area origin when the active
+      // pane spans the whole area (no split). In a split the box is pane-local;
+      // keep the model-derived area origin from the terminalSize memo below so
+      // the hardware cursor isn't offset by the pane's bounds (see ref comment).
+      if (isActive && !activeIsSplitRef.current) {
         contentOriginRef.current = { cols, rows, x: rect.x, y: rect.y }
       }
       const prev = measuredRef.current.get(tabId)
-      if (prev && prev.cols === cols && prev.rows === rows) {
+      if (prev !== undefined && prev.cols === cols && prev.rows === rows) {
         return
       }
+      // First measurement for this tab: even if it happens to match the
+      // open-loop bootstrap size, we still call resizeTab so the backend
+      // gate (snapshot suppression until measurement confirms the pane
+      // size) is lifted. confirmedFromMeasurement marks this call as the
+      // authoritative size for the rendered viewport.
       measuredRef.current.set(tabId, { cols, rows })
-      backend.resizeTab(tabId, cols, rows)
+      backend.resizeTab(tabId, cols, rows, { confirmedFromMeasurement: true })
     },
     [backend, contentOriginRef]
   )
 
-  const gitPaneInPaneMode = state.gitPane.mode === 'pane' && state.gitPane.visible
+  // `getBarWidth` is the single authority on bar width — the Bar component
+  // renders from the same function. A mismatch silently corrupts PTY columns
+  // and mouse hit-testing.
+  const leftBarWidth = getBarWidth(state.bars.left)
+  const rightBarWidth = getBarWidth(state.bars.right)
   const terminalSize = useMemo(() => {
-    const sidebarWidth = state.sidebar.visible ? state.sidebar.width : 0
-    const sessionBarRows = state.sessionBar.visible ? 1 : 0
-    const sessionBarTopOffset =
-      state.sessionBar.visible && state.sessionBar.position === 'top' ? 1 : 0
+    const projectBarRows = state.projectBar.visible ? 1 : 0
+    const projectBarTopOffset = projectBarRows
     const reservedRows =
       MAIN_AREA_VERTICAL_PADDING +
       STATUS_BAR_HEIGHT +
       TERMINAL_PANE_VERTICAL_CHROME +
-      sessionBarRows
-    const gitPaneWidth = gitPaneInPaneMode ? getGitPaneWidthFromRatio(state.gitPane.paneRatio) : 0
-    const gitOnLeft = gitPaneInPaneMode && state.gitPane.position === 'left'
+      projectBarRows
     const cols = Math.max(
       MIN_TERMINAL_COLS,
-      Math.floor(dimensions.width - sidebarWidth - gitPaneWidth - MAIN_AREA_HORIZONTAL_CHROME)
+      Math.floor(dimensions.width - leftBarWidth - rightBarWidth - MAIN_AREA_HORIZONTAL_CHROME)
     )
     const rows = Math.max(MIN_TERMINAL_ROWS, Math.floor(dimensions.height - reservedRows))
 
     contentOriginRef.current = {
       cols,
       rows,
-      x: sidebarWidth + (gitOnLeft ? gitPaneWidth : 0) + 1,
-      y: 1 + sessionBarTopOffset,
+      x: leftBarWidth + 1,
+      y: 1 + projectBarTopOffset,
     }
 
     return { cols, rows }
@@ -202,13 +258,9 @@ export function useTerminalResize({
     contentOriginRef,
     dimensions.height,
     dimensions.width,
-    state.sidebar.visible,
-    state.sidebar.width,
-    state.sessionBar.visible,
-    state.sessionBar.position,
-    gitPaneInPaneMode,
-    state.gitPane.position,
-    state.gitPane.paneRatio,
+    leftBarWidth,
+    rightBarWidth,
+    state.projectBar.visible,
   ])
 
   useLayoutEffect(() => {
@@ -224,20 +276,13 @@ export function useTerminalResize({
       resizingRef,
       resizingTimerRef,
       rows: terminalSize.rows,
+      skipTabId: activeTabIdRef.current ?? null,
       stableTabIds,
       sync: true,
     })
     handledBySyncRef.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    state.sidebar.visible,
-    state.sidebar.width,
-    state.sessionBar.visible,
-    state.sessionBar.position,
-    gitPaneInPaneMode,
-    state.gitPane.position,
-    state.gitPane.paneRatio,
-  ])
+  }, [leftBarWidth, rightBarWidth, state.projectBar.visible])
 
   useEffect(() => {
     if (handledBySyncRef.current) {
@@ -252,6 +297,7 @@ export function useTerminalResize({
       resizingRef,
       resizingTimerRef,
       rows: terminalSize.rows,
+      skipTabId: activeTabIdRef.current ?? null,
       stableTabIds,
       sync: false,
     })

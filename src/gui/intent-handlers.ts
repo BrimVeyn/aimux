@@ -1,6 +1,7 @@
 import type { GuiIntent } from '@aimux/gui-protocol'
 
-import type { AppAction, AppState, GitFileSection, SnippetRecord } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, GitFileSection, SnippetRecord } from '../state/types'
 import type { GuiRuntime } from './runtime'
 
 import { createPrefixedId } from '../platform/id'
@@ -57,13 +58,13 @@ function handleSnippetSubmit(
   runtime: GuiRuntime
 ): void {
   const state = runtime.getState()
-  // The host owns `modal.sessionTargetId` (set by `openSnippetEditor`); when
+  // The host owns `modal.projectTargetId` (set by `openSnippetEditor`); when
   // the intent omits `snippetId` (creation), we fall back to whatever the
   // open modal recorded. The intent value still wins when present — that's
   // the contract documented in `parseGuiIntent`.
   let snippetId: string | undefined = intent.snippetId
   if (snippetId === undefined && state.modal.type === 'snippet-editor') {
-    snippetId = state.modal.sessionTargetId ?? undefined
+    snippetId = state.modal.projectTargetId ?? undefined
   }
   persistSnippetSubmit(
     {

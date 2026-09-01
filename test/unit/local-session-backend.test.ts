@@ -1,10 +1,10 @@
 import { describe, expect, mock, test } from 'bun:test'
 
-import type { TabSession, WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { ProjectSnapshotV1, TabSession } from '../../src/state/types'
 
 import { LocalSessionBackend } from '../../src/session-backend/local-session-backend'
 
-function createSnapshot(): WorkspaceSnapshotV1 {
+function createSnapshot(): ProjectSnapshotV1 {
   return {
     activeTabId: 'tab-a',
     savedAt: new Date().toISOString(),
@@ -31,7 +31,7 @@ function createSnapshot(): WorkspaceSnapshotV1 {
 }
 
 describe('LocalSessionBackend.attach', () => {
-  test('resizes the full session during attach without threading scroll intents', async () => {
+  test('resizes the full project during attach without threading scroll intents', async () => {
     const backend = new LocalSessionBackend()
     const backendInternal = backend as unknown as {
       sessionManager: {
@@ -43,7 +43,7 @@ describe('LocalSessionBackend.attach', () => {
       statusLoop: {
         classifyNow: ReturnType<typeof mock>
         getTabStatus: ReturnType<typeof mock>
-        snapshotSessions: ReturnType<typeof mock>
+        snapshotProjects: ReturnType<typeof mock>
       }
     }
 
@@ -58,25 +58,25 @@ describe('LocalSessionBackend.attach', () => {
     backendInternal.statusLoop = {
       classifyNow: mock(() => {}),
       getTabStatus: mock(() => {}),
-      snapshotSessions: mock(() => []),
+      snapshotProjects: mock(() => []),
     }
 
     await backend.attach({
       cols: 80,
+      projectId: 'project-a',
+      projectSnapshot: snapshot,
       rows: 24,
-      sessionId: 'session-a',
-      workspaceSnapshot: snapshot,
     })
 
     const resizeArgs = backendInternal.sessionManager.resize.mock.calls as unknown as [
-      sessionId: string,
+      projectId: string,
       cols: number,
       rows: number,
       options?: { sync?: boolean },
     ][]
     const firstResize = resizeArgs[0]
     expect(firstResize).toBeDefined()
-    expect(firstResize?.[0]).toBe('session-a')
+    expect(firstResize?.[0]).toBe('project-a')
     expect(firstResize?.[1]).toBe(80)
     expect(firstResize?.[2]).toBe(24)
     // The backend derives its own re-anchor from the emulator; no intent map.

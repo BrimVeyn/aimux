@@ -12,7 +12,7 @@ const DIRTY_GIT: GitRefreshPayload = {
   files: [{ added: 1, path: 'a.ts', removed: 0, section: 'unstaged', status: 'M' }],
 }
 
-const EMPTY_STATE: AutoCommitState = { bySession: {} }
+const EMPTY_STATE: AutoCommitState = { byProject: {} }
 
 test('triggers when enabled + supported + diff + prev state idle', () => {
   expect(
@@ -22,7 +22,7 @@ test('triggers when enabled + supported + diff + prev state idle', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state: EMPTY_STATE,
     })
   ).toBe(true)
@@ -36,7 +36,7 @@ test('does not trigger when disabled', () => {
       enabled: false,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state: EMPTY_STATE,
     })
   ).toBe(false)
@@ -50,7 +50,7 @@ test('does not trigger for unsupported provider', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state: EMPTY_STATE,
     })
   ).toBe(false)
@@ -64,7 +64,7 @@ test('does not trigger without project path', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: false,
-      sessionId: 's1',
+      projectId: 's1',
       state: EMPTY_STATE,
     })
   ).toBe(false)
@@ -78,7 +78,7 @@ test('does not trigger with empty git', () => {
       enabled: true,
       git: EMPTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state: EMPTY_STATE,
     })
   ).toBe(false)
@@ -86,7 +86,7 @@ test('does not trigger with empty git', () => {
 
 test('does not re-trigger when ready with the same hash', () => {
   const state: AutoCommitState = {
-    bySession: {
+    byProject: {
       s1: {
         body: '',
         generatedAt: 1,
@@ -104,7 +104,7 @@ test('does not re-trigger when ready with the same hash', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state,
     })
   ).toBe(false)
@@ -112,7 +112,7 @@ test('does not re-trigger when ready with the same hash', () => {
 
 test('does re-trigger when ready with a different hash', () => {
   const state: AutoCommitState = {
-    bySession: {
+    byProject: {
       s1: {
         body: '',
         generatedAt: 1,
@@ -130,7 +130,7 @@ test('does re-trigger when ready with a different hash', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state,
     })
   ).toBe(true)
@@ -138,7 +138,7 @@ test('does re-trigger when ready with a different hash', () => {
 
 test('does not re-trigger a ready suggestion with the same hash', () => {
   const state: AutoCommitState = {
-    bySession: {
+    byProject: {
       s1: {
         body: '',
         generatedAt: 1,
@@ -156,7 +156,7 @@ test('does not re-trigger a ready suggestion with the same hash', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state,
     })
   ).toBe(false)
@@ -164,7 +164,7 @@ test('does not re-trigger a ready suggestion with the same hash', () => {
 
 test('does re-trigger a ready suggestion when the hash changes', () => {
   const state: AutoCommitState = {
-    bySession: {
+    byProject: {
       s1: {
         body: '',
         generatedAt: 1,
@@ -182,7 +182,7 @@ test('does re-trigger a ready suggestion when the hash changes', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state,
     })
   ).toBe(true)
@@ -191,7 +191,7 @@ test('does re-trigger a ready suggestion when the hash changes', () => {
 test('does not trigger while already generating the same hash', () => {
   const ctrl = new AbortController()
   const state: AutoCommitState = {
-    bySession: {
+    byProject: {
       s1: {
         abortController: ctrl,
         kind: 'generating',
@@ -208,7 +208,7 @@ test('does not trigger while already generating the same hash', () => {
       enabled: true,
       git: DIRTY_GIT,
       hasProjectPath: true,
-      sessionId: 's1',
+      projectId: 's1',
       state,
     })
   ).toBe(false)

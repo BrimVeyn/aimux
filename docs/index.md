@@ -12,32 +12,39 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 
 - `../README.md` - product overview, installation, quick start
 - `../packages/aimux-config/README.md` - typed configuration quick start
-- `getting-started.md` - first-run setup and first workspace
+- `getting-started.md` - first-run setup and first project
 
 ## Concepts
 
 - `concepts/config-and-state.md` - the canonical explanation of `aimux.config.ts`
-  versus `aimux.json`, `aimux-sessions.json`, and `aimux-snippets.json`
+  versus `aimux.json`, `aimux-projects.json`, and `aimux-snippets.json`
 - `concepts/profiles.md` - profile selection, environment variables, directory
   layout, and runtime isolation
 
 ## Guides
 
-- `guide/sessions.md` - workspace picker, project-bound workspaces, persistence,
+- `guide/settings.md` - the in-app settings screen: navigation, which file each
+  setting lands in, and how it interacts with `aimux.config.ts`
+- `guide/projects.md` - project picker, project creation, persistence,
   reordering, and reconnect behavior
 - `guide/keymaps.md` - key notation, modes, leader keys, multi-key sequences,
   help metadata, and override rules
 - `guide/themes.md` - built-in themes, the theme picker, and typed theme helpers
 - `guide/git-mode.md` - git-mode workflow: panel, diff view, keybindings,
   help overlay, and commit flow
-- `guide/worktrees.md` - per-workspace git worktrees: create, review against
-  base, and squash-move work between worktrees
+- `guide/workspaces.md` - per-project workspaces (git worktrees): create,
+  review against base, and squash-move work between them
 - `guide/snippets.md` - reusable text fragments: picker, inline triggers,
   built-in variables, cursor placement, shell-backed variables, undo
+- `guide/claude-integration.md` - Claude Code hook bridge: what aimux adds to
+  `~/.claude/settings.json`, how the hook server resolves PTYs, opt-out
+- `guide/usage-history.md` - long-term AI usage stats: activity heatmap, tokens
+  per model and per git branch, the daily rollup, and where the data lives
 
 ## Reference
 
-- `reference/cli.md` - every CLI command and its behavior
+- `reference/cli.md` - every CLI command and its behavior, including the
+  headless control plane (`tab`, `project`, `workspace`)
 - `reference/config-reference.md` - exhaustive `@brimveyn/aimux-config` reference
 - `reference/runtime-paths.md` - config paths, catalog paths, runtime directories,
   and socket files
@@ -45,6 +52,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 ## Developer Notes
 
 - `developer/architecture.md` - app, daemon, terminal-manager, and state flow
+- `developer/hot-reexec.md` - additive protocol contract and the daemon
+  hot-reexec swap that keeps PTYs alive across upgrades
 - `developer/aimux-config-internals.md` - builder internals, merge rules, and
   support-status caveats
 - `developer/toasts.md` - the transient notification system: imperative API,

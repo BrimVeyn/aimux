@@ -61,14 +61,23 @@ async function waitForSocket(socketPath: string): Promise<boolean> {
   return false
 }
 
-async function spawnDetachedProcess(command: 'daemon' | 'terminal-manager', socketPath: string) {
+/**
+ * Re-run this same aimux with another subcommand, detached and unwatched.
+ *
+ * The entrypoint is resolved from this module rather than `process.argv`, which
+ * points at whatever wrapper or shim launched us.
+ */
+export function spawnDetachedCommand(command: string): void {
   Bun.spawn([process.execPath, 'run', ENTRY_POINT, command], {
     detached: true,
     stderr: 'ignore',
     stdin: 'ignore',
     stdout: 'ignore',
   }).unref()
+}
 
+async function spawnDetachedProcess(command: 'daemon' | 'terminal-manager', socketPath: string) {
+  spawnDetachedCommand(command)
   return waitForSocket(socketPath)
 }
 
@@ -82,4 +91,18 @@ export async function spawnDetachedIpcDaemon(): Promise<boolean> {
 
 export async function spawnDetachedTerminalManager(): Promise<boolean> {
   return spawnDetachedProcess('terminal-manager', getTerminalManagerSocketPath())
+}
+
+/**
+ * Spawn the daemon as a hot-reexec successor. Identical to the fresh spawn
+ * at the OS level — the new daemon detects the handoff file written by the
+ * predecessor and adopts the reexec path itself
+ * (`consumeDaemonHandoff()` in src/daemon/daemon.ts). The wrapper exists so
+ * the call site reads intent ("we're swapping the daemon binary") rather
+ * than reuse of the fresh-boot spawner, and so a future SCM_RIGHTS variant
+ * (Ring 4) has a place to slot in.
+ */
+export async function spawnDaemonReexec(): Promise<boolean> {
+  logDebug('platform.daemon.spawnReexec', { socketPath: getIpcDaemonSocketPath() })
+  return spawnDetachedDaemon()
 }

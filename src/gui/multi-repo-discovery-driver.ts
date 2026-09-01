@@ -1,6 +1,6 @@
 import { getMultiRepoConfig } from '@brimveyn/aimux-config'
 
-import type { AppAction } from '../state/types'
+import type { AppAction } from '../state/actions'
 
 import { logDebug } from '../debug/input-log'
 import { discoverRepos } from '../git/repo-discovery'

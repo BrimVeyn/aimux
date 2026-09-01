@@ -1,10 +1,10 @@
 import { EventEmitter } from 'node:events'
 
 import type {
+  ProjectSnapshotV1,
   TabSession,
   TerminalModeState,
   TerminalSnapshot,
-  WorkspaceSnapshotV1,
 } from '../state/types'
 
 import { logDebug } from '../debug/input-log'
@@ -12,8 +12,8 @@ import { PtyManager } from '../pty/pty-manager'
 import {
   normalizeGroupedTabOrder,
   restoreLayoutTrees,
-  restoreTabsFromWorkspace,
-} from '../state/session-persistence'
+  restoreTabsFromProject,
+} from '../state/project-persistence'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
 
 interface SessionRegistryEvents {
@@ -69,7 +69,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     })
   }
 
-  attachFromSnapshot(snapshot: WorkspaceSnapshotV1 | undefined): {
+  attachFromSnapshot(snapshot: ProjectSnapshotV1 | undefined): {
     tabs: TabSession[]
     activeTabId: string | null
   } {
@@ -79,7 +79,7 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       snapshotTabs: snapshot?.tabs.length ?? 0,
     })
     if (this.tabs.size === 0 && snapshot) {
-      const restoredTabs = restoreTabsFromWorkspace(snapshot)
+      const restoredTabs = restoreTabsFromProject(snapshot)
       for (const tab of restoredTabs) {
         this.tabs.set(tab.id, tab)
       }
@@ -93,8 +93,12 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       for (const persisted of snapshot.tabs) {
         const existing = this.tabs.get(persisted.id)
         if (existing) {
-          existing.title = persisted.title
-          existing.worktreeId = persisted.worktreeId
+          if (existing.autoRenameStatus !== 'attempted') {
+            existing.title = persisted.title
+            existing.autoRenameStatus = persisted.autoRenameStatus
+          }
+          existing.workspaceId = persisted.workspaceId
+          existing.workerName = persisted.workerName
         }
       }
       if (
@@ -119,13 +123,24 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     // state. Append them after the snapshot-ordered ones so the user's saved
     // order is preserved for everything that was persisted.
     const { layoutTrees, tabGroupMap } = restoreLayoutTrees(snapshot, tabs)
-    const snapshotTabIds = new Set(snapshot.tabs.map((persisted) => persisted.id))
     const orderedSnapshotTabs = snapshot.tabs
       .map((persistedTab) => this.tabs.get(persistedTab.id))
       .filter((tab): tab is TabSession => tab !== undefined)
-    const liveOnlyTabs = tabs.filter((tab) => !snapshotTabIds.has(tab.id))
-    const mergedTabs = [...orderedSnapshotTabs, ...liveOnlyTabs]
-    const normalizedTabs = normalizeGroupedTabOrder(mergedTabs, layoutTrees, tabGroupMap)
+    // The registry — not the snapshot — is the source of truth for *which*
+    // tabs exist. A tab spawned by a sibling CLI after this project's
+    // snapshot was last persisted lives in `this.tabs` but is absent from
+    // `snapshot.tabs`; ordering by the snapshot alone would silently drop it
+    // from the attach result, so the UI would render an empty/stale project
+    // on switch. Append any live tab the snapshot doesn't mention (in
+    // registry order) so membership stays authoritative while the snapshot
+    // still supplies ordering + layout for the tabs it captured.
+    const snapshotIds = new Set(snapshot.tabs.map((persistedTab) => persistedTab.id))
+    const extraLiveTabs = tabs.filter((tab) => !snapshotIds.has(tab.id))
+    const normalizedTabs = normalizeGroupedTabOrder(
+      [...orderedSnapshotTabs, ...extraLiveTabs],
+      layoutTrees,
+      tabGroupMap
+    )
 
     return { activeTabId: this.activeTabId, tabs: normalizedTabs }
   }
@@ -143,6 +158,17 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
     cols: number
     rows: number
     cwd?: string
+    /** Extra env injected into the spawned shell. Passed through to the PTY. */
+    env?: Record<string, string>
+    autoRenameStatus?: 'eligible' | 'attempted'
+    /**
+     * Workspace this tab belongs to (for UI grouping). Stored on the
+     * TabSession so an attach-time replay surfaces it inside the right
+     * workspace column. Optional — tabs not bound to a workspace are valid.
+     */
+    workspaceId?: string
+    /** Project-scoped orchestration handle; does not affect PTY behavior. */
+    workerName?: string
   }): void {
     logDebug('daemon.registry.createSession', {
       args: options.args ?? [],
@@ -156,12 +182,15 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       this.tabs.set(options.tabId, {
         activity: 'idle',
         assistant: options.assistant,
+        autoRenameStatus: options.autoRenameStatus,
         buffer: '',
         command: [options.command, ...(options.args ?? [])].join(' '),
         id: options.tabId,
         status: 'starting',
         terminalModes: createDefaultTerminalModes(),
         title: options.title,
+        workerName: options.workerName,
+        workspaceId: options.workspaceId,
       })
     } else {
       existing.status = 'starting'
@@ -173,10 +202,32 @@ export class SessionRegistry extends EventEmitter<SessionRegistryEvents> {
       existing.assistant = options.assistant
       existing.title = options.title
       existing.command = [options.command, ...(options.args ?? [])].join(' ')
+      existing.autoRenameStatus = options.autoRenameStatus
+      if (options.workspaceId !== undefined) existing.workspaceId = options.workspaceId
+      if (options.workerName !== undefined) existing.workerName = options.workerName
     }
 
     this.activeTabId = options.tabId
     this.ptyManager.createSession(options)
+  }
+
+  updateTabMetadata(
+    tabId: string,
+    patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
+  ): void {
+    const tab = this.tabs.get(tabId)
+    if (!tab) return
+    if (patch.title !== undefined) tab.title = patch.title
+    if (patch.autoRenameStatus !== undefined) tab.autoRenameStatus = patch.autoRenameStatus
+  }
+
+  /**
+   * Read the in-memory TabSession for a tab. Returned by reference — used by
+   * the daemon's `tabAdded` broadcast path to publish the same shape the UI
+   * already knows how to ingest from `attachResult.tabs[]`.
+   */
+  getTab(tabId: string): TabSession | undefined {
+    return this.tabs.get(tabId)
   }
 
   write(tabId: string, data: string): void {

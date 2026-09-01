@@ -25,10 +25,15 @@ function fail(msg: string): never {
   process.exit(1)
 }
 
-function sh(cmd: string, args: string[], opts: { capture?: boolean } = {}): string {
+function sh(
+  cmd: string,
+  args: string[],
+  opts: { capture?: boolean; env?: Record<string, string> } = {}
+): string {
   const res = spawnSync(cmd, args, {
     cwd: ROOT,
     encoding: 'utf8',
+    env: opts.env ? { ...process.env, ...opts.env } : process.env,
     stdio: opts.capture === true ? ['inherit', 'pipe', 'pipe'] : 'inherit',
   })
   if (res.status !== 0) {
@@ -97,6 +102,31 @@ function requireCleanTree(): void {
   }
 }
 
+/**
+ * Refuse a root-only release when `packages/aimux-config/src` has moved since
+ * the last commit that touched its package.json — i.e. since the version npm
+ * has. `workspace:*` resolves to that published version, so shipping like this
+ * pairs a new app with an old config package: v1.23.1 shipped the settings
+ * rewrite against aimux-config 0.10.2, whose keymap still bound `h`/`←` to a
+ * pane that no longer existed, and the whole screen went dead to the arrows.
+ */
+function requireConfigReleased(configVersion: string): void {
+  const lastRelease = sh('git', ['log', '-1', '--format=%H', '--', CONFIG_PKG], { capture: true })
+  if (lastRelease === '') return
+  const diff = spawnSync(
+    'git',
+    ['diff', '--quiet', lastRelease, '--', 'packages/aimux-config/src'],
+    {
+      cwd: ROOT,
+    }
+  )
+  if (diff.status === 0) return
+  fail(
+    `packages/aimux-config/src changed since v${configVersion} was cut — pass a config-kind ` +
+      `(e.g. \`bun bump patch patch\`), or the release ships against the published ${configVersion}`
+  )
+}
+
 function currentBranch(): string {
   return sh('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { capture: true })
 }
@@ -117,6 +147,11 @@ async function confirm(question: string): Promise<boolean> {
   const answer = await new Promise<string>((resolve) => {
     const onData = (chunk: string) => {
       process.stdin.off('data', onData)
+      // Dropping the listener does not stop the stream: a TTY never EOFs, so a
+      // resumed stdin stays a live handle and the process hangs after the last
+      // push instead of exiting. This is the Ctrl-C everyone was typing at the
+      // end of a release.
+      process.stdin.pause()
       resolve(chunk)
     }
     process.stdin.on('data', onData)
@@ -150,7 +185,9 @@ async function main() {
   if (tagExists(tag)) fail(`tag ${tag} already exists`)
 
   let configPlan: { prev: string; next: string; name: string; raw: string } | null = null
-  if (configArg !== 'none') {
+  if (configArg === 'none') {
+    requireConfigReleased(readPackage(CONFIG_PKG).version)
+  } else {
     const configPkg = readPackage(CONFIG_PKG)
     configPlan = {
       name: configPkg.name,
@@ -177,6 +214,7 @@ async function main() {
     : `chore(release): ${tag}`
   console.log('will:')
   let step = 1
+  console.log(`  ${step++}. run pre-push checks (lint, format, typecheck, test)`)
   console.log(`  ${step++}. rewrite package.json version → ${rootNext}`)
   if (configPlan) {
     console.log(`  ${step++}. rewrite packages/aimux-config/package.json → ${configPlan.next}`)
@@ -191,6 +229,12 @@ async function main() {
     console.log('aborted.')
     process.exit(1)
   }
+
+  // Run the pre-push suite BEFORE mutating anything: a failing test used to
+  // surface only at `git push`, by which point the version bump was already
+  // written, committed and tagged — so retrying skipped a version.
+  console.log('running pre-push checks…')
+  sh('bunx', ['lefthook', 'run', 'pre-push'])
 
   writeFileSync(ROOT_PKG, rewriteVersion(rootPkg.raw, rootNext))
   if (configPlan) {
@@ -209,8 +253,9 @@ async function main() {
   sh('git', ['tag', '-a', tag, '-m', `Release ${tag}`])
 
   console.log(`pushing ${branch} and ${tag}…`)
-  sh('git', ['push', 'origin', branch])
-  sh('git', ['push', 'origin', tag])
+  // LEFTHOOK=0: the pre-push suite already ran above on the same tree.
+  sh('git', ['push', 'origin', branch], { env: { LEFTHOOK: '0' } })
+  sh('git', ['push', 'origin', tag], { env: { LEFTHOOK: '0' } })
 
   console.log(`\u001b[32m✔\u001b[0m released ${tag}`)
 }

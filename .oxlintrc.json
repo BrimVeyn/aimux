@@ -73,13 +73,24 @@
     "typescript/consistent-type-definitions": "warn",
     "react-perf/jsx-no-new-function-as-prop": "warn",
     "react-perf/jsx-no-new-array-as-prop": "warn",
-    "react-perf/jsx-no-new-object-as-prop": "warn"
+    "react-perf/jsx-no-new-object-as-prop": "warn",
+    "max-lines": ["error", { "max": 1000, "skipBlankLines": true, "skipComments": true }]
   },
   "overrides": [
     {
       "files": ["**/*.tsx"],
       "rules": {
         "typescript/promise-function-async": "off"
+      }
+    },
+    {
+      "files": [
+        "src/daemon/daemon.ts",
+        "packages/aimux-config/src/types.ts",
+        "test/unit/store.test.ts"
+      ],
+      "rules": {
+        "max-lines": "off"
       }
     }
   ],

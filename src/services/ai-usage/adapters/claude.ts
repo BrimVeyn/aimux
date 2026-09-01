@@ -1,7 +1,11 @@
 import type { AIUsageToolConfig } from '@brimveyn/aimux-config'
 
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
+
 import type { UsageSnapshot, UsageWindow, UsageWindowKind } from '../types'
 
+import { claudeHome } from '../../../platform/assistant-home'
 import { computePace, formatTimeRemaining } from '../pace'
 import { runCli } from '../spawn'
 
@@ -11,7 +15,7 @@ interface ClaudeOAuthCreds {
   planTier: string | null
 }
 
-interface ClaudeKeychainPayload {
+interface ClaudeCredentialsPayload {
   claudeAiOauth?: {
     accessToken?: string
     expiresAt?: number
@@ -59,7 +63,7 @@ function normalizePlanTier(raw: string | undefined | null): string | null {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
 
-function planTierFromPayload(payload: ClaudeKeychainPayload): string | null {
+function planTierFromPayload(payload: ClaudeCredentialsPayload): string | null {
   const o = payload.claudeAiOauth
   if (!o) return null
   const raw = o.rateLimitTier ?? o.rate_limit_tier ?? o.subscriptionType
@@ -77,6 +81,27 @@ function planTierFromPayload(payload: ClaudeKeychainPayload): string | null {
   return null
 }
 
+async function readCredsFromFile(): Promise<string | null> {
+  try {
+    const raw = await readFile(join(claudeHome(), '.credentials.json'), 'utf8')
+    return raw.trim() || null
+  } catch {
+    return null
+  }
+}
+
+async function readCredsFromKeychain(): Promise<string | null> {
+  if (process.platform !== 'darwin') return null
+  const result = await runCli('security', [
+    'find-generic-password',
+    '-s',
+    'Claude Code-credentials',
+    '-w',
+  ])
+  if (!result.ok) return null
+  return result.stdout.trim() || null
+}
+
 async function readClaudeCreds(): Promise<ClaudeOAuthCreds> {
   const now = Date.now()
   if (
@@ -87,22 +112,27 @@ async function readClaudeCreds(): Promise<ClaudeOAuthCreds> {
     return cachedCreds
   }
 
-  if (process.platform !== 'darwin') {
-    throw new Error('claude usage requires macOS keychain (darwin only)')
+  // macOS keeps the OAuth blob in the keychain; Linux (incl. WSL) and Windows
+  // write the same JSON to ~/.claude/.credentials.json. Try the platform's
+  // primary store first, then the other one — a macOS install with the keychain
+  // unavailable falls back to the file too.
+  const raw =
+    process.platform === 'darwin'
+      ? ((await readCredsFromKeychain()) ?? (await readCredsFromFile()))
+      : ((await readCredsFromFile()) ?? (await readCredsFromKeychain()))
+  if (raw === null) {
+    throw new Error('no Claude credentials found — run `claude` to sign in')
   }
-  const result = await runCli('security', [
-    'find-generic-password',
-    '-s',
-    'Claude Code-credentials',
-    '-w',
-  ])
-  if (!result.ok) {
-    throw new Error(`keychain read failed — run \`claude\` to sign in`)
+
+  let parsed: ClaudeCredentialsPayload
+  try {
+    parsed = JSON.parse(raw) as ClaudeCredentialsPayload
+  } catch {
+    throw new Error('claude credentials unreadable — run `claude` to sign in')
   }
-  const parsed = JSON.parse(result.stdout.trim()) as ClaudeKeychainPayload
   const access = parsed.claudeAiOauth?.accessToken
   if (!(access != null && access !== '')) {
-    throw new Error('no accessToken in Claude Code keychain')
+    throw new Error('no accessToken in Claude credentials — run `claude` to sign in')
   }
   cachedCreds = {
     accessToken: access,

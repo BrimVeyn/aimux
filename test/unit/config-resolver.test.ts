@@ -3,10 +3,9 @@ import { describe, expect, test } from 'bun:test'
 import { resolveConfig } from '../../packages/aimux-config/src/resolver'
 
 describe('resolveConfig startup override aliases', () => {
-  test('normalizes deprecated theme and session bar fields', () => {
+  test('normalizes deprecated theme and project bar fields', () => {
     const config = resolveConfig({
-      sessionBar: {
-        position: 'bottom',
+      projectBar: {
         visible: false,
       },
       theme: {
@@ -15,8 +14,7 @@ describe('resolveConfig startup override aliases', () => {
     })
 
     expect(config.theme).toEqual({ initialId: undefined, initialMode: 'light' })
-    expect(config.sessionBar).toEqual({
-      initialPosition: 'bottom',
+    expect(config.projectBar).toEqual({
       initialVisible: false,
     })
   })
@@ -39,10 +37,8 @@ describe('resolveConfig startup override aliases', () => {
         treeCompaction: false,
         visible: true,
       },
-      sessionBar: {
-        initialPosition: 'top',
+      projectBar: {
         initialVisible: true,
-        position: 'bottom',
         visible: false,
       },
       theme: {
@@ -52,19 +48,16 @@ describe('resolveConfig startup override aliases', () => {
     })
 
     expect(config.theme?.initialMode).toBe('dark')
-    expect(config.sessionBar).toEqual({
-      initialPosition: 'top',
+    expect(config.projectBar).toEqual({
       initialVisible: true,
     })
+    // Placement fields (initialMode/initialPosition/initialRatio/initialVisible)
+    // are accepted in user config but dropped — the bars layout owns placement.
     expect(config.gitPane).toEqual({
       diffCount: undefined,
       initialDiffModeRatio: 0.3,
       initialFileListMode: 'tree',
-      initialMode: 'pane',
-      initialPosition: 'right',
-      initialRatio: 0.4,
       initialTreeCompaction: true,
-      initialVisible: false,
       path: undefined,
       prefetchRadius: undefined,
     })
@@ -84,6 +77,6 @@ describe('resolveConfig startup override aliases', () => {
       path: { enabled: true, pathFn: expect.any(Function) },
       prefetchRadius: 3,
     })
-    expect('initialMode' in config.gitPane && config.gitPane.initialMode !== undefined).toBe(false)
+    expect('initialMode' in config.gitPane).toBe(false)
   })
 })

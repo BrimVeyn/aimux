@@ -13,7 +13,10 @@ import {
 } from '../../src/ipc/protocol'
 import { RemoteSessionBackend } from '../../src/session-backend/remote-session-backend'
 
-async function waitFor<T>(getValue: () => T | undefined, timeoutMs = 1_500): Promise<T> {
+// 1.5s was enough alone and not under a loaded suite — the socket round-trips
+// here are all sub-millisecond when they work, so a longer ceiling only ever
+// costs time on a run that was going to fail anyway.
+async function waitFor<T>(getValue: () => T | undefined, timeoutMs = 5_000): Promise<T> {
   const start = Date.now()
 
   return new Promise((resolve, reject) => {
@@ -74,6 +77,7 @@ describe('RemoteSessionBackend', () => {
               response = {
                 id: message.id,
                 payload: {
+                  capabilities: [],
                   maxVersion: IPC_PROTOCOL_VERSION,
                   minVersion: IPC_PROTOCOL_VERSION,
                   processVersion: 'test-daemon',
@@ -86,7 +90,7 @@ describe('RemoteSessionBackend', () => {
                 id: message.id,
                 payload: {
                   activeTabId: null,
-                  initialSessionStatuses: [],
+                  initialProjectStatuses: [],
                   protocolVersion: IPC_PROTOCOL_VERSION,
                   tabs: [],
                 },
@@ -131,9 +135,14 @@ describe('RemoteSessionBackend', () => {
 
     let server = await startServer()
     const backend = new RemoteSessionBackend()
+    // A write that lands while the socket is down reports the failure through
+    // `error`, and an EventEmitter throws on an `error` nobody listens for. The
+    // app has a listener; without one here the reconnect window turned into an
+    // unhandled throw, which is what made this test fail once in three runs.
+    backend.on('error', () => {})
 
     try {
-      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
+      await backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })
       backend.write('tab-1', 'hello\nworld')
 
       await waitFor(() => requests.find((message) => message.type === 'write'))
@@ -146,12 +155,18 @@ describe('RemoteSessionBackend', () => {
         return attachRequests.length >= 2 ? attachRequests : undefined
       }, 3_000)
 
-      backend.write('tab-1', 'after\nrestart')
-      await waitFor(() =>
-        requests.find(
+      // Written on every tick rather than once. The wait above ends when the
+      // *server* receives the attach, which is one round trip before the client
+      // sets itself attached — and a write before that is dropped by design
+      // (`skipWriteBeforeAttach`), there being nowhere to send it. Writing once
+      // in that window meant waiting out the timeout for a keystroke that was
+      // never going to arrive.
+      await waitFor(() => {
+        backend.write('tab-1', 'after\nrestart')
+        return requests.find(
           (message) => message.type === 'write' && message.payload.data === 'after\nrestart'
         )
-      )
+      })
 
       const helloRequests = requests.filter((message) => message.type === 'hello')
       const attachRequests = requests.filter((message) => message.type === 'attach')
@@ -159,8 +174,8 @@ describe('RemoteSessionBackend', () => {
       expect(helloRequests.length).toBeGreaterThanOrEqual(2)
       expect(attachRequests).toHaveLength(2)
       expect(attachRequests[0]?.payload.protocolVersion).toBe(IPC_PROTOCOL_VERSION)
-      expect(attachRequests[0]?.payload.sessionId).toBe('session-a')
-      expect(attachRequests[1]?.payload.sessionId).toBe('session-a')
+      expect(attachRequests[0]?.payload.projectId).toBe('project-a')
+      expect(attachRequests[1]?.payload.projectId).toBe('project-a')
       expect(
         requests.find(
           (message) => message.type === 'write' && message.payload.data === 'hello\nworld'
@@ -191,6 +206,7 @@ describe('RemoteSessionBackend', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',
@@ -203,7 +219,7 @@ describe('RemoteSessionBackend', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -237,7 +253,7 @@ describe('RemoteSessionBackend', () => {
     })
 
     try {
-      await backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })
+      await backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })
       backend.write('tab-1', 'hello')
 
       await waitFor(() => backendError)
@@ -278,6 +294,7 @@ describe('RemoteSessionBackend', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',
@@ -290,7 +307,7 @@ describe('RemoteSessionBackend', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: 999,
                 tabs: [],
               },
@@ -317,7 +334,7 @@ describe('RemoteSessionBackend', () => {
     const backend = new RemoteSessionBackend()
 
     try {
-      expect(backend.attach({ cols: 80, rows: 24, sessionId: 'session-a' })).rejects.toThrow(
+      expect(backend.attach({ cols: 80, projectId: 'project-a', rows: 24 })).rejects.toThrow(
         `Protocol mismatch: client v${IPC_PROTOCOL_VERSION}, daemon v999`
       )
     } finally {

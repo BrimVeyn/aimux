@@ -99,30 +99,30 @@ export async function runTerminalManager(): Promise<void> {
   // attached — re-evaluate idle state in that case too.
   sessionManager.on('exit', () => scheduleIdleExitIfApplicable())
 
-  sessionManager.on('render', (sessionId, tabId, viewport, terminalModes) => {
+  sessionManager.on('render', (projectId, tabId, viewport, terminalModes) => {
     const event: ManagerEvent = {
-      payload: { sessionId, tabId, terminalModes, viewport },
+      payload: { projectId, tabId, terminalModes, viewport },
       type: 'tabRender',
     }
     for (const socket of sockets) {
       send(socket, event)
     }
   })
-  sessionManager.on('bytes', (sessionId, tabId, data) => {
+  sessionManager.on('bytes', (projectId, tabId, data) => {
     if (!bytesBroadcastEnabled) return
-    const event: ManagerEvent = { payload: { data, sessionId, tabId }, type: 'tabBytes' }
+    const event: ManagerEvent = { payload: { data, projectId, tabId }, type: 'tabBytes' }
     for (const socket of sockets) {
       send(socket, event)
     }
   })
-  sessionManager.on('exit', (sessionId, tabId, exitCode) => {
-    const event: ManagerEvent = { payload: { exitCode, sessionId, tabId }, type: 'tabExit' }
+  sessionManager.on('exit', (projectId, tabId, exitCode) => {
+    const event: ManagerEvent = { payload: { exitCode, projectId, tabId }, type: 'tabExit' }
     for (const socket of sockets) {
       send(socket, event)
     }
   })
-  sessionManager.on('error', (sessionId, tabId, message) => {
-    const event: ManagerEvent = { payload: { message, sessionId, tabId }, type: 'tabError' }
+  sessionManager.on('error', (projectId, tabId, message) => {
+    const event: ManagerEvent = { payload: { message, projectId, tabId }, type: 'tabError' }
     for (const socket of sockets) {
       send(socket, event)
     }
@@ -165,9 +165,9 @@ export async function runTerminalManager(): Promise<void> {
               case 'attachSession': {
                 logDebug('terminalManager.request.attach.start', {
                   cols: message.payload.cols,
+                  projectId: message.payload.projectId,
                   rows: message.payload.rows,
-                  sessionId: message.payload.sessionId,
-                  snapshotTabs: message.payload.workspaceSnapshot?.tabs.length ?? 0,
+                  snapshotTabs: message.payload.projectSnapshot?.tabs.length ?? 0,
                 })
                 const negotiatedVersion = requireNegotiatedVersion(socket, negotiatedVersions)
                 if (message.payload.protocolVersion !== negotiatedVersion) {
@@ -176,13 +176,13 @@ export async function runTerminalManager(): Promise<void> {
                   )
                 }
                 sessionManager.resize(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.cols,
                   message.payload.rows
                 )
                 const attachResult = sessionManager.attachSession(
-                  message.payload.sessionId,
-                  message.payload.workspaceSnapshot
+                  message.payload.projectId,
+                  message.payload.projectSnapshot
                 )
                 send(socket, {
                   id: message.id,
@@ -191,7 +191,7 @@ export async function runTerminalManager(): Promise<void> {
                 })
                 logDebug('terminalManager.request.attach.success', {
                   activeTabId: attachResult.activeTabId,
-                  sessionId: message.payload.sessionId,
+                  projectId: message.payload.projectId,
                   tabs: attachResult.tabs.length,
                 })
                 break
@@ -200,30 +200,39 @@ export async function runTerminalManager(): Promise<void> {
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 logDebug('terminalManager.request.createTab.start', {
                   command: message.payload.command,
-                  sessionId: message.payload.sessionId,
+                  projectId: message.payload.projectId,
                   tabId: message.payload.tabId,
                   title: message.payload.title,
                 })
-                sessionManager.createTab(message.payload.sessionId, message.payload)
+                sessionManager.createTab(message.payload.projectId, message.payload)
                 sendOk(socket, message.id)
                 logDebug('terminalManager.request.createTab.success', {
-                  sessionId: message.payload.sessionId,
+                  projectId: message.payload.projectId,
                   tabId: message.payload.tabId,
                 })
                 break
               case 'write':
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.write(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.tabId,
                   message.payload.data
+                )
+                sendOk(socket, message.id)
+                break
+              case 'updateTabMetadata':
+                requireNegotiatedVersion(socket, negotiatedVersions)
+                sessionManager.updateTabMetadata(
+                  message.payload.projectId,
+                  message.payload.tabId,
+                  message.payload
                 )
                 sendOk(socket, message.id)
                 break
               case 'resizeClient': {
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.resize(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.cols,
                   message.payload.rows
                 )
@@ -233,7 +242,7 @@ export async function runTerminalManager(): Promise<void> {
               case 'resizeTab':
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.resizeTab(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.tabId,
                   message.payload.cols,
                   message.payload.rows
@@ -243,7 +252,7 @@ export async function runTerminalManager(): Promise<void> {
               case 'scroll':
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 sessionManager.scroll(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.tabId,
                   message.payload.deltaLines
                 )
@@ -251,22 +260,22 @@ export async function runTerminalManager(): Promise<void> {
                 break
               case 'scrollToBottom':
                 requireNegotiatedVersion(socket, negotiatedVersions)
-                sessionManager.scrollToBottom(message.payload.sessionId, message.payload.tabId)
+                sessionManager.scrollToBottom(message.payload.projectId, message.payload.tabId)
                 sendOk(socket, message.id)
                 break
               case 'setActiveTab':
                 requireNegotiatedVersion(socket, negotiatedVersions)
-                sessionManager.setActiveTab(message.payload.sessionId, message.payload.tabId)
+                sessionManager.setActiveTab(message.payload.projectId, message.payload.tabId)
                 sendOk(socket, message.id)
                 break
               case 'closeTab':
                 requireNegotiatedVersion(socket, negotiatedVersions)
-                sessionManager.closeTab(message.payload.sessionId, message.payload.tabId)
+                sessionManager.closeTab(message.payload.projectId, message.payload.tabId)
                 sendOk(socket, message.id)
                 break
               case 'disposeSession':
                 requireNegotiatedVersion(socket, negotiatedVersions)
-                sessionManager.disposeSession(message.payload.sessionId)
+                sessionManager.disposeSession(message.payload.projectId)
                 sendOk(socket, message.id)
                 break
               case 'ping':
@@ -285,7 +294,7 @@ export async function runTerminalManager(): Promise<void> {
               case 'serializeBuffer': {
                 requireNegotiatedVersion(socket, negotiatedVersions)
                 const data = sessionManager.serializeBuffer(
-                  message.payload.sessionId,
+                  message.payload.projectId,
                   message.payload.tabId
                 )
                 send(socket, {

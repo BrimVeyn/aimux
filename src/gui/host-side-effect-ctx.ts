@@ -1,11 +1,12 @@
 import type { CliRenderer } from '@opentui/core'
 
-import type { SideEffectContext } from '../app-runtime/side-effects'
+import type { SideEffectContext } from '../app-runtime/side-effect-context'
 import type { SessionBackend } from '../session-backend/types'
-import type { AppAction, AppState } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
-import { getSessionProjectPath } from '../state/session-worktrees'
+import { getActiveWorkspacePath } from '../state/project-workspaces'
 
 // The GUI has no shared TTY. executeSideEffect only touches the renderer in
 // `quit`, `runUpdateFromTui`, and `openEditorInline`; a no-op stub satisfies
@@ -82,11 +83,11 @@ export function makeSideEffectContext(opts: MakeContextOptions): SideEffectConte
     clearStartupGrace: opts.timeouts.clearStartupGrace,
     dispatch: opts.dispatch,
     getCurrentSessionProjectPath: () => {
-      const id = state.currentSessionId
+      const id = state.currentProjectId
       if (!(id != null && id !== '')) {
         return
       }
-      return getSessionProjectPath(state.sessions.find((session) => session.id === id))
+      return getActiveWorkspacePath(state.projects.find((session) => session.id === id))
     },
     getState: opts.getState,
     renderer: opts.renderer,

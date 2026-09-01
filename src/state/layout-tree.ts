@@ -124,6 +124,116 @@ export function allLeafIds(tree: LayoutNode): string[] {
   return [...allLeafIds(tree.first), ...allLeafIds(tree.second)]
 }
 
+export type BoundarySide = 'left' | 'right' | 'top' | 'bottom'
+
+export function getBoundaryLeafIds(node: LayoutNode, side: BoundarySide): string[] {
+  if (node.type === 'leaf') {
+    return [node.tabId]
+  }
+
+  const axisOfSide = side === 'left' || side === 'right' ? 'vertical' : 'horizontal'
+
+  if (node.direction === axisOfSide) {
+    // Split direction matches the side's axis: only one child touches `side`.
+    const child = side === 'left' || side === 'top' ? node.first : node.second
+    return getBoundaryLeafIds(child, side)
+  }
+
+  // Perpendicular split: both children touch `side`.
+  return [...getBoundaryLeafIds(node.first, side), ...getBoundaryLeafIds(node.second, side)]
+}
+
+export interface JunctionEdgeInfo {
+  tabId: string
+  direction: SplitDirection
+  screenStart: number
+  totalSize: number
+}
+
+export interface JunctionEdges {
+  left?: JunctionEdgeInfo
+  right?: JunctionEdgeInfo
+  top?: JunctionEdgeInfo
+  bottom?: JunctionEdgeInfo
+}
+
+function firstLeafIdOf(node: LayoutNode): string {
+  return node.type === 'leaf' ? node.tabId : firstLeafIdOf(node.first)
+}
+
+export function computeJunctionEdges(
+  tree: LayoutNode,
+  bounds: PaneRect,
+  origin: { x: number; y: number }
+): Map<string, JunctionEdges> {
+  const result = new Map<string, JunctionEdges>()
+  walk(tree, bounds)
+  return result
+
+  function ensure(tabId: string): JunctionEdges {
+    let entry = result.get(tabId)
+    if (!entry) {
+      entry = {}
+      result.set(tabId, entry)
+    }
+    return entry
+  }
+
+  function walk(node: LayoutNode, nodeBounds: PaneRect): void {
+    if (node.type === 'leaf') {
+      ensure(node.tabId)
+      return
+    }
+
+    const info: JunctionEdgeInfo = {
+      direction: node.direction,
+      screenStart:
+        node.direction === 'vertical' ? origin.x + nodeBounds.x : origin.y + nodeBounds.y,
+      tabId: firstLeafIdOf(node.first),
+      totalSize: node.direction === 'vertical' ? nodeBounds.cols : nodeBounds.rows,
+    }
+
+    if (node.direction === 'vertical') {
+      for (const leafId of getBoundaryLeafIds(node.first, 'right')) {
+        ensure(leafId).right = info
+      }
+      for (const leafId of getBoundaryLeafIds(node.second, 'left')) {
+        ensure(leafId).left = info
+      }
+    } else {
+      for (const leafId of getBoundaryLeafIds(node.first, 'bottom')) {
+        ensure(leafId).bottom = info
+      }
+      for (const leafId of getBoundaryLeafIds(node.second, 'top')) {
+        ensure(leafId).top = info
+      }
+    }
+
+    // Recurse with bounds math matching computePaneRects (now without separator gap).
+    if (node.direction === 'vertical') {
+      const firstCols = Math.max(1, Math.floor(nodeBounds.cols * node.ratio))
+      const secondCols = Math.max(1, nodeBounds.cols - firstCols)
+      walk(node.first, { cols: firstCols, rows: nodeBounds.rows, x: nodeBounds.x, y: nodeBounds.y })
+      walk(node.second, {
+        cols: secondCols,
+        rows: nodeBounds.rows,
+        x: nodeBounds.x + firstCols,
+        y: nodeBounds.y,
+      })
+    } else {
+      const firstRows = Math.max(1, Math.floor(nodeBounds.rows * node.ratio))
+      const secondRows = Math.max(1, nodeBounds.rows - firstRows)
+      walk(node.first, { cols: nodeBounds.cols, rows: firstRows, x: nodeBounds.x, y: nodeBounds.y })
+      walk(node.second, {
+        cols: nodeBounds.cols,
+        rows: secondRows,
+        x: nodeBounds.x,
+        y: nodeBounds.y + firstRows,
+      })
+    }
+  }
+}
+
 export function pruneLayoutTree(tree: LayoutNode, validTabIds: Set<string>): LayoutNode | null {
   if (tree.type === 'leaf') {
     return validTabIds.has(tree.tabId) ? tree : null
@@ -227,13 +337,13 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
   if (tree.direction === 'vertical') {
     // Split left/right
     const firstCols = Math.max(1, Math.floor(bounds.cols * tree.ratio))
-    const secondCols = Math.max(1, bounds.cols - firstCols - 1) // -1 for separator
+    const secondCols = Math.max(1, bounds.cols - firstCols)
 
     const firstBounds: PaneRect = { cols: firstCols, rows: bounds.rows, x: bounds.x, y: bounds.y }
     const secondBounds: PaneRect = {
       cols: secondCols,
       rows: bounds.rows,
-      x: bounds.x + firstCols + 1,
+      x: bounds.x + firstCols,
       y: bounds.y,
     }
 
@@ -246,14 +356,14 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
   } else {
     // Split top/bottom
     const firstRows = Math.max(1, Math.floor(bounds.rows * tree.ratio))
-    const secondRows = Math.max(1, bounds.rows - firstRows - 1) // -1 for separator
+    const secondRows = Math.max(1, bounds.rows - firstRows)
 
     const firstBounds: PaneRect = { cols: bounds.cols, rows: firstRows, x: bounds.x, y: bounds.y }
     const secondBounds: PaneRect = {
       cols: bounds.cols,
       rows: secondRows,
       x: bounds.x,
-      y: bounds.y + firstRows + 1,
+      y: bounds.y + firstRows,
     }
 
     for (const [id, rect] of computePaneRects(tree.first, firstBounds)) {

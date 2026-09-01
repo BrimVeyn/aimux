@@ -8,6 +8,8 @@ import type {
   GitRefreshPayload,
 } from '../state/types'
 
+import { MAX_DIFF_BYTES } from './diff-limits'
+
 interface NumstatRow {
   added: number | null
   removed: number | null
@@ -163,6 +165,11 @@ async function countUntrackedLines(cwd: string, path: string): Promise<number | 
   try {
     const file = Bun.file(`${cwd}/${path}`)
     if (!(await file.exists())) return null
+    // Size gate before the read, not after: `.text()` aborts the process on an
+    // oversized blob rather than throwing, so the catch below would never run. Callers
+    // treat null as "no count available", which is the honest answer for a 3 GB
+    // download sitting untracked in the working tree.
+    if (file.size > MAX_DIFF_BYTES) return null
     const text = await file.text()
     if (text.length === 0) return 0
     let count = 0
@@ -192,7 +199,7 @@ async function annotateUntrackedCounts(cwd: string, files: GitFileEntry[]): Prom
 
 interface CollectOptions {
   headOffset?: number
-  // Explicit ref to diff the working tree against (e.g. a worktree's fork
+  // Explicit ref to diff the working tree against (e.g. a workspace's fork
   // point). Takes precedence over headOffset when set.
   compareRef?: string
 }
@@ -259,7 +266,7 @@ async function collectAgainstHistorical(
 }
 
 // Diffs the working tree against an arbitrary ref (a HEAD~N commit, or a
-// worktree's fork point for review-vs-base), surfacing changed files as a
+// workspace's fork point for review-vs-base), surfacing changed files as a
 // single `historical` section plus any untracked files.
 async function collectAgainstRef(cwd: string, ref: string): Promise<GitCollectResult> {
   const [statusResult, nameStatus, numstat, untrackedStatus] = await Promise.all([

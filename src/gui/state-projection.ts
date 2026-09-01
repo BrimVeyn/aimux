@@ -20,9 +20,9 @@ import type {
   GitPanelState,
   GitPaneState,
   ModalState,
-  SessionRecord,
+  ProjectRecord,
   TabSession,
-  WorktreeRecord,
+  WorkspaceRecord,
 } from '../state/types'
 import type { GuiHelpEntry } from './gui-help-entries'
 
@@ -41,7 +41,7 @@ function projectTab(tab: TabSession): ProjectedTab {
   }
 }
 
-function projectWorktree(w: WorktreeRecord): WorktreeLite {
+function projectWorktree(w: WorkspaceRecord): WorktreeLite {
   return {
     baseRef: w.baseRef,
     branch: w.branch,
@@ -58,7 +58,7 @@ function projectWorktree(w: WorktreeRecord): WorktreeLite {
   }
 }
 
-function projectSession(s: SessionRecord): SessionRecordLite {
+function projectSession(s: ProjectRecord): SessionRecordLite {
   return {
     activeWorktreeId: s.activeWorktreeId,
     id: s.id,
@@ -167,8 +167,8 @@ function projectModal(modal: ModalState): ModalProjection {
     out.triggerBuffer = m.triggerBuffer as string | null
   }
   if (typeof m.stage === 'string') out.stage = m.stage as ModalProjection['stage']
-  if (typeof m.sessionTargetId === 'string' || m.sessionTargetId === null) {
-    out.sessionTargetId = m.sessionTargetId
+  if (typeof m.projectTargetId === 'string' || m.projectTargetId === null) {
+    out.projectTargetId = m.projectTargetId
   }
   if (typeof m.currentVersion === 'string') out.currentVersion = m.currentVersion
   if (typeof m.latestVersion === 'string') out.latestVersion = m.latestVersion
@@ -191,7 +191,7 @@ export function projectAppState(
     activeTabId: state.activeTabId,
     aiUsage: options.aiUsage,
     committedThemeId: options.committedThemeId,
-    currentSessionId: state.currentSessionId,
+    currentProjectId: state.currentProjectId,
     customCommands: state.customCommands,
     focusMode: state.focusMode,
     gitMode: projectGitMode(state.gitMode),
@@ -201,9 +201,9 @@ export function projectAppState(
     layoutTrees: state.layoutTrees,
     modal: projectModal(state.modal),
     multiRepo: state.multiRepo,
-    sessionBar: state.sessionBar,
-    sessions: state.sessions.map(projectSession),
-    sessionStatuses: state.sessionStatuses,
+    projectBar: state.projectBar,
+    projectStatuses: state.projectStatuses,
+    sessions: state.projects.map(projectSession),
     sidebar: { visible: state.sidebar.visible, width: state.sidebar.width },
     snippets: state.snippets,
     statusBar: options.statusBar,
@@ -212,6 +212,6 @@ export function projectAppState(
     themeId: options.themeId,
     themeMode: options.themeMode,
     transparent: options.transparent,
-    worktreeDivergence: state.worktreeDivergence,
+    workspaceDivergence: state.workspaceDivergence,
   }
 }

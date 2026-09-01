@@ -5,6 +5,76 @@ Typed configuration package for [`@brimveyn/aimux`](https://github.com/BrimVeyn/
 Use this package to author `aimux.config.ts` or `aimux.config.js` inside an
 `aimux` profile directory.
 
+## BREAKING in 0.9.0 — project / workspace / tab
+
+aimux now has one word per level, and each level has its own creation action:
+
+| Level         | What it is                               | Action                         |
+| ------------- | ---------------------------------------- | ------------------------------ |
+| **project**   | a repository you add by picking a folder | `<C-g>` → "Create new project" |
+| **workspace** | a git worktree inside a project          | `<C-p>`                        |
+| **tab**       | an assistant in a workspace              | `<C-n>`                        |
+
+What used to be called a workspace is now a **project**; what used to be called
+a worktree is now a **workspace**.
+
+**`<C-n>` no longer creates worktrees.** It is an assistant picker; the tab
+opens in the active workspace. Use `<C-p>` to create a workspace.
+
+### Renamed actions
+
+The old names still work in 0.9.0 as `@deprecated` aliases and will be removed
+in a later release:
+
+| 0.8.x                        | 0.9.0                         |
+| ---------------------------- | ----------------------------- |
+| `sessionPicker`              | `projectPicker`               |
+| `openCreateSessionModal`     | `openCreateProjectModal`      |
+| `createSessionEscape`        | `createProjectEscape`         |
+| `confirmCreateSession`       | `confirmCreateProject`        |
+| `reorderSession`             | `reorderProject`              |
+| `switchSessionByIndex`       | `switchProjectByIndex`        |
+| `toggleSessionBar`           | `toggleProjectBar`            |
+| `openWorktreeMove`           | `openWorkspaceMove`           |
+| `toggleWorktreeMoveDelete`   | `toggleWorkspaceMoveDelete`   |
+| `confirmWorktreeMove`        | `confirmWorkspaceMove`        |
+| `confirmWorktreeDeleteModal` | `confirmWorkspaceDeleteModal` |
+
+### Removed actions
+
+These have no replacement — `<C-n>` cannot create or delete a workspace any
+more. A config referencing them fails to compile, on purpose:
+`toggleNewTabWorktree`, `deleteSelectedWorktree`, `confirmDeleteWorktree`.
+
+### Renamed mode ids
+
+Mode ids are not aliased; `.mode('modal.create-session', …)` throws.
+
+| 0.8.x                                   | 0.9.0                            |
+| --------------------------------------- | -------------------------------- |
+| `modal.session-picker.filtering`        | `modal.project-picker.filtering` |
+| `modal.session-name`                    | `modal.project-name`             |
+| `modal.create-session`                  | `modal.create-project`           |
+| `modal.worktree-move`                   | `modal.workspace-move`           |
+| `modal.worktree-move-confirm`           | `modal.workspace-move-confirm`   |
+| `modal.worktree-delete-confirm`         | `modal.workspace-delete-confirm` |
+| `modal.new-tab.worktree-delete-confirm` | _(removed)_                      |
+| _(new)_                                 | `modal.create-workspace`         |
+
+### Renamed config keys
+
+`sessionBar` is now `projectBar`. The old key is still read; rename it. (An
+unknown key parses silently, so without the fallback the setting would just
+vanish.)
+
+### Removed config keys
+
+`workspaceTemplates` (and its pre-rename spelling `worktreeTemplates`) is
+removed. Workspace provisioning is a per-project setup script now — see
+`docs/guide/workspaces.md#setup-script`. Both keys are still declared as
+`never` so your editor strikes them through, and `aimux doctor` reports them if
+they are still in `aimux.json`.
+
 ## What This Package Does
 
 `@brimveyn/aimux-config` provides:
@@ -43,20 +113,20 @@ If you use another profile, replace `default` with that profile name.
 import { defineConfig, actions } from '@brimveyn/aimux-config'
 
 export default defineConfig({
-  sessionBar: {
+  projectBar: {
     initialPosition: 'top',
     initialVisible: true,
   },
 
   keymaps: (k) =>
-    k.mode('navigation', (m) => m.map('<C-p>', actions.sessionPicker, 'Workspace picker')),
+    k.mode('navigation', (m) => m.map('<C-g>', actions.projectPicker, 'Project picker')),
 })
 ```
 
 This example only uses surfaces that are wired into the runtime today.
 
 Important: typed config expresses startup intent. Fields such as
-`sessionBar.initialVisible` or `gitPane.initialMode` are reapplied on every
+`projectBar.initialVisible` or `gitPane.initialMode` are reapplied on every
 launch; runtime UI changes do not write back into `aimux.config.ts`.
 
 ## Key Notation
@@ -140,11 +210,12 @@ explanation.
 Pre-built actions include:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
+- projects: `projectPicker`, `switchProjectByIndex(n)` and project modal actions
+- workspaces: `createWorkspaceModal`, `openWorkspaceMove` and workspace modal actions
 - snippets: `snippetPicker`, snippet editor and filter actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `toggleSessionBar`, `toggleGitPane`,
+- UI: `toggleSidebar`, `toggleProjectBar`, `toggleGitPane`,
   `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: enter git mode, stage, delete or unstage, commit, push
@@ -183,12 +254,12 @@ palette guidance, and precedence details.
 | Surface      | Status             | Notes                                                                                |
 | ------------ | ------------------ | ------------------------------------------------------------------------------------ |
 | `keymaps`    | Supported          | Fully registered by the runtime                                                      |
-| `sessionBar` | Supported          | Startup overrides; app-managed runtime state still persists separately               |
+| `projectBar` | Supported          | Startup overrides; app-managed runtime state still persists separately               |
 | `gitPane`    | Supported          | Startup overrides for placement and rendering; runtime state persists separately     |
 | `theme`      | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins |
 | `themes`     | Supported          | User themes; appear in the picker and power synthesized highlighting                 |
 | `backends`   | Typed surface only | Runtime wiring deferred                                                              |
-| `sidebar`    | Typed surface only | Type exists, runtime not currently driven by this field                              |
+| `sidebar`    | Ignored            | Superseded by the app-managed `bars` state in `aimux.json`                           |
 | `hooks`      | Typed surface only | Type exists, runtime use not currently wired                                         |
 | `snippets`   | Typed surface only | Runtime currently uses `aimux-snippets.json`                                         |
 
@@ -204,6 +275,7 @@ Current helpers:
 
 - `claudeBackend()`
 - `codexBackend()`
+- `kimiBackend()`
 
 These helpers are documented as stubs. Do not treat them as a fully supported
 runtime backend override system yet.

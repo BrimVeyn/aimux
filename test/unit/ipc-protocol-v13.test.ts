@@ -1,0 +1,85 @@
+import { describe, expect, test } from 'bun:test'
+
+import {
+  IPC_CAPABILITY_LIST_TABS_LAST_LINE,
+  IPC_CAPABILITY_QUESTION_EVENTS,
+  IPC_CAPABILITY_TURN_LIFECYCLE,
+  IPC_PROTOCOL_CAPABILITIES,
+  IPC_PROTOCOL_VERSION,
+  parseServerMessage,
+} from '../../src/ipc/protocol'
+
+describe('ipc protocol v13', () => {
+  test('MAX still includes the historical v13 feature level', () => {
+    expect(IPC_PROTOCOL_VERSION).toBeGreaterThanOrEqual(13)
+  })
+
+  test('advertises every v13 capability', () => {
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_TURN_LIFECYCLE)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_QUESTION_EVENTS)
+    expect(IPC_PROTOCOL_CAPABILITIES).toContain(IPC_CAPABILITY_LIST_TABS_LAST_LINE)
+  })
+
+  test('tabTurnComplete event round-trips', () => {
+    const parsed = parseServerMessage({
+      payload: { idleMs: 1500, projectId: 'project-1', tabId: 'tab-1' },
+      type: 'tabTurnComplete',
+    })
+    expect(parsed.type).toBe('tabTurnComplete')
+  })
+
+  test('tabTurnComplete rejects a non-numeric idleMs', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: { idleMs: 'soon', projectId: 'project-1', tabId: 'tab-1' },
+        type: 'tabTurnComplete',
+      })
+    ).toThrow('tabTurnComplete.idleMs must be a number')
+  })
+
+  test('tabQuestion event round-trips with options', () => {
+    const parsed = parseServerMessage({
+      payload: {
+        kind: 'question',
+        options: ['1. Yes', '2. No'],
+        projectId: 'project-1',
+        prompt: 'Do you want to proceed?',
+        tabId: 'tab-1',
+      },
+      type: 'tabQuestion',
+    })
+    expect(parsed.type).toBe('tabQuestion')
+  })
+
+  test('tabQuestion event round-trips without options', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: {
+          kind: 'permission',
+          projectId: 'project-1',
+          prompt: 'Allow bash command?',
+          tabId: 'tab-1',
+        },
+        type: 'tabQuestion',
+      })
+    ).not.toThrow()
+  })
+
+  test('tabQuestion rejects an invalid kind', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: { kind: 'maybe', projectId: 's', prompt: 'x', tabId: 't' },
+        type: 'tabQuestion',
+      })
+    ).toThrow('tabQuestion.kind is invalid')
+  })
+
+  test('tabQuestion rejects non-string options', () => {
+    expect(() =>
+      parseServerMessage({
+        payload: { kind: 'question', options: [1, 2], projectId: 's', prompt: 'x', tabId: 't' },
+        type: 'tabQuestion',
+      })
+    ).toThrow('tabQuestion.options must be a string array when present')
+  })
+})

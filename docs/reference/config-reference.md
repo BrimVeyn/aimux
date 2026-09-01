@@ -43,12 +43,13 @@ defineConfig({
   keymaps?: (k: KeymapBuilderApi) => KeymapBuilderApi
   backends?: Record<string, BackendConfig>
   sidebar?: SidebarConfig
-  sessionBar?: SessionBarConfig
+  projectBar?: ProjectBarConfig
   gitPane?: GitPaneConfig
   hooks?: HooksConfig
   snippets?: SnippetDef[]
   snippetTriggerChar?: string
   autoCommit?: Partial<AutoCommitConfig>
+  autoRename?: Partial<AutoRenameConfig>
   multiRepo?: Partial<MultiRepoConfig>
   statusBar?: StatusBarConfig
 })
@@ -56,20 +57,27 @@ defineConfig({
 
 ## Support Matrix
 
+Most of these fields also have a row in the in-app settings screen (`<Leader>,`),
+which writes to `aimux.json`. This file is read at every launch and wins over it:
+a field declared here comes back on the next start, and the row says so. See
+`../guide/settings.md`.
+
 | Field                | Status             | Notes                                                                                                                   |
 | -------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
 | `keymaps`            | Supported          | Fully resolved and registered by the app                                                                                |
-| `sessionBar`         | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                   |
-| `gitPane`            | Supported          | Startup overrides for pane state; app-managed runtime state still persists separately                                   |
+| `projectBar`         | Supported          | Startup overrides; if set, these values reapply on every launch and beat `aimux.json`                                   |
+| `gitPane`            | Supported          | Content prefs only; placement moved to the app-managed `bars` state                                                     |
 | `theme`              | Supported          | `theme.initialMode` is a startup override; persisted `aimux.json.themeId` still wins                                    |
 | `backends`           | Typed surface only | Resolved by the config package, but current runtime wiring is deferred                                                  |
-| `sidebar`            | Typed surface only | Type exists, but current runtime sidebar state comes from app-managed state and snapshots                               |
+| `sidebar`            | Ignored            | Superseded by the app-managed `bars` state; kept so old config files still typecheck                                    |
 | `hooks`              | Typed surface only | Type exists; runtime use is not currently wired                                                                         |
 | `snippets`           | Supported          | Config-pinned snippets are merged into the runtime catalog at boot; read-only in the picker. See `../guide/snippets.md` |
 | `snippetTriggerChar` | Supported          | Single-character prefix for inline snippet triggers (default `:`). See `../guide/snippets.md`                           |
 | `autoCommit`         | Supported          | AI-written commit messages. Disabled by default; see `../guide/git-mode.md#auto-commit`                                 |
-| `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-workspaces`    |
-| `statusBar`          | Supported          | Hosts the `aiUsage` sub-block that powers the AI usage indicator                                                        |
+| `autoRename`         | Supported          | Renames new assistant tabs from their first prompt. Enabled by default; see `../guide/projects.md#automatic-tab-names`  |
+| `multiRepo`          | Supported          | Aggregates nested sub-repos into one git panel. Enabled by default; see `../guide/git-mode.md#multi-repo-projects`      |
+| `statusBar`          | Supported          | Hosts the `aiUsage` sub-block (AI usage indicator) and the `separator` glyph style for the bottom status bar            |
+| `workspaceTemplates` | Removed            | Superseded by the per-project setup script. See `../guide/workspaces.md#setup-script`                                   |
 
 ## `defineConfig`
 
@@ -118,32 +126,29 @@ Important runtime facts:
 
 See `../guide/keymaps.md` for notation and merge semantics.
 
-## `sessionBar`
+## `projectBar`
 
 Status: `Supported`
 
 Type:
 
 ```ts
-sessionBar?: {
+projectBar?: {
   initialVisible?: boolean
-  initialPosition?: 'top' | 'bottom'
 }
 ```
 
 Runtime behavior:
 
 - consumed during app initialization
-- used as a higher-priority source than `aimux.json.sessionBarVisible`
-- used as a higher-priority source than `aimux.json.sessionBarPosition`
-- reapplied on every launch while these config entries remain set
+- used as a higher-priority source than `aimux.json.projectBarVisible`
+- reapplied on every launch while this config entry remains set
 
 Example:
 
 ```ts
 export default defineConfig({
-  sessionBar: {
-    initialPosition: 'bottom',
+  projectBar: {
     initialVisible: true,
   },
 })
@@ -153,34 +158,17 @@ export default defineConfig({
 
 Status: `Supported`
 
-Type (discriminated union on `mode`):
+Type:
 
 ```ts
-type GitPaneConfig =
-  | {
-      initialMode?: 'embedded'
-      initialPosition?: 'top' | 'bottom'
-      initialVisible?: boolean
-      initialRatio?: number // 0..1, clamped to [0.2, 0.8]
-      initialDiffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
-      initialFileListMode?: 'tree' | 'flat'
-      initialTreeCompaction?: boolean
-      path?: GitPanePathConfig
-      diffCount?: GitPaneDiffCountConfig
-      prefetchRadius?: number
-    }
-  | {
-      initialMode: 'pane'
-      initialPosition?: 'left' | 'right'
-      initialVisible?: boolean
-      initialRatio?: number
-      initialDiffModeRatio?: number
-      initialFileListMode?: 'tree' | 'flat'
-      initialTreeCompaction?: boolean
-      path?: GitPanePathConfig
-      diffCount?: GitPaneDiffCountConfig
-      prefetchRadius?: number
-    }
+interface GitPaneConfig {
+  initialDiffModeRatio?: number // 0..1, clamped to [0.2, 0.8]
+  initialFileListMode?: 'tree' | 'flat'
+  initialTreeCompaction?: boolean
+  path?: GitPanePathConfig
+  diffCount?: GitPaneDiffCountConfig
+  prefetchRadius?: number
+}
 
 type GitPanePathConfig = { enabled: false } | { enabled: true; pathFn?: (path: string) => string }
 
@@ -189,16 +177,9 @@ type GitPaneDiffCountConfig = { enabled: boolean }
 
 Runtime behavior:
 
-- `mode: 'embedded'` renders the git file list inside the sidebar, above or
-- `initialMode: 'embedded'` renders the git file list inside the sidebar,
-  above or below the tab list depending on `initialPosition`.
-- `initialMode: 'pane'` renders the git file list as a standalone pane next to
-  the sidebar (`left`) or on the far right of the main area (`right`).
-- `initialPosition` allowed values are constrained per `initialMode` at the
-  type level.
-- `initialRatio` controls startup size: in `embedded` mode it's the vertical
-  split ratio against the tab list; in `pane` mode it maps to a column count in
-  `[20, 80]`.
+- Placement (`initialMode`, `initialPosition`, `initialRatio`, `initialVisible`)
+  moved to the bars layout — see [`bars`](#bars). Those fields are still
+  accepted so existing config files typecheck, but they are ignored.
 - `initialDiffModeRatio` controls the file-list width while you are in
   full-screen git diff mode.
 - `initialFileListMode` controls whether the git file list renders as a folder
@@ -219,11 +200,8 @@ Example:
 ```ts
 export default defineConfig({
   gitPane: {
-    initialMode: 'pane',
-    initialPosition: 'right',
     initialDiffModeRatio: 0.3,
     initialFileListMode: 'tree',
-    initialRatio: 0.35,
     initialTreeCompaction: true,
     path: {
       enabled: true,
@@ -236,8 +214,8 @@ export default defineConfig({
 
 Legacy migration: config files written before `gitPane` existed stored
 `gitPanelVisible` / `gitPanelRatio` at the root of `aimux.json`. Those keys
-are read once on load and converted to `{ mode: 'embedded', position: 'bottom',
-ratio, visible }`, then persisted under `gitPane` on the next save.
+are read once on load and folded into the derived bars layout on the next
+save.
 
 ## `theme`
 
@@ -300,26 +278,38 @@ interface BackendConfig {
 Notes:
 
 - the config package resolves this field
-- helper functions such as `claudeBackend()` and `codexBackend()` are exported
+- helper functions such as `claudeBackend()`, `codexBackend()`, and `kimiBackend()` are exported
 - the helper module explicitly documents runtime wiring as deferred
 
 Do not present this as a fully working runtime backend override surface today.
 
-## `sidebar`
+## `bars`
 
-Status: `Typed surface only`
+Status: `Runtime state, not typed config`
 
-Type:
+The left and right bars — and which widgets sit in each — are app-managed state
+persisted in `aimux.json` under `bars`, not something you declare in
+`aimux.config.ts`:
 
 ```ts
-interface SidebarConfig {
-  widgets?: string[]
-  width?: number
+interface PersistedBars {
+  left: PersistedBar
+  right: PersistedBar
+}
+
+interface PersistedBar {
+  visible: boolean
+  width: number // cells, clamped to [18, 80]
+  widgets: { id: string; grow: number; visible: boolean }[] // ordered top → bottom
 }
 ```
 
-Current runtime behavior is driven by app state and persisted workspace data,
-not by this top-level typed config field.
+Widget ids: `projects`, `git`. Move a widget between bars, reorder it, or
+hide it with the right-click menu on the widget. `<C-b>` toggles the left bar,
+`<Leader>B` the right one.
+
+Config files written before bars existed are upgraded automatically from the
+old `sidebar` + `gitPane.mode`/`position` fields on first load.
 
 ## `hooks`
 
@@ -412,7 +402,7 @@ background request is ever made. When `enabled: true`:
   message (and the actual commit) only cover the staged set; with nothing
   staged, `git add -A` is run before committing.
 
-Supported providers: `claude`, `codex`, `opencode`. The active tab's
+Supported providers: `claude`, `codex`, `opencode`, `grok`, `kimi`. The active tab's
 assistant determines which CLI is invoked.
 
 Example:
@@ -432,6 +422,58 @@ export default defineConfig({
 
 See [`../guide/git-mode.md#auto-commit`](../guide/git-mode.md#auto-commit)
 for the full user-facing walkthrough.
+
+## `autoRename`
+
+Status: `Supported`
+
+```ts
+autoRename?: {
+  enabled?: boolean                          // default: true
+  timeoutMs?: number                         // default: 15_000
+  models?: Partial<Record<string, string>>   // per-provider model override
+  settleMs?: number                          // default: 2_500
+  maxAttempts?: number                       // default: 3
+  minPromptWords?: number                    // default: 3
+}
+```
+
+After the first prompt that actually describes work, aimux runs that same
+assistant's headless CLI in the background and replaces the default tab label
+with a concise title. Explicit `--title` values and manual renames are never
+overwritten.
+
+- `settleMs` — quiet period before generating. Prompts submitted inside the
+  window are folded into the same request, so a rapid "read X" / "now do Y"
+  opening produces one title covering both. `0` generates on the first prompt.
+- `minPromptWords` — prompts below this length are treated as dialog answers
+  and ignored, as are slash commands, `!` shell escapes and confirmations like
+  `y` or `1`. Ignoring a prompt costs nothing: the tab stays armed.
+- `maxAttempts` — how many generations may fail before aimux gives up on the
+  CLI and derives a title from the prompt text locally. Failures in between
+  (non-zero exit, timeout, unusable output) leave the tab armed, so the next
+  prompt tries again. A provider whose CLI is not installed skips straight to
+  the local title.
+
+The first prompt is sent to the configured provider as an additional model
+request. Disable this feature if prompts must not leave the interactive
+assistant process. Supported providers are `claude`, `codex`, `opencode`,
+`grok`, and `kimi`; plain terminals and custom providers are ignored.
+
+```ts
+export default defineConfig({
+  autoRename: {
+    enabled: true,
+    models: {
+      claude: 'claude-haiku-4-5',
+      codex: 'gpt-5-mini',
+    },
+  },
+})
+```
+
+The daemon reads this setting at startup. Run `aimux restart-daemon` after
+changing it; live PTYs remain owned by the terminal-manager.
 
 ## `multiRepo`
 
@@ -487,12 +529,14 @@ Type:
 ```ts
 interface StatusBarConfig {
   aiUsage?: AIUsageToolConfig
+  hints?: boolean // default true
+  separator?: 'arrow' | 'round' | 'slant' | 'flame' | 'none' // default 'arrow'
 }
 
 interface AIUsageToolConfig {
   enabled?: boolean // default false
   tools?: Array<'claude' | 'codex'> // default ['claude', 'codex']
-  pollSeconds?: number // default 60; clamped to a minimum of 5
+  pollSeconds?: number // default 180; clamped to a minimum of 180 (Claude's endpoint rate-limits faster callers)
   claudePlan?: 'auto' | 'pro' | 'max5' | 'max20' // default 'auto'; reserved
   codexWeeklyLimit?: number // reserved
 }
@@ -509,22 +553,63 @@ Runtime behavior:
   token stored in `~/.codex/auth.json`
 - all colors are pulled from the active theme palette; no hardcoded colors
 
+### `hints`
+
+The second row under the bar, listing the keybindings of the current mode. Set
+`false` to drop it — the bar becomes one line tall and the terminal gets the
+other one back. Also togglable from the settings screen (Status bar →
+Keybinding hints).
+
+### `separator`
+
+Powerline-style glyph rendered between the status bar sections (mode badge,
+session/path tile, AI usage tile, version tile). All non-`none` options require
+a nerd-font / powerline-capable font.
+
+| Value   | Right glyph | Left glyph | Codepoints                                           |
+| ------- | :---------: | :--------: | ---------------------------------------------------- |
+| `arrow` |             |            | U+E0B0 / U+E0B2                                      |
+| `round` |             |            | U+E0B4 / U+E0B6                                      |
+| `slant` |             |            | U+E0BC / U+E0BA                                      |
+| `flame` |             |            | U+E0C0 / U+E0C2                                      |
+| `none`  |      —      |     —      | (no glyph; sections snap via background colour only) |
+
+Resolved once at app startup and persisted for the session.
+
 See [`../guide/ai-usage-indicator.md`](../guide/ai-usage-indicator.md) for the
-full guide, field reference, and platform requirements.
+full AI usage guide, field reference, and platform requirements.
 
 Example:
 
 ```ts
 export default defineConfig({
   statusBar: {
+    separator: 'round',
     aiUsage: {
       enabled: true,
-      pollSeconds: 60,
+      pollSeconds: 180,
       tools: ['claude', 'codex'],
     },
   },
 })
 ```
+
+## `workspaceTemplates` — removed
+
+Workspace templates spawned a fixed set of tabs and split panes at workspace
+creation, each pane optionally prefilled with a command. They are gone.
+
+Their provisioning half — `send: 'bun install'` fired on a timer, with no exit
+code and no per-project scoping — is now a per-project **setup script**, which
+runs with the workspace as its working directory and reports its exit code. See
+`../guide/workspaces.md#setup-script`.
+
+Their layout half has no replacement: open the tabs and splits you want, or ask
+an assistant to.
+
+A config that still declares `workspaceTemplates` (or the older
+`worktreeTemplates`) does nothing. `aimux doctor` reports it, because an unknown
+key otherwise parses silently.
 
 ## Actions
 
@@ -533,11 +618,11 @@ export default defineConfig({
 Common groups:
 
 - tabs: `nextTab`, `prevTab`, `newTab`, `renameTab`, `closeTab`, `restartTab`
-- workspaces: `sessionPicker`, `switchSessionByIndex(n)` and workspace modal actions
+- projects: `projectPicker`, `switchProjectByIndex(n)` and project modal actions
 - snippets: `snippetPicker`, snippet filter and editor actions
 - themes: `themePicker`, `previewTheme`, `confirmTheme`, `restoreTheme`
 - panes: `splitVertical`, `splitHorizontal`, `focusPane`, `resizePane`, `closePane`
-- UI: `toggleSidebar`, `resizeSidebar`, `toggleSessionBar`, `toggleGitPane`,
+- UI: `toggleSidebar`, `resizeSidebar`, `toggleProjectBar`, `toggleGitPane`,
   `resizeGitPane(delta)`, `setGitPaneMode(mode)`, `setGitPanePosition(position)`
 - modes: `enterInsert`, `leaveTerminalInput`, `closeModal`, `helpModal`
 - git: `enterGitMode`, `exitGitMode`, stage/unstage/delete, commit, push

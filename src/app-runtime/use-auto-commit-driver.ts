@@ -1,6 +1,7 @@
 import { type MutableRefObject, useEffect, useRef } from 'react'
 
-import type { AppAction, AppState, GitRefreshPayload, TabActivity } from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, GitRefreshPayload, TabActivity } from '../state/types'
 
 import {
   type AutoCommitConfigSnapshot,
@@ -61,7 +62,7 @@ export function useAutoCommitDriver({
   const prevActivityRef = useRef<Map<string, TabActivity | undefined>>(new Map())
 
   useEffect(() => {
-    // Always refresh the activity map so re-enabling mid-session doesn't fire
+    // Always refresh the activity map so re-enabling mid-project doesn't fire
     // a stale "became idle" transition. Skip only the dispatch work.
     const prev = prevActivityRef.current
     const next = new Map<string, TabActivity | undefined>()
@@ -73,15 +74,15 @@ export function useAutoCommitDriver({
       const becameIdle =
         (before === 'working' || before === 'waiting-input') && tab.activity === 'idle'
       if (becameIdle) {
-        const sessionId = state.currentSessionId
-        if (!(sessionId != null && sessionId !== '')) continue
-        const session = state.sessions.find((s) => s.id === sessionId)
+        const projectId = state.currentProjectId
+        if (!(projectId != null && projectId !== '')) continue
+        const project = state.projects.find((s) => s.id === projectId)
         const git = gitPayloadFromState(state)
         void onActivityTransition(depsRef.current, {
           assistant: tab.assistant,
           git,
-          projectPath: session?.projectPath,
-          sessionId,
+          projectId,
+          projectPath: project?.projectPath,
           tabId: tab.id,
         })
       }
@@ -92,16 +93,21 @@ export function useAutoCommitDriver({
   const lastGitHashRef = useRef<string | null>(null)
   const gitStabilizeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // `state.gitPanel`, not `state`: the payload is built from the git panel and
+  // nothing else, while `state` changes on every PTY frame. Keyed on the whole
+  // state this ran — and JSON.stringify'd the changed-file list — at the rate
+  // the assistants print.
   useEffect(() => {
     if (!configRef.current.enabled) return
-    const sessionId = state.currentSessionId
-    if (!(sessionId != null && sessionId !== '')) return
+    const state = stateRef.current
+    const projectId = state.currentProjectId
+    if (!(projectId != null && projectId !== '')) return
     const payload = gitPayloadFromState(state)
     if (!payload) return
     const cacheKey = JSON.stringify(payload)
     if (lastGitHashRef.current === cacheKey) return
     lastGitHashRef.current = cacheKey
-    onGitRefresh(depsRef.current, sessionId, payload)
+    onGitRefresh(depsRef.current, projectId, payload)
 
     // Debounced trigger: when the working tree stays stable for
     // GIT_STABILIZATION_DEBOUNCE_MS, try to start generation. Covers cases
@@ -114,18 +120,18 @@ export function useAutoCommitDriver({
         ? state.tabs.find((tab) => tab.id === activeTabId)
         : undefined
     if (!activeTab) return
-    const session = state.sessions.find((s) => s.id === sessionId)
+    const project = state.projects.find((s) => s.id === projectId)
     gitStabilizeTimerRef.current = setTimeout(() => {
       gitStabilizeTimerRef.current = null
       void onActivityTransition(depsRef.current, {
         assistant: activeTab.assistant,
         git: payload,
-        projectPath: session?.projectPath,
-        sessionId,
+        projectId,
+        projectPath: project?.projectPath,
         tabId: activeTab.id,
       })
     }, GIT_STABILIZATION_DEBOUNCE_MS)
-  }, [state])
+  }, [state.gitPanel, stateRef])
 
   useEffect(
     () => () => {

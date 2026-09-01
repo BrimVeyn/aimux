@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { isWorkspaceSnapshotV1 } from '../../src/state/validation'
+import { isProjectSnapshotV1 } from '../../src/state/validation'
 
 describe('config edge cases', () => {
-  test('workspace snapshot accepts custom assistant ids', () => {
+  test('project snapshot accepts custom assistant ids', () => {
     const snapshot = {
       activeTabId: 'tab-1',
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -31,10 +31,10 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(true)
+    expect(isProjectSnapshotV1(snapshot)).toBe(true)
   })
 
-  test('workspace snapshot rejects empty assistant id', () => {
+  test('project snapshot rejects empty assistant id', () => {
     const snapshot = {
       activeTabId: 'tab-1',
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -59,10 +59,10 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 
-  test('workspace snapshot rejects non-string assistant id', () => {
+  test('project snapshot rejects non-string assistant id', () => {
     const snapshot = {
       activeTabId: null,
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -87,18 +87,18 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 
-  test('workspace snapshot rejects missing required fields', () => {
-    expect(isWorkspaceSnapshotV1(null)).toBe(false)
-    expect(isWorkspaceSnapshotV1(undefined)).toBe(false)
-    expect(isWorkspaceSnapshotV1({})).toBe(false)
-    expect(isWorkspaceSnapshotV1({ version: 2 })).toBe(false)
-    expect(isWorkspaceSnapshotV1('string')).toBe(false)
+  test('project snapshot rejects missing required fields', () => {
+    expect(isProjectSnapshotV1(null)).toBe(false)
+    expect(isProjectSnapshotV1(undefined)).toBe(false)
+    expect(isProjectSnapshotV1({})).toBe(false)
+    expect(isProjectSnapshotV1({ version: 2 })).toBe(false)
+    expect(isProjectSnapshotV1('string')).toBe(false)
   })
 
-  test('workspace snapshot rejects tabs with invalid status', () => {
+  test('project snapshot rejects tabs with invalid status', () => {
     const snapshot = {
       activeTabId: null,
       savedAt: '2024-01-01T00:00:00.000Z',
@@ -123,7 +123,7 @@ describe('config edge cases', () => {
       version: 1,
     }
 
-    expect(isWorkspaceSnapshotV1(snapshot)).toBe(false)
+    expect(isProjectSnapshotV1(snapshot)).toBe(false)
   })
 })
 
@@ -202,5 +202,120 @@ describe('sidebar config loading', () => {
 
     expect(result.config.sidebar).toBeUndefined()
     expect(result.issues).toContain('ignored invalid sidebar')
+  })
+})
+
+describe('bars config loading', () => {
+  test('derives bars from the legacy sidebar + embedded git pane', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-bars-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'bars-legacy-embedded'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'bars-legacy-embedded')
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        customCommands: {},
+        gitPane: { embeddedRatio: 0.4, mode: 'embedded', position: 'bottom', visible: true },
+        sidebar: { visible: true, width: 33 },
+        version: 2,
+      })
+    )
+
+    const { loadConfig } = await import(`../../src/config.ts?bars-embedded=${Date.now()}`)
+    expect(loadConfig().bars).toEqual({
+      left: {
+        visible: true,
+        widgets: [
+          { grow: 60, id: 'projects', visible: true },
+          { grow: 40, id: 'git', visible: true },
+        ],
+        width: 33,
+      },
+      right: { visible: false, widgets: [], width: 40 },
+    })
+  })
+
+  test('a legacy right-side git pane becomes the right bar', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-bars-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'bars-legacy-pane'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'bars-legacy-pane')
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        customCommands: {},
+        gitPane: { mode: 'pane', paneRatio: 0.5, position: 'right', visible: true },
+        sidebar: { visible: true, width: 28 },
+        version: 2,
+      })
+    )
+
+    const { loadConfig } = await import(`../../src/config.ts?bars-pane=${Date.now()}`)
+    const bars = loadConfig().bars
+    expect(bars?.left.widgets).toEqual([{ grow: 100, id: 'projects', visible: true }])
+    expect(bars?.right).toEqual({
+      visible: true,
+      widgets: [{ grow: 100, id: 'git', visible: true }],
+      width: 40,
+    })
+  })
+
+  test('an explicit bars block wins over the legacy derivation', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-bars-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'bars-explicit'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'bars-explicit')
+    mkdirSync(profileDir, { recursive: true })
+    const bars = {
+      left: { visible: true, widgets: [{ grow: 100, id: 'git', visible: true }], width: 20 },
+      right: {
+        visible: true,
+        widgets: [{ grow: 100, id: 'projects', visible: true }],
+        width: 25,
+      },
+    }
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        bars,
+        customCommands: {},
+        sidebar: { visible: true, width: 28 },
+        version: 2,
+      })
+    )
+
+    const { loadConfig } = await import(`../../src/config.ts?bars-explicit=${Date.now()}`)
+    expect(loadConfig().bars).toEqual(bars)
+  })
+
+  test('git content prefs survive a config with no placement fields', async () => {
+    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-bars-home-'))
+    process.env.HOME = tempHome
+    process.env.AIMUX_PROFILE = 'bars-gitpane-prefs'
+
+    const profileDir = join(tempHome, '.config', 'aimux', 'bars-gitpane-prefs')
+    mkdirSync(profileDir, { recursive: true })
+    writeFileSync(
+      join(profileDir, 'aimux.json'),
+      JSON.stringify({
+        customCommands: {},
+        gitPane: { diffModeRatio: 0.42, fileListMode: 'flat', treeCompaction: false },
+        version: 2,
+      })
+    )
+
+    const { loadConfigResult } = await import(`../../src/config.ts?bars-prefs=${Date.now()}`)
+    const result = loadConfigResult()
+    expect(result.config.gitPane).toEqual({
+      diffModeRatio: 0.42,
+      fileListMode: 'flat',
+      treeCompaction: false,
+    })
+    expect(result.issues).not.toContain('ignored invalid gitPane')
   })
 })

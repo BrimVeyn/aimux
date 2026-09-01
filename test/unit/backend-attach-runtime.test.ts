@@ -1,11 +1,11 @@
 import { describe, expect, mock, test } from 'bun:test'
 
 import type { SessionBackend } from '../../src/session-backend/types'
-import type { LayoutState, WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { LayoutState, ProjectSnapshotV1 } from '../../src/state/types'
 
 import { resizeSnapshotPanes } from '../../src/app-runtime/backend-attach-runtime'
 
-function createSnapshot(): WorkspaceSnapshotV1 {
+function createSnapshot(): ProjectSnapshotV1 {
   return {
     activeTabId: 'tab-a',
     layoutTree: {

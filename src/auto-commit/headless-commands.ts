@@ -3,9 +3,15 @@ export interface HeadlessInvocation {
   args: string[]
 }
 
-export type SupportedProvider = 'claude' | 'codex' | 'opencode'
+export type SupportedProvider = 'claude' | 'codex' | 'opencode' | 'grok' | 'kimi'
 
-const SUPPORTED: ReadonlySet<string> = new Set<SupportedProvider>(['claude', 'codex', 'opencode'])
+const SUPPORTED: ReadonlySet<string> = new Set<SupportedProvider>([
+  'claude',
+  'codex',
+  'opencode',
+  'grok',
+  'kimi',
+])
 
 export function isSupportedProvider(id: string): id is SupportedProvider {
   return SUPPORTED.has(id)
@@ -31,6 +37,20 @@ export function buildHeadlessInvocation(
     }
     case 'opencode': {
       return { args: ['run', prompt], executable: 'opencode' }
+    }
+    case 'grok': {
+      // Headless: grok -p "<prompt>" [-m <model>]. Model appended after prompt value to
+      // match documented example shape `grok -p "..." -m my-model`. No output-format flag.
+      const args: string[] = ['-p', prompt]
+      if (model != null && model !== '') args.push('-m', model)
+      return { args, executable: 'grok' }
+    }
+    case 'kimi': {
+      // Headless: kimi -p "<prompt>" [--model <model>]. Non-interactive mode uses
+      // auto permission by default; --output-format text is the default.
+      const args: string[] = ['-p', prompt]
+      if (model != null && model !== '') args.push('--model', model)
+      return { args, executable: 'kimi' }
     }
     default:
       return null

@@ -1,12 +1,7 @@
 import { $ } from 'bun'
 
-import type {
-  AppAction,
-  AppState,
-  AssistantId,
-  AutoCommitState,
-  GitRefreshPayload,
-} from '../state/types'
+import type { AppAction } from '../state/actions'
+import type { AppState, AssistantId, AutoCommitState, GitRefreshPayload } from '../state/types'
 
 import { buildHeadlessInvocation, isSupportedProvider } from '../auto-commit/headless-commands'
 import { composePromptFromTemplate, loadBriefingTemplate } from '../auto-commit/prompt-loader'
@@ -22,7 +17,7 @@ export interface TriggerInput {
   assistant: AssistantId
   hasProjectPath: boolean
   git: GitRefreshPayload
-  sessionId: string
+  projectId: string
   state: AutoCommitState
   currentHash: string
 }
@@ -33,7 +28,7 @@ export function shouldTriggerAutoCommit(input: TriggerInput): boolean {
   if (!input.hasProjectPath) return false
   if (input.git.files.length === 0) return false
 
-  const existing = input.state.bySession[input.sessionId]
+  const existing = input.state.byProject[input.projectId]
   if (!existing || existing.kind === 'idle') return true
   if (existing.workingTreeHash === input.currentHash) return false
   return true
@@ -61,14 +56,14 @@ async function getTemplate(deps: DriverDeps): Promise<string> {
 }
 
 const UNTRACKED_FILE_BYTES_CAP = 8_000
-const SESSION_TAIL_BYTES_CAP = 8_000
+const PROJECT_TAIL_BYTES_CAP = 8_000
 
 export function extractSessionTail(buffer: string | undefined): string {
   if (!(buffer != null && buffer !== '')) return '[no session tail available]'
   const stripped = stripAnsi(buffer).trimEnd()
   if (stripped.length === 0) return '[no session tail available]'
-  return stripped.length > SESSION_TAIL_BYTES_CAP
-    ? stripped.slice(stripped.length - SESSION_TAIL_BYTES_CAP)
+  return stripped.length > PROJECT_TAIL_BYTES_CAP
+    ? stripped.slice(stripped.length - PROJECT_TAIL_BYTES_CAP)
     : stripped
 }
 
@@ -140,7 +135,7 @@ async function gatherContext(cwd: string, stagedOnly: boolean): Promise<Gathered
 }
 
 export interface ActivityTransitionArgs {
-  sessionId: string
+  projectId: string
   tabId: string
   assistant: AssistantId
   projectPath: string | undefined
@@ -163,7 +158,7 @@ export async function onActivityTransition(
     enabled: config.enabled,
     git: args.git,
     hasProjectPath: !!(args.projectPath != null && args.projectPath !== ''),
-    sessionId: args.sessionId,
+    projectId: args.projectId,
     state: state.autoCommit,
   })
   if (!should) return
@@ -180,15 +175,15 @@ export async function onManualTrigger(
     // Manual auto-commit triggers can fire outside git mode, so surface the
     // reason as a toast rather than an inline git-pane message that's unseen.
     toast.warning(`Auto-commit: ${reason}`)
-    deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
+    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
   }
   if (!config.enabled) return fail('disabled in config')
   if (!args.git || args.git.files.length === 0) return fail('no changes to summarise')
   if (!(args.projectPath != null && args.projectPath !== ''))
-    return fail('no project path for current session')
+    return fail('no project path for current project')
 
   const currentHash = workingTreeHash(args.git)
-  const existing = deps.getState().autoCommit.bySession[args.sessionId]
+  const existing = deps.getState().autoCommit.byProject[args.projectId]
   // An in-flight generation will dispatch ready/clear; just wait for it.
   if (existing && existing.kind === 'generating') return
   // Manual trigger is always user-intent to regenerate, even if a ready
@@ -213,11 +208,11 @@ async function runGeneration(
   if (!probe) return
   if (!isCommandAvailable(probe.executable)) return
 
-  // Supersede any in-flight generation for this session. Without this, a
+  // Supersede any in-flight generation for this project. Without this, a
   // rapid sequence of activity transitions (each with a different working
   // tree hash) would leak concurrent headless subprocesses until each hit
   // its 60 s timeout — burning real API credits.
-  const existing = deps.getState().autoCommit.bySession[args.sessionId]
+  const existing = deps.getState().autoCommit.byProject[args.projectId]
   if (existing && existing.kind === 'generating') {
     try {
       existing.abortController.abort()
@@ -229,7 +224,7 @@ async function runGeneration(
   const controller = new AbortController()
   deps.dispatch({
     abortController: controller,
-    sessionId: args.sessionId,
+    projectId: args.projectId,
     startedAt: Date.now(),
     tabId: args.tabId,
     type: 'auto-commit-generation-started',
@@ -240,7 +235,7 @@ async function runGeneration(
   const stagedOnly = args.git ? hasStagedFiles(args.git) : false
   const ctx = await gatherContext(args.projectPath as string, stagedOnly)
   if (!ctx) {
-    deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
+    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
     return
   }
   const tab = deps.getState().tabs.find((t) => t.id === args.tabId)
@@ -252,7 +247,7 @@ async function runGeneration(
     config.models[args.assistant]
   )
   if (!finalInvocation) {
-    deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
+    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
     return
   }
 
@@ -262,13 +257,13 @@ async function runGeneration(
     timeoutMs: config.timeoutMs,
   })
   if (!parsed) {
-    deps.dispatch({ sessionId: args.sessionId, type: 'auto-commit-clear' })
+    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
     return
   }
   deps.dispatch({
     body: parsed.body,
     generatedAt: Date.now(),
-    sessionId: args.sessionId,
+    projectId: args.projectId,
     title: parsed.title,
     type: 'auto-commit-generation-ready',
     workingTreeHash: currentHash,
@@ -277,14 +272,14 @@ async function runGeneration(
 
 export function onGitRefresh(
   deps: DriverDeps,
-  sessionId: string,
+  projectId: string,
   payload: GitRefreshPayload
 ): void {
   const state = deps.getState()
-  const current = state.autoCommit.bySession[sessionId]
+  const current = state.autoCommit.byProject[projectId]
   if (!current || current.kind === 'idle') return
   const newHash = workingTreeHash(payload)
   if (newHash !== current.workingTreeHash) {
-    deps.dispatch({ sessionId, type: 'auto-commit-clear' })
+    deps.dispatch({ projectId, type: 'auto-commit-clear' })
   }
 }

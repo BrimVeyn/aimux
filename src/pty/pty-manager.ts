@@ -3,9 +3,15 @@ import { Terminal as XTerm } from '@xterm/headless'
 import { type IPty, spawn } from 'bun-pty'
 import { EventEmitter } from 'node:events'
 
-import type { ScrollIntent, TerminalModeState, TerminalSnapshot } from '../state/types'
+import type {
+  ScrollIntent,
+  TerminalCursorStyle,
+  TerminalModeState,
+  TerminalSnapshot,
+} from '../state/types'
 
 import { logDebug } from '../debug/input-log'
+import { applyGhosttyShellIntegration } from './ghostty-shell-integration'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
 
 interface PtyManagerEvents {
@@ -23,6 +29,10 @@ interface SessionHandle {
   lastTerminalModes?: TerminalModeState
   alternateScrollMode: boolean
   cursorVisible: boolean
+  /** Last DECSCUSR shape; 'default' = the host terminal's configured cursor. */
+  cursorStyle: TerminalCursorStyle
+  /** Last DECSCUSR blink flag; undefined until an explicit DECSCUSR arrives. */
+  cursorBlink: boolean | undefined
   pendingModeSequence: string
   pendingWrites: number
   pendingExitCode: number | null
@@ -82,6 +92,28 @@ function trackPrivateModes(
     cursorVisible: nextCursorVisible,
     pendingSequence: getPendingModeSequence(sequence),
   }
+}
+
+// DECSCUSR (CSI Ps SP q): 0 resets to the terminal's configured cursor,
+// odd values blink, 1/2 = block, 3/4 = underline, 5/6 = bar.
+const DECSCUSR_STYLES: readonly TerminalCursorStyle[] = [
+  'block',
+  'block',
+  'underline',
+  'underline',
+  'bar',
+  'bar',
+]
+
+function decscusrToCursorState(ps: number): {
+  cursorStyle: TerminalCursorStyle
+  cursorBlink: boolean | undefined
+} {
+  const style = DECSCUSR_STYLES[ps - 1]
+  if (ps === 0 || style === undefined) {
+    return { cursorBlink: undefined, cursorStyle: 'default' }
+  }
+  return { cursorBlink: ps % 2 === 1, cursorStyle: style }
 }
 
 function getTerminalModes(emulator: XTerm, alternateScrollMode: boolean): TerminalModeState {
@@ -201,7 +233,11 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
 
   private emitRenderIfChanged(session: SessionHandle): void {
     if (!this.broadcastEnabled) return
-    const nextSnapshot = snapshotTerminal(session.emulator, session.cursorVisible)
+    const nextSnapshot = snapshotTerminal(session.emulator, {
+      cursorBlink: session.cursorBlink,
+      cursorStyle: session.cursorStyle,
+      cursorVisible: session.cursorVisible,
+    })
     const nextTerminalModes = getTerminalModes(session.emulator, session.alternateScrollMode)
     const snapshotChanged = !areTerminalSnapshotsEqual(session.lastSnapshot, nextSnapshot)
     const modesChanged =
@@ -255,6 +291,8 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
     cols: number
     rows: number
     cwd?: string
+    /** Extra environment variables merged on top of `process.env` for this PTY. */
+    env?: Record<string, string>
   }): void {
     this.disposeSession(options.tabId)
     logDebug('ptyManager.create.start', {
@@ -274,19 +312,28 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         scrollback: 1000,
       })
 
+      const env = applyGhosttyShellIntegration(
+        {
+          ...process.env,
+          COLORTERM: 'truecolor',
+          TERM: 'xterm-256color',
+          ...options.env,
+        },
+        options.command
+      )
+
       const pty = spawn(options.command, options.args ?? [], {
         cols: options.cols,
         cwd: options.cwd ?? process.cwd(),
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-        },
+        env,
         name: 'xterm-256color',
         rows: options.rows,
       })
 
       const session: SessionHandle = {
         alternateScrollMode: false,
+        cursorBlink: undefined,
+        cursorStyle: 'default',
         cursorVisible: true,
         emulator,
         lastScrollIntent: undefined,
@@ -300,6 +347,36 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         reaped: false,
         tabId: options.tabId,
       }
+
+      // xterm parses DECSCUSR itself but keeps the result in private state;
+      // mirror it here so snapshots can carry the shape to the renderer.
+      // Returning false lets xterm's own handler still run.
+      emulator.parser.registerCsiHandler({ final: 'q', intermediates: ' ' }, (params) => {
+        const raw = params[0]
+        const tracked = decscusrToCursorState(typeof raw === 'number' ? raw : 0)
+        session.cursorStyle = tracked.cursorStyle
+        session.cursorBlink = tracked.cursorBlink
+        return false
+      })
+
+      // Wire the emulator's reply channel back to the pty. When a program
+      // writes a query sequence — CPR (ESC[6n), Device Attributes (ESC[c),
+      // Device Status (ESC[5n), DECRQM, OSC color queries — xterm generates
+      // the answer and emits it via onData. Without forwarding it the program
+      // waits forever for a response it never gets (e.g. AWS CLI / Python
+      // prompt_toolkit warns "terminal doesn't support cursor position
+      // requests (CPR)"). These replies are produced synchronously inside the
+      // emulator.write() below, so write straight to the pty rather than
+      // queueing through the render path. The listener is disposed together
+      // with the emulator in finalize/dispose, mirroring registerCsiHandler.
+      //
+      // onBinary (legacy non-UTF-8 mouse reports) is intentionally not wired:
+      // bun-pty.write() only accepts a UTF-8 string so byte values >127 can't
+      // be transmitted faithfully, and the headless emulator is never fed raw
+      // mouse input, so it never generates those reports in the first place.
+      emulator.onData((reply) => {
+        session.pty.write(reply)
+      })
 
       pty.onData((data) => {
         // If the session has been replaced (createSession fired again for

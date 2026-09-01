@@ -86,19 +86,19 @@ export function startDiffOnDemandPipeline(opts: DiffOnDemandOpts): () => void {
   }
 
   let prevSelectedKey = appStore.getState().gitMode.selectedEntryKey
-  let prevSessionId = appStore.getState().currentSessionId
+  let prevProjectId = appStore.getState().currentProjectId
 
   const unsubscribe = appStore.subscribe(() => {
     const state = appStore.getState()
     const nextKey = state.gitMode.selectedEntryKey
-    const nextSessionId = state.currentSessionId
-    const sessionChanged = nextSessionId !== prevSessionId
-    if (nextKey !== prevSelectedKey || sessionChanged) {
+    const nextProjectId = state.currentProjectId
+    const projectChanged = nextProjectId !== prevProjectId
+    if (nextKey !== prevSelectedKey || projectChanged) {
       prevSelectedKey = nextKey
-      prevSessionId = nextSessionId
+      prevProjectId = nextProjectId
       // Drop the dedup latch so a re-selection of the same key after a
       // session change re-fetches against the new project path.
-      if (sessionChanged) {
+      if (projectChanged) {
         lastFetchedKey = null
       }
       tryFetch()

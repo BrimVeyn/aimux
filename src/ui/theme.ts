@@ -12,6 +12,7 @@ export {
   setMode,
   setTransparent,
   subscribeThemeChanges,
+  useBaseTheme,
   useMode,
   useTheme,
   useTransparent,

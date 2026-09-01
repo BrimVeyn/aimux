@@ -36,10 +36,16 @@ function requireValue<T>(value: T | null | undefined, message: string): T {
 }
 
 describe('mode handlers', () => {
-  test('navigation: maps j/k to move-active-tab', () => {
+  test('navigation: maps j/k to cycle-sidebar-item, h/l to move-active-tab', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
-    const result = requireValue(handler.handleKey(key('j'), ctx()), 'Expected navigation result')
-    expect(result.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    const j = requireValue(handler.handleKey(key('j'), ctx()), 'Expected j result')
+    expect(j.effects).toEqual([{ direction: 1, type: 'cycle-sidebar-item' }])
+    const k = requireValue(handler.handleKey(key('k'), ctx()), 'Expected k result')
+    expect(k.effects).toEqual([{ direction: -1, type: 'cycle-sidebar-item' }])
+    const l = requireValue(handler.handleKey(key('l'), ctx()), 'Expected l result')
+    expect(l.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    const h = requireValue(handler.handleKey(key('h'), ctx()), 'Expected h result')
+    expect(h.actions).toEqual([{ delta: -1, type: 'move-active-tab' }])
   })
 
   test('navigation: Ctrl+W is a leader prefix (no immediate action)', () => {
@@ -65,24 +71,31 @@ describe('mode handlers', () => {
     const context = ctx({ activeTabId: 'tab-1' })
     handler.handleKey(key('d'), context)
     const interrupt = requireValue(handler.handleKey(key('j'), context), 'Expected j result')
-    expect(interrupt.actions).toEqual([{ delta: 1, type: 'move-active-tab' }])
+    // After arming dd, j should fire the navigation key (sidebar item cycle).
+    expect(interrupt.effects).toEqual([{ direction: 1, type: 'cycle-sidebar-item' }])
     // Now a single d should only arm the chord, not close
     const armed = requireValue(handler.handleKey(key('d'), context), 'Expected armed result')
     expect(armed.actions).toEqual([])
   })
 
-  test('navigation: Ctrl+Z opens sidebar when hidden, no-op when visible', () => {
+  test('navigation: Ctrl+Z opens the projects bar when hidden, no-op when visible', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const hiddenCtx = ctx()
-    hiddenCtx.state.sidebar = { ...hiddenCtx.state.sidebar, visible: false }
+    hiddenCtx.state.bars = {
+      ...hiddenCtx.state.bars,
+      left: { ...hiddenCtx.state.bars.left, visible: false },
+    }
     const openResult = requireValue(
       handler.handleKey(key('z', { ctrl: true }), hiddenCtx),
       'Expected Ctrl+Z result'
     )
-    expect(openResult.actions).toEqual([{ type: 'toggle-sidebar' }])
+    expect(openResult.actions).toEqual([{ side: 'left', type: 'toggle-bar' }])
 
     const visibleCtx = ctx()
-    visibleCtx.state.sidebar = { ...visibleCtx.state.sidebar, visible: true }
+    visibleCtx.state.bars = {
+      ...visibleCtx.state.bars,
+      left: { ...visibleCtx.state.bars.left, visible: true },
+    }
     const noopResult = requireValue(
       handler.handleKey(key('z', { ctrl: true }), visibleCtx),
       'Expected Ctrl+Z noop result'
@@ -114,42 +127,41 @@ describe('mode handlers', () => {
     expect(result.effects[0]?.type).toBe('restart-tab')
   })
 
-  test('navigation: Ctrl+G opens session picker', () => {
+  test('navigation: Ctrl+G opens project picker', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
       handler.handleKey(key('g', { ctrl: true }), ctx()),
-      'Expected session picker result'
+      'Expected project picker result'
     )
-    expect(result.actions).toEqual([{ type: 'open-session-picker' }])
-    expect(result.transition).toBe('modal.session-picker.filtering')
+    expect(result.actions).toEqual([{ type: 'open-project-picker' }])
+    expect(result.transition).toBe('modal.project-picker.filtering')
   })
 
-  test('new-tab modal: Ctrl+W toggles worktree mode', () => {
-    const handler = requireValue(
-      getHandler('modal.new-tab.command-edit'),
-      'Missing new-tab handler'
-    )
-    const result = requireValue(
-      handler.handleKey(key('w', { ctrl: true }), ctx()),
-      'Expected WT result'
-    )
-
-    expect(result.actions).toEqual([{ type: 'toggle-new-tab-worktree' }])
-  })
-
-  test('navigation: Shift+J reorders tab', () => {
+  test('navigation: Ctrl+P opens the create-workspace modal', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('j', { shift: true }), ctx()),
+      handler.handleKey(key('p', { ctrl: true }), ctx()),
+      'Expected create-workspace result'
+    )
+
+    expect(result.actions).toEqual([{ type: 'open-create-workspace-modal' }])
+    expect(result.effects).toEqual([{ type: 'load-create-workspace-base-branches' }])
+    expect(result.transition).toBe('modal.create-workspace')
+  })
+
+  test('navigation: Shift+L reorders tab right', () => {
+    const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
+    const result = requireValue(
+      handler.handleKey(key('l', { shift: true }), ctx()),
       'Expected reorder result'
     )
     expect(result.actions).toEqual([{ delta: 1, type: 'reorder-active-tab' }])
   })
 
-  test('navigation: Shift+K reorders tab up', () => {
+  test('navigation: Shift+H reorders tab left', () => {
     const handler = requireValue(getHandler('navigation'), 'Missing navigation handler')
     const result = requireValue(
-      handler.handleKey(key('k', { shift: true }), ctx()),
+      handler.handleKey(key('h', { shift: true }), ctx()),
       'Expected reorder-up result'
     )
     expect(result.actions).toEqual([{ delta: -1, type: 'reorder-active-tab' }])
@@ -186,7 +198,7 @@ describe('mode handlers', () => {
 
   test('terminal-input: <leader> (Ctrl+W) is now a prefix (enter-layout on timeout)', () => {
     // Ctrl+W is both bound alone (→ enter-layout) and as a prefix for
-    // <leader>b / <leader>1..9 session-bar shortcuts. The trie therefore
+    // <leader>b / <leader>1..9 project-bar shortcuts. The trie therefore
     // waits for a continuation; handleKey returns an empty pending result.
     // The exact binding fires via the handler's timeout callback, which is
     // covered by sequence-resolver tests.
@@ -197,13 +209,13 @@ describe('mode handlers', () => {
     expect(result?.transition).toBeUndefined()
   })
 
-  test('terminal-input: Ctrl+B resolves to toggle-sidebar', () => {
+  test('terminal-input: Ctrl+B resolves to toggle-bar left', () => {
     const handler = requireValue(getHandler('terminal-input'), 'Missing terminal-input handler')
     const result = requireValue(
       handler.handleKey(key('b', { ctrl: true }), ctx()),
       'Expected Ctrl+B result'
     )
-    expect(result.actions).toContainEqual({ type: 'toggle-sidebar' })
+    expect(result.actions).toContainEqual({ side: 'left', type: 'toggle-bar' })
   })
 
   test('terminal-input: unbound keys (Ctrl+L) return null', () => {
@@ -211,25 +223,46 @@ describe('mode handlers', () => {
     expect(handler.handleKey(key('l', { ctrl: true }), ctx())).toBeNull()
   })
 
-  test('modal.session-picker: escape blocked without currentSessionId', () => {
+  test('modal.project-picker: escape blocked without currentProjectId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker.filtering'),
-      'Missing session-picker handler'
+      getHandler('modal.project-picker.filtering'),
+      'Missing project-picker handler'
     )
-    const result = handler.handleKey(key('escape'), ctx({ currentSessionId: null }))
+    const result = handler.handleKey(key('escape'), ctx({ currentProjectId: null }))
     expect(result).toBeNull()
   })
 
-  test('modal.session-picker: escape works with currentSessionId', () => {
+  test('modal.project-picker: escape works with currentProjectId', () => {
     const handler = requireValue(
-      getHandler('modal.session-picker.filtering'),
-      'Missing session-picker handler'
+      getHandler('modal.project-picker.filtering'),
+      'Missing project-picker handler'
     )
     const result = requireValue(
-      handler.handleKey(key('escape'), ctx({ currentSessionId: 's-1' })),
-      'Expected session-picker escape result'
+      handler.handleKey(key('escape'), ctx({ currentProjectId: 's-1' })),
+      'Expected project-picker escape result'
     )
     expect(result.transition).toBe('navigation')
+  })
+
+  test('settings: across a row changes its value, return hands over to a field', () => {
+    const handler = requireValue(getHandler('settings'), 'Missing settings handler')
+    // The screen is one list, so `h`/`l` and the arrows are free to mean what
+    // they read like — drag the gauge, step the enum — rather than "change
+    // column". Losing this is losing the only way to set a number without
+    // typing it.
+    for (const [name, delta] of [
+      ['l', 1],
+      ['right', 1],
+      ['h', -1],
+      ['left', -1],
+    ] as const) {
+      const result = requireValue(handler.handleKey(key(name), ctx()), `Expected ${name} result`)
+      expect(`${name}: ${JSON.stringify(result.effects)}`).toBe(
+        `${name}: ${JSON.stringify([{ delta, type: 'adjust-settings-row' }])}`
+      )
+    }
+    const enter = requireValue(handler.handleKey(key('return'), ctx()), 'Expected return result')
+    expect(enter.effects).toEqual([{ type: 'activate-settings-row' }])
   })
 
   test('modal.theme-picker: return confirms theme', () => {

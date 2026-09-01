@@ -88,6 +88,57 @@ describe('AssistantStatusDetector', () => {
     expect(s).toBe('working')
   })
 
+  // Ctrl+T todo overlay: the spinner line lands on row 11 counting from the
+  // bottom, just outside the 10-line tail, and Claude drops `esc to interrupt`
+  // from the status line while the overlay is up.
+  test('claude: working survives the Ctrl+T todo overlay', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot([
+        '● 4 tâches créées (#1 à #4). Ctrl+T devrait te les afficher.',
+        '',
+        '✳ Sautéed for 10s',
+        '',
+        '❯ travaille pendant 10 secondes',
+        '',
+        '✳ Flowing… (3s · thinking with high effort)',
+        '  └ ☐ Test todo 1',
+        '    ☐ Test todo 2',
+        '    ☐ Test todo 3',
+        '    ☐ Test todo 4',
+        '',
+        '',
+        '❯ ',
+        '',
+        '  Opus 5 (1M context) | Context: 5% | Branch: main | Dir: rainhub',
+        '  ▶▶ auto mode on (shift+tab to cycle) · ⌥+⏎ agent',
+      ]),
+    })
+    expect(s).toBe('working')
+  })
+
+  test('claude: finished status lines in the transcript stay idle', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'claude',
+      tabId: 't',
+      viewport: snapshot([
+        '✳ Sautéed for 10s',
+        '',
+        '● Voilà, c’est fait.',
+        '  └ ☒ Test todo 1',
+        '    ☒ Test todo 2',
+        '',
+        '❯ ',
+        '',
+        '  Opus 5 (1M context) | Context: 5% | Branch: main | Dir: rainhub',
+      ]),
+    })
+    expect(s).toBe('idle')
+  })
+
   test('codex: detects working and waiting-input', () => {
     const d = new AssistantStatusDetector()
     expect(
@@ -114,6 +165,122 @@ describe('AssistantStatusDetector', () => {
       viewport: snapshot(['△ Permission required to run command']),
     })
     expect(s).toBe('waiting-input')
+  })
+
+  test('grok: detects working from Thought for trace + interrupt', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't1',
+        viewport: snapshot(['Thought for 3.4s', '  esc to interrupt']),
+      })
+    ).toBe('working')
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't2',
+        viewport: snapshot(['Thinking… some reasoning']),
+      })
+    ).toBe('working')
+  })
+
+  test('grok: plan approval prompt is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'grok',
+      tabId: 't',
+      viewport: snapshot(['[ a ] pprove [ c ] omment [ q ] uit plan']),
+    })
+    expect(s).toBe('waiting-input')
+  })
+
+  test('grok: waiting on answers Q&A + enter select is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't',
+        viewport: snapshot(['Waiting on answers for 3 questions', 'Enter :select']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('grok: do you want / permission style prompt is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'grok',
+        tabId: 't',
+        viewport: snapshot(['Do you want to proceed with this change?']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('grok: idle when tail has no sentinels (plain prompt screen)', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'grok',
+      tabId: 't',
+      viewport: snapshot(['grok-4.5 · ask', '❯ type your prompt here']),
+    })
+    expect(s).toBe('idle')
+  })
+
+  test('kimi: approval panel title is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't1',
+        viewport: snapshot(['▶ Run this command?', '1. Approve', '2. Reject']),
+      })
+    ).toBe('waiting-input')
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't2',
+        viewport: snapshot(['Ready to build with this plan?', '1. Approve plan']),
+      })
+    ).toBe('waiting-input')
+  })
+
+  test('kimi: approval panel footer chrome is waiting-input', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'kimi',
+      tabId: 't',
+      viewport: snapshot(['↑/↓ select · 1/2/3 choose · ↵ confirm']),
+    })
+    expect(s).toBe('waiting-input')
+  })
+
+  test('kimi: detects working from working... label and braille spinner', () => {
+    const d = new AssistantStatusDetector()
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't1',
+        viewport: snapshot(['⠋ working...']),
+      })
+    ).toBe('working')
+    expect(
+      d.classify({
+        assistant: 'kimi',
+        tabId: 't2',
+        viewport: snapshot(['🌑  · Tip: press Esc to interrupt']),
+      })
+    ).toBe('working')
+  })
+
+  test('kimi: idle welcome / prompt screen is not working', () => {
+    const d = new AssistantStatusDetector()
+    const s = d.classify({
+      assistant: 'kimi',
+      tabId: 't',
+      viewport: snapshot(['Welcome to Kimi Code CLI!', 'Model: K2.7 Code', '> type your prompt']),
+    })
+    expect(s).toBe('idle')
   })
 
   test('custom CLI: shell command is always idle regardless of activity', () => {
@@ -227,6 +394,8 @@ describe('isShellCommand', () => {
     expect(isShellCommand('claude')).toBe(false)
     expect(isShellCommand('codex')).toBe(false)
     expect(isShellCommand('opencode')).toBe(false)
+    expect(isShellCommand('grok')).toBe(false)
+    expect(isShellCommand('kimi')).toBe(false)
     expect(isShellCommand('my-agent')).toBe(false)
     expect(isShellCommand(undefined)).toBe(false)
     expect(isShellCommand('')).toBe(false)

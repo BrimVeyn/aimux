@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs'
 
-import { CONFIG_PATH, loadConfigResult } from './config'
+import { completionStatus } from './cli/completion/install'
+import { getConfigPath, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
 
 export interface DoctorCheck {
@@ -22,11 +23,12 @@ function getConfigDetails(configResult: ReturnType<typeof loadConfigResult>): st
     return configResult.issues.join('; ')
   }
 
-  if (existsSync(CONFIG_PATH)) {
-    return `loaded ${CONFIG_PATH}`
+  const configPath = getConfigPath()
+  if (existsSync(configPath)) {
+    return `loaded ${configPath}`
   }
 
-  return `using defaults (${CONFIG_PATH} not found)`
+  return `using defaults (${configPath} not found)`
 }
 
 function getAssistantDetails(
@@ -71,6 +73,9 @@ export function buildDoctorReport(): DoctorReport {
     name: 'config',
     ok: configResult.issues.length === 0,
   })
+
+  const completion = completionStatus()
+  checks.push({ details: completion.detail, name: 'completion', ok: completion.ok })
 
   for (const option of ASSISTANT_OPTIONS) {
     const configuredCommand = config.customCommands[option.id] ?? option.command

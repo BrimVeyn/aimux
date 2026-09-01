@@ -3,14 +3,21 @@ import type { ThemedToken } from 'shiki'
 
 import type { LayoutNode, SplitDirection } from './layout-tree'
 
-export type BuiltinAssistantId = 'claude' | 'codex' | 'opencode' | 'terminal' | 'antigravity'
+export type BuiltinAssistantId =
+  | 'claude'
+  | 'codex'
+  | 'opencode'
+  | 'grok'
+  | 'kimi'
+  | 'terminal'
+  | 'antigravity'
 
 export type AssistantId = BuiltinAssistantId | (string & {})
 
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
 
 /**
- * Status values that may appear in legacy on-disk workspace snapshots but are
+ * Status values that may appear in legacy on-disk project snapshots but are
  * not produced by the running app anymore. Filtered at restore time.
  */
 export type LegacyPersistedTabStatus = TabStatus | 'exited'
@@ -18,25 +25,58 @@ export type LegacyPersistedTabStatus = TabStatus | 'exited'
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 
 /**
- * Per-session status flags. Both can be true at once (e.g. one tab working,
+ * Classifies why a tab is blocked on user input. `permission` is a tool /
+ * command approval prompt; `question` is any other prompt the assistant is
+ * waiting on. Carried by the `tabQuestion` server event so an orchestrator can
+ * branch without re-scraping the screen.
+ */
+export type QuestionKind = 'question' | 'permission'
+
+/**
+ * Per-project status flags. Both can be true at once (e.g. one tab working,
  * another waiting for user input) so we keep them as independent booleans
  * rather than a single priority enum.
  */
-export interface SessionStatus {
+export interface ProjectStatus {
   working: boolean
   waiting: boolean
 }
 
-export const IDLE_SESSION_STATUS: SessionStatus = { waiting: false, working: false }
+/**
+ * A workspace's status, as the sidebar draws it. `working`/`waiting` mirror
+ * `ProjectStatus` one level down; `done` is a latch — an assistant here
+ * finished a turn and nobody has looked yet — cleared when the workspace is
+ * entered or when it goes back to work.
+ */
+export interface WorkspaceActivity {
+  working: boolean
+  waiting: boolean
+  done: boolean
+}
 
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export const IDLE_WORKSPACE_ACTIVITY: WorkspaceActivity = {
+  done: false,
+  waiting: false,
+  working: false,
+}
+
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
+  | 'stats'
 
 export type ModalType =
   | 'new-tab'
-  | 'session-picker'
-  | 'session-name'
-  | 'create-session'
+  | 'project-picker'
+  | 'project-name'
+  | 'create-project'
+  | 'create-workspace'
   | 'rename-tab'
+  | 'rename-workspace'
   | 'snippet-picker'
   | 'snippet-editor'
   | 'theme-picker'
@@ -44,14 +84,27 @@ export type ModalType =
   | 'split-picker'
   | 'git-commit'
   | 'update-available'
-  | 'ai-usage'
-  | 'worktree-move'
+  | 'quotas'
+  | 'workspace-move'
+  | 'workspace-move-confirm'
+  | 'workspace-delete-confirm'
+  | 'flash-jump'
+  | 'setting-text'
+  | 'settings-search'
   | null
 
 export interface TerminalSpan {
   text: string
+  /** Hex color for RGB cells, or undefined for the "default" foreground. */
   fg?: string
+  /** Hex color for RGB cells, or undefined for the "default" background. */
   bg?: string
+  /** ANSI palette index (0-255) when the cell emitted an indexed color.
+   *  Resolved client-side against the host terminal's queried palette so
+   *  user themes (Ghostty, iTerm2, …) show through. Wins over `fg` if set. */
+  fgPalette?: number
+  /** ANSI palette index (0-255). Resolved client-side. Wins over `bg`. */
+  bgPalette?: number
   bold?: boolean
   italic?: boolean
   underline?: boolean
@@ -62,12 +115,22 @@ export interface TerminalLine {
   spans: TerminalSpan[]
 }
 
+/** DECSCUSR cursor shape; 'default' restores the host terminal's configured cursor. */
+export type TerminalCursorStyle = 'block' | 'underline' | 'bar' | 'default'
+
 export interface TerminalSnapshot {
   lines: TerminalLine[]
   tailLines?: TerminalLine[]
   viewportY: number
   baseY: number
   cursorVisible: boolean
+  cursorStyle?: TerminalCursorStyle
+  /** Blink flag from DECSCUSR; undefined means "host terminal's default". */
+  cursorBlink?: boolean
+  /** Cursor row relative to the rendered viewport; outside [0, rows) when
+   *  the user scrolled the viewport away from the active screen. */
+  cursorRow?: number
+  cursorCol?: number
 }
 
 // The scroll position is owned end-to-end by the backend emulator; this type
@@ -88,16 +151,21 @@ export interface PersistedTabSnapshot {
   assistant: AssistantId
   title: string
   command: string
+  /** Optional and additive: an older build ignores it and spawns fresh. */
+  sessionId?: string
   status: Exclude<LegacyPersistedTabStatus, 'disconnected'>
   buffer: string
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
   errorMessage?: string
   exitCode?: number
-  worktreeId?: string
+  workspaceId?: string
+  /** Stable project-scoped name assigned by the headless worker facade. */
+  workerName?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
 }
 
-export interface WorkspaceSnapshotV1 {
+export interface ProjectSnapshotV1 {
   version: 1
   savedAt: string
   activeTabId: string | null
@@ -109,11 +177,18 @@ export interface WorkspaceSnapshotV1 {
   layoutTree?: LayoutNode
   layoutTrees?: Record<string, LayoutNode>
   tabGroupMap?: Record<string, string>
+  /**
+   * Last viewed tab per workspace, keyed by workspace id. Optional and additive
+   * (no version bump): older builds ignore it, newer builds tolerate its
+   * absence. Written now so the data accrues, but restoring it at startup is
+   * gated off until a future change flips RESTORE_LAST_ACTIVE_TAB_BY_WORKSPACE.
+   */
+  lastActiveTabByWorkspace?: Record<string, string>
 }
 
-export type WorktreeSource = 'primary' | 'aimux-temp' | 'external'
+export type WorkspaceSource = 'primary' | 'aimux-temp' | 'external'
 
-export interface WorktreeRecord {
+export interface WorkspaceRecord {
   id: string
   name: string
   path: string
@@ -121,14 +196,18 @@ export interface WorktreeRecord {
   branch?: string
   baseRef?: string
   commitSha?: string
-  source: WorktreeSource
+  source: WorkspaceSource
   createdByAimux: boolean
   color?: string
   createdAt: string
   updatedAt: string
+  /** Last setup-script run for this workspace. Display only — the auto-run gate
+   *  is "this session has not seen this workspace id before". */
+  setupRanAt?: string
+  setupExitCode?: number
 }
 
-export interface SessionRecord {
+export interface ProjectRecord {
   id: string
   name: string
   projectPath?: string
@@ -136,16 +215,27 @@ export interface SessionRecord {
   updatedAt: string
   lastOpenedAt: string
   order?: number
-  workspaceSnapshot?: WorkspaceSnapshotV1
-  worktrees?: WorktreeRecord[]
-  activeWorktreeId?: string
+  projectSnapshot?: ProjectSnapshotV1
+  workspaces?: WorkspaceRecord[]
+  activeWorkspaceId?: string
+  /**
+   * The branch new workspaces fork from, when the repo's own default is the
+   * wrong answer — a gitflow repo branches off `develop` while still declaring
+   * `main` as its default, and nothing about the repo says so. Per project
+   * because the convention is the team's, not the user's: three repos, three
+   * answers. Unset means the repo's default branch.
+   */
+  defaultBaseRef?: string
+  /**
+   * Folded in the sidebar: the project's workspace rows are hidden, bar the one
+   * the cursor is on. Persisted, because a fold you have to redo on every start
+   * is worse than no fold at all.
+   */
+  collapsed?: boolean
 }
 
-export type SessionBarPosition = 'top' | 'bottom'
-
-export interface SessionBarState {
+export interface ProjectBarState {
   visible: boolean
-  position: SessionBarPosition
 }
 
 export interface TabSession {
@@ -158,20 +248,79 @@ export interface TabSession {
   viewport?: TerminalSnapshot
   terminalModes: TerminalModeState
   command: string
+  /**
+   * Names the assistant conversation this tab owns, so a respawn reopens it
+   * instead of starting over. Minted when the tab is created and handed to the
+   * CLI at spawn — we pick the id rather than discover it afterwards, because
+   * discovery cannot tell two tabs sharing a cwd apart.
+   *
+   * Absent on tabs created before this existed, and on assistants with no
+   * session support; both spawn exactly as they always did.
+   */
+  sessionId?: string
+  /**
+   * Deliberately put to sleep: the PTY is gone, the frozen viewport stays, and
+   * focusing the tab resumes it. Distinct from the `disconnected` it rides on —
+   * that also means "restored from a snapshot after a restart" — and only used
+   * to tell the two apart in the sidebar glyph, the pane overlay, and the wake.
+   * Ephemeral — never persisted, never on the wire: a restart turns every tab
+   * disconnected anyway, and Ctrl+r resumes them just the same.
+   */
+  hibernated?: boolean
   errorMessage?: string
   exitCode?: number
-  worktreeId?: string
+  workspaceId?: string
+  /**
+   * This tab is the one that rang: it finished a turn while you were looking
+   * elsewhere. Set alongside the workspace's own tick and cleared the moment
+   * the tab is opened or goes back to work, so the notification points at
+   * something rather than just happening. Ephemeral — never persisted, never
+   * on the wire.
+   */
+  unseen?: boolean
+  /** Stable project-scoped name assigned by the headless worker facade. */
+  workerName?: string
+  autoRenameStatus?: 'eligible' | 'attempted'
+  /**
+   * A real PTY tab that no chrome enumerates: absent from the top tab bar, from
+   * tab navigation, from `activeTabId` picks, and from the persisted snapshot.
+   * Rendered by whatever created it — today only the setup widget.
+   * `filterTabsForActiveWorkspace` is the single guard the UI paths share.
+   */
+  hidden?: boolean
+  /**
+   * Who owns this tab. Separate from `hidden` on purpose: promoting a setup tab
+   * into the main pane clears `hidden` but must not turn it back into an
+   * ordinary tab, or the PTY exit would close it and take the failure output
+   * with it — which is the one thing the promotion exists to read.
+   *
+   * ponytail: not on the ipc wire nor in the snapshot, so a promoted setup tab
+   * comes back from a restart as a plain tab running `bash …/setup.sh`. Add it
+   * to `TabSessionSummary` if that ever matters.
+   */
+  role?: 'setup'
 }
 
-export interface SidebarState {
+export type BarSide = 'left' | 'right'
+
+/**
+ * One widget slot in a bar. `grow` is the flex weight opentui consumes
+ * directly; hidden widgets keep their weight but are excluded from the layout.
+ */
+export interface BarWidget {
+  id: string
+  grow: number
+  visible: boolean
+}
+
+export interface BarState {
   visible: boolean
   width: number
-  minWidth: number
-  maxWidth: number
+  /** Ordered top → bottom. */
+  widgets: BarWidget[]
 }
 
-export type GitPaneMode = 'embedded' | 'pane'
-export type GitPanePosition = 'top' | 'bottom' | 'left' | 'right'
+export type BarsState = Record<BarSide, BarState>
 
 export type GitPanePathConfig =
   | { enabled: false }
@@ -182,11 +331,6 @@ export interface GitPaneDiffCountConfig {
 }
 
 export interface GitPaneState {
-  visible: boolean
-  mode: GitPaneMode
-  position: GitPanePosition
-  paneRatio: number
-  embeddedRatio: number
   diffModeRatio: number
   fileListMode: GitFileListMode
   treeCompaction: boolean
@@ -221,7 +365,14 @@ export interface GitPanelState {
   error: GitPanelError | null
 }
 
-export type DiffFileStatus = 'modified' | 'new' | 'deleted' | 'binary' | 'renamed' | 'image'
+export type DiffFileStatus =
+  | 'modified'
+  | 'new'
+  | 'deleted'
+  | 'binary'
+  | 'renamed'
+  | 'image'
+  | 'too-large'
 
 export interface DiffData {
   path: string
@@ -290,49 +441,89 @@ export interface GitModeState {
   folds: Record<string, Record<string, FoldState>>
   /** Working-tree-vs-HEAD~N offset. 0 = working tree vs HEAD (default). */
   headOffset: number
-  /** When true, diff the active worktree's working tree against its fork point. */
+  /** When true, diff the active workspace's working tree against its fork point. */
   reviewBase: boolean
 }
 
 interface ModalBase {
   selectedIndex: number
   editBuffer: string | null
-  sessionTargetId: string | null
+  projectTargetId: string | null
   cursorPos?: number
+  /**
+   * Where the focus goes when this modal closes, when it is not back to the
+   * panes. Set by whoever opened it, because that is who knows what is behind it
+   * — the settings screen opens five different modals, and none of them should
+   * have to grow a case in the reducer to find their way home.
+   */
+  returnTo?: FocusMode
 }
 
 export interface ModalClosed extends ModalBase {
   type: null
   editBuffer: null
-  sessionTargetId: null
+  projectTargetId: null
 }
 
+/**
+ * Picking an assistant for a new tab, and nothing else. The tab lands in the
+ * project's active workspace; creating a workspace is `create-workspace`'s job.
+ */
 export interface ModalNewTab extends ModalBase {
   type: 'new-tab'
   editingCommand: AssistantId | null
-  activeField: 'assistant' | 'branch-name' | 'target-worktree' | 'worktree-name'
-  branchError: string | null
-  branchName: string
-  createWorktree: boolean
-  selectedAssistantId: AssistantId | null
-  step: 'assistant' | 'worktree' | 'worktree-create'
-  targetWorktreeIndex: number
-  worktreeDeleteConfirmId: string | null
-  worktreeDeleteMessage: string | null
-  worktreeName: string
+  /**
+   * Set when `create-workspace` chained into this picker. The prompt the user
+   * typed there is sent to the assistant and drives the workspace's real name,
+   * and the tab is pinned to the freshly created workspace rather than the
+   * project's active one. Living on the modal means `close-modal` clears it, so
+   * escaping the picker cannot leak a stale prompt into a later tab.
+   */
+  pendingWorkspace?: PendingWorkspaceLaunch
+  /**
+   * A prompt to hand the picked assistant, with none of `pendingWorkspace`'s
+   * other behaviour: no workspace pinning, no rename. Used by "Ask an agent" in
+   * the setup widget.
+   */
+  pendingPrompt?: string
 }
 
-export interface ModalSessionPicker extends ModalBase {
-  type: 'session-picker'
+export interface PendingWorkspaceLaunch {
+  projectId: string
+  workspaceId: string
+  prompt: string
 }
 
-export interface ModalSessionName extends ModalBase {
-  type: 'session-name'
-  returnToSessionPicker: boolean
+export interface ModalProjectPicker extends ModalBase {
+  type: 'project-picker'
+}
+
+export interface ModalProjectName extends ModalBase {
+  type: 'project-name'
+  returnToProjectPicker: boolean
 }
 
 export interface ModalRenameTab extends ModalBase {
   type: 'rename-tab'
+}
+/**
+ * One text field over a settings row. Carries the row it belongs to so confirming
+ * writes back to the right one, and closing returns to the settings screen rather
+ * than to the panes.
+ */
+/** Fuzzy-ish search across every setting, from inside the settings screen. */
+export interface ModalSettingsSearch extends ModalBase {
+  type: 'settings-search'
+}
+export interface ModalSettingText extends ModalBase {
+  type: 'setting-text'
+  settingId: string
+  settingLabel: string
+}
+
+export interface ModalRenameWorkspace extends ModalBase {
+  type: 'rename-workspace'
+  workspaceProjectId: string
 }
 
 export interface ModalSnippetPicker extends ModalBase {
@@ -367,13 +558,35 @@ export interface ModalGitCommit extends ModalBase {
   stage: 'edit' | 'generating' | 'confirm'
 }
 
-export interface ModalCreateSession extends ModalBase {
-  type: 'create-session'
+export interface ModalCreateProject extends ModalBase {
+  type: 'create-project'
   directoryResults: DirectoryResult[]
   pendingProjectPath: string | null
   activeField: 'directory' | 'name'
   nameBuffer: string
-  returnToSessionPicker: boolean
+  returnToProjectPicker: boolean
+}
+
+/**
+ * Creating a workspace inside the current project — the second of the three
+ * creation actions (project / workspace / tab). Deliberately carries no
+ * assistant: once the workspace exists the effect chains into the new-tab modal.
+ */
+export interface ModalCreateWorkspace extends ModalBase {
+  type: 'create-workspace'
+  activeField: 'prompt' | 'base'
+  /**
+   * "What do you want to work on?" — the only thing the user types. It is sent
+   * to the assistant, and it names both the workspace and its branch.
+   */
+  prompt: string
+  branchError: string | null
+  /** Filter text typed into the "Base" picker. */
+  baseQuery: string
+  /** Resolved base ref the new workspace is forked from (a workspace's branch or a local branch). */
+  baseRef: string
+  /** Local branches available as base refs, loaded when the modal opens. */
+  baseBranches: string[]
 }
 
 export interface ModalSnippetEditor extends ModalBase {
@@ -393,40 +606,120 @@ export interface ModalUpdateAvailable extends ModalBase {
   latestVersion: string
 }
 
-export interface ModalAIUsage extends ModalBase {
-  type: 'ai-usage'
+/** The status bar's usage indicator, expanded. Carries nothing: it is a readout. */
+export interface ModalQuotas extends ModalBase {
+  type: 'quotas'
 }
 
-export interface ModalWorktreeMove extends ModalBase {
-  type: 'worktree-move'
-  /** The worktree being moved (may differ from the active one, e.g. a tab menu). */
-  sourceWorktreeId: string
+export interface ModalWorkspaceMove extends ModalBase {
+  type: 'workspace-move'
+  /** The workspace being moved (may differ from the active one, e.g. a tab menu). */
+  sourceWorkspaceId: string
   deleteSource: boolean
+  /** Per-workspace dirty file counts, loaded async when the modal opens. */
+  stats: { kind: 'loading' } | { kind: 'ready'; dirtyFiles: Record<string, number> }
 }
 
-export type DirectoryResultType = 'git-repo' | 'worktree' | 'workspace'
+/**
+ * Confirmation for a recoverable move failure: the target's dirty files
+ * overlap the incoming changes (stash-target) or the squash conflicts
+ * (keep-conflicts). Both workspaces are already restored; confirming re-runs
+ * move-workspace with the matching flag.
+ */
+export interface ModalWorkspaceMoveConfirm extends ModalBase {
+  type: 'workspace-move-confirm'
+  variant: 'stash-target' | 'keep-conflicts'
+  files: string[]
+  projectId: string
+  sourceWorkspaceId: string
+  targetWorkspaceId: string
+  deleteSource: boolean
+  sourceLabel: string
+  targetLabel: string
+}
+
+/**
+ * Standalone confirmation for a recoverable workspace delete failure triggered
+ * outside the new-tab picker (e.g. the sidebar's "Remove workspace"). Carries the
+ * params needed to re-run the delete with force once confirmed.
+ */
+export interface ModalWorkspaceDeleteConfirm extends ModalBase {
+  type: 'workspace-delete-confirm'
+  projectId: string
+  workspaceId: string
+  workspaceLabel: string
+  reason: string
+  closeTabs: boolean
+  /** Whether confirming force-deletes — true only after a recoverable failure. */
+  force: boolean
+}
+
+export type DirectoryResultType = 'git-repo' | 'workspace' | 'project'
 
 export interface DirectoryResult {
   path: string
   type: DirectoryResultType
 }
 
+export type FlashJumpTargetKind = 'project' | 'workspace' | 'tab'
+
+export interface FlashJumpTarget {
+  kind: FlashJumpTargetKind
+  /**
+   * 1-based index of the project in the visible project ordering — fed to
+   * the existing `switch-project-by-index` side effect when jumping.
+   */
+  projectIndex: number
+  projectId: string
+  /** Set for kind 'workspace' (the non-primary target) and kind 'tab' (the tab's workspace). */
+  workspaceId?: string
+  /** Set for kind 'tab'. */
+  tabId?: string
+}
+
+export interface FlashLabel {
+  /** Stable identity of the labelled row (`ws:<id>`, `wt:<id>`, `tab:<id>`). */
+  key: string
+  /** 1- or 2-char lowercase ASCII label. */
+  label: string
+  target: FlashJumpTarget
+}
+
+export interface ModalFlashJump extends ModalBase {
+  type: 'flash-jump'
+  labels: FlashLabel[]
+  /** Letters typed so far, narrowing the matching label set. */
+  buffer: string
+  /**
+   * Set by the reducer once the buffer narrows to a single match — read by
+   * app.tsx in a useEffect to perform the actual jump and close the modal.
+   */
+  pendingJump: FlashJumpTarget | null
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
-  | ModalSessionPicker
-  | ModalSessionName
+  | ModalProjectPicker
+  | ModalProjectName
   | ModalRenameTab
+  | ModalRenameWorkspace
   | ModalSnippetPicker
   | ModalThemePicker
   | ModalHelp
   | ModalSplitPicker
-  | ModalCreateSession
+  | ModalCreateProject
+  | ModalCreateWorkspace
   | ModalSnippetEditor
   | ModalGitCommit
   | ModalUpdateAvailable
-  | ModalAIUsage
-  | ModalWorktreeMove
+  | ModalQuotas
+  | ModalWorkspaceMove
+  | ModalWorkspaceMoveConfirm
+  | ModalWorkspaceDeleteConfirm
+  | ModalFlashJump
+  | ModalSettingText
+  | ModalSettingsSearch
 
 export interface LayoutState {
   terminalCols: number
@@ -444,9 +737,9 @@ export interface SnippetRecord {
 export interface DiscoveredRepo {
   /** Absolute path to the repo. */
   path: string
-  /** Label shown in UI (relative to the workspace root or repo basename). */
+  /** Label shown in UI (relative to the project root or repo basename). */
   name: string
-  /** True when the repo is the session's projectPath itself. */
+  /** True when the repo is the project's projectPath itself. */
   isRoot: boolean
 }
 
@@ -459,18 +752,43 @@ export interface MultiRepoState {
 
 export const EMPTY_MULTI_REPO_STATE: MultiRepoState = { prefixes: {}, repos: [] }
 
+/**
+ * Where the cursor is in the settings screen. Only the cursor: the values being
+ * edited live in `src/settings/settings-store.ts`, or already have a home in
+ * this state (`gitPane`, `customCommands`, …). Duplicating them here would make
+ * two of them.
+ */
+export interface SettingsUIState {
+  /**
+   * Where the cursor is in the screen's one list, counted across every section.
+   * The sections are headings in that list, not a column you move into, so this
+   * is the whole of the screen's state.
+   */
+  rowIndex: number
+}
+
+/**
+ * Where the cursor is on the stats screen. Nothing measured lives here — the
+ * numbers are read from disk by the pages that render them.
+ */
+export interface StatsUIState {
+  pageIndex: number
+  /** Rows scrolled from the top of the current page. Reset when the page changes. */
+  scrollTop: number
+}
+
 export interface AppState {
   tabs: TabSession[]
   activeTabId: string | null
   layoutTrees: Record<string, LayoutNode>
   tabGroupMap: Record<string, string>
-  sessions: SessionRecord[]
-  currentSessionId: string | null
-  sessionStatuses: Record<string, SessionStatus>
-  sessionBar: SessionBarState
+  projects: ProjectRecord[]
+  currentProjectId: string | null
+  projectStatuses: Record<string, ProjectStatus>
+  projectBar: ProjectBarState
   snippets: SnippetRecord[]
   focusMode: FocusMode
-  sidebar: SidebarState
+  bars: BarsState
   gitPane: GitPaneState
   modal: ModalState
   layout: LayoutState
@@ -479,149 +797,31 @@ export interface AppState {
   gitMode: GitModeState
   autoCommit: AutoCommitState
   multiRepo: MultiRepoState
+  settings: SettingsUIState
+  stats: StatsUIState
   /**
-   * Commits each worktree's branch is ahead/behind the ref it forked from,
-   * keyed by worktree id. Ephemeral (polled); not persisted to the catalog.
+   * Commits each workspace's branch is ahead/behind the ref it forked from,
+   * keyed by workspace id. Ephemeral (polled); not persisted to the catalog.
    */
-  worktreeDivergence: Record<string, BranchDivergence>
+  workspaceDivergence: Record<string, BranchDivergence>
+  /**
+   * What each workspace's assistants are doing, keyed by workspace id. Covers
+   * every project the daemon knows, not just the current one — see
+   * `src/app-runtime/workspace-activity.ts`, which owns the aggregation.
+   * Ephemeral; not persisted to the catalog.
+   */
+  workspaceActivity: Record<string, WorkspaceActivity>
+  /**
+   * Last active tab a user viewed within each workspace, keyed by workspace id.
+   * Lets switching back to a workspace restore its last-viewed tab instead of
+   * snapping to the first one. Ephemeral (in-memory); not persisted to the catalog.
+   */
+  lastActiveTabByWorkspace: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
 }
 
-// -- Modal actions --
-export type ModalAction =
-  | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
-  | { type: 'open-new-tab-modal' }
-  | { type: 'set-new-tab-branch-error'; message: string | null }
-  | {
-      type: 'set-new-tab-worktree-delete-state'
-      confirmWorktreeId?: string | null
-      message: string | null
-    }
-  | { type: 'enter-new-tab-worktree-create' }
-  | { type: 'select-new-tab-assistant'; assistantId?: AssistantId }
-  | { type: 'toggle-new-tab-worktree'; assistantId?: AssistantId }
-  | { type: 'open-edit-custom-command'; assistantId: AssistantId }
-  | { type: 'open-help-modal'; scope?: ModeId }
-  | { type: 'open-split-picker'; direction: SplitDirection }
-  | { type: 'open-session-picker' }
-  | {
-      type: 'open-session-name-modal'
-      sessionTargetId?: string
-      initialName?: string
-      returnToSessionPicker?: boolean
-    }
-  | { type: 'close-modal' }
-  | { type: 'move-modal-selection'; delta: number }
-  | { type: 'update-command-edit'; char: string }
-  | { type: 'cancel-command-edit' }
-  | { type: 'open-create-session-modal'; returnToSessionPicker: boolean }
-  | { type: 'set-directory-results'; results: DirectoryResult[] }
-  | { type: 'switch-create-session-field' }
-  | { type: 'select-directory' }
-  | { type: 'open-rename-tab-modal' }
-  | { type: 'open-snippet-picker' }
-  | { type: 'open-snippet-editor'; snippetId?: string }
-  | { type: 'set-help-entry-count'; count: number }
-  | { type: 'set-theme-entry-count'; count: number }
-  | { type: 'open-theme-picker' }
-  | { type: 'open-update-available-modal'; currentVersion: string; latestVersion: string }
-  | { type: 'set-modal-selection-index'; index: number }
-  | { type: 'open-ai-usage-modal' }
-  | { type: 'open-worktree-move-modal'; sourceWorktreeId: string }
-  | { type: 'toggle-worktree-move-delete' }
-
-// -- Session actions --
-export type SessionAction =
-  | { type: 'load-session'; sessionId: string; workspaceSnapshot?: WorkspaceSnapshotV1 }
-  | { type: 'set-sessions'; sessions: SessionRecord[] }
-  | { type: 'create-session-record'; session: SessionRecord }
-  | { type: 'rename-session-record'; sessionId: string; name: string }
-  | { type: 'delete-session-record'; sessionId: string; openSessionPicker?: boolean }
-  | { type: 'reorder-sessions'; orderedIds: string[] }
-  | { type: 'set-session-status'; sessionId: string; status: SessionStatus }
-  | { type: 'add-worktree-record'; sessionId: string; worktree: WorktreeRecord; activate?: boolean }
-  | { type: 'remove-worktree-record'; sessionId: string; worktreeId: string }
-  | { type: 'set-active-worktree'; sessionId: string; worktreeId: string }
-  | {
-      type: 'update-worktree-record'
-      sessionId: string
-      worktreeId: string
-      patch: Partial<WorktreeRecord>
-    }
-
-// -- Tab actions --
-export type TabAction =
-  | { type: 'add-tab'; tab: TabSession }
-  | {
-      type: 'hydrate-workspace'
-      tabs: TabSession[]
-      activeTabId: string | null
-      layoutTree?: LayoutNode | null
-      layoutTrees?: Record<string, LayoutNode>
-      tabGroupMap?: Record<string, string>
-    }
-  | { type: 'close-tab'; tabId: string }
-  | { type: 'close-active-tab' }
-  | { type: 'set-active-tab'; tabId: string }
-  | { type: 'move-active-tab'; delta: number }
-  | { type: 'reorder-active-tab'; delta: number }
-  | { type: 'reset-tab-session'; tabId: string }
-  | { type: 'rename-tab'; tabId: string; title: string }
-  | { type: 'append-tab-buffer'; tabId: string; chunk: string }
-  | {
-      type: 'replace-tab-viewport'
-      tabId: string
-      viewport: TerminalSnapshot
-      terminalModes: TerminalModeState
-      source?: 'resize' | 'scroll' | 'data' | 'switch'
-    }
-  | { type: 'set-tab-activity'; tabId: string; activity?: TabActivity }
-  | { type: 'set-tab-error'; tabId: string; message: string }
-
-// -- Layout actions --
-export type LayoutAction =
-  | {
-      type: 'split-pane'
-      direction: SplitDirection
-      newTab: TabSession
-    }
-  | { type: 'close-pane'; tabId: string }
-  | {
-      type: 'focus-pane-direction'
-      direction: 'left' | 'right' | 'up' | 'down'
-    }
-  | {
-      type: 'resize-pane'
-      tabId: string
-      delta: number
-      axis?: SplitDirection
-    }
-  | {
-      type: 'set-split-ratio'
-      tabId: string
-      ratio: number
-      axis?: SplitDirection
-    }
-
-// -- UI actions --
-export type UIAction =
-  | { type: 'toggle-sidebar' }
-  | { type: 'resize-sidebar'; delta: number }
-  | { type: 'set-sidebar-width'; width: number }
-  | { type: 'set-focus-mode'; focusMode: FocusMode }
-  | { type: 'set-terminal-size'; cols: number; rows: number }
-  | { type: 'toggle-git-pane' }
-  | { type: 'resize-git-pane'; delta: number }
-  | { type: 'set-git-pane-ratio'; target: 'pane' | 'embedded'; ratio: number }
-  | { type: 'resize-git-diff-pane'; delta: number }
-  | { type: 'set-git-pane-mode'; mode: GitPaneMode }
-  | { type: 'set-git-pane-position'; position: GitPanePosition }
-  | { type: 'set-pending-chords'; chords: string[] | null }
-  | { type: 'toggle-session-bar' }
-  | { type: 'set-session-bar-position'; position: SessionBarPosition }
-
-// -- Git panel actions --
+// -- Git panel payloads --
 export interface GitRefreshPayload {
   branch: string | null
   ahead: number
@@ -629,19 +829,16 @@ export interface GitRefreshPayload {
   files: GitFileEntry[]
 }
 
-/** Commits a worktree branch is ahead/behind the ref it forked from. */
+/** Commits a workspace branch is ahead/behind the ref it forked from. */
 export interface BranchDivergence {
   ahead: number
   behind: number
+  /** Lines changed since the fork point, working tree included. */
+  added?: number
+  removed?: number
 }
 
-export type GitPanelAction =
-  | { type: 'git-refresh-success'; payload: GitRefreshPayload }
-  | { type: 'git-refresh-error'; kind: GitPanelError }
-  | { type: 'git-panel-reset' }
-  | { type: 'set-worktree-divergence'; divergence: Record<string, BranchDivergence> }
-
-// -- Auto-commit state & actions --
+// -- Auto-commit state --
 export type AutoCommitSuggestion =
   | { kind: 'idle' }
   | {
@@ -661,116 +858,7 @@ export type AutoCommitSuggestion =
     }
 
 export interface AutoCommitState {
-  bySession: Record<string, AutoCommitSuggestion>
+  byProject: Record<string, AutoCommitSuggestion>
 }
 
-export const EMPTY_AUTO_COMMIT_STATE: AutoCommitState = { bySession: {} }
-
-export type AutoCommitAction =
-  | {
-      type: 'auto-commit-generation-started'
-      sessionId: string
-      tabId: string
-      workingTreeHash: string
-      abortController: AbortController
-      startedAt: number
-    }
-  | {
-      type: 'auto-commit-generation-ready'
-      sessionId: string
-      workingTreeHash: string
-      title: string
-      body: string
-      generatedAt: number
-    }
-  | { type: 'auto-commit-clear'; sessionId: string }
-
-export type GitModeAction =
-  | { type: 'enter-git-mode' }
-  | { type: 'exit-git-mode' }
-  | { type: 'git-mode-move-selection'; delta: -1 | 1 }
-  | { type: 'git-mode-move-file-selection'; delta: -1 | 1 }
-  | { type: 'git-mode-select-entry-by-key'; key: string }
-  | { type: 'git-mode-toggle-folder'; key: string }
-  | { type: 'git-mode-toggle-selected-folder' }
-  | { type: 'git-mode-collapse-selection' }
-  | { type: 'git-mode-expand-selection' }
-  | { type: 'git-mode-toggle-file-list-mode' }
-  | { type: 'git-mode-toggle-tree-compaction' }
-  | { type: 'git-mode-set-diff'; key: string; diff: DiffData; hash: string }
-  | {
-      type: 'git-mode-set-parsed'
-      key: string
-      hash: string
-      file: unknown
-    }
-  | {
-      type: 'git-mode-set-highlights'
-      key: string
-      hash: string
-      themeId: string
-      add: unknown
-      del: unknown
-    }
-  | {
-      type: 'git-mode-merge-highlights'
-      key: string
-      hash: string
-      themeId: string
-      add: { start: number; tokens: unknown }[]
-      del: { start: number; tokens: unknown }[]
-    }
-  | { type: 'git-mode-invalidate-diffs'; paths: string[] }
-  | { type: 'git-mode-set-loading'; key: string; loading: boolean }
-  | { type: 'git-mode-set-pending-delete'; path: string | null }
-  | { type: 'git-mode-clear-diff-cache'; path: string }
-  | { type: 'git-mode-set-message'; message: string | null }
-  | { type: 'snippet-picker-set-message'; message: string | null }
-  | { type: 'git-mode-toggle-diff-view' }
-  | { type: 'git-mode-toggle-review-base' }
-  | { type: 'git-mode-shift-head-offset'; delta: number }
-  | { type: 'git-mode-set-head-offset'; offset: number }
-  | {
-      type: 'git-mode-fold-adjust'
-      key: string
-      foldId: string
-      side: 'top' | 'bottom'
-      delta: number
-    }
-  | { type: 'git-mode-fold-set'; key: string; foldId: string; top: number; bottom: number }
-  | { type: 'git-mode-fold-toggle-all'; key: string }
-  | {
-      type: 'git-mode-optimistic-move'
-      path: string
-      fromSection: GitFileSection
-      toSection: GitFileSection | null
-    }
-  | { type: 'open-git-commit-modal'; sessionId?: string }
-  | { type: 'git-commit-enter-confirm' }
-  | { type: 'git-commit-leave-confirm' }
-  | { type: 'git-commit-enter-generating'; sessionId: string }
-  | { type: 'git-commit-leave-generating' }
-  | { type: 'git-commit-use-background-suggestion'; sessionId: string }
-
-// -- Data actions --
-export type DataAction =
-  | { type: 'set-snippets'; snippets: SnippetRecord[] }
-  | { type: 'delete-snippet'; snippetId: string }
-  | { type: 'set-custom-commands'; customCommands: Record<AssistantId, string> }
-
-// -- Multi-repo actions --
-export type MultiRepoAction =
-  | { type: 'multi-repo-set-repos'; repos: DiscoveredRepo[] }
-  | { type: 'multi-repo-clear' }
-
-export type AppAction =
-  | ModalAction
-  | SessionAction
-  | TabAction
-  | LayoutAction
-  | UIAction
-  | DataAction
-  | GitPanelAction
-  | GitModeAction
-  | AutoCommitAction
-  | MultiRepoAction
+export const EMPTY_AUTO_COMMIT_STATE: AutoCommitState = { byProject: {} }

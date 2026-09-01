@@ -13,7 +13,7 @@ interface Options {
   enabled: boolean
   projectPath: string | undefined
   headOffset: number
-  // When set, diff the working tree against this ref (worktree fork point for
+  // When set, diff the working tree against this ref (workspace fork point for
   // review-vs-base) instead of HEAD/HEAD~N.
   compareRef?: string
 }

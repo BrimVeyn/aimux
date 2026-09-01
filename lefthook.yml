@@ -26,4 +26,7 @@ pre-push:
     typecheck:
       run: bun run check
     test:
-      run: bun test
+      # Git exports GIT_DIR/GIT_INDEX_FILE to its hooks, and every `git` the
+      # tests run in their temp repos inherits them — commits then land in THIS
+      # repository instead. Scrub them before handing control to the suite.
+      run: env -u GIT_DIR -u GIT_INDEX_FILE -u GIT_WORK_TREE -u GIT_PREFIX -u GIT_COMMON_DIR bun test

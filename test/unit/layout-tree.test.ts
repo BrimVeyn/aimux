@@ -2,10 +2,12 @@ import { describe, expect, test } from 'bun:test'
 
 import {
   allLeafIds,
+  computeJunctionEdges,
   computePaneRects,
   createLeaf,
   findLeaf,
   getAdjacentLeaf,
+  getBoundaryLeafIds,
   type LayoutNode,
   pruneLayoutTree,
   removeNode,
@@ -278,8 +280,8 @@ describe('computePaneRects', () => {
     expect(r1.cols).toBe(50)
     expect(r1.rows).toBe(40)
 
-    expect(r2.x).toBe(51) // 50 + 1 separator
-    expect(r2.cols).toBe(49)
+    expect(r2.x).toBe(50)
+    expect(r2.cols).toBe(50)
     expect(r2.rows).toBe(40)
   })
 
@@ -300,8 +302,8 @@ describe('computePaneRects', () => {
     expect(r1.rows).toBe(20)
     expect(r1.cols).toBe(100)
 
-    expect(r2.y).toBe(21) // 20 + 1 separator
-    expect(r2.rows).toBe(19)
+    expect(r2.y).toBe(20)
+    expect(r2.rows).toBe(20)
     expect(r2.cols).toBe(100)
   })
 
@@ -329,8 +331,8 @@ describe('computePaneRects', () => {
 
     const r2 = requireValue(rects.get('tab-2'), 'Missing rect for tab-2')
     const r3 = requireValue(rects.get('tab-3'), 'Missing rect for tab-3')
-    expect(r2.x).toBe(51)
-    expect(r3.x).toBe(51)
+    expect(r2.x).toBe(50)
+    expect(r3.x).toBe(50)
     expect(r2.y).toBeLessThan(r3.y)
   })
 })
@@ -424,6 +426,75 @@ describe('getAdjacentLeaf', () => {
   })
 })
 
+describe('getBoundaryLeafIds', () => {
+  test('leaf returns its own id for every side', () => {
+    const leaf = createLeaf('tab-1')
+    expect(getBoundaryLeafIds(leaf, 'left')).toEqual(['tab-1'])
+    expect(getBoundaryLeafIds(leaf, 'right')).toEqual(['tab-1'])
+    expect(getBoundaryLeafIds(leaf, 'top')).toEqual(['tab-1'])
+    expect(getBoundaryLeafIds(leaf, 'bottom')).toEqual(['tab-1'])
+  })
+
+  test('vertical split: left boundary = leaves on the left subtree only', () => {
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: createLeaf('b'),
+      type: 'split',
+    }
+    expect(getBoundaryLeafIds(tree, 'left')).toEqual(['a'])
+    expect(getBoundaryLeafIds(tree, 'right')).toEqual(['b'])
+  })
+
+  test('vertical split: top/bottom boundaries include both children', () => {
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: createLeaf('b'),
+      type: 'split',
+    }
+    expect(getBoundaryLeafIds(tree, 'top').sort()).toEqual(['a', 'b'])
+    expect(getBoundaryLeafIds(tree, 'bottom').sort()).toEqual(['a', 'b'])
+  })
+
+  test('horizontal split: top boundary = first child leaves only', () => {
+    const tree: LayoutNode = {
+      direction: 'horizontal',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: createLeaf('b'),
+      type: 'split',
+    }
+    expect(getBoundaryLeafIds(tree, 'top')).toEqual(['a'])
+    expect(getBoundaryLeafIds(tree, 'bottom')).toEqual(['b'])
+    expect(getBoundaryLeafIds(tree, 'left').sort()).toEqual(['a', 'b'])
+    expect(getBoundaryLeafIds(tree, 'right').sort()).toEqual(['a', 'b'])
+  })
+
+  test('nested split: right boundary picks rightmost leaves only', () => {
+    // root: vertical [a | horizontal(b/top, c/bottom)]
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: {
+        direction: 'horizontal',
+        first: createLeaf('b'),
+        ratio: 0.5,
+        second: createLeaf('c'),
+        type: 'split',
+      },
+      type: 'split',
+    }
+    expect(getBoundaryLeafIds(tree, 'left')).toEqual(['a'])
+    expect(getBoundaryLeafIds(tree, 'right').sort()).toEqual(['b', 'c'])
+    expect(getBoundaryLeafIds(tree, 'top').sort()).toEqual(['a', 'b'])
+    expect(getBoundaryLeafIds(tree, 'bottom').sort()).toEqual(['a', 'c'])
+  })
+})
+
 describe('pruneLayoutTree', () => {
   test('keeps valid leaf', () => {
     const leaf = createLeaf('tab-1')
@@ -491,5 +562,94 @@ describe('pruneLayoutTree', () => {
       second: createLeaf('tab-3'),
       type: 'split',
     })
+  })
+})
+
+describe('computeJunctionEdges', () => {
+  const bounds = { cols: 100, rows: 40, x: 0, y: 0 }
+  const origin = { x: 10, y: 5 }
+
+  test('single leaf has no junction edges', () => {
+    const map = computeJunctionEdges(createLeaf('only'), bounds, origin)
+    expect(map.get('only')).toEqual({})
+  })
+
+  test('vertical split: right edge on first, left edge on second', () => {
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: createLeaf('b'),
+      type: 'split',
+    }
+    const map = computeJunctionEdges(tree, bounds, origin)
+
+    const expected = {
+      direction: 'vertical' as const,
+      screenStart: 10, // origin.x + bounds.x
+      tabId: 'a', // first leaf of node.first (matches handleSeparatorMouseDown today)
+      totalSize: 100, // bounds.cols
+    }
+
+    expect(map.get('a')).toEqual({ right: expected })
+    expect(map.get('b')).toEqual({ left: expected })
+  })
+
+  test('horizontal split: bottom edge on first, top edge on second', () => {
+    const tree: LayoutNode = {
+      direction: 'horizontal',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: createLeaf('b'),
+      type: 'split',
+    }
+    const map = computeJunctionEdges(tree, bounds, origin)
+
+    const expected = {
+      direction: 'horizontal' as const,
+      screenStart: 5,
+      tabId: 'a',
+      totalSize: 40,
+    }
+
+    expect(map.get('a')).toEqual({ bottom: expected })
+    expect(map.get('b')).toEqual({ top: expected })
+  })
+
+  test('nested split: leaves carry multiple ancestor edges', () => {
+    // root: vertical [a | horizontal(b/top, c/bottom)]
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('a'),
+      ratio: 0.5,
+      second: {
+        direction: 'horizontal',
+        first: createLeaf('b'),
+        ratio: 0.5,
+        second: createLeaf('c'),
+        type: 'split',
+      },
+      type: 'split',
+    }
+    const map = computeJunctionEdges(tree, bounds, origin)
+
+    const rootSplit = {
+      direction: 'vertical' as const,
+      screenStart: 10,
+      tabId: 'a',
+      totalSize: 100,
+    }
+    // After removing the separator gap, the inner horizontal split's bounds
+    // start at x = bounds.x + firstCols = 50, with cols = 50, rows = 40.
+    const innerSplit = {
+      direction: 'horizontal' as const,
+      screenStart: 5, // origin.y + innerBounds.y (innerBounds.y = 0)
+      tabId: 'b', // first leaf of inner split's first child
+      totalSize: 40,
+    }
+
+    expect(map.get('a')).toEqual({ right: rootSplit })
+    expect(map.get('b')).toEqual({ bottom: innerSplit, left: rootSplit })
+    expect(map.get('c')).toEqual({ left: rootSplit, top: innerSplit })
   })
 })

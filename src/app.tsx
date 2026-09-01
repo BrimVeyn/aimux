@@ -1,42 +1,64 @@
 import {
+  type AimuxUserConfig,
   type ResolvedConfig,
   setAutoCommitEnabled,
   setExternalEditorConfig,
   setMultiRepoConfig,
+  setStatusBarSeparator,
 } from '@brimveyn/aimux-config'
 import { useKeyboard, useRenderer, useTerminalDimensions } from '@opentui/react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
+import type { SideEffectContext } from './app-runtime/side-effect-context'
 import type { KeyChord } from './input/keymap/key-chord'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { TerminalContentOrigin } from './input/raw-input-handler'
 import type { SessionBackend } from './session-backend/types'
 
-import { executeSideEffect, type SideEffectContext } from './app-runtime/side-effects'
+import { setActiveMeasure } from './app-runtime/measure-ref'
+import { executeSideEffect } from './app-runtime/side-effects'
 import { useAutoCommitDriver } from './app-runtime/use-auto-commit-driver'
 import { useBackendRuntime } from './app-runtime/use-backend-runtime'
 import { useDirectorySearch } from './app-runtime/use-directory-search'
 import { useMouseHandlers } from './app-runtime/use-mouse-handlers'
+import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
+import { useSetupRunner } from './app-runtime/use-setup-runner'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
-import { useWorkspaceAutosave } from './app-runtime/use-workspace-autosave'
-import { loadConfig } from './config'
+import { loadConfig, saveConfig } from './config'
+import { enqueueGitOp } from './git/command-queue'
+import { pruneOrphanAimuxBranches } from './git/worktree'
 import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
+import { ensureClaudeSettingsHooks } from './integrations/claude-hooks-install'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
+import { bump } from './services/aimux-counters'
+import {
+  useAIUsageConfig,
+  useAutoCommitConfig,
+  useHarmonizeClaudeTheme,
+  useSnippetTriggerChar,
+} from './settings/live'
+import { ALL_SETTING_ROWS } from './settings/sections'
+import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
-import { setActiveDispatch, setActiveSideEffectRunner } from './state/dispatch-ref'
-import { findMostRecentSession, loadSessionCatalog } from './state/session-catalog'
-import { getSessionProjectPath } from './state/session-worktrees'
+import {
+  runSideEffectGlobal,
+  setActiveDispatch,
+  setActiveSideEffectRunner,
+} from './state/dispatch-ref'
+import { findMostRecentProject, loadProjectCatalog } from './state/project-catalog'
+import { getActiveWorkspacePath } from './state/project-workspaces'
 import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog'
 import { createInitialState } from './state/store'
+import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
 import { RootView } from './ui/root'
 import {
@@ -54,20 +76,29 @@ import {
   isNewerVersion,
 } from './update/version-check'
 
-const WORKSPACE_SAVE_DEBOUNCE_MS = 250
+const PROJECT_SAVE_DEBOUNCE_MS = 250
 
 export function App({
   backend,
   resolvedConfig,
+  userConfig,
 }: {
   backend: SessionBackend
   resolvedConfig: ResolvedConfig
+  userConfig: AimuxUserConfig
 }) {
-  // Publish the auto-commit enabled flag before any children render so
-  // actions (which live outside React) can read it synchronously.
-  setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
-  setMultiRepoConfig(resolvedConfig.multiRepo)
-  setExternalEditorConfig(resolvedConfig.externalEditor)
+  // Publish the config-file baseline into the runtime singletons before any
+  // children render, so actions (which live outside React) can read them
+  // synchronously. Lazy initializer, not the render body: this component
+  // re-renders on every dispatch, and re-running these would overwrite what the
+  // settings screen has since applied on top of the baseline (`hydrateSettings`).
+  useState(() => {
+    setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
+    setMultiRepoConfig(resolvedConfig.multiRepo)
+    setExternalEditorConfig(resolvedConfig.externalEditor)
+    setStatusBarSeparator(resolvedConfig.statusBar?.separator)
+    return null
+  })
 
   const keymapHandlers = useMemo(
     () => {
@@ -98,71 +129,42 @@ export function App({
   // selector reads. We discard the value — the store is the source of truth.
   useState(() => {
     const json = loadConfig()
-    const sessionBarVisible =
-      resolvedConfig.sessionBar?.initialVisible ?? json.sessionBarVisible ?? true
-    const sessionBarPosition =
-      resolvedConfig.sessionBar?.initialPosition ?? json.sessionBarPosition ?? 'top'
-    const sidebarOverrides = json.sidebar
-
+    const projectBarVisible =
+      resolvedConfig.projectBar?.initialVisible ?? json.projectBarVisible ?? true
     // Merge config-file gitPane (persisted prefs) with user's resolved gitPane
     // (programmatic config). User config wins; file provides persisted prior state.
     const userGitPane = resolvedConfig.gitPane
-    const fileListMode = userGitPane?.initialFileListMode ?? json.gitPane?.fileListMode ?? 'tree'
-    const diffModeRatio = userGitPane?.initialDiffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35
-    const treeCompaction =
-      userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true
-    const prefetchRadius = userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5
-    const persistedPaneRatio = json.gitPane?.paneRatio ?? json.gitPane?.ratio ?? 0.5
-    const persistedEmbeddedRatio = json.gitPane?.embeddedRatio ?? json.gitPane?.ratio ?? 0.5
     const gitPaneOverrides = {
-      ...json.gitPane,
-      diffModeRatio,
-      embeddedRatio:
-        userGitPane?.initialMode === 'embedded' && userGitPane?.initialRatio !== undefined
-          ? userGitPane.initialRatio
-          : persistedEmbeddedRatio,
-      fileListMode,
-      paneRatio:
-        userGitPane?.initialMode === 'pane' && userGitPane?.initialRatio !== undefined
-          ? userGitPane.initialRatio
-          : persistedPaneRatio,
-      prefetchRadius,
-      treeCompaction,
-      ...(userGitPane?.initialVisible !== undefined ? { visible: userGitPane.initialVisible } : {}),
-      ...(userGitPane?.initialMode !== undefined ? { mode: userGitPane.initialMode } : {}),
-      ...(userGitPane?.initialPosition !== undefined
-        ? { position: userGitPane.initialPosition }
-        : {}),
-      ...(userGitPane?.initialDiffModeRatio !== undefined
-        ? { diffModeRatio: userGitPane.initialDiffModeRatio }
-        : {}),
+      diffModeRatio: userGitPane?.initialDiffModeRatio ?? json.gitPane?.diffModeRatio ?? 0.35,
+      fileListMode: userGitPane?.initialFileListMode ?? json.gitPane?.fileListMode ?? 'tree',
+      prefetchRadius: userGitPane?.prefetchRadius ?? json.gitPane?.prefetchRadius ?? 5,
+      treeCompaction: userGitPane?.initialTreeCompaction ?? json.gitPane?.treeCompaction ?? true,
       ...(userGitPane?.path !== undefined ? { path: userGitPane.path } : {}),
       ...(userGitPane?.diffCount !== undefined ? { diffCount: userGitPane.diffCount } : {}),
     }
 
-    const sessionCatalog = loadSessionCatalog()
+    const projectCatalog = loadProjectCatalog()
     const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
     const initial = createInitialState(
       json.customCommands,
-      sessionCatalog,
+      projectCatalog,
       mergedSnippets,
-      sessionCatalog.length === 0,
+      projectCatalog.length === 0,
       {
+        bars: json.bars,
         gitPane: gitPaneOverrides,
-        sessionBarPosition,
-        sessionBarVisible,
-        sidebar: sidebarOverrides,
+        projectBarVisible,
       }
     )
     // Replace the module-level default with the fully-resolved initial state.
     // Preserves the dispatch baked into the store by app-store.ts.
     appStore.setState(initial)
-    const mostRecent = findMostRecentSession(sessionCatalog)
+    const mostRecent = findMostRecentProject(projectCatalog)
     if (mostRecent) {
       appStore.getState().dispatch({
-        sessionId: mostRecent.id,
-        type: 'load-session',
-        workspaceSnapshot: mostRecent.workspaceSnapshot,
+        projectId: mostRecent.id,
+        projectSnapshot: mostRecent.projectSnapshot,
+        type: 'load-project',
       })
     }
     return null
@@ -175,6 +177,15 @@ export function App({
   const state = useAppStore((s) => s)
   const dispatch = state.dispatch
 
+  // Config the settings screen can change under us. The resolved config file is
+  // the baseline each of these falls back to.
+  const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
+  const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
+  const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
+    resolvedConfig.theme?.beta?.harmonizeClaudeTheme
+  )
+  const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
+
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
     return () => {
@@ -183,23 +194,44 @@ export function App({
     }
   }, [dispatch])
 
+  // Replays what the settings screen has written on top of the config file (the
+  // setters at the top of this component are its baseline). Deliberately after
+  // the effect above and never during render: a row applies its value through
+  // whatever owns it, and some of those owners are reached by dispatching.
+  // Layout effect, so it lands before the first paint.
+  useLayoutEffect(() => {
+    hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    // Once per launch: the config file is read at startup and does not change
+    // under us, and every later write goes through `writeRow`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
-    if (!(resolvedConfig.theme?.beta?.harmonizeClaudeTheme === true)) return
+    if (!harmonizeClaudeTheme) return
     ensureClaudeSettingsThemePref()
     syncClaudeTheme(getCurrentTheme(), getCurrentMode())
     return subscribeThemeChanges((resolved, mode) => {
       syncClaudeTheme(resolved, mode)
     })
-  }, [resolvedConfig.theme?.beta?.harmonizeClaudeTheme])
+  }, [harmonizeClaudeTheme])
 
   useEffect(() => {
-    const aiUsage = resolvedConfig.statusBar?.aiUsage
-    if (!(aiUsage?.enabled === true)) {
+    // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,
+    // idempotently patches ~/.claude/settings.json so Claude Code's hooks
+    // call back into the daemon for per-tab activity detection. Silent on
+    // failure; the visual PTY detector is the fallback either way.
+    if (resolvedConfig.integrations.claudeHooks) {
+      ensureClaudeSettingsHooks()
+    }
+  }, [resolvedConfig.integrations.claudeHooks])
+
+  useEffect(() => {
+    if (!(aiUsageConfig.enabled === true)) {
       aiUsageStore.getState().setEnabled(false)
       return
     }
     aiUsageStore.getState().setEnabled(true)
-    const handle = startAIUsageService(aiUsage, (snap) => {
+    const handle = startAIUsageService(aiUsageConfig, (snap) => {
       aiUsageStore.getState().setSnapshot(snap)
     })
     return () => {
@@ -207,7 +239,9 @@ export function App({
       aiUsageStore.getState().clear()
       aiUsageStore.getState().setEnabled(false)
     }
-  }, [resolvedConfig.statusBar?.aiUsage])
+    // Memoized by `useAIUsageConfig`, so toggling the indicator restarts the
+    // service and nothing else does.
+  }, [aiUsageConfig])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return
@@ -236,16 +270,44 @@ export function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    // One-shot cleanup: prune `aimux/` branches orphaned by temp workspaces that
+    // were deleted before delete-time branch cleanup existed. Gated by a config
+    // flag so it runs once per machine. All git calls are best-effort (nothrow)
+    // and git protects branches still checked out in a live workspace.
+    if (loadConfig().prunedOrphanAimuxBranches === true) return
+    void (async () => {
+      const repoRoots = new Set<string>()
+      for (const project of loadProjectCatalog()) {
+        for (const workspace of project.workspaces ?? []) {
+          if (workspace.repoRoot !== '') repoRoots.add(workspace.repoRoot)
+        }
+      }
+      let removed = 0
+      for (const repoRoot of repoRoots) {
+        removed += await enqueueGitOp(() => pruneOrphanAimuxBranches(repoRoot))
+      }
+      saveConfig({ ...loadConfig(), prunedOrphanAimuxBranches: true })
+      if (removed > 0) toast.success(`Cleaned ${removed} orphaned aimux branch(es)`)
+    })()
+  }, [])
+
   const resizingRef = useRef(false)
+  // Seeded with state.layout's DEFAULT 80x24; reassigned below once
+  // useTerminalResize has produced the open-loop estimate from real dimensions.
+  // Reading state.layout here is wrong: on the first render state.layout is
+  // still the bootstrap default, and useBackendRuntime's attach effect would
+  // then hand 80x24 to the backend, resizing the daemon-persisted PTYs (or
+  // newly-spawned ones) to the wrong size and stranding the assistant's
+  // already-drawn content in the top-left until a project switch.
   const layoutRef = useRef(state.layout)
-  layoutRef.current = state.layout
   const activeTab = useMemo(
     () => state.tabs.find((tab) => tab.id === state.activeTabId),
     [state.activeTabId, state.tabs]
   )
-  const currentSession = useMemo(
-    () => state.sessions.find((session) => session.id === state.currentSessionId),
-    [state.currentSessionId, state.sessions]
+  const currentProject = useMemo(
+    () => state.projects.find((project) => project.id === state.currentProjectId),
+    [state.currentProjectId, state.projects]
   )
   const activeMouseForwardingEnabled = activeTab?.terminalModes.mouseTrackingMode !== 'none'
   const activeLocalScrollbackEnabled =
@@ -266,11 +328,32 @@ export function App({
   snippetsRef.current = state.snippets
   const branchRef = useRef(state.gitPanel.branch)
   branchRef.current = state.gitPanel.branch
-  const triggerCharRef = useRef(resolvedConfig.snippetTriggerChar)
-  triggerCharRef.current = resolvedConfig.snippetTriggerChar
+  const triggerCharRef = useRef(snippetTriggerChar)
+  triggerCharRef.current = snippetTriggerChar
 
   const contentOriginRef = useRef<TerminalContentOrigin>({ cols: 0, rows: 0, x: 0, y: 0 })
-  const currentSessionWorkspaceSnapshot = currentSession?.workspaceSnapshot
+  const currentProjectProjectSnapshot = currentProject?.projectSnapshot
+
+  // Must run before useBackendRuntime so its open-loop terminalSize seeds
+  // layoutRef before the attach effect reads it. See the comment on layoutRef.
+  const terminalSize = useTerminalResize({
+    backend,
+    contentOriginRef,
+    dimensions,
+    dispatch,
+    resizingRef,
+    state,
+  })
+  layoutRef.current = { terminalCols: terminalSize.cols, terminalRows: terminalSize.rows }
+
+  // Reaches the setup widget, which hosts its own PTY outside root.tsx's pane
+  // tree and so never sees the onMeasure prop chain.
+  useLayoutEffect(() => {
+    setActiveMeasure(terminalSize.onMeasure)
+    return () => {
+      setActiveMeasure(null)
+    }
+  }, [terminalSize.onMeasure])
 
   const syntaxOverlayFlag = resolvedConfig.theme?.beta?.experimentalSyntaxHighlight === true
   const syntaxOverlayFlagRef = useRef(syntaxOverlayFlag)
@@ -306,41 +389,33 @@ export function App({
   const { clearIdleTimer, clearStartupGrace, startStartupGrace } = useBackendRuntime({
     activeTabId: state.activeTabId,
     backend,
-    currentSessionId: state.currentSessionId,
-    currentSessionWorkspaceSnapshot,
+    currentProjectId: state.currentProjectId,
+    currentProjectProjectSnapshot,
     dispatch,
     layoutRef,
     resizingRef,
     syntaxOverlayEnabled,
   })
 
-  useWorkspaceAutosave(state, WORKSPACE_SAVE_DEBOUNCE_MS)
+  useProjectAutosave(state, PROJECT_SAVE_DEBOUNCE_MS)
   useDirectorySearch(state.modal, dispatch)
   useAutoCommitDriver({
-    config: resolvedConfig.autoCommit,
+    // Through the settings screen, so a change lands without a restart. The
+    // resolved config is the baseline it falls back to.
+    config: autoCommitConfig,
     dispatch,
     getProfileConfigRoot: getProfileConfigDir,
     state,
     stateRef,
   })
 
-  const terminalSize = useTerminalResize({
-    backend,
-    contentOriginRef,
-    dimensions,
-    dispatch,
-    resizingRef,
-    state,
-  })
-
   const {
-    handleEmbeddedGitResizeStart,
-    handleGitPaneResizeStart,
+    handleBarBoundaryResizeStart,
+    handleBarResizeStart,
     handlePaneActivate,
     handleSeparatorDrag,
     handleSeparatorDragEnd,
     handleSeparatorDragStart,
-    handleSidebarResizeStart,
     handleSplitResize,
     handleTerminalClick,
     handleTerminalDrag,
@@ -395,17 +470,36 @@ export function App({
     clearIdleTimer,
     clearStartupGrace,
     dispatch,
-    getCurrentSessionProjectPath: () => {
-      if (!(state.currentSessionId != null && state.currentSessionId !== '')) return
-      return getSessionProjectPath(state.sessions.find((s) => s.id === state.currentSessionId))
+    getCurrentProjectProjectPath: () => {
+      if (!(state.currentProjectId != null && state.currentProjectId !== '')) return
+      return getActiveWorkspacePath(state.projects.find((s) => s.id === state.currentProjectId))
     },
-    getState: () => stateRef.current,
+    // Read straight from the store, not stateRef. stateRef is only refreshed
+    // on render, so within a single JS turn (a click handler that dispatches
+    // then fires a side effect) it lags one step behind. appStore.getState
+    // reflects every dispatch synchronously.
+    getState: () => appStore.getState(),
     renderer,
     setThemeId,
     startStartupGrace,
     state,
     themeId,
   }
+
+  useSetupRunner(state, sideEffectCtx)
+
+  // Waking is the counterpart of hibernating, and focus is the only signal it
+  // needs: you looked at the tab, so you want it back. Keyed on the id as well
+  // as the flag so switching between two sleeping tabs wakes the second one.
+  // `restart-tab` already does the whole job — dispose, reset, respawn — and the
+  // respawn now carries `--resume`, so the conversation comes back with it.
+  const wakeTabRef = useRef(activeTab)
+  wakeTabRef.current = activeTab
+  useEffect(() => {
+    const tab = wakeTabRef.current
+    if (tab?.hibernated !== true) return
+    runSideEffectGlobal({ tab, type: 'restart-tab' })
+  }, [activeTab?.id, activeTab?.hibernated])
 
   function processKeyResult(result: KeyResult, modeId: ModeId): void {
     for (const action of result.actions) {
@@ -450,7 +544,38 @@ export function App({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const flashPendingJump = useAppStore((s) =>
+    s.modal.type === 'flash-jump' ? s.modal.pendingJump : null
+  )
+  useEffect(() => {
+    if (flashPendingJump === null) return
+    // Snapshot before clearing the modal: closing rewrites state.modal so we
+    // need the target in hand before dispatching.
+    const target = flashPendingJump
+    dispatch({ type: 'close-modal' })
+    if (target.kind === 'tab' && target.tabId != null && target.tabId !== '') {
+      dispatch({ tabId: target.tabId, type: 'set-active-tab' })
+      return
+    }
+    if (target.kind === 'project' || target.kind === 'workspace') {
+      executeSideEffect(
+        {
+          index: target.projectIndex,
+          type: 'switch-project-by-index',
+          workspaceId: target.workspaceId,
+        },
+        sideEffectCtx
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flashPendingJump])
+
   useKeyboard((key) => {
+    // Every key in every mode passes here, terminal-input included, which makes
+    // it the one honest place to count them. A count and nothing else — no key
+    // identity is recorded anywhere.
+    bump('keys')
+
     const currentState = stateRef.current
     // Global quit: Ctrl+C in any mode except terminal-input
     if (key.ctrl && key.name === 'c' && currentState.focusMode !== 'terminal-input') {
@@ -485,12 +610,11 @@ export function App({
         onTerminalMouseUp={handleTerminalMouseUp}
         onPaneActivate={handlePaneActivate}
         onSplitResize={handleSplitResize}
-        onEmbeddedGitResizeStart={handleEmbeddedGitResizeStart}
-        onGitPaneResizeStart={handleGitPaneResizeStart}
+        onBarBoundaryResizeStart={handleBarBoundaryResizeStart}
+        onBarResizeStart={handleBarResizeStart}
         onSeparatorDragStart={handleSeparatorDragStart}
         onSeparatorDrag={handleSeparatorDrag}
         onSeparatorDragEnd={handleSeparatorDragEnd}
-        onSidebarResizeStart={handleSidebarResizeStart}
         onMeasure={terminalSize.onMeasure}
         terminalCols={terminalSize.cols}
         terminalRows={terminalSize.rows}

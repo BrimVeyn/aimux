@@ -1,17 +1,19 @@
 import { describe, expect, test } from 'bun:test'
 
-import type { WorkspaceSnapshotV1 } from '../../src/state/types'
+import type { ProjectSnapshotV1 } from '../../src/state/types'
 
 import { SessionRegistry } from '../../src/daemon/session-registry'
 
 function createSnapshotTab(
   id: string,
   title: string,
-  assistant: 'claude' | 'codex' | 'terminal' = 'claude',
-  command = assistant === 'terminal' ? 'zsh' : assistant
+  assistant: 'claude' | 'codex' | 'grok' | 'terminal' = 'claude',
+  command = assistant === 'terminal' ? 'zsh' : assistant,
+  autoRenameStatus?: 'eligible' | 'attempted'
 ) {
   return {
     assistant,
+    autoRenameStatus,
     buffer: title.toLowerCase(),
     command,
     id,
@@ -27,7 +29,7 @@ function createSnapshotTab(
   }
 }
 
-function createSnapshot(overrides?: Partial<WorkspaceSnapshotV1>): WorkspaceSnapshotV1 {
+function createSnapshot(overrides?: Partial<ProjectSnapshotV1>): ProjectSnapshotV1 {
   return {
     activeTabId: 'tab-a',
     savedAt: new Date().toISOString(),
@@ -96,5 +98,45 @@ describe('SessionRegistry', () => {
     )
 
     expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-c', 'tab-a', 'tab-b'])
+  })
+
+  test('reattach keeps live tabs the snapshot no longer knows about', () => {
+    const registry = new SessionRegistry()
+
+    // Seed two live tabs (as if the project was populated).
+    registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Alpha'), createSnapshotTab('tab-b', 'Beta', 'codex')],
+      })
+    )
+
+    // A sibling CLI spawned tab-b *after* the UI last persisted this
+    // project's snapshot, so the reattach snapshot only mentions tab-a. The
+    // registry is authoritative for membership, so tab-b must survive —
+    // otherwise switching to this project renders it as empty/stale.
+    const reattached = registry.attachFromSnapshot(
+      createSnapshot({ activeTabId: 'tab-a', tabs: [createSnapshotTab('tab-a', 'Alpha')] })
+    )
+
+    expect(reattached.tabs.map((tab) => tab.id)).toEqual(['tab-a', 'tab-b'])
+  })
+
+  test('does not regress completed auto-rename metadata from a stale snapshot', () => {
+    const registry = new SessionRegistry()
+
+    registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Generated title', 'claude', 'claude', 'attempted')],
+      })
+    )
+
+    const reattached = registry.attachFromSnapshot(
+      createSnapshot({
+        tabs: [createSnapshotTab('tab-a', 'Claude', 'claude', 'claude', 'eligible')],
+      })
+    )
+
+    expect(reattached.tabs[0]?.autoRenameStatus).toBe('attempted')
+    expect(reattached.tabs[0]?.title).toBe('Generated title')
   })
 })

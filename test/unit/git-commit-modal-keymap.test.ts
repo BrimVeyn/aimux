@@ -28,8 +28,8 @@ function key(
 
 function stateWithGitCommitModalOpen(): AppState {
   const base = createInitialState()
-  const withSession = { ...base, currentSessionId: 'sess-1' }
-  return appReducer(withSession, { sessionId: 'sess-1', type: 'open-git-commit-modal' })
+  const withProject = { ...base, currentProjectId: 'sess-1' }
+  return appReducer(withProject, { projectId: 'sess-1', type: 'open-git-commit-modal' })
 }
 
 test('modal.git-commit is derived when the modal opens', () => {
@@ -49,8 +49,8 @@ test('Ctrl+A on empty title triggers generating + side-effect', () => {
   const ctx: ModeContext = { state }
   const result = handler?.handleKey(key('a', { ctrl: true }), ctx)
   expect(result).toBeTruthy()
-  expect(result?.actions).toEqual([{ sessionId: 'sess-1', type: 'git-commit-enter-generating' }])
-  expect(result?.effects).toEqual([{ sessionId: 'sess-1', type: 'generate-auto-commit-now' }])
+  expect(result?.actions).toEqual([{ projectId: 'sess-1', type: 'git-commit-enter-generating' }])
+  expect(result?.effects).toEqual([{ projectId: 'sess-1', type: 'generate-auto-commit-now' }])
   expect(result?.transition).toBe('modal.git-commit.generating')
 })
 
@@ -68,7 +68,7 @@ test('Ctrl+A on non-empty title goes directly to confirm', () => {
 
 test('generating stage derives modal.git-commit.generating mode id', () => {
   const state = stateWithGitCommitModalOpen()
-  const next = appReducer(state, { sessionId: 'sess-1', type: 'git-commit-enter-generating' })
+  const next = appReducer(state, { projectId: 'sess-1', type: 'git-commit-enter-generating' })
   if (next.modal.type !== 'git-commit') throw new Error('bad modal')
   expect(next.modal.stage).toBe('generating')
   expect(next.focusMode).toBe('modal')

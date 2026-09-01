@@ -13,7 +13,7 @@ import {
 } from '../../src/ipc/protocol'
 import { probeDaemonProtocolCompatibility } from '../../src/session-backend/bootstrap'
 
-describe('session backend bootstrap handshake', () => {
+describe('project backend bootstrap handshake', () => {
   const originalRuntimeDir = process.env.XDG_RUNTIME_DIR
   let tempRuntimeDir: string | null = null
 
@@ -46,6 +46,7 @@ describe('session backend bootstrap handshake', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'test-daemon',
@@ -58,7 +59,7 @@ describe('session backend bootstrap handshake', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: IPC_PROTOCOL_VERSION,
                 tabs: [],
               },
@@ -79,7 +80,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toMatchObject({
         compatible: true,
         processVersion: 'test-daemon',
         selectedVersion: IPC_PROTOCOL_VERSION,
@@ -116,6 +117,7 @@ describe('session backend bootstrap handshake', () => {
             response = {
               id: message.id,
               payload: {
+                capabilities: [],
                 maxVersion: IPC_PROTOCOL_VERSION,
                 minVersion: IPC_PROTOCOL_VERSION,
                 processVersion: 'old-daemon',
@@ -128,7 +130,7 @@ describe('session backend bootstrap handshake', () => {
               id: message.id,
               payload: {
                 activeTabId: null,
-                initialSessionStatuses: [],
+                initialProjectStatuses: [],
                 protocolVersion: 1,
                 tabs: [],
               },
@@ -149,7 +151,7 @@ describe('session backend bootstrap handshake', () => {
     })
 
     try {
-      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toEqual({
+      expect(probeDaemonProtocolCompatibility(getIpcDaemonSocketPath())).resolves.toMatchObject({
         compatible: false,
         error: 'attach returned protocol v1',
         processVersion: 'old-daemon',

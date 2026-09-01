@@ -89,10 +89,10 @@ export function GitCommitModal({
   const bodyActive = activeField === 'body'
   const isConfirm = stage === 'confirm'
   const isGenerating = stage === 'generating'
-  const currentSessionId = useAppStore((s) => s.currentSessionId)
+  const currentProjectId = useAppStore((s) => s.currentProjectId)
   const bgKind = useAppStore((s) => {
-    const id = s.currentSessionId
-    return id != null && id !== '' ? s.autoCommit.bySession[id]?.kind : undefined
+    const id = s.currentProjectId
+    return id != null && id !== '' ? s.autoCommit.byProject[id]?.kind : undefined
   })
   const isBgGenerating = bgKind === 'generating'
   const showBgSpinner = isBgGenerating && !isConfirm && !isGenerating
@@ -103,19 +103,19 @@ export function GitCommitModal({
 
   const onAutoCommitClick = useCallback((): void => {
     const hasTitle = title.trim().length > 0
-    if (hasTitle || !(currentSessionId != null && currentSessionId !== '')) {
+    if (hasTitle || !(currentProjectId != null && currentProjectId !== '')) {
       dispatchGlobal({ type: 'git-commit-enter-confirm' })
       return
     }
     if (bgKind === 'ready') {
-      dispatchGlobal({ sessionId: currentSessionId, type: 'git-commit-use-background-suggestion' })
+      dispatchGlobal({ projectId: currentProjectId, type: 'git-commit-use-background-suggestion' })
       return
     }
-    dispatchGlobal({ sessionId: currentSessionId, type: 'git-commit-enter-generating' })
+    dispatchGlobal({ projectId: currentProjectId, type: 'git-commit-enter-generating' })
     if (bgKind !== 'generating') {
-      runSideEffectGlobal({ sessionId: currentSessionId, type: 'generate-auto-commit-now' })
+      runSideEffectGlobal({ projectId: currentProjectId, type: 'generate-auto-commit-now' })
     }
-  }, [bgKind, currentSessionId, title])
+  }, [bgKind, currentProjectId, title])
 
   const handleAutoCommitMouseDown = useCallback(
     (event: OtuiMouseEvent) => {

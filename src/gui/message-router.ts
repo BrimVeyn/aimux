@@ -8,10 +8,10 @@ import type { GuiClientMessage, GuiServerMessage } from './protocol'
 import type { GuiRuntime } from './runtime'
 
 import {
-  handleCreateSessionEffect,
-  handleDeleteSessionEffect,
-  handleSwitchSessionEffect,
-} from '../app-runtime/session-actions'
+  handleCreateProjectEffect,
+  handleDeleteProjectEffect,
+  handleSwitchProjectEffect,
+} from '../app-runtime/project-actions'
 import { logDebug } from '../debug/input-log'
 import { deriveModeId } from '../input/modes/bridge'
 import { dispatchIntent } from './intent-handlers'
@@ -120,14 +120,14 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
       // there, so we don't need to call it explicitly here.
       break
     case 'switchSession': {
-      const session = state.sessions.find((entry) => entry.id === message.sessionId)
+      const session = state.projects.find((entry) => entry.id === message.sessionId)
       if (session) {
-        handleSwitchSessionEffect(state, backend, dispatch, session)
+        handleSwitchProjectEffect(state, backend, dispatch, session)
       }
       break
     }
     case 'createSession':
-      handleCreateSessionEffect(
+      handleCreateProjectEffect(
         state,
         dispatch,
         basename(message.path) || message.path,
@@ -135,7 +135,7 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
       )
       break
     case 'deleteSession':
-      handleDeleteSessionEffect(state, backend, dispatch, message.sessionId)
+      handleDeleteProjectEffect(state, backend, dispatch, message.sessionId)
       break
     case 'openWorktreeMove':
       dispatch({

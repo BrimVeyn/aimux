@@ -15,7 +15,10 @@ describe('snapshotTerminal', () => {
     const firstLine = snapshot.lines[0]
 
     expect(firstLine?.spans[0]?.text.trim()).toBe('red')
-    expect(firstLine?.spans[0]?.fg).toBe('#cd0000')
+    // Palette indices are no longer pre-converted to hex; the renderer
+    // resolves them against the host terminal's queried OSC 4 palette.
+    expect(firstLine?.spans[0]?.fgPalette).toBe(1)
+    expect(firstLine?.spans[0]?.fg).toBeUndefined()
     expect(snapshot.viewportY).toBe(0)
     expect(snapshot.baseY).toBe(0)
     expect(snapshot.cursorVisible).toBe(true)
@@ -154,9 +157,58 @@ describe('snapshotTerminal', () => {
       terminal.write('hello', resolve)
     })
 
-    const snapshot = snapshotTerminal(terminal, false)
+    const snapshot = snapshotTerminal(terminal, { cursorVisible: false })
     expect(snapshot.cursorVisible).toBe(false)
     expect(snapshot.lines[0]?.spans.some((span) => span.cursor === true)).toBe(false)
+    terminal.dispose()
+  })
+
+  test('exposes viewport-relative cursor position and DECSCUSR style', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('hello', resolve)
+    })
+
+    const snapshot = snapshotTerminal(terminal, {
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      cursorVisible: true,
+    })
+    expect(snapshot.cursorRow).toBe(0)
+    expect(snapshot.cursorCol).toBe(5)
+    expect(snapshot.cursorStyle).toBe('bar')
+    expect(snapshot.cursorBlink).toBe(true)
+    terminal.dispose()
+  })
+
+  test('moves cursorRow out of the viewport when scrolled into scrollback', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4, scrollback: 100 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('1\r\n2\r\n3\r\n4\r\n5\r\n6', resolve)
+    })
+
+    terminal.scrollLines(-1)
+    const snapshot = snapshotTerminal(terminal)
+    expect(snapshot.cursorRow).toBe(4)
+    terminal.dispose()
+  })
+
+  test('detects cursor style changes between snapshots', async () => {
+    const terminal = new Terminal({ allowProposedApi: true, cols: 20, rows: 4 })
+
+    await new Promise<void>((resolve) => {
+      terminal.write('hello', resolve)
+    })
+
+    const block = snapshotTerminal(terminal, { cursorStyle: 'block', cursorVisible: true })
+    const bar = snapshotTerminal(terminal, {
+      cursorBlink: true,
+      cursorStyle: 'bar',
+      cursorVisible: true,
+    })
+    expect(areTerminalSnapshotsEqual(block, bar)).toBe(false)
     terminal.dispose()
   })
 
@@ -167,7 +219,7 @@ describe('snapshotTerminal', () => {
       terminal.write('hi', resolve)
     })
 
-    const snapshot = snapshotTerminal(terminal, false)
+    const snapshot = snapshotTerminal(terminal, { cursorVisible: false })
     const firstLine = snapshot.lines[0]
     const width = firstLine?.spans.reduce((sum, span) => sum + span.text.length, 0)
     expect(width).toBe(20)
@@ -183,7 +235,7 @@ describe('snapshotTerminal', () => {
     })
 
     // Cursor sits at column 2, in the unwritten tail.
-    const snapshot = snapshotTerminal(terminal, true)
+    const snapshot = snapshotTerminal(terminal, { cursorVisible: true })
     const firstLine = snapshot.lines[0]
     const width = firstLine?.spans.reduce((sum, span) => sum + span.text.length, 0)
     expect(width).toBe(20)
