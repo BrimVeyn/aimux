@@ -28,6 +28,15 @@ export type GuiIntent =
   // `key` is the composite `${section}:dir:${folderPath}` from `gitFolderKey`
   // — same identity the reducer's `git-mode-toggle-folder` action expects.
   | { kind: 'git.toggleFolder'; key: string }
+  // Dragging a tab along the strip. No single keystroke expresses "put this
+  // entry at that index", which is exactly what this envelope is for. The
+  // list is the FULL visible order after the drop, flattened through split
+  // groups, matching what the `reorder-tabs` reducer expects.
+  | { kind: 'tabs.reorder'; orderedTabIds: string[] }
+  // Clicking a workspace row. Which of the two TUI paths this takes — a plain
+  // `set-active-workspace`, or a project switch carrying the workspace — is
+  // the host's call, since only it knows which project is current.
+  | { kind: 'workspace.activate'; projectId: string; workspaceId: string }
 
 /** Parse and validate a candidate intent payload; null if malformed. */
 export function parseGuiIntent(value: unknown): GuiIntent | null {
@@ -72,6 +81,17 @@ export function parseGuiIntent(value: unknown): GuiIntent | null {
     case 'git.toggleFolder':
       if (typeof obj.key !== 'string') return null
       return { key: obj.key, kind: 'git.toggleFolder' }
+    case 'tabs.reorder':
+      if (!Array.isArray(obj.orderedTabIds)) return null
+      if (!obj.orderedTabIds.every((id) => typeof id === 'string')) return null
+      return { kind: 'tabs.reorder', orderedTabIds: obj.orderedTabIds as string[] }
+    case 'workspace.activate':
+      if (typeof obj.projectId !== 'string' || typeof obj.workspaceId !== 'string') return null
+      return {
+        kind: 'workspace.activate',
+        projectId: obj.projectId,
+        workspaceId: obj.workspaceId,
+      }
     default:
       return null
   }

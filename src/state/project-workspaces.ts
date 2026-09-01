@@ -350,25 +350,6 @@ export function getRenderedTabWorkspaceId(
  * labels. Hidden tabs are dropped here rather than at each caller — including
  * on the no-project / no-active-workspace paths, which must not become a hole.
  */
-export function filterTabsForActiveWorkspace(
-  tabs: TabSession[],
-  project: ProjectRecord | undefined
-): TabSession[] {
-  const visible = tabs.filter((tab) => tab.hidden !== true)
-  if (!project) return visible
-  const activeWorkspaceId = project.activeWorkspaceId
-  if (activeWorkspaceId == null || activeWorkspaceId === '') return visible
-  const workspaces = project.workspaces ?? []
-  const primaryId = workspaces[0]?.id
-  const activeIsPrimary = primaryId != null && primaryId === activeWorkspaceId
-  return visible.filter((tab) => {
-    const owned = tab.workspaceId != null && tab.workspaceId !== ''
-    if (owned) return tab.workspaceId === activeWorkspaceId
-    // Unbound (legacy) tabs surface only under the primary workspace.
-    return activeIsPrimary
-  })
-}
-
 export function orderTabsByWorkspace(
   tabs: TabSession[],
   project: ProjectRecord | undefined

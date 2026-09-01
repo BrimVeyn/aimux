@@ -9,7 +9,7 @@ import type { ModalProjection } from "@/lib/types";
 //
 // THE RULE
 //   - Host owns committed state (the snippets catalog, modal.type,
-//     modal.sessionTargetId).
+//     modal.projectTargetId).
 //   - Client owns in-flight UI state (name / trigger / content buffers,
 //     which field has focus). The host's projection of those buffers is
 //     READ ONLY ON MOUNT and ignored afterwards.
@@ -81,13 +81,13 @@ export function SnippetEditorModal({
 }: {
   modal: ModalProjection;
 } & SnippetEditorModalCallbacks) {
-  const isEditing = modal.sessionTargetId != null;
-  // `modal.sessionTargetId` is read on every submit (the host owns this — it
+  const isEditing = modal.projectTargetId != null;
+  // `modal.projectTargetId` is read on every submit (the host owns this — it
   // identifies which snippet is being edited and never mutates while the
   // modal is open). A ref keeps the latest value accessible inside event
   // callbacks without re-binding handlers on every render.
-  const snippetIdRef = useRef<string | null>(modal.sessionTargetId);
-  snippetIdRef.current = modal.sessionTargetId;
+  const snippetIdRef = useRef<string | null>(modal.projectTargetId);
+  snippetIdRef.current = modal.projectTargetId;
 
   // Lazy initializers: seed ONCE from the projection. After this, the host's
   // editBuffer / nameBuffer / triggerBuffer / contentBuffer projections are

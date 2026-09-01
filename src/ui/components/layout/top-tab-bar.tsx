@@ -12,8 +12,12 @@ import { useWorkspaceDivergencePolling } from '../../../git/workspace-divergence
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
-import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
-import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
+import {
+  buildTabEntries,
+  filterTabsForActiveWorkspace,
+  type GroupEntry,
+  type TabEntry,
+} from '../../../state/tab-entries'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { moveIdToIdPosition } from '../../project-ordering'
 import { useTheme } from '../../theme'

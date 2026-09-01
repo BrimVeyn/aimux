@@ -40,6 +40,7 @@ function projectTab(tab: TabSession): ProjectedTab {
     id: tab.id,
     status: tab.status,
     title: tab.title,
+    unseen: tab.unseen,
     workspaceId: tab.workspaceId,
   }
 }

@@ -3,8 +3,8 @@ import { describe, expect, test } from 'bun:test'
 import type { AppState, ProjectRecord, TabSession, WorkspaceRecord } from '../../src/state/types'
 
 import { serializeProject } from '../../src/state/project-persistence'
-import { filterTabsForActiveWorkspace } from '../../src/state/project-workspaces'
 import { appReducer, createInitialState } from '../../src/state/store'
+import { filterTabsForActiveWorkspace } from '../../src/state/tab-entries'
 
 function tab(overrides: Partial<TabSession> & { id: string }): TabSession {
   return {

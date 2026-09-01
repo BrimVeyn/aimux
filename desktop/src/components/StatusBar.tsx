@@ -1,6 +1,10 @@
 import { AIUsageIndicator } from "@/components/AIUsageIndicator";
 import { theme } from "@/lib/theme";
-import type { AppStateProjection, FocusMode } from "@/lib/types";
+import type {
+  AppStateProjection,
+  FocusMode,
+  IdentitySegment,
+} from "@/lib/types";
 
 // Single-line, ambient status bar. No card background, no pill chips, no
 // inline hint dump — keybind hints and version live behind a hover popover
@@ -8,12 +12,8 @@ import type { AppStateProjection, FocusMode } from "@/lib/types";
 // communicated by typography alone (the word itself is colored), pairing
 // with the FocusModeRail above for a peripheral signal.
 //
-// The host pre-renders left/right/help/version strings (it owns the keymap
-// config). The GUI parses `left` on the nerd-font briefcase glyph to break
-// the session/tab context back into structured segments and render a real
-// typographic breadcrumb.
-
-const SESSION_ICON = "\u{f0b1}";
+// The host pre-renders right/help/version strings (it owns the keymap config)
+// and sends the identity breadcrumb as toned segments.
 
 // Mirror of FocusModeRail's color mapping so the label and the rail
 // communicate the focus mode with the same color, not two different ones.
@@ -76,39 +76,28 @@ function ModeLabel({ focusMode }: { focusMode: FocusMode }) {
   );
 }
 
-function SessionBreadcrumb({ leftString }: { leftString: string }) {
-  const raw = leftString.trim();
-  if (raw === "") return null;
-  const segments = raw
-    .split(SESSION_ICON)
-    .map((s) => s.trim())
-    .filter((s) => s !== "");
-
+/**
+ * The identity breadcrumb. The host sends toned segments, so this no longer
+ * splits a string on a nerd-font glyph to guess where one ends: `primary` is
+ * the project, `muted` is everything trailing it, separators included.
+ */
+function ProjectBreadcrumb({ segments }: { segments: IdentitySegment[] }) {
   if (segments.length === 0) return null;
-
   return (
     <span
-      className="chrome-meta flex min-w-0 items-baseline gap-1.5 truncate"
-      title={raw}
+      className="chrome-meta flex min-w-0 items-baseline truncate"
+      title={segments.map((seg) => seg.text).join("")}
     >
-      {segments.map((seg, i) => (
-        <span key={i} className="flex items-baseline gap-1.5 truncate">
-          {i > 0 ? (
-            <span
-              aria-hidden
-              style={{ color: theme.textMuted, opacity: 0.45 }}
-            >
-              ›
-            </span>
-          ) : null}
-          <span
-            className="truncate"
-            style={{
-              color: i === 0 ? theme.text : theme.textMuted,
-            }}
-          >
-            {seg}
-          </span>
+      {segments.map((seg) => (
+        <span
+          key={seg.id}
+          className="truncate whitespace-pre"
+          style={{
+            color: seg.tone === "primary" ? theme.text : theme.textMuted,
+            opacity: seg.tone === "primary" ? 1 : 0.75,
+          }}
+        >
+          {seg.text}
         </span>
       ))}
     </span>
@@ -223,7 +212,7 @@ export function StatusBar({
 
       <div className="h-3 w-px shrink-0" style={{ backgroundColor: theme.border, opacity: 0.6 }} />
 
-      <SessionBreadcrumb leftString={statusBar.left} />
+      <ProjectBreadcrumb segments={statusBar.projectSegments} />
 
       <div className="flex-1" />
 

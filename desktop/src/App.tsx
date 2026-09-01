@@ -1,15 +1,15 @@
 import { open } from '@tauri-apps/plugin-dialog'
-import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { Bar } from '@/components/Bar'
 import { FocusModeRail } from '@/components/FocusModeRail'
 import { GitPanel } from '@/components/git/GitPanel'
 import { GitView } from '@/components/git/GitView'
 import { ModalHost } from '@/components/ModalHost'
-import { SessionBar } from '@/components/SessionBar'
 import { Sidebar } from '@/components/Sidebar'
 import { SplitLayout } from '@/components/SplitLayout'
 import { StatusBar } from '@/components/StatusBar'
+import { TabBar } from '@/components/TabBar'
 import { TerminalPane } from '@/components/TerminalPane'
 import { normalizeKey } from '@/lib/keys'
 import { disposeTerminal, liveTerminalIds } from '@/lib/terminal-registry'
@@ -266,18 +266,18 @@ function App() {
     socketRef.current?.send({ t: 'openAiUsageModal' })
   }, [dismissModalIfOpen])
 
-  const switchSession = useCallback(
-    (sessionId: string) => {
+  const switchProject = useCallback(
+    (projectId: string) => {
       dismissModalIfOpen()
-      socketRef.current?.send({ sessionId, t: 'switchSession' })
+      socketRef.current?.send({ projectId, t: 'switchProject' })
     },
     [dismissModalIfOpen]
   )
 
-  const deleteSession = useCallback(
-    (sessionId: string) => {
+  const deleteProject = useCallback(
+    (projectId: string) => {
       dismissModalIfOpen()
-      socketRef.current?.send({ sessionId, t: 'deleteSession' })
+      socketRef.current?.send({ projectId, t: 'deleteProject' })
     },
     [dismissModalIfOpen]
   )
@@ -290,7 +290,7 @@ function App() {
     socketRef.current?.send({ index, t: 'modalConfirm' })
   }, [])
 
-  const newSession = useCallback(() => {
+  const newProject = useCallback(() => {
     dismissModalIfOpen()
     void (async () => {
       let path: string | null = null
@@ -298,10 +298,10 @@ function App() {
         const picked = await open({ directory: true, multiple: false })
         path = typeof picked === 'string' ? picked : null
       } catch {
-        path = window.prompt('Folder path for new session:')
+        path = window.prompt('Folder path for new project:')
       }
       if (path !== null && path !== '') {
-        socketRef.current?.send({ path, t: 'createSession' })
+        socketRef.current?.send({ path, t: 'createProject' })
       }
     })()
   }, [dismissModalIfOpen])
@@ -322,15 +322,26 @@ function App() {
   )
 
   const activeTabId = projection?.activeTabId ?? null
-  const currentSession = projection?.sessions.find((s) => s.id === projection.currentSessionId)
-  const activeWorktree = currentSession?.worktrees?.find(
-    (w) => w.id === currentSession.activeWorktreeId
-  )
-  const sidebarBranch = activeWorktree?.branch ?? null
+  const currentProject = projection?.projects.find((p) => p.id === projection.currentProjectId)
 
-  const toggleWorktreeMoveDelete = useCallback(() => {
-    socketRef.current?.send({ t: 'toggleWorktreeMoveDelete' })
+  const toggleWorkspaceMoveDelete = useCallback(() => {
+    socketRef.current?.send({ t: 'toggleWorkspaceMoveDelete' })
   }, [])
+
+  const reorderTabs = useCallback((orderedTabIds: string[]) => {
+    socketRef.current?.send({ intent: { kind: 'tabs.reorder', orderedTabIds }, t: 'intent' })
+  }, [])
+
+  const activateWorkspace = useCallback(
+    (projectId: string, workspaceId: string) => {
+      dismissModalIfOpen()
+      socketRef.current?.send({
+        intent: { kind: 'workspace.activate', projectId, workspaceId },
+        t: 'intent',
+      })
+    },
+    [dismissModalIfOpen]
+  )
 
   const openSnippetEditor = useCallback((snippetId?: string) => {
     socketRef.current?.send(
@@ -372,35 +383,36 @@ function App() {
   const activeTree: LayoutNode | null =
     groupId !== null ? (projection?.layoutTrees[groupId] ?? null) : null
 
+  const EMPTY_BAR = { visible: false, widgets: [], width: 0 }
+  const bars = projection?.bars ?? { left: EMPTY_BAR, right: EMPTY_BAR }
   const gitPane = projection?.gitPane
   const inGitMode = projection?.focusMode === 'git' || projection?.modal.type === 'git-commit'
-  // Stage 2a: pane+top/bottom isn't a real TUI combo (top/bottom are embedded-only).
-  // Fall back to left-pane behavior so the panel is still visible if the host ever
-  // emits this combo; Task 3 may revisit.
-  const showPanelLeftOrRight =
-    !inGitMode &&
-    gitPane?.visible === true &&
-    gitPane.mode === 'pane' &&
-    (gitPane.position === 'left' ||
-      gitPane.position === 'right' ||
-      gitPane.position === 'top' ||
-      gitPane.position === 'bottom')
-  const showPanelEmbedded =
-    !inGitMode &&
-    gitPane?.visible === true &&
-    gitPane.mode === 'embedded' &&
-    (gitPane.position === 'top' || gitPane.position === 'bottom')
-  const panelOnRight = gitPane?.mode === 'pane' && gitPane.position === 'right'
+
+  const sidebarElement =
+    projection !== null ? (
+      <Sidebar
+        activeTabId={activeTabId}
+        currentProjectId={projection.currentProjectId}
+        onInteract={leaveInsertMode}
+        onDeleteProject={deleteProject}
+        onNewProject={newProject}
+        onNewTab={newTab}
+        onSelectTab={activateTab}
+        onSelectWorkspace={activateWorkspace}
+        onSwitchProject={switchProject}
+        projects={projection.projects}
+        projectStatuses={projection.projectStatuses}
+        tabs={projection.tabs}
+        workspaceActivity={projection.workspaceActivity}
+        workspaceDivergence={projection.workspaceDivergence}
+      />
+    ) : null
 
   const gitPanelElement =
     projection !== null && gitPane !== undefined ? (
       <div
-        className="h-full overflow-hidden border-r"
-        style={{
-          backgroundColor: theme.backgroundPanel,
-          borderColor: theme.border,
-          padding: 8,
-        }}
+        className="h-full overflow-hidden"
+        style={{ backgroundColor: theme.backgroundPanel, padding: 8 }}
       >
         <GitPanel
           gitMode={projection.gitMode}
@@ -409,15 +421,11 @@ function App() {
           onStageFile={stageGitFile}
           onToggleFolder={toggleGitFolder}
           onUnstageFile={unstageGitFile}
-          projectPath={currentSession?.projectPath}
+          projectPath={currentProject?.projectPath}
         />
       </div>
     ) : null
 
-  const paneWrapperStyle: React.CSSProperties =
-    gitPane !== undefined
-      ? { flexBasis: `${gitPane.paneRatio * 100}%`, flexShrink: 0, minWidth: 0 }
-      : {}
 
   const sendEscape = useCallback(() => {
     // Single Esc transport for click-driven affordances (git-mode back button,
@@ -445,7 +453,7 @@ function App() {
         onStageFile={stageGitFile}
         onToggleFolder={toggleGitFolder}
         onUnstageFile={unstageGitFile}
-        projectPath={currentSession?.projectPath}
+        projectPath={currentProject?.projectPath}
         themeId={projection.themeId}
       />
     ) : null
@@ -469,38 +477,36 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col" style={{ backgroundColor: theme.background }}>
-      <SessionBar
-        sessions={projection?.sessions ?? []}
-        statuses={projection?.sessionStatuses ?? {}}
-        currentSessionId={projection?.currentSessionId ?? null}
-        onSwitch={switchSession}
-        onNew={newSession}
-        onDelete={deleteSession}
-      />
       <div className="flex min-h-0 flex-1">
-        {inGitMode ? (
-          gitViewElement
-        ) : (
-          <>
-            <Sidebar
-              sessionName={currentSession?.name ?? null}
-              branch={sidebarBranch}
-              tabs={projection?.tabs ?? []}
-              activeTabId={activeTabId}
-              onSelectTab={activateTab}
-              onCloseTab={closeTab}
-              onNewTab={newTab}
-              onInteract={leaveInsertMode}
-              embeddedRatio={showPanelEmbedded ? gitPane?.embeddedRatio : undefined}
-              gitPanelPosition={
-                showPanelEmbedded ? (gitPane?.position as 'top' | 'bottom') : undefined
-              }
-              gitPanelSlot={showPanelEmbedded ? gitPanelElement : undefined}
-            />
-            {showPanelLeftOrRight && !panelOnRight ? (
-              <div style={paneWrapperStyle}>{gitPanelElement}</div>
-            ) : null}
-            <main className="flex min-w-0 flex-1 flex-col">
+        <Bar
+          bar={bars.left}
+          side="left"
+          widgets={{ git: gitPanelElement, projects: sidebarElement }}
+        />
+        <main className="flex min-w-0 flex-1 flex-col">
+          {/* The strip sits inside the pane column, not above the bars — same
+              place the TUI puts it. In git mode it stays as something to read,
+              minus the `+` that would quietly pull you out of the screen. */}
+          <TabBar
+            activeTabId={activeTabId}
+            focused={
+              projection?.focusMode === 'terminal-input' ||
+              projection?.focusMode === 'navigation'
+            }
+            layoutTrees={projection?.layoutTrees ?? {}}
+            onActivate={activateTab}
+            onClose={closeTab}
+            onNew={newTab}
+            onReorder={reorderTabs}
+            panesReplaced={inGitMode}
+            project={currentProject}
+            tabGroupMap={projection?.tabGroupMap ?? {}}
+            tabs={projection?.tabs ?? []}
+          />
+          {inGitMode ? (
+            <div className="min-h-0 flex-1">{gitViewElement}</div>
+          ) : (
+            <>
               <div className="min-h-0 flex-1">
                 {activeTree !== null && activeTree.type === 'split' ? (
                   <SplitLayout
@@ -532,12 +538,14 @@ function App() {
                 ) : null}
               </div>
               <FocusModeRail focusMode={projection?.focusMode ?? 'navigation'} />
-            </main>
-            {showPanelLeftOrRight && panelOnRight ? (
-              <div style={paneWrapperStyle}>{gitPanelElement}</div>
-            ) : null}
-          </>
-        )}
+            </>
+          )}
+        </main>
+        <Bar
+          bar={bars.right}
+          side="right"
+          widgets={{ git: gitPanelElement, projects: sidebarElement }}
+        />
       </div>
       {projection ? (
         <StatusBar projection={projection} connecting={status !== 'open'} onOpenUsage={openUsage} />
@@ -553,10 +561,10 @@ function App() {
         <ModalHost
           modal={projection.modal}
           customCommands={projection.customCommands}
-          worktrees={currentSession?.worktrees ?? []}
-          worktreeDivergence={projection.worktreeDivergence}
-          sessions={projection.sessions}
-          currentSessionId={projection.currentSessionId}
+          workspaces={currentProject?.workspaces ?? []}
+          workspaceDivergence={projection.workspaceDivergence}
+          projects={projection.projects}
+          currentProjectId={projection.currentProjectId}
           snippets={projection.snippets}
           committedThemeId={projection.committedThemeId}
           helpEntries={projection.helpEntries}
@@ -565,7 +573,7 @@ function App() {
           gitFiles={projection.gitPanel.files}
           onSelect={selectModal}
           onConfirm={confirmModal}
-          onToggleDeleteSource={toggleWorktreeMoveDelete}
+          onToggleDeleteSource={toggleWorkspaceMoveDelete}
           onOpenSnippetEditor={openSnippetEditor}
           onSnippetSubmit={submitSnippetEditor}
           onSnippetCancel={cancelSnippetEditor}

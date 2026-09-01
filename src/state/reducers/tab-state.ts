@@ -18,10 +18,10 @@ import {
 import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
   clearWorkspaceDone,
-  filterTabsForActiveWorkspace,
   orderTabsByWorkspace,
   withActiveWorkspace,
 } from '../project-workspaces'
+import { filterTabsForActiveWorkspace } from '../tab-entries'
 import { createDefaultTerminalModes } from '../terminal-modes'
 
 const MAX_BUFFER_LENGTH = 50_000

@@ -1,6 +1,7 @@
 import type { AppState, FlashJumpTarget, FlashLabel } from '../../state/types'
 
-import { filterTabsForActiveWorkspace, getPrimaryWorkspace } from '../../state/project-workspaces'
+import { getPrimaryWorkspace } from '../../state/project-workspaces'
+import { filterTabsForActiveWorkspace } from '../../state/tab-entries'
 import { orderProjectsForDisplay } from '../project-ordering'
 import { assignFlashLabels, type FlashTarget } from './assign-labels'
 

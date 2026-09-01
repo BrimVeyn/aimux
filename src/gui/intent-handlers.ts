@@ -50,7 +50,43 @@ export function dispatchIntent(intent: GuiIntent, runtime: GuiRuntime): void {
       // a bare `git-mode-toggle-folder` dispatch with the row's key.
       runtime.dispatch({ key: intent.key, type: 'git-mode-toggle-folder' })
       return
+    case 'tabs.reorder':
+      // Same dispatch the TUI's tab-strip drag commits (top-tab-bar.tsx):
+      // the reducer rewrites only the visible tabs' slots.
+      runtime.dispatch({ orderedTabIds: intent.orderedTabIds, type: 'reorder-tabs' })
+      return
+    case 'workspace.activate':
+      handleWorkspaceActivate(intent, runtime)
+      return
   }
+}
+
+/**
+ * Mirrors `workspace-row.tsx`'s mouse-down: inside the current project it is a
+ * plain dispatch, but a cross-project click has to carry the workspace along
+ * with the switch. Splitting that into dispatch-then-switch leaves a window
+ * where the target project re-asserts its last-persisted workspace.
+ */
+function handleWorkspaceActivate(
+  intent: Extract<GuiIntent, { kind: 'workspace.activate' }>,
+  runtime: GuiRuntime
+): void {
+  const state = runtime.getState()
+  if (state.currentProjectId === intent.projectId) {
+    runtime.dispatch({
+      projectId: intent.projectId,
+      type: 'set-active-workspace',
+      workspaceId: intent.workspaceId,
+    })
+    return
+  }
+  const index = state.projects.findIndex((project) => project.id === intent.projectId)
+  if (index < 0) return
+  runtime.pipeline.runEffect({
+    index,
+    type: 'switch-project-by-index',
+    workspaceId: intent.workspaceId,
+  })
 }
 
 function handleSnippetSubmit(

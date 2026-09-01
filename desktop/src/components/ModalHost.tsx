@@ -4,13 +4,13 @@ import { AIUsageModal } from "@/components/AIUsageModal";
 import { CreateSessionModal } from "@/components/modals/CreateSessionModal";
 import { GitCommitModal } from "@/components/modals/GitCommitModal";
 import { HelpModal } from "@/components/modals/HelpModal";
-import { SessionPickerModal } from "@/components/modals/SessionPickerModal";
+import { ProjectPickerModal } from "@/components/modals/ProjectPickerModal";
 import { SnippetEditorModal } from "@/components/modals/SnippetEditorModal";
 import { SnippetPickerModal } from "@/components/modals/SnippetPickerModal";
 import { TextFieldModal } from "@/components/modals/TextFieldModal";
 import { ThemePickerModal } from "@/components/modals/ThemePickerModal";
 import { UpdateAvailableModal } from "@/components/modals/UpdateAvailableModal";
-import { WorktreeMoveModal } from "@/components/modals/WorktreeMoveModal";
+import { WorkspaceMoveModal } from "@/components/modals/WorkspaceMoveModal";
 import { allAssistants, filterAssistants } from "@/lib/assistants";
 import { formatDivergence } from "@/lib/git";
 import { theme } from "@/lib/theme";
@@ -20,19 +20,19 @@ import type {
   GitFileEntryLite,
   GuiHelpEntry,
   ModalProjection,
-  SessionRecordLite,
+  ProjectRecordLite,
   SnippetRecordLite,
   UsageSnapshot,
-  WorktreeLite,
+  WorkspaceLite,
 } from "@/lib/types";
 
 interface ModalHostProps {
   modal: ModalProjection;
   customCommands: Record<string, string>;
-  worktrees: WorktreeLite[];
-  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
-  sessions: SessionRecordLite[];
-  currentSessionId: string | null;
+  workspaces: WorkspaceLite[];
+  workspaceDivergence: Record<string, { ahead: number; behind: number }>;
+  projects: ProjectRecordLite[];
+  currentProjectId: string | null;
   snippets: SnippetRecordLite[];
   committedThemeId: string;
   helpEntries: GuiHelpEntry[];
@@ -66,10 +66,10 @@ interface ModalHostProps {
 export function ModalHost({
   modal,
   customCommands,
-  worktrees,
-  worktreeDivergence,
-  sessions,
-  currentSessionId,
+  workspaces,
+  workspaceDivergence,
+  projects,
+  currentProjectId,
   snippets,
   committedThemeId,
   helpEntries,
@@ -107,8 +107,8 @@ export function ModalHost({
           <NewTabModal
             modal={modal}
             customCommands={customCommands}
-            worktrees={worktrees}
-            worktreeDivergence={worktreeDivergence}
+            workspaces={workspaces}
+            workspaceDivergence={workspaceDivergence}
             onSelect={onSelect}
             onConfirm={onConfirm}
           />
@@ -120,10 +120,10 @@ export function ModalHost({
             onConfirm={onConfirm}
           />
         ) : modal.type === "session-picker" ? (
-          <SessionPickerModal
+          <ProjectPickerModal
             modal={modal}
-            sessions={sessions}
-            currentSessionId={currentSessionId}
+            projects={projects}
+            currentProjectId={currentProjectId}
             onSelect={onSelect}
             onConfirm={onConfirm}
           />
@@ -157,12 +157,12 @@ export function ModalHost({
             onSelect={onSelect}
             onConfirm={onConfirm}
           />
-        ) : modal.type === "worktree-move" ? (
-          <WorktreeMoveModal
+        ) : modal.type === "workspace-move" ? (
+          <WorkspaceMoveModal
             modal={modal}
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            worktreeDivergence={worktreeDivergence}
+            projects={projects}
+            currentProjectId={currentProjectId}
+            workspaceDivergence={workspaceDivergence}
             onSelect={onSelect}
             onConfirm={onConfirm}
             onToggleDeleteSource={onToggleDeleteSource}
@@ -311,40 +311,40 @@ function SplitPickerModal({
 function NewTabModal({
   modal,
   customCommands,
-  worktrees,
-  worktreeDivergence,
+  workspaces,
+  workspaceDivergence,
   onSelect,
   onConfirm,
 }: {
   modal: ModalProjection;
   customCommands: Record<string, string>;
-  worktrees: WorktreeLite[];
-  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
+  workspaces: WorkspaceLite[];
+  workspaceDivergence: Record<string, { ahead: number; behind: number }>;
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
 }) {
-  // Step 2: choose a worktree to launch in (or create a new one).
-  if (modal.step === "worktree" || modal.step === "worktree-create") {
+  // Step 2: choose a workspace to launch in (or create a new one).
+  if (modal.step === "workspace" || modal.step === "workspace-create") {
     const assistant = modal.selectedAssistantId ?? "assistant";
-    // TUI parity: worktree-create has two host-driven fields (name + branch);
+    // TUI parity: workspace-create has two host-driven fields (name + branch);
     // active one shows the cursor, inactive is dimmed. Tab cycles via host.
-    const isCreateStep = modal.step === "worktree-create";
+    const isCreateStep = modal.step === "workspace-create";
     const branchActive = modal.activeField === "branch-name";
     return (
       <div className="flex flex-col gap-2">
         <div className="font-bold">
-          New {assistant} tab <span style={{ color: theme.textMuted }}>· choose worktree</span>
+          New {assistant} tab <span style={{ color: theme.textMuted }}>· choose workspace</span>
         </div>
         {isCreateStep ? (
           <div className="flex flex-col gap-1">
             <span style={{ color: branchActive ? theme.textMuted : theme.primary }}>
-              Worktree
+              Workspace
             </span>
             <div
               className="rounded px-2 py-1"
               style={{ backgroundColor: theme.backgroundElement, color: theme.text }}
             >
-              {modal.worktreeName ?? ""}
+              {modal.workspaceName ?? ""}
               {!branchActive ? <span style={{ color: theme.primary }}>▏</span> : null}
             </div>
             <span style={{ color: branchActive ? theme.primary : theme.textMuted }}>Branch</span>
@@ -356,18 +356,18 @@ function NewTabModal({
               {branchActive ? <span style={{ color: theme.primary }}>▏</span> : null}
             </div>
           </div>
-        ) : modal.createWorktree === true ? (
+        ) : modal.createWorkspace === true ? (
           <div
             className="rounded px-2 py-1"
             style={{ backgroundColor: theme.backgroundElement }}
           >
-            new worktree: <span style={{ color: theme.primary }}>{modal.worktreeName ?? ""}</span>
+            new workspace: <span style={{ color: theme.primary }}>{modal.workspaceName ?? ""}</span>
           </div>
         ) : (
           <div className="flex flex-col">
-            {worktrees.map((wt, index) => {
+            {workspaces.map((wt, index) => {
               const primary = wt.source === "primary" ? " (primary)" : "";
-              const divergence = formatDivergence(worktreeDivergence[wt.id]);
+              const divergence = formatDivergence(workspaceDivergence[wt.id]);
               const primaryText =
                 wt.branch !== undefined && wt.branch !== "" ? wt.branch : wt.name;
               const label = `${primaryText}${primary}${divergence !== "" ? ` ${divergence}` : ""}`;
@@ -381,7 +381,7 @@ function NewTabModal({
                 />
               );
             })}
-            {worktrees.length === 0 ? (
+            {workspaces.length === 0 ? (
               <div className="px-2 py-1" style={{ color: theme.textMuted }}>
                 (current directory)
               </div>
@@ -391,7 +391,7 @@ function NewTabModal({
         <div className="pt-1" style={{ color: theme.textMuted }}>
           {isCreateStep
             ? "Enter: launch · Tab: switch field · Esc: back"
-            : "Enter: launch · C-w: toggle new worktree · ↑/↓: select · Esc: back"}
+            : "Enter: launch · C-w: toggle new workspace · ↑/↓: select · Esc: back"}
         </div>
       </div>
     );

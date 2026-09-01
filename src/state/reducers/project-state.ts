@@ -3,12 +3,9 @@ import type { AppState } from '../types'
 
 import { moveIdToIdPosition, orderProjectsForDisplay } from '../../ui/project-ordering'
 import { restoreProjectState } from '../project-persistence'
-import {
-  clearWorkspaceDone,
-  filterTabsForActiveWorkspace,
-  withActiveWorkspace,
-} from '../project-workspaces'
+import { clearWorkspaceDone, withActiveWorkspace } from '../project-workspaces'
 import { filterProjects } from '../selectors'
+import { filterTabsForActiveWorkspace } from '../tab-entries'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_WORKSPACE_ACTIVITY } from '../types'
 

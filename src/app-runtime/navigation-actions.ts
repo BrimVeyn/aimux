@@ -5,13 +5,12 @@ import { logInputDebug } from '../debug/input-log'
 import { appStore } from '../state/app-store'
 import { saveProjectCatalog } from '../state/project-catalog'
 import {
-  filterTabsForActiveWorkspace,
   getPrimaryWorkspace,
   getSidebarWorkspaces,
   withActiveWorkspace,
 } from '../state/project-workspaces'
 import { appReducer } from '../state/store'
-import { buildTabEntries } from '../state/tab-entries'
+import { buildTabEntries, filterTabsForActiveWorkspace } from '../state/tab-entries'
 import { switchProjectRecords } from './project-actions'
 
 export function handleSwitchProjectByIndex(

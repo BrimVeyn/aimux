@@ -2,7 +2,7 @@ import { Row } from "@/components/ModalHost";
 import { AimuxButton } from "@/components/ui/AimuxButton";
 import { formatDivergence } from "@/lib/git";
 import { theme } from "@/lib/theme";
-import type { ModalProjection, SessionRecordLite } from "@/lib/types";
+import type { ModalProjection, ProjectRecordLite } from "@/lib/types";
 
 const MOVE_HINTS: [key: string, label: string][] = [
   ["↵", "move into selected target"],
@@ -11,34 +11,34 @@ const MOVE_HINTS: [key: string, label: string][] = [
   ["esc", "cancel"],
 ];
 
-interface WorktreeMoveModalProps {
+interface WorkspaceMoveModalProps {
   modal: ModalProjection;
-  sessions: SessionRecordLite[];
-  currentSessionId: string | null;
-  worktreeDivergence: Record<string, { ahead: number; behind: number }>;
+  projects: ProjectRecordLite[];
+  currentProjectId: string | null;
+  workspaceDivergence: Record<string, { ahead: number; behind: number }>;
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
   onToggleDeleteSource: () => void;
 }
 
-export function WorktreeMoveModal({
+export function WorkspaceMoveModal({
   modal,
-  sessions,
-  currentSessionId,
-  worktreeDivergence,
+  projects,
+  currentProjectId,
+  workspaceDivergence,
   onSelect,
   onConfirm,
   onToggleDeleteSource,
-}: WorktreeMoveModalProps) {
-  const session = sessions.find((s) => s.id === currentSessionId);
-  const worktrees = session?.worktrees ?? [];
-  const sourceId = modal.sourceWorktreeId;
-  const source = worktrees.find((w) => w.id === sourceId);
+}: WorkspaceMoveModalProps) {
+  const session = projects.find((s) => s.id === currentProjectId);
+  const workspaces = session?.workspaces ?? [];
+  const sourceId = modal.sourceWorkspaceId;
+  const source = workspaces.find((w) => w.id === sourceId);
   const sourceLabel =
     source?.branch !== undefined && source.branch !== ""
       ? source.branch
-      : (source?.name ?? "worktree");
-  const targets = worktrees.filter((w) => w.id !== sourceId);
+      : (source?.name ?? "workspace");
+  const targets = workspaces.filter((w) => w.id !== sourceId);
   const deleteSource = modal.deleteSource ?? false;
   return (
     <div className="flex flex-col gap-2">
@@ -48,12 +48,12 @@ export function WorktreeMoveModal({
       <div className="flex flex-col">
         {targets.length === 0 ? (
           <div className="px-2 py-1" style={{ color: theme.textMuted }}>
-            No other worktree to move into.
+            No other workspace to move into.
           </div>
         ) : (
           targets.map((wt, index) => {
             const primary = wt.source === "primary" ? " (primary)" : "";
-            const divergence = formatDivergence(worktreeDivergence[wt.id]);
+            const divergence = formatDivergence(workspaceDivergence[wt.id]);
             const primaryText =
               wt.branch !== undefined && wt.branch !== "" ? wt.branch : wt.name;
             const label = `${primaryText}${primary}${divergence !== "" ? ` ${divergence}` : ""}`;

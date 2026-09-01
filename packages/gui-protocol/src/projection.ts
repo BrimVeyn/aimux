@@ -52,6 +52,8 @@ export interface ProjectedTab {
   assistant: string
   status: TabStatus
   activity?: TabActivity
+  /** The tab rang while you were looking elsewhere. Drawn as a dot. */
+  unseen?: boolean
   /**
    * Workspace the tab lives in. The tab strip shows the ACTIVE workspace's
    * tabs only, so without this the renderer cannot filter and would show

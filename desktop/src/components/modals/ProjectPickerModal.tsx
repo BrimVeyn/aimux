@@ -1,34 +1,34 @@
 import { FilterField, Footer, Row } from "@/components/ModalHost";
-import type { ModalProjection, SessionRecordLite } from "@/lib/types";
+import type { ModalProjection, ProjectRecordLite } from "@/lib/types";
 
 // Mirrors aimux filterSessions (name OR projectPath substring match).
 function filterSessions(
-  sessions: SessionRecordLite[],
+  projects: ProjectRecordLite[],
   filter: string | null,
-): SessionRecordLite[] {
-  if (filter === null || filter === "") return sessions;
+): ProjectRecordLite[] {
+  if (filter === null || filter === "") return projects;
   const lower = filter.toLowerCase();
-  return sessions.filter(
+  return projects.filter(
     (s) =>
       s.name.toLowerCase().includes(lower) ||
       (s.projectPath !== undefined && s.projectPath.toLowerCase().includes(lower)),
   );
 }
 
-export function SessionPickerModal({
+export function ProjectPickerModal({
   modal,
-  sessions,
-  currentSessionId,
+  projects,
+  currentProjectId,
   onSelect,
   onConfirm,
 }: {
   modal: ModalProjection;
-  sessions: SessionRecordLite[];
-  currentSessionId: string | null;
+  projects: ProjectRecordLite[];
+  currentProjectId: string | null;
   onSelect: (index: number) => void;
   onConfirm: (index: number) => void;
 }) {
-  const options = filterSessions(sessions, modal.editBuffer);
+  const options = filterSessions(projects, modal.editBuffer);
   return (
     <div className="flex flex-col gap-2">
       <div className="font-bold">Switch workspace</div>
@@ -38,7 +38,7 @@ export function SessionPickerModal({
           <Row
             key={s.id}
             selected={index === modal.selectedIndex}
-            label={s.id === currentSessionId ? `${s.name} (current)` : s.name}
+            label={s.id === currentProjectId ? `${s.name} (current)` : s.name}
             hint={s.projectPath}
             onSelect={() => onSelect(index)}
             onConfirm={() => onConfirm(index)}
