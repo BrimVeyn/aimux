@@ -11,7 +11,7 @@ export type GuiIntent =
       trigger: string
       content: string
       // Present when editing an existing snippet (host populated
-      // `modal.sessionTargetId` from the `openSnippetEditor` message);
+      // `modal.projectTargetId` from the `openSnippetEditor` message);
       // absent for creation.
       snippetId?: string
     }

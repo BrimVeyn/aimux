@@ -5,7 +5,7 @@ import { computeGuiHelpEntries } from './gui-help-entries'
 
 test('computeGuiHelpEntries returns serializable entries with keys + descriptions', async () => {
   const config = await loadUserConfig()
-  const entries = computeGuiHelpEntries(config.keymaps)
+  const entries = computeGuiHelpEntries(config.resolved.keymaps)
   expect(entries.length).toBeGreaterThan(0)
   for (const entry of entries) {
     expect(typeof entry.keys).toBe('string')

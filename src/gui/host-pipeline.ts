@@ -9,7 +9,7 @@ import type { SessionBackend } from '../session-backend/types'
 import type { AppState } from '../state/types'
 import type { ThemeId } from '../ui/themes'
 
-import { executeSideEffect } from '../app-runtime/side-effect-context'
+import { executeSideEffect } from '../app-runtime/side-effects'
 import { deriveModeId } from '../input/modes/bridge'
 import { getHandler, transitionTo } from '../input/modes/registry'
 import { appStore } from '../state/app-store'
@@ -151,9 +151,9 @@ export function createPipeline(opts: PipelineOptions) {
   // The config package's Action types are structurally identical to the local
   // ones; cast bridges the duplicated declarations.
   const modalConfirmActions: Partial<Record<string, ActionFn | KeyResult>> = {
-    'create-session': actions.confirmCreateSession as ActionFn,
-    'new-tab': actions.launchSelectedAssistant as ActionFn,
-    'session-picker': actions.confirmSelectedProject as KeyResult,
+    'create-project': actions.confirmCreateProject as ActionFn,
+    'new-tab': actions.launchSelectedAssistant as KeyResult,
+    'project-picker': actions.confirmSelectedProject as KeyResult,
     'snippet-picker': actions.snippetFilterPaste as KeyResult,
     'split-picker': actions.confirmSplit as KeyResult,
     'theme-picker': actions.confirmTheme as KeyResult,

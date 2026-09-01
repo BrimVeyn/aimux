@@ -1,20 +1,22 @@
 import type {
   AIUsageProjection,
   AppStateProjection,
+  BarLite,
   GitFileEntryLite,
   GitModeLite,
   GitPaneLite,
   GitPanelLite,
   ModalProjection,
   ProjectedTab,
-  SessionRecordLite,
+  ProjectRecordLite,
   StatusBarProjection,
-  WorktreeLite,
+  WorkspaceLite,
 } from '@aimux/gui-protocol'
 import type { ThemeMode } from '@brimveyn/aimux-config'
 
 import type {
   AppState,
+  BarState,
   GitFileEntry,
   GitModeState,
   GitPanelState,
@@ -38,10 +40,11 @@ function projectTab(tab: TabSession): ProjectedTab {
     id: tab.id,
     status: tab.status,
     title: tab.title,
+    workspaceId: tab.workspaceId,
   }
 }
 
-function projectWorktree(w: WorkspaceRecord): WorktreeLite {
+function projectWorkspace(w: WorkspaceRecord): WorkspaceLite {
   return {
     baseRef: w.baseRef,
     branch: w.branch,
@@ -58,13 +61,21 @@ function projectWorktree(w: WorkspaceRecord): WorktreeLite {
   }
 }
 
-function projectSession(s: ProjectRecord): SessionRecordLite {
+function projectProject(p: ProjectRecord): ProjectRecordLite {
   return {
-    activeWorktreeId: s.activeWorktreeId,
-    id: s.id,
-    name: s.name,
-    projectPath: s.projectPath,
-    worktrees: s.worktrees?.map(projectWorktree),
+    activeWorkspaceId: p.activeWorkspaceId,
+    id: p.id,
+    name: p.name,
+    projectPath: p.projectPath,
+    workspaces: p.workspaces?.map(projectWorkspace),
+  }
+}
+
+function projectBar(bar: BarState): BarLite {
+  return {
+    visible: bar.visible,
+    widgets: bar.widgets.map((w) => ({ grow: w.grow, id: w.id, visible: w.visible })),
+    width: bar.width,
   }
 }
 
@@ -84,13 +95,9 @@ function projectGitPane(g: GitPaneState): GitPaneLite {
   return {
     diffCount: { enabled: g.diffCount.enabled },
     diffModeRatio: g.diffModeRatio,
-    embeddedRatio: g.embeddedRatio,
     fileListMode: g.fileListMode,
-    mode: g.mode,
-    paneRatio: g.paneRatio,
-    position: g.position,
+    prefetchRadius: g.prefetchRadius,
     treeCompaction: g.treeCompaction,
-    visible: g.visible,
   }
 }
 
@@ -145,7 +152,7 @@ function projectModal(modal: ModalState): ModalProjection {
     out.activeField = m.activeField as ModalProjection['activeField']
   }
   if (typeof m.branchName === 'string') out.branchName = m.branchName
-  if (typeof m.createWorktree === 'boolean') out.createWorktree = m.createWorktree
+  if (typeof m.createWorkspace === 'boolean') out.createWorkspace = m.createWorkspace
   if (typeof m.deleteSource === 'boolean') out.deleteSource = m.deleteSource
   if (Array.isArray(m.directoryResults)) {
     out.directoryResults = m.directoryResults as ModalProjection['directoryResults']
@@ -157,9 +164,9 @@ function projectModal(modal: ModalState): ModalProjection {
   if (typeof m.selectedAssistantId === 'string' || m.selectedAssistantId === null) {
     out.selectedAssistantId = m.selectedAssistantId as string | null
   }
-  if (typeof m.sourceWorktreeId === 'string') out.sourceWorktreeId = m.sourceWorktreeId
+  if (typeof m.sourceWorkspaceId === 'string') out.sourceWorkspaceId = m.sourceWorkspaceId
   if (typeof m.step === 'string') out.step = m.step as ModalProjection['step']
-  if (typeof m.worktreeName === 'string') out.worktreeName = m.worktreeName
+  if (typeof m.workspaceName === 'string') out.workspaceName = m.workspaceName
   if (typeof m.contentBuffer === 'string' || m.contentBuffer === null) {
     out.contentBuffer = m.contentBuffer as string | null
   }
@@ -190,6 +197,7 @@ export function projectAppState(
   return {
     activeTabId: state.activeTabId,
     aiUsage: options.aiUsage,
+    bars: { left: projectBar(state.bars.left), right: projectBar(state.bars.right) },
     committedThemeId: options.committedThemeId,
     currentProjectId: state.currentProjectId,
     customCommands: state.customCommands,
@@ -201,10 +209,9 @@ export function projectAppState(
     layoutTrees: state.layoutTrees,
     modal: projectModal(state.modal),
     multiRepo: state.multiRepo,
-    projectBar: state.projectBar,
+    projectBar: { visible: state.projectBar.visible },
+    projects: state.projects.map(projectProject),
     projectStatuses: state.projectStatuses,
-    sessions: state.projects.map(projectSession),
-    sidebar: { visible: state.sidebar.visible, width: state.sidebar.width },
     snippets: state.snippets,
     statusBar: options.statusBar,
     tabGroupMap: state.tabGroupMap,
@@ -212,6 +219,7 @@ export function projectAppState(
     themeId: options.themeId,
     themeMode: options.themeMode,
     transparent: options.transparent,
+    workspaceActivity: state.workspaceActivity,
     workspaceDivergence: state.workspaceDivergence,
   }
 }

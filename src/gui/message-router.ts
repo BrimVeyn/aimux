@@ -110,7 +110,7 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
     case 'openAiUsageModal':
       // Clicking the usage indicator opens the detail modal (web-native:
       // explicit host command, not a simulated keystroke).
-      dispatch({ type: 'open-ai-usage-modal' })
+      dispatch({ type: 'open-quotas-modal' })
       break
     case 'closeTab':
       dispatch({ tabId: message.tabId, type: 'close-tab' })
@@ -119,14 +119,14 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
       // teardown is also invoked by the backend 'exit' subscriber wired
       // there, so we don't need to call it explicitly here.
       break
-    case 'switchSession': {
-      const session = state.projects.find((entry) => entry.id === message.sessionId)
+    case 'switchProject': {
+      const session = state.projects.find((entry) => entry.id === message.projectId)
       if (session) {
         handleSwitchProjectEffect(state, backend, dispatch, session)
       }
       break
     }
-    case 'createSession':
+    case 'createProject':
       handleCreateProjectEffect(
         state,
         dispatch,
@@ -134,17 +134,17 @@ export function dispatchClientMessage(message: GuiClientMessage, ctx: MessageCon
         message.path
       )
       break
-    case 'deleteSession':
-      handleDeleteProjectEffect(state, backend, dispatch, message.sessionId)
+    case 'deleteProject':
+      handleDeleteProjectEffect(state, backend, dispatch, message.projectId)
       break
-    case 'openWorktreeMove':
+    case 'openWorkspaceMove':
       dispatch({
-        sourceWorktreeId: message.sourceWorktreeId,
-        type: 'open-worktree-move-modal',
+        sourceWorkspaceId: message.sourceWorkspaceId,
+        type: 'open-workspace-move-modal',
       })
       break
-    case 'toggleWorktreeMoveDelete':
-      dispatch({ type: 'toggle-worktree-move-delete' })
+    case 'toggleWorkspaceMoveDelete':
+      dispatch({ type: 'toggle-workspace-move-delete' })
       break
     case 'openSnippetEditor':
       dispatch({ snippetId: message.snippetId, type: 'open-snippet-editor' })

@@ -33,12 +33,12 @@ export type GuiClientMessage =
   | { t: 'setSplitRatio'; tabId: string; ratio: number; axis: SplitDirection }
   | { t: 'openNewTab' }
   | { t: 'closeTab'; tabId: string }
-  | { t: 'switchSession'; sessionId: string }
-  | { t: 'createSession'; path: string }
-  | { t: 'deleteSession'; sessionId: string }
-  | { t: 'openWorktreeMove'; sourceWorktreeId: string }
+  | { t: 'switchProject'; projectId: string }
+  | { t: 'createProject'; path: string }
+  | { t: 'deleteProject'; projectId: string }
+  | { t: 'openWorkspaceMove'; sourceWorkspaceId: string }
   | { t: 'requestBytes'; tabId: string }
-  | { t: 'toggleWorktreeMoveDelete' }
+  | { t: 'toggleWorkspaceMoveDelete' }
   | { t: 'openAiUsageModal' }
   | { t: 'openSnippetEditor'; snippetId?: string }
   | { t: 'enterInsertMode' }
@@ -133,24 +133,24 @@ export function parseClientMessage(raw: string): GuiClientMessage | null {
       return { t: 'openNewTab' }
     case 'closeTab':
       return typeof value.tabId === 'string' ? { t: 'closeTab', tabId: value.tabId } : null
-    case 'switchSession':
-      return typeof value.sessionId === 'string'
-        ? { sessionId: value.sessionId, t: 'switchSession' }
+    case 'switchProject':
+      return typeof value.projectId === 'string'
+        ? { projectId: value.projectId, t: 'switchProject' }
         : null
-    case 'createSession':
-      return typeof value.path === 'string' ? { path: value.path, t: 'createSession' } : null
-    case 'deleteSession':
-      return typeof value.sessionId === 'string'
-        ? { sessionId: value.sessionId, t: 'deleteSession' }
+    case 'createProject':
+      return typeof value.path === 'string' ? { path: value.path, t: 'createProject' } : null
+    case 'deleteProject':
+      return typeof value.projectId === 'string'
+        ? { projectId: value.projectId, t: 'deleteProject' }
         : null
-    case 'openWorktreeMove':
-      return typeof value.sourceWorktreeId === 'string'
-        ? { sourceWorktreeId: value.sourceWorktreeId, t: 'openWorktreeMove' }
+    case 'openWorkspaceMove':
+      return typeof value.sourceWorkspaceId === 'string'
+        ? { sourceWorkspaceId: value.sourceWorkspaceId, t: 'openWorkspaceMove' }
         : null
     case 'requestBytes':
       return typeof value.tabId === 'string' ? { t: 'requestBytes', tabId: value.tabId } : null
-    case 'toggleWorktreeMoveDelete':
-      return { t: 'toggleWorktreeMoveDelete' }
+    case 'toggleWorkspaceMoveDelete':
+      return { t: 'toggleWorkspaceMoveDelete' }
     case 'openAiUsageModal':
       return { t: 'openAiUsageModal' }
     case 'openSnippetEditor':

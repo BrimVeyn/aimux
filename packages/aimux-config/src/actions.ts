@@ -322,10 +322,11 @@ export const confirmTheme: KeyResult = r(
 )
 
 export function previewTheme(delta: 1 | -1): KeyResult {
-  return r(
-    [{ delta, type: 'move-modal-selection' }],
-    [{ action: 'preview', delta, type: 'apply-theme' }]
-  )
+  // The action moves selectedIndex; the effect applies ids[selectedIndex].
+  // selectedIndex is the single source of truth, so the effect carries no
+  // delta of its own — `applyThemeEffect` never re-derived one anyway, and a
+  // mouse click has no direction to give it.
+  return r([{ delta, type: 'move-modal-selection' }], [{ action: 'preview', type: 'apply-theme' }])
 }
 
 export const toggleTransparent: KeyResult = r([], [{ type: 'toggle-transparent' }])

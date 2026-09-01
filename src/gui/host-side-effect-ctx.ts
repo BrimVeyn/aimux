@@ -82,7 +82,7 @@ export function makeSideEffectContext(opts: MakeContextOptions): SideEffectConte
     clearIdleTimer: opts.timeouts.clearIdleTimer,
     clearStartupGrace: opts.timeouts.clearStartupGrace,
     dispatch: opts.dispatch,
-    getCurrentSessionProjectPath: () => {
+    getCurrentProjectProjectPath: () => {
       const id = state.currentProjectId
       if (!(id != null && id !== '')) {
         return

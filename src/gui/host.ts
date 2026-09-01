@@ -35,7 +35,9 @@ export async function runGui(): Promise<void> {
   // `AIMUX_LOCAL_BACKEND=1` still forces the in-process backend for tests/dev
   // (honored by `createSessionBackend`); it is no longer the default.
 
-  const resolvedConfig = await loadUserConfig()
+  // `loadUserConfig` returns the resolved config alongside the file as
+  // written; only the resolved one has a value for every key.
+  const { resolved: resolvedConfig } = await loadUserConfig()
   setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
   setMultiRepoConfig(resolvedConfig.multiRepo)
   setExternalEditorConfig(resolvedConfig.externalEditor)

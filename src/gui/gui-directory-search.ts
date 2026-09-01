@@ -6,7 +6,7 @@ import { searchProjectDirectories, warmDirectoryCache } from '../platform/projec
 const DEBOUNCE_MS = 200
 
 function directoryQuery(modal: ModalState): string | null {
-  if (modal.type !== 'create-session') {
+  if (modal.type !== 'create-project') {
     return null
   }
   if (modal.activeField === 'directory') {

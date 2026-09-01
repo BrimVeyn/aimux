@@ -40,8 +40,8 @@ function bootHost() {
 describe('GUI host pipeline · ai-usage modal', () => {
   test('Escape closes the ai-usage modal (returns to navigation)', () => {
     const { pipeline } = bootHost()
-    appStore.getState().dispatch({ type: 'open-ai-usage-modal' })
-    expect(appStore.getState().modal.type).toBe('ai-usage')
+    appStore.getState().dispatch({ type: 'open-quotas-modal' })
+    expect(appStore.getState().modal.type).toBe('quotas')
     expect(appStore.getState().focusMode).toBe('modal')
 
     pipeline.handleKey({
@@ -59,7 +59,7 @@ describe('GUI host pipeline · ai-usage modal', () => {
 
   test('open-ai-usage-modal dispatched directly (web-native open path) still opens', () => {
     const { pipeline: _pipeline } = bootHost()
-    appStore.getState().dispatch({ type: 'open-ai-usage-modal' })
-    expect(appStore.getState().modal.type).toBe('ai-usage')
+    appStore.getState().dispatch({ type: 'open-quotas-modal' })
+    expect(appStore.getState().modal.type).toBe('quotas')
   })
 })

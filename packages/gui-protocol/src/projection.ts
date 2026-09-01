@@ -24,11 +24,25 @@ export type LayoutNode = LayoutLeaf | LayoutSplit
 
 export type TabActivity = 'working' | 'waiting-input' | 'idle'
 export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
-export type FocusMode = 'navigation' | 'terminal-input' | 'modal' | 'command-edit' | 'git'
+export type FocusMode =
+  | 'navigation'
+  | 'terminal-input'
+  | 'modal'
+  | 'command-edit'
+  | 'git'
+  | 'settings'
+  | 'stats'
 
-export interface SessionStatus {
+export interface ProjectStatus {
   working: boolean
   waiting: boolean
+}
+
+/** A workspace's aggregated assistant state, as the sidebar draws it. */
+export interface WorkspaceActivity {
+  working: boolean
+  waiting: boolean
+  done: boolean
 }
 
 export interface ProjectedTab {
@@ -38,9 +52,15 @@ export interface ProjectedTab {
   assistant: string
   status: TabStatus
   activity?: TabActivity
+  /**
+   * Workspace the tab lives in. The tab strip shows the ACTIVE workspace's
+   * tabs only, so without this the renderer cannot filter and would show
+   * every tab of every workspace at once.
+   */
+  workspaceId?: string
 }
 
-export interface WorktreeLite {
+export interface WorkspaceLite {
   id: string
   name: string
   baseRef?: string
@@ -55,12 +75,12 @@ export interface WorktreeLite {
   updatedAt?: string
 }
 
-export interface SessionRecordLite {
+export interface ProjectRecordLite {
   id: string
   name: string
-  activeWorktreeId?: string
+  activeWorkspaceId?: string
   projectPath?: string
-  worktrees?: WorktreeLite[]
+  workspaces?: WorkspaceLite[]
 }
 
 export interface GuiHelpEntry {
@@ -71,10 +91,19 @@ export interface GuiHelpEntry {
   modeLabel: string
 }
 
-// Mirror of the host's status-bar model plus the app version. The host computes
-// left/right/help strings (it owns the keymap config); the browser renders them.
+/** One run of status-bar text with its tone. */
+export interface IdentitySegment {
+  id: string
+  text: string
+  tone: 'primary' | 'muted'
+}
+
+// Mirror of the host's status-bar model plus the app version. The host owns the
+// keymap config, so it computes right/help; the identity breadcrumb arrives as
+// real segments, which is why the renderer no longer splits a string on a
+// nerd-font glyph to rebuild it.
 export interface StatusBarProjection {
-  left: string
+  projectSegments: IdentitySegment[]
   right: string
   help: string
   version: string
@@ -207,17 +236,33 @@ export interface GitModeLite {
   selectedEntryKey: string | null
 }
 
+/**
+ * The git pane stopped being a positioned, toggleable pane: it is a widget
+ * inside a bar (see `BarLite.widgets`), and git mode replaces the pane tree
+ * outright. What is left here is how the diff itself is drawn.
+ */
 export interface GitPaneLite {
   diffCount: { enabled: boolean }
-  // Width fraction the panel takes inside the full-screen git-mode view.
+  // Width fraction the file list takes inside the full-screen git-mode view.
   diffModeRatio: number
-  embeddedRatio: number
   fileListMode: 'tree' | 'flat'
-  mode: 'pane' | 'embedded'
-  paneRatio: number
-  position: 'left' | 'right' | 'top' | 'bottom'
   treeCompaction: boolean
+  /** Prefetch this many neighbours around the selection. 0 disables prefetch. */
+  prefetchRadius: number
+}
+
+/** A widget stacked inside a bar. Known ids: `projects`, `git`, `setup`. */
+export interface BarWidgetLite {
+  id: string
+  grow: number
   visible: boolean
+}
+
+export interface BarLite {
+  visible: boolean
+  width: number
+  /** Ordered top → bottom. */
+  widgets: BarWidgetLite[]
 }
 
 export interface MultiRepoLite {
@@ -227,9 +272,10 @@ export interface MultiRepoLite {
 
 /** Loose view of aimux's ModalState (only the fields the GUI renders so far). */
 export interface ModalProjection {
-  // `type` is open-ended: includes "new-tab", "session-picker", "snippet-picker",
-  // "split-picker", "theme-picker", "create-session", "worktree-move",
-  // "git-commit", "snippet-editor", "update-available", etc.
+  // `type` is open-ended: includes "new-tab", "project-picker", "project-name",
+  // "rename-tab", "rename-workspace", "snippet-picker", "split-picker",
+  // "theme-picker", "workspace-move", "git-commit", "snippet-editor",
+  // "settings-search", "setting-text", "update-available", etc.
   type: string | null
   editBuffer: string | null
   selectedIndex: number
@@ -241,21 +287,21 @@ export interface ModalProjection {
     | 'body'
     | 'trigger'
     | 'content'
-    | 'worktree-name'
+    | 'workspace-name'
     | 'branch-name'
-    | 'target-worktree'
+    | 'target-workspace'
     | 'assistant'
   branchName?: string
-  createWorktree?: boolean
-  // worktree-move specific fields
+  createWorkspace?: boolean
+  // workspace-move specific fields
   deleteSource?: boolean
   directoryResults?: DirectoryResultLite[]
   nameBuffer?: string
   scope?: string | null
   selectedAssistantId?: string | null
-  sourceWorktreeId?: string
-  step?: 'assistant' | 'worktree' | 'worktree-create'
-  worktreeName?: string
+  sourceWorkspaceId?: string
+  step?: 'assistant' | 'workspace' | 'workspace-create'
+  workspaceName?: string
   // git-commit (contentBuffer holds the inactive field) + snippet-editor (holds content when inactive)
   contentBuffer?: string | null
   // snippet-editor
@@ -263,7 +309,7 @@ export interface ModalProjection {
   // git-commit (GUI renders edit + confirm only; generating is host-side only)
   stage?: 'edit' | 'generating' | 'confirm'
   // snippet-editor: null => "Create snippet", non-null => "Edit snippet"
-  sessionTargetId?: string | null
+  projectTargetId?: string | null
   // update-available
   currentVersion?: string
   latestVersion?: string
@@ -273,15 +319,20 @@ export interface ModalProjection {
 export interface AppStateProjection {
   tabs: ProjectedTab[]
   activeTabId: string | null
-  sessions: SessionRecordLite[]
-  currentSessionId: string | null
-  sessionStatuses: Record<string, SessionStatus>
+  projects: ProjectRecordLite[]
+  currentProjectId: string | null
+  projectStatuses: Record<string, ProjectStatus>
   snippets: SnippetRecordLite[]
   focusMode: FocusMode
   modal: ModalProjection
   customCommands: Record<string, string>
-  sidebar: { visible: boolean; width: number }
-  sessionBar: { visible: boolean; position: 'top' | 'bottom' }
+  /**
+   * Chrome that flanks the panes. Projects, git and setup are widgets stacked
+   * inside these — there is no free-standing sidebar any more.
+   */
+  bars: { left: BarLite; right: BarLite }
+  /** The tab strip above the panes. */
+  projectBar: { visible: boolean }
   // `themeId` is the LIVE theme (reflects preview while the picker is open) and
   // drives the renderer's CSS. `committedThemeId` is the saved theme, used for
   // the "(current)" marker so it stays put while previewing.
@@ -298,5 +349,11 @@ export interface AppStateProjection {
   layoutTrees: Record<string, LayoutNode>
   multiRepo: MultiRepoLite
   tabGroupMap: Record<string, string>
-  worktreeDivergence: Record<string, { ahead: number; behind: number }>
+  /** Keyed by workspace id. `added`/`removed` are lines, working tree included. */
+  workspaceDivergence: Record<
+    string,
+    { ahead: number; behind: number; added?: number; removed?: number }
+  >
+  /** Keyed by workspace id — what each workspace's assistants are doing. */
+  workspaceActivity: Record<string, WorkspaceActivity>
 }

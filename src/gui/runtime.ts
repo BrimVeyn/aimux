@@ -148,33 +148,33 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   }
 
   // Initial AppState (port of app.tsx's lazy init, trimmed for the GUI).
-  let sessionCatalog = loadProjectCatalog()
+  let projectCatalog = loadProjectCatalog()
   const mergedSnippets = mergeConfigSnippets(loadSnippetCatalog(), resolvedConfig.snippets)
-  const initial = createInitialState(json.customCommands, sessionCatalog, mergedSnippets, false, {
+  const initial = createInitialState(json.customCommands, projectCatalog, mergedSnippets, false, {
+    // The sidebar became `bars`, and the tab strip has no position of its own
+    // any more — it sits above the panes, full stop.
+    bars: json.bars,
     projectBarVisible: resolvedConfig.projectBar?.initialVisible ?? json.projectBarVisible ?? true,
-    sessionBarPosition:
-      resolvedConfig.projectBar?.initialPosition ?? json.sessionBarPosition ?? 'top',
-    sidebar: json.sidebar,
   })
   appStore.setState(initial)
 
   const dispatch = appStore.getState().dispatch
   const getState = () => appStore.getState()
 
-  // Resolve the initial session: most recent, else a fresh one for the cwd.
-  let initialSession = findMostRecentProject(sessionCatalog)
-  if (initialSession === undefined) {
+  // Resolve the initial project: most recent, else a fresh one for the cwd.
+  let initialProject = findMostRecentProject(projectCatalog)
+  if (initialProject === undefined) {
     const cwd = process.cwd()
     const created = createProjectFromCurrentState(getState(), basename(cwd) || cwd, cwd)
-    sessionCatalog = created.sessions
-    saveProjectCatalog(sessionCatalog)
-    dispatch({ sessions: sessionCatalog, type: 'set-projects' })
-    initialSession = created.session
+    projectCatalog = created.projects
+    saveProjectCatalog(projectCatalog)
+    dispatch({ projects: projectCatalog, type: 'set-projects' })
+    initialProject = created.project
   }
   dispatch({
-    sessionId: initialSession.id,
+    projectId: initialProject.id,
+    projectSnapshot: initialProject.projectSnapshot,
     type: 'load-project',
-    workspaceSnapshot: initialSession.workspaceSnapshot,
   })
 
   setActiveKeymap(resolvedConfig.keymaps)
@@ -209,7 +209,6 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
 
   const buildProjection = (): AppStateProjection => {
     const state = getState()
-    const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId)
     const usage = aiUsageStore.getState()
     return projectAppState(state, {
       // AI usage lives in a separate vanilla store (not AppState); ship its
@@ -223,7 +222,7 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
       // Reuse the TUI's status-bar model (left/right/help strings) so the GUI
       // renders identical content; it needs the keymap config the host owns.
       statusBar: {
-        ...getStatusBarModel(state, activeTab, resolvedConfig.keymaps),
+        ...getStatusBarModel(state, resolvedConfig.keymaps),
         version: APP_VERSION,
       },
       themeId: getCurrentThemeId(),
@@ -365,13 +364,13 @@ export async function createGuiRuntime(deps: CreateGuiRuntimeDeps): Promise<GuiR
   const attachRequestIdRef = { current: 0 }
   let lastSessionId = getState().currentProjectId
   let lastActiveTabId = getState().activeTabId
-  const attachSession = (sessionId: string): void => {
-    const session = getState().projects.find((entry) => entry.id === sessionId)
+  const attachSession = (projectId: string): void => {
+    const project = getState().projects.find((entry) => entry.id === projectId)
     attachCurrentSession({
       attachRequestIdRef,
       backend,
-      currentProjectId: sessionId,
-      currentSessionWorkspaceSnapshot: session?.workspaceSnapshot,
+      currentProjectId: projectId,
+      currentProjectProjectSnapshot: project?.projectSnapshot,
       dispatch,
       layoutRef,
     })
