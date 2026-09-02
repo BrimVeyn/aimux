@@ -4,6 +4,7 @@ import type { WorkspaceRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { buildBaseRefOptions } from '../../../../state/selectors'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
@@ -35,6 +36,7 @@ export function CreateWorkspaceModal({
   workspaces,
 }: CreateWorkspaceModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
 
   const handleHover = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
@@ -45,18 +47,19 @@ export function CreateWorkspaceModal({
     () =>
       buildBaseRefOptions(workspaces, baseBranches, baseQuery).map((option) => ({
         key: option.ref,
-        leading: (
-          <text fg={option.kind === 'workspace' ? t.warning : t.textMuted}>
-            {option.kind === 'workspace' ? '\u{e728}' : '\u{e702}'}
-          </text>
-        ),
+        leading: (active) => {
+          let fg = t.textMuted
+          if (active) fg = ink
+          else if (option.kind === 'workspace') fg = t.warning
+          return <text fg={fg}>{option.kind === 'workspace' ? '\u{e728}' : '\u{e702}'}</text>
+        },
         subtitle:
-          option.kind === 'workspace' ? (
-            <text fg={t.textMuted}>workspace: {option.detail}</text>
-          ) : null,
-        title: (active) => <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+          option.kind === 'workspace'
+            ? (active) => <text fg={active ? ink : t.textMuted}>workspace: {option.detail}</text>
+            : null,
+        title: (active) => <text fg={active ? ink : t.textMuted}>{option.label}</text>,
       })),
-    [baseBranches, baseQuery, t, workspaces]
+    [baseBranches, baseQuery, ink, t, workspaces]
   )
 
   const baseActive = activeField === 'base'

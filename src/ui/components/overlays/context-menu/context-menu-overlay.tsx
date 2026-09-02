@@ -9,6 +9,7 @@ import {
   type ContextMenuState,
   subscribeContextMenu,
 } from '../../../context-menu/controller'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme, useTransparent } from '../../../theme'
 import { fillBorderedBoxInterior } from '../../../transparent-fill'
 
@@ -28,6 +29,7 @@ const MenuItem = memo(function MenuItem({
   width: number
 }) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const handleMouseOver = useCallback(() => onHover(index), [index, onHover])
   const handleMouseDown = useCallback(
     (e: OtuiMouseEvent) => {
@@ -45,11 +47,11 @@ const MenuItem = memo(function MenuItem({
       flexShrink={0}
       paddingLeft={1}
       paddingRight={1}
-      backgroundColor={active ? t.backgroundElement : undefined}
+      backgroundColor={active ? t.primary : undefined}
       onMouseOver={handleMouseOver}
       onMouseDown={handleMouseDown}
     >
-      <text fg={active ? t.text : t.textMuted} selectable={false}>
+      <text fg={active ? ink : t.textMuted} selectable={false}>
         {label}
       </text>
     </box>

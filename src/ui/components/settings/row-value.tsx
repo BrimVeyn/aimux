@@ -74,9 +74,16 @@ function valueColor(row: SettingRow, value: SettingValue, t: ResolvedTuiTheme): 
  * list would repaint it at the rate the terminals print.
  */
 export const RowValue = memo(function RowValue({
+  fg,
   maxWidth,
   row,
 }: {
+  /**
+   * Overrides the value's own colour. A row filled with `primary` has room for
+   * one ink, so the search results hand theirs down rather than let a green
+   * toggle sit on the accent.
+   */
+  fg?: string
   /** Cropped rather than wrapped: a row that grows a line shifts the list. */
   maxWidth?: number
   row: SettingRow
@@ -86,7 +93,7 @@ export const RowValue = memo(function RowValue({
   const value = useAppStore((s) => readRow(row, { state: s, values }))
   const text = formatValue(row, value)
   return (
-    <text fg={valueColor(row, value, t)} wrapMode="none">
+    <text fg={fg ?? valueColor(row, value, t)} wrapMode="none">
       {maxWidth === undefined ? text : truncate(text, maxWidth)}
     </text>
   )

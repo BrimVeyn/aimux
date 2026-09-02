@@ -4,6 +4,7 @@ import type { ThemeId } from '../../../themes'
 
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterThemeIds, themeDisplayName } from '../../../filter-themes'
+import { useSelectionInk } from '../../../selection-ink'
 import { useMode, useTheme, useTransparent } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -27,6 +28,7 @@ export function ThemePickerModal({
   selectedIndex,
 }: ThemePickerModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const transparent = useTransparent()
   const mode = useMode()
   const filtered = useMemo(() => filterThemeIds(filter), [filter])
@@ -48,11 +50,11 @@ export function ThemePickerModal({
             dispatchGlobal({ type: 'close-modal' })
             runSideEffectGlobal({ action: 'confirm', type: 'apply-theme' })
           },
-          title: <text fg={active ? t.text : t.textMuted}>{themeDisplayName(id)}</text>,
-          trailing: isCurrent ? <text fg={t.primary}>current</text> : undefined,
+          title: <text fg={active ? ink : t.textMuted}>{themeDisplayName(id)}</text>,
+          trailing: isCurrent ? <text fg={active ? ink : t.primary}>current</text> : undefined,
         }
       }),
-    [currentThemeId, effectiveIndex, filtered, t]
+    [currentThemeId, effectiveIndex, filtered, ink, t]
   )
 
   const handleHover = useCallback(

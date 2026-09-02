@@ -6,6 +6,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-
 import { filterProjects } from '../../../../state/selectors'
 import { abbreviatePath } from '../../../path-format'
 import { orderProjectsForDisplay } from '../../../project-ordering'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -44,6 +45,7 @@ export function ProjectPickerModal({
   selectedIndex,
 }: ProjectPickerModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const ordered = useMemo(() => orderProjectsForDisplay(projects), [projects])
   const filtered = useMemo(() => filterProjects(ordered, filter), [filter, ordered])
   const hasFilter = !!(filter != null && filter !== '')
@@ -59,10 +61,10 @@ export function ProjectPickerModal({
         onDelete: () => runSideEffectGlobal({ type: 'delete-selected-project' }),
         subtitle:
           project.projectPath != null && project.projectPath !== '' ? (
-            <text fg={t.textMuted}>{abbreviatePath(project.projectPath)}</text>
+            <text fg={active ? ink : t.textMuted}>{abbreviatePath(project.projectPath)}</text>
           ) : undefined,
         title: (
-          <text fg={active ? t.text : t.textMuted}>
+          <text fg={active ? ink : t.textMuted}>
             {formatProjectLine(project, currentProjectId, currentTabCount, displayIndex)}
           </text>
         ),
@@ -72,13 +74,11 @@ export function ProjectPickerModal({
       key: '__create-new__',
       onClick: () => runSideEffectGlobal({ type: 'confirm-selected-project' }),
       title: (
-        <text fg={selectedIndex === filtered.length ? t.text : t.textMuted}>
-          Create new project
-        </text>
+        <text fg={selectedIndex === filtered.length ? ink : t.textMuted}>Create new project</text>
       ),
     }
     return [...projectItems, createNewItem]
-  }, [currentProjectId, currentTabCount, filtered, ordered, selectedIndex, t])
+  }, [currentProjectId, currentTabCount, filtered, ink, ordered, selectedIndex, t])
 
   const handleHover = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),

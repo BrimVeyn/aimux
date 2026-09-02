@@ -3,6 +3,7 @@ import { useMemo } from 'react'
 import type { DirectoryResult } from '../../../../state/types'
 
 import { abbreviatePath } from '../../../path-format'
+import { useSelectionInk } from '../../../selection-ink'
 import { getCurrentTheme, useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
@@ -40,6 +41,7 @@ export function CreateProjectModal({
   selectedIndex,
 }: CreateProjectModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const dirActive = activeField === 'directory'
   const nameActive = activeField === 'name'
 
@@ -47,12 +49,16 @@ export function CreateProjectModal({
     () =>
       results.map((result) => ({
         key: result.path,
-        leading: <text fg={getDirectoryResultColor(result)}>{getDirectoryResultIcon(result)}</text>,
+        leading: (active) => (
+          <text fg={active ? ink : getDirectoryResultColor(result)}>
+            {getDirectoryResultIcon(result)}
+          </text>
+        ),
         title: (active) => (
-          <text fg={active ? t.text : t.textMuted}>{abbreviatePath(result.path)}</text>
+          <text fg={active ? ink : t.textMuted}>{abbreviatePath(result.path)}</text>
         ),
       })),
-    [results, t]
+    [ink, results, t]
   )
 
   return (

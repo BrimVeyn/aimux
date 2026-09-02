@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react'
 import { filterSettingRows } from '../../../../settings/search'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { RowValue } from '../../settings/row-value'
@@ -28,25 +29,29 @@ export function SettingsSearchModal({
   selectedIndex,
 }: SettingsSearchModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const projects = useAppStore((s) => s.projects)
   const hits = useMemo(() => filterSettingRows(projects, filter), [projects, filter])
 
   const items = useMemo<PickerItem[]>(
     () =>
-      hits.map((hit) => ({
-        group: hit.sectionLabel,
-        key: hit.row.id,
-        // Acts on the selection, which the hover just set — the same two-step
-        // every other picker's rows use.
-        onClick: () => runSideEffectGlobal({ type: 'confirm-settings-search' }),
-        subtitle:
-          hit.row.description != null && hit.row.description !== '' ? (
-            <text fg={t.textMuted}>{hit.row.description}</text>
-          ) : undefined,
-        title: <text fg={t.text}>{hit.row.label}</text>,
-        trailing: <RowValue row={hit.row} />,
-      })),
-    [hits, t]
+      hits.map((hit, index) => {
+        const active = index === selectedIndex
+        return {
+          group: hit.sectionLabel,
+          key: hit.row.id,
+          // Acts on the selection, which the hover just set — the same two-step
+          // every other picker's rows use.
+          onClick: () => runSideEffectGlobal({ type: 'confirm-settings-search' }),
+          subtitle:
+            hit.row.description != null && hit.row.description !== '' ? (
+              <text fg={active ? ink : t.textMuted}>{hit.row.description}</text>
+            ) : undefined,
+          title: <text fg={active ? ink : t.text}>{hit.row.label}</text>,
+          trailing: <RowValue fg={active ? ink : undefined} row={hit.row} />,
+        }
+      }),
+    [hits, ink, selectedIndex, t]
   )
 
   const handleHover = useCallback(

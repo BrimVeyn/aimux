@@ -7,6 +7,7 @@ import { useAppStore } from '../../../state/app-store'
 import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { STATS_PAGES, statsPageAt } from '../../../state/stats-pages'
+import { useSelectionInk } from '../../selection-ink'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { AimuxPage } from './aimux-page'
@@ -26,6 +27,7 @@ const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
  */
 export const StatsView = memo(function StatsView() {
   const t = useTheme()
+  const ink = useSelectionInk()
   const stats = useAppStore((s) => s.stats)
   const navWidth = useAppStore((s) => clampBarWidth(s.bars.left.width))
   const dimensions = useTerminalDimensions()
@@ -104,11 +106,11 @@ export const StatsView = memo(function StatsView() {
                 index={index}
                 onClickIndex={handlePageClick}
                 title={
-                  <text fg={index === stats.pageIndex ? t.text : t.textMuted}>
+                  <text fg={index === stats.pageIndex ? ink : t.textMuted}>
                     {`${entry.glyph} ${entry.label}`}
                   </text>
                 }
-                trailing={index === stats.pageIndex ? <text fg={t.primary}>›</text> : undefined}
+                trailing={index === stats.pageIndex ? <text fg={ink}>›</text> : undefined}
               />
             ))}
           </box>

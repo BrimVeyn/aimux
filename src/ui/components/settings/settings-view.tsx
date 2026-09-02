@@ -10,6 +10,7 @@ import { useAppStore } from '../../../state/app-store'
 import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
+import { useSelectionInk } from '../../selection-ink'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { Muted, Rule, Section, TileRow } from '../stats/shared'
@@ -71,6 +72,7 @@ function groupBySection(hits: SettingSearchHit[]): Group[] {
  */
 export const SettingsView = memo(function SettingsView() {
   const t = useTheme()
+  const ink = useSelectionInk()
   // The cursor is all this component needs from the app state. Rows read their
   // own values, so nothing here re-renders at the rate the terminals print.
   const rowIndex = useAppStore((s) => s.settings.rowIndex)
@@ -169,12 +171,12 @@ export const SettingsView = memo(function SettingsView() {
                 index={index}
                 onClickIndex={handleSectionClick}
                 title={
-                  <text fg={group.sectionId === current?.sectionId ? t.text : t.textMuted}>
+                  <text fg={group.sectionId === current?.sectionId ? ink : t.textMuted}>
                     {`${group.glyph} ${group.label}`}
                   </text>
                 }
                 trailing={
-                  group.sectionId === current?.sectionId ? <text fg={t.primary}>›</text> : undefined
+                  group.sectionId === current?.sectionId ? <text fg={ink}>›</text> : undefined
                 }
               />
             ))}
