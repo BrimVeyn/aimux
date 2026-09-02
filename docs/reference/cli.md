@@ -545,7 +545,24 @@ aimux plugin log <id> [--lines N] [--level debug|info|warn|error]
 
 aimux plugin doctor [path-or-id] [--no-apply] [--no-types]
 -> { ok, id, version, root, manifest, issues, halves, types, aimuxVersion }
+
+aimux plugin commands
+-> { commands: [{ pluginId, id, title, command, contexts? }] }
+
+aimux plugin exec <plugin-id> <command-id> [args...]
+-> { pluginId, commandId, exitCode, stdout, stderr, timedOut }
 ```
+
+`commands` and `exec` are the manifest-declared subprocess half: a plugin whose
+manifest has `commands[]` and no `entries` needs no TypeScript at all. The
+spawn happens in the daemon, so the same command is reachable from an event or
+a keybinding and not only from a shell, and the command's exit code becomes the
+CLI's own.
+
+A plugin can also contribute its own group and verbs — `aimux <group> <verb>`.
+Those run in the daemon too; the CLI learns their flags and args from a sidecar
+the daemon writes, so `--help`, argument validation and TAB completion work
+without the CLI loading any plugin code.
 
 `link` registers a directory in place and watches it for edits; `install`
 clones into `<profile>/plugins/<id>` and owns that copy. `unlink` and

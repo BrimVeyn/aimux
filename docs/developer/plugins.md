@@ -68,6 +68,7 @@ All per-profile, like the sockets — the `dev` profile has its own plugins.
 | `<profile>/plugins-state/<id>/`  | runtime state, `plugin.log`, `.hot/` build output       |
 | `<profile>/aimux-plugins.json`   | registry: links, enabled flags, per-plugin config       |
 | `<profile>/themes/*.json`        | extra themes, in the shipped format; filename is the id |
+| `<runtime>/plugin-cli.json`      | sidecar: the shape of every plugin CLI command          |
 
 `aimux.config.ts` is the declarative alternative to the registry:
 
@@ -224,6 +225,108 @@ back to `aimux.json`, so re-enabling the plugin put the widget somewhere else �
 or nowhere. The layout now keeps the id and `visibleWidgets` skips what cannot
 be drawn, so a bar reserves no space for it and the context menu does not offer
 it.
+
+## The daemon surface
+
+A plugin declaring `entries.daemon` receives its services through the same
+`extendContext` hook, with the same two invariants — every registration on the
+fiber, every id namespaced by the host.
+
+| Member                            | What it does                                             |
+| --------------------------------- | -------------------------------------------------------- |
+| `ctx.tabs`                        | list, get, `spawn`, `send`, `focus`, `close`, `snapshot` |
+| `ctx.projects` / `ctx.workspaces` | read the catalog, fresh on every call                    |
+| `ctx.assistants.register`         | a complete assistant, in one object                      |
+| `ctx.hooks.route` / `.url`        | an HTTP hook route at `/hook/<pluginId>.<id>`            |
+| `ctx.cli.register`                | an `aimux <group> <verb>`                                |
+| `ctx.on('tab:turnComplete')`, …   | the daemon event bus                                     |
+
+### Events
+
+| Event                                                   | Fires when                                            |
+| ------------------------------------------------------- | ----------------------------------------------------- |
+| `tab:status`                                            | a tab's activity changed — the finest and noisiest    |
+| `tab:turnComplete`                                      | `idle` held for the settle window; once per turn      |
+| `tab:question`                                          | a tab is blocked on a question or a permission prompt |
+| `tab:added`                                             | a tab was created, by the UI or a headless CLI        |
+| `project:status` / `:created` / `:switched` / `:closed` | project lifecycle                                     |
+| `workspace:added` / `:removed`                          | workspace lifecycle                                   |
+| `daemon:reexec`                                         | the daemon is handing off; one chance to flush        |
+
+Every one already existed as an IPC broadcast — the daemon knows a turn ended
+precisely because it is about to tell the UI. They fire _before_ the socket
+write, so a plugin reacting to a turn does not queue behind one.
+
+### Assistants
+
+An assistant is not one thing: a spawn command, a way of reading its TUI to
+tell working from waiting, a way of parsing the choices in a blocked prompt,
+optionally a usage endpoint, optionally a hook stream. A plugin declares them
+together because from the outside they are one thing — a tab that spawns and
+then never reports a status is a half-integration, not a feature.
+
+```ts
+ctx.assistants.register({
+  option: { id: 'acme.robot', label: 'Acme robot', command: 'acme-robot', description: '…' },
+  detectStatus: ({ haystack }) => (haystack.includes('whirring') ? 'working' : null),
+  extractOptions: ({ lines }) => parseMyMenu(lines),
+  usage: async (config) => fetchMyQuota(config),
+  hooks: { urlEnvVar: 'ACME_HOOK_URL', mapEvent: (name) => (name === 'TurnEnded' ? 'idle' : null) },
+})
+```
+
+`null` from a classifier is "no opinion" and hands over to the generic
+quiet-screen heuristic — the same contract the built-ins have. A hook event
+outranks the visual reading while fresh, except that a _visible_ permission
+prompt always wins: some prompts fire no hook at all, and the screen is the
+only place they show.
+
+Unregistering does not close the tabs already running the assistant. A PTY
+outlives the plugin that described how to spawn it.
+
+### CLI commands
+
+A plugin's command runs in the daemon; the CLI process loads no plugin code.
+The daemon writes the command's _shape_ to `<runtime>/plugin-cli.json`, and the
+CLI reads that to parse, validate and complete the call — so a usage error is
+reported at the same speed and in the same shape as for a built-in verb, and
+`aimux __complete` never opens a socket.
+
+## Commands, without any TypeScript
+
+A manifest's `commands[]` need no `entries` at all. Each is an argv the daemon
+spawns, and the plugin talks back through the `aimux` CLI it already has — no
+SDK, no bindings, nothing to keep in sync per language. A shell script is a
+plugin.
+
+```jsonc
+{
+  "id": "acme.notify",
+  "version": "0.1.0",
+  "apiVersion": 1,
+  "commands": [{ "id": "ping", "title": "Ping", "command": ["./notify.sh"] }],
+}
+```
+
+```
+aimux plugin commands              # list what every manifest declares
+aimux plugin exec acme.notify ping # run one
+```
+
+The environment a command is spawned with:
+
+| Variable                                           | Why                                                 |
+| -------------------------------------------------- | --------------------------------------------------- |
+| `AIMUX_BIN_PATH`, `AIMUX_SOCKET_PATH`              | call back with `aimux tab send`, `aimux worker run` |
+| `AIMUX_PLUGIN_ID`                                  | who you are                                         |
+| `AIMUX_PLUGIN_ROOT` / `_CONFIG_DIR` / `_STATE_DIR` | your directories, already resolved                  |
+| `AIMUX_CONTEXT_JSON`                               | what triggered this, as JSON                        |
+| `AIMUX_ENV=1`                                      | a marker to test for, like `CI`                     |
+
+Spawned with argv, never through a shell: no quoting to get wrong, nothing to
+inject into. `cwd` is the plugin's directory, which is what a relative
+`./notify.sh` means. A non-zero exit is the command's answer and
+`aimux plugin exec` passes it through as its own.
 
 ## API contract
 
