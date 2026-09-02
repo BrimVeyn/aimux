@@ -831,6 +831,17 @@ export interface AppState {
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
   /**
+   * The plugin pane holding the keyboard, by its qualified id, or null when a
+   * terminal has it.
+   *
+   * Kept alongside `activeTabId` rather than replacing it: every reducer and
+   * every side effect in the app reads `activeTabId` as *a tab*, and widening
+   * it would mean auditing all of them for "what if this is not one". So the
+   * terminal stays named, the pane says it has the keys, and moving focus back
+   * to any tab clears this.
+   */
+  activePluginPaneId: string | null
+  /**
    * The plugin view currently replacing the panes, by its qualified id
    * (`<pluginId>.<viewId>`), or null. Only meaningful while `focusMode` is
    * `plugin-view`; kept alongside rather than inside it so the focus union

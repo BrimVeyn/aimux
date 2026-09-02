@@ -8,16 +8,18 @@ import { useTheme } from '../../theme'
  * The chrome around a plugin's pane: the same border and background a terminal
  * pane draws, so a layout does not look like two different applications.
  *
- * It never draws the active border colour, because it can never be active —
- * see `src/ui/plugin-panes.tsx` for why keyboard focus stays with the
- * terminals. Mouse events reach the plugin's own elements through opentui, so
- * a list inside a pane still scrolls and clicks.
+ * It draws the focused border when the pane holds the keyboard, using the
+ * navigation colour rather than the terminal-input one: a pane is never in
+ * terminal input, and borrowing that colour would say it was.
  */
 export function PluginPane({
+  isActive = false,
   onMouseDown,
   paneId,
 }: {
   paneId: string
+  /** True while this pane holds the keyboard. */
+  isActive?: boolean
   onMouseDown?: (event: OtuiMouseEvent) => void
 }): ReactNode {
   const t = useTheme()
@@ -25,7 +27,7 @@ export function PluginPane({
     <box flexDirection="column" flexGrow={1} gap={0}>
       <box
         border
-        borderColor={t.border}
+        borderColor={isActive ? t.primary : t.border}
         title={pluginPaneTitle(paneId)}
         padding={0}
         flexDirection="column"

@@ -437,17 +437,64 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
 
 type NavDirection = 'left' | 'right' | 'up' | 'down'
 
-/**
- * Focus is a tab id everywhere in the app, so navigation crosses a plugin pane
- * rather than landing on it. An all-plugin subtree therefore has no neighbour
- * to offer, and the focus stays where it was.
- */
 function firstTabId(node: LayoutNode): string | null {
   return allTabIds(node)[0] ?? null
 }
 
 function lastTabId(node: LayoutNode): string | null {
   return allTabIds(node).at(-1) ?? null
+}
+
+/** Every leaf, in draw order — the traversal both neighbour helpers share. */
+function leaves(node: LayoutNode): LayoutLeaf[] {
+  if (node.type === 'leaf') return [node]
+  return [...leaves(node.first), ...leaves(node.second)]
+}
+
+function firstLeaf(node: LayoutNode): LayoutLeaf | null {
+  return leaves(node)[0] ?? null
+}
+
+function lastLeaf(node: LayoutNode): LayoutLeaf | null {
+  return leaves(node).at(-1) ?? null
+}
+
+/**
+ * The pane next to `fromId`, whatever it holds.
+ *
+ * The variant navigation uses: a plugin pane can hold the keyboard, so it is a
+ * destination like any other. `getAdjacentLeaf` below is the tab-only one, for
+ * the callers that need somewhere to put `activeTabId` — closing a tab, mainly,
+ * where a plugin pane is not an answer.
+ */
+export function getAdjacentPane(
+  tree: LayoutNode,
+  fromId: string,
+  direction: NavDirection
+): LayoutLeaf | null {
+  if (tree.type === 'leaf') return null
+
+  const inFirst = findLeaf(tree.first, fromId)
+  const inSecond = findLeaf(tree.second, fromId)
+  if (!inFirst && !inSecond) return null
+
+  const isMatchingDirection =
+    (tree.direction === 'vertical' && (direction === 'left' || direction === 'right')) ||
+    (tree.direction === 'horizontal' && (direction === 'up' || direction === 'down'))
+
+  if (isMatchingDirection) {
+    const goingToSecond = direction === 'right' || direction === 'down'
+    if (inFirst && goingToSecond) {
+      return getAdjacentPane(tree.first, fromId, direction) ?? firstLeaf(tree.second)
+    }
+    if (inSecond && !goingToSecond) {
+      return getAdjacentPane(tree.second, fromId, direction) ?? lastLeaf(tree.first)
+    }
+  }
+
+  return inFirst
+    ? getAdjacentPane(tree.first, fromId, direction)
+    : getAdjacentPane(tree.second, fromId, direction)
 }
 
 export function getAdjacentLeaf(

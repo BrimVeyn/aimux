@@ -136,3 +136,65 @@ describe('ctx.ui.panes', () => {
     expect(getPluginPane('acme.thing.board')).toBeUndefined()
   })
 })
+
+describe('focus in a plugin pane', () => {
+  function withPane(): AppState {
+    return apply(baseState(), {
+      direction: 'vertical',
+      paneId: 'acme.thing.board',
+      type: 'open-plugin-pane',
+    })
+  }
+
+  test('opening one does not move the keyboard', () => {
+    const state = withPane()
+    expect(state.activeTabId).toBe('tab-1')
+    expect(state.activePluginPaneId).toBeNull()
+  })
+
+  test('navigating into it gives it the keys, and keeps naming the terminal', () => {
+    const focused = apply(withPane(), { direction: 'right', type: 'focus-pane-direction' })
+
+    expect(focused.activePluginPaneId).toBe('acme.thing.board')
+    // `activeTabId` still names the terminal: every reducer in the app reads it
+    // as a tab, and moving back is a move rather than a restore.
+    expect(focused.activeTabId).toBe('tab-1')
+  })
+
+  test('navigating back out clears it', () => {
+    const focused = apply(withPane(), { direction: 'right', type: 'focus-pane-direction' })
+    const back = apply(focused, { direction: 'left', type: 'focus-pane-direction' })
+
+    expect(back.activePluginPaneId).toBeNull()
+    expect(back.activeTabId).toBe('tab-1')
+  })
+
+  test('navigation starts from the pane, not from the terminal beside it', () => {
+    // With three panes in a row, walking right from the middle one must reach
+    // the third — starting from `activeTabId` would land back on the middle.
+    const opened = apply(withPane(), {
+      direction: 'vertical',
+      paneId: 'acme.thing.notes',
+      type: 'open-plugin-pane',
+    })
+    const first = apply(opened, { direction: 'right', type: 'focus-pane-direction' })
+    const second = apply(first, { direction: 'right', type: 'focus-pane-direction' })
+
+    expect(first.activePluginPaneId).toBe('acme.thing.notes')
+    expect(second.activePluginPaneId).toBe('acme.thing.board')
+  })
+
+  test('making any tab active takes the keys back', () => {
+    const focused = apply(withPane(), { direction: 'right', type: 'focus-pane-direction' })
+    const switched = apply(focused, { tabId: 'tab-1', type: 'set-active-tab' })
+
+    expect(switched.activePluginPaneId).toBeNull()
+  })
+
+  test('closing the focused pane takes the keys back', () => {
+    const focused = apply(withPane(), { direction: 'right', type: 'focus-pane-direction' })
+    const closed = apply(focused, { paneId: 'acme.thing.board', type: 'close-plugin-pane' })
+
+    expect(closed.activePluginPaneId).toBeNull()
+  })
+})

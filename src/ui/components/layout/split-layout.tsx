@@ -25,6 +25,8 @@ interface SplitLayoutProps {
   node: LayoutNode
   tabs: TabSession[]
   activeTabId: string | null
+  /** The pane holding the keyboard, when it is not a terminal. */
+  activePluginPaneId?: string | null
   focusMode: FocusMode
   mouseForwardingEnabled: boolean
   localScrollbackEnabled: boolean
@@ -51,6 +53,7 @@ interface SplitLayoutProps {
 }
 
 export function SplitLayout({
+  activePluginPaneId = null,
   activeTabId,
   bounds,
   contentOrigin,
@@ -93,7 +96,7 @@ export function SplitLayout({
     // so none of the terminal wiring below applies to it. It gets the same
     // border and background, and mouse events reach the plugin's own elements.
     if (node.kind === 'plugin') {
-      return <PluginPane paneId={node.tabId} />
+      return <PluginPane paneId={node.tabId} isActive={node.tabId === activePluginPaneId} />
     }
     const tab = tabs.find((t) => t.id === node.tabId)
     const isActive = node.tabId === activeTabId

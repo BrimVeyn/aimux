@@ -163,10 +163,18 @@ ctx.ui.panes.open('board', 'vertical') // beside; 'horizontal' puts it below
 ctx.ui.panes.close('board')
 ```
 
-A pane never takes the keyboard — focus stays on the terminal it was split
-from, and `<C-w>hjkl` crosses it. Your own elements still receive mouse events,
-so a list inside a pane scrolls and clicks. Opening one that is already open
-does nothing, and a pane is not persisted: it lives for the session.
+Opening does not move the keyboard: focus stays on the terminal it was split
+from, and the user walks into the pane with the ordinary pane-navigation keys.
+While it is focused, keys route to its own mode — `plugin.pane.<qualified id>`
+— so bind them there:
+
+```ts
+keymaps: (k) =>
+  k.mode('plugin.pane.acme.thing.board', (m) => m.map('j', k.plugin('acme.thing.scrollDown')))
+```
+
+Opening one that is already open does nothing, and a pane is not persisted: it
+lives for the session.
 
 ### A status bar tile
 

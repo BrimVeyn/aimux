@@ -114,6 +114,7 @@ export function createInitialState(
   overrides: InitialStateOverrides = {}
 ): AppState {
   return {
+    activePluginPaneId: null,
     activePluginView: null,
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,

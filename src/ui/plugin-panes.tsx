@@ -1,5 +1,9 @@
+import type { ModeId } from '@brimveyn/aimux-config'
 import type { ReactNode } from 'react'
 
+import { registerHelpModeLabel } from '../input/keymap/help-entries'
+import { registerModeDerivation } from '../input/modes/bridge'
+import { type PluginModeTransitions, registerPluginMode } from '../input/modes/transitions'
 import { useAppStore } from '../state/app-store'
 import { useTheme } from './theme'
 
@@ -12,19 +16,35 @@ import { useTheme } from './theme'
  * board, a diff, a log browser sitting *beside* an agent rather than instead
  * of it.
  *
- * It is deliberately not focusable. `activeTabId` is a tab id in every reducer
- * and every side effect in the app, and letting a plugin pane hold it would
- * mean auditing all of them for "what if this is not a tab". So a pane is
- * drawn and takes mouse events, and keyboard focus stays with the terminals.
+ * A pane can hold the keyboard. It does not hold `activeTabId` — that stays a
+ * tab id in every reducer and side effect in the app — but
+ * `state.activePluginPaneId` names it, and registering a pane installs a mode
+ * for it exactly the way a full-screen view does: the mode, its help heading,
+ * and the derivation that routes input to it while it is the focused pane.
+ *
+ * They are registered together because they are inseparable in practice. A
+ * pane whose mode is unreachable draws and then ignores every key, which looks
+ * like a broken plugin rather than a missing registration.
  */
 
 export interface PluginPaneDefinition {
   /** Qualified id, `<pluginId>.<paneId>`. The kernel namespaces it. */
   id: string
   pluginId: string
-  /** Drawn in the pane's border. */
+  /** Drawn in the pane's border, and used as the mode's help heading. */
   title: string
+  /** Where the pane's mode may hand over to. Defaults to navigation only. */
+  transitions?: PluginModeTransitions
   render: () => ReactNode
+}
+
+/**
+ * `plugin.pane.<id>` rather than `plugin.<id>`: a plugin may register a view
+ * and a pane under the same unqualified name, and two modes with one id would
+ * route the second one's keys to the first.
+ */
+export function pluginPaneModeId(paneId: string): ModeId {
+  return `plugin.pane.${paneId}` as ModeId
 }
 
 const panes = new Map<string, PluginPaneDefinition>()
@@ -44,10 +64,19 @@ export function onPluginPanesChanged(listener: () => void): () => void {
 }
 
 export function registerPluginPane(pane: PluginPaneDefinition): () => void {
+  const modeId = pluginPaneModeId(pane.id)
   panes.set(pane.id, pane)
+
+  const disposers = [
+    registerPluginMode(modeId, pane.transitions),
+    registerHelpModeLabel(modeId, pane.title),
+    registerModeDerivation((state) => (state.activePluginPaneId === pane.id ? modeId : null)),
+  ]
+
   notify()
   return () => {
     if (panes.get(pane.id) === pane) panes.delete(pane.id)
+    for (let i = disposers.length - 1; i >= 0; i--) disposers[i]?.()
     notify()
   }
 }

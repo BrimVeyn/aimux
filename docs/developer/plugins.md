@@ -224,12 +224,24 @@ leaf, because a plugin pane takes up space and leaving it out would size the
 terminal beside it wrong; `forEachSplitPaneRect` computes over the whole tree
 and hands back only tabs, because its caller's next move is to resize a PTY.
 
-**A pane never takes the keyboard.** `activeTabId` is a tab id in every reducer
-and every side effect in the app; letting a plugin pane hold it would mean
-auditing all of them for "what if this is not a tab". So `open` leaves focus on
-the terminal it split from, `getAdjacentLeaf` crosses a pane rather than landing
-on it, and the plugin's own elements still take mouse events. Keyboard focus for
-panes is a later decision, not an oversight.
+**A pane holds the keyboard without holding `activeTabId`.** That field stays a
+tab id in every reducer and every side effect in the app — widening it would
+mean auditing all of them for "what if this is not a tab" — so
+`state.activePluginPaneId` names the focused pane alongside it, and the
+terminal keeps being named. Navigating onto a pane sets it; making any tab
+active clears it, which is why the clear lives in `withActiveTabWorkspace`
+rather than at every call site.
+
+Registering a pane installs a mode for it the way a full-screen view does: the
+mode, its help heading, and the derivation that routes input to it. The id is
+`plugin.pane.<paneId>` rather than `plugin.<paneId>`, because a plugin may
+register a view and a pane under the same unqualified name and two modes with
+one id would send the second one's keys to the first.
+
+`getAdjacentPane` is the traversal navigation uses — any leaf is a
+destination. `getAdjacentLeaf` is the tab-only one, for the callers that need
+somewhere to put `activeTabId`: closing a tab, mainly, where a plugin pane is
+not an answer.
 
 **Panes are session-scoped.** Saving strips them: a group holding one terminal
 and one plugin pane is not a split worth writing, because the plugin may be

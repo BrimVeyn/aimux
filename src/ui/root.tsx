@@ -342,6 +342,7 @@ export function RootView({
   const editorBg = t.background
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
+  const activePluginPaneId = useAppStore((s) => s.activePluginPaneId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const tabGroupMap = useAppStore((s) => s.tabGroupMap)
   const focusMode = useAppStore((s) => s.focusMode)
@@ -469,6 +470,7 @@ export function RootView({
                 node={activeTree}
                 tabs={tabs}
                 activeTabId={activeTabId}
+                activePluginPaneId={activePluginPaneId}
                 focusMode={focusMode}
                 contentOrigin={splitContentOrigin}
                 mouseForwardingEnabled={mouseForwardingEnabled}

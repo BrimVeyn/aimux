@@ -464,8 +464,10 @@ export interface PluginPanesApi {
    * the plugin's name for it, and two panes claiming it would make `close`
    * ambiguous.
    *
-   * A pane never takes the keyboard: `direction` decides where it goes, and
-   * focus stays on the terminal it was split from.
+   * Opening does not move the keyboard: `direction` decides where the pane
+   * goes, and focus stays on the terminal it was split from. The user walks
+   * into it with the ordinary pane-navigation keys, and its own keys are bound
+   * in its own mode — `plugin.pane.<pluginId>.<id>`.
    */
   open: (id: string, direction?: 'horizontal' | 'vertical') => void
   /** Takes it off screen. The layout collapses as it would for a closed tab. */

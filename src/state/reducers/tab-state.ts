@@ -7,8 +7,10 @@ import {
   createLeaf,
   createPluginLeaf,
   getAdjacentLeaf,
+  getAdjacentPane,
   getGroupIdForTab,
   getTreeForTab,
+  isTabLeaf,
   type LayoutNode,
   pruneLayoutTree,
   removeNode,
@@ -215,7 +217,10 @@ function withActiveTabWorkspace(
   // Opening the tab is reading its notification, whatever else this helper
   // decides about the workspace. Every path that makes a tab the active one
   // goes through here.
-  const seen = { ...state, tabs: clearTabUnseen(state.tabs, tabId) }
+  // A tab becoming active is the one signal that a plugin pane no longer holds
+  // the keyboard. Doing it here rather than at each call site is the point of
+  // the helper: every path that makes a tab active goes through it.
+  const seen = { ...state, activePluginPaneId: null, tabs: clearTabUnseen(state.tabs, tabId) }
   if (!(seen.currentProjectId != null && seen.currentProjectId !== '')) return seen
   const tab = seen.tabs.find((entry) => entry.id === tabId)
   if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return seen
@@ -737,6 +742,9 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
 
       const remaining = removeNode(closeTree, action.paneId)
       const nextTrees = { ...state.layoutTrees }
+      // Whatever held the keys is gone; the terminal it was beside gets them.
+      const nextPaneFocus =
+        state.activePluginPaneId === action.paneId ? null : state.activePluginPaneId
       const nextGroupMap = { ...state.tabGroupMap }
       delete nextGroupMap[action.paneId]
       // A group that is down to one pane is not a split any more, and the
@@ -749,21 +757,35 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         nextTrees[closeGroupId] = remaining
       }
 
-      return { ...state, layoutTrees: nextTrees, tabGroupMap: nextGroupMap }
+      return {
+        ...state,
+        activePluginPaneId: nextPaneFocus,
+        layoutTrees: nextTrees,
+        tabGroupMap: nextGroupMap,
+      }
     }
     case 'focus-pane-direction': {
-      if (!(state.activeTabId != null && state.activeTabId !== '')) {
+      // Navigation starts from whatever holds the keyboard, which may be a
+      // plugin pane — otherwise moving off one would jump from the terminal
+      // it was opened beside instead of from the pane itself.
+      const focusFrom = state.activePluginPaneId ?? state.activeTabId
+      if (!(focusFrom != null && focusFrom !== '')) {
         return state
       }
-      const focusTree = getTreeForTab(state.layoutTrees, state.tabGroupMap, state.activeTabId)
+      const focusTree = getTreeForTab(state.layoutTrees, state.tabGroupMap, focusFrom)
       if (!focusTree) {
         return state
       }
-      const neighbor = getAdjacentLeaf(focusTree, state.activeTabId, action.direction)
-      if (!(neighbor != null && neighbor !== '')) {
+      const neighbor = getAdjacentPane(focusTree, focusFrom, action.direction)
+      if (neighbor === null) {
         return state
       }
-      return withActiveTabWorkspace({ ...state, activeTabId: neighbor }, neighbor)
+      if (!isTabLeaf(neighbor)) {
+        // The pane takes the keys; `activeTabId` keeps naming the terminal, so
+        // moving back is a move rather than a restore.
+        return { ...state, activePluginPaneId: neighbor.tabId }
+      }
+      return withActiveTabWorkspace({ ...state, activeTabId: neighbor.tabId }, neighbor.tabId)
     }
     case 'resize-pane': {
       const resizeGroupId = getGroupIdForTab(state.tabGroupMap, action.tabId)
