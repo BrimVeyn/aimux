@@ -95,7 +95,7 @@ export type ModalAction =
       projectId: string
       workspaceId: string
       workspaceLabel: string
-      reason: string
+      reason?: string
       closeTabs: boolean
       force: boolean
     }
