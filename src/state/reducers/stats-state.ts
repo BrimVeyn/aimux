@@ -1,7 +1,7 @@
 import type { AppAction } from '../actions'
 import type { AppState, StatsUIState } from '../types'
 
-import { STATS_PAGES } from '../stats-pages'
+import { statsPages } from '../stats-pages'
 
 export function emptyStatsUI(): StatsUIState {
   return { pageIndex: 0, scrollTop: 0 }
@@ -27,14 +27,14 @@ export function reduceStatsState(state: AppState, action: AppAction): AppState |
       if (state.focusMode !== 'stats') return state
       return { ...state, focusMode: 'navigation' }
     case 'stats-move-page': {
-      const pageIndex = clamp(state.stats.pageIndex + action.delta, STATS_PAGES.length - 1)
+      const pageIndex = clamp(state.stats.pageIndex + action.delta, statsPages().length - 1)
       if (pageIndex === state.stats.pageIndex) return state
       // A new page is a different length; carrying the old offset into it lands
       // the viewport somewhere the user never scrolled to.
       return withStats(state, { pageIndex, scrollTop: 0 })
     }
     case 'stats-select-page': {
-      const pageIndex = clamp(action.pageIndex, STATS_PAGES.length - 1)
+      const pageIndex = clamp(action.pageIndex, statsPages().length - 1)
       if (pageIndex === state.stats.pageIndex) return state
       return withStats(state, { pageIndex, scrollTop: 0 })
     }

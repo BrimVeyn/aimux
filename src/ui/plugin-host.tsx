@@ -17,6 +17,7 @@ import {
 } from '../plugins/rpc-envelope'
 import { onSettingSectionsChanged } from '../settings/sections'
 import { dispatchGlobal } from '../state/dispatch-ref'
+import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
 import { extendUiPluginContext } from './plugin-ui-services'
@@ -190,6 +191,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       onPluginModalsChanged(bump),
       onBarWidgetsChanged(bump),
       onSettingSectionsChanged(bump),
+      onStatsPagesChanged(bump),
     ]
 
     backend.on('pluginEvent', onPluginEvent)

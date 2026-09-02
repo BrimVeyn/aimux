@@ -1,12 +1,12 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 
 import { useTerminalDimensions } from '@opentui/react'
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, type ReactNode, useCallback, useEffect, useRef } from 'react'
 
 import { useAppStore } from '../../../state/app-store'
 import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
-import { STATS_PAGES, statsPageAt } from '../../../state/stats-pages'
+import { getStatsPageRenderer, statsPageAt, statsPages } from '../../../state/stats-pages'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
 import { AimuxPage } from './aimux-page'
@@ -85,7 +85,9 @@ export const StatsView = memo(function StatsView() {
         body = <AimuxPage data={data} width={contentWidth} />
         break
       default:
-        page.id satisfies never
+        // A plugin page. `StatsPageId` is open, so this arm is reachable and
+        // the exhaustiveness check moves to the built-ins above it.
+        body = (getStatsPageRenderer(page.id)?.() ?? null) as ReactNode
     }
   }
 
@@ -97,7 +99,7 @@ export const StatsView = memo(function StatsView() {
             <text fg={t.textMuted}>Stats</text>
           </box>
           <box flexGrow={1} flexShrink={1} flexDirection="column" overflow="hidden">
-            {STATS_PAGES.map((entry, index) => (
+            {statsPages().map((entry, index) => (
               <ListItem
                 key={entry.id}
                 active={index === stats.pageIndex}

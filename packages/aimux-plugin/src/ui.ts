@@ -83,6 +83,20 @@ export interface PluginSettingsApi {
   registerSection: (section: unknown) => Disposer
 }
 
+export interface PluginStatsPage {
+  /** Unqualified; the host prefixes the plugin id. */
+  id: string
+  label: string
+  /** One cell, text presentation — the rule every nav glyph follows. */
+  glyph: string
+  render: () => PluginNode
+}
+
+export interface PluginStatsApi {
+  /** Adds a page to the stats screen's nav, after the built-in three. */
+  registerPage: (page: PluginStatsPage) => Disposer
+}
+
 export interface PluginThemesApi {
   /** The shipped theme JSON shape. A shipped id may not be replaced. */
   register: (id: string, theme: unknown) => Disposer
@@ -138,6 +152,7 @@ export interface PluginUiApi {
   settings: PluginSettingsApi
   themes: PluginThemesApi
   toast: PluginToastApi
+  stats: PluginStatsApi
   kit: PluginKit
 }
 

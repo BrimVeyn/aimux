@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { AppState } from '../../src/state/types'
 
-import { STATS_PAGES } from '../../src/state/stats-pages'
+import { BUILTIN_STATS_PAGES } from '../../src/state/stats-pages'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 /**
@@ -45,7 +45,7 @@ describe('stats reducer', () => {
   })
 
   test('the page cursor stops at both ends of the nav', () => {
-    const last = STATS_PAGES.length - 1
+    const last = BUILTIN_STATS_PAGES.length - 1
     let state = open()
     for (let index = 0; index < 10; index++) {
       state = appReducer(state, { delta: 1, type: 'stats-move-page' })
@@ -60,7 +60,7 @@ describe('stats reducer', () => {
 
   test('selecting a page out of range clamps instead of blanking the screen', () => {
     const state = appReducer(open(), { pageIndex: 99, type: 'stats-select-page' })
-    expect(state.stats.pageIndex).toBe(STATS_PAGES.length - 1)
+    expect(state.stats.pageIndex).toBe(BUILTIN_STATS_PAGES.length - 1)
   })
 
   test('changing page drops the offset — a new page is a different length', () => {

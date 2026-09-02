@@ -31,6 +31,8 @@ export type {
   PluginModalsApi,
   PluginNode,
   PluginSettingsApi,
+  PluginStatsApi,
+  PluginStatsPage,
   PluginStoreApi,
   PluginThemesApi,
   PluginToastApi,

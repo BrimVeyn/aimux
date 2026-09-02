@@ -20,6 +20,7 @@ import { registerSettingSection } from '../settings/sections'
 import { appStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
+import { registerStatsPage, registerStatsPageRenderer } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
@@ -89,6 +90,18 @@ function buildUi(ctx: PluginContext): PluginUiApi {
     },
     settings: {
       registerSection: (section) => own(ctx, registerSettingSection(section as SettingSection)),
+    },
+    stats: {
+      registerPage: (page) => {
+        const pageId = qualify(id, page.id)
+        const disposers = [
+          registerStatsPage({ glyph: page.glyph, id: pageId, label: page.label }),
+          registerStatsPageRenderer(pageId, page.render),
+        ]
+        return own(ctx, () => {
+          for (let i = disposers.length - 1; i >= 0; i--) disposers[i]?.()
+        })
+      },
     },
     themes: {
       register: (themeId, theme) => own(ctx, registerTuiTheme(themeId, theme as TuiThemeJson)),
