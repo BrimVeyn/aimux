@@ -512,7 +512,7 @@ export function App({
       dispatch(action)
     }
 
-    if (result.transition) {
+    if (result.transition !== undefined) {
       const transResult = transitionTo(modeId, result.transition, { state })
       for (const action of transResult.actions) {
         dispatch(action)

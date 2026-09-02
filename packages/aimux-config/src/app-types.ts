@@ -864,7 +864,12 @@ export interface AutoCommitState {
 
 // ─── Modes, key results and side effects ──────────────────────────────────────
 
-export type ModeId =
+/**
+ * The modes aimux ships. `ModeId` is this plus the plugin namespace, so a
+ * `switch` over a built-in mode stays exhaustive while a plugin can still
+ * introduce one of its own.
+ */
+export type BuiltinModeId =
   | 'navigation'
   | 'terminal-input'
   | 'git-mode'
@@ -894,6 +899,15 @@ export type ModeId =
   | 'modal.quotas'
   | 'settings'
   | 'stats'
+
+/**
+ * A mode a plugin owns. Namespaced by plugin id — `plugin.acme.thing.review` —
+ * so two plugins can each have a "review" mode, and so the owner of an
+ * unexpected mode id is readable from the id alone.
+ */
+export type PluginModeId = `plugin.${string}`
+
+export type ModeId = BuiltinModeId | PluginModeId
 
 /**
  * The effect half of the plugin envelope; see `PluginStateAction` for the

@@ -239,7 +239,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
       const allEntries = keymap ? collectHelpEntries(keymap) : []
-      const scopedEntries = scope ? allEntries.filter((e) => e.mode === scope) : allEntries
+      const scopedEntries = scope === null ? allEntries : allEntries.filter((e) => e.mode === scope)
       return {
         ...state,
         modal: {

@@ -83,7 +83,7 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
       return {
         help: '',
         projectSegments: projectSegs,
-        right: modalMode ? hintForMode(config, modalMode) : '',
+        right: modalMode === null ? '' : hintForMode(config, modalMode),
       }
     }
     case 'git': {
@@ -116,7 +116,7 @@ export function getStatusBarModel(state: AppState, config: ResolvedKeymapConfig)
       return {
         help: '',
         projectSegments: projectSegs,
-        right: commandEditMode ? hintForMode(config, commandEditMode) : '',
+        right: commandEditMode === null ? '' : hintForMode(config, commandEditMode),
       }
     }
     case 'navigation':

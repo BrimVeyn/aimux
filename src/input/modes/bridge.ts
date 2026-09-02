@@ -37,7 +37,46 @@ const MODAL_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'workspace-move-confirm': 'modal.workspace-move-confirm',
 }
 
+/**
+ * A derivation a plugin installs to claim input while its own UI is up.
+ * Returns the mode to route to, or null to defer to the built-in rules.
+ *
+ * Consulted before anything else, because that is the only useful position: a
+ * plugin view or modal renders on top, so it has to be able to take input from
+ * whatever is underneath — which is exactly what `help` and `flash-jump` do
+ * below, only hard-coded.
+ */
+export type ModeDerivation = (state: AppState) => ModeId | null
+
+const derivations: ModeDerivation[] = []
+
+/**
+ * Registers a derivation. Returns the disposer the plugin's fiber holds, so an
+ * unloaded plugin stops claiming input rather than routing keys into a mode
+ * with no handler.
+ */
+export function registerModeDerivation(derivation: ModeDerivation): () => void {
+  derivations.push(derivation)
+  return () => {
+    const index = derivations.indexOf(derivation)
+    if (index !== -1) derivations.splice(index, 1)
+  }
+}
+
+/** Test seam. Never called by the app. */
+export function clearModeDerivations(): void {
+  derivations.length = 0
+}
+
 export function deriveModeId(state: AppState): ModeId {
+  // Snapshot: a derivation that unregisters itself must not shift the list
+  // under the loop.
+  const claimants = [...derivations]
+  for (const derive of claimants) {
+    const claimed = derive(state)
+    if (claimed !== null) return claimed
+  }
+
   // Help renders as an overlay on top of git/navigation without flipping
   // focusMode, so it needs modal-first dispatch. Always in filter mode.
   if (state.modal.type === 'help') {
@@ -57,7 +96,7 @@ export function deriveModeId(state: AppState): ModeId {
   }
 
   const directMode = DIRECT_FOCUS_MODE_IDS[state.focusMode]
-  if (directMode) {
+  if (directMode !== undefined) {
     return directMode
   }
 
@@ -69,8 +108,8 @@ export function deriveModeId(state: AppState): ModeId {
       return 'modal.git-commit.confirm'
     }
     const modalType = state.modal.type
-    const commandEditMode = modalType ? COMMAND_EDIT_MODE_IDS[modalType] : undefined
-    if (commandEditMode) {
+    const commandEditMode = modalType === null ? undefined : COMMAND_EDIT_MODE_IDS[modalType]
+    if (commandEditMode !== undefined) {
       return commandEditMode
     }
 
@@ -82,8 +121,8 @@ export function deriveModeId(state: AppState): ModeId {
       return 'modal.git-commit.generating'
     }
     const modalType = state.modal.type
-    const modalMode = modalType ? MODAL_MODE_IDS[modalType] : undefined
-    if (modalMode) {
+    const modalMode = modalType === null ? undefined : MODAL_MODE_IDS[modalType]
+    if (modalMode !== undefined) {
       return modalMode
     }
 

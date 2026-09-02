@@ -2,7 +2,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 
 import { useCallback, useLayoutEffect, useMemo } from 'react'
 
-import { collectHelpEntries, HELP_MODE_LABELS } from '../../../../input/keymap/help-entries'
+import { collectHelpEntries, helpModeLabels } from '../../../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useKeymap } from '../../../keymap-context'
 import { useTheme } from '../../../theme'
@@ -27,7 +27,7 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
   const config = useKeymap()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
   const scoped = useMemo(
-    () => (scope ? allEntries.filter((e) => e.mode === scope) : allEntries),
+    () => (scope === null ? allEntries : allEntries.filter((e) => e.mode === scope)),
     [allEntries, scope]
   )
   const filtered = useMemo(
@@ -39,8 +39,8 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
   )
 
   const title = useMemo(() => {
-    if (!scope) return 'Keybindings'
-    const label = HELP_MODE_LABELS.find((m) => m.modeId === scope)?.label ?? scope
+    if (scope === null) return 'Keybindings'
+    const label = helpModeLabels().find((m) => m.modeId === scope)?.label ?? scope
     return `${label} — keybindings`
   }, [scope])
 

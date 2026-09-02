@@ -35,8 +35,12 @@ describe('plugin effects', () => {
 
   test('keeps handlers of different plugins apart', () => {
     const hits: string[] = []
-    registerPluginEffect('acme.a', 'go', () => hits.push('a'))
-    registerPluginEffect('acme.b', 'go', () => hits.push('b'))
+    registerPluginEffect('acme.a', 'go', () => {
+      hits.push('a')
+    })
+    registerPluginEffect('acme.b', 'go', () => {
+      hits.push('b')
+    })
 
     runPluginEffect('acme.b', 'go', undefined, CTX)
     expect(hits).toEqual(['b'])
@@ -75,8 +79,12 @@ describe('plugin effects', () => {
 
   test('re-registering replaces rather than stacking', () => {
     const hits: string[] = []
-    registerPluginEffect('acme.a', 'go', () => hits.push('first'))
-    registerPluginEffect('acme.a', 'go', () => hits.push('second'))
+    registerPluginEffect('acme.a', 'go', () => {
+      hits.push('first')
+    })
+    registerPluginEffect('acme.a', 'go', () => {
+      hits.push('second')
+    })
 
     runPluginEffect('acme.a', 'go', undefined, CTX)
     // A reload registers again; stacking would run both closures.

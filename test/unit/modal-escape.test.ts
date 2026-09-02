@@ -26,7 +26,7 @@ function pressEscape(open: AppAction[]): AppState {
   if (!result) throw new Error('no Esc binding')
 
   for (const action of result.actions) state = appReducer(state, action)
-  if (result.transition) {
+  if (result.transition !== undefined) {
     const trans = transitionTo(modeId, result.transition, { state })
     for (const action of trans.actions) state = appReducer(state, action)
   }

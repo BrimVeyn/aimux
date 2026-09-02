@@ -1,6 +1,13 @@
-import type { ModeId } from './types'
+import type { BuiltinModeId, ModeId } from '@brimveyn/aimux-config'
 
-const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
+/**
+ * Which built-in mode may hand over to which. Exhaustive over `BuiltinModeId`
+ * on purpose: adding a mode without saying where it can go should not compile.
+ *
+ * Plugin modes are not in this table and cannot be — the set is not known at
+ * build time. They are governed by `pluginModeTransitions` below.
+ */
+const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
   'git-mode': ['navigation', 'modal.git-commit', 'modal.workspace-move'],
   'modal.create-project': ['navigation', 'modal.project-picker.filtering'],
   'modal.create-workspace': ['navigation', 'terminal-input'],
@@ -65,6 +72,67 @@ const TRANSITIONS: Record<ModeId, readonly ModeId[]> = {
   'terminal-input': ['navigation', 'modal.split-picker', 'modal.quotas', 'settings', 'stats'],
 }
 
+/**
+ * What a plugin declares when it registers a mode. Both directions default to
+ * `navigation` alone, which is the conservative reading: a plugin mode is
+ * reachable from the panes and returns to them, and anything wider has to be
+ * asked for.
+ */
+export interface PluginModeTransitions {
+  /** Built-in or plugin modes that may enter this one. */
+  from?: readonly ModeId[]
+  /** Modes this one may hand over to. */
+  to?: readonly ModeId[]
+}
+
+const pluginModes = new Map<string, PluginModeTransitions>()
+
+export function isPluginModeId(id: ModeId): boolean {
+  return id.startsWith('plugin.')
+}
+
+/**
+ * Registers a plugin mode's transition rules. Returns the disposer the
+ * plugin's fiber holds; unloading the plugin therefore also makes its mode
+ * unreachable, rather than leaving a mode nothing can handle.
+ */
+export function registerPluginMode(
+  id: ModeId,
+  transitions: PluginModeTransitions = {}
+): () => void {
+  pluginModes.set(id, transitions)
+  return () => {
+    pluginModes.delete(id)
+  }
+}
+
+/** Test seam. Never called by the app. */
+export function clearPluginModes(): void {
+  pluginModes.clear()
+}
+
+export function registeredPluginModes(): ModeId[] {
+  return [...pluginModes.keys()] as ModeId[]
+}
+
+/**
+ * A plugin mode that was never registered — its plugin failed to load, or was
+ * unloaded while its mode was current — is not a valid destination. Falling
+ * back to "allowed" would strand input in a mode with no handler.
+ */
 export function isValidTransition(from: ModeId, to: ModeId): boolean {
-  return TRANSITIONS[from].includes(to)
+  if (isPluginModeId(from)) {
+    const rules = pluginModes.get(from)
+    if (!rules) return to === 'navigation'
+    return to === 'navigation' || (rules.to?.includes(to) ?? false)
+  }
+
+  if (isPluginModeId(to)) {
+    const rules = pluginModes.get(to)
+    if (!rules) return false
+    return from === 'navigation' || (rules.from?.includes(from) ?? false)
+  }
+
+  // Both ends are built-in by here: `isPluginModeId` ruled out the other case.
+  return TRANSITIONS[from as BuiltinModeId].includes(to)
 }
