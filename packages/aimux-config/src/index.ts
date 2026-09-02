@@ -32,6 +32,13 @@ export { GroupBuilder, KeymapBuilder, ModeBindingBuilder } from './keymap-builde
 export { getDefaultKeymapConfig } from './defaults'
 export { resolveConfig } from './resolver'
 export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime'
+export {
+  clearPluginActions,
+  hasPluginAction,
+  pluginAction,
+  pluginActionNames,
+  registerPluginAction,
+} from './plugin-actions-runtime'
 export { getMultiRepoConfig, setMultiRepoConfig } from './multi-repo-runtime'
 export { getStatusBarSeparator, setStatusBarSeparator } from './status-bar-runtime'
 export {

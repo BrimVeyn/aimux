@@ -174,6 +174,20 @@ export interface KeymapBuilderApi {
     id: ModeId | readonly ModeId[],
     configure: (m: ModeBindingBuilderApi) => ModeBindingBuilderApi
   ): KeymapBuilderApi
+  /**
+   * Binds an action a plugin contributes, by its qualified `<pluginId>.<verb>`
+   * name:
+   *
+   * ```ts
+   * k.mode('navigation', (m) => m.map('<leader>r', k.plugin('acme.review.open')))
+   * ```
+   *
+   * A name, not a function, because the keymap is resolved at startup and
+   * plugins load after it. Requiring an import would mean a config file could
+   * only reference plugins it could reach — the coupling a plugin system
+   * exists to remove. An unresolved name is inert, the way an unbound key is.
+   */
+  plugin(name: string): Action
 }
 
 // ─── Top-level user config ────────────────────────────────────────────────────
