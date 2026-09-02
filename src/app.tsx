@@ -71,6 +71,7 @@ import {
   subscribeThemeChanges,
 } from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
+import { loadUserThemes } from './ui/user-themes'
 import {
   fetchLatestNpmVersion,
   getCurrentPackageVersion,
@@ -118,6 +119,13 @@ export function App({
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
+    // Before the first `applyTheme`: a persisted `themeId` naming a theme from
+    // `<profile>/themes/` has to resolve, or the app would fall back to
+    // `aimux` and then write that fallback back to the config file.
+    const userThemes = loadUserThemes()
+    for (const issue of userThemes.issues) {
+      toast.error(`theme ${issue.file}: ${issue.message}`)
+    }
     const config = loadConfig()
     const persisted =
       config.themeId != null && config.themeId !== '' && isKnownThemeId(config.themeId)

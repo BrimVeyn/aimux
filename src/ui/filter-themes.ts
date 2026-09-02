@@ -1,4 +1,4 @@
-import { THEME_IDS, type ThemeId } from './themes'
+import { type ThemeId, themeIds } from './themes'
 
 export function themeDisplayName(id: ThemeId): string {
   return id
@@ -8,9 +8,12 @@ export function themeDisplayName(id: ThemeId): string {
 }
 
 export function filterThemeIds(filter: string | null): ThemeId[] {
-  if (!(filter != null && filter !== '')) return THEME_IDS
+  // Read per call: a theme dropped into `<profile>/themes/` or shipped by a
+  // plugin has to show up in the picker without a restart.
+  const ids = themeIds()
+  if (!(filter != null && filter !== '')) return ids
   const needle = filter.toLowerCase()
-  return THEME_IDS.filter((id) => {
+  return ids.filter((id) => {
     return id.toLowerCase().includes(needle) || themeDisplayName(id).toLowerCase().includes(needle)
   })
 }

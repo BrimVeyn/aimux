@@ -1,4 +1,5 @@
 import {
+  getTuiTheme,
   migrateThemeId,
   type ResolvedTuiTheme,
   resolveTuiTheme,
@@ -47,7 +48,7 @@ const CHROME_BG_TOKENS = [
 // render, and drive an infinite update loop.
 function derive(id: ThemeId, mode: ThemeMode, transparent: boolean): ResolvedTuiTheme {
   if (!cachedBase || cachedId !== id || cachedMode !== mode) {
-    const json = TUI_THEMES[id] ?? TUI_THEMES.aimux
+    const json = getTuiTheme(id) ?? TUI_THEMES.aimux
     if (!json) throw new Error(`No theme JSON for ${id}`)
     cachedBase = resolveTuiTheme(json, mode)
     cachedOverlay = null

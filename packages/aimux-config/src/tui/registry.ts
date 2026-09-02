@@ -76,12 +76,55 @@ export const TUI_THEMES: Record<string, TuiThemeJson> = {
   'zenburn': zenburn as TuiThemeJson,
 }
 
-export type ThemeId = keyof typeof TUI_THEMES
+/**
+ * A shipped theme id. Widened with `(string & {})` because a theme can also be
+ * registered at runtime — from `<profile>/themes/` or by a plugin — and those
+ * ids are not knowable here. The literal half survives, so autocomplete still
+ * lists the shipped ones.
+ */
+export type ThemeId = keyof typeof TUI_THEMES | (string & {})
 
-export const THEME_IDS: ThemeId[] = Object.keys(TUI_THEMES).sort() as ThemeId[]
+/** Ids aimux ships, sorted. Runtime-registered ones are not in here. */
+export const BUILTIN_THEME_IDS: string[] = Object.keys(TUI_THEMES).sort()
+
+const runtimeThemes = new Map<string, TuiThemeJson>()
+
+/**
+ * Registers a theme loaded at runtime — a JSON file in `<profile>/themes/`, or
+ * one a plugin ships. Returns the disposer; unregistering a theme that is
+ * currently applied leaves the applied colours alone, since they were already
+ * resolved into the theme store.
+ *
+ * A runtime id may not shadow a shipped one: silently replacing `dracula`
+ * would make "which dracula?" depend on load order.
+ */
+export function registerTuiTheme(id: string, theme: TuiThemeJson): () => void {
+  if (id in TUI_THEMES) {
+    throw new Error(`theme "${id}" is shipped with aimux and cannot be replaced`)
+  }
+  runtimeThemes.set(id, theme)
+  return () => {
+    runtimeThemes.delete(id)
+  }
+}
+
+/** Test seam. Never called by the app. */
+export function clearRuntimeThemes(): void {
+  runtimeThemes.clear()
+}
+
+/** Every id the picker offers: shipped plus runtime-registered, sorted. */
+export function themeIds(): string[] {
+  if (runtimeThemes.size === 0) return BUILTIN_THEME_IDS
+  return [...BUILTIN_THEME_IDS, ...runtimeThemes.keys()].sort()
+}
+
+export function getTuiTheme(id: string): TuiThemeJson | undefined {
+  return TUI_THEMES[id] ?? runtimeThemes.get(id)
+}
 
 export function isKnownThemeId(id: string): id is ThemeId {
-  return id in TUI_THEMES
+  return id in TUI_THEMES || runtimeThemes.has(id)
 }
 
 const LEGACY_ID_MAP: Record<string, ThemeId> = {

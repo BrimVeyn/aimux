@@ -1,4 +1,14 @@
-export { isKnownThemeId, migrateThemeId, THEME_IDS, type ThemeId, TUI_THEMES } from './registry'
+export {
+  BUILTIN_THEME_IDS,
+  clearRuntimeThemes,
+  getTuiTheme,
+  isKnownThemeId,
+  migrateThemeId,
+  registerTuiTheme,
+  type ThemeId,
+  themeIds,
+  TUI_THEMES,
+} from './registry'
 export { type ClaudeThemeFile, resolveClaudeTheme, resolveTuiTheme } from './resolve'
 export { type TuiShikiOptions, tuiThemeToShiki } from './shiki'
 export { TUI_COLOR_TOKENS, type TuiColorToken } from './tokens'

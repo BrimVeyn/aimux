@@ -5,15 +5,19 @@ export * as actions from './actions'
 
 // TUI theme system (1:1 port of opencode TUI).
 export {
+  BUILTIN_THEME_IDS,
   type ClaudeThemeFile,
+  clearRuntimeThemes,
+  getTuiTheme,
   isKnownThemeId,
   migrateThemeId,
+  registerTuiTheme,
   resolveClaudeTheme,
   type ResolvedTuiTheme,
   resolveTuiTheme,
   type RGBA,
-  THEME_IDS,
   type ThemeId,
+  themeIds,
   type ThemeMode,
   TUI_COLOR_TOKENS,
   TUI_THEMES,
