@@ -238,6 +238,7 @@ export interface DaemonPluginContext extends PluginContext {
   readonly assistants: PluginAssistantsApi
   readonly hooks: PluginHooksApi
   readonly cli: PluginCliApi
+  readonly metrics: PluginMetricsApi
 }
 ```
 
@@ -389,6 +390,50 @@ export interface PluginSettingsApi {
    * separate "read it first" step to forget.
    */
   watch: (id: string, listener: (value: PluginSettingValue) => void) => Disposer
+}
+```
+
+```ts
+/**
+ * One tab, as a UI plugin sees it. A narrow projection on purpose: the app's
+ * own `TabSession` carries a viewport, terminal modes and a scrollback buffer,
+ * none of which a plugin has any business holding a reference to.
+ */
+export interface PluginTabInfo {
+  id: string
+  title: string
+  assistant: string
+  status: string
+  /** `idle` / `working` / `waiting-input`, or null when nothing has said yet. */
+  activity: string | null
+  workspaceId?: string
+}
+```
+
+```ts
+/** What aimux is currently showing, as much of it as a plugin can act on. */
+export interface PluginUiState {
+  tabs: readonly PluginTabInfo[]
+  activeTabId: string | null
+  /** The same tab `activeTabId` names, or null. Saved lookups add up. */
+  activeTab: PluginTabInfo | null
+  projectId: string | null
+}
+```
+
+```ts
+export interface PluginStateApi {
+  /** A snapshot, outside React. */
+  get: () => PluginUiState
+  /** Fires on every change, and once immediately with the current value. */
+  subscribe: (listener: (state: PluginUiState) => void) => Disposer
+  /**
+   * The hook a renderer wants: re-renders only when the selected value
+   * changes. The snapshot object is stable between changes, so selecting a
+   * field is cheap — selecting a *new object* re-renders every time, which is
+   * the same rule every store hook has.
+   */
+  use: <T>(select: (state: PluginUiState) => T) => T
 }
 ```
 
@@ -549,6 +594,7 @@ export interface PluginUiApi {
   themes: PluginThemesApi
   toast: PluginToastApi
   panes: PluginPanesApi
+  state: PluginStateApi
   stats: PluginStatsApi
   statusBar: PluginStatusBarApi
   kit: PluginKit
@@ -647,18 +693,69 @@ export interface PluginTabsApi {
 
 ```ts
 /**
- * Project and workspace records, as `aimux.json` holds them. Read from the
- * catalog on every call, because another process may have written it.
+ * A workspace, as a plugin sees it. `path` is the directory to run a command
+ * in and `repoRoot` the repository it belongs to — for a git worktree those
+ * differ, which is exactly why both are here.
+ */
+export interface PluginWorkspaceView {
+  id: string
+  name: string
+  path: string
+  repoRoot: string
+  branch?: string
+  baseRef?: string
+}
+```
+
+```ts
+export interface PluginProjectView {
+  id: string
+  name: string
+  /** Where the project lives, when it has a directory of its own. */
+  path?: string
+  workspaces: PluginWorkspaceView[]
+  activeWorkspaceId?: string
+}
+```
+
+```ts
+/**
+ * Project and workspace records, read from the catalog on every call because
+ * another process may have written it.
+ *
+ * Narrow projections rather than the raw records: the catalog entry carries a
+ * whole persisted UI snapshot — layout trees, scrollback buffers — and handing
+ * that to a plugin would make every field of it something aimux can no longer
+ * change.
  */
 export interface PluginProjectsApi {
-  list: () => unknown[]
-  get: (projectId: string) => unknown
+  list: () => PluginProjectView[]
+  get: (projectId: string) => PluginProjectView | undefined
 }
 ```
 
 ```ts
 export interface PluginWorkspacesApi {
-  list: (projectId: string) => unknown[]
+  list: (projectId: string) => PluginWorkspaceView[]
+}
+```
+
+```ts
+/**
+ * What aimux knows about its own use, per local calendar day — counts and
+ * nothing else. No key identity, no content, nothing that leaves the machine.
+ */
+export interface PluginCounterDay {
+  /** `YYYY-MM-DD`, local calendar. */
+  day: string
+  values: Record<string, number>
+}
+```
+
+```ts
+export interface PluginMetricsApi {
+  /** Newest day first. `days` caps how far back it looks; default 30. */
+  counters: (days?: number) => PluginCounterDay[]
 }
 ```
 

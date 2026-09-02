@@ -1,12 +1,18 @@
-import type { PluginContext } from '@brimveyn/aimux-plugin'
+import type {
+  PluginContext,
+  PluginCounterDay,
+  PluginProjectView,
+  PluginWorkspaceView,
+} from '@brimveyn/aimux-plugin'
 
 import type { HookServer } from '../integrations/hook-server'
-import type { ProjectRecord, TerminalSnapshot } from '../state/types'
+import type { ProjectRecord, TerminalSnapshot, WorkspaceRecord } from '../state/types'
 import type { DaemonTabEntry } from './daemon'
 
 import { registerPluginCliCommand } from '../plugins/cli-commands'
 import { type AssistantDefinition, registerAssistant } from '../pty/assistant-registry'
 import { extractTailLines } from '../pty/assistant-status-detector'
+import { readCounters } from '../services/aimux-counters/store'
 import { loadProjectCatalog } from '../state/project-catalog'
 
 /**
@@ -22,6 +28,36 @@ import { loadProjectCatalog } from '../state/project-catalog'
  * answers `listTabs` from, and routing a plugin's read through the TM would put
  * plugin traffic on the socket that every PTY's output shares.
  */
+
+/**
+ * Narrow projections of the catalog records.
+ *
+ * A `ProjectRecord` carries a whole persisted UI snapshot — layout trees,
+ * scrollback buffers — and handing that to a plugin would make every field of
+ * it something aimux can no longer change.
+ */
+function toWorkspaceView(workspace: WorkspaceRecord): PluginWorkspaceView {
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    path: workspace.path,
+    repoRoot: workspace.repoRoot,
+    ...(workspace.baseRef === undefined ? {} : { baseRef: workspace.baseRef }),
+    ...(workspace.branch === undefined ? {} : { branch: workspace.branch }),
+  }
+}
+
+function toProjectView(project: ProjectRecord): PluginProjectView {
+  return {
+    id: project.id,
+    name: project.name,
+    workspaces: (project.workspaces ?? []).map(toWorkspaceView),
+    ...(project.activeWorkspaceId === undefined
+      ? {}
+      : { activeWorkspaceId: project.activeWorkspaceId }),
+    ...(project.projectPath === undefined ? {} : { path: project.projectPath }),
+  }
+}
 
 /** What the daemon hands over so these services can reach its state. */
 export interface DaemonPluginBackings {
@@ -111,15 +147,27 @@ export function createDaemonContextExtender(
     }
 
     const projects = {
-      get: (projectId: string): ProjectRecord | undefined =>
-        loadProjectCatalog().find((project) => project.id === projectId),
+      get: (projectId: string): PluginProjectView | undefined => {
+        const found = loadProjectCatalog().find((project) => project.id === projectId)
+        return found ? toProjectView(found) : undefined
+      },
       /** Read from the catalog on every call: another process may have written it. */
-      list: (): ProjectRecord[] => loadProjectCatalog(),
+      list: (): PluginProjectView[] => loadProjectCatalog().map(toProjectView),
     }
 
     const workspaces = {
-      list: (projectId: string) =>
-        loadProjectCatalog().find((project) => project.id === projectId)?.workspaces ?? [],
+      list: (projectId: string): PluginWorkspaceView[] =>
+        (loadProjectCatalog().find((project) => project.id === projectId)?.workspaces ?? []).map(
+          toWorkspaceView
+        ),
+    }
+
+    const metrics = {
+      counters: (days = 30): PluginCounterDay[] =>
+        Object.entries(readCounters().days)
+          .sort(([a], [b]) => (a < b ? 1 : -1))
+          .slice(0, Math.max(0, days))
+          .map(([day, values]) => ({ day, values: { ...values } as Record<string, number> })),
     }
 
     const assistants = {
@@ -175,6 +223,7 @@ export function createDaemonContextExtender(
     extended.tabs = tabs
     extended.projects = projects
     extended.workspaces = workspaces
+    extended.metrics = metrics
     extended.assistants = assistants
     extended.hooks = hooks
     extended.cli = cli

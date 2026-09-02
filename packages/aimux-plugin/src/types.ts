@@ -2,6 +2,7 @@ import type {
   PluginAssistantsApi,
   PluginCliApi,
   PluginHooksApi,
+  PluginMetricsApi,
   PluginProjectsApi,
   PluginTabsApi,
   PluginWorkspacesApi,
@@ -135,6 +136,7 @@ export interface DaemonPluginContext extends PluginContext {
   readonly assistants: PluginAssistantsApi
   readonly hooks: PluginHooksApi
   readonly cli: PluginCliApi
+  readonly metrics: PluginMetricsApi
 }
 
 export interface PluginDefinition<Ctx extends PluginContext = PluginContext> {

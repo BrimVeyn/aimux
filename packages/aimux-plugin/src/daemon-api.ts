@@ -55,16 +55,59 @@ export interface PluginTabsApi {
 }
 
 /**
- * Project and workspace records, as `aimux.json` holds them. Read from the
- * catalog on every call, because another process may have written it.
+ * A workspace, as a plugin sees it. `path` is the directory to run a command
+ * in and `repoRoot` the repository it belongs to — for a git worktree those
+ * differ, which is exactly why both are here.
+ */
+export interface PluginWorkspaceView {
+  id: string
+  name: string
+  path: string
+  repoRoot: string
+  branch?: string
+  baseRef?: string
+}
+
+export interface PluginProjectView {
+  id: string
+  name: string
+  /** Where the project lives, when it has a directory of its own. */
+  path?: string
+  workspaces: PluginWorkspaceView[]
+  activeWorkspaceId?: string
+}
+
+/**
+ * Project and workspace records, read from the catalog on every call because
+ * another process may have written it.
+ *
+ * Narrow projections rather than the raw records: the catalog entry carries a
+ * whole persisted UI snapshot — layout trees, scrollback buffers — and handing
+ * that to a plugin would make every field of it something aimux can no longer
+ * change.
  */
 export interface PluginProjectsApi {
-  list: () => unknown[]
-  get: (projectId: string) => unknown
+  list: () => PluginProjectView[]
+  get: (projectId: string) => PluginProjectView | undefined
 }
 
 export interface PluginWorkspacesApi {
-  list: (projectId: string) => unknown[]
+  list: (projectId: string) => PluginWorkspaceView[]
+}
+
+/**
+ * What aimux knows about its own use, per local calendar day — counts and
+ * nothing else. No key identity, no content, nothing that leaves the machine.
+ */
+export interface PluginCounterDay {
+  /** `YYYY-MM-DD`, local calendar. */
+  day: string
+  values: Record<string, number>
+}
+
+export interface PluginMetricsApi {
+  /** Newest day first. `days` caps how far back it looks; default 30. */
+  counters: (days?: number) => PluginCounterDay[]
 }
 
 export interface PluginAssistantsApi {

@@ -4,8 +4,10 @@ import type {
   PluginContext,
   PluginKit,
   PluginStoreApi,
+  PluginTabInfo,
   PluginThemeSnapshot,
   PluginUiApi,
+  PluginUiState,
 } from '@brimveyn/aimux-plugin'
 import type { ReactNode } from 'react'
 
@@ -18,10 +20,12 @@ import {
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
+import type { AppState } from '../state/types'
+
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
 import { registerSettingSection } from '../settings/sections'
 import { settingsStore } from '../settings/settings-store'
-import { appStore } from '../state/app-store'
+import { appStore, useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
 import { registerStatsPage, registerStatsPageRenderer } from '../state/stats-pages'
@@ -45,6 +49,45 @@ import { registerBarWidget } from './widgets/registry'
  * `board` gets `acme.thing.board` whether it wanted to or not — two plugins
  * can each have a "board", and the owner of any id stays readable from the id.
  */
+
+/**
+ * The projection a plugin sees, cached on the three slices it is built from.
+ *
+ * Stability is the whole point: a plugin's selector runs on every store change,
+ * and rebuilding the snapshot each time would re-render every widget on every
+ * keystroke. Recomputing only when `tabs`, `activeTabId` or `currentProjectId`
+ * changes identity gives `use(s => s.activeTab?.title)` the behaviour a caller
+ * expects for free.
+ */
+let cachedFrom: [AppState['tabs'], string | null, string | null] | null = null
+let cachedState: PluginUiState = { activeTab: null, activeTabId: null, projectId: null, tabs: [] }
+
+function projectUiState(state: AppState): PluginUiState {
+  if (
+    cachedFrom !== null &&
+    cachedFrom[0] === state.tabs &&
+    cachedFrom[1] === state.activeTabId &&
+    cachedFrom[2] === state.currentProjectId
+  ) {
+    return cachedState
+  }
+  const tabs: PluginTabInfo[] = state.tabs.map((tab) => ({
+    activity: tab.activity ?? null,
+    assistant: tab.assistant,
+    id: tab.id,
+    status: tab.status,
+    title: tab.title,
+    ...(tab.workspaceId === undefined ? {} : { workspaceId: tab.workspaceId }),
+  }))
+  cachedFrom = [state.tabs, state.activeTabId, state.currentProjectId]
+  cachedState = {
+    activeTab: tabs.find((tab) => tab.id === state.activeTabId) ?? null,
+    activeTabId: state.activeTabId,
+    projectId: state.currentProjectId,
+    tabs,
+  }
+  return cachedState
+}
 
 /**
  * The theme as a plugin sees it: flat colour tokens plus the mode. Same values
@@ -144,6 +187,19 @@ function buildUi(ctx: PluginContext): PluginUiApi {
           })
         )
       },
+    },
+    state: {
+      get: () => projectUiState(appStore.getState()),
+      subscribe: (listener) => {
+        listener(projectUiState(appStore.getState()))
+        return own(
+          ctx,
+          appStore.subscribe((next) => {
+            listener(projectUiState(next))
+          })
+        )
+      },
+      use: (select) => useAppStore((next) => select(projectUiState(next))),
     },
     stats: {
       registerPage: (page) => {

@@ -115,6 +115,18 @@ export function createDoctorExtender(
             return undo
           },
         },
+        state: {
+          // A dry run has no app: an empty snapshot lets a plugin that reads
+          // the active tab during `apply` still complete.
+          get: () => ({ activeTab: null, activeTabId: null, projectId: null, tabs: [] }),
+          subscribe: (listener: (value: unknown) => void) => {
+            listener({ activeTab: null, activeTabId: null, projectId: null, tabs: [] })
+            return noop
+          },
+          use: () => {
+            /* no React in a dry run */
+          },
+        },
         stats: {
           registerPage: (page: { id: string }) => record(into.statsPages, page.id),
         },
@@ -178,6 +190,7 @@ export function createDoctorExtender(
       list: () => [],
     }
     extended.workspaces = { list: () => [] }
+    extended.metrics = { counters: () => [] }
     extended.assistants = {
       register: (definition: { option: { id: string } }) =>
         record(into.assistants, definition.option.id),

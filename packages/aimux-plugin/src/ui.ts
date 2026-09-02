@@ -101,6 +101,44 @@ export interface PluginSettingsApi {
   watch: (id: string, listener: (value: PluginSettingValue) => void) => Disposer
 }
 
+/**
+ * One tab, as a UI plugin sees it. A narrow projection on purpose: the app's
+ * own `TabSession` carries a viewport, terminal modes and a scrollback buffer,
+ * none of which a plugin has any business holding a reference to.
+ */
+export interface PluginTabInfo {
+  id: string
+  title: string
+  assistant: string
+  status: string
+  /** `idle` / `working` / `waiting-input`, or null when nothing has said yet. */
+  activity: string | null
+  workspaceId?: string
+}
+
+/** What aimux is currently showing, as much of it as a plugin can act on. */
+export interface PluginUiState {
+  tabs: readonly PluginTabInfo[]
+  activeTabId: string | null
+  /** The same tab `activeTabId` names, or null. Saved lookups add up. */
+  activeTab: PluginTabInfo | null
+  projectId: string | null
+}
+
+export interface PluginStateApi {
+  /** A snapshot, outside React. */
+  get: () => PluginUiState
+  /** Fires on every change, and once immediately with the current value. */
+  subscribe: (listener: (state: PluginUiState) => void) => Disposer
+  /**
+   * The hook a renderer wants: re-renders only when the selected value
+   * changes. The snapshot object is stable between changes, so selecting a
+   * field is cheap — selecting a *new object* re-renders every time, which is
+   * the same rule every store hook has.
+   */
+  use: <T>(select: (state: PluginUiState) => T) => T
+}
+
 export interface PluginPane {
   /** Unqualified; the host prefixes the plugin id. */
   id: string
@@ -237,6 +275,7 @@ export interface PluginUiApi {
   themes: PluginThemesApi
   toast: PluginToastApi
   panes: PluginPanesApi
+  state: PluginStateApi
   stats: PluginStatsApi
   statusBar: PluginStatusBarApi
   kit: PluginKit
