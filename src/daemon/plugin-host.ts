@@ -5,6 +5,7 @@ import type { ParsedArgs } from '../cli/flags'
 import type { PluginDiscoveryIssue } from '../plugins/discovery'
 import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 
+import { BUILTIN_PLUGINS } from '../builtin-plugins'
 import { logDebug } from '../debug/input-log'
 import { getPluginCliCommand } from '../plugins/cli-commands'
 import { listExecCommands, runExecCommand } from '../plugins/exec-adapter'
@@ -134,6 +135,7 @@ export async function startDaemonPluginHost(
 
   const runtime = new PluginRuntime({
     ...(options.extendContext === undefined ? {} : { extendContext: options.extendContext }),
+    builtins: BUILTIN_PLUGINS,
     host: 'daemon',
     onIssues: (issues) => {
       for (const issue of issues) {

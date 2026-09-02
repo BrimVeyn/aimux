@@ -1,5 +1,7 @@
 import type { PluginHost, PluginManifest, PluginPaths } from '@brimveyn/aimux-plugin'
 
+import type { BuiltinHalfLoader } from './builtin'
+
 /**
  * How aimux came to know about a plugin. It decides two things: whether the
  * directory is aimux's to delete, and whether it is watched for edits.
@@ -7,8 +9,10 @@ import type { PluginHost, PluginManifest, PluginPaths } from '@brimveyn/aimux-pl
  * - `link`    a developer checkout registered by `aimux plugin link`. Watched.
  * - `install` cloned into `<profile>/plugins/<id>` by `aimux plugin install`.
  * - `config`  declared inline in `aimux.config.ts`. Watched, never deleted.
+ * - `builtin` shipped inside aimux. No directory, so nothing to watch or
+ *   delete; it is otherwise an ordinary plugin.
  */
-export type PluginSource = 'link' | 'install' | 'config'
+export type PluginSource = 'link' | 'install' | 'config' | 'builtin'
 
 /**
  * One plugin as the host sees it before any of its code has run: where it
@@ -23,6 +27,12 @@ export interface PluginRecord {
   enabled: boolean
   config: Record<string, unknown>
   paths: PluginPaths
+  /**
+   * Present only for `source: 'builtin'`: the halves come from the binary
+   * rather than from `root`, which is not a path. Everything downstream — the
+   * fiber, the effect stack, the reload — is identical.
+   */
+  builtin?: Partial<Record<PluginHost, BuiltinHalfLoader>>
 }
 
 /**

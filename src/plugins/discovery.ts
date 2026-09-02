@@ -8,6 +8,7 @@ import type { PluginRecord, PluginSource } from './types'
 import { version as APP_VERSION } from '../../package.json'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
+import { buildBuiltinRecords, type BuiltinPlugin } from './builtin'
 import {
   checkHostCompatibility,
   formatManifestIssues,
@@ -129,7 +130,8 @@ function collectCandidates(
  */
 export async function discoverPlugins(
   userPlugins: readonly PluginConfigEntry[] = [],
-  appVersion: string = APP_VERSION
+  appVersion: string = APP_VERSION,
+  builtins: readonly BuiltinPlugin[] = []
 ): Promise<PluginDiscoveryResult> {
   const issues: PluginDiscoveryIssue[] = []
   const { byPath, configOnly } = collectCandidates(userPlugins, issues)
@@ -141,8 +143,13 @@ export async function discoverPlugins(
     overridesById.set(entry.id, entry)
   }
 
-  const records: PluginRecord[] = []
-  const seenIds = new Set<string>()
+  // Built-ins come first: they exist before anything is linked, and putting
+  // them through the same record list is what makes `plugin list`, `plugin
+  // doctor`, config precedence and the kernel treat them as ordinary plugins.
+  const builtin = buildBuiltinRecords(builtins, overridesById)
+  const records: PluginRecord[] = [...builtin.records]
+  const seenIds = new Set<string>(builtin.records.map((record) => record.id))
+  for (const issue of builtin.issues) issues.push(issue)
 
   for (const candidate of byPath.values()) {
     const result = await readManifest(candidate.root)
@@ -168,6 +175,9 @@ export async function discoverPlugins(
     if (seenIds.has(manifest.id)) {
       issues.push({
         id: manifest.id,
+        // A directory claiming a built-in's id lands here too, and "keeping
+        // the first" is the right answer: the shipped one wins, and the user
+        // is told which plugin was ignored.
         message: `declared twice; keeping the first`,
         path: candidate.root,
       })

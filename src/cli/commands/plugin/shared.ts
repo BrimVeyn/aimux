@@ -5,6 +5,7 @@ import { isAbsolute, resolve } from 'node:path'
 
 import type { DaemonClient } from '../../client/daemon-client'
 
+import { BUILTIN_PLUGINS } from '../../../builtin-plugins'
 import { IPC_CAPABILITY_PLUGIN_RPC } from '../../../ipc/protocol'
 import { formatManifestIssues, readManifest } from '../../../plugins/manifest'
 import { loadPluginRegistryResult, type PluginRegistryEntry } from '../../../plugins/registry-file'
@@ -44,6 +45,15 @@ export function findRegistryEntry(id: string): PluginRegistryEntry | undefined {
 export function requireRegistryEntry(id: string): PluginRegistryEntry {
   const entry = findRegistryEntry(id)
   if (!entry) {
+    // A built-in has no registry row to toggle — it ships with aimux. Saying
+    // "not linked or installed" about a plugin the user can plainly see in
+    // `plugin list` would be the wrong answer to the right question.
+    if (BUILTIN_PLUGINS.some((builtin) => builtin.manifest.id === id)) {
+      throw new CliUsageError(
+        `plugin "${id}" ships with aimux; switch it off in aimux.config.ts with ` +
+          `plugins: [{ id: '${id}', enabled: false }]`
+      )
+    }
     throw new CliUsageError(`plugin "${id}" is not linked or installed — see \`aimux plugin list\``)
   }
   return entry

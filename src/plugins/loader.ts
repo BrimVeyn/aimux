@@ -1,6 +1,7 @@
 import type { PluginConfigEntry } from '@brimveyn/aimux-config'
 import type { PluginContext, PluginHost } from '@brimveyn/aimux-plugin'
 
+import type { BuiltinPlugin } from './builtin'
 import type { PluginRecord, PluginRpcTransport, PluginStatus } from './types'
 
 import { logDebug } from '../debug/input-log'
@@ -23,6 +24,13 @@ export interface PluginRuntimeOptions {
   transport: PluginRpcTransport
   /** `resolvedConfig.plugins` — the `aimux.config.ts` half of discovery. */
   userPlugins: readonly PluginConfigEntry[]
+  /**
+   * Plugins shipped inside aimux. Injected rather than imported so a test
+   * builds a runtime with none of them, and so the list is visible at the two
+   * call sites that matter — `src/ui/plugin-host.tsx` and
+   * `src/daemon/plugin-host.ts` — instead of being an implicit global.
+   */
+  builtins?: readonly BuiltinPlugin[]
   onStatusChange?: (statuses: PluginStatus[]) => void
   /**
    * Discovery problems: a missing directory, a malformed manifest, a config
@@ -52,6 +60,13 @@ export class PluginRuntime {
     })
   }
 
+  private async discover(): Promise<{
+    issues: PluginDiscoveryIssue[]
+    records: PluginRecord[]
+  }> {
+    return discoverPlugins(this.options.userPlugins, undefined, this.options.builtins)
+  }
+
   get issues(): readonly PluginDiscoveryIssue[] {
     return this.currentIssues
   }
@@ -77,7 +92,7 @@ export class PluginRuntime {
    * set — `plugin link`, `plugin enable`, an edited registry.
    */
   async refresh(): Promise<void> {
-    const { issues, records } = await discoverPlugins(this.options.userPlugins)
+    const { issues, records } = await this.discover()
     this.records = records
     this.currentIssues = issues
 
@@ -103,7 +118,11 @@ export class PluginRuntime {
     // Only halves this host actually runs are worth watching: a UI-only plugin
     // changing must not churn the daemon's fibers.
     const watchable = this.records.filter(
-      (record) => record.enabled && record.manifest.entries?.[this.options.host] !== undefined
+      (record) =>
+        record.enabled &&
+        // A built-in has no directory to watch; it reloads with aimux.
+        record.builtin === undefined &&
+        record.manifest.entries?.[this.options.host] !== undefined
     )
     this.unwatch = watchPlugins({
       onChange: (ids) => {
@@ -130,7 +149,7 @@ export class PluginRuntime {
   }
 
   private async refreshRecord(id: string): Promise<void> {
-    const { issues, records } = await discoverPlugins(this.options.userPlugins)
+    const { issues, records } = await this.discover()
     this.currentIssues = issues
     const updated = records.find((record) => record.id === id)
     if (!updated) return

@@ -216,14 +216,24 @@ export class PluginFiber {
 
     let definition: PluginDefinition
     try {
-      const entryPath = resolve(this.record.root, this.entry)
-      const loaded = await loadPluginEntry({
-        entryPath,
-        half: this.host,
-        pluginId: this.record.id,
-        revision: this.loadRevision + 1,
-      })
-      definition = loaded.definition as PluginDefinition
+      // A built-in ships inside the binary: there is no file to bundle and no
+      // module to invalidate, so the definition is simply imported. Everything
+      // after this line — inject, apply, the effect stack, the unload — is the
+      // same code path a third-party plugin takes, which is the point of
+      // shipping features as plugins at all.
+      const builtin = this.record.builtin?.[this.host]
+      if (builtin) {
+        definition = await builtin()
+      } else {
+        const entryPath = resolve(this.record.root, this.entry)
+        const loaded = await loadPluginEntry({
+          entryPath,
+          half: this.host,
+          pluginId: this.record.id,
+          revision: this.loadRevision + 1,
+        })
+        definition = loaded.definition as PluginDefinition
+      }
     } catch (error) {
       this.fail(error, 'load')
       return

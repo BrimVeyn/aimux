@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 import type { SessionBackend } from '../session-backend/types'
 
+import { BUILTIN_PLUGINS } from '../builtin-plugins'
 import { logDebug } from '../debug/input-log'
 import { PluginRuntime } from '../plugins/loader'
 import {
@@ -94,6 +95,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     }
 
     const runtime = new PluginRuntime({
+      builtins: BUILTIN_PLUGINS,
       extendContext: extendUiPluginContext,
       host: 'ui',
       onIssues: (issues) => {
