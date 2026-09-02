@@ -14,6 +14,7 @@
 import type { AssistantId, TabActivity, TerminalSnapshot } from '../state/types'
 
 import { getLineText } from '../input/terminal-text-extraction'
+import { getAssistantDefinition } from './assistant-registry'
 
 const TAIL_LINE_COUNT = 10
 const ACTIVE_CHANGE_WINDOW_MS = 600
@@ -151,7 +152,15 @@ function classifyBuiltin(
     case 'kimi':
       return classifyKimi(haystack, rawTail)
     default:
-      return null
+      // Not a built-in. A plugin may have registered a classifier for this id;
+      // `null` from either hands over to the generic heuristic.
+      return (
+        getAssistantDefinition(assistant)?.detectStatus?.({
+          haystack,
+          screen: rawScreen,
+          tail: rawTail,
+        }) ?? null
+      )
   }
 }
 

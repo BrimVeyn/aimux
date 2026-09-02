@@ -312,7 +312,12 @@ export interface AimuxThemeConfig {
   }
 }
 
-export type AIUsageTool = 'claude' | 'codex'
+/**
+ * A tool the usage indicator can poll. Widened with `(string & {})` because a
+ * plugin assistant can declare a `usage` adapter and its id is not knowable
+ * here; the literal half survives, so the built-in two still autocomplete.
+ */
+export type AIUsageTool = 'claude' | 'codex' | (string & {})
 
 export interface AIUsageToolConfig {
   enabled?: boolean
