@@ -7,7 +7,7 @@ import { version as APP_VERSION } from '../../package.json'
 import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
-import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
+import { type HookServer, startHookServer } from '../integrations/hook-server'
 import { MANAGER_CAPABILITY_WORKER_METADATA } from '../ipc/manager-protocol'
 import {
   type ClientRequest,
@@ -537,29 +537,31 @@ export async function runDaemon(): Promise<void> {
   // shipped shell bridge reads on every invocation, so PTYs spawned by a
   // *previous* daemon transparently follow URL changes after a restart.
   // Failure to start is non-fatal — detection falls back to the visual PTY scanner.
-  let hookServer: ClaudeHookServer | null = null
+  let hookServer: HookServer | null = null
   const hookUrlFilePath = getClaudeHookUrlFilePath()
   try {
-    hookServer = startClaudeHookServer({
-      onEvent: (event) => {
-        statusLoop.recordHookEvent({
-          hookEventName: event.hookEventName,
-          paneId: event.paneId,
-          payload: event.payload,
-          receivedAt: event.receivedAt,
-        })
-        // `UserPromptSubmit` carries the exact prompt at the exact moment it is
-        // submitted, so auto-rename prefers it over reconstructing keystrokes:
-        // trust dialogs, menus and completions never produce one.
-        if (event.hookEventName === 'UserPromptSubmit') {
-          const prompt = event.payload.prompt
-          const parentToolUseId = event.payload.parent_tool_use_id
-          const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
-          if (typeof prompt === 'string' && !fromSubagent) {
-            autoRename.observePrompt(event.paneId, prompt)
-          }
+    hookServer = startHookServer()
+    // Claude registers like anything else. It is the first route rather than a
+    // special one, which is what makes a plugin's route the same mechanism.
+    hookServer.route('claude', (event) => {
+      statusLoop.recordHookEvent({
+        hookEventName: event.hookEventName,
+        paneId: event.paneId,
+        payload: event.payload,
+        receivedAt: event.receivedAt,
+        source: event.source,
+      })
+      // `UserPromptSubmit` carries the exact prompt at the exact moment it is
+      // submitted, so auto-rename prefers it over reconstructing keystrokes:
+      // trust dialogs, menus and completions never produce one.
+      if (event.hookEventName === 'UserPromptSubmit') {
+        const prompt = event.payload.prompt
+        const parentToolUseId = event.payload.parent_tool_use_id
+        const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
+        if (typeof prompt === 'string' && !fromSubagent) {
+          autoRename.observePrompt(event.paneId, prompt)
         }
-      },
+      }
     })
     try {
       writeFileSync(hookUrlFilePath, hookServer.url, { mode: 0o600 })
