@@ -4,6 +4,16 @@
 // manifest and aimux refuses to load a plugin written against a generation it
 // does not implement, rather than failing halfway through `apply`.
 
+export type {
+  PluginAssistantsApi,
+  PluginCliApi,
+  PluginHooksApi,
+  PluginProjectsApi,
+  PluginSpawnTabInput,
+  PluginTabsApi,
+  PluginTabView,
+  PluginWorkspacesApi,
+} from './daemon-api'
 export { definePlugin } from './define-plugin'
 export { EffectStack } from './effects'
 export { type EventBusOptions, PluginEventBus } from './event-bus'

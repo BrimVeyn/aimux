@@ -1,3 +1,11 @@
+import type {
+  PluginAssistantsApi,
+  PluginCliApi,
+  PluginHooksApi,
+  PluginProjectsApi,
+  PluginTabsApi,
+  PluginWorkspacesApi,
+} from './daemon-api'
 import type { PluginHost, PluginManifest } from './manifest'
 import type { PluginActionsApi, PluginStoreApi, PluginUiApi } from './ui'
 
@@ -115,9 +123,18 @@ export interface UiPluginContext<Slice = unknown> extends PluginContext {
   readonly store: PluginStoreApi<Slice>
 }
 
-/** Daemon half. Assistant/hook/CLI services land on this type in API phase 3. */
+/**
+ * The daemon half's context. Attached by the daemon host; a plugin declaring
+ * `entries.daemon` always receives them.
+ */
 export interface DaemonPluginContext extends PluginContext {
   readonly host: 'daemon'
+  readonly tabs: PluginTabsApi
+  readonly projects: PluginProjectsApi
+  readonly workspaces: PluginWorkspacesApi
+  readonly assistants: PluginAssistantsApi
+  readonly hooks: PluginHooksApi
+  readonly cli: PluginCliApi
 }
 
 export interface PluginDefinition<Ctx extends PluginContext = PluginContext> {

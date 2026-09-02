@@ -1,4 +1,5 @@
 import type { PluginConfigEntry } from '@brimveyn/aimux-config'
+import type { PluginContext } from '@brimveyn/aimux-plugin'
 
 import type { ParsedArgs } from '../cli/flags'
 import type { PluginDiscoveryIssue } from '../plugins/discovery'
@@ -71,6 +72,8 @@ export interface DaemonPluginHostOptions {
   broadcast: (event: PluginEventPayload) => void
   /** Whether any UI process is currently attached — gates daemon → UI calls. */
   hasUiClient: () => boolean
+  /** Attaches the daemon's services to each plugin context. */
+  extendContext?: (ctx: PluginContext) => void
 }
 
 export interface DaemonPluginHost {
@@ -127,6 +130,7 @@ export async function startDaemonPluginHost(
   }
 
   const runtime = new PluginRuntime({
+    ...(options.extendContext === undefined ? {} : { extendContext: options.extendContext }),
     host: 'daemon',
     onIssues: (issues) => {
       for (const issue of issues) {

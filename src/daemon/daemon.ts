@@ -38,6 +38,7 @@ import {
 } from './catalog-writer'
 import { emitDaemonEvent } from './daemon-events'
 import { type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
+import { createDaemonContextExtender } from './plugin-services'
 import {
   consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
@@ -585,12 +586,108 @@ export async function runDaemon(): Promise<void> {
   // Every failure here is contained: a plugin that throws lands in `FAILED`
   // with its error in its own log, and the daemon serves tabs as if it were
   // not there.
+  /**
+   * Spawns a tab on a plugin's behalf. The same steps the `createTab` request
+   * takes, minus the socket: remember the tab first so early render events have
+   * metadata to merge into, then create it, then announce it.
+   *
+   * Size comes from the project's last attached dimensions, because a plugin has
+   * no viewport of its own — the same fallback the headless CLI uses, and the
+   * same error when no UI has ever attached.
+   */
+  const spawnTabForPlugin = async (input: {
+    projectId: string
+    assistant: string
+    title: string
+    command: string
+    args?: string[]
+    cwd?: string
+    workspaceId?: string
+  }): Promise<string> => {
+    const dimensions = projectDimensions.get(input.projectId)
+    if (!dimensions) {
+      throw new Error(
+        `no UI has attached to project ${input.projectId} yet, so there is no size to spawn a tab with`
+      )
+    }
+    const tabId = crypto.randomUUID()
+    const fullCommand = [input.command, ...(input.args ?? [])].join(' ')
+    const autoRenameStatus = initialAutoRenameStatus(
+      resolvedConfig.autoRename,
+      input.assistant,
+      false
+    )
+    rememberTab(input.projectId, tabId, input.assistant, fullCommand, undefined, {
+      autoRenameStatus,
+      status: 'starting',
+      title: input.title,
+      workspaceId: input.workspaceId,
+    })
+    const env: Record<string, string> = { AIMUX_PANE_ID: tabId }
+    if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
+    try {
+      await manager.createTab({
+        args: input.args,
+        assistant: input.assistant,
+        autoRenameStatus,
+        cols: dimensions.cols,
+        command: input.command,
+        cwd: input.cwd,
+        env,
+        projectId: input.projectId,
+        rows: dimensions.rows,
+        tabId,
+        title: input.title,
+        workspaceId: input.workspaceId,
+      })
+    } catch (error) {
+      tabRegistry.delete(tabId)
+      throw error
+    }
+    const synthesizedTab: TabSession = {
+      activity: 'idle',
+      assistant: input.assistant,
+      autoRenameStatus,
+      buffer: '',
+      command: fullCommand,
+      id: tabId,
+      status: 'starting',
+      terminalModes: createDefaultTerminalModes(),
+      title: input.title,
+      workspaceId: input.workspaceId,
+    }
+    emitDaemonEvent('tab:added', { projectId: input.projectId, tab: synthesizedTab })
+    broadcastForProjectVersioned(input.projectId, 11, {
+      payload: { projectId: input.projectId, tab: synthesizedTab },
+      type: 'tabAdded',
+    })
+    autoRename.register(synthesizedTab)
+    return tabId
+  }
+
   let pluginHost: DaemonPluginHost | null = null
   try {
     pluginHost = await startDaemonPluginHost({
       broadcast: (event) => {
         broadcastPluginEvent(event)
       },
+      extendContext: createDaemonContextExtender({
+        activeTabId: (projectId) => projectActiveTabIds.get(projectId) ?? null,
+        closeTab: async (tabId) => {
+          const entry = tabRegistry.get(tabId)
+          if (!entry) throw new Error(`unknown tab: ${tabId}`)
+          await manager.closeTab(entry.projectId, tabId)
+        },
+        focus: async (projectId, tabId) => manager.setActiveTab(projectId, tabId),
+        hookServer: () => hookServer,
+        spawnTab: spawnTabForPlugin,
+        tabs: () => tabRegistry,
+        write: async (tabId, data) => {
+          const entry = tabRegistry.get(tabId)
+          if (!entry) throw new Error(`unknown tab: ${tabId}`)
+          await manager.write(entry.projectId, tabId, data)
+        },
+      }),
       hasUiClient: () => countUiAttachers() > 0,
       userPlugins: resolvedConfig.plugins,
     })
