@@ -161,6 +161,9 @@ one, and nothing about what either process can offer.
 | `ctx.ui.modals.register` / `.open` / `.close`       | a modal, closed by the ordinary `close-modal`       |
 | `ctx.ui.settings.registerSection`                   | a settings section beyond the generated one         |
 | `ctx.ui.themes.register`                            | a theme, in the shipped JSON format                 |
+| `ctx.ui.themes.current` / `.onChange`               | the active palette and mode, outside React          |
+| `ctx.ui.settings.get` / `.watch`                    | one of aimux's own setting rows, by dotted id       |
+| `ctx.ui.statusBar.register`                         | a tile on the right of the status bar               |
 | `ctx.ui.stats.registerPage`                         | a page on the stats screen                          |
 | `ctx.ui.toast`                                      | the usual three toast levels                        |
 | `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `useTheme`       |
@@ -327,6 +330,82 @@ Spawned with argv, never through a shell: no quoting to get wrong, nothing to
 inject into. `cwd` is the plugin's directory, which is what a relative
 `./notify.sh` means. A non-zero exit is the command's answer and
 `aimux plugin exec` passes it through as its own.
+
+## Built-in plugins
+
+Some of aimux's own features are plugins. `src/builtin-plugins/` holds them,
+and `builtinPlugins(resolvedConfig)` is the list both hosts are handed.
+
+A built-in is not a privileged kind of plugin. Same record, same fiber, same
+context, same effect stack, same reload, same config precedence, same
+`plugin list` row. It differs in one place — where the definition comes from —
+and that is four lines in the fiber:
+
+```ts
+const builtin = this.record.builtin?.[this.host]
+if (builtin) definition = await builtin()
+else <bundle and import from disk>
+```
+
+There is no directory and no manifest file, because there is no disk: aimux
+compiles to a single binary. The manifest is a literal validated by the same
+`parseManifest` a third-party one goes through, so a malformed built-in
+manifest fails in CI rather than in a terminal. The halves are lazy imports, so
+the daemon never evaluates a UI half.
+
+A built-in has no registry row to toggle; it is switched off from
+`aimux.config.ts` with `plugins: [{ id, enabled: false }]`, and
+`aimux plugin disable` says so rather than claiming it is not installed.
+
+### Migrated config
+
+A migrated feature usually predates its plugin, and the keys it was configured
+under are already in people's config files. `BuiltinPlugin.config` seeds
+`ctx.config` from aimux's own configuration, so the plugin body reads nothing
+but `ctx.config` — exactly like a third-party plugin — while the mapping from
+the legacy key stays visible in the built-in's declaration:
+
+```ts
+export function aiUsagePlugin(config?: ResolvedConfig): BuiltinPlugin {
+  const aiUsage = config?.statusBar?.aiUsage
+  return { config: { claudePlan: aiUsage?.claudePlan }, halves: { … }, manifest: { … } }
+}
+```
+
+Settings _rows_ need none of that: `ctx.ui.settings.get`/`watch` read aimux's
+own rows by the dotted id the user writes, so a feature can move into a plugin
+while its toggle stays exactly where it was.
+
+### What the migrations changed about the API
+
+Each migration was a test of the API, and what it could not express cleanly was
+filled in before it landed.
+
+| Migration                                 | What was missing                                                              |
+| ----------------------------------------- | ----------------------------------------------------------------------------- |
+| `aimux.claude` (theme sync, hook install) | reading the active theme outside React, and reading aimux's own settings rows |
+| `aimux.ai-usage` (quota tile)             | a status-bar registry, and seeding `ctx.config` from aimux's config           |
+
+### Not migrated, and why
+
+- **`auto-commit`** keeps its state in `AppState` and renders through the git
+  pane. Moving it means moving its state into a plugin slice and its UI into a
+  plugin view — a bigger change than the migration, and one that would make the
+  git pane worse before it made it better.
+- **`auto-rename`** watches the raw PTY byte stream to catch the user's prompt.
+  There is no plugin event for that and there should not be a firehose one; the
+  clean seam is for prompt capture to stay core and emit a `tab:prompt` event,
+  with the naming half — which decides and calls a model — as the plugin. That
+  needs `ctx.tabs.rename`, which does not exist yet.
+- **The `setup` widget** is addressable by id in a user's `bars` config. A
+  plugin's ids are namespaced by the host, on purpose, so migrating it would
+  rename `setup` to `aimux.setup.setup` and silently drop it out of existing
+  layouts. Worth doing with a compatibility alias, not worth doing quietly.
+
+One limit found and left alone: a plugin can open its own modals, not aimux's.
+`aimux.ai-usage`'s tile dispatches `open-quotas-modal` directly, which a
+third-party plugin could not do. An API for opening built-in modals by id would
+be a wide, brittle surface, and no third-party plugin has asked for it.
 
 ## API contract
 

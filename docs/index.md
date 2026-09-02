@@ -40,6 +40,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
   `~/.claude/settings.json`, how the hook server resolves PTYs, opt-out
 - `guide/usage-history.md` - long-term AI usage stats: activity heatmap, tokens
   per model and per git branch, the daily rollup, and where the data lives
+- `guide/plugins.md` - installing, configuring and switching off plugins,
+  including the ones aimux ships with
 
 ## Reference
 
@@ -48,6 +50,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
 - `reference/config-reference.md` - exhaustive `@brimveyn/aimux-config` reference
 - `reference/runtime-paths.md` - config paths, catalog paths, runtime directories,
   and socket files
+- `reference/plugin-api.md` - every export of `@brimveyn/aimux-plugin`,
+  generated from the sources
 
 ## Developer Notes
 
@@ -58,6 +62,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
   support-status caveats
 - `developer/toasts.md` - the transient notification system: imperative API,
   options, and architecture
+- `developer/plugins.md` - the plugin kernel: hosts, halves, module loading,
+  lifecycle, every surface, and the built-in plugins
 
 ## Support Status Labels
 
