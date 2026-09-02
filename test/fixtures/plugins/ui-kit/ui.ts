@@ -1,4 +1,4 @@
-import { definePlugin, type UiPluginContext } from '@brimveyn/aimux-plugin'
+import { definePlugin, type PluginNode, type UiPluginContext } from '@brimveyn/aimux-plugin'
 
 interface Slice {
   count: number
@@ -7,7 +7,15 @@ interface Slice {
 /** Fixture exercising every service on the UI context. */
 export default definePlugin<UiPluginContext<Slice>>({
   apply(ctx) {
-    ctx.ui.widgets.register({ id: 'board', label: 'Board', render: () => null })
+    // Rendered through the kit, so the widget looks like the rest of aimux
+    // without the plugin learning opentui's box model.
+    const { KeyHint, Panel } = ctx.ui.kit
+    ctx.ui.widgets.register({
+      id: 'board',
+      label: 'Board',
+      render: (): PluginNode =>
+        Panel({ children: KeyHint({ hints: [{ keys: 'q', label: 'close' }] }) }),
+    })
     ctx.ui.views.register({ id: 'board', render: () => null, title: 'Board' })
     ctx.ui.modals.register({ id: 'confirm', render: () => null, title: 'Confirm' })
 

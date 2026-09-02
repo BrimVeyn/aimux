@@ -2,6 +2,7 @@ import type {
   Disposer,
   PluginActionsApi,
   PluginContext,
+  PluginKit,
   PluginStoreApi,
   PluginUiApi,
 } from '@brimveyn/aimux-plugin'
@@ -20,6 +21,7 @@ import { appStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
 import { toast } from '../state/toast-store'
+import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
 import { registerPluginView } from './plugin-views'
 import { registerBarWidget } from './widgets/registry'
@@ -51,9 +53,22 @@ function own(ctx: PluginContext, dispose: Disposer): Disposer {
   return dispose
 }
 
+/**
+ * One frozen object, shared by every plugin: the components are stateless and
+ * a per-plugin copy would only give React new identities to re-mount on.
+ */
+const KIT: PluginKit = {
+  KeyHint,
+  List: List as PluginKit['List'],
+  Panel,
+  Row,
+  useTheme: () => usePluginTheme() as unknown as Record<string, string>,
+}
+
 function buildUi(ctx: PluginContext): PluginUiApi {
   const { id } = ctx
   return {
+    kit: KIT,
     modals: {
       close: () => {
         dispatchGlobal({ type: 'close-modal' })

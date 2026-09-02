@@ -25,6 +25,8 @@ export {
 export type {
   PluginActionsApi,
   PluginBarWidget,
+  PluginComponent,
+  PluginKit,
   PluginModal,
   PluginModalsApi,
   PluginNode,

@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 import type { Disposer } from './types'
 
 /**
@@ -14,14 +16,18 @@ import type { Disposer } from './types'
  */
 
 /**
- * Whatever aimux's React renders. Typed as `unknown` on purpose: giving this
- * package a real `ReactNode` would mean depending on `@types/react`, and a
- * plugin returning JSX satisfies `unknown` either way.
+ * What a plugin renders. `react` is an optional peer of this package, typed
+ * only — no runtime dependency, and any plugin drawing UI already needs
+ * `@types/react` to write JSX at all.
  *
- * The node must come from *aimux's* React — the module loader forces that
- * resolution, so a plugin that simply imports `react` gets the right one.
+ * The node must come from *aimux's* React at runtime. The module loader forces
+ * that resolution, so a plugin that simply imports `react` gets the right one
+ * and its hooks work.
  */
-export type PluginNode = unknown
+export type PluginNode = ReactNode
+
+/** A component the kit hands back, usable directly in a plugin's JSX. */
+export type PluginComponent<Props> = (props: Props) => PluginNode
 
 /** Aimux's own types, re-declared structurally where the shape is small. */
 export interface PluginToastApi {
@@ -82,6 +88,49 @@ export interface PluginThemesApi {
   register: (id: string, theme: unknown) => Disposer
 }
 
+/**
+ * The primitives a plugin renders with, already styled like the rest of aimux.
+ *
+ * Handed over on the context rather than imported: they are implemented in the
+ * app, against the same theme store and the same `Surface`/`ListItem` the
+ * built-in screens use, and re-implementing them in this package would be the
+ * duplication the type de-duplication just removed.
+ *
+ * Not a component library. A plugin that needs something else drops to `<box>`
+ * and `<text>` and styles it from `kit.useTheme()`, which is what every
+ * built-in view does.
+ */
+export interface PluginKit {
+  /**
+   * The resolved theme. The one thing a plugin must not hard-code: aimux ships
+   * 34 themes and loads more from disk, and a plugin with its own colours is
+   * the part of the screen that stops matching when the user switches.
+   */
+  useTheme: () => Record<string, string>
+  /** A titled container — what a bar widget and a full-screen view both are. */
+  Panel: PluginComponent<{
+    children?: PluginNode
+    title?: string
+    tone?: 'muted' | 'elevated'
+    padding?: number
+    flexGrow?: number
+  }>
+  /** A label/value line — what every settings and stats row already is. */
+  Row: PluginComponent<{ label: PluginNode; value?: PluginNode; dim?: boolean }>
+  /** A selectable list, with the built-in cursor glyph and mouse wiring. */
+  List: PluginComponent<{
+    items: readonly unknown[]
+    selectedIndex?: number
+    keyOf?: (item: unknown, index: number) => string
+    renderItem: (item: unknown, index: number) => PluginNode
+    empty?: PluginNode
+    onSelect?: (index: number) => void
+    onHover?: (index: number) => void
+  }>
+  /** The footer line every modal and screen ends with. */
+  KeyHint: PluginComponent<{ hints: readonly { keys: string; label: string }[] }>
+}
+
 export interface PluginUiApi {
   widgets: PluginWidgetsApi
   views: PluginViewsApi
@@ -89,6 +138,7 @@ export interface PluginUiApi {
   settings: PluginSettingsApi
   themes: PluginThemesApi
   toast: PluginToastApi
+  kit: PluginKit
 }
 
 /**
