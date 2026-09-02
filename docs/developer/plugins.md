@@ -165,11 +165,12 @@ one, and nothing about what either process can offer.
 | `ctx.ui.settings.get` / `.watch`                    | one of aimux's own setting rows, by dotted id       |
 | `ctx.ui.statusBar.register`                         | a tile on the right of the status bar               |
 | `ctx.ui.panes.register` / `.open` / `.close`        | a leaf in the layout tree that is not a terminal    |
+| `ctx.ui.state.get` / `.subscribe` / `.use`          | tabs, the active tab, the project — read only       |
 | `ctx.ui.stats.registerPage`                         | a page on the stats screen                          |
 | `ctx.ui.toast`                                      | the usual three toast levels                        |
 | `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `useTheme`       |
 | `ctx.actions.register` / `.effect`                  | a named keyboard action, and the effect it runs     |
-| `ctx.store.reducer` / `.get` / `.set` / `.dispatch` | this plugin's slice of `AppState`                   |
+| `ctx.store.reducer` / `.get` / `.use` / `.dispatch` | this plugin's slice of `AppState`                   |
 
 Two invariants are enforced by the host rather than asked of the plugin.
 
@@ -296,6 +297,13 @@ fiber, every id namespaced by the host.
 Every one already existed as an IPC broadcast — the daemon knows a turn ended
 precisely because it is about to tell the UI. They fire _before_ the socket
 write, so a plugin reacting to a turn does not queue behind one.
+
+### Metrics
+
+`ctx.metrics.counters(days)` hands over aimux's own record of its use, per
+local calendar day. Counts and nothing else — no key identity, no content —
+which is the posture the counters file already had and the reason exposing it
+needed no new decision.
 
 ### Assistants
 

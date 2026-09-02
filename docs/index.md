@@ -64,6 +64,8 @@ This directory contains the detailed documentation for `@brimveyn/aimux` and
   options, and architecture
 - `developer/plugins.md` - the plugin kernel: hosts, halves, module loading,
   lifecycle, every surface, and the built-in plugins
+- `../examples/plugins/` - four example plugins, typechecked with the repo:
+  a model shifter, a load graph, a commit grid, a stats pane
 
 ## Support Status Labels
 

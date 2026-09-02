@@ -196,6 +196,27 @@ The vocabulary: `tab:status`, `tab:turnComplete`, `tab:question`, `tab:added`,
 `project:status`, `project:created`, `project:switched`, `project:closed`,
 `workspace:added`, `workspace:removed`, `daemon:reexec`.
 
+### Projects, workspaces and repositories
+
+```ts
+const project = ctx.projects.get(projectId)
+const workspace = project?.workspaces.find((w) => w.id === project.activeWorkspaceId)
+// `path` is where to run a command; `repoRoot` is the repository. For a git
+// worktree those differ, which is why both are here.
+Bun.spawn(['git', 'log'], { cwd: workspace?.repoRoot })
+```
+
+### aimux's own counters
+
+```ts
+for (const { day, values } of ctx.metrics.counters(14)) {
+  ctx.log.info(day, { tabs: values.tabsOpened ?? 0 })
+}
+```
+
+Counts per local day, and nothing else: no key identity, no content, nothing
+that leaves the machine.
+
 ### Drive a tab
 
 ```ts
