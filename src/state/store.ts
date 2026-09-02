@@ -6,6 +6,7 @@ import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
+import { reducePluginSlices } from './reducers/plugin-slices'
 import { reduceProjectState } from './reducers/project-state'
 import { emptySettingsUI, reduceSettingsState } from './reducers/settings-state'
 import { emptyStatsUI, reduceStatsState } from './reducers/stats-state'
@@ -133,6 +134,8 @@ export function createInitialState(
       : emptyModal(),
     multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
+    pluginRegistryVersion: 0,
+    plugins: {},
     projectBar: {
       visible: overrides.projectBarVisible ?? true,
     },
@@ -178,6 +181,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const statsState = reduceStatsState(state, action)
   if (statsState) return statsState
+
+  // Last: by now every built-in reducer has declined the action, so a plugin
+  // can never shadow a core one by registering a slice with a colliding name.
+  const pluginState = reducePluginSlices(state, action)
+  if (pluginState) return pluginState
 
   switch (action.type) {
     case 'set-snippets':

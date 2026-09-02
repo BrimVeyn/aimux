@@ -804,6 +804,22 @@ export interface AppState {
   lastActiveTabByWorkspace: Record<string, string>
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
+  /**
+   * One namespaced slice per plugin, keyed by plugin id. Opaque to the core
+   * reducer: a plugin registers a reducer for its own key and nothing else
+   * reads or writes it. Namespacing rather than a flat merge is what keeps a
+   * plugin from colliding with the app — or with another plugin — over a
+   * state key.
+   */
+  plugins: Record<string, unknown>
+  /**
+   * Bumped whenever a plugin registry changes — a widget registered, a view
+   * withdrawn, a fiber reloaded. Components that read a registry rather than
+   * the store subscribe to this so a hot reload repaints them; without it a
+   * reloaded widget would keep rendering its previous closure until something
+   * unrelated re-rendered the tree.
+   */
+  pluginRegistryVersion: number
 }
 
 // -- Git panel payloads --
@@ -1304,6 +1320,19 @@ export type MultiRepoAction =
   | { type: 'multi-repo-set-repos'; repos: DiscoveredRepo[] }
   | { type: 'multi-repo-clear' }
 
+/**
+ * The one variant a plugin dispatches. `AppAction` stays a closed union — the
+ * exhaustiveness check across every reducer is worth more than the ability to
+ * add arms to it — so a plugin's own action travels inside this envelope and
+ * is routed to that plugin's slice reducer by `pluginId`.
+ */
+export type PluginStateAction =
+  | { type: 'plugin-action'; pluginId: string; actionId: string; payload?: unknown }
+  /** Replaces a plugin's whole slice. Used on load, and on unload to drop it. */
+  | { type: 'set-plugin-slice'; pluginId: string; slice: unknown }
+  /** Signals that some plugin registry changed; see `pluginRegistryVersion`. */
+  | { type: 'bump-plugin-registry' }
+
 export type AppAction =
   | ModalAction
   | ProjectAction
@@ -1317,3 +1346,4 @@ export type AppAction =
   | GitModeAction
   | AutoCommitAction
   | MultiRepoAction
+  | PluginStateAction
