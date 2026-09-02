@@ -75,12 +75,30 @@ export interface PluginModalsApi {
   close: () => void
 }
 
+/** What a settings row holds. Absent when nothing has ever set it. */
+export type PluginSettingValue = boolean | number | string | undefined
+
 export interface PluginSettingsApi {
   /**
    * Registers a section beyond the one generated from the manifest's `config`
    * schema. Most plugins need neither — declaring `config` is enough.
    */
   registerSection: (section: unknown) => Disposer
+  /**
+   * Reads one of *aimux's own* settings by row id — the same dotted id that
+   * appears in `aimux.config.ts` and on the settings screen.
+   *
+   * A plugin's own configuration is `ctx.config`; this is for the cases where
+   * a plugin has to agree with aimux about something the user already set,
+   * rather than ask them a second time.
+   */
+  get: (id: string) => PluginSettingValue
+  /**
+   * Calls back on every change to that row, and once immediately with the
+   * current value — so a plugin gating itself on a toggle is one call, with no
+   * separate "read it first" step to forget.
+   */
+  watch: (id: string, listener: (value: PluginSettingValue) => void) => Disposer
 }
 
 export interface PluginStatsPage {
@@ -97,9 +115,26 @@ export interface PluginStatsApi {
   registerPage: (page: PluginStatsPage) => Disposer
 }
 
+/** Light or dark. The user picks it, or the terminal does. */
+export type PluginThemeMode = 'dark' | 'light'
+
+export interface PluginThemeSnapshot {
+  /** Resolved colour tokens — the same values `kit.useTheme()` returns. */
+  colors: Record<string, string>
+  mode: PluginThemeMode
+}
+
 export interface PluginThemesApi {
   /** The shipped theme JSON shape. A shipped id may not be replaced. */
   register: (id: string, theme: unknown) => Disposer
+  /**
+   * The active theme outside React. `kit.useTheme()` is the hook for anything
+   * being rendered; this is for the rest — a plugin writing the palette to a
+   * file, or telling another program about it.
+   */
+  current: () => PluginThemeSnapshot
+  /** Fires on every theme or mode change. Does not fire for the initial value. */
+  onChange: (listener: (snapshot: PluginThemeSnapshot) => void) => Disposer
 }
 
 /**

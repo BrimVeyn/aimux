@@ -22,6 +22,8 @@ export interface DoctorRegistrations {
   settingsSections: number
   actions: string[]
   effects: string[]
+  /** aimux settings the plugin gates itself on — `ctx.ui.settings.watch`. */
+  settingsWatched: string[]
   assistants: string[]
   hookRoutes: string[]
   cliCommands: string[]
@@ -38,6 +40,7 @@ export function emptyRegistrations(): DoctorRegistrations {
     hookRoutes: [],
     modals: [],
     settingsSections: 0,
+    settingsWatched: [],
     statsPages: [],
     storeReducer: false,
     themes: [],
@@ -86,15 +89,29 @@ export function createDoctorExtender(
           register: (modal: { id: string }) => record(into.modals, modal.id),
         },
         settings: {
+          // `undefined` is the honest dry-run answer — nothing is set in a
+          // process with no settings store. A plugin that registers only
+          // inside the callback therefore reports nothing, which is why the
+          // watched ids are reported: the author can see the gate.
+          get: (): undefined => {
+            /* nothing is set in a process with no settings store */
+          },
           registerSection: () => {
             into.settingsSections += 1
             return noop
+          },
+          watch: (settingId: string, listener: (value: undefined) => void) => {
+            const undo = record(into.settingsWatched, settingId)
+            listener(undefined)
+            return undo
           },
         },
         stats: {
           registerPage: (page: { id: string }) => record(into.statsPages, page.id),
         },
         themes: {
+          current: () => ({ colors: {}, mode: 'dark' }),
+          onChange: () => noop,
           register: (id: string) => record(into.themes, id),
         },
         toast: { error: noop, info: noop, success: noop },

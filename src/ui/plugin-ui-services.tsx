@@ -4,6 +4,7 @@ import type {
   PluginContext,
   PluginKit,
   PluginStoreApi,
+  PluginThemeSnapshot,
   PluginUiApi,
 } from '@brimveyn/aimux-plugin'
 import type { ReactNode } from 'react'
@@ -11,12 +12,15 @@ import type { ReactNode } from 'react'
 import {
   registerPluginAction,
   registerTuiTheme,
+  type ResolvedTuiTheme,
   type SettingSection,
+  type ThemeMode,
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
 import { registerSettingSection } from '../settings/sections'
+import { settingsStore } from '../settings/settings-store'
 import { appStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
@@ -25,6 +29,7 @@ import { toast } from '../state/toast-store'
 import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
 import { registerPluginView } from './plugin-views'
+import { getCurrentMode, getCurrentTheme, subscribeThemeChanges } from './theme-store'
 import { registerBarWidget } from './widgets/registry'
 
 /**
@@ -38,6 +43,14 @@ import { registerBarWidget } from './widgets/registry'
  * `board` gets `acme.thing.board` whether it wanted to or not — two plugins
  * can each have a "board", and the owner of any id stays readable from the id.
  */
+
+/**
+ * The theme as a plugin sees it: flat colour tokens plus the mode. Same values
+ * `kit.useTheme()` hands a component, in the shape a non-React caller wants.
+ */
+function themeSnapshot(resolved: ResolvedTuiTheme, mode: ThemeMode): PluginThemeSnapshot {
+  return { colors: resolved as unknown as Record<string, string>, mode }
+}
 
 /** `<pluginId>.<id>`. The one place the prefix is applied. */
 function qualify(pluginId: string, id: string): string {
@@ -89,7 +102,24 @@ function buildUi(ctx: PluginContext): PluginUiApi {
         ),
     },
     settings: {
+      get: (settingId) => settingsStore.getState().values[settingId],
       registerSection: (section) => own(ctx, registerSettingSection(section as SettingSection)),
+      // Fires immediately as well as on change: a plugin gating itself on a
+      // toggle wants one call, not a read followed by a subscription it has to
+      // remember to keep in step.
+      watch: (settingId, listener) => {
+        let last = settingsStore.getState().values[settingId]
+        listener(last)
+        return own(
+          ctx,
+          settingsStore.subscribe((state) => {
+            const next = state.values[settingId]
+            if (next === last) return
+            last = next
+            listener(next)
+          })
+        )
+      },
     },
     stats: {
       registerPage: (page) => {
@@ -104,6 +134,14 @@ function buildUi(ctx: PluginContext): PluginUiApi {
       },
     },
     themes: {
+      current: () => themeSnapshot(getCurrentTheme(), getCurrentMode()),
+      onChange: (listener) =>
+        own(
+          ctx,
+          subscribeThemeChanges((resolved, mode) => {
+            listener(themeSnapshot(resolved, mode))
+          })
+        ),
       register: (themeId, theme) => own(ctx, registerTuiTheme(themeId, theme as TuiThemeJson)),
     },
     toast: {
