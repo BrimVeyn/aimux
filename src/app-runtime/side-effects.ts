@@ -8,7 +8,6 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
-import { countEffect } from '../services/aimux-counters/observe'
 import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
@@ -16,6 +15,7 @@ import { toast } from '../state/toast-store'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
+import { emitAppEvent } from './app-events'
 import { openFileInEditor, openSelectedSnippetSourceInEditor } from './editor-actions'
 import {
   runGenerateAutoCommitNow,
@@ -218,7 +218,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
 
   // Every effect path funnels through here, including the mouse and IPC ones,
   // so this is the one place that sees them all.
-  countEffect(effect)
+  emitAppEvent('effect', { effect })
 
   switch (effect.type) {
     case 'quit': {

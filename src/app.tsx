@@ -39,6 +39,7 @@ import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/c
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
 import { bump } from './services/aimux-counters'
+import { observeCounters } from './services/aimux-counters/observe'
 import {
   useAIUsageConfig,
   useAutoCommitConfig,
@@ -199,6 +200,11 @@ export function App({
     resolvedConfig.theme?.beta?.harmonizeClaudeTheme
   )
   const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
+
+  // The counters are a subscriber to the app event bus, not a hard-wired
+  // consumer of it. Subscribed once per app instance, alongside the dispatch
+  // wiring they observe.
+  useLayoutEffect(() => observeCounters(), [])
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
