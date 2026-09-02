@@ -11,8 +11,11 @@ export type KeyChord = string
 const SPECIAL_NAMES: Record<string, string> = {
   BS: 'backspace',
   CR: 'return',
+  Del: 'delete',
   Down: 'down',
+  End: 'end',
   Esc: 'escape',
+  Home: 'home',
   Left: 'left',
   Right: 'right',
   Space: 'space',
@@ -38,6 +41,12 @@ export function keyInputToChord(key: KeyInput): KeyChord {
   let prefix = ''
   if (ctrl) prefix += 'C-'
   if (meta) prefix += 'M-'
+  // Only for named keys. On a single character shift is already in the character
+  // itself (handled above), so an `S-` there would be a chord nothing produces.
+  // Whether Shift+Enter arrives at all is the terminal's call — it needs the
+  // kitty keyboard protocol or modifyOtherThanKeys to report the modifier, and
+  // where it does not the Ctrl+Enter binding beside it still fires.
+  if (shift && baseName.length > 1) prefix += 'S-'
 
   return `${prefix}${baseName}`
 }
@@ -136,6 +145,7 @@ function parseAngleBracketToken(inner: string): KeyChord {
   let prefix = ''
   if (ctrl) prefix += 'C-'
   if (meta) prefix += 'M-'
+  if (shift && keyName.length > 1) prefix += 'S-'
 
   return `${prefix}${keyName}`
 }
