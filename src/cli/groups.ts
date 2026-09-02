@@ -15,4 +15,5 @@ export const CLI_GROUPS: ReadonlySet<string> = new Set([
   'workspace',
   'worker',
   'plugin',
+  'skill',
 ])

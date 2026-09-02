@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 
 import type { CliCommand } from '../../registry'
 
@@ -18,6 +17,7 @@ import {
   isCommandAvailable,
   parseCommand,
 } from '../../../pty/command-registry'
+import { skillPath as resolveSkillPath } from '../../../skills'
 import {
   findPrimaryWorkspace,
   PROJECT_ENV_VAR,
@@ -64,9 +64,7 @@ export const workerDoctor: CliCommand = {
     const primaryWorkspace = findPrimaryWorkspace(project)
     const projectOrigin = ctx.getProjectOrigin?.() ?? 'active'
     const availableAssistants = assistants.filter((assistant) => assistant.available)
-    const skillPath = fileURLToPath(
-      new URL('../../../../skills/aimux-orchestrator/', import.meta.url)
-    )
+    const skillPath = resolveSkillPath('aimux-orchestrator')
     const issues: string[] = []
     if (missingDaemonCapabilities.length > 0) {
       issues.push(

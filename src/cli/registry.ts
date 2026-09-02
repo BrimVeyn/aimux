@@ -17,6 +17,7 @@ import { projectCreate } from './commands/project/create'
 import { projectList } from './commands/project/list'
 import { projectShow } from './commands/project/show'
 import { projectSwitch } from './commands/project/switch'
+import { skillList, skillPathCommand } from './commands/skill'
 import { tabAwait } from './commands/tab/await'
 import { tabClose } from './commands/tab/close'
 import { tabCreate } from './commands/tab/create'
@@ -84,6 +85,8 @@ export const COMMANDS: readonly CliCommand[] = [
   pluginReload,
   pluginLog,
   pluginDoctor,
+  skillList,
+  skillPathCommand,
   pluginCommands,
   pluginExec,
 ]

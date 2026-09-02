@@ -217,7 +217,12 @@ export const pluginNew: CliCommand = {
     { description: 'Include a UI half', kind: 'boolean', name: 'ui' },
     { description: 'Include a daemon half', kind: 'boolean', name: 'daemon' },
     { description: 'Include a manifest command (any language)', kind: 'boolean', name: 'exec' },
-    { description: 'Where to create it (default: ./<id>)', kind: 'string', name: 'dir' },
+    {
+      complete: { kind: 'file' },
+      description: 'Where to create it (default: ./<id>)',
+      kind: 'string',
+      name: 'dir',
+    },
   ],
   group: 'plugin',
   run: async (ctx) => {

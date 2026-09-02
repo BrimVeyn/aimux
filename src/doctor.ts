@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { completionStatus } from './cli/completion/install'
 import { getConfigPath, loadConfigResult } from './config'
 import { ASSISTANT_OPTIONS, isCommandAvailable, parseCommand } from './pty/command-registry'
+import { skillStatuses } from './skills'
 
 export interface DoctorCheck {
   name: string
@@ -76,6 +77,16 @@ export function buildDoctorReport(): DoctorReport {
 
   const completion = completionStatus()
   checks.push({ details: completion.detail, name: 'completion', ok: completion.ok })
+
+  // A skill that did not survive packaging is invisible until an agent reads
+  // nothing at all, which is not a failure that announces itself.
+  for (const skill of skillStatuses()) {
+    checks.push({
+      details: skill.present ? skill.path : `missing: ${skill.path}`,
+      name: `skill:${skill.id}`,
+      ok: skill.present,
+    })
+  }
 
   for (const option of ASSISTANT_OPTIONS) {
     const configuredCommand = config.customCommands[option.id] ?? option.command

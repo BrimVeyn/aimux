@@ -508,6 +508,20 @@ aimux workspace remove <id|path> [--force] [--project W]
 -> { id, name, path }
 ```
 
+### `aimux skill`
+
+Where the skills aimux ships actually live. An agent asked to author a plugin
+needs the directory before it can read anything in it, and the path depends on
+how aimux was installed.
+
+```
+aimux skill list
+-> { skills: [{ id, summary, path, present }] }
+
+aimux skill path <id>
+-> { id, path, summary }
+```
+
 ### `aimux plugin`
 
 Manages the plugin kernel (`docs/developer/plugins.md`). The CLI process never

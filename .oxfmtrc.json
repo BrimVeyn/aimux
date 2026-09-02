@@ -10,5 +10,6 @@
   "printWidth": 100,
   "sortTailwindcss": {
     "functions": ["clsx", "cn"]
-  }
+  },
+  "ignorePatterns": ["docs/reference/plugin-api.md", "skills/aimux-plugin-author/references/api.md"]
 }
