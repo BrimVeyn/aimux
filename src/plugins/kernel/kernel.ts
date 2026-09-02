@@ -39,6 +39,27 @@ export interface PluginKernelOptions {
   extendContext?: (ctx: PluginContext) => void
 }
 
+/**
+ * Whether a fiber is holding a record that no longer describes the plugin.
+ *
+ * `ctx.config` is `record.config`, captured when `apply` ran, and `apiVersion:
+ * 1` has no way to tell a plugin its config changed — plugins destructure it.
+ * So a config edit reaches a running plugin the only honest way available:
+ * the fiber is disposed and rebuilt around the new record. This used to check
+ * `root` alone, which meant `aimux plugin reload` after a config edit rebuilt
+ * the module and handed it the old values.
+ */
+function recordChanged(previous: PluginRecord, next: PluginRecord): boolean {
+  if (previous.root !== next.root) return true
+  if (previous.manifest.version !== next.manifest.version) return true
+  const before = Object.keys(previous.config)
+  const after = Object.keys(next.config)
+  if (before.length !== after.length) return true
+  return after.some(
+    (key) => JSON.stringify(previous.config[key]) !== JSON.stringify(next.config[key])
+  )
+}
+
 export class PluginKernel {
   readonly bus: PluginEventBus
   readonly services = new ServiceRegistry()
@@ -161,8 +182,7 @@ export class PluginKernel {
         await fiber.dispose()
         this.fibers.delete(id)
         this.rpcHandlers.delete(id)
-      } else if (record.root !== fiber.record.root) {
-        // Relinked elsewhere: the old fiber's entry path is stale.
+      } else if (recordChanged(fiber.record, record)) {
         await fiber.dispose()
         this.fibers.delete(id)
         this.rpcHandlers.delete(id)

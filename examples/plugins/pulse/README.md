@@ -38,6 +38,14 @@ this plugin does not change that — it reads what is already on disk.
 
 ## Note on focus
 
-A pane never takes the keyboard: `<leader>p` opens it beside your terminal and
-the terminal keeps the cursor. That is aimux's rule, not this plugin's — see
-`docs/developer/plugins.md`.
+Opening does not move the keyboard: `<leader>p` puts the pane beside your
+terminal and the terminal keeps the cursor. Walk into it with the ordinary
+pane-navigation keys, and it takes the keys — its border lights up. Its own
+bindings live in its own mode:
+
+```ts
+keymaps: (k) =>
+  k.mode('plugin.pane.aimux-examples.pulse.stats', (m) =>
+    m.map('q', k.plugin('aimux-examples.pulse.close'))
+  )
+```

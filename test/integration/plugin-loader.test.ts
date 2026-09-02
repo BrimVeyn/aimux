@@ -255,4 +255,50 @@ describe('plugin loader', () => {
       /no daemon handler/
     )
   })
+
+  /**
+   * `ctx.config` is `record.config`, captured when `apply` ran, and
+   * `apiVersion: 1` gives a plugin no way to hear that it changed — plugins
+   * destructure it. So an edited value reaches a running plugin the only
+   * honest way available: the fiber is rebuilt around the new record.
+   *
+   * The kernel used to rebuild only when the plugin had *moved on disk*, so a
+   * config write followed by `aimux plugin reload` re-imported the module and
+   * handed it the old values. Every settings row and every `plugin set` would
+   * have been a lie.
+   */
+  test('an edited config reaches a running plugin', async () => {
+    const root = register('hello', 'aimux-test.hello')
+    const instance = await start()
+
+    expect(await instance.kernel.handleRpc('aimux-test.hello', 'greet', 'world')).toBe(
+      'hello world'
+    )
+
+    upsertPluginRegistryEntry({
+      config: { greeting: 'bonjour' },
+      enabled: true,
+      id: 'aimux-test.hello',
+      path: root,
+      source: 'link',
+      version: '1.0.0',
+    })
+    await instance.refresh()
+
+    expect(await instance.kernel.handleRpc('aimux-test.hello', 'greet', 'world')).toBe(
+      'bonjour world'
+    )
+  })
+
+  test('and an unchanged config rebuilds nothing', async () => {
+    register('hello', 'aimux-test.hello')
+    const instance = await start()
+    const before = instance.statuses()[0]?.revision
+
+    // `refresh` runs on every registry change and every watcher event.
+    // Rebuilding on each one would restart every plugin whenever any of them
+    // changed.
+    await instance.refresh()
+    expect(instance.statuses()[0]?.revision).toBe(before ?? 0)
+  })
 })
