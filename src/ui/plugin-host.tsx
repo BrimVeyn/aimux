@@ -19,6 +19,7 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
 import { onPluginViewsChanged } from './plugin-views'
+import { onBarWidgetsChanged } from './widgets/registry'
 
 /**
  * The UI's plugin host, extracted from `app.tsx` from the start — that file is
@@ -181,7 +182,11 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     const bump = (): void => {
       dispatchGlobal({ type: 'bump-plugin-registry' })
     }
-    const unwatchRegistries = [onPluginViewsChanged(bump), onPluginModalsChanged(bump)]
+    const unwatchRegistries = [
+      onPluginViewsChanged(bump),
+      onPluginModalsChanged(bump),
+      onBarWidgetsChanged(bump),
+    ]
 
     backend.on('pluginEvent', onPluginEvent)
     void runtime.start()

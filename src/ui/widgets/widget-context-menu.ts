@@ -3,7 +3,7 @@ import type { ContextMenuItem } from '../context-menu/controller'
 
 import { visibleWidgets } from '../../state/bars'
 import { dispatchGlobal } from '../../state/dispatch-ref'
-import { WIDGET_LABELS } from './registry'
+import { getWidgetLabel, isWidgetRenderable } from './registry'
 
 /** `Show <label>` for every hidden widget in either bar. */
 function showHiddenItems(bars: BarsState): ContextMenuItem[] {
@@ -11,8 +11,11 @@ function showHiddenItems(bars: BarsState): ContextMenuItem[] {
   for (const side of ['left', 'right'] as const) {
     for (const widget of bars[side].widgets) {
       if (widget.visible) continue
+      // An orphan — a disabled or failed plugin's widget — is not offerable:
+      // showing it would reserve space for something nothing can draw.
+      if (!isWidgetRenderable(widget.id)) continue
       items.push([
-        `Show ${WIDGET_LABELS[widget.id] ?? widget.id}`,
+        `Show ${getWidgetLabel(widget.id)}`,
         () => dispatchGlobal({ type: 'toggle-widget', widgetId: widget.id }),
       ])
     }
