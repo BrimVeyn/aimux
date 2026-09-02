@@ -4,7 +4,7 @@ import { runPluginBuild } from '../../../plugins/build'
 import { upsertPluginRegistryEntry } from '../../../plugins/registry-file'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeError, writeJson } from '../../output'
-import { notifyDaemon, readManifestOrThrow, resolvePluginRoot } from './shared'
+import { notifyRunningDaemon, readManifestOrThrow, resolvePluginRoot } from './shared'
 
 /**
  * Registers a development checkout in place. Unlike `install` it copies
@@ -40,7 +40,7 @@ export const pluginLink: CliCommand = {
       version: manifest.version,
     })
 
-    const refreshed = await notifyDaemon(ctx.getDaemon, 'refresh')
+    const refreshed = await notifyRunningDaemon('refresh')
     writeJson({
       build,
       daemon: refreshed.ok ? 'refreshed' : (refreshed.detail ?? 'unreachable'),

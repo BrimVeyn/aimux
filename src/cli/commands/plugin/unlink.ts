@@ -3,7 +3,7 @@ import type { CliCommand } from '../../registry'
 import { removePluginRegistryEntry } from '../../../plugins/registry-file'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeError, writeJson } from '../../output'
-import { notifyDaemon, requireRegistryEntry } from './shared'
+import { notifyRunningDaemon, requireRegistryEntry } from './shared'
 
 /**
  * Drops the registration. The directory is untouched — it was never aimux's
@@ -23,7 +23,7 @@ export const pluginUnlink: CliCommand = {
     }
 
     removePluginRegistryEntry(id)
-    const refreshed = await notifyDaemon(ctx.getDaemon, 'refresh')
+    const refreshed = await notifyRunningDaemon('refresh')
     writeJson({
       daemon: refreshed.ok ? 'refreshed' : (refreshed.detail ?? 'unreachable'),
       id,

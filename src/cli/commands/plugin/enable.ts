@@ -3,7 +3,7 @@ import type { CliCommand } from '../../registry'
 import { setPluginEnabled } from '../../../plugins/registry-file'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeError, writeJson } from '../../output'
-import { notifyDaemon, requireKnownPlugin } from './shared'
+import { notifyRunningDaemon, requireKnownPlugin } from './shared'
 
 /**
  * Enable and disable are one implementation: a disabled plugin stays
@@ -40,7 +40,7 @@ function toggle(verb: 'enable' | 'disable'): CliCommand {
         writeError(`${id}: aimux.config.ts declares \`enabled\` and keeps winning — edit it there`)
       }
 
-      const refreshed = await notifyDaemon(ctx.getDaemon, 'refresh')
+      const refreshed = await notifyRunningDaemon('refresh')
       writeJson({
         daemon: refreshed.ok ? 'refreshed' : (refreshed.detail ?? 'unreachable'),
         enabled,

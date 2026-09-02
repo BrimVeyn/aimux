@@ -4,7 +4,7 @@ import type { CliCommand } from '../../registry'
 import { redactPluginConfig } from '../../../plugins/manifest'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { discoverAllPlugins, notifyDaemon } from './shared'
+import { discoverAllPlugins, notifyRunningDaemon } from './shared'
 
 /**
  * Two answers in one: what is registered (authoritative, always available) and
@@ -21,9 +21,9 @@ export const pluginList: CliCommand = {
   args: [],
   flags: SHARED_FLAGS,
   group: 'plugin',
-  run: async (ctx) => {
+  run: async () => {
     const { issues, records } = await discoverAllPlugins()
-    const live = await notifyDaemon(ctx.getDaemon, 'list')
+    const live = await notifyRunningDaemon('list')
     const statuses =
       live.ok && typeof live.result === 'object' && live.result !== null
         ? ((live.result as { plugins?: PluginStatus[] }).plugins ?? null)

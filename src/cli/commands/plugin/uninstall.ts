@@ -6,7 +6,7 @@ import { getPluginConfigDir, getPluginStateDir } from '../../../plugins/paths'
 import { removePluginRegistryEntry } from '../../../plugins/registry-file'
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, writeError, writeJson } from '../../output'
-import { notifyDaemon, requireRegistryEntry } from './shared'
+import { notifyRunningDaemon, requireRegistryEntry } from './shared'
 
 /**
  * Deletes the managed checkout. State goes with it — it is a cache by
@@ -41,7 +41,7 @@ export const pluginUninstall: CliCommand = {
     rmSync(getPluginStateDir(id), { force: true, recursive: true })
     if (purge) rmSync(getPluginConfigDir(id), { force: true, recursive: true })
 
-    const refreshed = await notifyDaemon(ctx.getDaemon, 'refresh')
+    const refreshed = await notifyRunningDaemon('refresh')
     writeJson({
       configKept: !purge,
       daemon: refreshed.ok ? 'refreshed' : (refreshed.detail ?? 'unreachable'),

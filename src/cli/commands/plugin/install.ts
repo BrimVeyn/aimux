@@ -9,7 +9,7 @@ import { getInstalledPluginDir, getPluginsRootDir } from '../../../plugins/paths
 import { upsertPluginRegistryEntry } from '../../../plugins/registry-file'
 import { CliUsageError, SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, EXIT_RUNTIME, EXIT_USAGE, writeError, writeJson } from '../../output'
-import { notifyDaemon } from './shared'
+import { notifyRunningDaemon } from './shared'
 
 /**
  * `owner/repo` or `owner/repo/sub/dir`. Deliberately not a URL: v1 installs
@@ -131,7 +131,7 @@ export const pluginInstall: CliCommand = {
         version: manifest.version,
       })
 
-      const refreshed = await notifyDaemon(ctx.getDaemon, 'refresh')
+      const refreshed = await notifyRunningDaemon('refresh')
       writeJson({
         build,
         daemon: refreshed.ok ? 'refreshed' : (refreshed.detail ?? 'unreachable'),

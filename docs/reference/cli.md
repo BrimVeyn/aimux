@@ -534,7 +534,8 @@ aimux plugin new <id> [--ui] [--daemon] [--exec] [--dir PATH]
 -> { id, root, shapes, created: [...files], next: [...commands] }
 
 aimux plugin list
--> { plugins: [{ id, name, version, source, enabled, halves, root, config }],
+-> { plugins: [{ id, name, version, source, root, enabled, enabledFrom,
+                 halves, state: { ui, daemon }, error, hasConfigSchema, config }],
      running: [{ id, host, state, revision, effects, error?, missing? }] | null,
      issues: [string], daemon }
 
@@ -552,6 +553,24 @@ aimux plugin uninstall <id> [--purge]
 
 aimux plugin enable <id>
 aimux plugin disable <id>
+-> { id, enabled, source, storedIn, shadowedBy, daemon }
+
+aimux plugin config <id>
+-> { id, name, version, source, enabled, enabledFrom,
+     fields: [{ key, type, label, description?, required, secret,
+                default?, value, isSet, origin, shadowedBy? }],
+     extraKeys }
+
+aimux plugin set <id> <key> <value> [--value-stdin]
+-> { id, key, value, written, shadowedBy, daemon }
+
+aimux plugin unset <id> <key>
+-> { id, key, removed, value, origin, daemon }
+
+aimux plugin show <id> [--lines N] [--level debug|info|warn|error]
+-> { id, name, version, source, root, enabled, enabledFrom, halves,
+     state: { ui, daemon }, errors, missing, issues, config, extraKeys,
+     paths, log, daemon }
 -> { id, enabled, daemon }
 
 aimux plugin reload [id]
@@ -569,6 +588,25 @@ aimux plugin commands
 aimux plugin exec <plugin-id> <command-id> [args...]
 -> { pluginId, commandId, exitCode, stdout, stderr, timedOut }
 ```
+
+`enable`, `disable`, `set` and `unset` work on **every** plugin — built-in,
+linked, installed, or declared in `aimux.config.ts` — because the state goes
+into the registry's `overrides` block, keyed by id, rather than into a row only
+some of them have.
+
+`enabledFrom` (`default` / `registry` / `config`) is the field to read before
+acting: a `disable` that `aimux.config.ts` will overrule at the next launch is
+not a disable. When a write is outranked, `shadowedBy` names the file, the write
+still happens, and stderr says so — exit stays `0`.
+
+`set` coerces the value against the manifest's declared type and refuses a key
+the manifest does not declare, listing the ones it does. `resolvePluginConfig`
+would let an undeclared key through silently, and a typo that lands somewhere no
+plugin reads is the worst outcome available.
+
+None of `enable`, `disable`, `set`, `unset`, `list` or `show` starts a daemon
+that is not running: the write is durable and the next launch picks it up. They
+report `"daemon": "unreachable"` and still exit `0`.
 
 `commands` and `exec` are the manifest-declared subprocess half: a plugin whose
 manifest has `commands[]` and no `entries` needs no TypeScript at all. The

@@ -1,6 +1,7 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { pluginConfig, pluginSet, pluginUnset } from './commands/plugin/config'
 import { pluginDoctor } from './commands/plugin/doctor'
 import { pluginDisable, pluginEnable } from './commands/plugin/enable'
 import { pluginCommands, pluginExec } from './commands/plugin/exec'
@@ -10,6 +11,7 @@ import { pluginList } from './commands/plugin/list'
 import { pluginLog } from './commands/plugin/log'
 import { pluginNew } from './commands/plugin/new'
 import { pluginReload } from './commands/plugin/reload'
+import { pluginShow } from './commands/plugin/show'
 import { pluginUninstall } from './commands/plugin/uninstall'
 import { pluginUnlink } from './commands/plugin/unlink'
 import { projectClose } from './commands/project/close'
@@ -85,6 +87,10 @@ export const COMMANDS: readonly CliCommand[] = [
   pluginReload,
   pluginLog,
   pluginDoctor,
+  pluginShow,
+  pluginConfig,
+  pluginSet,
+  pluginUnset,
   skillList,
   skillPathCommand,
   pluginCommands,

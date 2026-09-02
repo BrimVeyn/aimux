@@ -14,6 +14,7 @@ import { discoverPlugins, type PluginDiscoveryIssue } from '../../../plugins/dis
 import { formatManifestIssues, readManifest } from '../../../plugins/manifest'
 import { loadPluginRegistryResult, type PluginRegistryEntry } from '../../../plugins/registry-file'
 import { PLUGIN_CONTROL_CLI_RUN, PLUGIN_CONTROL_ID } from '../../../plugins/rpc-envelope'
+import { connectToDaemon } from '../../client/bootstrap'
 import { CliUsageError, type ParsedArgs } from '../../flags'
 
 /**
@@ -104,6 +105,23 @@ export async function requireKnownPlugin(id: string): Promise<{
  * running, and the next launch picks it up. The caller decides whether that is
  * worth reporting.
  */
+/**
+ * Like `notifyDaemon`, but never starts a daemon that is not running.
+ *
+ * For the courtesies — `refresh` after a registry write, `list` for live
+ * state. The write is already durable and the next launch picks it up, so
+ * spawning a whole daemon to tell it about a plugin the user may have just
+ * switched *off* is the wrong trade: it costs seconds and starts something
+ * nobody asked for. Verbs that need work done — `exec`, `reload`, a plugin's
+ * own CLI command — still use `notifyDaemon` and still autostart.
+ */
+export async function notifyRunningDaemon(
+  verb: string,
+  payload: unknown = {}
+): Promise<{ ok: boolean; detail?: string; result?: unknown }> {
+  return notifyDaemon(async () => connectToDaemon({ autostart: false }), verb, payload)
+}
+
 export async function notifyDaemon(
   getDaemon: () => Promise<DaemonClient>,
   verb: string,
