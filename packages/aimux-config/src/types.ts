@@ -485,7 +485,7 @@ export interface ModalWorkspaceDeleteConfirm extends ModalBase {
   projectId: string
   workspaceId: string
   workspaceLabel: string
-  reason: string
+  reason?: string
   closeTabs: boolean
   /** Whether confirming force-deletes — true only after a recoverable failure. */
   force: boolean
@@ -688,7 +688,7 @@ export type ModalAction =
       projectId: string
       workspaceId: string
       workspaceLabel: string
-      reason: string
+      reason?: string
       closeTabs: boolean
       force: boolean
     }

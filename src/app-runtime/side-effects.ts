@@ -13,6 +13,7 @@ import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+import { beginWorkspaceDelete, endWorkspaceDelete } from '../state/workspace-delete-store'
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
@@ -306,6 +307,16 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       return
     }
     case 'delete-workspace': {
+      const deleting = state.projects
+        .find((entry) => entry.id === effect.projectId)
+        ?.workspaces?.find((entry) => entry.id === effect.workspaceId)
+      // Marked before the enqueue, not inside the git op: the queue is why a
+      // delete can sit there doing nothing visible, which is the whole thing
+      // this indicator exists to answer.
+      beginWorkspaceDelete(
+        effect.workspaceId,
+        deleting?.branch ?? deleting?.name ?? 'this workspace'
+      )
       void (async () => {
         try {
           await enqueueGitOp(async () =>
@@ -333,11 +344,18 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
             closeTabs: effect.closeTabs === true,
             force: true,
             projectId: effect.projectId,
-            reason: message,
+            // Git's refusal, condensed to the one line that changes the answer.
+            // The raw message is a paragraph of plumbing nobody reads before
+            // pressing y, and the dialog is not where it gets debugged.
+            reason: /active assistant tabs/i.test(message)
+              ? 'Its assistant tabs will be closed.'
+              : 'Deleting anyway discards uncommitted work.',
             type: 'open-workspace-delete-confirm',
             workspaceId: effect.workspaceId,
             workspaceLabel: workspace?.branch ?? workspace?.name ?? 'this workspace',
           })
+        } finally {
+          endWorkspaceDelete(effect.workspaceId)
         }
       })()
       return

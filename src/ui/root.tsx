@@ -44,6 +44,7 @@ import { WorkspaceMoveModal } from './components/modals/workspace/workspace-move
 import { ContextMenuOverlay } from './components/overlays/context-menu/context-menu-overlay'
 import { PendingChordOverlay } from './components/overlays/pending-chord-overlay'
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
+import { WorkspaceDeletingOverlay } from './components/overlays/workspace-deleting-overlay'
 import { SettingsView } from './components/settings/settings-view'
 import { StatsView } from './components/stats/stats-view'
 import { useTheme } from './theme'
@@ -541,6 +542,7 @@ export function RootView({
         themeId,
         workspaceDivergence,
       })}
+      <WorkspaceDeletingOverlay />
       <ToastViewport />
     </box>
   )

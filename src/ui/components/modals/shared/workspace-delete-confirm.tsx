@@ -6,7 +6,11 @@ import { Form } from './form'
 
 interface WorkspaceDeleteConfirmProps {
   keybindsModeId: ModeId
-  reason: string
+  /**
+   * One short line naming what confirming costs beyond the delete itself.
+   * Omitted for the ordinary case, where the title already said everything.
+   */
+  reason?: string
   workspaceLabel: string
 }
 
@@ -24,16 +28,13 @@ export function WorkspaceDeleteConfirm({
   return (
     <Form
       title="Delete workspace?"
+      subtitle={workspaceLabel}
       keybindsModeId={keybindsModeId}
       width={uiTokens.modalWidth.md}
+      // Destructive confirmation — the one place §7 keeps an inline key hint.
       footer={<text fg={t.textMuted}>Enter / y to delete · Esc / n to cancel</text>}
     >
-      <box flexDirection="column" gap={1}>
-        <text fg={t.text}>
-          Delete <strong>{workspaceLabel}</strong>?
-        </text>
-        <text fg={t.warning}>{reason}</text>
-      </box>
+      {reason == null || reason === '' ? null : <text fg={t.textMuted}>{reason}</text>}
     </Form>
   )
 }
