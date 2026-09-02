@@ -35,6 +35,15 @@ export interface TestContextOptions {
    * verb does in production.
    */
   onCall?: (verb: string, payload: unknown) => unknown
+  /**
+   * Attaches host services to the context, the way the real hosts do through
+   * the kernel's `extendContext`. Without it a plugin that touches `ctx.ui` or
+   * `ctx.tabs` cannot be applied here at all — which is what made
+   * `aimux plugin doctor` unable to check the plugins that need checking most.
+   *
+   * A test usually wants recording stubs; `doctor` supplies exactly that.
+   */
+  extend?: (ctx: PluginContext) => void
 }
 
 export interface TestContextHandle {
@@ -181,6 +190,8 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
     service: <T = unknown>(name: string): T | undefined => services.get(name) as T | undefined,
     waterfall: async <T>(event: string, value: T) => bus.waterfall(event, value),
   }
+
+  options.extend?.(ctx)
 
   return {
     apply: async (definition) => {

@@ -6,6 +6,11 @@ import type { CliCommand } from '../../registry'
 
 import { version as APP_VERSION } from '../../../../package.json'
 import {
+  createDoctorExtender,
+  type DoctorRegistrations,
+  emptyRegistrations,
+} from '../../../plugins/doctor-services'
+import {
   checkHostCompatibility,
   formatManifestIssues,
   readManifest,
@@ -33,7 +38,13 @@ interface HalfReport {
   built: boolean
   applied: boolean
   /** What `apply` registered against the sandbox context. */
-  registrations?: { effects: number; events: string[]; rpcVerbs: string[]; services: string[] }
+  registrations?: DoctorRegistrations & {
+    /** Live disposers — a rough measure of how much the plugin registered. */
+    disposers: number
+    events: string[]
+    rpcVerbs: string[]
+    services: string[]
+  }
   error?: string
 }
 
@@ -72,12 +83,22 @@ async function checkHalf(
 
   if (!apply) return report
 
-  const harness = createTestContext({ config, host, id: pluginId })
+  // The host services stand in, recording rather than registering — without
+  // them a plugin that touches `ctx.ui` or `ctx.assistants` fails on a missing
+  // property and doctor reports a broken plugin that is fine.
+  const contributed = emptyRegistrations()
+  const harness = createTestContext({
+    config,
+    extend: createDoctorExtender(host, contributed),
+    host,
+    id: pluginId,
+  })
   try {
     await harness.apply(definition)
     report.applied = true
     report.registrations = {
-      effects: harness.effectCount(),
+      ...contributed,
+      disposers: harness.effectCount(),
       events: harness.bus.events(),
       rpcVerbs: harness.handledVerbs(),
       services: [...harness.provided.keys()],
