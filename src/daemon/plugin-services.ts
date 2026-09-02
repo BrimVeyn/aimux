@@ -73,6 +73,8 @@ export interface DaemonPluginBackings {
     workspaceId?: string
   }) => Promise<string>
   write: (tabId: string, data: string) => Promise<void>
+  /** Title change that reaches the manager, the session and every UI. */
+  renameTab: (tabId: string, title: string) => void
   focus: (projectId: string, tabId: string) => Promise<void>
   closeTab: (tabId: string) => Promise<void>
   hookServer: () => HookServer | null
@@ -134,6 +136,15 @@ export function createDaemonContextExtender(
           views.push(toView(tabId, entry))
         }
         return views
+      },
+      /**
+       * A title change, not a suggestion: it reaches the manager, the
+       * persisted session and every attached UI, so it outlives the plugin
+       * that made it.
+       */
+      rename: async (tabId: string, title: string): Promise<void> => {
+        backings.renameTab(tabId, title)
+        return Promise.resolve()
       },
       /** Writes to the PTY. Bytes, not a line: a newline is the caller's to add. */
       send: async (tabId: string, data: string) => backings.write(tabId, data),

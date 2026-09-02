@@ -235,6 +235,7 @@ const tabId = await ctx.tabs.spawn({
   title: 'review',
 })
 await ctx.tabs.send(tabId, 'review the diff\r') // bytes: the newline is yours
+await ctx.tabs.rename(tabId, 'reviewing the diff')
 const screen = ctx.tabs.snapshot(tabId, 40)
 ```
 

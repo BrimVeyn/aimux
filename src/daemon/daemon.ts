@@ -682,6 +682,12 @@ export async function runDaemon(): Promise<void> {
         },
         focus: async (projectId, tabId) => manager.setActiveTab(projectId, tabId),
         hookServer: () => hookServer,
+        // The same path auto-rename uses, which is the point: a plugin's
+        // rename and aimux's own reach the manager, the session and every UI
+        // identically, so neither can produce a title the other cannot.
+        renameTab: (tabId, title) => {
+          applyTabMetadata(tabId, { title })
+        },
         spawnTab: spawnTabForPlugin,
         tabs: () => tabRegistry,
         write: async (tabId, data) => {

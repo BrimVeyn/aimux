@@ -600,21 +600,32 @@ jamais.
 
 ## 6.5 Les trois migrations restantes, et ce qu'elles coûtent
 
-**`auto-rename`** — la plus rentable. Deux ajouts d'API, tous deux utiles à
-d'autres : un événement daemon `tab:prompt` émis par la capture de prompt
-existante (qui reste cœur : c'est de la plomberie PTY), et `ctx.tabs.rename`.
-Le plugin devient « à ce prompt, décide d'un titre et pose-le », soit ~120
-lignes. Le firehose d'octets bruts ne bouge pas et ne doit pas.
+**`auto-rename`** — la plus rentable. `ctx.tabs.rename` **est fait** : un
+plugin pose un titre par le même chemin qu'aimux (`applyTabMetadata` →
+manager, session, toutes les UI), donc il ne peut pas produire un titre
+qu'aimux lui-même ne pourrait pas.
+
+Reste `tab:prompt`, et il y a une contrainte que le plan n'avait pas vue : la
+reconstruction d'un prompt à partir des frappes vit dans l'état par onglet du
+`AutoRenameCoordinator`, qui n'existe que pour les onglets `eligible`. Émettre
+l'événement depuis `acceptPrompt` donnerait un `tab:prompt` qui se tait dès
+qu'un onglet a été renommé — un demi-événement. Le faire proprement veut dire
+sortir `PromptCapture` du coordinateur pour en faire un observateur par onglet
+indépendant d'auto-rename, puis émettre. C'est le vrai périmètre : ~1 jour, et
+c'est ce qui rend l'événement honnête pour tout le monde, pas seulement pour le
+plugin qui le remplace.
 
 **`auto-commit`** — dépend de 6.4. Une fois la fente ouverte, le plugin possède
 son état dans sa slice, et le panneau git affiche ce qu'un fournisseur lui a
 donné. Sans la fente, c'est un déplacement d'état vers nulle part.
 
-**Widget `setup`** — bloqué sur une seule chose : son id est `setup` dans le
-`bars` des utilisateurs, et le namespacing de l'hôte le renommerait en
-`aimux.setup.setup`. Un alias de compatibilité dans `registerBarWidget` (~15
-lignes) débloque, et débloque en même temps toute future migration d'un id
-visible par l'utilisateur.
+**Widget `setup`** — annulé. Le plan disait « bloqué sur un alias d'id » ; en
+regardant le code, il dessine le viewport d'un PTY caché (`TerminalViewport`,
+`usePaneSizeReport`, `runSideEffectGlobal`, `findSetupTab`). Un plugin ne peut
+pas rendre un terminal, et il ne devrait pas y avoir d'API pour ça — ce serait
+l'API interne d'aimux sous un autre nom. L'alias d'id reste une bonne idée le
+jour où une vraie migration en a besoin ; le construire sans utilisateur ne
+l'était pas.
 
 **Overlay de syntaxe** — demande une cascade _synchrone_ (`waterfall` est
 async, le chemin de rendu ne l'est pas). Un canal de transformation sync sur le
@@ -625,10 +636,10 @@ l'overlay est très bien là où il est.
 
 1. Publier le paquet (6.2). Rien d'autre ne compte tant que c'est faux.
 2. Clavier dans les panes (6.3.1).
-3. Alias de widget + migration `setup` — petit, et prouve le mécanisme d'alias.
-4. `tab:prompt` + `tabs.rename` + migration `auto-rename`.
-5. Fente « message de commit » (6.4) + migration `auto-commit`.
-6. Le reste de 6.3 au fil des demandes.
+3. Sortir `PromptCapture` du coordinateur, puis `tab:prompt`, puis migration
+   `auto-rename` (`tabs.rename` est déjà là).
+4. Fente « message de commit » (6.4) + migration `auto-commit`.
+5. Le reste de 6.3 au fil des demandes.
 
 Les trois autres chantiers de la phase 5 — isolation Worker, `plugin define`,
 marketplace — restent non commencés et non planifiés ici : aucun des quatre

@@ -177,6 +177,7 @@ export function createDoctorExtender(
         /* nothing to find in a dry run */
       },
       list: () => [],
+      rename: async () => {},
       send: async () => {},
       snapshot: () => null,
       // A dry run must not spawn anything. Rejecting is honest: an `apply` that

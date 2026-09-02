@@ -692,6 +692,14 @@ export interface PluginTabsApi {
   spawn: (input: PluginSpawnTabInput) => Promise<string>
   /** Writes to the PTY. Bytes, not a line: the newline is the caller's to add. */
   send: (tabId: string, data: string) => Promise<void>
+  /**
+   * Sets the tab's title. Reaches every attached UI and the persisted session,
+   * so it survives a restart — the same path aimux's own auto-rename uses.
+   *
+   * A title the user typed is theirs: a plugin that renames on its own
+   * schedule should check whether one is already set rather than overwrite it.
+   */
+  rename: (tabId: string, title: string) => Promise<void>
   focus: (projectId: string, tabId: string) => Promise<void>
   close: (tabId: string) => Promise<void>
   /** The tab's last rendered lines, or null when it has produced no viewport. */

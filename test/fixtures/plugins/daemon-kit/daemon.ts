@@ -37,6 +37,9 @@ export default definePlugin<DaemonPluginContext>({
     ctx.rpc.handle('nudge', async (tabId) => {
       await ctx.tabs.send(String(tabId), 'hello\r')
     })
+    ctx.rpc.handle('retitle', async (tabId) => {
+      await ctx.tabs.rename(String(tabId), 'reviewing the diff')
+    })
     ctx.on('tab:turnComplete', (payload) => {
       ctx.log.info('turn complete', { payload: JSON.stringify(payload) })
     })

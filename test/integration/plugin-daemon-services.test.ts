@@ -43,6 +43,7 @@ let hookServer: HookServer | null = null
 let tabs = new Map<string, DaemonTabEntry>()
 let spawned: unknown[] = []
 let writes: { tabId: string; data: string }[] = []
+let renames: { tabId: string; title: string }[] = []
 
 const TRANSPORT: PluginRpcTransport = { broadcast: () => {}, call: async () => null }
 
@@ -63,6 +64,9 @@ async function start(): Promise<PluginRuntime> {
       closeTab: async () => {},
       focus: async () => {},
       hookServer: () => hookServer,
+      renameTab: (tabId, title) => {
+        renames.push({ tabId, title })
+      },
       spawnTab: async (input) => {
         spawned.push(input)
         return 'tab-new'
@@ -91,6 +95,7 @@ beforeEach(() => {
   tabs = new Map()
   spawned = []
   writes = []
+  renames = []
 })
 
 afterEach(async () => {
@@ -219,5 +224,18 @@ describe('daemon plugin services', () => {
     emitDaemonEvent('tab:turnComplete', { idleMs: 1, projectId: 'p', tabId: 't' })
     dispose()
     expect(seen).toHaveLength(1)
+  })
+})
+
+describe('ctx.tabs.rename', () => {
+  test('a title change goes where aimux own does', async () => {
+    const instance = await start()
+
+    await instance.kernel.handleRpc('aimux-test.daemonkit', 'retitle', 'tab-1')
+
+    // Not a suggestion: the backing is the same `applyTabMetadata` auto-rename
+    // uses, so the title reaches the manager, the session and every attached
+    // UI — a plugin cannot produce a title aimux itself could not.
+    expect(renames).toEqual([{ tabId: 'tab-1', title: 'reviewing the diff' }])
   })
 })
