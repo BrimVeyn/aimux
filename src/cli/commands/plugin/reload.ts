@@ -13,7 +13,7 @@ import { notifyDaemon } from './shared'
  * attached UI, so one command reloads both processes.
  */
 export const pluginReload: CliCommand = {
-  args: [{ complete: { kind: 'none' }, name: 'id' }],
+  args: [{ complete: { kind: 'dynamic', source: 'plugin' }, name: 'id' }],
   flags: SHARED_FLAGS,
   group: 'plugin',
   run: async (ctx) => {

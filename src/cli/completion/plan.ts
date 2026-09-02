@@ -21,8 +21,21 @@ export interface CompletionCandidate {
 export type CompletionPlan =
   /** Ready-to-print candidates, already filtered and prefixed. */
   | { candidates: CompletionCandidate[]; kind: 'candidates' }
-  /** Needs live state. `prefix` is re-applied to each resolved value. */
-  | { kind: 'dynamic'; prefix: string; source: DynamicCompletionSource; word: string }
+  /**
+   * Needs live state. `prefix` is re-applied to each resolved value.
+   *
+   * `positionals` are the ones already typed, because one source needs them:
+   * a plugin's config keys depend on which plugin the previous positional
+   * named. Resolving them here would mean I/O in the planner, which is the
+   * one thing it must not do — it runs on every TAB press.
+   */
+  | {
+      kind: 'dynamic'
+      prefix: string
+      source: DynamicCompletionSource
+      word: string
+      positionals: readonly string[]
+    }
   /** Hand off to the shell's own filename completion. */
   | { kind: 'files' }
   /** Free text — offer nothing. */
@@ -91,12 +104,13 @@ function filtered(candidates: readonly CompletionCandidate[], word: string): Com
 function fromSource(
   source: CompletionSource | undefined,
   word: string,
-  prefix: string
+  prefix: string,
+  positionals: readonly string[] = []
 ): CompletionPlan {
   if (!source) return NONE
   switch (source.kind) {
     case 'dynamic':
-      return { kind: 'dynamic', prefix, source: source.source, word }
+      return { kind: 'dynamic', positionals, prefix, source: source.source, word }
     case 'file':
       return { kind: 'files' }
     case 'values': {
@@ -115,6 +129,8 @@ interface TokenScan {
   /** Set when the last token was a flag still waiting for its value. */
   awaitingValueFor: FlagSpec | null
   positionalCount: number
+  /** The positional tokens themselves, in order. */
+  positionals: string[]
   stoppedFlags: boolean
   usedFlags: Set<string>
 }
@@ -128,6 +144,7 @@ function scanTokens(tokens: readonly string[], flags: readonly FlagSpec[]): Toke
   const scan: TokenScan = {
     awaitingValueFor: null,
     positionalCount: 0,
+    positionals: [],
     stoppedFlags: false,
     usedFlags: new Set<string>(),
   }
@@ -153,6 +170,7 @@ function scanTokens(tokens: readonly string[], flags: readonly FlagSpec[]): Toke
       continue
     }
     scan.positionalCount++
+    scan.positionals.push(token)
   }
 
   return scan
@@ -239,5 +257,5 @@ export function planCompletion(
     )
   }
 
-  return fromSource(command.args[scan.positionalCount]?.complete, word, '')
+  return fromSource(command.args[scan.positionalCount]?.complete, word, '', scan.positionals)
 }

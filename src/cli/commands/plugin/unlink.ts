@@ -10,7 +10,7 @@ import { notifyDaemon, requireRegistryEntry } from './shared'
  * to delete, which is exactly the difference from `uninstall`.
  */
 export const pluginUnlink: CliCommand = {
-  args: [{ complete: { kind: 'none' }, name: 'id', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'plugin' }, name: 'id', required: true }],
   flags: SHARED_FLAGS,
   group: 'plugin',
   run: async (ctx) => {

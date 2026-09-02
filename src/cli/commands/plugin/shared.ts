@@ -1,12 +1,16 @@
+import type { PluginConfigEntry } from '@brimveyn/aimux-config'
 import type { PluginManifest } from '@brimveyn/aimux-plugin'
 
 import { existsSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 
+import type { PluginRecord } from '../../../plugins/types'
 import type { DaemonClient } from '../../client/daemon-client'
 
 import { builtinPlugins } from '../../../builtin-plugins'
+import { loadUserConfig } from '../../../config/loader'
 import { IPC_CAPABILITY_PLUGIN_RPC } from '../../../ipc/protocol'
+import { discoverPlugins, type PluginDiscoveryIssue } from '../../../plugins/discovery'
 import { formatManifestIssues, readManifest } from '../../../plugins/manifest'
 import { loadPluginRegistryResult, type PluginRegistryEntry } from '../../../plugins/registry-file'
 import { PLUGIN_CONTROL_CLI_RUN, PLUGIN_CONTROL_ID } from '../../../plugins/rpc-envelope'
@@ -45,18 +49,50 @@ export function findRegistryEntry(id: string): PluginRegistryEntry | undefined {
 export function requireRegistryEntry(id: string): PluginRegistryEntry {
   const entry = findRegistryEntry(id)
   if (!entry) {
-    // A built-in has no registry row to toggle — it ships with aimux. Saying
-    // "not linked or installed" about a plugin the user can plainly see in
-    // `plugin list` would be the wrong answer to the right question.
-    if (builtinPlugins().some((builtin) => builtin.manifest.id === id)) {
-      throw new CliUsageError(
-        `plugin "${id}" ships with aimux; switch it off in aimux.config.ts with ` +
-          `plugins: [{ id: '${id}', enabled: false }]`
-      )
-    }
     throw new CliUsageError(`plugin "${id}" is not linked or installed — see \`aimux plugin list\``)
   }
   return entry
+}
+
+/**
+ * Every plugin aimux knows about, resolved the way the hosts resolve them:
+ * `aimux.config.ts`, the registry, and the shipped built-ins.
+ *
+ * The verbs that act on *any* plugin — enable, disable, set, unset, show —
+ * take this rather than a registry row, because a row is only how a linked or
+ * installed plugin is known. A built-in has none, which used to make it
+ * untouchable from the CLI.
+ */
+export async function discoverAllPlugins(): Promise<{
+  records: PluginRecord[]
+  issues: PluginDiscoveryIssue[]
+  userPlugins: readonly PluginConfigEntry[]
+}> {
+  const { resolved } = await loadUserConfig()
+  const { issues, records } = await discoverPlugins(
+    resolved.plugins,
+    undefined,
+    builtinPlugins(resolved)
+  )
+  return { issues, records, userPlugins: resolved.plugins }
+}
+
+/** The record for one id, or a usage error naming what to run instead. */
+export async function requireKnownPlugin(id: string): Promise<{
+  record: PluginRecord
+  issues: PluginDiscoveryIssue[]
+  userEntry: PluginConfigEntry | undefined
+}> {
+  const { issues, records, userPlugins } = await discoverAllPlugins()
+  const record = records.find((entry) => entry.id === id)
+  if (!record) {
+    throw new CliUsageError(`unknown plugin "${id}" — see \`aimux plugin list\``)
+  }
+  return {
+    issues,
+    record,
+    userEntry: userPlugins.find((entry) => entry.id === id),
+  }
 }
 
 /**

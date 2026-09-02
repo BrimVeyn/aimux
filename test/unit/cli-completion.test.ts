@@ -98,7 +98,7 @@ describe('completion planner', () => {
 
   test('plans a dynamic lookup for positionals that name live objects', () => {
     const plan = planFor(['aimux', 'tab', 'send', ''])
-    expect(plan).toEqual({ kind: 'dynamic', prefix: '', source: 'tab', word: '' })
+    expect(plan).toEqual({ kind: 'dynamic', positionals: [], prefix: '', source: 'tab', word: '' })
   })
 
   test('counts positionals so the second one plans separately', () => {
@@ -109,12 +109,13 @@ describe('completion planner', () => {
   test('flag values are not mistaken for positionals', () => {
     // `--project main` consumes two words; <tabId> is still unfilled.
     const plan = planFor(['aimux', 'tab', 'send', '--project', 'main', ''])
-    expect(plan).toEqual({ kind: 'dynamic', prefix: '', source: 'tab', word: '' })
+    expect(plan).toEqual({ kind: 'dynamic', positionals: [], prefix: '', source: 'tab', word: '' })
   })
 
   test('carries the prefix through --flag=value dynamic lookups', () => {
     expect(planFor(['aimux', 'tab', 'list', '--project=ma'])).toEqual({
       kind: 'dynamic',
+      positionals: [],
       prefix: '--project=',
       source: 'project',
       word: 'ma',

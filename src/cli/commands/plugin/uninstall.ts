@@ -15,7 +15,7 @@ import { notifyDaemon, requireRegistryEntry } from './shared'
  * expect, and re-entering it because a version bump needed a reinstall is not.
  */
 export const pluginUninstall: CliCommand = {
-  args: [{ complete: { kind: 'none' }, name: 'id', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'plugin' }, name: 'id', required: true }],
   flags: [
     ...SHARED_FLAGS,
     { description: 'Also delete the plugin config directory', kind: 'boolean', name: 'purge' },

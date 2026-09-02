@@ -15,7 +15,7 @@ import { notifyDaemon } from './shared'
  */
 export const pluginExec: CliCommand = {
   args: [
-    { complete: { kind: 'none' }, name: 'plugin-id', required: true },
+    { complete: { kind: 'dynamic', source: 'plugin' }, name: 'plugin-id', required: true },
     { complete: { kind: 'none' }, name: 'command-id', required: true },
   ],
   flags: SHARED_FLAGS,

@@ -77,7 +77,12 @@ async function resolvePlan(plan: CompletionPlan, descriptions: boolean): Promise
     }
     case 'dynamic': {
       const { resolveDynamicCandidates } = await import('./sources')
-      const candidates = await resolveDynamicCandidates(plan.source, plan.word, plan.prefix)
+      const candidates = await resolveDynamicCandidates(
+        plan.source,
+        plan.word,
+        plan.prefix,
+        plan.positionals
+      )
       if (candidates.length === 0) return DIRECTIVE_NONE
       return `${renderCandidates(candidates, descriptions)}\n${DIRECTIVE_LIST}`
     }

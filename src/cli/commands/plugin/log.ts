@@ -13,7 +13,7 @@ const LEVELS = new Set(['debug', 'info', 'warn', 'error'])
  * and the toast has scrolled away.
  */
 export const pluginLog: CliCommand = {
-  args: [{ complete: { kind: 'none' }, name: 'id', required: true }],
+  args: [{ complete: { kind: 'dynamic', source: 'plugin' }, name: 'id', required: true }],
   flags: [
     ...SHARED_FLAGS,
     { description: 'Show only the last N lines (default 50)', kind: 'number', name: 'lines' },
