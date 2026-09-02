@@ -638,6 +638,11 @@ export type ModalAction =
     }
   | { type: 'close-modal' }
   | { type: 'move-modal-selection'; delta: number }
+  | {
+      type: 'move-modal-cursor'
+      delta?: number
+      to?: 'end' | 'home' | 'line-down' | 'line-up' | 'word-left' | 'word-right'
+    }
   | { type: 'update-command-edit'; char: string }
   | { type: 'cancel-command-edit' }
   | { type: 'open-create-project-modal'; returnToProjectPicker: boolean }

@@ -4,6 +4,7 @@ import type { ModalWorkspaceMove, WorkspaceRecord } from '../../../../state/type
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { formatDivergence } from '../../../../state/project-workspaces'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'
@@ -34,6 +35,7 @@ export function WorkspaceMoveModal({
   workspaces,
 }: WorkspaceMoveModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const source = useMemo(
     () => workspaces.find((w) => w.id === sourceWorkspaceId),
     [sourceWorkspaceId, workspaces]
@@ -106,11 +108,11 @@ export function WorkspaceMoveModal({
                 onHoverIndex={handleSelectIndex}
                 onClickIndex={handleSelectIndex}
                 title={
-                  <text fg={active ? t.text : t.textMuted} wrapMode="none">
+                  <text fg={active ? ink : t.textMuted} wrapMode="none">
                     {label}
                     {workspace.source === 'primary' ? ' (primary)' : ''}
                     {ahead !== '' ? ` ${ahead}` : ''}
-                    {dirty ? <span fg={t.warning}> ●</span> : null}
+                    {dirty ? <span fg={active ? ink : t.warning}> ●</span> : null}
                   </text>
                 }
               />

@@ -129,9 +129,15 @@ export function StatusBar() {
 
   const glyphs = SEPARATOR_GLYPHS[getStatusBarSeparator()]
 
-  const tileB = t.backgroundElement
-  const tileFiller = t.backgroundPanel
-  const tileX = t.backgroundElement
+  // The bar's own band is backgroundElement, not backgroundPanel: the chrome
+  // directly above it — the tab bar and both widget bars — is panel, and with no
+  // rules left anywhere the status bar merged into it. Its two mid tiles drop to
+  // panel to keep a step between tile and filler. Which of the three tones is
+  // lighter is a theme's business (catppuccin recesses, aimux lifts); all that
+  // matters is that they are three different tokens.
+  const tileB = t.backgroundPanel
+  const tileFiller = t.backgroundElement
+  const tileX = t.backgroundPanel
   const tileY = modeColor
 
   const hasB = model.projectSegments.length > 0

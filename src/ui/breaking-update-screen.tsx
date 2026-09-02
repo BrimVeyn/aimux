@@ -2,6 +2,7 @@ import { useKeyboard } from '@opentui/react'
 
 import { ModalShell } from './components/modals/shared/modal-shell'
 import { ListItem } from './components/primitives/list-item'
+import { useSelectionInk } from './selection-ink'
 import { uiTokens } from './ui-tokens'
 
 interface BreakingUpdateScreenProps {
@@ -9,6 +10,7 @@ interface BreakingUpdateScreenProps {
 }
 
 export function BreakingUpdateScreen({ onConfirm }: BreakingUpdateScreenProps) {
+  const ink = useSelectionInk()
   useKeyboard((key) => {
     if (key.name === 'return') {
       key.preventDefault()
@@ -24,7 +26,11 @@ export function BreakingUpdateScreen({ onConfirm }: BreakingUpdateScreenProps) {
           <text>The terminal manager must be restarted.</text>
           <text>You will lose your current terminal states.</text>
         </box>
-        <ListItem active direction="row" title={<text>OK — Restart terminal manager</text>} />
+        <ListItem
+          active
+          direction="row"
+          title={<text fg={ink}>OK — Restart terminal manager</text>}
+        />
       </box>
     </ModalShell>
   )

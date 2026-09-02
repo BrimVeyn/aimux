@@ -1,3 +1,4 @@
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { ListItem } from '../../primitives/list-item'
@@ -20,6 +21,7 @@ export function UpdateAvailableModal({
   selectedIndex,
 }: UpdateAvailableModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   return (
     <ModalShell
       title="Update available"
@@ -36,7 +38,7 @@ export function UpdateAvailableModal({
               key={option.label}
               active={active}
               direction="row"
-              title={<text fg={active ? t.text : t.textMuted}>{option.label}</text>}
+              title={<text fg={active ? ink : t.textMuted}>{option.label}</text>}
             />
           )
         })}

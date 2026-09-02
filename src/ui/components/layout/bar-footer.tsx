@@ -53,11 +53,9 @@ export function BarFooter({ contentWidth }: { contentWidth: number }) {
 
   return (
     <box flexDirection="column" flexShrink={0}>
-      <box flexShrink={0}>
-        <text fg={t.border} selectable={false} wrapMode="none">
-          {'─'.repeat(Math.max(1, contentWidth))}
-        </text>
-      </box>
+      {/* A blank row, not a rule: the footer is set off from the last widget by
+          the gap alone. */}
+      <box height={1} flexShrink={0} />
       {/* Each entry is its own <text>, with a spacer box between them: one string
           holding both would make the whole footer a single click target. */}
       <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>

@@ -7,6 +7,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 
 import type { LayoutNode, SplitDirection } from './layout-tree'
+import type { CursorTarget } from './text-cursor'
 import type {
   AssistantId,
   BarSide,
@@ -32,7 +33,7 @@ import type {
 } from './types'
 
 export type ModalAction =
-  | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
+  | { type: 'move-modal-cursor'; delta?: number; to?: CursorTarget }
   | {
       type: 'open-new-tab-modal'
       pendingWorkspace?: PendingWorkspaceLaunch

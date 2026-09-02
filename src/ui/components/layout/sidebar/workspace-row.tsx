@@ -33,14 +33,11 @@ interface WorkspaceRowProps {
   projectIndex: number
   /** True when this row is the active cursor item. */
   isActiveItem: boolean
-  /** True when this row's project is the current project (selection scope). */
-  inCurrentGroup: boolean
   contentWidth: number
 }
 
 export const WorkspaceRow = memo(function WorkspaceRow({
   contentWidth,
-  inCurrentGroup,
   isActiveItem,
   project,
   projectIndex,
@@ -134,12 +131,12 @@ export const WorkspaceRow = memo(function WorkspaceRow({
     return entries
   }, [project.id, workspace.branch, workspace.id, workspace.name, workspace.source])
 
-  let bgColor: string | undefined
-  if (isActiveItem) {
-    bgColor = base.backgroundElement
-  } else if (inCurrentGroup) {
-    bgColor = base.backgroundPanel
-  }
+  // No band for "this row's project is the current one": the bar is a single
+  // backgroundPanel surface now and backgroundElement is spoken for by the
+  // cursor row, which leaves no third tone that works in every theme. The
+  // cursor row — one step off the panel, plus its accent bar — is what says
+  // where you are; the group it sits in follows from that.
+  const bgColor = isActiveItem ? base.backgroundElement : undefined
   // The cursor: a full-height accent bar down the left of the row, both lines
   // of it. The background alone is one step of grey and gets lost among rows
   // that carry colour of their own; a bar the height of the row is found

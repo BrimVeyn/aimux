@@ -7,7 +7,6 @@ import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { useTheme } from '../../theme'
 import { truncate } from '../../truncate'
-import { Rule } from '../stats/shared'
 import { describeValue } from './row-value'
 
 /**
@@ -121,7 +120,9 @@ export const SettingsFooter = memo(function SettingsFooter({
 
   return (
     <box flexDirection="column" flexShrink={0} paddingLeft={pad} paddingRight={pad}>
-      <Rule width={width} />
+      {/* A blank row, not a rule: the footer is set off from the list by the gap,
+          the same way the sidebar's is. */}
+      <box height={1} flexShrink={0} />
       <box width={width} flexDirection="row" flexShrink={0}>
         <box flexGrow={1} flexShrink={1}>
           <text fg={t.textMuted} selectable={false} wrapMode="none">

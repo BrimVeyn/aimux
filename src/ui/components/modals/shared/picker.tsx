@@ -4,6 +4,7 @@ import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui
 import { useTerminalDimensions } from '@opentui/react'
 import { type ReactNode, useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { BareInput } from '../../primitives/bare-input'
 import { ListItem } from '../../primitives/list-item'
@@ -48,7 +49,10 @@ function PickerItemCtas({
   onDelete?: () => void
   onWorkspace?: () => void
 }) {
-  const t = useTheme()
+  // These only ever render on the selected row, which is filled with `primary` —
+  // so they wear its ink, not the primary/warning/error they would carry
+  // anywhere else. `[edit]` in primary on primary is nothing at all.
+  const ink = useSelectionInk()
   const handleEdit = useCallback(
     (event: OtuiMouseEvent) => {
       event.stopPropagation()
@@ -74,17 +78,17 @@ function PickerItemCtas({
     <box flexDirection="row" gap={1}>
       {onEdit ? (
         <box onMouseDown={handleEdit}>
-          <text fg={t.primary}>[edit]</text>
+          <text fg={ink}>[edit]</text>
         </box>
       ) : null}
       {onWorkspace ? (
         <box onMouseDown={handleWorkspace}>
-          <text fg={t.warning}>[WT]</text>
+          <text fg={ink}>[WT]</text>
         </box>
       ) : null}
       {onDelete ? (
         <box onMouseDown={handleDelete}>
-          <text fg={t.error}>[del]</text>
+          <text fg={ink}>[del]</text>
         </box>
       ) : null}
     </box>

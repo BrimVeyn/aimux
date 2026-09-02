@@ -10,9 +10,10 @@ import { useAppStore } from '../../../state/app-store'
 import { clampBarWidth } from '../../../state/bars'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
+import { useSelectionInk } from '../../selection-ink'
 import { useTheme } from '../../theme'
 import { ListItem } from '../primitives/list-item'
-import { Muted, Rule, Section, TileRow } from '../stats/shared'
+import { Muted, Section, TileRow } from '../stats/shared'
 import { SettingsFooter } from './settings-footer'
 import { CONFIG_FILE_MARK, SettingsRow, TOUCHED_MARK } from './settings-row'
 import { SettingsSearchBar } from './settings-search-bar'
@@ -23,6 +24,8 @@ const SETTINGS_GLYPH = '\u{2699}'
 
 /** One padding column either side, the same inset the stats pages sit in. */
 const PAGE_PAD = 1
+/** Matches the bar's own gutter, so the nav and a bar line up to the column. */
+const NAV_GUTTER = 2
 
 /** A section and the rows it owns, each keeping the index the cursor holds. */
 interface Group {
@@ -71,6 +74,7 @@ function groupBySection(hits: SettingSearchHit[]): Group[] {
  */
 export const SettingsView = memo(function SettingsView() {
   const t = useTheme()
+  const ink = useSelectionInk()
   // The cursor is all this component needs from the app state. Rows read their
   // own values, so nothing here re-renders at the rate the terminals print.
   const rowIndex = useAppStore((s) => s.settings.rowIndex)
@@ -146,14 +150,21 @@ export const SettingsView = memo(function SettingsView() {
     [hits.length, touchedCount, configCount]
   )
 
-  // Same 1-cell seam the bar draws between itself and the terminal, so the two
+  // The same gutter the bar draws between itself and the terminal, so the two
   // views line up to the column.
-  const navContentWidth = Math.max(1, navWidth - 1)
+  const navContentWidth = Math.max(1, navWidth - NAV_GUTTER)
   const usable = Math.max(24, dimensions.width - navWidth - 2 - PAGE_PAD * 2)
 
   return (
     <box flexDirection="row" flexGrow={1} overflow="hidden">
-      <box width={navWidth} flexDirection="row" overflow="hidden" backgroundColor={t.background}>
+      {/* The nav is this screen's bar, so it wears the bar's surface: panel
+          against the page the content pane keeps. */}
+      <box
+        width={navWidth}
+        flexDirection="row"
+        overflow="hidden"
+        backgroundColor={t.backgroundPanel}
+      >
         <box width={navContentWidth} flexDirection="column" overflow="hidden">
           <box paddingLeft={1} paddingRight={1}>
             <text fg={t.textMuted}>Settings</text>
@@ -169,12 +180,12 @@ export const SettingsView = memo(function SettingsView() {
                 index={index}
                 onClickIndex={handleSectionClick}
                 title={
-                  <text fg={group.sectionId === current?.sectionId ? t.text : t.textMuted}>
+                  <text fg={group.sectionId === current?.sectionId ? ink : t.textMuted}>
                     {`${group.glyph} ${group.label}`}
                   </text>
                 }
                 trailing={
-                  group.sectionId === current?.sectionId ? <text fg={t.primary}>›</text> : undefined
+                  group.sectionId === current?.sectionId ? <text fg={ink}>›</text> : undefined
                 }
               />
             ))}
@@ -185,19 +196,13 @@ export const SettingsView = memo(function SettingsView() {
             </text>
           </box>
         </box>
-        <box width={1} flexShrink={0} backgroundColor={t.border} />
+        <box width={NAV_GUTTER} flexShrink={0} backgroundColor={t.backgroundPanel} />
       </box>
-      {/* The pane the terminal would be in, with the same border — the content
-          keeps the inset it had instead of jumping to the edge of the screen. */}
-      <box
-        border
-        borderColor={t.borderActive}
-        title={`${SETTINGS_GLYPH} Settings`}
-        padding={0}
-        flexDirection="column"
-        flexGrow={1}
-        backgroundColor={t.background}
-      >
+      {/* The pane the terminal would be in, with the same inset — padding where
+          that one has padding, and no frame, for the same reason. The titled
+          border said "Settings" a third time, after the nav heading and the
+          section header. */}
+      <box padding={1} flexDirection="column" flexGrow={1} backgroundColor={t.background}>
         {/* Outside the scroll: the way to find a setting should not be a thing
             you have to scroll back up to. */}
         <box flexShrink={0} paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD} paddingTop={1}>
@@ -212,14 +217,13 @@ export const SettingsView = memo(function SettingsView() {
         >
           <box flexDirection="column" paddingLeft={PAGE_PAD} paddingRight={PAGE_PAD}>
             <TileRow tiles={tiles} usable={usable} />
-            <box paddingTop={1} paddingBottom={1} flexShrink={0}>
-              <Rule width={usable} />
-            </box>
+            <box height={1} flexShrink={0} />
             {current === undefined ? (
               <Muted>Nothing to configure here yet.</Muted>
             ) : (
               <Section
                 glyph={current.glyph}
+                rule={false}
                 title={current.label}
                 // Pinned to the same right edge every note on the screen lands on.
                 note={String(current.rows.length)}

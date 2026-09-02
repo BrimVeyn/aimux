@@ -4,6 +4,7 @@ import type { WorkspaceRecord } from '../../../../state/types'
 
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { buildBaseRefOptions } from '../../../../state/selectors'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { AutoComplete, Form, type FormOptionItem, TextField } from '../shared/form'
@@ -35,6 +36,7 @@ export function CreateWorkspaceModal({
   workspaces,
 }: CreateWorkspaceModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
 
   const handleHover = useCallback(
     (index: number) => dispatchGlobal({ index, type: 'set-modal-selection-index' }),
@@ -45,24 +47,30 @@ export function CreateWorkspaceModal({
     () =>
       buildBaseRefOptions(workspaces, baseBranches, baseQuery).map((option) => ({
         key: option.ref,
-        leading: (
-          <text fg={option.kind === 'workspace' ? t.warning : t.textMuted}>
-            {option.kind === 'workspace' ? '\u{e728}' : '\u{e702}'}
-          </text>
-        ),
+        leading: (active) => {
+          let fg = t.textMuted
+          if (active) fg = ink
+          else if (option.kind === 'workspace') fg = t.warning
+          return <text fg={fg}>{option.kind === 'workspace' ? '\u{e728}' : '\u{e702}'}</text>
+        },
         subtitle:
-          option.kind === 'workspace' ? (
-            <text fg={t.textMuted}>workspace: {option.detail}</text>
-          ) : null,
-        title: (active) => <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+          option.kind === 'workspace'
+            ? (active) => <text fg={active ? ink : t.textMuted}>workspace: {option.detail}</text>
+            : null,
+        title: (active) => <text fg={active ? ink : t.textMuted}>{option.label}</text>,
       })),
-    [baseBranches, baseQuery, t, workspaces]
+    [baseBranches, baseQuery, ink, t, workspaces]
   )
 
   const baseActive = activeField === 'base'
   return (
+    // The title asks the question and the subtitle answers what happens with the
+    // answer, so the prompt field needs no label of its own — a heading, a
+    // question, a paragraph and a placeholder all saying the same thing was four
+    // lines of chrome above an empty box.
     <Form
       title="New workspace"
+      subtitle="What do you want to work on? Names the workspace and its branch, and is sent to the assistant."
       keybindsModeId="modal.create-workspace"
       width={uiTokens.modalWidth.xl}
     >
@@ -70,11 +78,9 @@ export function CreateWorkspaceModal({
         <box flexDirection="column">
           <TextField
             active={activeField === 'prompt'}
-            label="What do you want to work on? (optional)"
-            description="Sent to the assistant, and names the workspace and its branch. Leave empty for a bare workspace."
             value={prompt}
             cursorPos={activeField === 'prompt' ? cursorPos : undefined}
-            placeholder="Describe the task, or leave empty..."
+            placeholder="Describe the task, or leave empty for a bare workspace..."
             minLines={PROMPT_LINES}
           />
           {branchError != null && branchError !== '' ? (
@@ -94,7 +100,6 @@ export function CreateWorkspaceModal({
           onHover={handleHover}
           emptyState={<text fg={t.textMuted}>No branches found</text>}
         />
-        <text fg={t.textMuted}>Ctrl+Enter newline · Tab picks a base · Enter creates</text>
       </box>
     </Form>
   )
