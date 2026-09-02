@@ -101,6 +101,23 @@ export interface PluginSettingsApi {
   watch: (id: string, listener: (value: PluginSettingValue) => void) => Disposer
 }
 
+export interface PluginStatusBarSegment {
+  /** Unqualified; the host prefixes the plugin id. */
+  id: string
+  render: () => PluginNode
+}
+
+export interface PluginStatusBarApi {
+  /**
+   * Adds a tile to the right of the status bar, before the version.
+   *
+   * The bar draws its own separators and tile colours around it, so a segment
+   * renders content and nothing else — there are no powerline glyphs to get
+   * wrong. Order is registration order.
+   */
+  register: (segment: PluginStatusBarSegment) => Disposer
+}
+
 export interface PluginStatsPage {
   /** Unqualified; the host prefixes the plugin id. */
   id: string
@@ -188,6 +205,7 @@ export interface PluginUiApi {
   themes: PluginThemesApi
   toast: PluginToastApi
   stats: PluginStatsApi
+  statusBar: PluginStatusBarApi
   kit: PluginKit
 }
 

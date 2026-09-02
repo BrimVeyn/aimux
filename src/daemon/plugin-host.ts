@@ -2,10 +2,10 @@ import type { PluginConfigEntry } from '@brimveyn/aimux-config'
 import type { PluginContext } from '@brimveyn/aimux-plugin'
 
 import type { ParsedArgs } from '../cli/flags'
+import type { BuiltinPlugin } from '../plugins/builtin'
 import type { PluginDiscoveryIssue } from '../plugins/discovery'
 import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 
-import { BUILTIN_PLUGINS } from '../builtin-plugins'
 import { logDebug } from '../debug/input-log'
 import { getPluginCliCommand } from '../plugins/cli-commands'
 import { listExecCommands, runExecCommand } from '../plugins/exec-adapter'
@@ -69,6 +69,8 @@ export interface PluginEventPayload {
 
 export interface DaemonPluginHostOptions {
   userPlugins: readonly PluginConfigEntry[]
+  /** The plugins aimux ships. Supplied by `daemon.ts`, which has the config. */
+  builtins: readonly BuiltinPlugin[]
   /**
    * Fan an event out to every attached client that negotiated v19 and is not
    * a thin CLI attacher. Supplied by `daemon.ts`, which owns the socket set.
@@ -135,7 +137,7 @@ export async function startDaemonPluginHost(
 
   const runtime = new PluginRuntime({
     ...(options.extendContext === undefined ? {} : { extendContext: options.extendContext }),
-    builtins: BUILTIN_PLUGINS,
+    builtins: options.builtins,
     host: 'daemon',
     onIssues: (issues) => {
       for (const issue of issues) {

@@ -1,5 +1,8 @@
+import type { ResolvedConfig } from '@brimveyn/aimux-config'
+
 import type { BuiltinPlugin } from '../plugins/builtin'
 
+import { aiUsagePlugin } from './ai-usage'
 import { CLAUDE_PLUGIN } from './claude'
 
 /**
@@ -14,5 +17,13 @@ import { CLAUDE_PLUGIN } from './claude'
  * A built-in is switched off like anything else, from `aimux.config.ts`:
  *
  *   plugins: [{ id: 'aimux.claude', enabled: false }]
+ *
+ * Takes the resolved config because a migrated feature keeps the keys it was
+ * always configured under: the mapping from `statusBar.aiUsage.*` and friends
+ * to a plugin's `ctx.config` lives in the built-in's own declaration, so the
+ * plugin body reads nothing aimux-specific. Callable with nothing when only
+ * the ids are wanted.
  */
-export const BUILTIN_PLUGINS: readonly BuiltinPlugin[] = [CLAUDE_PLUGIN]
+export function builtinPlugins(config?: ResolvedConfig): readonly BuiltinPlugin[] {
+  return [CLAUDE_PLUGIN, aiUsagePlugin(config)]
+}

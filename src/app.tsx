@@ -26,6 +26,7 @@ import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useSetupRunner } from './app-runtime/use-setup-runner'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
+import { builtinPlugins } from './builtin-plugins'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
@@ -35,13 +36,11 @@ import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
-import { startAIUsageService } from './services/ai-usage/provider'
 import { bump } from './services/aimux-counters'
 import { observeCounters } from './services/aimux-counters/observe'
-import { useAIUsageConfig, useAutoCommitConfig, useSnippetTriggerChar } from './settings/live'
+import { useAutoCommitConfig, useSnippetTriggerChar } from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
-import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import {
   runSideEffectGlobal,
@@ -101,7 +100,11 @@ export function App({
   // Plugin host. Mounted after `registerAllModes` so a plugin's `apply` sees a
   // fully-registered mode table, and before the first paint so a widget it
   // contributes is present on the initial render rather than popping in.
-  usePluginHost({ backend, userPlugins: resolvedConfig.plugins })
+  usePluginHost({
+    backend,
+    builtins: builtinPlugins(resolvedConfig),
+    userPlugins: resolvedConfig.plugins,
+  })
 
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
@@ -181,7 +184,6 @@ export function App({
   // Config the settings screen can change under us. The resolved config file is
   // the baseline each of these falls back to.
   const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
-  const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
   const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
 
   // The counters are a subscriber to the app event bus, not a hard-wired
@@ -208,24 +210,6 @@ export function App({
     // under us, and every later write goes through `writeRow`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!(aiUsageConfig.enabled === true)) {
-      aiUsageStore.getState().setEnabled(false)
-      return
-    }
-    aiUsageStore.getState().setEnabled(true)
-    const handle = startAIUsageService(aiUsageConfig, (snap) => {
-      aiUsageStore.getState().setSnapshot(snap)
-    })
-    return () => {
-      handle.stop()
-      aiUsageStore.getState().clear()
-      aiUsageStore.getState().setEnabled(false)
-    }
-    // Memoized by `useAIUsageConfig`, so toggling the indicator restarts the
-    // service and nothing else does.
-  }, [aiUsageConfig])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return

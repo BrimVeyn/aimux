@@ -5,6 +5,7 @@ import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../st
 
 import { version as APP_VERSION } from '../../package.json'
 import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
+import { builtinPlugins } from '../builtin-plugins'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
 import { type HookServer, startHookServer } from '../integrations/hook-server'
@@ -671,6 +672,7 @@ export async function runDaemon(): Promise<void> {
       broadcast: (event) => {
         broadcastPluginEvent(event)
       },
+      builtins: builtinPlugins(resolvedConfig),
       extendContext: createDaemonContextExtender({
         activeTabId: (projectId) => projectActiveTabIds.get(projectId) ?? null,
         closeTab: async (tabId) => {

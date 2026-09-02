@@ -44,6 +44,8 @@ export type {
   PluginSettingValue,
   PluginStatsApi,
   PluginStatsPage,
+  PluginStatusBarApi,
+  PluginStatusBarSegment,
   PluginStoreApi,
   PluginThemeMode,
   PluginThemesApi,

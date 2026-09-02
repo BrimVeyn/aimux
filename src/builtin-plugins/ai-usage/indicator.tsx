@@ -2,10 +2,10 @@ import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 import { useCallback } from 'react'
 
-import { useAIUsageStore } from '../../../../state/ai-usage-store'
-import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { formatCompact } from '../../../format-number'
-import { useTheme } from '../../../theme'
+import { useAIUsageStore } from '../../state/ai-usage-store'
+import { dispatchGlobal } from '../../state/dispatch-ref'
+import { formatCompact } from '../../ui/format-number'
+import { useTheme } from '../../ui/theme'
 
 /** nf-cod-claude / nf-cod-openai. Needs a nerd font, like the status bar separators. */
 const ICON: Record<AIUsageTool, string> = {

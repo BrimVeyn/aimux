@@ -19,6 +19,7 @@ export interface DoctorRegistrations {
   modals: string[]
   themes: string[]
   statsPages: string[]
+  statusBarSegments: string[]
   settingsSections: number
   actions: string[]
   effects: string[]
@@ -42,6 +43,7 @@ export function emptyRegistrations(): DoctorRegistrations {
     settingsSections: 0,
     settingsWatched: [],
     statsPages: [],
+    statusBarSegments: [],
     storeReducer: false,
     themes: [],
     views: [],
@@ -108,6 +110,9 @@ export function createDoctorExtender(
         },
         stats: {
           registerPage: (page: { id: string }) => record(into.statsPages, page.id),
+        },
+        statusBar: {
+          register: (segment: { id: string }) => record(into.statusBarSegments, segment.id),
         },
         themes: {
           current: () => ({ colors: {}, mode: 'dark' }),

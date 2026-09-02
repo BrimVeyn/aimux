@@ -34,6 +34,19 @@ export interface BuiltinPlugin {
   manifest: Omit<PluginManifest, 'entries'>
   /** The halves this plugin ships. Same two hosts as everyone else. */
   halves: Partial<Record<PluginHost, BuiltinHalfLoader>>
+  /**
+   * `ctx.config` values taken from aimux's own configuration.
+   *
+   * A migrated feature usually predates its plugin, and the keys it was
+   * configured under are in people's `aimux.config.ts` already. Seeding them
+   * here means the plugin body reads nothing but `ctx.config` — exactly like a
+   * third-party plugin — while the mapping from the legacy key stays visible
+   * in the built-in's declaration, which is where a reader would look for it.
+   *
+   * Ranks below the user's `plugins: [{ id, config }]` override, above the
+   * manifest's own defaults.
+   */
+  config?: Record<string, unknown>
 }
 
 /**
@@ -94,7 +107,7 @@ export function buildBuiltinRecords(
     }
 
     const override = overrides.get(parsed.manifest.id)
-    const resolved = resolvePluginConfig(parsed.manifest, override?.config)
+    const resolved = resolvePluginConfig(parsed.manifest, builtin.config, override?.config)
     for (const issue of resolved.issues) {
       issues.push({
         id: parsed.manifest.id,

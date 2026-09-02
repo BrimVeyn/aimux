@@ -2,10 +2,10 @@ import type { PluginConfigEntry } from '@brimveyn/aimux-config'
 
 import { useEffect, useRef, useState } from 'react'
 
+import type { BuiltinPlugin } from '../plugins/builtin'
 import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 import type { SessionBackend } from '../session-backend/types'
 
-import { BUILTIN_PLUGINS } from '../builtin-plugins'
 import { logDebug } from '../debug/input-log'
 import { PluginRuntime } from '../plugins/loader'
 import {
@@ -39,6 +39,8 @@ export interface UsePluginHostOptions {
   backend: SessionBackend
   /** `resolvedConfig.plugins`. Read once: config is not reloaded at runtime. */
   userPlugins: readonly PluginConfigEntry[]
+  /** The plugins aimux ships. Supplied by `app.tsx`, which has the config. */
+  builtins: readonly BuiltinPlugin[]
 }
 
 export interface PluginHostHandle {
@@ -76,6 +78,8 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
   // render, and the host must be created exactly once per app instance.
   const userPluginsRef = useRef(options.userPlugins)
   userPluginsRef.current = options.userPlugins
+  const builtinsRef = useRef(options.builtins)
+  builtinsRef.current = options.builtins
 
   useEffect(() => {
     let stopped = false
@@ -95,7 +99,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     }
 
     const runtime = new PluginRuntime({
-      builtins: BUILTIN_PLUGINS,
+      builtins: builtinsRef.current,
       extendContext: extendUiPluginContext,
       host: 'ui',
       onIssues: (issues) => {

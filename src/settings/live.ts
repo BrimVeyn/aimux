@@ -1,11 +1,9 @@
-import type { AIUsageToolConfig, AutoCommitConfig } from '@brimveyn/aimux-config'
-
-import { useMemo } from 'react'
+import type { AutoCommitConfig } from '@brimveyn/aimux-config'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
 import { ACTIVITY_SPRITES } from './sections/experimental'
-import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS, HINTS_ENABLED } from './sections/status-bar'
+import { HINTS_ENABLED } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 
 /**
@@ -43,21 +41,6 @@ export function useSnippetTriggerChar(fromConfigFile: string): string {
   const stored = useSettingsStore((s) => s.values[SNIPPET_TRIGGER_CHAR])
   if (typeof stored === 'string' && stored.length === 1) return stored
   return fromConfigFile
-}
-
-/**
- * Memoized on purpose: its consumer restarts the polling service whenever this
- * object changes, so a fresh identity per render would restart it per render.
- */
-export function useAIUsageConfig(fromConfigFile: AIUsageToolConfig | undefined): AIUsageToolConfig {
-  const values = useSettingsStore((s) => s.values)
-  const enabled = values[AI_USAGE_ENABLED] === true
-  const poll = values[AI_USAGE_POLL_SECONDS]
-  const pollSeconds = typeof poll === 'number' ? poll : fromConfigFile?.pollSeconds
-  return useMemo(
-    () => ({ ...fromConfigFile, enabled, pollSeconds }),
-    [enabled, fromConfigFile, pollSeconds]
-  )
 }
 
 /**

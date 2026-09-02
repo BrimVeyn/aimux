@@ -29,6 +29,7 @@ import { toast } from '../state/toast-store'
 import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
 import { registerPluginView } from './plugin-views'
+import { registerStatusBarSegment } from './status-bar-segments'
 import { getCurrentMode, getCurrentTheme, subscribeThemeChanges } from './theme-store'
 import { registerBarWidget } from './widgets/registry'
 
@@ -132,6 +133,16 @@ function buildUi(ctx: PluginContext): PluginUiApi {
           for (let i = disposers.length - 1; i >= 0; i--) disposers[i]?.()
         })
       },
+    },
+    statusBar: {
+      register: (segment) =>
+        own(
+          ctx,
+          registerStatusBarSegment({
+            id: qualify(id, segment.id),
+            render: () => segment.render() as ReactNode,
+          })
+        ),
     },
     themes: {
       current: () => themeSnapshot(getCurrentTheme(), getCurrentMode()),
