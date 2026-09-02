@@ -38,6 +38,10 @@ export {
 } from './external-editor-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
+// The application state, mode and layout shapes. Defined in this package —
+// `src/` re-exports them rather than declaring its own copies.
+export type * from './app-types'
+
 // User-facing config types (keymap/backends/projects/etc.).
 export type {
   Action,
@@ -47,21 +51,14 @@ export type {
   AIUsageTool,
   AIUsageToolConfig,
   AppAction,
-  AppState,
   AutoCommitConfig,
   AutoRenameConfig,
   BackendConfig,
   BindingDef,
-  DiscoveredRepo,
   ExternalEditorConfig,
-  FocusMode,
-  GitFileListMode,
   GitPaneConfig,
-  GitPaneDiffCountConfig,
   GitPaneEmbeddedConfig,
   GitPanePaneConfig,
-  GitPanePathConfig,
-  GitPaneState,
   GroupBuilderApi,
   HooksConfig,
   KeyInput,
@@ -70,26 +67,21 @@ export type {
   LayoutLeaf,
   LayoutNode,
   LayoutSplit,
-  ModalState,
   ModeBindingBuilderApi,
   ModeContext,
   ModeId,
   ModeKeymapDef,
   MultiRepoConfig,
-  MultiRepoState,
   PluginConfigDecl,
   PluginConfigEntry,
-  ProjectRecord,
   ResolvedConfig,
   ResolvedKeymapConfig,
   SidebarConfig,
   SideEffect,
   SnippetDef,
-  SnippetRecord,
   SnippetShellVar,
   SnippetVar,
   SplitDirection,
   StatusBarConfig,
   StatusBarSeparator,
-  TabSession,
 } from './types'

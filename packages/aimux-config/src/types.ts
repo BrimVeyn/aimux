@@ -1,10 +1,42 @@
 // -----------------------------------------------------------------------------
-// Self-contained types for the aimux keymap/config surface.
-// These are duplicated from the aimux CLI's internal types to keep this
-// package dependency-free. They must stay structurally identical with the
-// CLI types in `aimux`'s `src/state/types.ts`, `src/input/modes/types.ts`,
-// `src/ui/themes.ts`, and `src/state/layout-tree.ts`.
+// The aimux keymap/config surface: everything a user's `aimux.config.ts` and a
+// plugin author write against.
+//
+// The application state, mode and layout shapes it builds on live in
+// `./app-types` and are re-exported here, so this module stays the one import
+// a config file needs. Both halves are SOURCE definitions — `src/` re-exports
+// from this package rather than declaring its own copies, which is what makes
+// the two impossible to drift apart.
 // -----------------------------------------------------------------------------
+
+export type * from './app-types'
+
+import type {
+  AppState,
+  AssistantId,
+  BarSide,
+  BranchDivergence,
+  DiffData,
+  DirectoryResult,
+  FocusMode,
+  GitFileListMode,
+  GitFileSection,
+  GitPaneDiffCountConfig,
+  GitPanelError,
+  GitPanePathConfig,
+  GitPaneState,
+  GitRefreshPayload,
+  PendingWorkspaceLaunch,
+  ProjectRecord,
+  ProjectSnapshotV1,
+  ProjectStatus,
+  SnippetRecord,
+  TabActivity,
+  TabSession,
+  TerminalModeState,
+  TerminalSnapshot,
+  WorkspaceRecord,
+} from './app-types'
 
 // ─── Mode identifiers ─────────────────────────────────────────────────────────
 
@@ -41,73 +73,9 @@ export type ModeId =
 
 // ─── Primitive app types ──────────────────────────────────────────────────────
 
-export type BuiltinAssistantId =
-  | 'claude'
-  | 'codex'
-  | 'opencode'
-  | 'grok'
-  | 'kimi'
-  | 'terminal'
-  | 'antigravity'
-export type AssistantId = BuiltinAssistantId | (string & {})
-export type TabStatus = 'starting' | 'running' | 'disconnected' | 'error'
-
-/**
- * Status values that may appear in legacy on-disk project snapshots but are
- * not produced by the running app anymore.
- */
-export type LegacyPersistedTabStatus = TabStatus | 'exited'
-export type TabActivity = 'working' | 'waiting-input' | 'idle'
-export interface ProjectStatus {
-  working: boolean
-  waiting: boolean
-}
-export interface WorkspaceActivity {
-  working: boolean
-  waiting: boolean
-  done: boolean
-}
-export type FocusMode =
-  | 'navigation'
-  | 'terminal-input'
-  | 'modal'
-  | 'command-edit'
-  | 'git'
-  | 'settings'
-  | 'stats'
 export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Terminal data shapes ─────────────────────────────────────────────────────
-
-export interface TerminalSpan {
-  text: string
-  fg?: string
-  bg?: string
-  bold?: boolean
-  italic?: boolean
-  underline?: boolean
-  cursor?: boolean
-}
-
-export interface TerminalLine {
-  spans: TerminalSpan[]
-}
-
-export interface TerminalSnapshot {
-  lines: TerminalLine[]
-  tailLines?: TerminalLine[]
-  viewportY: number
-  baseY: number
-  cursorVisible: boolean
-}
-
-export interface TerminalModeState {
-  mouseTrackingMode: 'none' | 'x10' | 'vt200' | 'drag' | 'any'
-  sendFocusMode: boolean
-  alternateScrollMode: boolean
-  isAlternateBuffer: boolean
-  bracketedPasteMode: boolean
-}
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
@@ -123,501 +91,6 @@ export interface LayoutSplit {
   second: LayoutNode
 }
 export type LayoutNode = LayoutLeaf | LayoutSplit
-
-// ─── Records ──────────────────────────────────────────────────────────────────
-
-export interface PersistedTabSnapshot {
-  id: string
-  assistant: AssistantId
-  title: string
-  command: string
-  status: Exclude<LegacyPersistedTabStatus, 'disconnected'>
-  buffer: string
-  viewport?: TerminalSnapshot
-  terminalModes: TerminalModeState
-  errorMessage?: string
-  exitCode?: number
-  workspaceId?: string
-  autoRenameStatus?: 'eligible' | 'attempted'
-}
-
-export interface ProjectSnapshotV1 {
-  version: 1
-  savedAt: string
-  activeTabId: string | null
-  sidebar: {
-    visible: boolean
-    width: number
-  }
-  tabs: PersistedTabSnapshot[]
-  layoutTree?: LayoutNode
-  layoutTrees?: Record<string, LayoutNode>
-  tabGroupMap?: Record<string, string>
-  /**
-   * Last viewed tab per workspace, keyed by workspace id. Optional and additive
-   * (no version bump): older builds ignore it, newer builds tolerate its
-   * absence. Written now so the data accrues, but restoring it at startup is
-   * gated off until a future change flips RESTORE_LAST_ACTIVE_TAB_BY_WORKSPACE.
-   */
-  lastActiveTabByWorkspace?: Record<string, string>
-}
-
-export type WorkspaceSource = 'primary' | 'aimux-temp' | 'external'
-
-export interface WorkspaceRecord {
-  id: string
-  name: string
-  path: string
-  repoRoot: string
-  branch?: string
-  baseRef?: string
-  commitSha?: string
-  source: WorkspaceSource
-  createdByAimux: boolean
-  color?: string
-  createdAt: string
-  updatedAt: string
-  /** Last setup-script run for this workspace. Display only — the auto-run gate
-   *  is "this session has not seen this workspace id before". */
-  setupRanAt?: string
-  setupExitCode?: number
-}
-
-export interface ProjectRecord {
-  id: string
-  name: string
-  projectPath?: string
-  createdAt: string
-  updatedAt: string
-  lastOpenedAt: string
-  order?: number
-  projectSnapshot?: ProjectSnapshotV1
-  workspaces?: WorkspaceRecord[]
-  activeWorkspaceId?: string
-}
-
-export interface TabSession {
-  id: string
-  assistant: AssistantId
-  title: string
-  status: TabStatus
-  activity?: TabActivity
-  buffer: string
-  viewport?: TerminalSnapshot
-  terminalModes: TerminalModeState
-  command: string
-  errorMessage?: string
-  exitCode?: number
-  workspaceId?: string
-  /** This tab finished a turn while you were elsewhere. See `src/state/types.ts`. */
-  unseen?: boolean
-  autoRenameStatus?: 'eligible' | 'attempted'
-  /** Real PTY tab that no chrome enumerates. See `src/state/types.ts`. */
-  hidden?: boolean
-  /** Who owns this tab, independent of visibility. See `src/state/types.ts`. */
-  role?: 'setup'
-}
-
-export interface SnippetRecord {
-  id: string
-  name: string
-  content: string
-  trigger?: string
-  vars?: Record<string, SnippetVar>
-}
-
-export type DirectoryResultType = 'git-repo' | 'workspace' | 'project'
-
-export interface DirectoryResult {
-  path: string
-  type: DirectoryResultType
-}
-
-// ─── Bars / git panel / modal state (for ModeContext) ─────────────────────────
-
-export type BarSide = 'left' | 'right'
-
-export interface BarWidget {
-  id: string
-  grow: number
-  visible: boolean
-}
-
-export interface BarState {
-  visible: boolean
-  width: number
-  /** Ordered top → bottom. */
-  widgets: BarWidget[]
-}
-
-export type BarsState = Record<BarSide, BarState>
-
-export interface GitPaneState {
-  diffModeRatio: number
-  fileListMode: GitFileListMode
-  treeCompaction: boolean
-  path: GitPanePathConfig
-  diffCount: GitPaneDiffCountConfig
-  prefetchRadius: number
-}
-
-export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'C' | 'U' | '?'
-export type GitFileSection = 'staged' | 'unstaged' | 'untracked' | 'historical'
-
-export interface GitFileEntry {
-  path: string
-  renamedFrom?: string
-  section: GitFileSection
-  status: GitFileStatus
-  added: number | null
-  removed: number | null
-  repoPath?: string
-}
-
-export type GitPanelError = 'not-a-repo' | 'unknown'
-
-export interface GitPanelState {
-  branch: string | null
-  ahead: number
-  behind: number
-  files: GitFileEntry[]
-  error: GitPanelError | null
-}
-
-export type DiffFileStatus =
-  | 'modified'
-  | 'new'
-  | 'deleted'
-  | 'binary'
-  | 'renamed'
-  | 'image'
-  | 'too-large'
-
-export interface DiffData {
-  path: string
-  status: DiffFileStatus
-  oldPath?: string
-  rawDiff: string
-  binarySizeBefore?: number
-  binarySizeAfter?: number
-  errorMessage?: string
-  imageBytesBefore?: Uint8Array
-  imageBytesAfter?: Uint8Array
-  imageMime?: string
-  imageFormatLabel?: string
-}
-
-export type GitDiffView = 'split' | 'stacked'
-export type GitFileListMode = 'tree' | 'flat'
-
-export interface FoldState {
-  top: number
-  bottom: number
-}
-
-export interface GitModeState {
-  selectedEntryKey: string | null
-  collapsedFolders: Record<string, true>
-  diffs: Record<string, DiffData>
-  /** Parsed diff cache (internal); detailed shape lives in src/state/types. */
-  parsedFiles: Record<string, { hash: string; file: unknown }>
-  /** Syntax-highlight cache (internal). */
-  highlights: Record<string, { hash: string; themeId: string; add: unknown; del: unknown }>
-  loading: Record<string, boolean>
-  pendingDeletePath: string | null
-  actionMessage: string | null
-  diffView: GitDiffView
-  folds: Record<string, Record<string, FoldState>>
-  headOffset: number
-  reviewBase: boolean
-}
-
-interface ModalBase {
-  selectedIndex: number
-  editBuffer: string | null
-  projectTargetId: string | null
-  cursorPos?: number
-  /**
-   * Where the focus goes when this modal closes, when it is not back to the
-   * panes. Set by whoever opened it, because that is who knows what is behind it
-   * — the settings screen opens five different modals, and none of them should
-   * have to grow a case in the reducer to find their way home.
-   */
-  returnTo?: FocusMode
-}
-
-export interface ModalClosed extends ModalBase {
-  type: null
-  editBuffer: null
-  projectTargetId: null
-}
-
-export interface ModalNewTab extends ModalBase {
-  type: 'new-tab'
-  editingCommand: AssistantId | null
-  /** Set when `create-workspace` chained into this picker. */
-  pendingWorkspace?: PendingWorkspaceLaunch
-  /** A prompt for the picked assistant, without the workspace pinning/rename. */
-  pendingPrompt?: string
-}
-export interface PendingWorkspaceLaunch {
-  projectId: string
-  workspaceId: string
-  prompt: string
-}
-export interface ModalProjectPicker extends ModalBase {
-  type: 'project-picker'
-}
-export interface ModalProjectName extends ModalBase {
-  type: 'project-name'
-  returnToProjectPicker: boolean
-}
-export interface ModalRenameTab extends ModalBase {
-  type: 'rename-tab'
-}
-/** Fuzzy-ish search across every setting, from inside the settings screen. */
-export interface ModalSettingsSearch extends ModalBase {
-  type: 'settings-search'
-}
-export interface ModalSettingText extends ModalBase {
-  type: 'setting-text'
-  settingId: string
-  settingLabel: string
-}
-export interface ModalRenameWorkspace extends ModalBase {
-  type: 'rename-workspace'
-  workspaceProjectId: string
-}
-export interface ModalSnippetPicker extends ModalBase {
-  type: 'snippet-picker'
-  actionMessage?: string | null
-}
-export interface ModalThemePicker extends ModalBase {
-  type: 'theme-picker'
-  entryCount: number
-}
-export interface ModalHelp extends ModalBase {
-  type: 'help'
-  entryCount: number
-  scope: ModeId | null
-}
-export interface ModalSplitPicker extends ModalBase {
-  type: 'split-picker'
-  splitDirection: SplitDirection
-}
-export interface ModalCreateProject extends ModalBase {
-  type: 'create-project'
-  directoryResults: DirectoryResult[]
-  pendingProjectPath: string | null
-  activeField: 'directory' | 'name'
-  nameBuffer: string
-  returnToProjectPicker: boolean
-}
-export interface ModalCreateWorkspace extends ModalBase {
-  type: 'create-workspace'
-  activeField: 'prompt' | 'base'
-  /** "What do you want to work on?" — names the workspace and its branch. */
-  prompt: string
-  branchError: string | null
-  baseQuery: string
-  baseRef: string
-  baseBranches: string[]
-}
-export interface ModalGitCommit extends ModalBase {
-  type: 'git-commit'
-  activeField: 'title' | 'body'
-  contentBuffer: string
-  stage: 'edit' | 'generating' | 'confirm'
-}
-export interface ModalSnippetEditor extends ModalBase {
-  type: 'snippet-editor'
-  activeField: 'name' | 'trigger' | 'content'
-  nameBuffer: string
-  triggerBuffer: string
-  contentBuffer: string
-}
-
-export interface ModalUpdateAvailable extends ModalBase {
-  type: 'update-available'
-  currentVersion: string
-  latestVersion: string
-}
-
-/** The status bar's usage indicator, expanded. Carries nothing: it is a readout. */
-export interface ModalQuotas extends ModalBase {
-  type: 'quotas'
-}
-
-export interface ModalWorkspaceMove extends ModalBase {
-  type: 'workspace-move'
-  /** The workspace being moved (may differ from the active one, e.g. a tab menu). */
-  sourceWorkspaceId: string
-  deleteSource: boolean
-  /** Per-workspace dirty file counts, loaded async when the modal opens. */
-  stats: { kind: 'loading' } | { kind: 'ready'; dirtyFiles: Record<string, number> }
-}
-
-/**
- * Confirmation for a recoverable move failure: the target's dirty files
- * overlap the incoming changes (stash-target) or the squash conflicts
- * (keep-conflicts). Both workspaces are already restored; confirming re-runs
- * move-workspace with the matching flag.
- */
-export interface ModalWorkspaceMoveConfirm extends ModalBase {
-  type: 'workspace-move-confirm'
-  variant: 'stash-target' | 'keep-conflicts'
-  files: string[]
-  projectId: string
-  sourceWorkspaceId: string
-  targetWorkspaceId: string
-  deleteSource: boolean
-  sourceLabel: string
-  targetLabel: string
-}
-
-/**
- * Standalone confirmation for a recoverable workspace delete failure triggered
- * outside the new-tab picker (e.g. the sidebar's "Remove workspace"). Carries the
- * params needed to re-run the delete with force once confirmed.
- */
-export interface ModalWorkspaceDeleteConfirm extends ModalBase {
-  type: 'workspace-delete-confirm'
-  projectId: string
-  workspaceId: string
-  workspaceLabel: string
-  reason: string
-  closeTabs: boolean
-  /** Whether confirming force-deletes — true only after a recoverable failure. */
-  force: boolean
-}
-
-export type FlashJumpTargetKind = 'project' | 'workspace' | 'tab'
-
-export interface FlashJumpTarget {
-  kind: FlashJumpTargetKind
-  projectIndex: number
-  projectId: string
-  workspaceId?: string
-  tabId?: string
-}
-
-export interface FlashLabel {
-  key: string
-  label: string
-  target: FlashJumpTarget
-}
-
-export interface ModalFlashJump extends ModalBase {
-  type: 'flash-jump'
-  labels: FlashLabel[]
-  buffer: string
-  pendingJump: FlashJumpTarget | null
-}
-
-export type ModalState =
-  | ModalClosed
-  | ModalNewTab
-  | ModalProjectPicker
-  | ModalProjectName
-  | ModalRenameTab
-  | ModalRenameWorkspace
-  | ModalSnippetPicker
-  | ModalThemePicker
-  | ModalHelp
-  | ModalSplitPicker
-  | ModalCreateProject
-  | ModalCreateWorkspace
-  | ModalSnippetEditor
-  | ModalGitCommit
-  | ModalUpdateAvailable
-  | ModalQuotas
-  | ModalWorkspaceMove
-  | ModalWorkspaceMoveConfirm
-  | ModalWorkspaceDeleteConfirm
-  | ModalFlashJump
-  | ModalSettingText
-  | ModalSettingsSearch
-
-export interface LayoutState {
-  terminalCols: number
-  terminalRows: number
-}
-
-export interface ProjectBarState {
-  visible: boolean
-}
-
-export type AutoCommitSuggestion =
-  | { kind: 'idle' }
-  | {
-      kind: 'generating'
-      tabId: string
-      workingTreeHash: string
-      abortController: AbortController
-      startedAt: number
-    }
-  | {
-      kind: 'ready'
-      tabId: string
-      workingTreeHash: string
-      title: string
-      body: string
-      generatedAt: number
-    }
-
-export interface AutoCommitState {
-  byProject: Record<string, AutoCommitSuggestion>
-}
-
-export interface DiscoveredRepo {
-  path: string
-  name: string
-  isRoot: boolean
-}
-
-export interface MultiRepoState {
-  repos: DiscoveredRepo[]
-  prefixes: Record<string, string>
-}
-
-/** Where the cursor is in the settings screen — the cursor only, not the values. */
-export interface SettingsUIState {
-  rowIndex: number
-}
-
-/** Mirror of the CLI's `StatsUIState`. */
-export interface StatsUIState {
-  pageIndex: number
-  scrollTop: number
-}
-
-export interface AppState {
-  tabs: TabSession[]
-  activeTabId: string | null
-  layoutTrees: Record<string, LayoutNode>
-  tabGroupMap: Record<string, string>
-  projects: ProjectRecord[]
-  currentProjectId: string | null
-  projectStatuses: Record<string, ProjectStatus>
-  projectBar: ProjectBarState
-  snippets: SnippetRecord[]
-  focusMode: FocusMode
-  bars: BarsState
-  gitPane: GitPaneState
-  modal: ModalState
-  layout: LayoutState
-  customCommands: Record<AssistantId, string>
-  gitPanel: GitPanelState
-  gitMode: GitModeState
-  autoCommit: AutoCommitState
-  multiRepo: MultiRepoState
-  settings: SettingsUIState
-  stats: StatsUIState
-  workspaceDivergence: Record<string, BranchDivergence>
-  workspaceActivity: Record<string, WorkspaceActivity>
-  lastActiveTabByWorkspace: Record<string, string>
-  pendingChords: string[] | null
-}
 
 // ─── AppAction union ──────────────────────────────────────────────────────────
 
@@ -798,22 +271,6 @@ export type StatsAction =
   | { type: 'stats-scroll'; delta: number }
   /** The offset the scrollbox actually accepted, sent back so the state cannot run past the page. */
   | { type: 'stats-scroll-settled'; scrollTop: number }
-
-export interface GitRefreshPayload {
-  branch: string | null
-  ahead: number
-  behind: number
-  files: GitFileEntry[]
-}
-
-/** Commits a workspace branch is ahead/behind the ref it forked from. */
-export interface BranchDivergence {
-  ahead: number
-  behind: number
-  /** Lines changed since the fork point, working tree included. */
-  added?: number
-  removed?: number
-}
 
 export type GitPanelAction =
   | { type: 'git-refresh-success'; payload: GitRefreshPayload }
@@ -1147,14 +604,6 @@ export interface ProjectBarConfig {
 }
 
 // ─── Git pane config (discriminated union) ────────────────────────────────────
-
-export type GitPanePathConfig =
-  | { enabled: false }
-  | { enabled: true; pathFn?: (path: string) => string }
-
-export interface GitPaneDiffCountConfig {
-  enabled: boolean
-}
 
 interface GitPaneBaseConfig {
   /** Startup override for git pane visibility. Reapplied on each launch. */
