@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 import pkg from '../../package.json'
-import { resolveHookScriptPath } from '../../src/integrations/claude-hooks-install'
+import { resolveHookScriptPath } from '../../src/builtin-plugins/claude/hooks-install'
 
 const ROOT = new URL('../..', import.meta.url).pathname
 

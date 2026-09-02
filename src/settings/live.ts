@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 
 import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
-import { ACTIVITY_SPRITES, HARMONIZE_CLAUDE_THEME } from './sections/experimental'
+import { ACTIVITY_SPRITES } from './sections/experimental'
 import { AI_USAGE_ENABLED, AI_USAGE_POLL_SECONDS, HINTS_ENABLED } from './sections/status-bar'
 import { useSettingsStore } from './settings-store'
 
@@ -81,12 +81,6 @@ export function useAutoCommitModel(assistant: string | undefined): string | unde
  */
 export function useActivitySprites(): boolean {
   return useSettingsStore((s) => s.values[ACTIVITY_SPRITES] === true)
-}
-
-/** Whether to keep Claude Code's theme in step with the active aimux theme. */
-export function useHarmonizeClaudeTheme(fromConfigFile: boolean | undefined): boolean {
-  const stored = useSettingsStore((s) => s.values[HARMONIZE_CLAUDE_THEME])
-  return typeof stored === 'boolean' ? stored : fromConfigFile === true
 }
 
 /** Whether the status bar draws its second row of keybinding hints. */

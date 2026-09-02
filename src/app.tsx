@@ -33,19 +33,12 @@ import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
-import { ensureClaudeSettingsHooks } from './integrations/claude-hooks-install'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
-import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { startAIUsageService } from './services/ai-usage/provider'
 import { bump } from './services/aimux-counters'
 import { observeCounters } from './services/aimux-counters/observe'
-import {
-  useAIUsageConfig,
-  useAutoCommitConfig,
-  useHarmonizeClaudeTheme,
-  useSnippetTriggerChar,
-} from './settings/live'
+import { useAIUsageConfig, useAutoCommitConfig, useSnippetTriggerChar } from './settings/live'
 import { ALL_SETTING_ROWS } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { aiUsageStore } from './state/ai-usage-store'
@@ -63,14 +56,7 @@ import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
 import { usePluginHost } from './ui/plugin-host'
 import { RootView } from './ui/root'
-import {
-  applyTheme,
-  getCurrentMode,
-  getCurrentTheme,
-  setMode,
-  setTransparent,
-  subscribeThemeChanges,
-} from './ui/theme'
+import { applyTheme, setMode, setTransparent } from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
 import { loadUserThemes } from './ui/user-themes'
 import {
@@ -196,9 +182,6 @@ export function App({
   // the baseline each of these falls back to.
   const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
   const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
-  const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
-    resolvedConfig.theme?.beta?.harmonizeClaudeTheme
-  )
   const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
 
   // The counters are a subscriber to the app event bus, not a hard-wired
@@ -225,25 +208,6 @@ export function App({
     // under us, and every later write goes through `writeRow`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!harmonizeClaudeTheme) return
-    ensureClaudeSettingsThemePref()
-    syncClaudeTheme(getCurrentTheme(), getCurrentMode())
-    return subscribeThemeChanges((resolved, mode) => {
-      syncClaudeTheme(resolved, mode)
-    })
-  }, [harmonizeClaudeTheme])
-
-  useEffect(() => {
-    // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,
-    // idempotently patches ~/.claude/settings.json so Claude Code's hooks
-    // call back into the daemon for per-tab activity detection. Silent on
-    // failure; the visual PTY detector is the fallback either way.
-    if (resolvedConfig.integrations.claudeHooks) {
-      ensureClaudeSettingsHooks()
-    }
-  }, [resolvedConfig.integrations.claudeHooks])
 
   useEffect(() => {
     if (!(aiUsageConfig.enabled === true)) {

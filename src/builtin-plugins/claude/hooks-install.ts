@@ -9,8 +9,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileS
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { logDebug } from '../debug/input-log'
-import { claudeHome } from '../platform/assistant-home'
+import { logDebug } from '../../debug/input-log'
+import { claudeHome } from '../../platform/assistant-home'
 
 const HOOK_EVENTS = [
   'UserPromptSubmit',

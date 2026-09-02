@@ -1,5 +1,7 @@
 import type { BuiltinPlugin } from '../plugins/builtin'
 
+import { CLAUDE_PLUGIN } from './claude'
+
 /**
  * The plugins aimux ships with.
  *
@@ -13,4 +15,4 @@ import type { BuiltinPlugin } from '../plugins/builtin'
  *
  *   plugins: [{ id: 'aimux.claude', enabled: false }]
  */
-export const BUILTIN_PLUGINS: readonly BuiltinPlugin[] = []
+export const BUILTIN_PLUGINS: readonly BuiltinPlugin[] = [CLAUDE_PLUGIN]

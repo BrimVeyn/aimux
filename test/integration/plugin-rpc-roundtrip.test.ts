@@ -288,10 +288,13 @@ describe('plugin RPC — over a socket', () => {
 
     const result = (await host.handleRequest('aimux', 'list', {})) as {
       plugins: unknown[]
-      known: unknown[]
+      known: { source: string }[]
     }
+    // Nothing is *loaded* here — but the plugins aimux ships are always known,
+    // and one of them has no daemon half, which is exactly the difference
+    // between the two lists.
     expect(result.plugins).toEqual([])
-    expect(result.known).toEqual([])
+    expect(result.known.every((entry) => entry.source === 'builtin')).toBe(true)
     expect(host.handleRequest('aimux', 'nonsense', {})).rejects.toThrow(
       /unknown plugin control verb/
     )

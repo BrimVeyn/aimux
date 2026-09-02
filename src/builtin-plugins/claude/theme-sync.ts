@@ -14,8 +14,8 @@ import {
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { logDebug } from '../debug/input-log'
-import { claudeHome } from '../platform/assistant-home'
+import { logDebug } from '../../debug/input-log'
+import { claudeHome } from '../../platform/assistant-home'
 
 const THEME_SLUG = 'aimux'
 const THEME_PREF_VALUE = `custom:${THEME_SLUG}`
