@@ -895,6 +895,19 @@ export type ModeId =
   | 'settings'
   | 'stats'
 
+/**
+ * The effect half of the plugin envelope; see `PluginStateAction` for the
+ * action half. Same reasoning: the union stays closed so the 68-branch
+ * executor keeps its exhaustiveness check, and a plugin's effect is routed by
+ * `pluginId` to the handler that plugin registered.
+ */
+export interface PluginSideEffect {
+  type: 'plugin-effect'
+  pluginId: string
+  effectId: string
+  payload?: unknown
+}
+
 export type SideEffect =
   | { type: 'quit'; state: AppState }
   | { type: 'open-new-tab' }
@@ -986,6 +999,7 @@ export type SideEffect =
   | { type: 'reset-settings-row' }
   | { type: 'confirm-settings-search' }
   | { type: 'commit-setting-text'; settingId: string; value: string }
+  | PluginSideEffect
 
 export interface KeyResult {
   actions: AppAction[]

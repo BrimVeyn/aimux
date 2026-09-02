@@ -31,6 +31,7 @@ import {
   handleSwitchProjectByIndex,
   handleSwitchTabByIndex,
 } from './navigation-actions'
+import { runPluginEffect } from './plugin-effects'
 import {
   handleCreateProjectEffect,
   handleDeleteProjectEffect,
@@ -621,6 +622,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'commit-setting-text': {
       commitSettingText(ctx, effect.settingId, effect.value)
+      return
+    }
+    // The one arm the core does not implement: routed to whichever plugin
+    // registered `effectId`, and contained there so a throwing plugin cannot
+    // abort the rest of this keystroke's effects.
+    case 'plugin-effect': {
+      runPluginEffect(effect.pluginId, effect.effectId, effect.payload, ctx)
       return
     }
     default:
