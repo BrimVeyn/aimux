@@ -15,6 +15,12 @@ events, fibers, HMR). The distribution format is modelled on herdr (declarative
 manifest, `config` / `state` directories, `install` / `link`, a shipped skill,
 and a subprocess adapter so a plugin can be written in any language).
 
+**Where the types live.** `@brimveyn/aimux-config` holds the application state,
+mode, layout, action and settings shapes; `src/` re-exports them. They used to
+be declared in both places, "kept structurally identical" by hand, and had
+already drifted on six types by the time anyone checked. A public plugin API
+cannot rest on that.
+
 ## Hosts
 
 ```
@@ -55,12 +61,13 @@ full schema.
 
 All per-profile, like the sockets — the `dev` profile has its own plugins.
 
-| Path                             | Holds                                             |
-| -------------------------------- | ------------------------------------------------- |
-| `<profile>/plugins/<id>/`        | installed plugins (checkout managed by aimux)     |
-| `<profile>/plugins-config/<id>/` | files a human edits                               |
-| `<profile>/plugins-state/<id>/`  | runtime state, `plugin.log`, `.hot/` build output |
-| `<profile>/aimux-plugins.json`   | registry: links, enabled flags, per-plugin config |
+| Path                             | Holds                                                   |
+| -------------------------------- | ------------------------------------------------------- |
+| `<profile>/plugins/<id>/`        | installed plugins (checkout managed by aimux)           |
+| `<profile>/plugins-config/<id>/` | files a human edits                                     |
+| `<profile>/plugins-state/<id>/`  | runtime state, `plugin.log`, `.hot/` build output       |
+| `<profile>/aimux-plugins.json`   | registry: links, enabled flags, per-plugin config       |
+| `<profile>/themes/*.json`        | extra themes, in the shipped format; filename is the id |
 
 `aimux.config.ts` is the declarative alternative to the registry:
 
@@ -138,6 +145,85 @@ UNLOADING ──▶ DISPOSED                     FAILED
 4. On the daemon side this touches neither the socket nor the terminal manager:
    no PTY is affected and no client reconnects.
 5. `aimux plugin reload [id]` runs the same path by hand.
+
+## The UI surface
+
+A plugin declaring `entries.ui` receives three service objects on its context,
+attached by the UI host through the kernel's `extendContext` hook. The kernel
+itself stays host-agnostic — it knows how to build a context and how to dispose
+one, and nothing about what either process can offer.
+
+| Member                                              | What it registers                                   |
+| --------------------------------------------------- | --------------------------------------------------- |
+| `ctx.ui.widgets.register`                           | a bar widget, placed and resized like the built-ins |
+| `ctx.ui.views.register` / `.open` / `.close`        | a full-screen view that replaces the pane tree      |
+| `ctx.ui.modals.register` / `.open` / `.close`       | a modal, closed by the ordinary `close-modal`       |
+| `ctx.ui.settings.registerSection`                   | a settings section beyond the generated one         |
+| `ctx.ui.themes.register`                            | a theme, in the shipped JSON format                 |
+| `ctx.ui.stats.registerPage`                         | a page on the stats screen                          |
+| `ctx.ui.toast`                                      | the usual three toast levels                        |
+| `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `useTheme`       |
+| `ctx.actions.register` / `.effect`                  | a named keyboard action, and the effect it runs     |
+| `ctx.store.reducer` / `.get` / `.set` / `.dispatch` | this plugin's slice of `AppState`                   |
+
+Two invariants are enforced by the host rather than asked of the plugin.
+
+**Every registration goes on the fiber.** The host wraps each one in
+`ctx.effect`, so an unload is total: a plugin does not have to keep the
+disposers, and could not leak one if it tried.
+
+**Ids are namespaced by the host.** A plugin registering `board` gets
+`acme.thing.board` whether it wanted to or not. Two plugins can each have a
+"board", and the owner of any id stays readable from the id alone.
+
+### Keyboard
+
+An action is registered by unqualified verb and bound by qualified name:
+
+```ts
+ctx.actions.register('open', () => ({
+  actions: [],
+  effects: [{ type: 'plugin-effect', pluginId: ctx.id, effectId: 'openBoard' }],
+}))
+ctx.actions.effect('openBoard', () => ctx.ui.views.open('board'))
+```
+
+```ts
+// aimux.config.ts
+keymaps: (k) => k.mode('navigation', (m) => m.map('<leader>b', k.plugin('acme.thing.open'))),
+```
+
+A name rather than a function, because the keymap is resolved at startup and
+plugins load after it — requiring an import would mean a config file could only
+reference plugins it could reach. An unresolved name is inert: the key does
+nothing, the way an unbound key does. Anything louder would turn one disabled
+plugin into a broken keyboard.
+
+### What "opening a closed union" meant
+
+`AppAction`, `SideEffect`, `ModalState` and the mode tables stay closed unions —
+the exhaustiveness checks across every reducer and the 68-branch effect executor
+are worth more than the ability to add arms. Each grew exactly one generic
+variant instead, routed by `pluginId`:
+
+- `plugin-action` → the plugin's slice reducer;
+- `plugin-effect` → the plugin's effect handler;
+- `plugin-modal` → the plugin's modal renderer;
+- `plugin-view` (a `FocusMode`) → the plugin's view renderer.
+
+`ModeId` is the exception: it becomes ``BuiltinModeId | `plugin.${string}` ``,
+because a mode is an identity rather than a payload. Three tables that were
+exhaustive over it — the transition matrix, the focus-mode derivation, the help
+headings — each gained a registry with a disposer.
+
+### Orphans
+
+A persisted layout can name a widget whose plugin is disabled, still loading, or
+failed. That id used to be pruned as corruption and the pruned layout written
+back to `aimux.json`, so re-enabling the plugin put the widget somewhere else —
+or nowhere. The layout now keeps the id and `visibleWidgets` skips what cannot
+be drawn, so a bar reserves no space for it and the context menu does not offer
+it.
 
 ## API contract
 
