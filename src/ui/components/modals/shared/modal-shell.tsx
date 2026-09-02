@@ -37,11 +37,21 @@ export function ModalShell({
       justifyContent="center"
       alignItems="center"
     >
+      {/* No frame, like everything else — the panel background is what lifts the
+          modal off the terminal, and the extra column either side is what makes
+          it read as a card rather than a box drawn on the screen.
+
+          Transparent mode is the one exception that keeps the border: there is
+          no background there to lift anything, so without a rule the modal has
+          no edge at all. */}
       <box
-        border
+        border={transparent}
         borderColor={t.border}
         backgroundColor={bg}
-        padding={1}
+        paddingTop={1}
+        paddingBottom={1}
+        paddingLeft={2}
+        paddingRight={2}
         width={width}
         renderAfter={transparent ? fillBorderedBoxInterior : undefined}
       >

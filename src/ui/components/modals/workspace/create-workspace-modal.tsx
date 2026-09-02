@@ -64,8 +64,13 @@ export function CreateWorkspaceModal({
 
   const baseActive = activeField === 'base'
   return (
+    // The title asks the question and the subtitle answers what happens with the
+    // answer, so the prompt field needs no label of its own — a heading, a
+    // question, a paragraph and a placeholder all saying the same thing was four
+    // lines of chrome above an empty box.
     <Form
       title="New workspace"
+      subtitle="What do you want to work on? Names the workspace and its branch, and is sent to the assistant."
       keybindsModeId="modal.create-workspace"
       width={uiTokens.modalWidth.xl}
     >
@@ -73,11 +78,9 @@ export function CreateWorkspaceModal({
         <box flexDirection="column">
           <TextField
             active={activeField === 'prompt'}
-            label="What do you want to work on? (optional)"
-            description="Sent to the assistant, and names the workspace and its branch. Leave empty for a bare workspace."
             value={prompt}
             cursorPos={activeField === 'prompt' ? cursorPos : undefined}
-            placeholder="Describe the task, or leave empty..."
+            placeholder="Describe the task, or leave empty for a bare workspace..."
             minLines={PROMPT_LINES}
           />
           {branchError != null && branchError !== '' ? (
@@ -97,7 +100,6 @@ export function CreateWorkspaceModal({
           onHover={handleHover}
           emptyState={<text fg={t.textMuted}>No branches found</text>}
         />
-        <text fg={t.textMuted}>Ctrl+Enter newline · Tab picks a base · Enter creates</text>
       </box>
     </Form>
   )

@@ -133,9 +133,13 @@ export function ContextMenuOverlay() {
         left={left}
         width={width}
         flexDirection="column"
-        border
+        // backgroundElement, not backgroundPanel: this pops up over the bars as
+        // often as over the terminal, and the bars are panel — a panel menu on a
+        // panel bar has no edge. Transparent mode keeps the border for the same
+        // reason the modal does: there is no background there to stand on.
+        border={transparent}
         borderColor={t.border}
-        backgroundColor={transparent ? 'transparent' : t.backgroundPanel}
+        backgroundColor={transparent ? 'transparent' : t.backgroundElement}
         renderAfter={transparent ? fillBorderedBoxInterior : undefined}
         onMouseDown={handleMenuMouseDown}
       >

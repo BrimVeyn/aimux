@@ -88,20 +88,16 @@ export function NewTabModal({
         keybindsModeId="modal.new-tab.editing-command"
         width={uiTokens.modalWidth.md}
       >
-        <TextField
-          active
-          description={<>blank to reset to default: {option.command}</>}
-          value={editBuffer}
-          cursorPos={cursorPos}
-          placeholder={option.command}
-        />
+        {/* No description: the placeholder is the default command, so the field
+            already shows what leaving it blank gets you. */}
+        <TextField active value={editBuffer} cursorPos={cursorPos} placeholder={option.command} />
       </Form>
     )
   }
 
   return (
     <Picker
-      title="New tab: choose assistant"
+      title="New tab"
       keybindsModeId="modal.new-tab.command-edit"
       width={uiTokens.modalWidth.md}
       gap={1}

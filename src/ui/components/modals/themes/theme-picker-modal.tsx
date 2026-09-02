@@ -70,13 +70,15 @@ export function ThemePickerModal({
       filter={filter}
       cursorPos={cursorPos}
       footer={
-        <box flexDirection="column" gap={0}>
-          <text fg={t.textMuted}>
-            {filtered.length === 0 ? '' : ` ${effectiveIndex + 1} / ${filtered.length}`}
-          </text>
-          <text fg={t.textMuted}>{` transparent: ${transparent ? 'on' : 'off'} (ctrl-t)`}</text>
-          <text fg={t.textMuted}>{` mode: ${mode} (ctrl-l)`}</text>
-        </box>
+        <text fg={t.textMuted}>
+          {[
+            filtered.length === 0 ? '' : `${effectiveIndex + 1}/${filtered.length}`,
+            `transparent ${transparent ? 'on' : 'off'} (ctrl-t)`,
+            `mode ${mode} (ctrl-l)`,
+          ]
+            .filter((part) => part !== '')
+            .join(' · ')}
+        </text>
       }
       items={items}
       selectedIndex={effectiveIndex}
