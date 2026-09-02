@@ -71,6 +71,16 @@ function synthesizeEntries(halves: BuiltinPlugin['halves']): Partial<Record<Plug
   return entries
 }
 
+/** Which layer said `enabled`, for a record that has no registry row of its own. */
+export function enabledOrigin(
+  fromUserConfig: boolean | undefined,
+  fromRegistry: boolean | undefined
+): 'default' | 'registry' | 'config' {
+  if (fromUserConfig !== undefined) return 'config'
+  if (fromRegistry !== undefined) return 'registry'
+  return 'default'
+}
+
 export interface BuiltinRecordsResult {
   records: PluginRecord[]
   issues: { id: string; message: string }[]
@@ -87,7 +97,10 @@ export interface BuiltinRecordsResult {
  */
 export function buildBuiltinRecords(
   builtins: readonly BuiltinPlugin[],
-  overrides: ReadonlyMap<string, { enabled?: boolean; config?: Record<string, unknown> }>
+  /** `aimux.config.ts` entries, by id. The hand-written layer; outranks all. */
+  userOverrides: ReadonlyMap<string, { enabled?: boolean; config?: Record<string, unknown> }>,
+  /** The registry's `overrides` block: what the settings screen and the CLI write. */
+  registryOverrides: ReadonlyMap<string, { enabled?: boolean; config?: Record<string, unknown> }>
 ): BuiltinRecordsResult {
   const records: PluginRecord[] = []
   const issues: BuiltinRecordsResult['issues'] = []
@@ -106,8 +119,14 @@ export function buildBuiltinRecords(
       continue
     }
 
-    const override = overrides.get(parsed.manifest.id)
-    const resolved = resolvePluginConfig(parsed.manifest, builtin.config, override?.config)
+    const user = userOverrides.get(parsed.manifest.id)
+    const registry = registryOverrides.get(parsed.manifest.id)
+    const resolved = resolvePluginConfig(
+      parsed.manifest,
+      builtin.config,
+      registry?.config,
+      user?.config
+    )
     for (const issue of resolved.issues) {
       issues.push({
         id: parsed.manifest.id,
@@ -118,7 +137,8 @@ export function buildBuiltinRecords(
     records.push({
       builtin: builtin.halves,
       config: resolved.config,
-      enabled: override?.enabled ?? true,
+      enabled: user?.enabled ?? registry?.enabled ?? true,
+      enabledFrom: enabledOrigin(user?.enabled, registry?.enabled),
       id: parsed.manifest.id,
       manifest: parsed.manifest,
       paths: getPluginPaths(parsed.manifest.id, BUILTIN_ROOT),

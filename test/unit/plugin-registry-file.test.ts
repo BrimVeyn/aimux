@@ -5,10 +5,12 @@ import { join } from 'node:path'
 
 import { getPluginRegistryFilePath } from '../../src/plugins/paths'
 import {
+  getPluginOverride,
   loadPluginRegistryResult,
   removePluginRegistryEntry,
   savePluginRegistry,
   setPluginEnabled,
+  setPluginOverride,
   upsertPluginRegistryEntry,
 } from '../../src/plugins/registry-file'
 
@@ -22,6 +24,11 @@ import {
 const originalHome = process.env.HOME
 const originalProfile = process.env.AIMUX_PROFILE
 let tempHome = ''
+
+/** Written out of order on purpose: the saved file must read the same twice. */
+const OUT_OF_ORDER: Record<string, { enabled: boolean }> = {}
+OUT_OF_ORDER['z.later'] = { enabled: false }
+OUT_OF_ORDER['a.earlier'] = { enabled: false }
 
 function writeRegistry(contents: unknown): void {
   const path = getPluginRegistryFilePath()
@@ -120,17 +127,65 @@ describe('plugin registry file', () => {
   test('enable, disable, and remove', () => {
     upsertPluginRegistryEntry({ enabled: true, id: 'acme.x', path: '/tmp/x', source: 'link' })
 
+    // The state goes to `overrides`, not to the row: that is what makes a
+    // built-in — which has no row — toggle the same way. The row's own
+    // `enabled` is left alone and read as a layer beneath.
     expect(setPluginEnabled('acme.x', false)).toBe(true)
-    expect(loadPluginRegistryResult().registry.plugins[0]?.enabled).toBe(false)
-    expect(setPluginEnabled('acme.missing', false)).toBe(false)
+    expect(getPluginOverride('acme.x')).toEqual({ enabled: false })
+    expect(loadPluginRegistryResult().registry.plugins[0]?.enabled).toBe(true)
+
+    // An id with no row is the normal case now, not a failure.
+    expect(setPluginEnabled('aimux.claude', false)).toBe(true)
+    expect(getPluginOverride('aimux.claude')).toEqual({ enabled: false })
 
     expect(removePluginRegistryEntry('acme.x')).toBe(true)
     expect(removePluginRegistryEntry('acme.x')).toBe(false)
     expect(loadPluginRegistryResult().registry.plugins).toEqual([])
   })
 
+  test('a config override merges key by key', () => {
+    setPluginOverride('acme.x', { config: { pollSeconds: 5 } })
+    setPluginOverride('acme.x', { config: { gpuCommand: 'nvidia-smi' } })
+
+    // Setting one value must not drop the others: a settings screen writes one
+    // row at a time.
+    expect(getPluginOverride('acme.x')?.config).toEqual({
+      gpuCommand: 'nvidia-smi',
+      pollSeconds: 5,
+    })
+  })
+
+  test('an override that says nothing is removed rather than left empty', () => {
+    setPluginOverride('acme.x', { config: { pollSeconds: 5 } })
+    setPluginOverride('acme.x', { config: { pollSeconds: undefined } })
+
+    // The file records decisions, not the absence of them — which is also what
+    // `plugin unset` on the last key has to leave behind.
+    expect(getPluginOverride('acme.x')).toBeUndefined()
+  })
+
+  test('enabled and config live side by side under one id', () => {
+    setPluginOverride('acme.x', { enabled: false })
+    setPluginOverride('acme.x', { config: { pollSeconds: 5 } })
+
+    expect(getPluginOverride('acme.x')).toEqual({ config: { pollSeconds: 5 }, enabled: false })
+  })
+
+  test('a malformed override is dropped with an issue, and the rest still loads', () => {
+    writeRegistry({
+      overrides: { 'acme.bad': 'nope', 'acme.good': { enabled: false } },
+      plugins: [],
+      version: 1,
+    })
+
+    const { issues, registry } = loadPluginRegistryResult()
+    expect(registry.overrides).toEqual({ 'acme.good': { enabled: false } })
+    expect(issues.some((issue) => issue.includes('overrides.acme.bad'))).toBe(true)
+  })
+
   test('writes rows in a stable order so the file does not churn', () => {
     savePluginRegistry({
+      overrides: OUT_OF_ORDER,
       plugins: [
         { enabled: true, id: 'z.last', path: '/tmp/z', source: 'link' },
         { enabled: true, id: 'a.first', path: '/tmp/a', source: 'link' },
@@ -140,6 +195,10 @@ describe('plugin registry file', () => {
     expect(loadPluginRegistryResult().registry.plugins.map((entry) => entry.id)).toEqual([
       'a.first',
       'z.last',
+    ])
+    expect(Object.keys(loadPluginRegistryResult().registry.overrides)).toEqual([
+      'a.earlier',
+      'z.later',
     ])
   })
 })

@@ -25,6 +25,13 @@ export interface PluginRecord {
   root: string
   source: PluginSource
   enabled: boolean
+  /**
+   * Which layer decided `enabled`. The CLI reports it because it is the answer
+   * to a question an agent has to ask before acting: a `plugin disable` that
+   * `aimux.config.ts` will overrule at the next launch is not a disable, and
+   * saying so is cheaper than letting the agent find out later.
+   */
+  enabledFrom: 'default' | 'registry' | 'config'
   config: Record<string, unknown>
   paths: PluginPaths
   /**

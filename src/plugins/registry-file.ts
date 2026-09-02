@@ -8,10 +8,17 @@ import { getPluginRegistryFilePath } from './paths'
 
 /**
  * `<profile>/aimux-plugins.json` — the machine-written half of plugin
- * configuration. `aimux plugin link/install/enable/disable` write it; the
- * settings screen will write per-plugin config into it in a later phase.
+ * configuration. `aimux plugin link/install`, `plugin enable/disable`,
+ * `plugin set` and the settings screen all write it.
  *
- * `aimux.config.ts` is the hand-written half and outranks it, so a user who
+ * Two blocks, answering two different questions. `plugins[]` says *where the
+ * code is*, and only a linked or installed plugin has a row there. `overrides`
+ * says *how the user has set it*, keyed by id — so a built-in, a link, an
+ * install and a plugin declared inline in `aimux.config.ts` are all toggled
+ * and configured the same way. Before that split, a built-in had no row to
+ * toggle and `plugin disable` had to apologise and point at the config file.
+ *
+ * `aimux.config.ts` is the hand-written half and outranks both, so a user who
  * declares a plugin in their config file never has to reconcile the two.
  *
  * Validation is per entry, like `loadConfigResult`: one malformed row is
@@ -34,9 +41,19 @@ export interface PluginRegistryEntry {
   origin?: string
 }
 
+/**
+ * What the user has set for one plugin, whatever kind it is. Both fields are
+ * optional: an override exists to say one thing, not to restate the defaults.
+ */
+export interface PluginOverride {
+  enabled?: boolean
+  config?: Record<string, unknown>
+}
+
 export interface PluginRegistry {
   version: number
   plugins: PluginRegistryEntry[]
+  overrides: Record<string, PluginOverride>
 }
 
 export interface PluginRegistryLoadResult {
@@ -44,7 +61,26 @@ export interface PluginRegistryLoadResult {
   issues: string[]
 }
 
-const EMPTY: PluginRegistry = { plugins: [], version: PLUGIN_REGISTRY_VERSION }
+function emptyRegistry(): PluginRegistry {
+  return { overrides: {}, plugins: [], version: PLUGIN_REGISTRY_VERSION }
+}
+
+/**
+ * One override. A malformed one is dropped with an issue rather than taken
+ * partially: half an override is a plugin configured in a way nobody wrote.
+ */
+function parseOverride(id: string, value: unknown, issues: string[]): PluginOverride | null {
+  if (!isRecord(value)) {
+    issues.push(`overrides.${id}: not an object`)
+    return null
+  }
+  const override: PluginOverride = {}
+  if (typeof value.enabled === 'boolean') override.enabled = value.enabled
+  else if (value.enabled !== undefined) issues.push(`overrides.${id}.enabled: not a boolean`)
+  if (isRecord(value.config)) override.config = value.config
+  else if (value.config !== undefined) issues.push(`overrides.${id}.config: not an object`)
+  return override
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -81,7 +117,7 @@ function parseEntry(value: unknown, index: number, issues: string[]): PluginRegi
 
 export function loadPluginRegistryResult(): PluginRegistryLoadResult {
   const path = getPluginRegistryFilePath()
-  if (!existsSync(path)) return { issues: [], registry: { ...EMPTY, plugins: [] } }
+  if (!existsSync(path)) return { issues: [], registry: emptyRegistry() }
 
   let parsed: unknown
   try {
@@ -89,15 +125,12 @@ export function loadPluginRegistryResult(): PluginRegistryLoadResult {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     logDebug('plugin.registry.parseFailed', { error: message, path })
-    return {
-      issues: [`${path} is not valid JSON: ${message}`],
-      registry: { ...EMPTY, plugins: [] },
-    }
+    return { issues: [`${path} is not valid JSON: ${message}`], registry: emptyRegistry() }
   }
 
   const issues: string[] = []
   if (!isRecord(parsed)) {
-    return { issues: [`${path}: expected a JSON object`], registry: { ...EMPTY, plugins: [] } }
+    return { issues: [`${path}: expected a JSON object`], registry: emptyRegistry() }
   }
   if (parsed.version !== undefined && parsed.version !== PLUGIN_REGISTRY_VERSION) {
     issues.push(`unsupported plugin registry version ${JSON.stringify(parsed.version)}`)
@@ -121,7 +154,17 @@ export function loadPluginRegistryResult(): PluginRegistryLoadResult {
     plugins.push(entry)
   }
 
-  return { issues, registry: { plugins, version: PLUGIN_REGISTRY_VERSION } }
+  const overrides: Record<string, PluginOverride> = {}
+  if (isRecord(parsed.overrides)) {
+    for (const [id, raw] of Object.entries(parsed.overrides)) {
+      const override = parseOverride(id, raw, issues)
+      if (override) overrides[id] = override
+    }
+  } else if (parsed.overrides !== undefined) {
+    issues.push('overrides: expected an object')
+  }
+
+  return { issues, registry: { overrides, plugins, version: PLUGIN_REGISTRY_VERSION } }
 }
 
 export function savePluginRegistry(registry: PluginRegistry): boolean {
@@ -129,6 +172,10 @@ export function savePluginRegistry(registry: PluginRegistry): boolean {
   try {
     mkdirSync(getProfileConfigDir(), { recursive: true })
     const ordered: PluginRegistry = {
+      // Sorted so a hand-edit or a diff of this file reads the same way twice.
+      overrides: Object.fromEntries(
+        Object.entries(registry.overrides).sort(([a], [b]) => a.localeCompare(b))
+      ),
       plugins: [...registry.plugins].sort((a, b) => a.id.localeCompare(b.id)),
       version: PLUGIN_REGISTRY_VERSION,
     }
@@ -159,10 +206,46 @@ export function removePluginRegistryEntry(id: string): boolean {
   return savePluginRegistry({ ...registry, plugins: next })
 }
 
-export function setPluginEnabled(id: string, enabled: boolean): boolean {
+export function getPluginOverride(id: string): PluginOverride | undefined {
+  return loadPluginRegistryResult().registry.overrides[id]
+}
+
+/**
+ * Merges a patch into one plugin's override. `config` merges key by key so
+ * setting one value does not drop the others; an explicit `undefined` for a
+ * key removes it, which is what `plugin unset` needs.
+ *
+ * An override that ends up saying nothing is deleted rather than left as an
+ * empty object: the file should record decisions, not the absence of them.
+ */
+export function setPluginOverride(id: string, patch: PluginOverride): boolean {
   const { registry } = loadPluginRegistryResult()
-  const entry = registry.plugins.find((row) => row.id === id)
-  if (!entry) return false
-  entry.enabled = enabled
+  const current = registry.overrides[id] ?? {}
+  const next: PluginOverride = { ...current }
+
+  if (patch.enabled !== undefined) next.enabled = patch.enabled
+  if (patch.config !== undefined) {
+    const config = { ...current.config }
+    for (const [key, value] of Object.entries(patch.config)) {
+      if (value === undefined) delete config[key]
+      else config[key] = value
+    }
+    if (Object.keys(config).length === 0) delete next.config
+    else next.config = config
+  }
+
+  if (next.enabled === undefined && next.config === undefined) delete registry.overrides[id]
+  else registry.overrides[id] = next
   return savePluginRegistry(registry)
+}
+
+/**
+ * Enable or disable any plugin — built-in, linked, installed, or declared in
+ * `aimux.config.ts`. It writes an override rather than a registry row's
+ * `enabled` field, which is what makes the four kinds behave alike; the row's
+ * own `enabled` is still read as a layer beneath, so files written before this
+ * keep working.
+ */
+export function setPluginEnabled(id: string, enabled: boolean): boolean {
+  return setPluginOverride(id, { enabled })
 }

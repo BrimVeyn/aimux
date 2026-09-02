@@ -8,7 +8,7 @@ import type { PluginRecord, PluginSource } from './types'
 import { version as APP_VERSION } from '../../package.json'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
-import { buildBuiltinRecords, type BuiltinPlugin } from './builtin'
+import { buildBuiltinRecords, type BuiltinPlugin, enabledOrigin } from './builtin'
 import {
   checkHostCompatibility,
   formatManifestIssues,
@@ -17,7 +17,7 @@ import {
   resolvePluginConfig,
 } from './manifest'
 import { getPluginPaths } from './paths'
-import { loadPluginRegistryResult } from './registry-file'
+import { loadPluginRegistryResult, type PluginOverride } from './registry-file'
 
 /**
  * Discovery answers one question: which plugins exist, where, and with what
@@ -43,7 +43,15 @@ export interface PluginDiscoveryResult {
 interface Candidate {
   root: string
   source: PluginSource
-  enabled: boolean
+  /**
+   * The two `enabled` layers, kept apart because only the answer to "who
+   * decided this" lets the CLI tell an agent whether its `disable` will stick.
+   * A registry row's own `enabled` is legacy — `plugin disable` writes the
+   * overrides block now — so only an explicit `false` there counts as a
+   * decision; `true` is what every row has by default.
+   */
+  registryEnabled?: boolean
+  userEnabled?: boolean
   /** Registry-provided config; the user-config layer is applied on top. */
   registryConfig?: Record<string, unknown>
   userConfig?: Record<string, unknown>
@@ -68,10 +76,15 @@ function prefixIssues(id: string, issues: readonly ManifestIssue[]): string {
 function collectCandidates(
   userPlugins: readonly PluginConfigEntry[],
   issues: PluginDiscoveryIssue[]
-): { byPath: Map<string, Candidate>; configOnly: PluginConfigEntry[] } {
+): {
+  byPath: Map<string, Candidate>
+  configOnly: PluginConfigEntry[]
+  overrides: Map<string, PluginOverride>
+} {
   const byPath = new Map<string, Candidate>()
 
   const registry = loadPluginRegistryResult()
+  const overrides = new Map(Object.entries(registry.registry.overrides))
   for (const issue of registry.issues) issues.push({ message: issue })
   for (const entry of registry.registry.plugins) {
     const root = resolvePluginPath(entry.path)
@@ -85,7 +98,7 @@ function collectCandidates(
     }
     byPath.set(root, {
       declaredId: entry.id,
-      enabled: entry.enabled,
+      ...(entry.enabled ? {} : { registryEnabled: false }),
       ...(entry.config === undefined ? {} : { registryConfig: entry.config }),
       root,
       source: entry.source,
@@ -110,9 +123,12 @@ function collectCandidates(
     const existing = byPath.get(root)
     byPath.set(root, {
       declaredId: entry.id ?? existing?.declaredId,
-      enabled: entry.enabled ?? existing?.enabled ?? true,
       root,
       source: existing?.source ?? 'config',
+      ...(existing?.registryEnabled === undefined
+        ? {}
+        : { registryEnabled: existing.registryEnabled }),
+      ...(entry.enabled === undefined ? {} : { userEnabled: entry.enabled }),
       ...(existing?.registryConfig === undefined
         ? {}
         : { registryConfig: existing.registryConfig }),
@@ -120,7 +136,7 @@ function collectCandidates(
     })
   }
 
-  return { byPath, configOnly }
+  return { byPath, configOnly, overrides }
 }
 
 /**
@@ -134,7 +150,7 @@ export async function discoverPlugins(
   builtins: readonly BuiltinPlugin[] = []
 ): Promise<PluginDiscoveryResult> {
   const issues: PluginDiscoveryIssue[] = []
-  const { byPath, configOnly } = collectCandidates(userPlugins, issues)
+  const { byPath, configOnly, overrides } = collectCandidates(userPlugins, issues)
 
   // `{ id, config }` entries with no path configure a candidate found above.
   const overridesById = new Map<string, PluginConfigEntry>()
@@ -146,7 +162,7 @@ export async function discoverPlugins(
   // Built-ins come first: they exist before anything is linked, and putting
   // them through the same record list is what makes `plugin list`, `plugin
   // doctor`, config precedence and the kernel treat them as ordinary plugins.
-  const builtin = buildBuiltinRecords(builtins, overridesById)
+  const builtin = buildBuiltinRecords(builtins, overridesById, overrides)
   const records: PluginRecord[] = [...builtin.records]
   const seenIds = new Set<string>(builtin.records.map((record) => record.id))
   for (const issue of builtin.issues) issues.push(issue)
@@ -195,9 +211,14 @@ export async function discoverPlugins(
     }
 
     const override = overridesById.get(manifest.id)
+    const stored = overrides.get(manifest.id)
+    // Manifest defaults ← the registry row ← the overrides block ← the two
+    // shapes an `aimux.config.ts` entry can take. The hand-written file is
+    // last because it wins.
     const resolved = resolvePluginConfig(
       manifest,
       candidate.registryConfig,
+      stored?.config,
       candidate.userConfig,
       override?.config
     )
@@ -209,10 +230,13 @@ export async function discoverPlugins(
       })
     }
 
+    const fromConfig = override?.enabled ?? candidate.userEnabled
+    const fromRegistry = stored?.enabled ?? candidate.registryEnabled
     seenIds.add(manifest.id)
     records.push({
       config: resolved.config,
-      enabled: override?.enabled ?? candidate.enabled,
+      enabled: fromConfig ?? fromRegistry ?? true,
+      enabledFrom: enabledOrigin(fromConfig, fromRegistry),
       id: manifest.id,
       manifest,
       paths: getPluginPaths(manifest.id, candidate.root),
