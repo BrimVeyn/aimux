@@ -1,0 +1,517 @@
+# aimux — Plugin Kernel : plan d'implémentation
+
+Un noyau de plugins in-process façon DeepSeek Harness (contexte, injection,
+effets réversibles, rechargement à chaud), avec la couche déclarative et
+« le CLI est l'API » d'herdr comme second étage. Deux moitiés par plugin, une
+par processus hôte.
+
+Basé sur aimux 1.23.7 (`main @ b7da8b5`, 2026-09-01). Décisions tranchées le
+2026-09-01, voir la section 10.
+
+## Sommaire
+
+1. [État des lieux](#1-état-des-lieux)
+2. [Les deux modèles](#2-les-deux-modèles-et-ce-quon-en-garde)
+3. [Architecture cible](#3-architecture-cible)
+4. [Surface d'API](#4-surface-dapi--le-contexte-par-processus)
+5. [Live refresh](#5-live-refresh)
+6. [Refactos requises](#6-refactos-requises-par-ordre-de-dépendance)
+7. [Plan par phases](#7-plan-par-phases)
+8. [« Un plugin en un prompt »](#8--un-plugin-en-un-prompt---ce-que-le-skill-doit-contenir)
+9. [Risques](#9-risques-et-parades)
+10. [Décisions](#10-décisions)
+
+---
+
+## 1. État des lieux
+
+aimux a déjà plusieurs registres _data-driven_ (sections de réglages, commandes
+CLI, widgets de barre) et un seul point de chargement de code utilisateur :
+l'`import()` de `aimux.config.ts` dans `src/config/loader.ts`. Tout le reste est
+fermé par des unions TypeScript et des `switch`.
+
+| Registre                 | Où                                                   | Forme actuelle                         | Verrou                                                                 |
+| ------------------------ | ---------------------------------------------------- | -------------------------------------- | ---------------------------------------------------------------------- |
+| Assistants / adaptateurs | `src/pty/command-registry.ts:210`                    | `ASSISTANT_OPTIONS[]`                  | union `BuiltinAssistantId` ; `customCommands` ne porte qu'une commande |
+| Détecteur de statut      | `src/pty/assistant-status-detector.ts:142`           | `switch(assistant)`                    | tables regex inline par CLI                                            |
+| Widgets de barre         | `src/ui/widgets/registry.tsx`, `src/state/bars.ts:7` | `WIDGET_RENDERERS`, `KNOWN_WIDGET_IDS` | ids inconnus purgés dans `sanitizeBars`                                |
+| Vues plein écran         | `src/ui/root.tsx:424`                                | chaîne `if / else if` sur `focusMode`  | aucun registre                                                         |
+| Modales                  | `src/ui/root.tsx:101`, `types.ts:349`                | `switch` à 25 branches, union fermée   | props bag figé                                                         |
+| Modes clavier            | `types.ts:11`, `transitions.ts`, `bridge.ts`         | union de 30 `ModeId`                   | transitions exhaustives, 3 tables de dérivation, labels d'aide         |
+| Actions / SideEffects    | `types.ts:891/906`, `side-effects.ts:220`            | unions fermées, `switch` à 68 branches | dupliqués à la main entre le package et `src/`                         |
+| Slices du store          | `src/state/store.ts:150`                             | chaîne ordonnée de 10 reducers         | `AppState` plat, 24 clés                                               |
+| Thèmes                   | `packages/aimux-config/src/tui/registry.ts`          | 34 imports JSON statiques              | pas de chargement disque                                               |
+| Serveur de hooks         | `src/integrations/claude-hook-server.ts`             | une route, un vendeur                  | —                                                                      |
+| Usage IA                 | `src/services/ai-usage/provider.ts`                  | `switch(tool)`, 2 adaptateurs          | union `AIUsageTool`                                                    |
+| Réglages                 | `src/settings/sections/index.ts`                     | `SETTING_SECTIONS` (13)                | **déjà ouvert** : à copier comme modèle                                |
+| Commandes CLI            | `src/cli/registry.ts:38`                             | `COMMANDS[]` + complétion générée      | **déjà ouvert**                                                        |
+| Skills                   | `src/cli/commands/worker/doctor.ts:68`               | un chemin relatif codé en dur          | aucun registre                                                         |
+
+Trois seams existants sont directement réutilisables :
+
+- la config : `loadUserConfig` est déjà le loader de code utilisateur ;
+- l'instrumentation `countAction` / `countEffect` dans
+  `src/services/aimux-counters/observe.ts`, appelée à chaque dispatch et
+  chaque side effect, donc un bus d'événements en attente ;
+- le `SideEffectContext` de `src/app-runtime/side-effect-context.ts`,
+  exactement l'objet de capacités qu'un plugin UI a besoin de recevoir.
+
+> **Bug trouvé en chemin.** `package.json` publie `src`, `skills`, `README`,
+> `LICENSE` mais pas `assets/`. `resolveHookScriptPath()` ne sonde que
+> `assets/claude-hooks/`, donc l'intégration `claudeHooks` se dégrade
+> silencieusement en détection visuelle sur une installation npm. À corriger
+> en phase 0, indépendamment du reste.
+
+## 2. Les deux modèles et ce qu'on en garde
+
+### herdr : déclaratif, hors-processus, « le CLI est l'API »
+
+- Manifeste `herdr-plugin.toml` : `id`, `version`, `min_herdr_version`, puis
+  des tableaux `[[actions]]`, `[[events]]`, `[[panes]]`, `[[link_handlers]]`,
+  `[[build]]`, `[[startup]]`, chacun pointant sur une `command`.
+- Chaque action est un sous-processus ; l'hôte injecte `HERDR_SOCKET_PATH`,
+  `HERDR_BIN_PATH`, `HERDR_PLUGIN_CONTEXT_JSON`, les répertoires `ROOT` /
+  `CONFIG_DIR` / `STATE_DIR`.
+- Placement de panes (`overlay`, `popup`, `split`, `tab`), keybindings vers des
+  actions qualifiées `plugin.id.action`, install/link depuis GitHub,
+  marketplace par topic.
+- Skill `skills/herdr/SKILL.md` livré dans le dépôt, imprimable via
+  `herdr --skill`.
+- Pas de rechargement à chaud en v1, pas de sandbox, pas d'API de stockage.
+
+### DeepSeek Harness : tout est plugin, noyau Cordis
+
+- Un plugin est un module qui exporte `name`, `inject` (services requis) et
+  `apply(ctx)`. Les services vivent sur `ctx` (`ctx.tools`, `ctx.llm`…) ; un
+  plugin attend que ses dépendances existent.
+- Machine à états par plugin (_fiber_) : `PENDING → LOADING → ACTIVE`,
+  `FAILED`, `UNLOADING → DISPOSED`. Toute inscription faite via `ctx` est
+  annulée au déchargement (`ctx.on`, `ctx.effect(() => dispose)`).
+- Événements à cinq modes de dispatch : `emit`, `parallel`, `serial`, `bail`,
+  `waterfall` (chaîne de `next()`, court-circuitable).
+- HMR : éditer un plugin le décharge, le recharge et rejoue `apply`. Comme les
+  inscriptions se nettoient d'elles-mêmes, rien ne fuit.
+- Paquets « à deux moitiés » (host + browser) et un sous-système _extensions_
+  où le modèle définit, exécute et retire des paquets dynamiques en mémoire.
+
+### Synthèse retenue
+
+Le **noyau** vient de Cordis : contexte, injection, effets réversibles,
+événements typés, fibers, HMR. La **forme de distribution** vient d'herdr :
+manifeste déclaratif, répertoires config/state, `install` / `link`, skill dans
+le dépôt, et un adaptateur « commandes » pour écrire un plugin dans n'importe
+quel langage en s'appuyant sur le CLI `aimux` existant. Le découpage en deux
+moitiés répond à l'architecture trois-processus d'aimux.
+
+## 3. Architecture cible
+
+Un plugin peut contribuer à l'UI (widgets, vues, modales, actions, réglages,
+thèmes) et au daemon (assistants, détecteurs, hooks, requêtes IPC, commandes
+CLI). Le terminal manager ne charge jamais de plugin : c'est le processus qui
+tient les PTY, et sa stabilité est la garantie de survie des sessions.
+
+```
+┌──────────────────────────┐   ┌──────────────────────────┐   ┌──────────────────┐
+│ App UI                   │   │ Daemon                   │   │ Terminal manager │
+│                          │   │                          │   │                  │
+│ PluginKernel (ui)        │   │ PluginKernel (daemon)    │   │ PTY + émulateurs │
+│  widgets · views · modals│   │  assistants · détecteurs │   │ (inchangé)       │
+│  actions · keymaps       │   │  hooks HTTP · événements │   │                  │
+│  settings · themes       │   │  requêtes IPC · CLI      │   │ aucun plugin,    │
+│  store · toasts          │   │                          │   │ par règle        │
+│                          │   │ Plugin built-in aimux.exec│  │                  │
+│ Watcher fs → dispose +   │   │  (manifestes herdr,      │   │                  │
+│  re-import               │   │   sous-processus AIMUX_*)│   │                  │
+└────────────┬─────────────┘   └────────────┬─────────────┘   └──────────────────┘
+             │  IPC v19, capacité pluginRpc │        daemon ⇄ TM : inchangé
+             └──────────────────────────────┘
+```
+
+### Anatomie d'un plugin
+
+```
+my-plugin/
+  aimux-plugin.json      # manifeste : lu sans exécuter de code
+  ui.ts                  # moitié UI  : export default definePlugin({...})
+  daemon.ts              # moitié daemon (optionnelle)
+  package.json           # deps du plugin (bun install au link/install)
+  README.md
+```
+
+```jsonc
+// aimux-plugin.json
+{
+  "id": "acme.telegram-notify",
+  "name": "Telegram notify",
+  "version": "0.1.0",
+  "minAimuxVersion": "1.24.0",
+  "apiVersion": 1,
+  "entries": { "ui": "./ui.ts", "daemon": "./daemon.ts" },
+  "build": [["bun", "install"]],
+  "config": { "botToken": { "type": "string", "secret": true } },
+  // optionnel : plugin « exec » façon herdr
+  "commands": [
+    { "id": "ping", "title": "Ping", "command": ["node", "ping.js"], "contexts": ["tab"] },
+  ],
+}
+```
+
+```ts
+// daemon.ts
+import { definePlugin } from '@brimveyn/aimux-plugin'
+
+export default definePlugin({
+  inject: ['tabs', 'events'],
+  apply(ctx) {
+    ctx.on('tab:turnComplete', async ({ tabId }) => {
+      const tab = ctx.tabs.get(tabId)
+      await notify(ctx.config.botToken, `${tab?.title} a fini son tour`)
+    })
+    ctx.effect(() => {
+      const t = setInterval(poll, 60_000)
+      return () => clearInterval(t)
+    })
+  },
+})
+```
+
+Le manifeste porte tout ce que l'hôte doit connaître _avant_ d'exécuter le
+code : quelles moitiés existent (donc quel processus recharger), la version
+d'API, le schéma de config (donc les lignes de réglages générées), les
+commandes exec. Les entrées TS sont chargées par `import()` comme
+`aimux.config.ts` aujourd'hui : Bun exécute le TS, pas de build.
+
+### Emplacements et découverte
+
+- `<profil>/plugins/<id>/` : installés (checkout géré) ;
+  `<profil>/plugins-state/<id>/` : état runtime ;
+  `<profil>/plugins-config/<id>/` : fichiers éditables.
+- `<profil>/aimux-plugins.json` : registre écrit par la machine (liens locaux,
+  enabled, config par plugin, versions).
+- `aimux.config.ts` :
+  `plugins: ['./local/plugin', { id: 'acme.x', enabled: false, config: {...} }]`
+  pour la voie déclarative.
+- Isolation par profil, comme les sockets : le profil `dev` a ses propres
+  plugins.
+
+## 4. Surface d'API : le contexte par processus
+
+Un seul package public, `@brimveyn/aimux-plugin`, dans `packages/`. Il exporte
+`definePlugin`, les types `UiContext` et `DaemonContext`, et
+`createTestContext()` pour les tests des plugins.
+
+| Service                                                                                          | Processus | Ce qu'il expose                                                                                  | Branché sur                                                     |
+| ------------------------------------------------------------------------------------------------ | --------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
+| `ctx.log`, `ctx.config`, `ctx.paths`, `ctx.effect`, `ctx.on/emit`                                | les deux  | socle Cordis : journal par plugin, config typée par schéma, répertoires, disposers, événements   | nouveau `src/plugins/kernel`                                    |
+| `ctx.rpc`                                                                                        | les deux  | `call('verb', payload)` vers l'autre moitié, `handle('verb', fn)`, `broadcast`                   | enveloppe `pluginRpc` IPC                                       |
+| `ctx.ui.widgets`                                                                                 | ui        | `register({ id, label, render(width) })` : placement, resize, menu contextuel gratuits           | `WIDGET_RENDERERS` devenu dynamique                             |
+| `ctx.ui.views`                                                                                   | ui        | vue plein écran remplaçant l'arbre de panes, avec son mode clavier                               | `root.tsx` → registre                                           |
+| `ctx.ui.modals`                                                                                  | ui        | `open({ id, render, onKey })` ; une seule variante `plugin-modal` dans l'union                   | `modal-state.ts`                                                |
+| `ctx.actions`                                                                                    | ui        | `register('verb', (ctx) => KeyResult)` ; utilisable dans `keymaps` via `k.plugin('acme.x.verb')` | variantes génériques `plugin-action` / `plugin-effect`          |
+| `ctx.keymaps`                                                                                    | ui        | bind / unbind par mode, modes `plugin.<id>.<mode>`                                               | `resolver.ts`, `transitions.ts`, `bridge.ts`, `help-entries.ts` |
+| `ctx.settings`                                                                                   | ui        | `registerSection(section)` avec les `SettingRow` existants ; section générée depuis le schéma    | `SETTING_SECTIONS`                                              |
+| `ctx.themes`, `ctx.stats.pages`, `ctx.statusBar`, `ctx.contextMenu`, `ctx.toast`, `ctx.snippets` | ui        | enregistrements réversibles                                                                      | registres respectifs                                            |
+| `ctx.store`                                                                                      | ui        | slice namespacée `state.plugins[id]`, reducer et sélecteurs ; `ctx.app.state` en lecture         | chaîne de reducers                                              |
+| `ctx.tabs`, `ctx.projects`, `ctx.workspaces`                                                     | les deux  | lecture, `spawn`, `send`, `focus`, `tail`, `snapshot`                                            | backend / tabRegistry du daemon                                 |
+| `ctx.assistants`                                                                                 | daemon    | `register({ id, command, model?, session?, detectStatus?, extractQuestion?, usage?, hooks? })`   | `ASSISTANT_OPTIONS`, détecteur, arbitre, usage IA               |
+| `ctx.hooks`                                                                                      | daemon    | `route('/hook/<plugin>', handler)` + injection d'env par PTY                                     | `claude-hook-server.ts`, `daemon.ts:856`                        |
+| `ctx.cli`                                                                                        | daemon    | `register({ group, verb, flags, run })` ; complétion générée                                     | `src/cli/registry.ts`                                           |
+| `ctx.events`                                                                                     | daemon    | `tab:status`, `tab:turnComplete`, `tab:question`, `project:*`, `workspace:*`, `daemon:reexec`    | broadcasts existants                                            |
+
+Règle de conception : toute API du contexte retourne un disposer ou est
+enregistrée via `ctx.effect`. C'est ce qui rend le rechargement à chaud sûr
+par construction, pas par discipline.
+
+## 5. Live refresh
+
+1. `fs.watch` récursif sur chaque plugin lié (`plugin link`) ; debounce 150 ms.
+2. Le manifeste dit quelles moitiés ont changé. Le kernel concerné passe la
+   fiber en `UNLOADING`, rejoue tous les disposers, puis `DISPOSED`.
+3. Réimport avec invalidation du cache module (voir le spike de phase 0),
+   nouvelle fiber, `apply`. Les registres UI bumpent une version dans le
+   store : React re-rend.
+4. Côté daemon, le rechargement ne touche ni la socket ni le TM : aucune PTY
+   n'est affectée, aucun client ne se reconnecte. Un plugin qui lève à
+   l'`apply` reste en `FAILED` avec son erreur affichée en toast et dans
+   `aimux plugin log`.
+5. `aimux plugin reload [id]` déclenche le même chemin à la main. Le hot-reexec
+   du daemon (`runtime/daemon.handoff.json`) n'a rien à sérialiser : le
+   successeur relance simplement le loader.
+
+Le même mécanisme s'étend naturellement à `aimux.config.ts`, qui n'est
+aujourd'hui jamais rechargé : keymaps et snippets deviennent live-refresh par
+la même occasion.
+
+## 6. Refactos requises, par ordre de dépendance
+
+### R1 · Types partagés
+
+`packages/aimux-config/src/types.ts` annonce que ses types « doivent rester
+structurellement identiques » à ceux de `src/state/types.ts`,
+`src/input/modes/types.ts`, `src/state/layout-tree.ts`. Un package public de
+plugins ne peut pas être bâti sur une duplication manuelle. Faire de
+`packages/aimux-config` la source unique (ré-export côté `src/`), ou extraire
+un `packages/aimux-types`. C'est le seul refacto « ennuyeux » mais il
+conditionne la stabilité de l'API.
+
+### R2 · Ouvrir les unions sans les casser
+
+- `AppAction` et `SideEffect` : ajouter deux variantes génériques
+  `{ type: 'plugin-action', pluginId, actionId, payload }` et
+  `{ type: 'plugin-effect', … }`. Les unions restent fermées,
+  `switch-exhaustiveness-check` reste satisfait.
+- `ModeId` : `BuiltinModeId | \`plugin.${string}\``. `transitions.ts`obtient
+une règle par défaut pour les modes plugin (vers/depuis`navigation`, plus ce
+que le plugin déclare). `bridge.ts`gagne un point d'extension`deriveModeId`. `HELP_MODE_LABELS` lit le registre.
+- `FocusMode` : une valeur `plugin-view` avec `activePluginView: string` dans
+  l'état.
+- `ModalState` : une variante `plugin-modal`.
+- `AppState` : une clé `plugins: Record<string, unknown>` +
+  `pluginRegistryVersion: number`.
+
+### R3 · Registres dynamiques
+
+- Widgets : `KNOWN_WIDGET_IDS` devient `getKnownWidgetIds()` ; `sanitizeBars`
+  conserve les ids inconnus en état _orphelin_ (masqués, non purgés) pour
+  survivre à un plugin désactivé. `DEFAULT_BARS` accepte les placements
+  déclarés par le plugin.
+- Vues, modales, stats pages, sections de réglages, thèmes, pages d'aide :
+  chacun devient un module `registry.ts` avec `register()` qui retourne un
+  disposer. Les built-ins s'enregistrent au boot par le même chemin.
+- Reducers : `appReducer` appelle en dernier `reducePluginSlices`, qui route
+  sur `state.plugins[id]`.
+- Assistants : `ASSISTANT_OPTIONS` → `assistantRegistry` ; l'objet
+  d'adaptateur absorbe `classifyBuiltin` (map d'`AssistantId` vers
+  classifieur), l'extracteur de questions, l'adaptateur d'usage IA et le
+  mapping de hooks. L'arbitre passe de deux sources à N.
+- Serveur de hooks : `POST /hook/:plugin` avec table de routes ; Claude
+  devient la première route enregistrée.
+- CLI : `COMMANDS` reste un tableau, plus un `registerCliCommand()` ; la
+  complétion lit la liste fusionnée. Les commandes de plugin transitent par le
+  daemon (le processus CLI ne charge pas de plugin).
+
+### R4 · Bus d'événements unifié
+
+Remplacer les appels directs à `countAction` / `countEffect` par un
+`appEvents.emit('action', a)` dont les compteurs deviennent un abonné. Côté
+daemon, les broadcasts `tabStatus`, `tabTurnComplete`, `tabQuestion`, cycle de
+vie projet/workspace émettent aussi sur le bus local avant l'envoi IPC. Le
+kernel branche `ctx.on` dessus.
+
+### R5 · Config et IPC
+
+- `AimuxUserConfig.plugins`, `aimux-plugins.json`, `StoredSettings` par plugin
+  (préfixe `plugin.<id>.`).
+- Protocole IPC : v19, `MIN` inchangé, capacité `pluginRpc`, deux types de
+  message opaques validés une seule fois (`pluginId`, `verb`,
+  `payload: unknown`). Aucun plugin ne bumpe jamais le protocole.
+- Le `HooksConfig.onProjectCreate` déclaré et jamais appelé : le câbler sur le
+  bus, il devient le premier hook « legacy » compatible.
+
+### R6 · Hygiène
+
+- `max-lines: 1000` (oxlint) : `daemon.ts` (1429) et `root.tsx` (547) vont
+  grossir ; extraire `daemon/plugin-host.ts` et `ui/plugin-host.tsx` dès le
+  départ.
+- knip : ajouter `src/plugins/**` et `packages/aimux-plugin/src/index.ts` aux
+  entrées.
+- `check-protocol-discipline.ts` : nouvelle règle « aucun import de
+  `src/plugins` depuis `src/terminal-manager` ».
+
+## 7. Plan par phases
+
+Chaque phase se termine mergeable, tests verts, sans plugin externe requis.
+Les durées supposent une personne à plein temps plus des workers aimux pour
+les migrations mécaniques.
+
+### Phase 0 · Spikes et prérequis (≈ 1 semaine)
+
+**Livrable :** décision technique sur le rechargement de module, package
+skeleton, bug `assets/` corrigé.
+
+1. Spike : invalider le cache ESM de Bun pour un fichier modifié. Candidats :
+   `import(path + '?v=' + mtime)`, copie vers `<state>/.hot/<hash>.ts`, ou
+   `Bun.build` vers un blob. Critère : rechargement < 200 ms, pas de fuite
+   mémoire visible après 100 cycles.
+2. Spike : rendre un composant React fourni par un module chargé dynamiquement
+   dans opentui (contexte React partagé, pas de double instance de `react`).
+   Le plugin doit importer `react` et `@opentui/react` résolus depuis aimux :
+   documenter la résolution (`peerDependencies` + `bun link` ou un alias de
+   résolution dans le loader).
+3. Créer `packages/aimux-plugin` (types vides, `definePlugin`, README),
+   l'ajouter au workspace et à knip.
+4. Corriger `package.json` `files` (ajouter `assets`) et le test associé.
+5. Écrire la RFC courte dans `docs/developer/plugins.md` à partir de ce
+   document, y figer l'`apiVersion: 1`.
+
+### Phase 1 · Kernel, loader, config, CLI (≈ 2 semaines)
+
+**Livrable :** un plugin « hello » chargé dans l'UI et le daemon, rechargé à
+chaud, listé et journalisé par le CLI. Aucun registre ouvert encore.
+
+1. `src/plugins/kernel/` : `Fiber` (états, transitions, erreurs), `Context`
+   (services, `inject` avec attente, `effect`, `plugin()` enfant), `EventBus`
+   (5 modes), `ServiceRegistry` (provide / retrait déclenchant l'unload des
+   dépendants).
+2. `src/plugins/manifest.ts` : parse et validation d'`aimux-plugin.json`,
+   semver contre `minAimuxVersion` et `apiVersion`.
+3. `src/plugins/loader.ts` : découverte (répertoire du profil,
+   `aimux-plugins.json`, `config.plugins`), résolution des moitiés, import
+   isolé (try/catch → `FAILED`), journal par plugin dans
+   `<state>/<id>/plugin.log`.
+4. `src/plugins/watch.ts` : watcher + debounce + reload ; désactivable par
+   `AIMUX_PLUGIN_WATCH=0`.
+5. Hôtes : `src/ui/plugin-host.tsx` (monté dans `app.tsx` après
+   `registerAllModes`) et `src/daemon/plugin-host.ts` (après
+   `startClaudeHookServer`). Contexte minimal : `log`, `config`, `paths`,
+   `effect`, `on`, `rpc`.
+6. IPC v19 : `pluginRequest` / `pluginEvent`, capacité `pluginRpc`, routage
+   daemon → handler, broadcast → moitiés UI.
+7. Config : `plugins` dans `AimuxUserConfig` et le resolver ;
+   `aimux-plugins.json` avec validation par champ comme `loadConfigResult`.
+8. CLI : `aimux plugin list | link | unlink | install <owner/repo[/subdir]> |
+uninstall | enable | disable | reload | log | doctor`. `install` = clone +
+   prévisualisation du manifeste + `build` après confirmation, comme herdr.
+9. Tests : unitaires kernel (cycle de vie, disposers, inject en attente, HMR
+   sans fuite), intégration loader avec un plugin fixture dans
+   `test/fixtures/plugins/`, roundtrip IPC `pluginRpc`.
+
+### Phase 2 · Ouvrir l'UI et l'input (≈ 3 semaines)
+
+**Livrable :** un plugin peut ajouter un widget de barre, une vue plein écran,
+une modale, des actions liées au clavier, une section de réglages, un thème,
+une page de stats.
+
+1. R1 (types partagés) en premier : c'est la fondation du package public.
+2. R2 : variantes `plugin-action` / `plugin-effect`, `ModeId` ouvert,
+   `plugin-view`, `plugin-modal`, slice `plugins`.
+3. R3 UI : registres widgets, views, modals, settings, themes (avec chargement
+   disque depuis `<profil>/themes/`, comme les sprites), stats pages, status
+   bar, aide.
+4. Keymap builder : `k.plugin('acme.x.verb')` et modes plugin dans
+   `KeymapBuilderApi` ; l'aide générée affiche les bindings des plugins.
+5. R4 : bus d'événements UI ; compteurs migrés en abonné.
+6. Kit de primitives pour plugins : `Panel`, `List`, `KeyHint`, `Row`, thème
+   via hook, pour qu'un plugin ait la même allure que le reste sans apprendre
+   opentui.
+7. Tests : rendu d'un widget plugin dans une barre, transition vers un mode
+   plugin, reducer de slice, help entries.
+
+### Phase 3 · Ouvrir le daemon (≈ 2 semaines)
+
+**Livrable :** un plugin peut déclarer un assistant complet, réagir aux tours
+et questions, recevoir des hooks HTTP, ajouter une commande CLI, ou n'être
+qu'un manifeste de commandes.
+
+1. R3 daemon : `assistantRegistry`, map de classifieurs, arbitre N sources,
+   adaptateurs d'usage IA, routes de hooks, `registerCliCommand`.
+2. `ctx.tabs` / `ctx.projects` / `ctx.workspaces` côté daemon sur le
+   `tabRegistry` et le backend.
+3. Plugin built-in `aimux.exec` : interprète `manifest.commands`,
+   `manifest.events`, `manifest.panes` ; lance les sous-processus avec
+   `AIMUX_SOCKET_PATH`, `AIMUX_BIN_PATH`, `AIMUX_PLUGIN_ID`,
+   `AIMUX_PLUGIN_ROOT/CONFIG_DIR/STATE_DIR`, `AIMUX_CONTEXT_JSON`,
+   `AIMUX_ENV=1`. Les panes « overlay / popup / split / tab » se traduisent en
+   tabs aimux existants.
+4. Règle de discipline : `src/terminal-manager` n'importe jamais
+   `src/plugins`.
+5. Tests : assistant custom de bout en bout (reprend
+   `test/integration/custom-assistants.test.ts`), route de hook, commande CLI
+   de plugin visible dans la complétion.
+
+### Phase 4 · Dogfooding, skill, docs (≈ 2 semaines)
+
+**Livrable :** quatre fonctionnalités existantes sont des plugins built-in, le
+skill d'auteur est livré, la doc utilisateur et développeur existe.
+
+1. Migrer vers `src/builtin-plugins/` : `claude-integration` (hooks, syntax
+   overlay, theme sync), `ai-usage`, `auto-commit`, `auto-rename`. Le widget
+   `setup` ensuite. Git et projets restent cœur.
+2. Chaque migration est un test de l'API : ce qu'une migration ne peut pas
+   faire proprement est un trou d'API à combler avant de continuer.
+3. Skill `skills/aimux-plugin-author/` (section 8), commande
+   `aimux plugin new <id> [--ui] [--daemon] [--exec]`,
+   `aimux --skill plugin-author`.
+4. Docs : `docs/guide/plugins.md` (utilisateur), `docs/developer/plugins.md`
+   (architecture), `docs/reference/plugin-api.md` (généré depuis les `.d.ts`
+   par un script `scripts/gen-plugin-api-doc.ts`).
+5. Dépôt `aimux-plugin-examples` : trois plugins (notification Telegram,
+   layout bootstrap, lien GitHub), miroir des exemples herdr.
+
+### Phase 5 · Extensions optionnelles (à décider)
+
+- **Panes non-terminal** : `LayoutLeaf` gagne `kind: 'tab' | 'plugin'`. Touche
+  ~15 call sites (`layout-tree.ts`, `tab-state.ts`,
+  `use-terminal-resize.ts`…). Utile pour un board, un diff, un navigateur de
+  logs à côté d'un agent.
+- **Plugins dynamiques définis par un agent** (DeepSeek « extensions ») :
+  `aimux plugin define --from-file` crée un plugin en mémoire, vivant jusqu'au
+  redémarrage. Un worker aimux pourrait s'ajouter un widget de suivi pendant
+  sa tâche.
+- **Marketplace** : index par topic GitHub `aimux-plugin` + manifeste à la
+  racine, page sur le site de docs.
+- **Isolation** : moitié daemon dans un `Worker` Bun pour qu'une boucle
+  infinie ne gèle pas le daemon.
+
+## 8. « Un plugin en un prompt » : ce que le skill doit contenir
+
+Un skill ne remplace pas une API prévisible. Le kit qui rend l'objectif
+réaliste tient en six pièces, toutes livrées par le dépôt aimux et versionnées
+avec lui.
+
+- **`skills/aimux-plugin-author/SKILL.md`** : préflight
+  (`aimux plugin doctor`), boucle d'auteur (`new → link → reload → log`),
+  règles d'API (tout est réversible, pas d'état global, pas de protocole IPC),
+  checklist de sortie (types, tests, README, manifeste).
+- **`references/api.md`** : généré depuis les `.d.ts` de
+  `@brimveyn/aimux-plugin` à chaque release. Un agent qui lit une API à jour
+  ne devine pas.
+- **`references/recipes.md`** : dix recettes courtes couvrant chaque service
+  (widget, vue, modale, action + keybinding, section de réglages, assistant,
+  détecteur de statut, hook HTTP, commande CLI, plugin exec).
+- **`references/manifest.md`** : schéma JSON du manifeste avec exemples valides
+  et invalides.
+- **`assets/`** : template de plugin (les trois formes), template de test avec
+  `createTestContext()`.
+- **`aimux plugin doctor <path>`** : valide le manifeste, importe les moitiés à
+  sec, vérifie les types via `tsc --noEmit` sur le plugin, liste les
+  inscriptions faites par `apply`. Le message d'erreur nomme le champ et la
+  ligne : c'est ce que l'agent lit en boucle.
+
+Le skill existant `aimux-orchestrator` est le modèle de forme (frontmatter,
+references, assets) et `worker doctor` le modèle de résolution de chemin.
+Ajouter un petit registre de skills à `doctor.ts` pour ne plus coder un chemin
+par skill.
+
+## 9. Risques et parades
+
+| Risque                                                        | Impact                                        | Parade                                                                           |
+| ------------------------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------- |
+| Bun ne permet pas d'invalider proprement un module ESM        | pas de HMR, seulement « reload = restart UI » | spike phase 0 ; repli : copie hashée du fichier, ou rechargement via `Bun.build` |
+| Double instance de React / opentui dans un plugin             | hooks cassés, rendu vide                      | résolution forcée vers les modules d'aimux ; `doctor` détecte le cas             |
+| Dérive entre les types dupliqués package / `src`              | API publique instable                         | R1 avant toute publication                                                       |
+| Un plugin daemon bloque la boucle                             | toutes les UI figées, PTY vivantes            | timeouts sur les handlers, `FAILED` après N erreurs, phase 5 Worker              |
+| Fichiers > 1000 lignes, knip, discipline protocole            | CI rouge                                      | hôtes extraits dès la phase 1, entrées knip, règle TM                            |
+| Sécurité : le code du plugin tourne avec les droits de l'user | comme herdr                                   | prévisualisation à l'install, `--yes` explicite, pas de sandbox promise          |
+| Surface d'API trop large trop tôt                             | rétro-compat impossible                       | `apiVersion`, tout ce qui n'est pas dogfoodé en phase 4 reste `@experimental`    |
+
+## 10. Décisions
+
+Tranché le 2026-09-01. Les quatre premiers points suivent la recommandation ;
+les deux derniers restent des hypothèses du plan, à revoir en phase 5.
+
+1. **Modèle d'exécution : les deux.** TS in-process comme voie principale
+   (seule façon d'avoir du rendu UI et du HMR), l'adaptateur exec comme plugin
+   built-in pour la voie herdr.
+2. **Rendu UI : React/opentui direct, avec un kit de primitives.** Un DSL
+   déclaratif serait plus stable mais rend un « board » ou un « diff »
+   impossible.
+3. **Dogfooding : claude-integration, ai-usage, auto-commit, auto-rename.** Le
+   panneau git reste cœur : trop lié aux reducers pour un premier passage.
+4. **Distribution v1 : GitHub `owner/repo[/subdir]` + `link` local.** npm plus
+   tard si des plugins ont des dépendances lourdes.
+5. _Hypothèse :_ pas de panes non-terminal dans l'arbre de layout en v1 ; les
+   vues plein écran et les widgets de barre couvrent la plupart des cas avec
+   dix fois moins de call sites.
+6. _Hypothèse :_ moitié daemon in-process avec timeouts ; l'API RPC est conçue
+   pour qu'un passage en Worker soit invisible pour les plugins.
