@@ -1,4 +1,5 @@
 import type { PluginHost, PluginManifest } from './manifest'
+import type { PluginActionsApi, PluginStoreApi, PluginUiApi } from './ui'
 
 /**
  * Everything a plugin registers hands back one of these. The kernel calls
@@ -103,9 +104,15 @@ export interface PluginContext {
   service: <T = unknown>(name: string) => T | undefined
 }
 
-/** UI half. Widget/view/modal services land on this type in API phase 2. */
-export interface UiPluginContext extends PluginContext {
+/**
+ * The UI half's context. `ui`, `actions` and `store` are attached by the UI
+ * host; a plugin declaring `entries.ui` always receives them.
+ */
+export interface UiPluginContext<Slice = unknown> extends PluginContext {
   readonly host: 'ui'
+  readonly ui: PluginUiApi
+  readonly actions: PluginActionsApi
+  readonly store: PluginStoreApi<Slice>
 }
 
 /** Daemon half. Assistant/hook/CLI services land on this type in API phase 3. */

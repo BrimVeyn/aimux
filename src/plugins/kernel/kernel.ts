@@ -1,4 +1,9 @@
-import { type Disposer, PluginEventBus, type PluginHost } from '@brimveyn/aimux-plugin'
+import {
+  type Disposer,
+  type PluginContext,
+  PluginEventBus,
+  type PluginHost,
+} from '@brimveyn/aimux-plugin'
 
 import type { PluginRecord, PluginRpcTransport, PluginStatus } from '../types'
 
@@ -27,6 +32,11 @@ export interface PluginKernelOptions {
   transport: PluginRpcTransport
   /** Fired after any fiber changes state — the UI re-renders on it. */
   onStatusChange?: (statuses: PluginStatus[]) => void
+  /**
+   * Attaches host-specific services to each plugin context. See
+   * `FiberHost.extendContext`.
+   */
+  extendContext?: (ctx: PluginContext) => void
 }
 
 export class PluginKernel {
@@ -38,12 +48,14 @@ export class PluginKernel {
   private readonly rpcHandlers = new Map<string, Map<string, (payload: unknown) => unknown>>()
   private readonly transport: PluginRpcTransport
   private readonly onStatusChange: ((statuses: PluginStatus[]) => void) | undefined
+  private readonly extendContext: ((ctx: PluginContext) => void) | undefined
   private disposed = false
 
   constructor(options: PluginKernelOptions) {
     this.host = options.host
     this.transport = options.transport
     this.onStatusChange = options.onStatusChange
+    this.extendContext = options.extendContext
     this.bus = new PluginEventBus({
       onError: (error, context) => {
         const owner = context.owner ?? 'unknown'
@@ -111,6 +123,7 @@ export class PluginKernel {
   private fiberHost(): ConstructorParameters<typeof PluginFiber>[3] {
     return {
       bus: this.bus,
+      ...(this.extendContext === undefined ? {} : { extendContext: this.extendContext }),
       onStateChange: () => {
         this.notify()
       },

@@ -23,6 +23,21 @@ export {
   type TestRpcCall,
 } from './test-context'
 export type {
+  PluginActionsApi,
+  PluginBarWidget,
+  PluginModal,
+  PluginModalsApi,
+  PluginNode,
+  PluginSettingsApi,
+  PluginStoreApi,
+  PluginThemesApi,
+  PluginToastApi,
+  PluginUiApi,
+  PluginView,
+  PluginViewsApi,
+  PluginWidgetsApi,
+} from './ui'
+export type {
   DaemonPluginContext,
   Disposer,
   PluginContext,

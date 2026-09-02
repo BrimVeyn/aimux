@@ -49,6 +49,9 @@ export {
 } from './external-editor-runtime'
 export { DEFAULT_MULTI_REPO_CONFIG } from './defaults'
 
+// The settings screen's row and section shapes; a plugin registers one.
+export type * from './settings-types'
+
 // The application state, mode and layout shapes. Defined in this package —
 // `src/` re-exports them rather than declaring its own copies.
 export type * from './app-types'

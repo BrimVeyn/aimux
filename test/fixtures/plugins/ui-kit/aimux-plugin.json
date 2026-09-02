@@ -1,0 +1,8 @@
+{
+  "id": "aimux-test.uikit",
+  "name": "UI kit",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "entries": { "ui": "./ui.ts" },
+  "config": { "greeting": { "type": "string", "default": "hi" } }
+}

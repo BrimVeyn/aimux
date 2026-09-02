@@ -43,6 +43,16 @@ export interface FiberHost {
   ) => Disposer
   /** Called on every state transition so the kernel can re-evaluate and notify. */
   onStateChange: (fiber: PluginFiber) => void
+  /**
+   * Attaches the host's own services to a freshly-built context — `ctx.ui` in
+   * the UI, `ctx.assistants` in the daemon. The kernel stays host-agnostic
+   * this way: it knows how to build a context and how to dispose one, and
+   * nothing about what either process can offer.
+   *
+   * Anything it registers must go on the fiber through `ctx.effect`, or the
+   * unload will miss it.
+   */
+  extendContext?: (ctx: PluginContext) => void
 }
 
 export type FiberState = PluginStatus['state']
@@ -244,6 +254,7 @@ export class PluginFiber {
     }
 
     const ctx = this.createContext()
+    this.kernel.extendContext?.(ctx)
     try {
       await definition.apply(ctx)
     } catch (error) {

@@ -19,6 +19,7 @@ import { onSettingSectionsChanged } from '../settings/sections'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
+import { extendUiPluginContext } from './plugin-ui-services'
 import { onPluginViewsChanged } from './plugin-views'
 import { onBarWidgetsChanged } from './widgets/registry'
 
@@ -92,6 +93,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     }
 
     const runtime = new PluginRuntime({
+      extendContext: extendUiPluginContext,
       host: 'ui',
       onIssues: (issues) => {
         // Discovery problems are the user's to fix, and a plugin that silently

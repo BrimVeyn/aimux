@@ -1,5 +1,5 @@
 import type { PluginConfigEntry } from '@brimveyn/aimux-config'
-import type { PluginHost } from '@brimveyn/aimux-plugin'
+import type { PluginContext, PluginHost } from '@brimveyn/aimux-plugin'
 
 import type { PluginRecord, PluginRpcTransport, PluginStatus } from './types'
 
@@ -31,6 +31,8 @@ export interface PluginRuntimeOptions {
    * is the worst outcome available.
    */
   onIssues?: (issues: PluginDiscoveryIssue[]) => void
+  /** Attaches host-specific services to each plugin context. */
+  extendContext?: (ctx: PluginContext) => void
 }
 
 export class PluginRuntime {
@@ -46,6 +48,7 @@ export class PluginRuntime {
       host: options.host,
       transport: options.transport,
       ...(options.onStatusChange === undefined ? {} : { onStatusChange: options.onStatusChange }),
+      ...(options.extendContext === undefined ? {} : { extendContext: options.extendContext }),
     })
   }
 
