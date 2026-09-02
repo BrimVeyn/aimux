@@ -2,6 +2,7 @@ import { memo, useCallback } from 'react'
 
 import type { SettingRow } from '../../../settings/types'
 
+import { rowMarks } from '../../../settings/row-marks'
 import { readRow, storedRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
@@ -105,8 +106,11 @@ export const SettingsFooter = memo(function SettingsFooter({
   width: number
 }) {
   const t = useTheme()
-  const fromConfigFile = useSettingsStore((s) => (row ? s.fromConfigFile.has(row.id) : false))
-  const touched = useSettingsStore((s) => (row ? s.touched.has(row.id) : false))
+  const storeMarks = {
+    fromConfigFile: useSettingsStore((s) => (row ? s.fromConfigFile.has(row.id) : false)),
+    touched: useSettingsStore((s) => (row ? s.touched.has(row.id) : false)),
+  }
+  const { fromConfigFile, touched } = row ? rowMarks(row, storeMarks) : storeMarks
   const defaultValue = useSettingsStore((s) => (row ? s.defaults[row.id] : undefined))
 
   const handleClose = useCallback(() => dispatchGlobal({ type: 'exit-settings' }), [])

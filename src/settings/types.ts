@@ -4,6 +4,7 @@
 // `src/settings` is unchanged.
 
 export type {
+  PluginSettingRow,
   SettingCtx,
   SettingOption,
   SettingRow,

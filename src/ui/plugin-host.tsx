@@ -8,6 +8,7 @@ import type { SessionBackend } from '../session-backend/types'
 
 import { logDebug } from '../debug/input-log'
 import { PluginRuntime } from '../plugins/loader'
+import { publishPluginRecords, publishPluginStatuses } from '../plugins/plugin-store'
 import {
   isCallEnvelope,
   PLUGIN_CONTROL_ID,
@@ -22,6 +23,7 @@ import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
 import { onPluginPanesChanged } from './plugin-panes'
+import { setPluginRefresh } from './plugin-refresh-ref'
 import { extendUiPluginContext } from './plugin-ui-services'
 import { onPluginViewsChanged } from './plugin-views'
 import { onBarWidgetsChanged } from './widgets/registry'
@@ -114,6 +116,13 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
         if (stopped) return
         setStatuses(next)
         setVersion((value) => value + 1)
+        publishPluginStatuses(next)
+        // The records too: a status change follows every `kernel.apply`, which
+        // follows every refresh, so this is where the two are both current.
+        publishPluginRecords(
+          runtimeRef.current?.knownRecords() ?? [],
+          runtimeRef.current?.issues ?? []
+        )
         for (const status of next) {
           if (status.state === 'failed' && status.error !== undefined) {
             toast.error(`plugin ${status.id}: ${status.error}`)
@@ -124,6 +133,18 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       userPlugins: userPluginsRef.current,
     })
     runtimeRef.current = runtime
+
+    /**
+     * Re-read the plugins here and in the daemon. The daemon's `refresh`
+     * broadcasts back to every attached UI, so a settings write reaches both
+     * processes with one call — and the local refresh covers the daemonless
+     * case, where this process is the only one there is.
+     */
+    const refreshEverywhere = (): void => {
+      void runtime.refresh()
+      void send(backend, PLUGIN_CONTROL_ID, PLUGIN_CONTROL_REFRESH, {}, 'ui.plugin.refreshFailed')
+    }
+    setPluginRefresh(refreshEverywhere)
 
     /**
      * Answers a daemon → UI call. The reply travels back as an ordinary
@@ -207,6 +228,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
 
     return () => {
       stopped = true
+      setPluginRefresh(null)
       for (const unwatch of unwatchRegistries) unwatch()
       backend.off('pluginEvent', onPluginEvent)
       void runtime.stop()

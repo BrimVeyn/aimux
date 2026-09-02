@@ -47,13 +47,23 @@ function nextNumberValue(
   return Math.min(row.max, Math.max(row.min, round(base + delta * row.step)))
 }
 
-/** Asks for a field, seeded with what the row holds. */
+/**
+ * Asks for a field, seeded with what the row holds — except for a secret,
+ * which is seeded empty.
+ *
+ * The row already reads as `<secret>` rather than as the token, so seeding
+ * from it would put that placeholder in an editable field, and appending to it
+ * would store `<secret>` plus whatever was typed. Empty says the right thing:
+ * a secret is replaced, not edited.
+ */
 function openField(row: SettingRow, current: SettingValue): void {
+  const secret =
+    row.kind !== 'info' && row.kind !== 'action' && row.storage === 'plugin' && row.secret === true
   dispatchGlobal({
     label: row.label,
     settingId: row.id,
     type: 'open-setting-text-modal',
-    value: String(current),
+    value: secret ? '' : String(current),
   })
 }
 

@@ -3,6 +3,7 @@ import type { ScrollBoxRenderable } from '@opentui/core'
 import { useTerminalDimensions } from '@opentui/react'
 import { memo, useCallback, useMemo, useRef } from 'react'
 
+import { usePluginStore } from '../../../plugins/plugin-store'
 import { filterSettingRows, type SettingSearchHit } from '../../../settings/search'
 import { getSection } from '../../../settings/sections'
 import { useSettingsStore } from '../../../settings/settings-store'
@@ -81,6 +82,10 @@ export const SettingsView = memo(function SettingsView() {
   // print.
   const projects = useAppStore((s) => s.projects)
   const revision = useSettingsStore((s) => s.revision)
+  // The plugin store is the other place a row's value can live, and it changes
+  // when a plugin loads, fails or is toggled — none of which touches the
+  // settings store.
+  const pluginRevision = usePluginStore((s) => s.revision)
   const touchedCount = useSettingsStore((s) => s.touched.size)
   const configCount = useSettingsStore((s) => s.fromConfigFile.size)
   // The section list stands exactly where the left bar stands. Its configured
@@ -94,7 +99,7 @@ export const SettingsView = memo(function SettingsView() {
     // `revision` is an invalidation key, not an input: it says a value the builder
     // read from disk may have changed under it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [projects, revision]
+    [projects, revision, pluginRevision]
   )
   const groups = useMemo(() => groupBySection(hits), [hits])
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)

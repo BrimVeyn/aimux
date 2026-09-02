@@ -78,11 +78,46 @@ interface DerivedRow {
   write: (value: SettingValue, ctx: SettingCtx) => void
 }
 
+/**
+ * A row over one key of a plugin's configuration.
+ *
+ * Not a `settings` row: that block of `aimux.json` is never read by plugin
+ * discovery, so a value written there would silently reach no plugin. Not an
+ * `app` row either — its value has neither a home in `AppState` nor a place in
+ * the settings screen's hydration, and the two marks a plugin row most needs
+ * (`~` the registry has an override, `*` `aimux.config.ts` declares it and
+ * keeps winning) come from the plugin's own layers rather than from this
+ * screen's bookkeeping.
+ *
+ * The three functions are closures, like `DerivedRow`'s: the settings store
+ * must not learn how to reach a plugin registry.
+ */
+interface PluginConfigRow {
+  storage: 'plugin'
+  /** For the detail view, and for a test to name the row it means. */
+  pluginId: string
+  field: string
+  /** Never rendered and edited from empty. */
+  secret?: boolean
+  /** `aimux.config.ts` declares this key and keeps winning. Drives `*`. */
+  fromConfigFile: boolean
+  /** A layer above the manifest default set it. Drives `~`. */
+  isSet: boolean
+  read: () => SettingValue
+  write: (value: SettingValue) => void
+  /** Drop the override and fall back through the layers underneath. */
+  reset: () => void
+}
+
 /** A row whose value lives in the `settings` block of `aimux.json`. */
 export type StoredSettingRow = SettingRowBase & SettingKind & StoredRow
 
+/** A row over one key of a plugin's config. Narrowed by `storage === 'plugin'`. */
+export type PluginSettingRow = SettingRowBase & SettingKind & PluginConfigRow
+
 export type SettingRow =
   | StoredSettingRow
+  | PluginSettingRow
   | (SettingRowBase & SettingKind & DerivedRow)
   | (SettingRowBase & { kind: 'info'; value: (ctx: SettingCtx) => string })
   /**

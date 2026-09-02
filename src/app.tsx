@@ -39,7 +39,7 @@ import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { bump } from './services/aimux-counters'
 import { observeCounters } from './services/aimux-counters/observe'
 import { useAutoCommitConfig, useSnippetTriggerChar } from './settings/live'
-import { ALL_SETTING_ROWS } from './settings/sections'
+import { ALL_SETTING_ROWS, setPluginUserConfig } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
 import { appStore, useAppStore } from './state/app-store'
 import {
@@ -206,6 +206,9 @@ export function App({
   // Layout effect, so it lands before the first paint.
   useLayoutEffect(() => {
     hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    // Which plugin config keys the file declares, so those rows can say they
+    // come back on restart. Read once, like everything else here.
+    setPluginUserConfig(resolvedConfig.plugins)
     // Once per launch: the config file is read at startup and does not change
     // under us, and every later write goes through `writeRow`.
     // eslint-disable-next-line react-hooks/exhaustive-deps

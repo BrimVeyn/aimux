@@ -1,6 +1,7 @@
 import type { ProjectRecord } from '../../state/types'
 import type { SettingRow, SettingSection } from '../types'
 
+import { pluginConfigSections } from '../plugin-config-rows'
 import { ABOUT_SECTION } from './about'
 import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
@@ -11,6 +12,7 @@ import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
 import { NOTIFICATIONS_SECTION } from './notifications'
+import { PLUGINS_SECTION } from './plugins'
 import { SETUP_SECTION } from './setup'
 import { STATUS_BAR_SECTION } from './status-bar'
 import { WORKSPACE_SECTION } from './workspace'
@@ -33,6 +35,7 @@ export const BUILTIN_SETTING_SECTIONS: readonly SettingSection[] = [
   STATUS_BAR_SECTION,
   INTEGRATIONS_SECTION,
   EXPERIMENTAL_SECTION,
+  PLUGINS_SECTION,
   ABOUT_SECTION,
 ]
 
@@ -79,11 +82,35 @@ export function clearSettingSections(): void {
  * Read fresh on every call: the cursor bounds, the search index and the screen
  * all derive from it, and a plugin loaded after boot has to move all three.
  */
+/**
+ * Every section on screen: the built-ins, then one generated per configurable
+ * plugin, then whatever a plugin registered for itself, then About.
+ *
+ * The generated ones come from the plugin store rather than from a plugin's
+ * own fiber, deliberately: a section a plugin registered would vanish the
+ * moment it stopped loading, which is exactly when someone needs to change its
+ * configuration.
+ */
 export function settingSections(): readonly SettingSection[] {
-  if (pluginSections.size === 0) return BUILTIN_SETTING_SECTIONS
+  const generated = pluginConfigSections(pluginUserConfigRef)
+  if (pluginSections.size === 0 && generated.length === 0) return BUILTIN_SETTING_SECTIONS
   const about = BUILTIN_SETTING_SECTIONS.at(-1)
   const rest = BUILTIN_SETTING_SECTIONS.slice(0, -1)
-  return about ? [...rest, ...pluginSections.values(), about] : [...pluginSections.values()]
+  const middle = [...generated, ...pluginSections.values()]
+  return about ? [...rest, ...middle, about] : middle
+}
+
+/**
+ * `aimux.config.ts`'s plugin entries, needed to know which keys the file
+ * declares — and therefore which rows carry the "comes back on restart" mark.
+ * Set once at boot by the app; empty is the honest default everywhere else.
+ */
+let pluginUserConfigRef: readonly { id?: string; config?: Record<string, unknown> }[] = []
+
+export function setPluginUserConfig(
+  entries: readonly { id?: string; config?: Record<string, unknown> }[]
+): void {
+  pluginUserConfigRef = entries
 }
 
 /**
