@@ -46,6 +46,7 @@ import { PendingChordOverlay } from './components/overlays/pending-chord-overlay
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { SettingsView } from './components/settings/settings-view'
 import { StatsView } from './components/stats/stats-view'
+import { PluginViewHost } from './plugin-views'
 import { useTheme } from './theme'
 
 const EMPTY_WORKSPACES: WorkspaceRecord[] = []
@@ -438,6 +439,9 @@ export function RootView({
   // Read-only, so unlike settings it has no modal that belongs to it and no
   // second condition: the screen is up exactly while focus is on it.
   else if (focusMode === 'stats') replacesPanes = <StatsView />
+  // A plugin view replaces the panes the same way, and for the same reason:
+  // everything else on screen is identical, so only the centre branches.
+  else if (focusMode === 'plugin-view') replacesPanes = <PluginViewHost />
 
   const center =
     replacesPanes !== null ? (

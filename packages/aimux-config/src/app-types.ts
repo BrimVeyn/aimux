@@ -71,6 +71,13 @@ export type FocusMode =
   | 'git'
   | 'settings'
   | 'stats'
+  /**
+   * A plugin's full-screen view has replaced the pane tree. Which one is in
+   * `AppState.activePluginView` — one focus mode covers every plugin view, the
+   * way `modal` covers every modal, so adding a view is a registration rather
+   * than a change to this union.
+   */
+  | 'plugin-view'
 
 export type ModalType =
   | 'new-tab'
@@ -805,6 +812,13 @@ export interface AppState {
   /** Chord prefix the sequence resolver is currently waiting on, or null when idle. */
   pendingChords: string[] | null
   /**
+   * The plugin view currently replacing the panes, by its qualified id
+   * (`<pluginId>.<viewId>`), or null. Only meaningful while `focusMode` is
+   * `plugin-view`; kept alongside rather than inside it so the focus union
+   * does not have to grow an arm per view.
+   */
+  activePluginView: string | null
+  /**
    * One namespaced slice per plugin, keyed by plugin id. Opaque to the core
    * reducer: a plugin registers a reducer for its own key and nothing else
    * reads or writes it. Namespacing rather than a flat merge is what keeps a
@@ -1360,6 +1374,10 @@ export type PluginStateAction =
   | { type: 'set-plugin-slice'; pluginId: string; slice: unknown }
   /** Signals that some plugin registry changed; see `pluginRegistryVersion`. */
   | { type: 'bump-plugin-registry' }
+  /** Replaces the panes with a plugin's full-screen view. */
+  | { type: 'open-plugin-view'; viewId: string }
+  /** Returns from a plugin view to the panes. */
+  | { type: 'close-plugin-view' }
 
 export type AppAction =
   | ModalAction

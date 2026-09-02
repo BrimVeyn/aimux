@@ -108,6 +108,7 @@ export function createInitialState(
   overrides: InitialStateOverrides = {}
 ): AppState {
   return {
+    activePluginView: null,
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,
     bars: sanitizeBars(overrides.bars ?? DEFAULT_BARS),

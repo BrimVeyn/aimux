@@ -74,6 +74,15 @@ export function reducePluginSlices(state: AppState, action: AppAction): AppState
     }
     case 'bump-plugin-registry':
       return { ...state, pluginRegistryVersion: state.pluginRegistryVersion + 1 }
+    case 'open-plugin-view':
+      return { ...state, activePluginView: action.viewId, focusMode: 'plugin-view' }
+    case 'close-plugin-view': {
+      if (state.activePluginView === null) return state
+      // Back to the panes, never to whatever opened the view: a plugin view
+      // replaces the pane tree outright, so there is no screen behind it to
+      // return to the way a modal has one.
+      return { ...state, activePluginView: null, focusMode: 'navigation' }
+    }
     default:
       return null
   }
