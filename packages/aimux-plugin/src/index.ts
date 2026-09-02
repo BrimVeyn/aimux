@@ -40,6 +40,8 @@ export type {
   PluginModal,
   PluginModalsApi,
   PluginNode,
+  PluginPane,
+  PluginPanesApi,
   PluginSettingsApi,
   PluginSettingValue,
   PluginStatsApi,

@@ -1245,6 +1245,19 @@ export type LayoutAction =
       ratio: number
       axis?: SplitDirection
     }
+  /**
+   * Splits the active pane and puts a plugin's renderer beside it. Two
+   * concrete arms rather than another routed `plugin-*` variant: where a pane
+   * goes and when it closes is the layout's business, not the plugin's, and
+   * the reducer has to reason about both.
+   */
+  | {
+      type: 'open-plugin-pane'
+      /** Qualified `<pluginId>.<paneId>`. */
+      paneId: string
+      direction: SplitDirection
+    }
+  | { type: 'close-plugin-pane'; paneId: string }
 
 export type UIAction =
   | { type: 'toggle-bar'; side: BarSide }

@@ -1,6 +1,12 @@
 import type { AppState, ProjectSnapshotV1, TabSession, TabStatus } from './types'
 
-import { allTabIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
+import {
+  allTabIds,
+  createGroupId,
+  type LayoutNode,
+  pruneLayoutTree,
+  stripPluginPanes,
+} from './layout-tree'
 
 export function createEmptyProjectSnapshot(): ProjectSnapshotV1 {
   return {
@@ -32,15 +38,36 @@ function getDisconnectedStatus(status: TabStatus): TabStatus {
   return status
 }
 
+/**
+ * The layout as it goes to disk: terminals only, and the group map rebuilt
+ * from what survived. A group that was only holding a terminal and a plugin
+ * pane is not a split any more, so it is not written as one.
+ */
+function persistableLayout(state: AppState): {
+  trees: Record<string, LayoutNode>
+  groupMap: Record<string, string>
+} {
+  const trees: Record<string, LayoutNode> = {}
+  const groupMap: Record<string, string> = {}
+  for (const [groupId, tree] of Object.entries(state.layoutTrees)) {
+    const stripped = stripPluginPanes(tree)
+    if (!stripped || stripped.type !== 'split') continue
+    trees[groupId] = stripped
+    for (const leafId of allTabIds(stripped)) groupMap[leafId] = groupId
+  }
+  return { groupMap, trees }
+}
+
 export function serializeProject(state: AppState): ProjectSnapshotV1 {
+  const { groupMap: persistedGroupMap, trees: persistedTrees } = persistableLayout(state)
   return {
     activeTabId: state.activeTabId,
     lastActiveTabByWorkspace:
       Object.keys(state.lastActiveTabByWorkspace).length > 0
         ? state.lastActiveTabByWorkspace
         : undefined,
-    layoutTree: Object.values(state.layoutTrees)[0] ?? undefined,
-    layoutTrees: Object.keys(state.layoutTrees).length > 0 ? state.layoutTrees : undefined,
+    layoutTree: Object.values(persistedTrees)[0] ?? undefined,
+    layoutTrees: Object.keys(persistedTrees).length > 0 ? persistedTrees : undefined,
     savedAt: new Date().toISOString(),
     // Mirror of the left bar. `isProjectSnapshotV1` requires this key —
     // dropping it invalidates every entry in the project catalog.
@@ -48,7 +75,7 @@ export function serializeProject(state: AppState): ProjectSnapshotV1 {
       visible: state.bars.left.visible,
       width: state.bars.left.width,
     },
-    tabGroupMap: Object.keys(state.tabGroupMap).length > 0 ? state.tabGroupMap : undefined,
+    tabGroupMap: Object.keys(persistedGroupMap).length > 0 ? persistedGroupMap : undefined,
     // Hidden tabs (the setup runner's PTY) are session-scoped on purpose: the
     // durable record of a setup run is `WorkspaceRecord.setupRanAt`, and keeping
     // them out here is what lets `hidden` stay off the ipc/daemon wire.

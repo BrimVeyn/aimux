@@ -17,6 +17,7 @@ export interface DoctorRegistrations {
   widgets: string[]
   views: string[]
   modals: string[]
+  panes: string[]
   themes: string[]
   statsPages: string[]
   statusBarSegments: string[]
@@ -40,6 +41,7 @@ export function emptyRegistrations(): DoctorRegistrations {
     effects: [],
     hookRoutes: [],
     modals: [],
+    panes: [],
     settingsSections: 0,
     settingsWatched: [],
     statsPages: [],
@@ -89,6 +91,11 @@ export function createDoctorExtender(
           close: noop,
           open: noop,
           register: (modal: { id: string }) => record(into.modals, modal.id),
+        },
+        panes: {
+          close: noop,
+          open: noop,
+          register: (pane: { id: string }) => record(into.panes, pane.id),
         },
         settings: {
           // `undefined` is the honest dry-run answer — nothing is set in a

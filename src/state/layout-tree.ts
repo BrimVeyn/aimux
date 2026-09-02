@@ -270,6 +270,28 @@ export function computeJunctionEdges(
   }
 }
 
+/**
+ * The tree with every plugin pane taken out.
+ *
+ * Used on the way to disk. A plugin pane is session-scoped by design — the
+ * plugin that draws it may be disabled, still loading, or gone by the next
+ * launch — and writing its id into a user's `aimux.json` would leave a
+ * reference nothing can resolve. Restoring already prunes anything that is not
+ * a live tab, so this is about not writing it in the first place.
+ */
+export function stripPluginPanes(tree: LayoutNode): LayoutNode | null {
+  if (tree.type === 'leaf') {
+    return isTabLeaf(tree) ? tree : null
+  }
+  const first = stripPluginPanes(tree.first)
+  const second = stripPluginPanes(tree.second)
+  if (!first && !second) return null
+  if (!first) return second
+  if (!second) return first
+  if (first === tree.first && second === tree.second) return tree
+  return { ...tree, first, second }
+}
+
 export function pruneLayoutTree(tree: LayoutNode, validTabIds: Set<string>): LayoutNode | null {
   if (tree.type === 'leaf') {
     return validTabIds.has(tree.tabId) ? tree : null

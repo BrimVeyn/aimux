@@ -21,6 +21,7 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
+import { onPluginPanesChanged } from './plugin-panes'
 import { extendUiPluginContext } from './plugin-ui-services'
 import { onPluginViewsChanged } from './plugin-views'
 import { onBarWidgetsChanged } from './widgets/registry'
@@ -195,6 +196,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     const unwatchRegistries = [
       onPluginViewsChanged(bump),
       onPluginModalsChanged(bump),
+      onPluginPanesChanged(bump),
       onBarWidgetsChanged(bump),
       onSettingSectionsChanged(bump),
       onStatsPagesChanged(bump),

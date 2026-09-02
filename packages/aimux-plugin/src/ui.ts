@@ -101,6 +101,38 @@ export interface PluginSettingsApi {
   watch: (id: string, listener: (value: PluginSettingValue) => void) => Disposer
 }
 
+export interface PluginPane {
+  /** Unqualified; the host prefixes the plugin id. */
+  id: string
+  /** Drawn in the pane's border. */
+  title: string
+  render: () => PluginNode
+}
+
+export interface PluginPanesApi {
+  /**
+   * Declares a pane: a leaf in the layout tree that draws something other than
+   * a terminal. A widget is a narrow strip and a view takes the whole screen;
+   * a pane is the one that sits *beside* an agent — a board, a diff, a log
+   * browser.
+   *
+   * Registering does not put it on screen; `open` does.
+   */
+  register: (pane: PluginPane) => Disposer
+  /**
+   * Splits the pane the user is in and puts this one beside it. Takes the
+   * unqualified id. Opening one that is already open does nothing: the id is
+   * the plugin's name for it, and two panes claiming it would make `close`
+   * ambiguous.
+   *
+   * A pane never takes the keyboard: `direction` decides where it goes, and
+   * focus stays on the terminal it was split from.
+   */
+  open: (id: string, direction?: 'horizontal' | 'vertical') => void
+  /** Takes it off screen. The layout collapses as it would for a closed tab. */
+  close: (id: string) => void
+}
+
 export interface PluginStatusBarSegment {
   /** Unqualified; the host prefixes the plugin id. */
   id: string
@@ -204,6 +236,7 @@ export interface PluginUiApi {
   settings: PluginSettingsApi
   themes: PluginThemesApi
   toast: PluginToastApi
+  panes: PluginPanesApi
   stats: PluginStatsApi
   statusBar: PluginStatusBarApi
   kit: PluginKit

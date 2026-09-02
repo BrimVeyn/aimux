@@ -5,6 +5,7 @@ import {
   allTabIds,
   createGroupId,
   createLeaf,
+  createPluginLeaf,
   getAdjacentLeaf,
   getGroupIdForTab,
   getTreeForTab,
@@ -681,6 +682,74 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
     case 'close-pane': {
       const idx = state.tabs.findIndex((tab) => tab.id === action.tabId)
       return closeTabAtIndex(state, idx)
+    }
+    case 'open-plugin-pane': {
+      if (!(state.activeTabId != null && state.activeTabId !== '')) {
+        return state
+      }
+      // One instance per registered pane. Opening an open pane is a no-op
+      // rather than a second copy: the id is the plugin's name for it, and two
+      // panes claiming it would make "close it" ambiguous.
+      if (state.tabGroupMap[action.paneId] !== undefined) {
+        return state
+      }
+
+      let paneGroupId = getGroupIdForTab(state.tabGroupMap, state.activeTabId)
+      const existing =
+        paneGroupId != null && paneGroupId !== '' ? state.layoutTrees[paneGroupId] : undefined
+      let paneTree: LayoutNode
+      if (paneGroupId != null && paneGroupId !== '' && existing) {
+        paneTree = existing
+      } else {
+        paneGroupId = createGroupId()
+        paneTree = createLeaf(state.activeTabId)
+      }
+
+      const withPane = splitNode(
+        paneTree,
+        state.activeTabId,
+        action.direction,
+        createPluginLeaf(action.paneId)
+      )
+      if (withPane === paneTree) {
+        return state
+      }
+
+      // The active tab does not change: a plugin pane cannot hold focus, so
+      // opening one beside a terminal must not take the keyboard away from it.
+      return {
+        ...state,
+        layoutTrees: { ...state.layoutTrees, [paneGroupId]: withPane },
+        tabGroupMap: {
+          ...state.tabGroupMap,
+          [action.paneId]: paneGroupId,
+          [state.activeTabId]: paneGroupId,
+        },
+      }
+    }
+    case 'close-plugin-pane': {
+      const closeGroupId = state.tabGroupMap[action.paneId]
+      const closeTree =
+        closeGroupId != null && closeGroupId !== '' ? state.layoutTrees[closeGroupId] : undefined
+      if (closeGroupId == null || closeGroupId === '' || !closeTree) {
+        return state
+      }
+
+      const remaining = removeNode(closeTree, action.paneId)
+      const nextTrees = { ...state.layoutTrees }
+      const nextGroupMap = { ...state.tabGroupMap }
+      delete nextGroupMap[action.paneId]
+      // A group that is down to one pane is not a split any more, and the
+      // surviving tab goes back to being an ordinary tab — the same collapse
+      // closing a tab performs.
+      if (remaining === null || remaining.type === 'leaf') {
+        delete nextTrees[closeGroupId]
+        if (remaining?.type === 'leaf') delete nextGroupMap[remaining.tabId]
+      } else {
+        nextTrees[closeGroupId] = remaining
+      }
+
+      return { ...state, layoutTrees: nextTrees, tabGroupMap: nextGroupMap }
     }
     case 'focus-pane-direction': {
       if (!(state.activeTabId != null && state.activeTabId !== '')) {

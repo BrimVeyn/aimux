@@ -16,6 +16,7 @@ import {
   type PaneRect,
   type SplitDirection,
 } from '../../../state/layout-tree'
+import { PluginPane } from './plugin-pane'
 import { TerminalPane } from './terminal-pane'
 
 const PANE_CHROME = PANE_BORDER
@@ -88,6 +89,12 @@ export function SplitLayout({
     [bounds, contentOrigin]
   )
   if (node.type === 'leaf') {
+    // A pane holding a plugin has no PTY, no viewport and no activity state,
+    // so none of the terminal wiring below applies to it. It gets the same
+    // border and background, and mouse events reach the plugin's own elements.
+    if (node.kind === 'plugin') {
+      return <PluginPane paneId={node.tabId} />
+    }
     const tab = tabs.find((t) => t.id === node.tabId)
     const isActive = node.tabId === activeTabId
     logInputDebug('split.paneOrigin', {

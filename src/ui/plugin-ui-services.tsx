@@ -28,6 +28,7 @@ import { registerStatsPage, registerStatsPageRenderer } from '../state/stats-pag
 import { toast } from '../state/toast-store'
 import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
+import { registerPluginPane } from './plugin-panes'
 import { registerPluginView } from './plugin-views'
 import { registerStatusBarSegment } from './status-bar-segments'
 import { getCurrentMode, getCurrentTheme, subscribeThemeChanges } from './theme-store'
@@ -99,6 +100,28 @@ function buildUi(ctx: PluginContext): PluginUiApi {
             pluginId: id,
             render: (props) => modal.render(props) as ReactNode,
             title: modal.title,
+          })
+        ),
+    },
+    panes: {
+      close: (paneId) => {
+        dispatchGlobal({ paneId: qualify(id, paneId), type: 'close-plugin-pane' })
+      },
+      open: (paneId, direction) => {
+        dispatchGlobal({
+          direction: direction ?? 'vertical',
+          paneId: qualify(id, paneId),
+          type: 'open-plugin-pane',
+        })
+      },
+      register: (pane) =>
+        own(
+          ctx,
+          registerPluginPane({
+            id: qualify(id, pane.id),
+            pluginId: id,
+            render: () => pane.render() as ReactNode,
+            title: pane.title,
           })
         ),
     },
