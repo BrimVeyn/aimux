@@ -42,6 +42,9 @@
     },
     "packages/aimux-config": {
       "project": ["src/**/*.ts"]
+    },
+    "packages/aimux-plugin": {
+      "project": ["src/**/*.ts"]
     }
   }
 }

@@ -1,0 +1,36 @@
+{
+  "name": "@brimveyn/aimux-plugin",
+  "version": "0.1.0",
+  "description": "Plugin authoring API for aimux — context, effects, events and RPC for in-process plugins.",
+  "keywords": [
+    "aimux",
+    "extension",
+    "multiplexer",
+    "plugin",
+    "terminal",
+    "tui"
+  ],
+  "homepage": "https://github.com/BrimVeyn/aimux#readme",
+  "bugs": {
+    "url": "https://github.com/BrimVeyn/aimux/issues"
+  },
+  "license": "MIT",
+  "author": "BrimVeyn",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BrimVeyn/aimux.git",
+    "directory": "packages/aimux-plugin"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
