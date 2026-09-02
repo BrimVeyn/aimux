@@ -140,6 +140,34 @@ the part of the screen that stops matching when the user switches.
 ctx.ui.stats.registerPage({ id: 'board', label: 'Board', glyph: '◆', render: () => <Stats /> })
 ```
 
+### A pane, beside an agent
+
+A leaf in the layout tree that is not a terminal. Registering declares it;
+`open` puts it on screen by splitting the pane the user is in.
+
+```tsx
+ctx.ui.panes.register({
+  id: 'board',
+  title: 'Board',
+  render: () => {
+    const { Panel, Row } = ctx.ui.kit
+    return (
+      <Panel title="Board">
+        <Row label="Queued" value="3" />
+      </Panel>
+    )
+  },
+})
+
+ctx.ui.panes.open('board', 'vertical') // beside; 'horizontal' puts it below
+ctx.ui.panes.close('board')
+```
+
+A pane never takes the keyboard — focus stays on the terminal it was split
+from, and `<C-w>hjkl` crosses it. Your own elements still receive mouse events,
+so a list inside a pane scrolls and clicks. Opening one that is already open
+does nothing, and a pane is not persisted: it lives for the session.
+
 ### A status bar tile
 
 Sits on the right, before the version. aimux draws the separators and the tile

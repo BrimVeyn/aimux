@@ -6,8 +6,8 @@ description: Installing, configuring and switching off aimux plugins — includi
 # Plugins
 
 A plugin adds to aimux without a fork: a widget in a bar, a panel on the stats
-screen, a key that does something, an assistant aimux did not know about, a
-command that fires when an agent finishes a turn.
+screen, a pane sitting beside an agent, a key that does something, an assistant
+aimux did not know about, a command that fires when an agent finishes a turn.
 
 Some of them ship with aimux. `aimux plugin list` shows those alongside
 anything you have added, because there is no difference in how they load — a

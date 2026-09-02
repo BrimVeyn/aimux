@@ -164,6 +164,7 @@ one, and nothing about what either process can offer.
 | `ctx.ui.themes.current` / `.onChange`               | the active palette and mode, outside React          |
 | `ctx.ui.settings.get` / `.watch`                    | one of aimux's own setting rows, by dotted id       |
 | `ctx.ui.statusBar.register`                         | a tile on the right of the status bar               |
+| `ctx.ui.panes.register` / `.open` / `.close`        | a leaf in the layout tree that is not a terminal    |
 | `ctx.ui.stats.registerPage`                         | a page on the stats screen                          |
 | `ctx.ui.toast`                                      | the usual three toast levels                        |
 | `ctx.ui.kit`                                        | `Panel`, `Row`, `List`, `KeyHint`, `useTheme`       |
@@ -202,6 +203,42 @@ plugins load after it — requiring an import would mean a config file could onl
 reference plugins it could reach. An unresolved name is inert: the key does
 nothing, the way an unbound key does. Anything louder would turn one disabled
 plugin into a broken keyboard.
+
+### Panes
+
+A widget is a narrow strip and a view takes the whole screen. A pane is the one
+in between, and the one the layout tree was already shaped for: a board, a
+diff, a log browser sitting _beside_ an agent rather than covering it.
+
+`LayoutLeaf` gained `kind?: 'tab' | 'plugin'`. Absent means `tab`, which is
+every layout ever written to `aimux.json`, so nothing migrated. The interesting
+consequence is that `allLeafIds` had to go: every caller of it meant "the
+terminals in this group" — it indexed into `state.tabs`, resized a PTY, or
+ordered the tab strip — and quietly widening it would have handed a plugin pane
+id to `backend.resizeTab`. It split into `allTabIds` and `allPaneIds`, and the
+compiler made all twelve call sites answer which they meant.
+
+Geometry says panes, everything else says tabs: `computePaneRects` covers every
+leaf, because a plugin pane takes up space and leaving it out would size the
+terminal beside it wrong; `forEachSplitPaneRect` computes over the whole tree
+and hands back only tabs, because its caller's next move is to resize a PTY.
+
+**A pane never takes the keyboard.** `activeTabId` is a tab id in every reducer
+and every side effect in the app; letting a plugin pane hold it would mean
+auditing all of them for "what if this is not a tab". So `open` leaves focus on
+the terminal it split from, `getAdjacentLeaf` crosses a pane rather than landing
+on it, and the plugin's own elements still take mouse events. Keyboard focus for
+panes is a later decision, not an oversight.
+
+**Panes are session-scoped.** Saving strips them: a group holding one terminal
+and one plugin pane is not a split worth writing, because the plugin may be
+disabled or gone by the next launch. The restore path already pruned anything
+that was not a live tab; `stripPluginPanes` is about not writing the id at all.
+
+**One instance per id.** Opening an open pane is a no-op rather than a second
+copy — the id is the plugin's name for it, and two panes claiming it would make
+`close` ambiguous. A pane whose plugin is not loaded renders a line naming it,
+because an unexplained empty rectangle in a layout is worse.
 
 ### What "opening a closed union" meant
 
