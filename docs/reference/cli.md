@@ -516,6 +516,9 @@ anything needing a live kernel to the daemon, which reloads its own halves and
 forwards the same instruction to every attached UI.
 
 ```
+aimux plugin new <id> [--ui] [--daemon] [--exec] [--dir PATH]
+-> { id, root, shapes, created: [...files], next: [...commands] }
+
 aimux plugin list
 -> { plugins: [{ id, name, version, source, enabled, halves, root, config }],
      running: [{ id, host, state, revision, effects, error?, missing? }] | null,

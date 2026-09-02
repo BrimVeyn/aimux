@@ -8,6 +8,7 @@ import { pluginInstall } from './commands/plugin/install'
 import { pluginLink } from './commands/plugin/link'
 import { pluginList } from './commands/plugin/list'
 import { pluginLog } from './commands/plugin/log'
+import { pluginNew } from './commands/plugin/new'
 import { pluginReload } from './commands/plugin/reload'
 import { pluginUninstall } from './commands/plugin/uninstall'
 import { pluginUnlink } from './commands/plugin/unlink'
@@ -72,6 +73,7 @@ export const COMMANDS: readonly CliCommand[] = [
   workerList,
   workerStop,
   workerDoctor,
+  pluginNew,
   pluginList,
   pluginLink,
   pluginUnlink,
