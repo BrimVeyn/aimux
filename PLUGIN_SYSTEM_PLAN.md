@@ -515,3 +515,122 @@ les deux derniers restent des hypothèses du plan, à revoir en phase 5.
    dix fois moins de call sites.
 6. _Hypothèse :_ moitié daemon in-process avec timeouts ; l'API RPC est conçue
    pour qu'un passage en Worker soit invisible pour les plugins.
+
+---
+
+# Phase 6 · Ce qu'il reste, et dans quel ordre
+
+Écrit le 2026-09-02, après les phases 0-5 et les quatre plugins d'exemple.
+Les phases précédentes disaient ce qu'on allait construire ; celle-ci part de
+ce qui a résisté.
+
+## 6.1 Où en est le passage des features natives
+
+| Feature                   | État                                                    |
+| ------------------------- | ------------------------------------------------------- |
+| Thème Claude + hooks      | **plugin** (`aimux.claude`)                             |
+| Indicateur d'usage IA     | **plugin** (`aimux.ai-usage`) — tuile + polling         |
+| Overlay de syntaxe Claude | cœur — transformation par frame dans le chemin de rendu |
+| Pages stats usage/quotas  | cœur — lues par l'écran stats, pas par le plugin        |
+| `auto-commit`             | cœur — état dans `AppState`, rendu par le panneau git   |
+| `auto-rename`             | cœur — lit le flux d'octets PTY brut                    |
+| Widget `setup`            | cœur — son id est dans le `bars` des utilisateurs       |
+| Git (mode, panneau, diff) | cœur, **et doit le rester** — voir 6.4                  |
+
+Deux migrations complètes, deux partielles, trois refusées pour des raisons
+nommées. Le point de la phase 4 était de prouver l'API, pas de vider `src/` :
+chaque migration a bouché un trou, et les trois refus sont chacun bloqués sur
+une chose précise plutôt que sur de l'effort.
+
+## 6.2 Le seul vrai bloqueur : publier le paquet
+
+`@brimveyn/aimux-plugin` n'est pas sur npm. Conséquence : un plugin hors de ce
+dépôt ne peut pas `bun install` sa dépendance, donc `aimux plugin doctor`
+rapporte `types.ok: false` pour tout le monde, tout le temps. Le noyau marche,
+le scaffold marche, la boucle d'auteur marche — et le premier retour que reçoit
+un auteur est rouge.
+
+**À faire avant tout le reste.** Publier `@brimveyn/aimux-plugin` (et
+`@brimveyn/aimux-config`, dont il dépend en types), figer `apiVersion: 1`, et
+ajouter au release script une étape qui régénère `docs/reference/plugin-api.md`
+et refuse de publier si le test de dérive échoue.
+
+Coût : petit. Impact : c'est la différence entre « un système de plugins » et
+« un système de plugins que quelqu'un d'autre peut utiliser ».
+
+## 6.3 Ce qui manque pour écrire les plugins qu'on veut écrire
+
+Les quatre exemples ont buté sur ceci, par ordre décroissant de gêne.
+
+1. **Un pane ne prend pas le clavier.** Un pane de stats qu'on ne peut pas
+   faire défiler est à moitié utile. La correction est nommée depuis la phase
+   5 : un `activePaneId` distinct d'`activeTabId`, et un mode clavier par
+   pane comme les vues plein écran en ont déjà un. ~10 call sites, tous dans
+   `tab-state` et `raw-input-handler`. **Le prochain morceau à faire.**
+2. **Un plugin ne peut pas naviguer aimux.** Ouvrir le mode git, l'écran
+   stats, une modale native : rien. Un `ctx.ui.navigate('git' | 'stats' |
+'settings')` étroit couvrirait le besoin réel sans exposer les ids de
+   modales — qui deviendraient de l'API le jour où on les expose.
+3. **Un widget ne connaît que sa largeur.** La hauteur est devinée. Passer
+   `{ cols, rows }` à `render` plutôt qu'un nombre.
+4. **Pas de test de rendu pour un plugin.** `createTestContext` couvre
+   `apply`/`dispose`, pas « est-ce que ça dessine ». aimux a un test renderer ;
+   l'exposer via `@brimveyn/aimux-plugin/testing` rendrait les tests de widget
+   possibles hors du dépôt.
+
+## 6.4 Git : ce qui doit bouger et ce qui ne doit pas
+
+Le mode git n'est pas un point d'extension, c'est l'application : un écran, un
+renderer de diff, une file de commandes, un panneau PR, ~40 fichiers. Le
+transformer en plugin ferait de l'API plugin l'API interne d'aimux — exactement
+ce que `apiVersion: 1` promet de ne pas faire.
+
+Ce qui vaut la peine d'être ouvert _dans_ git, en revanche :
+
+- **un fournisseur de message de commit** : `ctx.ui.git.suggestCommitMessage`.
+  C'est ce dont `auto-commit` a besoin pour migrer, et c'est une demande réelle
+  de tiers (« que mon plugin écrive les messages de commit »).
+- **un événement `git:workingTreeChanged`** et un `ctx.git.status(repoRoot)`
+  en lecture seule, pour tout plugin qui réagit au dépôt.
+- **un fournisseur de PR**, plus tard, si quelqu'un veut GitLab.
+
+Autrement dit : `auto-commit` migre en _ouvrant une fente_, pas en déplaçant du
+code. C'est le bon ordre — la fente est utile même si `auto-commit` ne bouge
+jamais.
+
+## 6.5 Les trois migrations restantes, et ce qu'elles coûtent
+
+**`auto-rename`** — la plus rentable. Deux ajouts d'API, tous deux utiles à
+d'autres : un événement daemon `tab:prompt` émis par la capture de prompt
+existante (qui reste cœur : c'est de la plomberie PTY), et `ctx.tabs.rename`.
+Le plugin devient « à ce prompt, décide d'un titre et pose-le », soit ~120
+lignes. Le firehose d'octets bruts ne bouge pas et ne doit pas.
+
+**`auto-commit`** — dépend de 6.4. Une fois la fente ouverte, le plugin possède
+son état dans sa slice, et le panneau git affiche ce qu'un fournisseur lui a
+donné. Sans la fente, c'est un déplacement d'état vers nulle part.
+
+**Widget `setup`** — bloqué sur une seule chose : son id est `setup` dans le
+`bars` des utilisateurs, et le namespacing de l'hôte le renommerait en
+`aimux.setup.setup`. Un alias de compatibilité dans `registerBarWidget` (~15
+lignes) débloque, et débloque en même temps toute future migration d'un id
+visible par l'utilisateur.
+
+**Overlay de syntaxe** — demande une cascade _synchrone_ (`waterfall` est
+async, le chemin de rendu ne l'est pas). Un canal de transformation sync sur le
+bus, ~20 lignes. À faire seulement si quelqu'un veut décorer le viewport ; sinon
+l'overlay est très bien là où il est.
+
+## 6.6 Ordre proposé
+
+1. Publier le paquet (6.2). Rien d'autre ne compte tant que c'est faux.
+2. Clavier dans les panes (6.3.1).
+3. Alias de widget + migration `setup` — petit, et prouve le mécanisme d'alias.
+4. `tab:prompt` + `tabs.rename` + migration `auto-rename`.
+5. Fente « message de commit » (6.4) + migration `auto-commit`.
+6. Le reste de 6.3 au fil des demandes.
+
+Les trois autres chantiers de la phase 5 — isolation Worker, `plugin define`,
+marketplace — restent non commencés et non planifiés ici : aucun des quatre
+plugins d'exemple n'en a eu besoin, ce qui est la meilleure indication qu'on a
+sur leur urgence.
