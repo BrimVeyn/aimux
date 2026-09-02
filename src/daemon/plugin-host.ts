@@ -13,6 +13,7 @@ import {
   PLUGIN_CONTROL_RELOAD,
   PLUGIN_RPC_REPLY_VERB,
 } from '../plugins/rpc-envelope'
+import { type DaemonEventName, onDaemonEvent } from './daemon-events'
 
 /**
  * The daemon's plugin host, extracted from `daemon.ts` from the start: that
@@ -32,6 +33,25 @@ interface PendingOutboundCall {
 }
 
 const OUTBOUND_CALL_TIMEOUT_MS = 10_000
+
+/**
+ * Every event forwarded to plugins. Listed rather than derived, because the
+ * list *is* the published vocabulary: adding an event to `DaemonEvents` should
+ * be a decision to expose it, not a side effect of declaring it.
+ */
+const DAEMON_EVENT_NAMES: readonly DaemonEventName[] = [
+  'tab:status',
+  'tab:turnComplete',
+  'tab:question',
+  'tab:added',
+  'project:status',
+  'project:created',
+  'project:switched',
+  'project:closed',
+  'workspace:added',
+  'workspace:removed',
+  'daemon:reexec',
+]
 
 export interface PluginEventPayload {
   pluginId: string
@@ -113,6 +133,18 @@ export async function startDaemonPluginHost(
     transport,
     userPlugins: options.userPlugins,
   })
+
+  // Bridge the daemon's own event bus onto the kernel's, so `ctx.on('tab:...')`
+  // works without a plugin knowing either bus exists. Kept as a bridge rather
+  // than one bus: the daemon's is typed to aimux's vocabulary and fires inside
+  // the status loop, the kernel's is string-keyed and shared with RPC — and a
+  // plugin listener must not be able to run inside the loop that produced the
+  // event.
+  const unbridge = DAEMON_EVENT_NAMES.map((event) =>
+    onDaemonEvent(event, (payload) => {
+      runtime.kernel.emit(event, payload)
+    })
+  )
 
   await runtime.start()
   logDebug('daemon.pluginHost.started', {
@@ -202,6 +234,7 @@ export async function startDaemonPluginHost(
         entry.reject(new Error('daemon plugin host stopped'))
       }
       pending.clear()
+      for (const dispose of unbridge) dispose()
       await runtime.stop()
     },
   }

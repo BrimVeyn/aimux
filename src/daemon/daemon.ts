@@ -36,6 +36,7 @@ import {
   deleteFromCatalog,
   removeWorkspaceFromCatalog,
 } from './catalog-writer'
+import { emitDaemonEvent } from './daemon-events'
 import { type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
 import {
   consumeDaemonHandoff,
@@ -483,10 +484,18 @@ export async function runDaemon(): Promise<void> {
     listTabs: listTabsForProject,
     onProjectStatus: (projectId, status) => {
       logDebug('daemon.status.project', { projectId, status })
+      emitDaemonEvent('project:status', { projectId, status })
       broadcastAll({ payload: { projectId, status }, type: 'projectStatus' })
     },
     onTabQuestion: (tabId, projectId, detail) => {
       logDebug('daemon.status.question', { kind: detail.kind, projectId, tabId })
+      emitDaemonEvent('tab:question', {
+        kind: detail.kind,
+        options: detail.options,
+        projectId,
+        prompt: detail.prompt,
+        tabId,
+      })
       // v13 / capability `questionEvents`. Same v13 send-time gate as below.
       broadcastAllVersioned(13, {
         payload: {
@@ -501,6 +510,7 @@ export async function runDaemon(): Promise<void> {
     },
     onTabStatus: (tabId, status, projectId, workspaceId) => {
       logDebug('daemon.status.tab', { projectId, status, tabId })
+      emitDaemonEvent('tab:status', { projectId, status, tabId, workspaceId })
       // Broadcast to every client. Clients silently ignore events for tabIds
       // they don't know about, so there's no UI impact — this costs one
       // extra socket write per tab per change, which is trivial, and
@@ -510,6 +520,7 @@ export async function runDaemon(): Promise<void> {
     },
     onTurnComplete: (tabId, projectId, idleMs, workspaceId) => {
       logDebug('daemon.status.turnComplete', { idleMs, projectId, tabId })
+      emitDaemonEvent('tab:turnComplete', { idleMs, projectId, tabId, workspaceId })
       // v13 / capability `turnLifecycle`. Gate at send time — pre-v13 parsers
       // throw on unknown event types and would drop the connection. MIN stays
       // at 10, so we fan this only to peers that negotiated at least v13.
@@ -932,6 +943,7 @@ export async function runDaemon(): Promise<void> {
                     workerName: message.payload.workerName,
                     workspaceId: message.payload.workspaceId,
                   }
+                  emitDaemonEvent('tab:added', { projectId, tab: synthesizedTab })
                   broadcastForProjectVersioned(projectId, 11, {
                     payload: { projectId, tab: synthesizedTab },
                     type: 'tabAdded',
@@ -1091,6 +1103,7 @@ export async function runDaemon(): Promise<void> {
                 case 'createProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { name, projectPath, switch: doSwitch } = message.payload
+                  emitDaemonEvent('project:created', { name, projectPath })
                   if (countUiAttachers() > 0) {
                     // Relay to the UI so it can preserve the live snapshot
                     // of the currently-open project before appending the
@@ -1147,6 +1160,9 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'closeProject': {
+                  emitDaemonEvent('project:closed', {
+                    projectId: message.payload.targetProjectId,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetProjectId } = message.payload
                   assertProjectInCatalog(targetProjectId)
@@ -1164,6 +1180,7 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'announceProjectSwitched': {
+                  emitDaemonEvent('project:switched', { projectId: message.payload.projectId })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   // UI-emitted acknowledgement. Relay so any --wait CLI can
                   // exit. We don't validate that the announcement matches
@@ -1177,6 +1194,10 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'addWorkspaceRecord': {
+                  emitDaemonEvent('workspace:added', {
+                    projectId: message.payload.projectId,
+                    workspace: message.payload.workspace,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { projectId: targetProjectId, workspace } = message.payload
                   if (countUiAttachers() > 0) {
@@ -1211,6 +1232,10 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'removeWorkspaceRecord': {
+                  emitDaemonEvent('workspace:removed', {
+                    projectId: message.payload.projectId,
+                    workspaceId: message.payload.workspaceId,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { projectId: targetProjectId, workspaceId } = message.payload
                   if (countUiAttachers() > 0) {
@@ -1322,6 +1347,9 @@ export async function runDaemon(): Promise<void> {
     }
     draining = true
     logDebug('daemon.reexec.start', { pid: process.pid, reason: reason ?? null })
+    // One chance for a plugin holding external state to flush it: the process
+    // exits a few hundred milliseconds from here.
+    emitDaemonEvent('daemon:reexec', { reason })
 
     const oldSocketPath = getDaemonOldSocketPath()
     // Clear any stale dirent from a previous botched reexec.
