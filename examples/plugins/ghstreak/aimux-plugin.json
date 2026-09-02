@@ -20,6 +20,12 @@
       "label": "Ask GitHub first",
       "description": "Off falls straight to `git log` in the repo you are in.",
       "default": true
+    },
+    "token": {
+      "type": "string",
+      "label": "GitHub token",
+      "description": "Used instead of the `gh` CLI. Needs read:user. Leave empty to use `gh`.",
+      "secret": true
     }
   }
 }

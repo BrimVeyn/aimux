@@ -464,6 +464,66 @@ One limit found and left alone: a plugin can open its own modals, not aimux's.
 third-party plugin could not do. An API for opening built-in modals by id would
 be a wide, brittle surface, and no third-party plugin has asked for it.
 
+## The control surface
+
+Where a user's decisions about a plugin live, and how they reach it.
+
+`<profile>/aimux-plugins.json` has two blocks answering two questions.
+`plugins[]` says _where the code is_, and only a linked or installed plugin has
+a row there. `overrides` says _how the user has set it_, keyed by id — so a
+built-in, a link, an install and a plugin declared inline in `aimux.config.ts`
+are toggled and configured the same way. Before that split, a built-in had no
+row to toggle and `plugin disable` had to apologise and point at the config
+file.
+
+The full ladder, lowest first:
+
+```
+manifest default → BuiltinPlugin.config → registry row → overrides
+                 → aimux.config.ts
+```
+
+A registry row's own `enabled` and `config` are still read, so files written
+before this keep working; nothing writes them any more. `PluginRecord.enabledFrom`
+names the layer that decided, because a `plugin disable` that `aimux.config.ts`
+will overrule at the next launch is not a disable, and an agent has to be able
+to find that out before acting rather than after.
+
+`src/plugins/config-origin.ts` answers the same question per key, once, for
+both surfaces. Two copies would drift the first time a layer moved, and the CLI
+and the settings screen would then disagree about the same value in front of
+the same user.
+
+### How a write lands
+
+`ctx.config` is `record.config`, captured when `apply` ran, and `apiVersion: 1`
+gives a plugin no way to hear that it changed — plugins destructure it. So a
+changed value reaches a running plugin the only honest way available: the fiber
+is disposed and rebuilt around the new record. `recordChanged` in the kernel
+decides, covering root, version and config; an unchanged config rebuilds
+nothing, which matters because `refresh` runs on every registry change and
+every watcher event.
+
+Settings writes are debounced 300 ms before that refresh, because `←`/`→` on a
+number row writes once per keypress.
+
+### The settings surface
+
+`storage: 'plugin'` is a third row kind. Not `'settings'` — that block of
+`aimux.json` is never read by discovery, so a value written there would reach
+no plugin at all. Not `'app'` either: the value has no home in `AppState`, and
+the two marks a plugin row needs come from the plugin's own layers rather than
+from hydration, which runs once at boot before any plugin has loaded.
+
+The row carries its own `read`/`write`/`reset` closures so the settings store
+never learns how to reach a plugin registry, and the redaction lives in the
+_reader_ — so the row's value, the footer's full-value line and the edit
+modal's seed are covered by one rule instead of three.
+
+`src/plugins/plugin-store.ts` is what lets a section see any of this: a
+`SettingSection`'s `rows` is a plain function of the projects, deliberately, so
+it has no way to reach the running host.
+
 ## API contract
 
 `apiVersion: 1` is frozen as of this document. Within generation 1:

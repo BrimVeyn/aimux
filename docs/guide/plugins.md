@@ -53,18 +53,29 @@ aimux plugin disable <id>
 aimux plugin enable <id>
 ```
 
-A disabled plugin stays registered and configured; it just never loads. That
-makes "is this plugin the problem?" a one-command question with a one-command
-answer, rather than an unlink/relink round trip that loses its settings.
+Or flip its switch on the settings screen, under **Plugins**.
 
-The plugins that ship with aimux have no registry row to toggle — they are part
-of the binary — so they are switched off in `aimux.config.ts`:
+A disabled plugin stays known and configured; it just never loads. That makes
+"is this plugin the problem?" a one-command question with a one-command answer,
+rather than an unlink/relink round trip that loses its settings.
+
+This works on every plugin — including the ones that ship with aimux. They have
+no registry row of their own, so the decision is stored under an `overrides`
+block keyed by id, which is the same place a linked or installed plugin's
+switch lives.
+
+`aimux.config.ts` still outranks it:
 
 ```ts
 export default {
   plugins: [{ id: 'aimux.claude', enabled: false }],
 }
 ```
+
+When it does, the CLI says so — `shadowedBy: "aimux.config.ts"` — and the
+settings row carries the `*` mark and the note _"set in aimux.config.ts — comes
+back on restart"_. The write still happens, so removing the config line reveals
+what you asked for.
 
 Today those are:
 
@@ -79,9 +90,22 @@ turns the feature off outright.
 ## Configuring one
 
 A plugin declares its settings in its manifest, and aimux generates rows for
-them on the settings screen — nothing to write by hand. When you would rather
-keep the values in your config file, or need to set something before first
-launch:
+them on the settings screen — one section per plugin, nothing to write by hand.
+
+From a script, or from an agent:
+
+```
+aimux plugin config <id>              # every field, and where its value came from
+aimux plugin set <id> <key> <value>   # coerced against the declared type
+aimux plugin unset <id> <key>         # back to whatever is underneath
+```
+
+`set` refuses a key the manifest does not declare, and lists the ones it does.
+A typo that landed somewhere no plugin reads would fail silently, which is
+worse than failing.
+
+You can still keep values in your config file — useful before a first launch,
+or to pin something:
 
 ```ts
 export default {
@@ -89,22 +113,41 @@ export default {
 }
 ```
 
-`aimux.config.ts` wins over the settings screen for a key it declares: the file
-you edit outranks the one aimux writes. A value of the wrong type is ignored
-with a warning rather than coerced.
+The full order, lowest first: the manifest's default, then what aimux seeded
+for a built-in, then what the settings screen or the CLI wrote, then
+`aimux.config.ts`. The file you edit by hand outranks the one aimux writes. A
+value of the wrong type is ignored with a warning rather than coerced.
 
-Secrets marked as such in the manifest are never echoed — not by `plugin list`,
-not on the settings screen, not in the plugin's log. They are still stored as
-plaintext JSON in your profile: that is shoulder-surfing hygiene, not
-encryption.
+Changing a value reloads the plugin that owns it, because a plugin reads its
+configuration when it starts. You may see a plugin's pane or widget blink.
+
+### Secrets
+
+A field the manifest marks `secret` is never echoed — not by `plugin config`,
+not by `plugin set`'s own output, not on the settings screen, not in the
+plugin's log. The row reads `<secret>` and its editor opens empty, because a
+secret is replaced rather than edited.
+
+Pass one without putting it in your shell history:
+
+```
+aimux plugin set acme.telegram-notify botToken --value-stdin < ~/.token
+```
+
+It is still stored as plaintext JSON in your profile. That is shoulder-surfing
+hygiene, not encryption.
 
 ## When something is wrong
 
 ```
+aimux plugin show <id>             # state, config, errors and the log, in one call
 aimux plugin doctor <id-or-path>   # is it valid, does it load, what does it register
 aimux plugin log <id> --level warn # what it has been saying
 aimux plugin reload [id]           # reload one, or all of them
 ```
+
+`plugin show` exits `0` even when the plugin has failed — the question was
+answered; read `state`.
 
 `doctor` reports the offending field and a reason rather than "invalid" — the
 same output whether you are debugging someone else's plugin or writing your

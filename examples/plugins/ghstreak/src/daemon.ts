@@ -53,6 +53,30 @@ async function run(argv: string[], cwd?: string): Promise<string | null> {
   }
 }
 
+/**
+ * The same query, over HTTP, with a token the user configured.
+ *
+ * Declared `secret` in the manifest, which is the whole reason it is here: a
+ * token is the one config value whose *rendering* can leak, and aimux redacts
+ * it everywhere — the settings row, `plugin config`, `plugin set`'s echo, the
+ * plugin log. A plugin gets the real value in `ctx.config` and nothing else
+ * ever sees it.
+ */
+async function fromToken(token: string): Promise<Calendar | null> {
+  try {
+    const response = await fetch('https://api.github.com/graphql', {
+      body: JSON.stringify({ query: GRAPHQL }),
+      headers: { 'authorization': `bearer ${token}`, 'content-type': 'application/json' },
+      method: 'POST',
+    })
+    if (!response.ok) return null
+    return toCalendar((await response.json()) as GhResponse)
+  } catch {
+    // Offline, or a token the API refused. The caller falls through to `git`.
+    return null
+  }
+}
+
 async function fromGithub(): Promise<Calendar | null> {
   const raw = await run(['gh', 'api', 'graphql', '-f', `query=${GRAPHQL}`])
   if (raw === null) return null
@@ -63,7 +87,10 @@ async function fromGithub(): Promise<Calendar | null> {
   } catch {
     return null
   }
+  return toCalendar(parsed)
+}
 
+function toCalendar(parsed: GhResponse): Calendar | null {
   const viewer = parsed.data?.viewer
   const calendar = viewer?.contributionsCollection?.contributionCalendar
   if (!calendar?.weeks) return null
@@ -114,6 +141,13 @@ export default definePlugin({
     ctx.rpc.handle('calendar', async (payload) => {
       const { projectId } = payload as { projectId: string | null }
 
+      // A configured token first: it is the explicit choice, and it works on a
+      // machine with no `gh` installed.
+      const token = typeof ctx.config.token === 'string' ? ctx.config.token.trim() : ''
+      if (token !== '') {
+        const answered = await fromToken(token)
+        if (answered !== null) return answered
+      }
       if (preferGithub) {
         const github = await fromGithub()
         if (github !== null) return github
