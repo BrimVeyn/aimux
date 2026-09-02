@@ -7,10 +7,13 @@ import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 
 import { logDebug } from '../debug/input-log'
 import { getPluginCliCommand } from '../plugins/cli-commands'
+import { listExecCommands, runExecCommand } from '../plugins/exec-adapter'
 import { PluginRuntime } from '../plugins/loader'
 import {
   isReplyEnvelope,
   PLUGIN_CONTROL_CLI_RUN,
+  PLUGIN_CONTROL_EXEC_LIST,
+  PLUGIN_CONTROL_EXEC_RUN,
   PLUGIN_CONTROL_ID,
   PLUGIN_CONTROL_LIST,
   PLUGIN_CONTROL_REFRESH,
@@ -188,6 +191,24 @@ export async function startDaemonPluginHost(
           verb: PLUGIN_CONTROL_REFRESH,
         })
         return { plugins: runtime.statuses() }
+      }
+      case PLUGIN_CONTROL_EXEC_LIST:
+        return { commands: listExecCommands(runtime.knownRecords()) }
+      case PLUGIN_CONTROL_EXEC_RUN: {
+        const request = payload as {
+          pluginId?: string
+          commandId?: string
+          args?: string[]
+          context?: Record<string, unknown>
+        }
+        const record = runtime.knownRecords().find((candidate) => candidate.id === request.pluginId)
+        if (!record) throw new Error(`unknown plugin: ${String(request.pluginId)}`)
+        return runExecCommand(
+          record,
+          String(request.commandId),
+          request.args ?? [],
+          request.context ?? {}
+        )
       }
       case PLUGIN_CONTROL_CLI_RUN: {
         // A plugin's CLI command runs here, not in the `aimux` process that

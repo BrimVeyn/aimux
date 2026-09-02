@@ -3,6 +3,7 @@ import type { ArgSpec, FlagSpec } from './flags'
 
 import { pluginDoctor } from './commands/plugin/doctor'
 import { pluginDisable, pluginEnable } from './commands/plugin/enable'
+import { pluginCommands, pluginExec } from './commands/plugin/exec'
 import { pluginInstall } from './commands/plugin/install'
 import { pluginLink } from './commands/plugin/link'
 import { pluginList } from './commands/plugin/list'
@@ -81,6 +82,8 @@ export const COMMANDS: readonly CliCommand[] = [
   pluginReload,
   pluginLog,
   pluginDoctor,
+  pluginCommands,
+  pluginExec,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

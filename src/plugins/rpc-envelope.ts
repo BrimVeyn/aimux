@@ -24,6 +24,10 @@ export const PLUGIN_CONTROL_REFRESH = 'refresh'
 export const PLUGIN_CONTROL_LIST = 'list'
 /** Runs a plugin's CLI command in the daemon; see `src/plugins/cli-commands.ts`. */
 export const PLUGIN_CONTROL_CLI_RUN = 'cli:run'
+/** Lists the manifest `commands[]` across every loaded plugin. */
+export const PLUGIN_CONTROL_EXEC_LIST = 'exec:list'
+/** Spawns one manifest command; see `src/plugins/exec-adapter.ts`. */
+export const PLUGIN_CONTROL_EXEC_RUN = 'exec:run'
 
 /** Verbs a plugin may not register; `__` is aimux's namespace on this channel. */
 export function isReservedRpcVerb(verb: string): boolean {
