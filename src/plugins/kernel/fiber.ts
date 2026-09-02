@@ -47,6 +47,22 @@ export interface FiberHost {
 
 export type FiberState = PluginStatus['state']
 
+/**
+ * `ctx.effect` cannot await — it is called from a synchronous `apply` body —
+ * so a setup that rejects has nowhere to surface but the plugin's own log.
+ */
+async function runEffect(
+  stack: EffectStack,
+  setup: Parameters<EffectStack['run']>[0],
+  log: PluginContext['log']
+): Promise<void> {
+  try {
+    await stack.run(setup)
+  } catch (error) {
+    log.error('effect setup failed', { error: String(error) })
+  }
+}
+
 export class PluginFiber {
   private stack = new EffectStack()
   private currentState: FiberState = 'pending'
@@ -126,9 +142,7 @@ export class PluginFiber {
       effect: (setup) => {
         // Fire-and-forget on purpose: `apply` is not required to await its own
         // effects, and a rejecting setup must not take down the whole apply.
-        void stack.run(setup).catch((error: unknown) => {
-          log.error('effect setup failed', { error: String(error) })
-        })
+        void runEffect(stack, setup, log)
       },
       emit: (event, payload) => {
         kernel.bus.emit(event, payload)
@@ -173,10 +187,16 @@ export class PluginFiber {
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise
     if (this.currentState === 'active' || this.currentState === 'loading') return
-    this.startPromise = this.runStart().finally(() => {
-      this.startPromise = null
-    })
+    this.startPromise = this.runStartOnce()
     return this.startPromise
+  }
+
+  private async runStartOnce(): Promise<void> {
+    try {
+      await this.runStart()
+    } finally {
+      this.startPromise = null
+    }
   }
 
   private async runStart(): Promise<void> {

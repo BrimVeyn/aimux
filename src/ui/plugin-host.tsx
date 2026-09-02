@@ -13,6 +13,7 @@ import {
   PLUGIN_CONTROL_REFRESH,
   PLUGIN_CONTROL_RELOAD,
   PLUGIN_RPC_REPLY_VERB,
+  type PluginCallEnvelope,
 } from '../plugins/rpc-envelope'
 import { toast } from '../state/toast-store'
 
@@ -38,6 +39,26 @@ export interface PluginHostHandle {
   version: number
 }
 
+/**
+ * Every UI → daemon message is fire-and-forget except a plugin's own
+ * `ctx.rpc.call`; a failure has no caller waiting and belongs in the debug log.
+ */
+async function send(
+  backend: SessionBackend,
+  pluginId: string,
+  verb: string,
+  payload: unknown,
+  event: string
+): Promise<void> {
+  try {
+    // Called as a method, not detached: the remote backend's implementation
+    // reaches for `this.send` and the negotiated capability set.
+    await backend.pluginRequest?.(pluginId, verb, payload)
+  } catch (error) {
+    logDebug(event, { error: String(error), pluginId, verb })
+  }
+}
+
 export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
   const [statuses, setStatuses] = useState<PluginStatus[]>([])
   const [version, setVersion] = useState(0)
@@ -55,9 +76,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       broadcast: (pluginId, verb, payload) => {
         // No fanout primitive on this side: a UI broadcast is a call whose
         // answer nobody waits for.
-        void backend.pluginRequest?.(pluginId, verb, payload).catch((error: unknown) => {
-          logDebug('ui.plugin.broadcastFailed', { error: String(error), pluginId, verb })
-        })
+        void send(backend, pluginId, verb, payload, 'ui.plugin.broadcastFailed')
       },
       call: async (pluginId, verb, payload) => {
         if (!backend.pluginRequest) {
@@ -97,16 +116,35 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
      * intercepts before any plugin dispatch.
      */
     const reply = (callId: string, ok: boolean, result: unknown, error?: string): void => {
-      void backend
-        .pluginRequest?.(PLUGIN_CONTROL_ID, PLUGIN_RPC_REPLY_VERB, {
-          __call: callId,
-          error,
-          ok,
-          result,
-        })
-        .catch((sendError: unknown) => {
-          logDebug('ui.plugin.replyFailed', { callId, error: String(sendError) })
-        })
+      void send(
+        backend,
+        PLUGIN_CONTROL_ID,
+        PLUGIN_RPC_REPLY_VERB,
+        { __call: callId, error, ok, result },
+        'ui.plugin.replyFailed'
+      )
+    }
+
+    /** Answers a daemon → UI call, then sends the outcome back either way. */
+    const answer = async (
+      pluginId: string,
+      verb: string,
+      envelope: PluginCallEnvelope
+    ): Promise<void> => {
+      try {
+        reply(
+          envelope.__call,
+          true,
+          await runtime.kernel.handleRpc(pluginId, verb, envelope.payload)
+        )
+      } catch (error) {
+        reply(
+          envelope.__call,
+          false,
+          undefined,
+          error instanceof Error ? error.message : String(error)
+        )
+      }
     }
 
     const onPluginEvent = (pluginId: string, verb: string, payload: unknown): void => {
@@ -126,19 +164,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       }
 
       if (isCallEnvelope(payload)) {
-        void runtime.kernel
-          .handleRpc(pluginId, verb, payload.payload)
-          .then((result) => {
-            reply(payload.__call, true, result)
-          })
-          .catch((error: unknown) => {
-            reply(
-              payload.__call,
-              false,
-              undefined,
-              error instanceof Error ? error.message : String(error)
-            )
-          })
+        void answer(pluginId, verb, payload)
         return
       }
 

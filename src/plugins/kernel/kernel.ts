@@ -233,7 +233,14 @@ export class PluginKernel {
     this.bus.emit(`rpc:${pluginId}.${verb}`, payload)
     const handler = this.rpcHandlers.get(pluginId)?.get(verb)
     if (!handler) return
-    void this.handleRpc(pluginId, verb, payload).catch((error: unknown) => {
+    void this.dispatchBroadcast(pluginId, verb, payload)
+  }
+
+  /** A broadcast has no caller to reject; a failure goes to the plugin's log. */
+  private async dispatchBroadcast(pluginId: string, verb: string, payload: unknown): Promise<void> {
+    try {
+      await this.handleRpc(pluginId, verb, payload)
+    } catch (error) {
       appendPluginLog(pluginId, {
         at: new Date().toISOString(),
         data: { error: String(error), verb },
@@ -241,7 +248,7 @@ export class PluginKernel {
         level: 'error',
         message: 'broadcast handler failed',
       })
-    })
+    }
   }
 
   /** Host-side event emission — how `tab:turnComplete` and friends reach plugins. */
