@@ -1,5 +1,7 @@
 import type { CliCommand } from '../../registry'
 
+import { builtinPlugins } from '../../../builtin-plugins'
+import { loadUserConfig } from '../../../config/loader'
 import { discoverPlugins } from '../../../plugins/discovery'
 import { redactPluginConfig } from '../../../plugins/manifest'
 import { SHARED_FLAGS } from '../../flags'
@@ -7,18 +9,27 @@ import { EXIT_OK, writeJson } from '../../output'
 import { notifyDaemon } from './shared'
 
 /**
- * Two answers in one: what is registered on disk (authoritative, always
- * available) and what is actually running (only when the daemon is up). They
- * disagree exactly when something is wrong — a plugin that failed to apply, or
- * one linked since the daemon last looked — which is what the user came to
- * find out.
+ * Two answers in one: what is registered (authoritative, always available) and
+ * what is actually running (only when the daemon is up). They disagree exactly
+ * when something is wrong — a plugin that failed to apply, or one linked since
+ * the daemon last looked — which is what the user came to find out.
+ *
+ * The first answer runs the same discovery the hosts do, `aimux.config.ts` and
+ * shipped plugins included. Anything less would make the list disagree with
+ * reality for two whole categories of plugin: one declared inline in the
+ * config file, and one that ships with aimux.
  */
 export const pluginList: CliCommand = {
   args: [],
   flags: SHARED_FLAGS,
   group: 'plugin',
   run: async (ctx) => {
-    const { issues, records } = await discoverPlugins()
+    const { resolved } = await loadUserConfig()
+    const { issues, records } = await discoverPlugins(
+      resolved.plugins,
+      undefined,
+      builtinPlugins(resolved)
+    )
     const live = await notifyDaemon(ctx.getDaemon, 'list')
     const statuses =
       live.ok && typeof live.result === 'object' && live.result !== null
