@@ -1,17 +1,11 @@
-export type SplitDirection = 'horizontal' | 'vertical'
+// The layout shapes themselves live in `@brimveyn/aimux-config`, which is the
+// single definition for every type a user's config or a plugin can see. They
+// used to be declared here as well, "kept structurally identical" by hand —
+// a promise no compiler was checking. Re-exporting keeps the import sites
+// unchanged while making drift impossible.
+export type { LayoutLeaf, LayoutNode, LayoutSplit, SplitDirection } from '@brimveyn/aimux-config'
 
-export interface LayoutLeaf {
-  type: 'leaf'
-  tabId: string
-}
-export interface LayoutSplit {
-  type: 'split'
-  direction: SplitDirection
-  ratio: number
-  first: LayoutNode
-  second: LayoutNode
-}
-export type LayoutNode = LayoutLeaf | LayoutSplit
+import type { LayoutLeaf, LayoutNode, SplitDirection } from '@brimveyn/aimux-config'
 
 export interface PaneRect {
   x: number
