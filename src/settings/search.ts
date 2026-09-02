@@ -1,7 +1,7 @@
 import type { ProjectRecord } from '../state/types'
 import type { SettingRow } from './types'
 
-import { sectionRows, SETTING_SECTIONS } from './sections'
+import { sectionRows, settingSections } from './sections'
 
 export interface SettingSearchHit {
   row: SettingRow
@@ -31,7 +31,7 @@ export function filterSettingRows(
   const hits: SettingSearchHit[] = []
   let rowIndex = -1
 
-  for (const section of SETTING_SECTIONS) {
+  for (const section of settingSections()) {
     const rows = sectionRows(section, projects)
     for (const row of rows) {
       rowIndex++

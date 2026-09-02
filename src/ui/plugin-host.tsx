@@ -15,6 +15,7 @@ import {
   PLUGIN_RPC_REPLY_VERB,
   type PluginCallEnvelope,
 } from '../plugins/rpc-envelope'
+import { onSettingSectionsChanged } from '../settings/sections'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { toast } from '../state/toast-store'
 import { onPluginModalsChanged } from './plugin-modals'
@@ -186,6 +187,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       onPluginViewsChanged(bump),
       onPluginModalsChanged(bump),
       onBarWidgetsChanged(bump),
+      onSettingSectionsChanged(bump),
     ]
 
     backend.on('pluginEvent', onPluginEvent)

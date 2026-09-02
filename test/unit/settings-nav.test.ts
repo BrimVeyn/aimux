@@ -4,7 +4,7 @@ import type { AppAction } from '../../src/state/actions'
 import type { AppState } from '../../src/state/types'
 
 import { filterSettingRows } from '../../src/settings/search'
-import { SETTING_SECTIONS, totalRowCount } from '../../src/settings/sections'
+import { BUILTIN_SETTING_SECTIONS, totalRowCount } from '../../src/settings/sections'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 function open(): AppState {
@@ -19,7 +19,7 @@ function apply(state: AppState, ...actions: AppAction[]): AppState {
 
 const STATE = createInitialState()
 const ROW_COUNT = totalRowCount(STATE.projects)
-const SECOND_SECTION = SETTING_SECTIONS[1]
+const SECOND_SECTION = BUILTIN_SETTING_SECTIONS[1]
 if (!SECOND_SECTION) throw new Error('this test needs a second section')
 
 function sectionAt(state: AppState): string | undefined {
@@ -69,7 +69,7 @@ test('} jumps to the first row of the next section', () => {
   expect(sectionAt(state)).toBe(SECOND_SECTION.id)
   // The first row of it, not the same offset carried across.
   expect(sectionAt(appReducer(state, { delta: -1, type: 'settings-move-selection' }))).toBe(
-    SETTING_SECTIONS[0]?.id
+    BUILTIN_SETTING_SECTIONS[0]?.id
   )
 })
 
@@ -88,12 +88,12 @@ test('{ from inside a section goes to its own first row before the one above', (
 
 test('} at the last section stays put rather than falling off the end', () => {
   let state = open()
-  for (let i = 0; i < SETTING_SECTIONS.length + 5; i++) {
+  for (let i = 0; i < BUILTIN_SETTING_SECTIONS.length + 5; i++) {
     state = appReducer(state, { delta: 1, type: 'settings-jump-section' })
   }
 
   expect(state.settings.rowIndex).toBeLessThan(ROW_COUNT)
-  expect(sectionAt(state)).toBe(SETTING_SECTIONS.at(-1)?.id)
+  expect(sectionAt(state)).toBe(BUILTIN_SETTING_SECTIONS.at(-1)?.id)
 })
 
 test('clicking a row selects it', () => {
