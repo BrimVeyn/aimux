@@ -22,14 +22,12 @@ export const SettingsSearchBar = memo(function SettingsSearchBar({ width }: { wi
     dispatchGlobal({ type: 'open-settings-search' })
   }, [])
 
-  // Filled, bordered in the active colour, and the prompt at full strength: it
-  // is the one control on a read-mostly screen, and a control drawn like the
-  // text around it is a control nobody sees.
+  // Filled, and the prompt at full strength: it is the one control on a
+  // read-mostly screen, and a control drawn like the text around it is a control
+  // nobody sees. The fill is enough to say so — the frame it used to wear cost
+  // two rows to repeat what the fill already said.
   return (
     <box
-      border
-      borderStyle="rounded"
-      borderColor={t.borderActive}
       backgroundColor={t.backgroundElement}
       width={width}
       flexShrink={0}
