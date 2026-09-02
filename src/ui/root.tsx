@@ -46,6 +46,7 @@ import { PendingChordOverlay } from './components/overlays/pending-chord-overlay
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { SettingsView } from './components/settings/settings-view'
 import { StatsView } from './components/stats/stats-view'
+import { PluginModalHost } from './plugin-modals'
 import { PluginViewHost } from './plugin-views'
 import { useTheme } from './theme'
 
@@ -280,6 +281,8 @@ function renderModal(
     case 'flash-jump':
       // Pure overlay — rendered inline by FlashLabelBadge inside the rows.
       return null
+    case 'plugin-modal':
+      return <PluginModalHost modalId={modal.modalId} props={modal.props} />
     case null:
       return null
     default:

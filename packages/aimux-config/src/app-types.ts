@@ -101,6 +101,12 @@ export type ModalType =
   | 'flash-jump'
   | 'setting-text'
   | 'settings-search'
+  /**
+   * Every plugin modal, the way `plugin-view` covers every plugin view. Which
+   * one is on `ModalPlugin.modalId`, so adding a modal is a registration
+   * rather than an arm on this union.
+   */
+  | 'plugin-modal'
   | null
 
 export interface TerminalSpan {
@@ -691,6 +697,18 @@ export interface ModalFlashJump extends ModalBase {
   pendingJump: FlashJumpTarget | null
 }
 
+export interface ModalPlugin extends ModalBase {
+  type: 'plugin-modal'
+  pluginId: string
+  /** Qualified id, `<pluginId>.<modalId>`; the key the registry is read by. */
+  modalId: string
+  /**
+   * Whatever the plugin passed when it opened the modal. Opaque to the
+   * reducer, which is the point: a plugin modal's state is the plugin's.
+   */
+  props?: unknown
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -714,6 +732,7 @@ export type ModalState =
   | ModalFlashJump
   | ModalSettingText
   | ModalSettingsSearch
+  | ModalPlugin
 
 export interface LayoutState {
   terminalCols: number
@@ -1378,6 +1397,14 @@ export type PluginStateAction =
   | { type: 'open-plugin-view'; viewId: string }
   /** Returns from a plugin view to the panes. */
   | { type: 'close-plugin-view' }
+  /** Opens a plugin's modal over whatever is on screen. `close-modal` closes it. */
+  | {
+      type: 'open-plugin-modal'
+      pluginId: string
+      modalId: string
+      props?: unknown
+      returnTo?: FocusMode
+    }
 
 export type AppAction =
   | ModalAction

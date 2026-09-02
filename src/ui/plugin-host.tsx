@@ -15,7 +15,10 @@ import {
   PLUGIN_RPC_REPLY_VERB,
   type PluginCallEnvelope,
 } from '../plugins/rpc-envelope'
+import { dispatchGlobal } from '../state/dispatch-ref'
 import { toast } from '../state/toast-store'
+import { onPluginModalsChanged } from './plugin-modals'
+import { onPluginViewsChanged } from './plugin-views'
 
 /**
  * The UI's plugin host, extracted from `app.tsx` from the start — that file is
@@ -171,11 +174,21 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       runtime.kernel.deliverBroadcast(pluginId, verb, payload)
     }
 
+    // A widget, view or modal lives in a registry rather than in the store, so
+    // React has no way to learn it changed. Every registry change bumps one
+    // number the hosting components subscribe to; that is the whole mechanism
+    // behind a hot-reloaded view repainting.
+    const bump = (): void => {
+      dispatchGlobal({ type: 'bump-plugin-registry' })
+    }
+    const unwatchRegistries = [onPluginViewsChanged(bump), onPluginModalsChanged(bump)]
+
     backend.on('pluginEvent', onPluginEvent)
     void runtime.start()
 
     return () => {
       stopped = true
+      for (const unwatch of unwatchRegistries) unwatch()
       backend.off('pluginEvent', onPluginEvent)
       void runtime.stop()
       runtimeRef.current = null

@@ -460,6 +460,22 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'theme-picker',
         },
       }
+    case 'open-plugin-modal':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          modalId: `${action.pluginId}.${action.modalId}`,
+          pluginId: action.pluginId,
+          projectTargetId: null,
+          props: action.props,
+          selectedIndex: 0,
+          type: 'plugin-modal',
+          ...(action.returnTo === undefined ? {} : { returnTo: action.returnTo }),
+        },
+      }
     case 'open-quotas-modal':
       return {
         ...state,
