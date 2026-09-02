@@ -19,7 +19,7 @@ if (command === 'completion') {
 // CLI control plane (docs/reference/cli.md). Branch BEFORE the UI bootstrap so
 // `aimux tab list` from a non-TTY shell never spins up the React renderer.
 // Dynamic import keeps the CLI code out of the UI's cold-start cost.
-const CLI_GROUPS = new Set(['tab', 'project', 'workspace', 'worker'])
+const { CLI_GROUPS } = await import('./cli/groups')
 if (typeof command === 'string' && CLI_GROUPS.has(command)) {
   const { runCli } = await import('./cli')
   process.exit(await runCli(process.argv.slice(2)))

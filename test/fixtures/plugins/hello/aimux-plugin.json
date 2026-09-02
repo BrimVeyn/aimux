@@ -1,0 +1,12 @@
+{
+  "id": "aimux-test.hello",
+  "name": "Hello",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "description": "Fixture exercising both halves, effects, events and rpc.",
+  "entries": { "ui": "./ui.ts", "daemon": "./daemon.ts" },
+  "config": {
+    "greeting": { "type": "string", "default": "hello" },
+    "token": { "type": "string", "secret": true }
+  }
+}

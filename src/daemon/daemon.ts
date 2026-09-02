@@ -36,6 +36,7 @@ import {
   deleteFromCatalog,
   removeWorkspaceFromCatalog,
 } from './catalog-writer'
+import { type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
 import {
   consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
@@ -351,6 +352,24 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
+  /**
+   * Plugin events reach UI processes only: a thin CLI attacher runs no plugin
+   * kernel, and a pre-v19 peer's `parseServerMessage` would throw on the
+   * unknown type and drop its connection.
+   */
+  const broadcastPluginEvent = (event: {
+    pluginId: string
+    verb: string
+    payload?: unknown
+  }): void => {
+    for (const socket of sockets) {
+      if (thinAttachers.has(socket)) continue
+      const version = negotiatedVersions.get(socket)
+      if (version === undefined || version < 19) continue
+      send(socket, { payload: event, type: 'pluginEvent' })
+    }
+  }
+
   const applyTabMetadata = (
     tabId: string,
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
@@ -542,6 +561,28 @@ export async function runDaemon(): Promise<void> {
     }
   } catch (error) {
     logDebug('daemon.hookServer.startFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  // Plugin host. Started after the hook server so a daemon plugin can already
+  // see a working hook pipeline in its `apply`, and before the socket opens so
+  // the `pluginRpc` capability is honest the moment a client can ask for it.
+  //
+  // Every failure here is contained: a plugin that throws lands in `FAILED`
+  // with its error in its own log, and the daemon serves tabs as if it were
+  // not there.
+  let pluginHost: DaemonPluginHost | null = null
+  try {
+    pluginHost = await startDaemonPluginHost({
+      broadcast: (event) => {
+        broadcastPluginEvent(event)
+      },
+      hasUiClient: () => countUiAttachers() > 0,
+      userPlugins: resolvedConfig.plugins,
+    })
+  } catch (error) {
+    logDebug('daemon.pluginHost.startFailed', {
       error: error instanceof Error ? error.message : String(error),
     })
   }
@@ -1157,6 +1198,18 @@ export async function runDaemon(): Promise<void> {
                   sendOk(socket, message.id)
                   break
                 }
+                case 'pluginRequest': {
+                  if (!pluginHost) {
+                    throw new Error('plugin host is not running in this daemon')
+                  }
+                  const result = await pluginHost.handleRequest(
+                    message.payload.pluginId,
+                    message.payload.verb,
+                    message.payload.payload
+                  )
+                  send(socket, { id: message.id, payload: { result }, type: 'pluginResult' })
+                  break
+                }
                 case 'removeWorkspaceRecord': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { projectId: targetProjectId, workspaceId } = message.payload
@@ -1357,6 +1410,7 @@ export async function runDaemon(): Promise<void> {
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
+    if (pluginHost) void pluginHost.stop()
     if (hookServer) {
       void hookServer.stop()
       try {

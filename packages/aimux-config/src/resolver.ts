@@ -5,6 +5,8 @@ import type {
   ModeId,
   ModeKeymapDef,
   MultiRepoConfig,
+  PluginConfigDecl,
+  PluginConfigEntry,
   ResolvedConfig,
   ResolvedKeymapConfig,
 } from './types'
@@ -60,6 +62,7 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     integrations: resolveIntegrations(userConfig.integrations),
     keymaps,
     multiRepo,
+    plugins: resolvePlugins(userConfig.plugins),
     // ponytail: `sessionBar` is the pre-rename key. Unknown keys parse
     // silently, so without the fallback the setting just vanishes.
     projectBar: resolveProjectBar(userConfig.projectBar ?? userConfig.sessionBar),
@@ -69,6 +72,25 @@ export function resolveConfig(userConfig: AimuxUserConfig): ResolvedConfig {
     statusBar: userConfig.statusBar ?? {},
     theme: resolveTheme(userConfig.theme),
   }
+}
+
+/**
+ * Normalises the shorthand. A declaration with neither `path` nor `id` names
+ * nothing loadable, so it is dropped here rather than becoming a mystery
+ * "plugin not found" at load time.
+ */
+function resolvePlugins(declarations: PluginConfigDecl[] | undefined): PluginConfigEntry[] {
+  if (!declarations) return []
+  const entries: PluginConfigEntry[] = []
+  for (const declaration of declarations) {
+    if (typeof declaration === 'string') {
+      if (declaration.trim() !== '') entries.push({ path: declaration })
+      continue
+    }
+    if (declaration.path === undefined && declaration.id === undefined) continue
+    entries.push(declaration)
+  }
+  return entries
 }
 
 function resolveIntegrations(

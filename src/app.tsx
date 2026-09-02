@@ -60,6 +60,7 @@ import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
+import { usePluginHost } from './ui/plugin-host'
 import { RootView } from './ui/root'
 import {
   applyTheme,
@@ -109,6 +110,11 @@ export function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
+  // Plugin host. Mounted after `registerAllModes` so a plugin's `apply` sees a
+  // fully-registered mode table, and before the first paint so a widget it
+  // contributes is present on the initial render rather than popping in.
+  usePluginHost({ backend, userPlugins: resolvedConfig.plugins })
+
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {

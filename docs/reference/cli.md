@@ -508,6 +508,63 @@ aimux workspace remove <id|path> [--force] [--project W]
 -> { id, name, path }
 ```
 
+### `aimux plugin`
+
+Manages the plugin kernel (`docs/developer/plugins.md`). The CLI process never
+loads plugin code: these verbs read manifests and the registry, and hand
+anything needing a live kernel to the daemon, which reloads its own halves and
+forwards the same instruction to every attached UI.
+
+```
+aimux plugin list
+-> { plugins: [{ id, name, version, source, enabled, halves, root, config }],
+     running: [{ id, host, state, revision, effects, error?, missing? }] | null,
+     issues: [string], daemon }
+
+aimux plugin link <path> [--no-build]
+-> { id, version, root, halves, linked, build, daemon }
+
+aimux plugin unlink <id>
+-> { id, root, unlinked, daemon }
+
+aimux plugin install <owner/repo[/subdir]> [--yes] [--dry-run]
+-> { id, version, origin, root, installed, build, daemon }
+
+aimux plugin uninstall <id> [--purge]
+-> { id, removed, uninstalled, configKept, daemon }
+
+aimux plugin enable <id>
+aimux plugin disable <id>
+-> { id, enabled, daemon }
+
+aimux plugin reload [id]
+-> { id, reloaded, result }
+
+aimux plugin log <id> [--lines N] [--level debug|info|warn|error]
+-> { id, path, entries: [{ at, host, level, message, data? }] }
+
+aimux plugin doctor [path-or-id] [--no-apply] [--no-types]
+-> { ok, id, version, root, manifest, issues, halves, types, aimuxVersion }
+```
+
+`link` registers a directory in place and watches it for edits; `install`
+clones into `<profile>/plugins/<id>` and owns that copy. `unlink` and
+`uninstall` are therefore not interchangeable, and each refuses the other's
+plugins rather than deleting a directory it does not own.
+
+`install` prints the manifest and the `build` argv on stderr and then refuses
+without `--yes`: build steps run arbitrary commands with your privileges, and
+there is no sandbox. `--dry-run` prints the manifest and stops.
+
+`doctor` is the author loop. It validates the manifest field by field, bundles
+each half, applies it against a throwaway context, and reports what that apply
+registered — effects, events, RPC verbs, services — plus `tsc --noEmit` when
+the plugin ships a tsconfig. Exit 3 when anything failed. It is the one verb
+that executes plugin code; nothing it runs touches the running aimux.
+
+Secrets declared with `"secret": true` in the manifest are printed as
+`<secret>` by `list`.
+
 ## JSON Output Conventions
 
 - One JSON object per invocation on stdout (`tab wait` and `tab tail` are

@@ -48,8 +48,14 @@ export interface TestContextHandle {
   broadcasts: TestRpcCall[]
   /** Services the plugin published via `ctx.provide`. */
   provided: Map<string, unknown>
-  /** Run a definition's `apply` against this context, awaiting its effects. */
-  apply: (definition: PluginDefinition<never>) => Promise<void>
+  /**
+   * Run a definition's `apply` against this context. Generic so an inline
+   * `{ apply(ctx) { … } }` infers the base context and a typed
+   * `PluginDefinition<UiPluginContext>` is accepted as written.
+   */
+  apply: <Ctx extends PluginContext = PluginContext>(
+    definition: PluginDefinition<Ctx>
+  ) => Promise<void>
   /** Call a verb the plugin registered with `ctx.rpc.handle`. */
   invoke: <T = unknown>(verb: string, payload?: unknown) => Promise<T>
   /** Verbs the plugin currently handles. */

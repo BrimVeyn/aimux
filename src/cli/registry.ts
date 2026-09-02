@@ -1,6 +1,15 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { pluginDoctor } from './commands/plugin/doctor'
+import { pluginDisable, pluginEnable } from './commands/plugin/enable'
+import { pluginInstall } from './commands/plugin/install'
+import { pluginLink } from './commands/plugin/link'
+import { pluginList } from './commands/plugin/list'
+import { pluginLog } from './commands/plugin/log'
+import { pluginReload } from './commands/plugin/reload'
+import { pluginUninstall } from './commands/plugin/uninstall'
+import { pluginUnlink } from './commands/plugin/unlink'
 import { projectClose } from './commands/project/close'
 import { projectCreate } from './commands/project/create'
 import { projectList } from './commands/project/list'
@@ -62,6 +71,16 @@ export const COMMANDS: readonly CliCommand[] = [
   workerList,
   workerStop,
   workerDoctor,
+  pluginList,
+  pluginLink,
+  pluginUnlink,
+  pluginInstall,
+  pluginUninstall,
+  pluginEnable,
+  pluginDisable,
+  pluginReload,
+  pluginLog,
+  pluginDoctor,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

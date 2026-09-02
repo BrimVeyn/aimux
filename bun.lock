@@ -6,6 +6,7 @@
       "name": "@brimveyn/aimux",
       "dependencies": {
         "@brimveyn/aimux-config": "workspace:*",
+        "@brimveyn/aimux-plugin": "workspace:*",
         "@opentui/core": "^0.1.90",
         "@opentui/react": "^0.1.90",
         "@resvg/resvg-wasm": "^2.6.2",

@@ -75,6 +75,8 @@ export type {
   ModeKeymapDef,
   MultiRepoConfig,
   MultiRepoState,
+  PluginConfigDecl,
+  PluginConfigEntry,
   ProjectRecord,
   ResolvedConfig,
   ResolvedKeymapConfig,

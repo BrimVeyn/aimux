@@ -1035,6 +1035,35 @@ export interface HooksConfig {
   onProjectCreate?: (project: { name: string; projectPath?: string }) => void | Promise<void>
 }
 
+// ─── Plugin config ────────────────────────────────────────────────────────────
+
+/**
+ * A plugin declared from `aimux.config.ts` rather than through
+ * `aimux plugin link`. Either form works; this one is the version-controllable
+ * half, and it outranks `aimux-plugins.json` on every key it sets.
+ */
+export interface PluginConfigEntry {
+  /**
+   * Directory holding `aimux-plugin.json`. Relative paths resolve against the
+   * profile config directory — the one `aimux.config.ts` itself lives in.
+   * Omit it to configure a plugin that is already linked or installed.
+   */
+  path?: string
+  /**
+   * Plugin id. Required when there is no `path`; otherwise it is checked
+   * against the manifest so a moved directory fails loudly instead of loading
+   * something else.
+   */
+  id?: string
+  /** Default true. `false` keeps the plugin registered but never loads it. */
+  enabled?: boolean
+  /** Merged over the manifest defaults and the registry, and wins over both. */
+  config?: Record<string, unknown>
+}
+
+/** A bare string is shorthand for `{ path }`. */
+export type PluginConfigDecl = string | PluginConfigEntry
+
 // ─── Snippet config (stub) ────────────────────────────────────────────────────
 
 /**
@@ -1328,6 +1357,11 @@ export interface AimuxUserConfig {
   externalEditor?: ExternalEditorConfig
   integrations?: AimuxIntegrationsConfig
   /**
+   * Plugins to load, in addition to anything `aimux plugin link/install`
+   * registered. See `docs/developer/plugins.md`.
+   */
+  plugins?: PluginConfigDecl[]
+  /**
    * @deprecated Removed. Workspace provisioning is a per-project setup script
    * now — see `docs/guide/workspaces.md#setup`. Declared here only so the strike
    * -through shows up in your editor: an unknown key parses silently, so without
@@ -1401,4 +1435,6 @@ export interface ResolvedConfig {
   integrations: {
     claudeHooks: boolean
   }
+  /** Normalised to the object form; a bare string became `{ path }`. */
+  plugins: PluginConfigEntry[]
 }

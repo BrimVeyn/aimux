@@ -55,6 +55,13 @@ export interface ProjectBackendEvents {
    */
   workspaceAdded: [projectId: string, workspace: WorkspaceRecord]
   workspaceRemoved: [projectId: string, workspaceId: string]
+  /**
+   * v19 plugin channel. Either a one-way message from a plugin's daemon half,
+   * a daemon → UI call awaiting a reply, or aimux's own control channel
+   * (`pluginId: 'aimux'`). The UI plugin host is the only subscriber; the
+   * payload is opaque to everything in between.
+   */
+  pluginEvent: [pluginId: string, verb: string, payload: unknown]
 }
 
 export interface ResizeOptions {
@@ -120,4 +127,11 @@ export interface SessionBackend extends EventEmitter<ProjectBackendEvents> {
    * --wait` CLI can exit. No-op on local backends (no daemon).
    */
   announceProjectSwitched(projectId: string): void
+  /**
+   * v19 — sends one plugin RPC request to the daemon and resolves with its
+   * result. Optional: a local backend has no daemon to talk to, and a plugin
+   * whose call cannot leave the process gets a clean rejection rather than a
+   * hang.
+   */
+  pluginRequest?(pluginId: string, verb: string, payload?: unknown): Promise<unknown>
 }

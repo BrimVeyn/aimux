@@ -1,4 +1,4 @@
-import type { Disposer, PluginEventListener } from './types'
+import type { PluginEventListener } from './types'
 
 /**
  * The event bus lives in the public package rather than in the host so that
@@ -30,7 +30,8 @@ export class PluginEventBus {
 
   constructor(private readonly options: EventBusOptions = {}) {}
 
-  on<T = unknown>(event: string, listener: PluginEventListener<T>, owner?: string): Disposer {
+  /** The unsubscribe handle. Synchronous — nothing here can suspend. */
+  on<T = unknown>(event: string, listener: PluginEventListener<T>, owner?: string): () => void {
     const registration: Registration = { listener: listener as PluginEventListener<never>, owner }
     const existing = this.listeners.get(event)
     if (existing) existing.push(registration)
