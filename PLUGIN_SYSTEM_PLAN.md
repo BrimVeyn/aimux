@@ -645,3 +645,128 @@ Les trois autres chantiers de la phase 5 — isolation Worker, `plugin define`,
 marketplace — restent non commencés et non planifiés ici : aucun des quatre
 plugins d'exemple n'en a eu besoin, ce qui est la meilleure indication qu'on a
 sur leur urgence.
+
+---
+
+# Phase 7 · Une interface de contrôle des plugins
+
+Planifié le 2026-09-02 par un agent qui a lu tout le code du noyau, du CLI et
+de l'écran de réglages. Trois parties : activer/désactiver n'importe quel
+plugin (y compris ceux livrés), les configurer, et une surface où faire les
+deux.
+
+## 7.0 Ce qui existe déjà, et ce qui manque discrètement
+
+| Pièce                                   | État                                                        |
+| --------------------------------------- | ----------------------------------------------------------- |
+| `resolvePluginConfig` (précédence)      | fait, correct, testé                                        |
+| `redactPluginConfig`                    | fait                                                        |
+| `buildPluginSettingSection`             | **écrit, testé, et jamais appelé par l'app**                |
+| `docs/guide/plugins.md`                 | affirme déjà que les lignes de réglages sont générées. Non. |
+| activer/désactiver un built-in          | `aimux.config.ts` seulement                                 |
+| état des plugins hors React             | aucun — `app.tsx` jette le retour de `usePluginHost`        |
+| une config qui atteint un plugin vivant | **corrigé le 2026-09-02** (voir 7.1 ci-dessous)             |
+
+Autrement dit la partie 2 est à moitié construite sur le mauvais stockage, et
+le blocage de la partie 1 est un trou de modèle de données, pas un trou d'UI.
+
+## 7.1 Le bug qui rendait la partie 2 morte-née — corrigé
+
+Le noyau ne reconstruisait une fibre que si le plugin avait _bougé sur le
+disque_. Une valeur de config modifiée était invisible : `plugin set` puis
+`plugin reload` ré-importait le module et lui redonnait les anciennes valeurs.
+Corrigé — `recordChanged` couvre maintenant `root`, la version et la config.
+
+C'est aussi la réponse à « comment une écriture atteint un plugin qui tourne » :
+en reconstruisant sa fibre. `apiVersion: 1` n'a pas d'API d'abonnement et les
+plugins déstructurent `ctx.config` ; muter en place laisserait la moitié d'entre
+eux périmés sans que rien ne puisse le détecter.
+
+## 7.2 Décisions
+
+**D1 — Stockage : un bloc `overrides` dans `aimux-plugins.json`.**
+
+```jsonc
+{
+  "plugins": [
+    /* inchangé : où est le code — link/install */
+  ],
+  "overrides": { "aimux.claude": { "enabled": false } },
+}
+```
+
+`plugins[]` répond « où est le code », `overrides` répond « comment
+l'utilisateur l'a réglé » — et c'est keyé par id, donc ça marche pour un
+built-in, un lien, une install ou une entrée de config, identiquement.
+L'asymétrie est supprimée à la racine plutôt que rustinée dans chaque verbe.
+
+Précédence complète : `manifest default ← BuiltinPlugin.config ← ligne de
+registre ← overrides ← aimux.config.ts`.
+
+_Rejeté_ : une ligne `source: 'builtin'` dans `plugins[]` — `discovery.ts` fait
+`existsSync(root)` sur chaque ligne et signalerait « répertoire disparu » pour
+un plugin qui n'en a pas.
+
+**D2 — La vue de gestion est une section de l'écran de réglages, plus une
+modale.** Un écran neuf coûterait des arms sur `FocusMode`, `BuiltinModeId`, la
+table `TRANSITIONS`, un handler de mode, des en-têtes d'aide, deux `AppAction`,
+un `SideEffect`, un réducteur, un composant et un raccourci — pour une liste
+avec un interrupteur et des valeurs, ce qui est exactement le métier de l'écran
+de réglages. Ce que cet écran ne peut pas faire, c'est afficher une stack et un
+extrait de log : ça justifie **une** modale.
+
+**D3 — Une troisième valeur de `storage` : `'plugin'`.** `storage: 'settings'`
+écrit dans le bloc `settings` d'`aimux.json`, que la découverte ne lit jamais —
+une valeur écrite là n'atteindrait silencieusement aucun plugin. C'est
+précisément ce que `plugin-section.ts` produit aujourd'hui, et pourquoi il n'est
+branché nulle part.
+
+## 7.3 Le CLI, pour un agent
+
+| L'agent veut…                      | Il tape                                          |
+| ---------------------------------- | ------------------------------------------------ |
+| lister avec la config              | `aimux plugin list`                              |
+| basculer un plugin                 | `aimux plugin disable aimux.claude`              |
+| poser une valeur                   | `aimux plugin set acme.telegram quietMinutes 15` |
+| savoir pourquoi un plugin a échoué | `aimux plugin show acme.telegram`                |
+
+`list` gagne `state`, `error`, `enabledFrom` (`default | registry | config`) —
+c'est `enabledFrom` qui dit à l'agent si son `disable` va tenir ou être
+outrepassé par `aimux.config.ts` au prochain lancement. `set` coerce selon le
+type déclaré et **refuse** une clé inconnue : `resolvePluginConfig` la
+laisserait passer, et une faute de frappe qui ne fait rien est le pire résultat
+possible pour un agent. `--value-stdin` évite qu'un token entre dans
+l'historique du shell.
+
+Contrat de codes de sortie : `0` l'écriture a eu lieu ou la lecture a réussi —
+**y compris daemon injoignable** ; `2` id inconnu / clé inconnue / type refusé ;
+`3` écriture du registre impossible ; `4` jamais.
+
+## 7.4 Deux bugs latents à corriger en chemin
+
+- **Un secret est affiché par la ligne qui le montre.** `row-value.tsx` ne
+  renvoie le placeholder que si la valeur est vide, donc un secret _avec_ une
+  valeur s'imprime — dans la ligne, dans le pied de page, et
+  `settings-actions.ts` amorce la modale d'édition avec `String(current)`. À
+  corriger à `readRow` **et** à `openField`. Latent aujourd'hui parce que
+  `plugin-section.ts` n'est pas branché ; actif dès qu'il le sera.
+- **Une ligne numérique écrit à chaque frappe.** `←`/`→` appelle `writeRow` par
+  pression ; sans anti-rebond, maintenir `→` sur un `pollSeconds` redémarre la
+  fibre soixante fois.
+
+## 7.5 Laissé dehors, exprès
+
+Éditer `aimux.config.ts` depuis l'UI ou le CLI (tout le modèle de précédence
+repose sur ce fichier comme étant _celui écrit à la main_) ; chiffrer les
+secrets (ils restent du JSON en clair, la rédaction est de l'hygiène anti
+regard par-dessus l'épaule) ; un écran dédié ; les opérations en lot ;
+l'activation par projet.
+
+## 7.6 Sur les configs des plugins d'exemple
+
+Déjà fait : les quatre en déclarent une (`shifter` cinq vitesses, `sysload`
+`pollSeconds`/`gpuCommand`, `ghstreak` `refreshMinutes`/`preferGithub`, `pulse`
+`days`). Ils deviennent le jeu de test de cette phase — cinq champs `string`, un
+`number` avec un plancher, un `boolean`, et rien de secret, ce qui laisse un
+trou à combler : aucun exemple n'a de champ `secret`, et c'est le seul dont le
+rendu peut fuiter.
