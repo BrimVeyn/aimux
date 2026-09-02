@@ -44,12 +44,6 @@ interface TerminalPaneProps {
   junctionEdges?: JunctionEdges
 }
 
-function getBorderColor(isActive: boolean, focusMode: TerminalPaneProps['focusMode']): string {
-  const t = getCurrentTheme()
-  if (!isActive) return t.border
-  return focusMode === 'terminal-input' ? t.accent : t.primary
-}
-
 function renderSpan(span: TerminalSpan, key: string, softCursor: boolean): ReactNode {
   let node: ReactNode = span.text
 
@@ -177,15 +171,19 @@ const NOOP = (): void => {}
 // wraps) a wheel event bumps _scrollY, and opentui's onResize never re-clamps it,
 // so the offset sticks for the renderable's life: the viewport shifts up, dead
 // rows appear at the bottom, and the prompt scrolls off-screen after `clear`.
-// Pin the offset to 0 and disable the built-in wheel handler outright (it also
-// drives horizontal scroll once wrapMode is "none"). The event still bubbles to
-// forwardScrollEvent, so local scrollback / mouse-forwarding keep working, and
-// selection is unaffected (it's driven by the renderer, not handleScroll).
-// handleScroll is protected; reach it via Reflect, mirroring the scrollY reset
-// already used in TerminalPane.
+//
+// Kill the built-in wheel handler at its dispatch point: processMouseEvent calls
+// onMouseEvent() unconditionally after any React mouse listener, and
+// TextBufferRenderable.onMouseEvent() unconditionally calls handleScroll() for a
+// scroll event. Overriding onMouseEvent (rather than only handleScroll) is a
+// single deterministic no-op standing between every wheel step and _scrollY, so
+// the drift can no longer slip in on a path the later reset misses. Selection is
+// unaffected: it is driven by the renderer (startSelection/updateSelection), not
+// by onMouseEvent, which exists only to scroll. Both are protected; reach them
+// via Reflect, mirroring the scrollY reset already used elsewhere in the pane.
 const pinTerminalScroll = (node: TextRenderable | null): void => {
   if (!node) return
-  Reflect.set(node, 'handleScroll', NOOP)
+  Reflect.set(node, 'onMouseEvent', NOOP)
   if (node.scrollY !== 0) node.scrollY = 0
 }
 
@@ -498,9 +496,13 @@ export function TerminalPane({
   return (
     <box flexDirection="column" flexGrow={1} gap={0}>
       <ContextMenuBox
-        border
-        borderColor={getBorderColor(paneIsActive, focusMode)}
-        padding={0}
+        // No frame, in any state — not around the pane, not between two split
+        // panes, and nothing that colours itself by focus mode. What was the
+        // border is now plain padding: same one-cell inset, so the geometry
+        // PANE_BORDER describes and the resize/hit-test gutter both still hold,
+        // but the cells are painted in the editor background like everything
+        // else. Surfaces are told apart by their background alone.
+        padding={1}
         flexDirection="column"
         flexGrow={1}
         backgroundColor={editorBg}
