@@ -1,0 +1,19 @@
+{
+  "id": "aimux-examples.pulse",
+  "name": "Pulse",
+  "version": "1.0.0",
+  "description": "A pane beside your agent showing what aimux knows about its own use",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "days": {
+      "type": "number",
+      "label": "Days to show",
+      "description": "How far back the pane looks.",
+      "default": 14
+    }
+  }
+}

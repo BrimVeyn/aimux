@@ -1,0 +1,25 @@
+{
+  "id": "aimux-examples.ghstreak",
+  "name": "Commit grid",
+  "version": "1.0.0",
+  "description": "A year of commits as a grid, from the signed-in GitHub account or the repo in front of you",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "refreshMinutes": {
+      "type": "number",
+      "label": "Refresh every",
+      "description": "Minutes between refreshes. GitHub's calendar does not move often.",
+      "default": 30
+    },
+    "preferGithub": {
+      "type": "boolean",
+      "label": "Ask GitHub first",
+      "description": "Off falls straight to `git log` in the repo you are in.",
+      "default": true
+    }
+  }
+}

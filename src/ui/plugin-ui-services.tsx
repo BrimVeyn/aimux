@@ -311,6 +311,7 @@ function buildStore(ctx: PluginContext): PluginStoreApi {
     set: (slice) => {
       dispatchGlobal({ pluginId: id, slice, type: 'set-plugin-slice' })
     },
+    use: () => useAppStore((state) => state.plugins[id]),
   }
 }
 

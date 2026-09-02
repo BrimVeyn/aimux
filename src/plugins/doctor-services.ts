@@ -162,6 +162,9 @@ export function createDoctorExtender(
           return noop
         },
         set: noop,
+        use: () => {
+          /* no React in a dry run */
+        },
       }
       return
     }

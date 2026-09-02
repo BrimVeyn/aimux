@@ -632,8 +632,14 @@ export interface PluginStoreApi<Slice = unknown> {
   reducer: (
     reduce: (slice: Slice | undefined, action: { actionId: string; payload?: unknown }) => Slice
   ) => Disposer
-  /** Reads the current slice. */
+  /** Reads the current slice. A snapshot: it does not subscribe. */
   get: () => Slice | undefined
+  /**
+   * The slice, as a hook. What a renderer wants: `get()` inside a component
+   * reads the right value once and then never hears about the next one, which
+   * is a widget that quietly stops updating.
+   */
+  use: () => Slice | undefined
   /** Replaces the slice outright. */
   set: (slice: Slice) => void
   /** Dispatches into this plugin's reducer. */

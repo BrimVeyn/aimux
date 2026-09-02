@@ -1,4 +1,4 @@
-import { definePlugin, type UiPluginContext } from '@brimveyn/aimux-plugin'
+import { definePlugin, type PluginNode, type UiPluginContext } from '@brimveyn/aimux-plugin'
 
 import { gearAt, GEARS, shift } from './gears'
 
@@ -73,25 +73,29 @@ export default definePlugin({
     bind('down', () => shift(currentGear(), -1))
     for (const gear of GEARS) bind(`gear${gear.index}`, () => gear.index)
 
-    ctx.ui.statusBar.register({
-      id: 'gear',
-      render: () => {
-        const { Row } = ctx.ui.kit
-        const theme = ctx.ui.kit.useTheme()
-        // The hook, not `state.get()`: this is a component, and it has to
-        // re-render when the user shifts.
-        const slice = ctx.store.get() ?? EMPTY
-        const gear = gearAt(slice.gear)
-        return (
-          <Row
-            label={
-              <text fg={slice.error === null ? theme.text : theme.error}>{`⚙ ${gear.index}`}</text>
-            }
-            value={<text fg={theme.textMuted}>{gear.label}</text>}
-          />
-        )
-      },
-    })
+    /**
+     * A component, not a render body. `render` is called from inside aimux's
+     * own component, so calling a hook there would splice a plugin's hooks
+     * into aimux's hook order. And `store.use()` is what makes the tile redraw
+     * when the gear changes — `store.get()` reads the right value once and
+     * then never hears about the next one.
+     */
+    function GearTile(): PluginNode {
+      const { Row } = ctx.ui.kit
+      const theme = ctx.ui.kit.useTheme()
+      const slice = ctx.store.use() ?? EMPTY
+      const gear = gearAt(slice.gear)
+      return (
+        <Row
+          label={
+            <text fg={slice.error === null ? theme.text : theme.error}>{`⚙ ${gear.index}`}</text>
+          }
+          value={<text fg={theme.textMuted}>{gear.label}</text>}
+        />
+      )
+    }
+
+    ctx.ui.statusBar.register({ id: 'gear', render: () => <GearTile /> })
 
     ctx.log.info('shifter ready', { gears: GEARS.length })
   },

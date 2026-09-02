@@ -94,9 +94,18 @@ export function rewriteSharedSpecifiers(
   let output = source
   for (const [specifier, absolute] of resolutions) {
     const escaped = escapeRegExp(specifier)
+    // `[\s\S]` and not `[^\n]`: a bundler emits the import list the way the
+    // source wrote it, and any formatter wraps a list of four names. An import
+    // that spans lines used to slip through unrewritten, stay bare, and fail
+    // at load with "Cannot find package" — for no reason the author could see
+    // except that they had one import too many.
+    //
+    // The capture reproduces everything between `import` and the specifier
+    // verbatim, so a match that runs past a preceding statement rewrites the
+    // specifier and changes nothing else.
     const fromClause = new RegExp(
-      `^(\\s*(?:import|export)\\b[^\\n]*?from\\s*)(["'])${escaped}\\2`,
-      'gm'
+      `((?:import|export)\\b[\\s\\S]*?\\bfrom\\s*)(["'])${escaped}\\2`,
+      'g'
     )
     const sideEffect = new RegExp(`^(\\s*import\\s*)(["'])${escaped}\\2`, 'gm')
     output = output.replaceAll(fromClause, `$1$2${absolute}$2`)
