@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, realpathSync, rmSync } from 'node:fs'
+import { mkdirSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -26,6 +26,14 @@ const SHARED_EXTERNALS = [
   'react/jsx-runtime',
   'react/jsx-dev-runtime',
   '@opentui/react',
+  // The JSX runtime subpaths, and not for symmetry: aimux sets
+  // `jsxImportSource` to `@opentui/react`, so every `<box>` a plugin writes
+  // compiles to an import of one of these. Leaving them out of the shared set
+  // bundles a second copy of the runtime — which then cannot resolve `react`
+  // from inside the plugin, and the half fails to load with an error naming a
+  // file the author never wrote.
+  '@opentui/react/jsx-runtime',
+  '@opentui/react/jsx-dev-runtime',
   '@opentui/core',
   '@brimveyn/aimux-plugin',
   '@brimveyn/aimux-config',
@@ -98,13 +106,38 @@ export function rewriteSharedSpecifiers(
 }
 
 /** Keeps the newest artifacts and deletes the rest. Best-effort. */
-function pruneHotArtifacts(hotDir: string): void {
+/**
+ * Keeps the last few artifacts and drops the rest.
+ *
+ * By modification time, and never the file just written. Sorting by *name* is
+ * what this used to do, and it was wrong the moment a second half shared the
+ * directory: `doctor-daemon-<ts>` sorts before `doctor-ui-<ts>` whatever the
+ * timestamps say, so the freshly built daemon artifact was the one pruned —
+ * and the half then failed to load with an ENOENT naming a file the plugin
+ * author never wrote.
+ */
+function pruneHotArtifacts(hotDir: string, keepPath: string): void {
   try {
     const entries = readdirSync(hotDir)
       .filter((name) => name.endsWith('.mjs'))
-      .sort()
-    for (const name of entries.slice(0, Math.max(0, entries.length - HOT_ARTIFACT_KEEP))) {
-      rmSync(join(hotDir, name), { force: true })
+      .map((name) => {
+        const path = join(hotDir, name)
+        let mtimeMs = 0
+        try {
+          mtimeMs = statSync(path).mtimeMs
+        } catch {
+          // Raced with another prune; treat it as ancient and let the unlink
+          // below no-op.
+        }
+        return { mtimeMs, path }
+      })
+      .filter((entry) => entry.path !== keepPath)
+      .sort((a, b) => a.mtimeMs - b.mtimeMs)
+
+    // `keepPath` is excluded above and counts against the budget here: the
+    // newest artifact is always one of the ones kept.
+    for (const entry of entries.slice(0, Math.max(0, entries.length - (HOT_ARTIFACT_KEEP - 1)))) {
+      rmSync(entry.path, { force: true })
     }
   } catch {
     // A missing or unreadable hot dir is not worth failing a load over.
@@ -153,7 +186,7 @@ export async function buildPluginEntry(options: BuildPluginEntryOptions): Promis
     `${options.half}-${String(options.revision).padStart(6, '0')}.mjs`
   )
   await Bun.write(artifactPath, rewritten)
-  pruneHotArtifacts(hotDir)
+  pruneHotArtifacts(hotDir, artifactPath)
 
   // Canonicalised before it is handed back. Bun resolves an import specifier
   // against a cached directory listing keyed by the *real* path, so on a

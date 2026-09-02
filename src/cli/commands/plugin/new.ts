@@ -180,7 +180,11 @@ function packageJson(id: string): string {
   return `${JSON.stringify(
     {
       dependencies: { '@brimveyn/aimux-plugin': '^0.1.0' },
-      devDependencies: { '@types/bun': 'latest', '@types/react': '^19' },
+      devDependencies: {
+        '@opentui/react': '^0.5.0',
+        '@types/bun': 'latest',
+        '@types/react': '^19',
+      },
       name: id.replace('.', '-'),
       private: true,
       type: 'module',
@@ -195,6 +199,10 @@ const TSCONFIG = `${JSON.stringify(
   {
     compilerOptions: {
       jsx: 'react-jsx',
+      // aimux's elements are opentui's, so `<box>` and `<text>` only typecheck
+      // — and only compile to the runtime aimux shares with the plugin — when
+      // the JSX source is opentui's React binding rather than plain React.
+      jsxImportSource: '@opentui/react',
       lib: ['ESNext', 'DOM'],
       module: 'Preserve',
       moduleResolution: 'bundler',
