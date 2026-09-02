@@ -25,6 +25,19 @@ if (typeof command === 'string' && CLI_GROUPS.has(command)) {
   process.exit(await runCli(process.argv.slice(2)))
 }
 
+// A group contributed by a plugin. Checked after the built-in set and only
+// when a verb follows, so bare `aimux` still starts the TUI — and only ever
+// one small file read, on a path that was about to boot the whole renderer
+// anyway. The daemon rewrites that sidecar whenever the registry changes; the
+// CLI process still loads no plugin code.
+if (typeof command === 'string' && typeof process.argv[3] === 'string') {
+  const { readPluginCliSidecar } = await import('./plugins/cli-commands')
+  if (readPluginCliSidecar().some((spec) => spec.group === command)) {
+    const { runCli } = await import('./cli')
+    process.exit(await runCli(process.argv.slice(2)))
+  }
+}
+
 if (command === '--version' || command === '-v' || command === 'version') {
   const { version } = await import('../package.json')
   process.stdout.write(`aimux ${version}\n`)

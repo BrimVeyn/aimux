@@ -1,12 +1,15 @@
 import type { PluginConfigEntry } from '@brimveyn/aimux-config'
 
+import type { ParsedArgs } from '../cli/flags'
 import type { PluginDiscoveryIssue } from '../plugins/discovery'
 import type { PluginRpcTransport, PluginStatus } from '../plugins/types'
 
 import { logDebug } from '../debug/input-log'
+import { getPluginCliCommand } from '../plugins/cli-commands'
 import { PluginRuntime } from '../plugins/loader'
 import {
   isReplyEnvelope,
+  PLUGIN_CONTROL_CLI_RUN,
   PLUGIN_CONTROL_ID,
   PLUGIN_CONTROL_LIST,
   PLUGIN_CONTROL_REFRESH,
@@ -181,6 +184,22 @@ export async function startDaemonPluginHost(
           verb: PLUGIN_CONTROL_REFRESH,
         })
         return { plugins: runtime.statuses() }
+      }
+      case PLUGIN_CONTROL_CLI_RUN: {
+        // A plugin's CLI command runs here, not in the `aimux` process that
+        // typed it: the CLI loads no plugin code, so the daemon is the only
+        // place the handler exists.
+        const request = payload as { group?: string; verb?: string; args?: ParsedArgs }
+        const command =
+          typeof request.group === 'string' && typeof request.verb === 'string'
+            ? getPluginCliCommand(request.group, request.verb)
+            : undefined
+        if (!command) {
+          throw new Error(`no plugin CLI command: ${String(request.group)} ${String(request.verb)}`)
+        }
+        return {
+          result: await command.run(request.args ?? { flags: {}, positionals: [] }),
+        }
       }
       case PLUGIN_CONTROL_LIST:
         return {

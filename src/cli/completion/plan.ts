@@ -8,9 +8,10 @@
  * generates `--help`, so completion cannot drift from the documented CLI.
  */
 
+import type { PluginCliCommandSpec } from '../../plugins/cli-commands'
 import type { CompletionSource, DynamicCompletionSource, FlagSpec } from '../flags'
 
-import { COMMANDS, resolveCommand } from '../registry'
+import { type CliCommand, COMMANDS, resolveCommand } from '../registry'
 
 export interface CompletionCandidate {
   description?: string
@@ -57,10 +58,22 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   workspace: 'Git workspaces attached to the active project',
 }
 
-function groupCandidates(): CompletionCandidate[] {
+/** A sidecar spec, shaped like a `CliCommand` for the planner's purposes. */
+function asCommands(specs: readonly PluginCliCommandSpec[]): CliCommand[] {
+  return specs.map((spec) => ({
+    args: spec.args ?? [],
+    flags: spec.flags ?? [],
+    group: spec.group,
+    run: async () => 0,
+    summary: spec.summary,
+    verb: spec.verb,
+  }))
+}
+
+function groupCandidates(pluginCommands: readonly PluginCliCommandSpec[]): CompletionCandidate[] {
   const seen = new Set<string>()
   const candidates: CompletionCandidate[] = []
-  for (const command of COMMANDS) {
+  for (const command of [...COMMANDS, ...asCommands(pluginCommands)]) {
     if (seen.has(command.group)) continue
     seen.add(command.group)
     candidates.push({ description: GROUP_DESCRIPTIONS[command.group], value: command.group })
@@ -145,7 +158,10 @@ function scanTokens(tokens: readonly string[], flags: readonly FlagSpec[]): Toke
   return scan
 }
 
-function planTopLevel(word: string): CompletionPlan {
+function planTopLevel(
+  word: string,
+  pluginCommands: readonly PluginCliCommandSpec[]
+): CompletionPlan {
   if (word.startsWith('-')) {
     return filtered(
       [
@@ -155,21 +171,30 @@ function planTopLevel(word: string): CompletionPlan {
       word
     )
   }
-  return filtered([...groupCandidates(), ...TOP_LEVEL_COMMANDS], word)
+  return filtered([...groupCandidates(pluginCommands), ...TOP_LEVEL_COMMANDS], word)
 }
 
 /**
  * @param words Full command line tokens, including the program name at index 0.
  * @param cword Index into `words` of the token being completed.
  */
-export function planCompletion(words: readonly string[], cword: number): CompletionPlan {
+export function planCompletion(
+  words: readonly string[],
+  cword: number,
+  /**
+   * Plugin verbs, read from the daemon's sidecar by the caller. Passed in
+   * rather than read here so this module keeps its no-I/O property, which is
+   * what makes every branch of it unit-testable.
+   */
+  pluginCommands: readonly PluginCliCommandSpec[] = []
+): CompletionPlan {
   const index = Math.max(0, cword)
   const word = words[index] ?? ''
   const argIndex = index - 1
   if (argIndex < 0) return NONE
 
   const args = words.slice(1)
-  if (argIndex === 0) return planTopLevel(word)
+  if (argIndex === 0) return planTopLevel(word, pluginCommands)
 
   const group = args[0] ?? ''
 
@@ -177,7 +202,9 @@ export function planCompletion(words: readonly string[], cword: number): Complet
     return argIndex === 1 ? filtered(COMPLETION_SUBCOMMANDS, word) : NONE
   }
 
-  const verbs = COMMANDS.filter((command) => command.group === group)
+  const verbs = [...COMMANDS, ...asCommands(pluginCommands)].filter(
+    (command) => command.group === group
+  )
   if (verbs.length === 0) return NONE
 
   if (argIndex === 1) {

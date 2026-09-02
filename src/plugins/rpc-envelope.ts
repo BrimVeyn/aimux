@@ -22,6 +22,8 @@ export const PLUGIN_CONTROL_ID = 'aimux'
 export const PLUGIN_CONTROL_RELOAD = 'reload'
 export const PLUGIN_CONTROL_REFRESH = 'refresh'
 export const PLUGIN_CONTROL_LIST = 'list'
+/** Runs a plugin's CLI command in the daemon; see `src/plugins/cli-commands.ts`. */
+export const PLUGIN_CONTROL_CLI_RUN = 'cli:run'
 
 /** Verbs a plugin may not register; `__` is aimux's namespace on this channel. */
 export function isReservedRpcVerb(verb: string): boolean {

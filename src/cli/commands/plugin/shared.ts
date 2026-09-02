@@ -8,8 +8,8 @@ import type { DaemonClient } from '../../client/daemon-client'
 import { IPC_CAPABILITY_PLUGIN_RPC } from '../../../ipc/protocol'
 import { formatManifestIssues, readManifest } from '../../../plugins/manifest'
 import { loadPluginRegistryResult, type PluginRegistryEntry } from '../../../plugins/registry-file'
-import { PLUGIN_CONTROL_ID } from '../../../plugins/rpc-envelope'
-import { CliUsageError } from '../../flags'
+import { PLUGIN_CONTROL_CLI_RUN, PLUGIN_CONTROL_ID } from '../../../plugins/rpc-envelope'
+import { CliUsageError, type ParsedArgs } from '../../flags'
 
 /**
  * Helpers shared by the `aimux plugin` verbs.
@@ -83,4 +83,21 @@ export async function notifyDaemon(
   } catch (error) {
     return { detail: error instanceof Error ? error.message : String(error), ok: false }
   }
+}
+
+/**
+ * Asks the daemon to run a plugin's CLI command. Separate from `notifyDaemon`
+ * because this one is the point of the invocation rather than a courtesy: an
+ * unreachable daemon here is a failed command, not a deferred refresh.
+ */
+export async function runPluginCliCommand(
+  getDaemon: () => Promise<DaemonClient>,
+  group: string,
+  verb: string,
+  args: ParsedArgs
+): Promise<{ ok: boolean; detail?: string; result?: unknown }> {
+  const outcome = await notifyDaemon(getDaemon, PLUGIN_CONTROL_CLI_RUN, { args, group, verb })
+  if (!outcome.ok) return outcome
+  const payload = outcome.result as { result?: unknown } | undefined
+  return { ok: true, result: payload?.result }
 }

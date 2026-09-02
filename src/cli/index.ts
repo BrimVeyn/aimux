@@ -1,8 +1,10 @@
 import type { DaemonClient } from './client/daemon-client'
 import type { CliContext } from './context'
 
+import { readPluginCliSidecar } from '../plugins/cli-commands'
 import { connectToDaemon, DaemonUnreachableError } from './client/bootstrap'
 import { listProjects, resolveProjectWithOrigin } from './client/project-resolver'
+import { runPluginCliCommand } from './commands/plugin/shared'
 import { type ArgSpec, CliUsageError, type FlagSpec, parseArgs, SHARED_FLAGS } from './flags'
 import {
   EXIT_DAEMON_UNREACHABLE,
@@ -60,6 +62,38 @@ function flagValueHint(flag: FlagSpec): string {
 function formatFlagLine(flag: FlagSpec): string {
   const head = `  --${flag.name}${flagValueHint(flag)}`.padEnd(32)
   return `${head}${flag.description ?? ''}`
+}
+
+/**
+ * A plugin's command, turned into an ordinary `CliCommand` whose `run` asks the
+ * daemon.
+ *
+ * The CLI parses and validates the call itself — from the spec in the sidecar —
+ * so a usage error is reported the same way and at the same speed as for a
+ * built-in verb, without a socket. Only the work crosses over.
+ */
+function pluginCommands(): CliCommand[] {
+  return readPluginCliSidecar().map((spec) => ({
+    args: spec.args ?? [],
+    flags: [...(spec.flags ?? []), ...SHARED_FLAGS],
+    group: spec.group,
+    run: async (ctx) => {
+      const outcome = await runPluginCliCommand(ctx.getDaemon, spec.group, spec.verb, ctx.args)
+      if (!outcome.ok) {
+        writeError(outcome.detail ?? 'plugin command failed')
+        writeJson({ error: outcome.detail ?? 'plugin command failed', kind: 'runtime-error' })
+        return EXIT_RUNTIME
+      }
+      writeJson(outcome.result ?? {})
+      return EXIT_OK
+    },
+    summary: `${spec.summary} (${spec.pluginId})`,
+    verb: spec.verb,
+  }))
+}
+
+function resolvePluginCommand(group: string, verb: string): CliCommand | undefined {
+  return pluginCommands().find((c) => c.group === group && c.verb === verb)
 }
 
 function printHelp(): void {
@@ -123,7 +157,7 @@ function printHelp(): void {
 }
 
 function printGroupHelp(group: string): void {
-  const commands = COMMANDS.filter((c) => c.group === group)
+  const commands = [...COMMANDS, ...pluginCommands()].filter((c) => c.group === group)
   if (commands.length === 0) {
     printHelp()
     return
@@ -191,7 +225,10 @@ export async function runCli(argv: readonly string[]): Promise<number> {
   // the verb list without erroring on the missing verb, so agents can drill
   // down step by step.
   if (verb === '' || verb === '--help' || verb === '-h') {
-    if (COMMANDS.some((c) => c.group === group)) {
+    if (
+      COMMANDS.some((c) => c.group === group) ||
+      pluginCommands().some((c) => c.group === group)
+    ) {
       printGroupHelp(group)
       return EXIT_OK
     }
@@ -200,7 +237,7 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     return EXIT_USAGE
   }
 
-  const command = resolveCommand(group, verb)
+  const command = resolveCommand(group, verb) ?? resolvePluginCommand(group, verb)
   if (!command) {
     writeError(`unknown command: ${group} ${verb}`)
     printHelp()
