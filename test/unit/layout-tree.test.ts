@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 
 import {
-  allLeafIds,
+  allPaneIds,
+  allTabIds,
   computeJunctionEdges,
   computePaneRects,
   createLeaf,
+  createPluginLeaf,
   findLeaf,
   getAdjacentLeaf,
   getBoundaryLeafIds,
+  isTabLeaf,
   type LayoutNode,
   pruneLayoutTree,
   removeNode,
@@ -33,7 +36,7 @@ describe('createLeaf', () => {
 describe('splitNode', () => {
   test('splits a leaf vertically', () => {
     const tree = createLeaf('tab-1')
-    const result = splitNode(tree, 'tab-1', 'vertical', 'tab-2')
+    const result = splitNode(tree, 'tab-1', 'vertical', createLeaf('tab-2'))
 
     expect(result).toEqual({
       direction: 'vertical',
@@ -46,7 +49,7 @@ describe('splitNode', () => {
 
   test('splits a leaf horizontally', () => {
     const tree = createLeaf('tab-1')
-    const result = splitNode(tree, 'tab-1', 'horizontal', 'tab-2')
+    const result = splitNode(tree, 'tab-1', 'horizontal', createLeaf('tab-2'))
 
     expect(result.type).toBe('split')
     if (result.type === 'split') {
@@ -63,7 +66,7 @@ describe('splitNode', () => {
       type: 'split',
     }
 
-    const result = splitNode(tree, 'tab-2', 'horizontal', 'tab-3')
+    const result = splitNode(tree, 'tab-2', 'horizontal', createLeaf('tab-3'))
 
     expect(result.type).toBe('split')
     if (result.type === 'split') {
@@ -79,7 +82,7 @@ describe('splitNode', () => {
 
   test('returns same tree if target not found', () => {
     const tree = createLeaf('tab-1')
-    const result = splitNode(tree, 'tab-999', 'vertical', 'tab-2')
+    const result = splitNode(tree, 'tab-999', 'vertical', createLeaf('tab-2'))
     expect(result).toBe(tree)
   })
 })
@@ -169,7 +172,7 @@ describe('findLeaf', () => {
 
 describe('allLeafIds', () => {
   test('returns single leaf id', () => {
-    expect(allLeafIds(createLeaf('tab-1'))).toEqual(['tab-1'])
+    expect(allPaneIds(createLeaf('tab-1'))).toEqual(['tab-1'])
   })
 
   test('returns all leaf ids in order', () => {
@@ -187,7 +190,7 @@ describe('allLeafIds', () => {
       type: 'split',
     }
 
-    expect(allLeafIds(tree)).toEqual(['tab-1', 'tab-2', 'tab-3'])
+    expect(allPaneIds(tree)).toEqual(['tab-1', 'tab-2', 'tab-3'])
   })
 })
 
@@ -651,5 +654,81 @@ describe('computeJunctionEdges', () => {
     expect(map.get('a')).toEqual({ right: rootSplit })
     expect(map.get('b')).toEqual({ bottom: innerSplit, left: rootSplit })
     expect(map.get('c')).toEqual({ left: rootSplit, top: innerSplit })
+  })
+})
+
+/**
+ * A pane can hold something other than a terminal. The tree itself stays
+ * indifferent to what that is — it is geometry — but two questions it is asked
+ * have different answers depending on the leaf: "what is on screen" and "what
+ * has a PTY behind it".
+ */
+describe('plugin panes', () => {
+  const mixed: LayoutNode = {
+    direction: 'vertical',
+    first: createLeaf('tab-1'),
+    ratio: 0.5,
+    second: createPluginLeaf('acme.thing.board'),
+    type: 'split',
+  }
+
+  test('a plugin leaf is a leaf everywhere geometry looks', () => {
+    expect(allPaneIds(mixed)).toEqual(['tab-1', 'acme.thing.board'])
+    // And it takes up space: the terminal beside it is half the width, not all
+    // of it. Leaving the pane out of the rects would size that PTY wrong.
+    const rects = computePaneRects(mixed, { cols: 100, rows: 40, x: 0, y: 0 })
+    expect(rects.get('tab-1')?.cols).toBe(50)
+    expect(rects.get('acme.thing.board')?.cols).toBe(50)
+  })
+
+  test('and is not a tab anywhere a tab is meant', () => {
+    expect(allTabIds(mixed)).toEqual(['tab-1'])
+  })
+
+  test('an unmarked leaf is a terminal, which is every layout ever persisted', () => {
+    expect(isTabLeaf({ tabId: 'tab-1', type: 'leaf' })).toBe(true)
+    expect(isTabLeaf(createPluginLeaf('acme.thing.board'))).toBe(false)
+  })
+
+  test('splitting can put one beside a terminal', () => {
+    const tree = splitNode(
+      createLeaf('tab-1'),
+      'tab-1',
+      'vertical',
+      createPluginLeaf('acme.thing.board')
+    )
+    expect(tree.type).toBe('split')
+    expect(allTabIds(tree)).toEqual(['tab-1'])
+  })
+
+  test('focus crosses a plugin pane rather than landing on it', () => {
+    // Focus is a tab id everywhere in the app; a pane that is not a tab cannot
+    // become the active one.
+    const tree: LayoutNode = {
+      direction: 'vertical',
+      first: createLeaf('tab-1'),
+      ratio: 0.5,
+      second: {
+        direction: 'vertical',
+        first: createPluginLeaf('acme.thing.board'),
+        ratio: 0.5,
+        second: createLeaf('tab-2'),
+        type: 'split',
+      },
+      type: 'split',
+    }
+    expect(getAdjacentLeaf(tree, 'tab-1', 'right')).toBe('tab-2')
+    expect(getAdjacentLeaf(tree, 'tab-2', 'left')).toBe('tab-1')
+  })
+
+  test('a direction with only plugin panes in it offers no neighbour', () => {
+    expect(getAdjacentLeaf(mixed, 'tab-1', 'right')).toBeNull()
+  })
+
+  test('persisting drops them: a plugin pane lives for the session', () => {
+    // `pruneLayoutTree` is given the live tab ids, and a plugin pane is not
+    // one — so a saved layout is terminals, and a restore never waits on a
+    // plugin that may never load.
+    expect(pruneLayoutTree(mixed, new Set(['tab-1']))).toEqual(createLeaf('tab-1'))
   })
 })

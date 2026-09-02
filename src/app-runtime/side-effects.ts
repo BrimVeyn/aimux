@@ -8,7 +8,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
-import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
+import { allTabIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
@@ -139,7 +139,7 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
     return
   }
 
-  for (const tabId of allLeafIds(groupTree)) {
+  for (const tabId of allTabIds(groupTree)) {
     const tab = state.tabs.find((entry) => entry.id === tabId)
     if (tab) {
       pasteSnippetToTab(backend, tabId, tab, snippet)

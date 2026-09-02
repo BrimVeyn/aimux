@@ -2,7 +2,7 @@ import type { AppAction } from '../actions'
 import type { AppState, TabSession } from '../types'
 
 import {
-  allLeafIds,
+  allTabIds,
   createGroupId,
   createLeaf,
   getAdjacentLeaf,
@@ -129,7 +129,7 @@ function moveLayoutGroup(
     const adjacentTree =
       adjacentGroupId != null && adjacentGroupId !== '' ? state.layoutTrees[adjacentGroupId] : null
     if (adjacentTree && adjacentTree.type === 'split') {
-      const adjacentIds = new Set(allLeafIds(adjacentTree))
+      const adjacentIds = new Set(allTabIds(adjacentTree))
       let otherEnd = groupEnd + 1
       while (
         otherEnd < tabs.length - 1 &&
@@ -161,7 +161,7 @@ function moveLayoutGroup(
     const adjacentTree =
       adjacentGroupId != null && adjacentGroupId !== '' ? state.layoutTrees[adjacentGroupId] : null
     if (adjacentTree && adjacentTree.type === 'split') {
-      const adjacentIds = new Set(allLeafIds(adjacentTree))
+      const adjacentIds = new Set(allTabIds(adjacentTree))
       let otherStart = groupStart - 1
       while (otherStart > 0 && adjacentIds.has(getTabIdAtIndex(tabs, otherStart - 1) ?? '')) {
         otherStart--
@@ -388,7 +388,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           const pruned = pruneLayoutTree(tree, tabIds)
           if (pruned && pruned.type === 'split') {
             hydratedTrees[gId] = pruned
-            for (const leafId of allLeafIds(pruned)) {
+            for (const leafId of allTabIds(pruned)) {
               hydratedGroupMap[leafId] = gId
             }
           }
@@ -400,7 +400,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         if (pruned && pruned.type === 'split') {
           const gId = createGroupId()
           hydratedTrees[gId] = pruned
-          for (const leafId of allLeafIds(pruned)) {
+          for (const leafId of allTabIds(pruned)) {
             hydratedGroupMap[leafId] = gId
           }
         }
@@ -459,7 +459,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           : null
       const activeGroupTree =
         activeGroupId != null && activeGroupId !== '' ? state.layoutTrees[activeGroupId] : null
-      const layoutIds = activeGroupTree ? allLeafIds(activeGroupTree) : []
+      const layoutIds = activeGroupTree ? allTabIds(activeGroupTree) : []
       if (
         layoutIds.length > 1 &&
         state.activeTabId != null &&
@@ -494,7 +494,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       const targetTree =
         targetGroupId != null && targetGroupId !== '' ? state.layoutTrees[targetGroupId] : null
       if (targetTree && targetTree.type === 'split') {
-        const targetIds = new Set(allLeafIds(targetTree))
+        const targetIds = new Set(allTabIds(targetTree))
         const tabs = moveTabAcrossTargetGroup(
           state.tabs,
           activeIndex,
@@ -649,10 +649,10 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         tree = createLeaf(state.activeTabId)
       }
 
-      const newTree = splitNode(tree, state.activeTabId, action.direction, newTab.id)
+      const newTree = splitNode(tree, state.activeTabId, action.direction, createLeaf(newTab.id))
 
       // Insert newTab right after the last layout group member
-      const layoutIdSet = new Set(allLeafIds(tree))
+      const layoutIdSet = new Set(allTabIds(tree))
       let insertIndex = state.tabs.length
       for (let i = state.tabs.length - 1; i >= 0; i--) {
         const tabId = getTabIdAtIndex(state.tabs, i)

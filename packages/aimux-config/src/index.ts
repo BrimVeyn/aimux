@@ -79,6 +79,7 @@ export type {
   KeymapBuilderApi,
   KeyResult,
   LayoutLeaf,
+  LayoutLeafKind,
   LayoutNode,
   LayoutSplit,
   ModeBindingBuilderApi,

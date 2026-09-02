@@ -30,9 +30,29 @@ export type SplitDirection = 'horizontal' | 'vertical'
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
+/**
+ * What occupies a pane. `tab` is a terminal; `plugin` is a renderer a plugin
+ * registered, and has no PTY behind it.
+ */
+export type LayoutLeafKind = 'tab' | 'plugin'
+
 export interface LayoutLeaf {
   type: 'leaf'
+  /**
+   * The tab id — or, when `kind` is `'plugin'`, the qualified pane id
+   * (`<pluginId>.<paneId>`).
+   *
+   * Still called `tabId` because it is the key in every layout ever written to
+   * `aimux.json`, and a rename would be a migration for the sake of a name.
+   * Code that means "whatever is in this pane" should say so by using
+   * `allPaneIds`; code that means "a terminal" uses `allTabIds`.
+   */
   tabId: string
+  /**
+   * Absent means `'tab'`. Every persisted layout omits it, and every pane that
+   * existed before plugins could hold one is a terminal.
+   */
+  kind?: LayoutLeafKind
 }
 export interface LayoutSplit {
   type: 'split'

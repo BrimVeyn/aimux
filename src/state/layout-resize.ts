@@ -1,6 +1,12 @@
 import type { ProjectSnapshotV1 } from './types'
 
-import { computePaneRects, type LayoutNode, PANE_BORDER, type PaneRect } from './layout-tree'
+import {
+  allTabIds,
+  computePaneRects,
+  type LayoutNode,
+  PANE_BORDER,
+  type PaneRect,
+} from './layout-tree'
 
 export interface TerminalBounds {
   x: number
@@ -39,6 +45,14 @@ export function toTerminalContentSize(rect: PaneRect): { cols: number; rows: num
   }
 }
 
+/**
+ * The rect of every *terminal* pane in every split.
+ *
+ * The rects come from the whole tree — a plugin pane takes up space, and
+ * leaving it out would put every terminal beside it at the wrong size — but
+ * only tabs are handed back, because the caller's next move is to resize a PTY
+ * and a plugin pane does not have one.
+ */
 export function forEachSplitPaneRect(
   trees: LayoutNode[],
   bounds: TerminalBounds,
@@ -49,8 +63,10 @@ export function forEachSplitPaneRect(
       continue
     }
 
-    for (const [tabId, rect] of computePaneRects(tree, bounds)) {
-      callback(tabId, rect)
+    const tabs = new Set(allTabIds(tree))
+    for (const [paneId, rect] of computePaneRects(tree, bounds)) {
+      if (!tabs.has(paneId)) continue
+      callback(paneId, rect)
     }
   }
 }

@@ -1,6 +1,6 @@
 import type { AppState, ProjectSnapshotV1, TabSession, TabStatus } from './types'
 
-import { allLeafIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
+import { allTabIds, createGroupId, type LayoutNode, pruneLayoutTree } from './layout-tree'
 
 export function createEmptyProjectSnapshot(): ProjectSnapshotV1 {
   return {
@@ -170,7 +170,7 @@ export function restoreLayoutTrees(
       const pruned = pruneLayoutTree(tree, validTabIds)
       if (pruned && pruned.type === 'split') {
         layoutTrees[gId] = pruned
-        for (const leafId of allLeafIds(pruned)) {
+        for (const leafId of allTabIds(pruned)) {
           tabGroupMap[leafId] = gId
         }
       }
@@ -181,7 +181,7 @@ export function restoreLayoutTrees(
     if (pruned && pruned.type === 'split') {
       const gId = createGroupId()
       layoutTrees[gId] = pruned
-      for (const leafId of allLeafIds(pruned)) {
+      for (const leafId of allTabIds(pruned)) {
         tabGroupMap[leafId] = gId
       }
     }
@@ -212,7 +212,7 @@ export function pruneSnapshotOfWorkspace(
       const pruned = pruneLayoutTree(tree, validTabIds)
       if (pruned && pruned.type === 'split') {
         trees[groupId] = pruned
-        for (const leafId of allLeafIds(pruned)) {
+        for (const leafId of allTabIds(pruned)) {
           groupMap[leafId] = groupId
         }
       }
