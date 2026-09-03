@@ -88,6 +88,8 @@ export interface PluginTabView {
   command: string
   workspaceId?: string
   workerName?: string
+  /** See the package's `PluginTabView.unnamed`. */
+  unnamed: boolean
 }
 
 function toView(id: string, entry: DaemonTabEntry): PluginTabView {
@@ -97,6 +99,10 @@ function toView(id: string, entry: DaemonTabEntry): PluginTabView {
     id,
     projectId: entry.projectId,
     title: entry.title ?? '',
+    // aimux's own encoding of "still carries a default title": set when the
+    // tab is created without one on a namable assistant, cleared by any
+    // rename. A plugin that names tabs needs the fact, not the field.
+    unnamed: entry.autoRenameStatus === 'eligible',
     workerName: entry.workerName,
     workspaceId: entry.workspaceId,
   }
@@ -140,7 +146,8 @@ export function createDaemonContextExtender(
       /**
        * A title change, not a suggestion: it reaches the manager, the
        * persisted session and every attached UI, so it outlives the plugin
-       * that made it.
+       * that made it. It also settles the tab's name — `unnamed` goes false —
+       * so a second namer leaves it alone.
        */
       rename: async (tabId: string, title: string): Promise<void> => {
         backings.renameTab(tabId, title)

@@ -56,6 +56,8 @@ const DAEMON_EVENT_NAMES: readonly DaemonEventName[] = [
   'tab:prompt',
   'tab:question',
   'tab:added',
+  'tab:renamed',
+  'tab:closed',
   'project:status',
   'project:created',
   'project:switched',

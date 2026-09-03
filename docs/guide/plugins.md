@@ -106,13 +106,14 @@ what you asked for.
 
 Today those are:
 
-| Id               | What it does                                                        |
-| ---------------- | ------------------------------------------------------------------- |
-| `aimux.claude`   | Writes aimux's theme and activity hooks into Claude Code's settings |
-| `aimux.ai-usage` | The Claude/Codex quota tile in the status bar, and its polling      |
+| Id                  | What it does                                                        |
+| ------------------- | ------------------------------------------------------------------- |
+| `aimux.claude`      | Writes aimux's theme and activity hooks into Claude Code's settings |
+| `aimux.ai-usage`    | The Claude/Codex quota tile in the status bar, and its polling      |
+| `aimux.auto-rename` | Names a tab after the first thing you ask its agent                 |
 
-Both keep their own settings rows on the settings screen; disabling the plugin
-turns the feature off outright.
+All three keep their own settings rows on the settings screen; disabling the
+plugin turns the feature off outright.
 
 ## Configuring one
 

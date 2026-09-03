@@ -809,6 +809,16 @@ export interface PluginTabView {
   command: string
   workspaceId?: string
   workerName?: string
+  /**
+   * True while the tab still carries the title it was born with: created
+   * without one, on an assistant that supports being named, and renamed by
+   * nobody since — not the user, not aimux, not a plugin.
+   *
+   * A plugin that names tabs reads this before naming one, which is how it
+   * avoids naming the same tab twice or writing over a title the user chose.
+   * `rename` clears it, whoever calls it.
+   */
+  unnamed: boolean
 }
 ```
 
