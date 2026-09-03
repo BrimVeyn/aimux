@@ -1,7 +1,9 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { actionList } from './commands/action/list'
 import { actionRun } from './commands/action/run'
+import { eventsFollow } from './commands/events/follow'
 import { keymapResolve } from './commands/keymap/resolve'
 import { pluginConfig, pluginSet, pluginUnset } from './commands/plugin/config'
 import { pluginDoctor } from './commands/plugin/doctor'
@@ -13,9 +15,12 @@ import { pluginList } from './commands/plugin/list'
 import { pluginLog } from './commands/plugin/log'
 import { pluginNew } from './commands/plugin/new'
 import { pluginReload } from './commands/plugin/reload'
+import { pluginSearch } from './commands/plugin/search'
+import { pluginRestartService, pluginServices } from './commands/plugin/services'
 import { pluginShow } from './commands/plugin/show'
 import { pluginUninstall } from './commands/plugin/uninstall'
 import { pluginUnlink } from './commands/plugin/unlink'
+import { pluginUpdate } from './commands/plugin/update'
 import { profileList } from './commands/profile/list'
 import { projectClose } from './commands/project/close'
 import { projectCreate } from './commands/project/create'
@@ -85,6 +90,10 @@ export const COMMANDS: readonly CliCommand[] = [
   pluginLink,
   pluginUnlink,
   pluginInstall,
+  pluginUpdate,
+  pluginSearch,
+  pluginServices,
+  pluginRestartService,
   pluginUninstall,
   pluginEnable,
   pluginDisable,
@@ -103,6 +112,8 @@ export const COMMANDS: readonly CliCommand[] = [
   uiState,
   keymapResolve,
   actionRun,
+  actionList,
+  eventsFollow,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

@@ -11,6 +11,7 @@ import { PluginRuntime } from '../plugins/loader'
 import { publishPluginRecords, publishPluginStatuses } from '../plugins/plugin-store'
 import {
   isCallEnvelope,
+  PLUGIN_CONTROL_ACTION_LIST,
   PLUGIN_CONTROL_ID,
   PLUGIN_CONTROL_KEYMAP_RESOLVE,
   PLUGIN_CONTROL_REFRESH,
@@ -25,6 +26,8 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { describeUiState, resolveKeymap, runPluginActionByName } from './introspection'
+import { installCommandPaneEffect, reconcileCommandPanes } from './plugin-command-panes'
+import { listPluginCommands } from './plugin-commands'
 import { setUiPluginEmitter } from './plugin-events-ref'
 import { onPluginModalsChanged } from './plugin-modals'
 import { onPluginPanesChanged } from './plugin-panes'
@@ -124,10 +127,13 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
         publishPluginStatuses(next)
         // The records too: a status change follows every `kernel.apply`, which
         // follows every refresh, so this is where the two are both current.
-        publishPluginRecords(
-          runtimeRef.current?.knownRecords() ?? [],
-          runtimeRef.current?.issues ?? []
-        )
+        const records = runtimeRef.current?.knownRecords() ?? []
+        publishPluginRecords(records, runtimeRef.current?.issues ?? [])
+        // Manifest panes follow the record, not the fiber: registered while
+        // the plugin is known and enabled, and every open program of a
+        // plugin that is gone is closed here, which is what makes an unlink
+        // kill the process a reload would have kept.
+        reconcileCommandPanes(records)
         for (const status of next) {
           if (status.state === 'failed' && status.error !== undefined) {
             toast.error(`plugin ${status.id}: ${status.error}`)
@@ -201,6 +207,10 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
           reply(envelope.__call, true, describeUiState())
           return
         }
+        if (verb === PLUGIN_CONTROL_ACTION_LIST) {
+          reply(envelope.__call, true, { commands: listPluginCommands() })
+          return
+        }
         if (verb === PLUGIN_CONTROL_KEYMAP_RESOLVE) {
           reply(
             envelope.__call,
@@ -271,6 +281,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       onStatsPagesChanged(bump),
     ]
 
+    const uninstallCommandPanes = installCommandPaneEffect()
     backend.on('pluginEvent', onPluginEvent)
     // aimux's own UI events reach plugins through this: a call site emits
     // without importing the kernel, and emits into nothing before we mount.
@@ -284,6 +295,7 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       setPluginRefresh(null)
       setUiPluginEmitter(null)
       for (const unwatch of unwatchRegistries) unwatch()
+      uninstallCommandPanes()
       backend.off('pluginEvent', onPluginEvent)
       void runtime.stop()
       runtimeRef.current = null

@@ -1,9 +1,11 @@
 import type {
   Disposer,
   PluginActionsApi,
+  PluginCommandsApi,
   PluginContext,
   PluginGitFile,
   PluginKit,
+  PluginLayoutNode,
   PluginStoreApi,
   PluginTabInfo,
   PluginThemeSnapshot,
@@ -26,14 +28,38 @@ import type { AppState, GitFileEntry } from '../state/types'
 
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
 import { registerCommitMessageProvider } from '../git/commit-message-provider'
+import {
+  gitCommitStaged,
+  gitDiffOf,
+  gitDiscard,
+  gitStage,
+  gitUnstage,
+} from '../git/plugin-git-writes'
 import { registerKeymapLayer } from '../input/keymap/plugin-layer'
 import { registerSettingSection } from '../settings/sections'
 import { settingsStore } from '../settings/settings-store'
 import { appStore, useAppStore } from '../state/app-store'
-import { dispatchGlobal } from '../state/dispatch-ref'
+import { dispatchGlobal, runSideEffectGlobal } from '../state/dispatch-ref'
+import {
+  allPaneIds as allPaneIdsOf,
+  getTreeForTab,
+  isTabLeaf,
+  type LayoutNode,
+} from '../state/layout-tree'
+import { getCurrentProject } from '../state/project-workspaces'
 import { registerPluginSlice } from '../state/reducers/plugin-slices'
 import { registerStatsPage, registerStatsPageRenderer } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
+import { notify as deliverNotification, registerNotificationSink } from './notifications'
+import {
+  closeCommandPane,
+  findCommandPaneTab,
+  getCommandPane,
+  openCommandPane,
+  openCommandPaneIds,
+  registerCommandPane,
+} from './plugin-command-panes'
+import { listPluginCommands, runPluginCommand } from './plugin-commands'
 import { KeyHint, List, Panel, Row, usePluginTheme } from './plugin-kit'
 import { registerPluginModal } from './plugin-modals'
 import { registerPluginPane } from './plugin-panes'
@@ -139,6 +165,34 @@ function describeFiles(files: readonly GitFileEntry[]): PluginGitFile[] {
   }))
 }
 
+/** The directory git writes run in: the project's, which is what the panel polls. */
+function requireRepoPath(): string {
+  const path = getCurrentProject(appStore.getState())?.projectPath
+  if (path === undefined || path === '') throw new Error('no project with a path is open')
+  return path
+}
+
+/** The layout tree as a plugin reads it: `id` says what it is, `kind` what it holds. */
+function describeTree(node: LayoutNode): PluginLayoutNode {
+  if (node.type === 'leaf') {
+    return { id: node.tabId, kind: isTabLeaf(node) ? 'tab' : 'plugin', type: 'leaf' }
+  }
+  return {
+    direction: node.direction,
+    first: describeTree(node.first),
+    ratio: node.ratio,
+    second: describeTree(node.second),
+    type: 'split',
+  }
+}
+
+function activeGroupTree(): LayoutNode | null {
+  const state = appStore.getState()
+  const from = state.activePluginPaneId ?? state.activeTabId
+  if (from == null || from === '') return null
+  return getTreeForTab(state.layoutTrees, state.tabGroupMap, from)
+}
+
 /** Leaving whichever screen the user is on, before opening another. */
 const EXIT_BY_FOCUS: Partial<Record<string, AppAction>> = {
   git: { type: 'exit-git-mode' },
@@ -156,6 +210,9 @@ function buildUi(ctx: PluginContext): PluginUiApi {
   const { id } = ctx
   return {
     git: {
+      commit: async (input) => gitCommitStaged(requireRepoPath(), input),
+      diff: async (path, options) => gitDiffOf(requireRepoPath(), path, options),
+      discard: async (paths) => gitDiscard(requireRepoPath(), paths),
       provideCommitMessage: (provider) => {
         // aimux's own provider yields to any plugin the user installs; see
         // `commit-message-provider.ts` for why the ranks exist.
@@ -174,6 +231,7 @@ function buildUi(ctx: PluginContext): PluginUiApi {
         }
         return own(ctx, registration.dispose)
       },
+      stage: async (paths) => gitStage(requireRepoPath(), paths),
       status: () => {
         const { gitPanel } = appStore.getState()
         return {
@@ -183,8 +241,43 @@ function buildUi(ctx: PluginContext): PluginUiApi {
           files: describeFiles(gitPanel.files),
         }
       },
+      unstage: async (paths) => gitUnstage(requireRepoPath(), paths),
     },
     kit: KIT,
+    layout: {
+      close: (tabId) => {
+        const target = tabId ?? appStore.getState().activeTabId
+        if (target == null || target === '') return
+        dispatchGlobal({ tabId: target, type: 'close-pane' })
+        runSideEffectGlobal({ tabId: target, type: 'close-tab' })
+      },
+      focus: (direction) => {
+        dispatchGlobal({ direction, type: 'focus-pane-direction' })
+      },
+      panes: () => {
+        const tree = activeGroupTree()
+        if (tree !== null) return allPaneIdsOf(tree)
+        const { activeTabId } = appStore.getState()
+        return activeTabId == null || activeTabId === '' ? [] : [activeTabId]
+      },
+      resize: (delta, axis) => {
+        const { activeTabId } = appStore.getState()
+        if (activeTabId == null || activeTabId === '') return
+        dispatchGlobal({ axis, delta, tabId: activeTabId, type: 'resize-pane' })
+      },
+      split: (direction) => {
+        const { activeTabId } = appStore.getState()
+        if (activeTabId == null || activeTabId === '') return
+        runSideEffectGlobal({ direction, sourceTabId: activeTabId, type: 'split-pane' })
+      },
+      swap: (direction) => {
+        dispatchGlobal({ direction, type: 'swap-pane' })
+      },
+      tree: () => {
+        const tree = activeGroupTree()
+        return tree === null ? null : describeTree(tree)
+      },
+    },
     modals: {
       close: () => {
         dispatchGlobal({ type: 'close-modal' })
@@ -211,16 +304,49 @@ function buildUi(ctx: PluginContext): PluginUiApi {
       if (screen === 'terminal') return
       dispatchGlobal(ENTER_BY_SCREEN[screen])
     },
+    notifications: {
+      notify: (notification) => {
+        deliverNotification({ ...notification, kind: 'custom', pluginId: id })
+      },
+      provide: (sink) => {
+        const registration = registerNotificationSink(id, sink)
+        if (!registration.accepted) {
+          ctx.log.warn('notifications are already provided by another plugin', {
+            reason: registration.reason,
+          })
+          return () => {
+            /* the slot was never taken; there is nothing to give back */
+          }
+        }
+        return own(ctx, registration.dispose)
+      },
+    },
     panes: {
       close: (paneId) => {
-        dispatchGlobal({ paneId: qualify(id, paneId), type: 'close-plugin-pane' })
+        const qualified = qualify(id, paneId)
+        if (getCommandPane(qualified) !== undefined || findCommandPaneTab(qualified)) {
+          closeCommandPane(qualified)
+          return
+        }
+        dispatchGlobal({ paneId: qualified, type: 'close-plugin-pane' })
       },
       open: (paneId, direction) => {
+        const qualified = qualify(id, paneId)
+        if (getCommandPane(qualified) !== undefined) {
+          openCommandPane(qualified, direction ?? 'vertical')
+          return
+        }
         dispatchGlobal({
           direction: direction ?? 'vertical',
-          paneId: qualify(id, paneId),
+          paneId: qualified,
           type: 'open-plugin-pane',
         })
+      },
+      openCommandPanes: () => {
+        const prefix = `${id}.`
+        return openCommandPaneIds()
+          .filter((paneId) => paneId.startsWith(prefix))
+          .map((paneId) => paneId.slice(prefix.length))
       },
       register: (pane) =>
         own(
@@ -230,6 +356,18 @@ function buildUi(ctx: PluginContext): PluginUiApi {
             pluginId: id,
             render: () => pane.render() as ReactNode,
             title: pane.title,
+          })
+        ),
+      registerCommand: (pane) =>
+        own(
+          ctx,
+          registerCommandPane({
+            command: pane.command,
+            id: qualify(id, pane.id),
+            pluginId: id,
+            pluginRoot: ctx.paths.root,
+            title: pane.title,
+            ...(pane.cwd === undefined ? {} : { cwd: pane.cwd }),
           })
         ),
     },
@@ -354,14 +492,25 @@ function buildActions(ctx: PluginContext): PluginActionsApi {
       ),
     // The keymap binds `<pluginId>.<verb>`; `k.plugin('acme.thing.open')` is
     // the same string a user writes in their config.
-    register: (verb, handler) =>
+    register: (verb, handler, meta) =>
       own(
         ctx,
-        registerPluginAction(qualify(id, verb), (modeCtx) => {
-          const result = handler(modeCtx)
-          return (result ?? null) as ReturnType<Parameters<typeof registerPluginAction>[1]>
-        })
+        registerPluginAction(
+          qualify(id, verb),
+          (modeCtx) => {
+            const result = handler(modeCtx)
+            return (result ?? null) as ReturnType<Parameters<typeof registerPluginAction>[1]>
+          },
+          meta ?? {}
+        )
       ),
+  }
+}
+
+function buildCommands(): PluginCommandsApi {
+  return {
+    list: () => listPluginCommands(),
+    run: (commandId) => runPluginCommand(commandId),
   }
 }
 
@@ -440,9 +589,11 @@ export function extendUiPluginContext(ctx: PluginContext): void {
     ui: PluginUiApi
     actions: PluginActionsApi
     store: PluginStoreApi
+    commands: PluginCommandsApi
   }
   extended.ui = buildUi(ctx)
   extended.actions = buildActions(ctx)
   extended.store = buildStore(ctx)
+  extended.commands = buildCommands()
   applyContributions(ctx)
 }
