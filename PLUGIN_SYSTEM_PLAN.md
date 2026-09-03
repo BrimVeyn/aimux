@@ -770,3 +770,178 @@ Déjà fait : les quatre en déclarent une (`shifter` cinq vitesses, `sysload`
 `number` avec un plancher, un `boolean`, et rien de secret, ce qui laisse un
 trou à combler : aucun exemple n'a de champ `secret`, et c'est le seul dont le
 rendu peut fuiter.
+
+---
+
+# Phase 8 · Un plugin en un prompt, à chaud
+
+Planifié le 2026-09-03, à partir d'une question qui est la bonne mesure du
+projet et non un cas d'usage parmi d'autres :
+
+> Je lance une session Claude, je lui dis « reproduis le plugin shifter ».
+> Est-ce qu'il va au bout — code, keybinds, placement dans l'interface — sans
+> redémarrer aimux et sans mon aide ?
+
+Réponse aujourd'hui : **non**. Le noyau tient (link à chaud, reload à chaud,
+config à chaud, désinstallation totale), mais tout ce qui _raccorde_ un plugin
+à l'interface passe encore par un fichier que l'humain écrit à la main et par
+un redémarrage. Un agent finit avec du code correct que personne ne voit.
+
+## 8.0 Ce que l'agent peut faire, et où il bute
+
+Vérifié dans le code et sur le profil `dev`, où `aimux-examples.sysload` est
+lié et sa moitié daemon `active`.
+
+| Étape                               | État                                                             |
+| ----------------------------------- | ---------------------------------------------------------------- |
+| échafauder (`plugin new`)           | ✅                                                               |
+| `bun install` dans le scaffold      | ❌ `@brimveyn/aimux-plugin` n'est pas publié (404 npm)           |
+| lier, valider (`link`, `doctor`)    | ✅ `doctor` rend les `registrations` réelles                     |
+| charger dans une TUI qui tourne     | ✅ `link` → daemon `refresh` → broadcast → `runtime.refresh()`   |
+| recharger sur sauvegarde            | ✅ watcher + fibre                                               |
+| lire/écrire sa config               | ✅ `plugin config` / `set` / `unset`                             |
+| **tuile de status bar**             | ✅ auto-rendue — `useStatusBarSegments` dessine tout le registre |
+| **widget de barre**                 | ❌ aucun chemin de placement (8.1)                               |
+| **keybinding**                      | ❌ `aimux.config.ts` + redémarrage (8.2)                         |
+| **ouvrir un pane**                  | ❌ dépend d'un keybinding, donc idem                             |
+| **vérifier que ça s'affiche**       | ❌ rien ne le dit hors de l'écran (8.4)                          |
+| savoir sur quel profil tourne l'app | ❌ deviné par `AIMUX_PROFILE` (8.5)                              |
+
+Les trois trous, dans le détail, parce que chacun a une cause différente :
+
+**T1 — Un widget de barre n'a aucun chemin de placement.**
+`registerBarWidget` appelle `registerWidgetId`, qui rend l'id _dessinable_ ;
+mais une barre ne dessine que ce qui est listé dans `aimux.json`
+`bars[side].widgets`, et rien ne l'y met. Il n'existe pas d'action
+`add-widget` — le réducteur ne connaît que `toggle-widget` et `move-widget`,
+qui opèrent sur un widget _déjà placé_ — et le menu contextuel n'offre que
+`Show` pour un widget placé-mais-caché. `getKnownWidgetIds()` n'a **aucun
+appelant** : c'est le symptôme, la fonction a été écrite pour un menu « ajouter »
+qui n'existe pas. Enfin `aimux.config.ts` n'a pas de champ `bars` du tout, donc
+le snippet des READMEs de `sysload` et `ghstreak` ne fait rien. Constat de
+terrain : `sysload` est lié depuis des jours sur le profil `dev` et son widget
+n'a jamais pu s'afficher.
+
+**T2 — Un keybinding coûte un redémarrage, et un plugin ne peut pas en
+proposer.** `loadUserConfig()` est appelé une fois (`index.tsx`), et
+`app.tsx` fait `setActiveKeymap` + `registerAllModes` dans un `useMemo([])`.
+Le registre de modes est pourtant une `Map` mutable et le keymap actif une
+simple référence : la relecture à chaud est à portée, ce n'est pas un mur
+d'architecture. Côté manifeste, `contributes` n'existe pas — un plugin déclare
+`entries`, `config`, `build`, `commands`, et rien qui touche l'interface.
+
+**T3 — L'agent est aveugle.** `plugin show` donne l'état de la fibre, pas
+celui de l'écran. Aucun moyen de demander « le widget est-il visible », « à
+quoi résout `<leader>+` », ni de déclencher une action de plugin sans clavier
+(`plugin exec` lance les commandes sous-processus du manifeste, pas les
+actions UI). Un agent qui ne peut pas vérifier ne peut pas boucler, et un
+agent qui ne boucle pas rend du code qu'il croit fini.
+
+## 8.1 Décisions
+
+**D1 — `contributes` dans le manifeste : le plugin _propose_, l'utilisateur
+_dispose_.**
+
+```jsonc
+{
+  "contributes": {
+    "bars": [{ "widget": "load", "side": "left", "position": "end", "grow": 30 }],
+    "keymaps": [{ "mode": "navigation", "key": "<leader>+", "action": "up" }],
+  },
+}
+```
+
+Ids non qualifiés, comme partout ailleurs : l'hôte préfixe. C'est ce qui rend
+la tâche de l'agent atteignable — il écrit un fichier, dans le répertoire du
+plugin, qu'il possède déjà.
+
+La précédence est celle qu'on a déjà, avec un cran de plus en bas :
+`contributes ← aimux.json (placement de l'utilisateur) ← aimux.config.ts`. Un
+défaut de plugin ne réécrit jamais un choix humain, et **la décision 7.5 tient :
+ni le CLI ni un plugin n'écrivent `aimux.config.ts`.**
+
+**D2 — Ce qu'un plugin pose porte sa marque.** Une entrée placée par
+`contributes` est persistée avec son origine (`placedBy: "plugin"`). Un unlink
+retire ce que le plugin avait posé et laisse ce que l'utilisateur avait bougé ;
+sans cette marque, la seule alternative honnête serait de ne rien nettoyer.
+Corollaire : une entrée que l'utilisateur a déplacée ou cachée perd la marque —
+elle est devenue sa décision, et un reload ne doit pas la ramener.
+
+**D3 — Une couche de keymap dynamique, pas une relecture du fichier.**
+`registerKeymapLayer(pluginId, modes)` empile des bindings au-dessus du
+`ResolvedKeymapConfig` résolu, reconstruit les handlers des modes touchés et
+republie le keymap actif ; la fibre tient le disposer. Recharger
+`aimux.config.ts` à chaud serait un autre chantier (il exporte des fonctions,
+des thèmes, des snippets) et n'est pas nécessaire ici : le fichier de
+l'utilisateur reste la couche du dessus, lue au démarrage.
+
+**D4 — Le CLI devient l'œil de l'agent, pas une deuxième UI.** On ajoute des
+lectures et _un_ déclencheur, rien qui duplique l'écran de réglages.
+
+**D5 — L'objectif est un eval, pas une impression.** Tant que « reproduis
+shifter » n'est pas une suite qu'on lance, « est-ce que ça marche » restera une
+question d'opinion. La phase se termine sur ce test, pas sur les fonctionnalités.
+
+## 8.2 Chantiers, par ordre de dépendance
+
+**C0 · Publier (débloque tout le reste, ne dépend de rien).**
+`@brimveyn/aimux-plugin` sur npm, et un aimux publié qui embarque le noyau —
+le binaire global actuel (1.23.7) ne connaît pas le groupe `plugin` et part
+lancer la TUI. En attendant, `plugin new` détecte qu'il tourne depuis un
+checkout et écrit une dépendance résolvable (`bun link` ou chemin workspace)
+plutôt qu'un `^0.1.0` qui n'existe pas.
+
+**C1 · Keymap à chaud.** `registerKeymapLayer` + disposer + reconstruction des
+handlers concernés. Tests : deux plugins qui lient la même touche (le dernier
+chargé perd, et le log le dit), unload qui rend la touche, `aimux.config.ts`
+qui gagne toujours.
+
+**C2 · Placement à chaud.** Action `add-widget` (réducteur, persistance,
+bornes de `grow`), plus l'entrée « Add widget → » du menu contextuel qui liste
+enfin `getKnownWidgetIds()` non placés. Le trou de T1 se rebouche là même s'il
+n'y avait pas de plugin.
+
+**C3 · `contributes`.** Validation dans `manifest.ts` (mêmes messages nommés
+par champ que le reste : `contributes.bars[0].side`), application au load par
+la fibre via C1 et C2, marque `placedBy` de D2. `doctor` rend ce que le
+manifeste propose **et** ce que l'hôte en a fait — c'est la même exigence que
+`registrations`.
+
+**C4 · Les yeux du CLI.**
+
+| L'agent veut…                      | Il tape                                      |
+| ---------------------------------- | -------------------------------------------- |
+| voir ce que l'écran montre         | `aimux ui state`                             |
+| savoir à quoi résout une touche    | `aimux keymap resolve '<leader>+'`           |
+| déclencher une action sans clavier | `aimux action run aimux-examples.shifter.up` |
+
+`ui state` : barres, widgets visibles avec leur origine, panes ouverts, mode
+actif, segments de status bar. `keymap resolve` : l'action et d'où vient le
+binding (`config | plugin | défaut`) — c'est le pendant d'`enabledFrom`, qui a
+déjà prouvé son utilité en phase 7. `action run` passe par le daemon jusqu'à la
+moitié UI ; c'est aussi ce qui rend `pulse.open` testable sans toucher un
+clavier.
+
+**C5 · Le profil, deviné correctement.** Un `plugin link` sans `AIMUX_PROFILE`
+regarde quelles instances tournent : une seule → c'est celle-là ; plusieurs →
+refus avec la liste, jamais un lien silencieux dans `default` pendant que la
+TUI tourne en `dev`. Plus `aimux profile list --running`, une ligne pour
+l'agent au début de sa session.
+
+**C6 · Réparer ce qui ment.** Les READMEs de `sysload` et `ghstreak` (le
+snippet `bars:` ne marche pas), le skill (`bun install` qui échoue), et la
+section « Trying one » d'`examples/README.md` qui s'arrête avant l'étape où
+l'on voit quelque chose.
+
+**C7 · L'eval « reproduis shifter ».** Une session non interactive, le prompt
+nu, et des assertions sur l'état final : plugin lié et `active`, tuile visible,
+`<leader>+` résolvant vers son action, `action run` qui change la vitesse, zéro
+redémarrage, zéro intervention. Le critère de fin de phase, et le seul.
+
+## 8.3 Laissé dehors, exprès
+
+Recharger `aimux.config.ts` à chaud (D3) ; un `contributes` qui poserait des
+thèmes ou des réglages d'écran (les surfaces existantes suffisent) ; laisser un
+plugin réserver une touche contre l'utilisateur ; un pilotage d'écran plus large
+que les trois verbes de C4 — le CLI doit rester l'œil de l'agent, pas devenir
+une seconde interface à maintenir.
