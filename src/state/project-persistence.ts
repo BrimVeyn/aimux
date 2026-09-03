@@ -79,8 +79,11 @@ export function serializeProject(state: AppState): ProjectSnapshotV1 {
     // Hidden tabs (the setup runner's PTY) are session-scoped on purpose: the
     // durable record of a setup run is `WorkspaceRecord.setupRanAt`, and keeping
     // them out here is what lets `hidden` stay off the ipc/daemon wire.
+    // A plugin's command pane too: the plugin may be gone by the next launch,
+    // and a tab running `lazygit` with nobody to explain it is worse than
+    // no tab.
     tabs: state.tabs
-      .filter((tab) => tab.hidden !== true)
+      .filter((tab) => tab.hidden !== true && tab.pluginPane === undefined)
       .map((tab) => ({
         assistant: tab.assistant,
         autoRenameStatus: tab.autoRenameStatus,

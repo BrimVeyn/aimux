@@ -49,7 +49,7 @@ export interface UiStateReport {
   activeTabId: string | null
   activePluginPaneId: string | null
   focusMode: string
-  tabs: { id: string; title: string; status: string }[]
+  tabs: { id: string; title: string; status: string; pluginPane?: string }[]
 }
 
 function describeBar(bar: {
@@ -80,7 +80,12 @@ export function describeUiState(): UiStateReport {
     focusMode: state.focusMode,
     mode: deriveModeId(state),
     statusBar: statusBarSegmentIds(),
-    tabs: state.tabs.map((tab) => ({ id: tab.id, status: tab.status, title: tab.title })),
+    tabs: state.tabs.map((tab) => ({
+      id: tab.id,
+      status: tab.status,
+      title: tab.title,
+      ...(tab.pluginPane === undefined ? {} : { pluginPane: tab.pluginPane }),
+    })),
   }
 }
 
