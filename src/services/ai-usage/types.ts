@@ -2,7 +2,13 @@ import type { AIUsageTool } from '@brimveyn/aimux-config'
 
 export type { AIUsageTool }
 
-export type UsageWindowKind = 'session' | 'weekly' | 'sonnet' | 'opus' | 'primary' | 'secondary'
+/**
+ * Identity of a window, and the key it renders under. Well-known values are
+ * `session`, `weekly`, `primary` and `secondary`; per-model weekly ceilings use
+ * the model's own name lowercased (`opus`, `sonnet`, `fable`, …), which the
+ * provider adds to over time, so this stays open rather than a closed union.
+ */
+export type UsageWindowKind = string
 
 export type UsagePaceStage =
   | 'farAhead'
