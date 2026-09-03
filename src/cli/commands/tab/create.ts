@@ -22,7 +22,7 @@ import {
 } from '../../../pty/command-registry'
 import { CliUsageError, SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createProjectWorkspace } from '../workspace/create-core'
+import { createProjectWorkspace, daemonWorkspaceRegistrar } from '../workspace/create-core'
 
 const FALLBACK_COLS = 200
 const FALLBACK_ROWS = 60
@@ -222,7 +222,7 @@ export async function createCliTab(
     createdWorkspace = await createProjectWorkspace({
       base: base ?? 'HEAD',
       branch: branch ?? `aimux/${workspaceName}`,
-      daemon,
+      daemon: daemonWorkspaceRegistrar(daemon),
       name: workspaceName,
       project,
     })
