@@ -311,4 +311,60 @@ describe('plugin RPC — over a socket', () => {
       /unknown plugin control verb/
     )
   })
+
+  /**
+   * `ui:state`, `keymap:resolve` and `action:run` are the only control verbs
+   * the daemon cannot answer: they describe the screen. With nobody attached
+   * the honest answer is "nobody is attached" — not a thirty-second timeout on
+   * a call that will never be replied to, which is what forwarding blindly
+   * would produce.
+   */
+  test('the UI verbs say so when no UI is attached, rather than hanging', async () => {
+    useTempProfile(cleanups)
+    const host = await startDaemonPluginHost({
+      broadcast: () => {},
+      builtins: [],
+      hasUiClient: () => false,
+      userPlugins: [],
+    })
+    cleanups.push(() => void host.stop())
+
+    for (const verb of ['ui:state', 'keymap:resolve', 'action:run']) {
+      const answer = (await host.handleRequest('aimux', verb, {})) as {
+        attached: boolean
+        detail?: string
+      }
+      expect(answer.attached).toBe(false)
+      expect(answer.detail).toContain('no UI attached')
+    }
+  })
+
+  test('a UI verb is forwarded to the UI, and its answer comes back', async () => {
+    useTempProfile(cleanups)
+    const events: { pluginId: string; verb: string; payload?: unknown }[] = []
+    const host = await startDaemonPluginHost({
+      broadcast: (event) => events.push(event),
+      builtins: [],
+      hasUiClient: () => true,
+      userPlugins: [],
+    })
+    cleanups.push(() => void host.stop())
+
+    const pending = host.handleRequest('aimux', 'keymap:resolve', { keys: '<leader>+' })
+    await Bun.sleep(20)
+
+    // It left as an event on the reserved control id, carrying a correlation id
+    // and the payload the CLI typed.
+    const outbound = events.find((event) => event.verb === 'keymap:resolve')
+    expect(outbound?.pluginId).toBe('aimux')
+    const envelope = outbound?.payload as { __call: string; payload: unknown }
+    expect(envelope.payload).toEqual({ keys: '<leader>+' })
+
+    await host.handleRequest('aimux', PLUGIN_RPC_REPLY_VERB, {
+      __call: envelope.__call,
+      ok: true,
+      result: { bound: true, origin: 'plugin' },
+    })
+    expect(await pending).toEqual({ attached: true, bound: true, origin: 'plugin' })
+  })
 })
