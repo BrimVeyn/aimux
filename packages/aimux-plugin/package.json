@@ -28,7 +28,8 @@
   ],
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   },
   "publishConfig": {
     "access": "public"
@@ -37,6 +38,16 @@
     "@types/react": "^19.2.14"
   },
   "peerDependencies": {
+    "@opentui/core": ">=0.1.90",
+    "@opentui/react": ">=0.1.90",
     "react": ">=19"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/react": {
+      "optional": true
+    }
   }
 }

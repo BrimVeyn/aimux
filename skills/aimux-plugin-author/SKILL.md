@@ -128,6 +128,24 @@ await harness.dispose()
 expect(harness.effectCount()).toBe(0) // an unload leaves nothing behind
 ```
 
+For a `ui` half, `harness.ui` records what you registered and drives what you
+read: `harness.ui.registrations.widgets`, `harness.ui.setState({ … })`,
+`harness.ui.setGitStatus(…)`, `harness.ui.askForCommitMessage()`.
+
+That covers what a plugin _registers_. What it _draws_ needs the renderer:
+
+```ts
+import { renderPluginNode } from '@brimveyn/aimux-plugin/testing'
+
+const { frame, dispose } = await renderPluginNode(<MyWidget cols={30} rows={8} />)
+expect(frame).toContain('CPU')
+dispose()
+```
+
+Pass `until: (frame) => frame.includes('…')` for a widget that fills in after
+mount — asserting on the first frame of an async widget is the exact shape of a
+flaky test.
+
 ## References
 
 - `references/api.md` — every export of `@brimveyn/aimux-plugin`, generated
