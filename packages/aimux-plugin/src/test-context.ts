@@ -211,10 +211,12 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
       ui: unknown
       actions: unknown
       store: unknown
+      commands: unknown
     }
     extended.ui = surface.ui
     extended.actions = surface.actions
     extended.store = surface.store
+    extended.commands = surface.commands
   }
 
   options.extend?.(ctx)

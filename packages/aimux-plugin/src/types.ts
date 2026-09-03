@@ -8,7 +8,7 @@ import type {
   PluginWorkspacesApi,
 } from './daemon-api'
 import type { PluginHost, PluginManifest } from './manifest'
-import type { PluginActionsApi, PluginStoreApi, PluginUiApi } from './ui'
+import type { PluginActionsApi, PluginCommandsApi, PluginStoreApi, PluginUiApi } from './ui'
 
 /**
  * Everything a plugin registers hands back one of these. The kernel calls
@@ -122,6 +122,7 @@ export interface UiPluginContext<Slice = unknown> extends PluginContext {
   readonly ui: PluginUiApi
   readonly actions: PluginActionsApi
   readonly store: PluginStoreApi<Slice>
+  readonly commands: PluginCommandsApi
 }
 
 /**

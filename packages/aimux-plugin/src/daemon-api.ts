@@ -109,8 +109,30 @@ export interface PluginProjectsApi {
   get: (projectId: string) => PluginProjectView | undefined
 }
 
+export interface PluginCreateWorkspaceInput {
+  projectId: string
+  name: string
+  /** Defaults to `aimux/<name>`. */
+  branch?: string
+  /** Base ref for the branch. Defaults to `HEAD`. */
+  base?: string
+}
+
 export interface PluginWorkspacesApi {
   list: (projectId: string) => PluginWorkspaceView[]
+  /**
+   * Creates a git worktree and its catalog record — what `aimux workspace
+   * create` does, from inside the daemon. Resolves with the record; rejects
+   * with the same messages the CLI prints, a base ref that does not exist
+   * included.
+   */
+  create: (input: PluginCreateWorkspaceInput) => Promise<PluginWorkspaceView>
+  /**
+   * Removes a worktree and its record. Refuses the primary workspace, and
+   * one with live tabs unless `force` says otherwise — a tab running in a
+   * directory that vanishes is a worse outcome than a rejected call.
+   */
+  remove: (projectId: string, workspaceId: string, options?: { force?: boolean }) => Promise<void>
 }
 
 /**
@@ -128,6 +150,38 @@ export interface PluginMetricsApi {
   counters: (days?: number) => PluginCounterDay[]
 }
 
+/** What aimux knows about the conversation behind a tab. */
+export interface PluginSessionInfo {
+  tabId: string
+  assistant: string
+  /** The vendor's conversation id, when the tab was spawned with one. */
+  sessionId: string | null
+  /** The transcript on disk, when the vendor writes one and it exists yet. */
+  transcriptPath: string | null
+  /** The `--model` the tab was spawned with, when one was given. */
+  model: string | null
+}
+
+/**
+ * Token usage of one conversation, read from its transcript. Cumulative
+ * across the whole session, which is what a token dashboard, a handoff
+ * threshold, or a "you are near the limit" nudge wants.
+ */
+export interface PluginSessionUsage {
+  tabId: string
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  total: number
+  /** Billed assistant messages seen. */
+  turns: number
+  /** Total tokens per model id. */
+  models: Record<string, number>
+  /** ISO time of the last billed message, or null with no usage yet. */
+  lastAt: string | null
+}
+
 export interface PluginAssistantsApi {
   /**
    * Registers a complete assistant: spawn command, status classifier, question
@@ -135,6 +189,19 @@ export interface PluginAssistantsApi {
    * `src/pty/assistant-registry.ts` for the shape.
    */
   register: (definition: unknown) => Disposer
+  /** The conversation behind a tab, or undefined for an unknown tab. */
+  session: (tabId: string) => PluginSessionInfo | undefined
+  /**
+   * Reads the transcript. Zero everywhere for a tab whose assistant writes
+   * none, or has not written one yet; undefined for an unknown tab.
+   */
+  usage: (tabId: string) => Promise<PluginSessionUsage | undefined>
+  /**
+   * Closes the tab and spawns a fresh one resuming the same conversation —
+   * the move after a rate limit, a crashed CLI, or a handoff. Resolves with
+   * the new tab id. Rejects when the tab has no session to resume.
+   */
+  resume: (tabId: string) => Promise<string>
 }
 
 export interface PluginHooksApi {

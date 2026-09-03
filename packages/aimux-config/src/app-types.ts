@@ -315,6 +315,13 @@ export interface TabSession {
    * to `TabSessionSummary` if that ever matters.
    */
   role?: 'setup'
+  /**
+   * The qualified id of the plugin command pane this tab is (`<pluginId>.<paneId>`),
+   * when a plugin's `panes[]` or `registerCommand` spawned it. Session-scoped
+   * like every plugin pane: never persisted, never on the wire, so it comes
+   * back from a restart as a plain terminal tab running the same argv.
+   */
+  pluginPane?: string
 }
 
 export type BarSide = 'left' | 'right'
@@ -1253,6 +1260,11 @@ export type LayoutAction =
   | { type: 'close-pane'; tabId: string }
   | {
       type: 'focus-pane-direction'
+      direction: 'left' | 'right' | 'up' | 'down'
+    }
+  /** Exchanges the pane holding the keyboard with its neighbour. Focus follows it. */
+  | {
+      type: 'swap-pane'
       direction: 'left' | 'right' | 'up' | 'down'
     }
   | {

@@ -1,12 +1,14 @@
 import {
   PLUGIN_API_VERSION,
   type PluginBarContribution,
+  type PluginCommandPaneSpec,
   type PluginCommandSpec,
   type PluginConfigField,
   type PluginContributions,
   type PluginHost,
   type PluginKeymapContribution,
   type PluginManifest,
+  type PluginServiceSpec,
 } from '@brimveyn/aimux-plugin'
 import { join } from 'node:path'
 
@@ -215,6 +217,94 @@ function validateCommands(
   return commands
 }
 
+const SERVICE_RESTART = new Set(['never', 'on-failure', 'always'])
+
+/** Shared by `panes[]` and `services[]`: an id and an argv, or a named issue. */
+function validateArgvEntries(
+  field: string,
+  value: unknown,
+  issues: ManifestIssue[]
+): { at: string; raw: Record<string, unknown>; command: string[] }[] | undefined {
+  if (value === undefined) return undefined
+  if (!Array.isArray(value)) {
+    issues.push({ field, message: 'must be an array of descriptors' })
+    return undefined
+  }
+  const entries: { at: string; raw: Record<string, unknown>; command: string[] }[] = []
+  for (const [index, raw] of value.entries()) {
+    const at = `${field}[${index}]`
+    if (!isRecord(raw)) {
+      issues.push({ field: at, message: 'must be an object' })
+      continue
+    }
+    if (!isNonEmptyString(raw.id)) {
+      issues.push({ field: `${at}.id`, message: 'must be a non-empty string' })
+      continue
+    }
+    if (
+      !Array.isArray(raw.command) ||
+      raw.command.length === 0 ||
+      !raw.command.every(isNonEmptyString)
+    ) {
+      issues.push({
+        field: `${at}.command`,
+        message: 'must be a non-empty array of strings (argv, not a shell string)',
+      })
+      continue
+    }
+    entries.push({ at, command: raw.command as string[], raw })
+  }
+  return entries
+}
+
+/** Panes that host a program — see `PluginCommandPaneSpec`. */
+function validatePanes(
+  value: unknown,
+  issues: ManifestIssue[]
+): PluginCommandPaneSpec[] | undefined {
+  const entries = validateArgvEntries('panes', value, issues)
+  if (entries === undefined) return undefined
+  const panes: PluginCommandPaneSpec[] = []
+  for (const { at, command, raw } of entries) {
+    if (raw.cwd !== undefined && !isNonEmptyString(raw.cwd)) {
+      issues.push({
+        field: `${at}.cwd`,
+        message: 'must be "workspace", "project", "plugin" or an absolute path',
+      })
+      continue
+    }
+    const pane: PluginCommandPaneSpec = { command, id: raw.id as string }
+    if (isNonEmptyString(raw.title)) pane.title = raw.title
+    if (isNonEmptyString(raw.cwd)) pane.cwd = raw.cwd
+    panes.push(pane)
+  }
+  return panes
+}
+
+/** Supervised processes — see `PluginServiceSpec`. */
+function validateServices(
+  value: unknown,
+  issues: ManifestIssue[]
+): PluginServiceSpec[] | undefined {
+  const entries = validateArgvEntries('services', value, issues)
+  if (entries === undefined) return undefined
+  const services: PluginServiceSpec[] = []
+  for (const { at, command, raw } of entries) {
+    if (
+      raw.restart !== undefined &&
+      (typeof raw.restart !== 'string' || !SERVICE_RESTART.has(raw.restart))
+    ) {
+      issues.push({ field: `${at}.restart`, message: 'must be "never", "on-failure" or "always"' })
+      continue
+    }
+    const service: PluginServiceSpec = { command, id: raw.id as string }
+    if (typeof raw.restart === 'string')
+      service.restart = raw.restart as PluginServiceSpec['restart']
+    services.push(service)
+  }
+  return services
+}
+
 /**
  * What the plugin asks the interface for. Every issue names the offending
  * entry — `contributes.bars[0].side` — because this block is written by hand
@@ -355,16 +445,20 @@ export function parseManifest(value: unknown): ManifestResult {
   const config = validateConfigSchema(value.config, issues)
   const build = validateBuild(value.build, issues)
   const commands = validateCommands(value.commands, issues)
+  const panes = validatePanes(value.panes, issues)
+  const services = validateServices(value.services, issues)
   const contributes = validateContributes(value.contributes, issues)
 
   const hasHalf =
     entries !== undefined && (entries.ui !== undefined || entries.daemon !== undefined)
   const hasCommands = commands !== undefined && commands.length > 0
-  if (!hasHalf && !hasCommands) {
+  const hasPanes = panes !== undefined && panes.length > 0
+  const hasServices = services !== undefined && services.length > 0
+  if (!hasHalf && !hasCommands && !hasPanes && !hasServices) {
     issues.push({
       field: 'entries',
       message:
-        'a plugin must contribute something: declare entries.ui, entries.daemon, or commands[]',
+        'a plugin must contribute something: declare entries.ui, entries.daemon, commands[], panes[] or services[]',
     })
   }
 
@@ -382,6 +476,8 @@ export function parseManifest(value: unknown): ManifestResult {
   if (build !== undefined) manifest.build = build
   if (config !== undefined) manifest.config = config
   if (commands !== undefined) manifest.commands = commands
+  if (panes !== undefined) manifest.panes = panes
+  if (services !== undefined) manifest.services = services
   if (contributes !== undefined) manifest.contributes = contributes
 
   return { manifest, ok: true }

@@ -56,10 +56,23 @@ plugin with a broken manifest fails with a field name rather than a stack.
 | `build`           | no       | argv arrays run once at link/install time, e.g. `[["bun","install"]]`       |
 | `config`          | no       | field name → `{ type, label?, description?, default?, required?, secret? }` |
 | `commands`        | no\*     | `{ id, command: argv, title?, contexts? }`                                  |
+| `panes`           | no\*     | `{ id, command: argv, title?, cwd? }` — a program hosted in a pane          |
+| `services`        | no\*     | `{ id, command: argv, restart? }` — a process the daemon keeps alive        |
 | `contributes`     | no       | `bars` and/or `keymaps` — where the widget goes, which key runs the action  |
 
 \* A plugin must contribute _something_: `entries.ui`, `entries.daemon`, or a
-non-empty `commands`. A manifest with none of the three is rejected.
+non-empty `commands`, `panes` or `services`. A manifest with none of them is
+rejected.
+
+`panes[]` puts a program — lazygit, yazi, a binary you ship — in a pane beside
+the agent, with no TypeScript: `cwd` is `workspace` (default), `project`,
+`plugin`, or an absolute path, and `aimux action run` cannot open it but
+`ctx.ui.panes.open(id)` from a UI half can, as can a `contributes.keymaps`
+binding to an action that calls it. `services[]` is a process the daemon
+starts when the plugin is enabled, stops when it is not, and restarts per
+`restart` (`on-failure` by default, `always`, `never`) with a doubling backoff;
+its stdout and stderr land in `aimux plugin log`, and `aimux plugin services`
+shows its state. Both run with the same `AIMUX_*` environment as `commands[]`.
 
 The `id` is the namespace for every registration you make — widget ids, keymap
 modes, RPC verbs, hook paths. The dot is required because an unqualified

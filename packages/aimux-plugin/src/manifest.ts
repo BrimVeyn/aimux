@@ -84,6 +84,34 @@ export interface PluginContributions {
   keymaps?: PluginKeymapContribution[]
 }
 
+/**
+ * A pane that runs a program, declared rather than registered — the manifest
+ * twin of `ctx.ui.panes.registerCommand`. `cwd` reads as it does there.
+ */
+export interface PluginCommandPaneSpec {
+  id: string
+  title?: string
+  /** argv, not a shell string. */
+  command: string[]
+  cwd?: string
+}
+
+/**
+ * A long-running process the daemon supervises: started when the plugin
+ * loads, stopped when it unloads, restarted according to `restart`. A relay,
+ * a watcher, a bridge — anything that is not a command that finishes.
+ *
+ * Runs with the same `AIMUX_*` environment as `commands[]`, so it can call
+ * back through the CLI in any language.
+ */
+export interface PluginServiceSpec {
+  id: string
+  /** argv, not a shell string. */
+  command: string[]
+  /** Default `on-failure`: a clean exit stays down, a crash comes back. */
+  restart?: 'never' | 'on-failure' | 'always'
+}
+
 export interface PluginManifest {
   /** Reverse-DNS-ish, `<vendor>.<name>`; the namespace for every registration. */
   id: string
@@ -100,6 +128,10 @@ export interface PluginManifest {
   build?: string[][]
   config?: Record<string, PluginConfigField>
   commands?: PluginCommandSpec[]
+  /** Panes that host a program. Applied when the UI half loads — or, with no UI entry, at once. */
+  panes?: PluginCommandPaneSpec[]
+  /** Processes the daemon keeps alive for the plugin. */
+  services?: PluginServiceSpec[]
   /**
    * What the plugin asks the interface for: a place for its widget, a key for
    * its action. Applied by the host when the UI half loads, withdrawn when it

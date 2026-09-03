@@ -15,23 +15,50 @@ import type { ActionFn, KeyResult, ModeContext } from './types'
  * action factories a config file calls already are.
  */
 
+/** What a palette shows for an action. */
+export interface PluginActionInfo {
+  /** Qualified `<pluginId>.<verb>`. */
+  name: string
+  title?: string
+  description?: string
+}
+
 /** Qualified `<pluginId>.<verb>` — the id a keymap writes. */
 const handlers = new Map<string, ActionFn>()
+const meta = new Map<string, Omit<PluginActionInfo, 'name'>>()
 
-export function registerPluginAction(name: string, handler: ActionFn): () => void {
+export function registerPluginAction(
+  name: string,
+  handler: ActionFn,
+  info: Omit<PluginActionInfo, 'name'> = {}
+): () => void {
   handlers.set(name, handler)
+  meta.set(name, info)
   return () => {
-    if (handlers.get(name) === handler) handlers.delete(name)
+    if (handlers.get(name) !== handler) return
+    handlers.delete(name)
+    meta.delete(name)
   }
 }
 
 /** Test seam. Never called by the app. */
 export function clearPluginActions(): void {
   handlers.clear()
+  meta.clear()
 }
 
 export function pluginActionNames(): string[] {
   return [...handlers.keys()]
+}
+
+/**
+ * Every registered action with whatever it said about itself. The list a
+ * palette is built from: an action without a title is still listed, under
+ * its verb, because hiding it would make "why is my action not in the
+ * palette" a question with no answer.
+ */
+export function listPluginActions(): PluginActionInfo[] {
+  return [...handlers.keys()].map((name) => ({ name, ...meta.get(name) }))
 }
 
 export function hasPluginAction(name: string): boolean {

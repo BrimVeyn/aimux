@@ -35,7 +35,9 @@ export { isAutoCommitEnabled, setAutoCommitEnabled } from './auto-commit-runtime
 export {
   clearPluginActions,
   hasPluginAction,
+  listPluginActions,
   pluginAction,
+  type PluginActionInfo,
   pluginActionNames,
   registerPluginAction,
 } from './plugin-actions-runtime'
