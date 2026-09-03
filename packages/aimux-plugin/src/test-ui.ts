@@ -84,6 +84,7 @@ const DEFAULT_THEME: PluginThemeSnapshot = { colors: {}, mode: 'dark' }
 const EMPTY_GIT: PluginGitStatus = { ahead: 0, behind: 0, branch: null, files: [] }
 
 const EMPTY_REQUEST: PluginCommitMessageRequest = {
+  assistant: 'claude',
   branch: 'main',
   diff: '',
   files: [],

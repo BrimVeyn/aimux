@@ -111,9 +111,14 @@ Today those are:
 | `aimux.claude`      | Writes aimux's theme and activity hooks into Claude Code's settings |
 | `aimux.ai-usage`    | The Claude/Codex quota tile in the status bar, and its polling      |
 | `aimux.auto-rename` | Names a tab after the first thing you ask its agent                 |
+| `aimux.auto-commit` | Writes the commit message aimux suggests, by asking your assistant  |
 
-All three keep their own settings rows on the settings screen; disabling the
-plugin turns the feature off outright.
+They keep their own settings rows on the settings screen; disabling the plugin
+turns the feature off outright — with one nuance for `aimux.auto-commit`:
+switching it off leaves the trigger and the panel in place and takes away the
+only thing that writes a message, so aimux stops suggesting. Installing a
+plugin that writes commit messages displaces it without your having to switch
+anything off.
 
 ## Configuring one
 

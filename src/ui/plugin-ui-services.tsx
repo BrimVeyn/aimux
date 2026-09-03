@@ -157,7 +157,11 @@ function buildUi(ctx: PluginContext): PluginUiApi {
   return {
     git: {
       provideCommitMessage: (provider) => {
-        const registration = registerCommitMessageProvider(id, provider)
+        // aimux's own provider yields to any plugin the user installs; see
+        // `commit-message-provider.ts` for why the ranks exist.
+        const registration = registerCommitMessageProvider(id, provider, {
+          builtin: id.startsWith('aimux.'),
+        })
         if (!registration.accepted) {
           // Silence here would mean a plugin whose whole purpose never runs,
           // with nothing anywhere saying why.

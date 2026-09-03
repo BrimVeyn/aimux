@@ -199,3 +199,37 @@ describe('ctx.ui.navigate', () => {
     setActiveDispatch(null)
   })
 })
+
+describe('the two ranks', () => {
+  test('a user plugin displaces the built-in, and gives it back on unload', async () => {
+    // aimux's own answer registers at boot, like any other plugin.
+    registerCommitMessageProvider('aimux.auto-commit', () => ({ title: 'from aimux' }), {
+      builtin: true,
+    })
+    expect(getCommitMessageProvider()?.pluginId).toBe('aimux.auto-commit')
+
+    const handle = harness()
+    await handle.apply({
+      apply(context) {
+        const ctx = context as typeof context & { ui: PluginUiApi }
+        ctx.ui.git.provideCommitMessage(() => ({ title: 'from the user' }))
+      },
+    })
+
+    // First-come-first-served would have meant aimux won its own boot race and
+    // no third-party plugin could ever hold the slot.
+    expect(getCommitMessageProvider()?.pluginId).toBe('acme.commits')
+
+    await handle.dispose()
+    expect(getCommitMessageProvider()?.pluginId).toBe('aimux.auto-commit')
+  })
+
+  test('two user plugins is still a refusal', () => {
+    registerCommitMessageProvider('acme.first', () => ({ title: 'first' }))
+    const second = registerCommitMessageProvider('acme.second', () => ({ title: 'second' }))
+
+    expect(second.accepted).toBe(false)
+    expect(second.reason).toContain('acme.first')
+    expect(getCommitMessageProvider()?.pluginId).toBe('acme.first')
+  })
+})

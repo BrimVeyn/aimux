@@ -596,12 +596,33 @@ the IPC and terminal-manager protocols, in the persisted session. Moving it
 into the plugin would have been a protocol migration wearing a plugin
 migration's clothes.
 
+### `auto-commit`, and what was left behind on purpose
+
+Everything that makes auto-commit a _feature_ stayed: when it triggers, the
+working-tree hash that says a suggestion has gone stale, the abort that
+supersedes an in-flight generation, and the panel it appears in. Moving those
+would have meant moving state into a plugin slice and the UI into a plugin
+view — a bigger change than the migration, and one that would have made the git
+pane worse before it made it better.
+
+What moved is the model call: the briefing template, the prompt composition,
+the headless invocation, the parsing. `aimux.auto-commit` holds the
+commit-message slot through the same `ctx.ui.git.provideCommitMessage` a
+third-party plugin uses, with no privileged path — the only way the slot could
+be trusted, since a built-in that cheated would prove nothing about it.
+
+That forced one rule into the slot itself: **ranks**. A built-in registered at
+boot wins a first-come-first-served slot every time, so no plugin a user
+installed could ever hold it. A user's plugin now displaces the built-in and
+hands it back on unload; two user plugins is still a refusal, because between
+equals the message you get would depend on load order.
+
+The driver lost its own model call in the trade: there is no second path any
+more, and a provider that declines means no suggestion this time rather than a
+fallback to something aimux keeps in reserve.
+
 ### Not migrated, and why
 
-- **`auto-commit`** keeps its state in `AppState` and renders through the git
-  pane. Moving it means moving its state into a plugin slice and its UI into a
-  plugin view — a bigger change than the migration, and one that would make the
-  git pane worse before it made it better.
 - **The `setup` widget** is addressable by id in a user's `bars` config. A
   plugin's ids are namespaced by the host, on purpose, so migrating it would
   rename `setup` to `aimux.setup.setup` and silently drop it out of existing

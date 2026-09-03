@@ -76,7 +76,11 @@ describe('the plugins aimux ships', () => {
       expect(status.state).toBe('active')
       expect(status.source).toBe('builtin')
     }
-    expect(statuses.map((status) => status.id).sort()).toEqual(['aimux.ai-usage', 'aimux.claude'])
+    expect(statuses.map((status) => status.id).sort()).toEqual([
+      'aimux.ai-usage',
+      'aimux.auto-commit',
+      'aimux.claude',
+    ])
   })
 
   test('and unloads without leaving anything behind', async () => {
@@ -107,6 +111,6 @@ describe('the plugins aimux ships', () => {
         .knownRecords()
         .map((record) => record.id)
         .sort()
-    ).toEqual(['aimux.ai-usage', 'aimux.auto-rename', 'aimux.claude'])
+    ).toEqual(['aimux.ai-usage', 'aimux.auto-commit', 'aimux.auto-rename', 'aimux.claude'])
   })
 })
