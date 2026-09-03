@@ -32,11 +32,24 @@ interface UsageWindowPayload {
   resets_at?: string
 }
 
+/**
+ * A row of `limits`. Per-model weekly ceilings only exist here: the response
+ * has fixed `seven_day_opus` / `seven_day_sonnet` keys, but a newer model like
+ * Fable never gets one — it shows up as a `weekly_scoped` row naming itself.
+ */
+interface ClaudeLimitPayload {
+  kind?: string
+  percent?: number
+  resets_at?: string | null
+  scope?: { model?: { display_name?: string | null } | null } | null
+}
+
 interface ClaudeUsageResponse {
   five_hour?: UsageWindowPayload
   seven_day?: UsageWindowPayload
   seven_day_sonnet?: UsageWindowPayload
   seven_day_opus?: UsageWindowPayload
+  limits?: ClaudeLimitPayload[]
   extra_usage?: UsageWindowPayload & { spent_usd?: number; limit_usd?: number }
 }
 
@@ -166,6 +179,28 @@ function buildWindow(
   }
 }
 
+/** The per-model weekly ceilings the fixed `seven_day_*` keys do not cover. */
+export function scopedWindows(
+  limits: ClaudeLimitPayload[] | undefined,
+  now: number
+): UsageWindow[] {
+  const out: UsageWindow[] = []
+  for (const limit of limits ?? []) {
+    if (limit.kind !== 'weekly_scoped') continue
+    const name = limit.scope?.model?.display_name
+    if (name == null || name === '') continue
+    const window = buildWindow(
+      name.toLowerCase(),
+      name,
+      { resets_at: limit.resets_at ?? undefined, utilization: limit.percent },
+      SEVEN_DAY_SECONDS,
+      now
+    )
+    if (window) out.push(window)
+  }
+  return out
+}
+
 export async function fetchClaudeUsage(_config: AIUsageToolConfig): Promise<UsageSnapshot> {
   const nowIso = new Date().toISOString()
   const base: UsageSnapshot = {
@@ -224,6 +259,9 @@ export async function fetchClaudeUsage(_config: AIUsageToolConfig): Promise<Usag
     if (opus) windows.push(opus)
     const sonnet = buildWindow('sonnet', 'Sonnet', parsed.seven_day_sonnet, SEVEN_DAY_SECONDS, now)
     if (sonnet) windows.push(sonnet)
+    for (const scoped of scopedWindows(parsed.limits, now)) {
+      if (!windows.some((w) => w.kind === scoped.kind)) windows.push(scoped)
+    }
 
     const summary = session ?? weekly
 
