@@ -8,7 +8,7 @@ import claudePlugin from '../../src/builtin-plugins/claude/ui'
 import { ALL_SETTING_ROWS } from '../../src/settings/sections'
 import { settingsStore } from '../../src/settings/settings-store'
 import { extendUiPluginContext } from '../../src/ui/plugin-ui-services'
-import { setMode } from '../../src/ui/theme-store'
+import { getCurrentMode, setMode } from '../../src/ui/theme-store'
 
 /**
  * The first feature to become a plugin, checked through the plugin API rather
@@ -34,6 +34,8 @@ async function applyPlugin(): Promise<{ dispose: () => Promise<unknown> }> {
   return { dispose: async () => handle.dispose() }
 }
 
+const originalMode = getCurrentMode()
+
 beforeEach(() => {
   tempHome = mkdtempSync(join(tmpdir(), 'aimux-claude-'))
   process.env.CLAUDE_CONFIG_DIR = tempHome
@@ -44,6 +46,12 @@ afterEach(() => {
   if (originalClaudeDir === undefined) delete process.env.CLAUDE_CONFIG_DIR
   else process.env.CLAUDE_CONFIG_DIR = originalClaudeDir
   settingsStore.setState({ values: {} })
+  // The theme mode is a module-global, and `bun test` runs every file in one
+  // process: a test that ends in light mode hands light mode to whatever runs
+  // next. That is exactly how `terminal-snapshot` — which asserts the dark
+  // fallback colours — passed here and failed on CI, where the file order puts
+  // it after this one.
+  setMode(originalMode)
   rmSync(tempHome, { force: true, recursive: true })
 })
 
