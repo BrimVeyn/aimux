@@ -30,7 +30,17 @@ import { clearBarWidgets, getWidgetRenderer } from '../../src/ui/widgets/registr
 
 const EXAMPLES = join(new URL('../..', import.meta.url).pathname, 'examples', 'plugins')
 const TRANSPORT: PluginRpcTransport = { broadcast: () => {}, call: async () => null }
-const NAMES = ['ghstreak', 'pulse', 'shifter', 'sysload'] as const
+const NAMES = [
+  'ghstreak',
+  'journal',
+  'lazygit',
+  'ntfy',
+  'palette',
+  'pulse',
+  'shifter',
+  'sysload',
+  'tokens',
+] as const
 
 let runtime: PluginRuntime | null = null
 const cleanups: (() => void)[] = []
@@ -113,5 +123,7 @@ test('every example plugin loads and draws its first frame', async () => {
   // And the pane, which draws the same kind of row and would have crashed the
   // moment the user opened it rather than at boot.
   expect(rendered.frame).toContain('Open tabs')
+  // The tokens tile, for a tab the daemon half has not answered about yet.
+  expect(rendered.frame).toContain('⌁')
   rendered.dispose()
 })

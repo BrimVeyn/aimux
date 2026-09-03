@@ -1,0 +1,20 @@
+{
+  "id": "aimux-examples.journal",
+  "name": "Journal",
+  "version": "1.0.0",
+  "description": "Everything that happens in aimux, written down by a shell script and read back in a pane",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx"
+  },
+  "services": [
+    {
+      "id": "follow",
+      "command": ["sh", "bin/follow.sh"],
+      "restart": "always"
+    }
+  ],
+  "contributes": {
+    "keymaps": [{ "mode": "navigation", "key": "<leader>j", "action": "toggle" }]
+  }
+}

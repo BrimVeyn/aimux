@@ -1,0 +1,40 @@
+{
+  "id": "aimux-examples.ntfy",
+  "name": "ntfy",
+  "version": "1.0.0",
+  "description": "aimux's notifications on your phone through ntfy, or on your desktop — replacing the sound, not doubling it",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "topic": {
+      "type": "string",
+      "label": "ntfy topic",
+      "description": "The topic to publish to. Empty skips ntfy and uses the desktop only.",
+      "default": ""
+    },
+    "server": {
+      "type": "string",
+      "label": "ntfy server",
+      "description": "Where the topic lives. Self-hosted servers work the same way.",
+      "default": "https://ntfy.sh"
+    },
+    "token": {
+      "type": "string",
+      "label": "Access token",
+      "description": "For a protected topic. Empty publishes anonymously.",
+      "secret": true
+    },
+    "desktop": {
+      "type": "boolean",
+      "label": "Desktop notification",
+      "description": "Also raise one through the OS — `osascript` on macOS, `notify-send` on Linux.",
+      "default": true
+    }
+  },
+  "contributes": {
+    "keymaps": [{ "mode": "navigation", "key": "<leader>n", "action": "test" }]
+  }
+}
