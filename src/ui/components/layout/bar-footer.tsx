@@ -54,7 +54,7 @@ export function BarFooter({ contentWidth }: { contentWidth: number }) {
   return (
     <box flexDirection="column" flexShrink={0}>
       {/* A blank row, not a rule: the footer is set off from the last widget by
-          the gap alone. */}
+          the gap alone — the rule under it is the bottom edge of the bar. */}
       <box height={1} flexShrink={0} />
       {/* Each entry is its own <text>, with a spacer box between them: one string
           holding both would make the whole footer a single click target. */}
