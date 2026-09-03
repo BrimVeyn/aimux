@@ -46,10 +46,6 @@ import { PendingChordOverlay } from './components/overlays/pending-chord-overlay
 import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { SettingsView } from './components/settings/settings-view'
 import { StatsView } from './components/stats/stats-view'
-import {
-  useActiveWorkspaceDeleteLabel,
-  WorkspaceDeletingView,
-} from './components/workspace/workspace-deleting-view'
 import { PluginModalHost } from './plugin-modals'
 import { PluginViewHost } from './plugin-views'
 import { useTheme } from './theme'
@@ -423,7 +419,6 @@ export function RootView({
     activeTabId != null && activeTabId !== ''
       ? getTreeForTab(layoutTrees, tabGroupMap, activeTabId)
       : null
-  const deletingLabel = useActiveWorkspaceDeleteLabel()
   const createProjectFields = getCreateProjectFields(modal)
   const snippetEditorFields = getSnippetEditorFields(modal)
 
@@ -451,10 +446,6 @@ export function RootView({
   // A plugin view replaces the panes the same way, and for the same reason:
   // everything else on screen is identical, so only the centre branches.
   else if (focusMode === 'plugin-view') replacesPanes = <PluginViewHost />
-  // Last: a delete on the workspace you are looking at takes the pane area and
-  // nothing else. Git and settings outrank it — they are where you went, this is
-  // something that happened to where you were.
-  else if (deletingLabel !== '') replacesPanes = <WorkspaceDeletingView label={deletingLabel} />
 
   const center =
     replacesPanes !== null ? (
