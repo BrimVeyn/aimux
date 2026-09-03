@@ -55,6 +55,7 @@ export type {
   PluginNode,
   PluginPane,
   PluginPanesApi,
+  PluginScreen,
   PluginSettingsApi,
   PluginSettingValue,
   PluginStateApi,
@@ -73,6 +74,7 @@ export type {
   PluginView,
   PluginViewsApi,
   PluginWidgetsApi,
+  PluginWidgetSize,
 } from './ui'
 export type {
   DaemonPluginContext,

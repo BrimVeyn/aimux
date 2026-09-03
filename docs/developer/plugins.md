@@ -96,6 +96,21 @@ log. A mode nobody has bound — a plugin pane's own mode — gets a handler bui
 and registered for it, wired through `setKeymapHandlerWiring` so it gets the
 same callbacks `registerAllModes` handed the others.
 
+## Two smaller holes the examples found
+
+**A plugin could not move the user.** `ctx.ui.navigate('git' | 'stats' |
+'settings' | 'terminal')` covers the real need without exposing modal or view
+ids, which would become API the day they were exposed. It leaves the current
+screen before opening another, the way a key press does.
+
+**A widget knew its width and guessed its height.** `render` now receives
+`(contentWidth, { cols, rows })`. A second argument rather than a replacement:
+the width shipped as a number under `apiVersion: 1`, and swapping it would
+break every published plugin to save a parameter. `rows` is _measured_ after
+opentui settles layout — the height is a flex share, so recomputing it here
+would be a second implementation of someone else's arithmetic, correct until it
+was not.
+
 ## Git: a slot, not a subsystem
 
 Git mode is not a point of extension — it is the application: a screen, a diff

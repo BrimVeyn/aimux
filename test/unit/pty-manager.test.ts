@@ -12,6 +12,25 @@ import { PtyManager } from '../../src/pty/pty-manager'
 const BASH = Bun.which('bash')
 
 /**
+ * Waits for a condition instead of for a duration.
+ *
+ * The fixed sleeps below are a bet that a shell prints faster than the number
+ * in the timeout, and on a loaded CI runner that bet loses: this file's own
+ * header already records one test removed for exactly that. `scrollViewport`
+ * was the next one — 150 ms for a shell to print twenty lines, green on every
+ * developer machine and red on a busy runner. Waiting for the output makes the
+ * test say what it is actually waiting for, and fail with that sentence when it
+ * never arrives.
+ */
+async function waitFor(condition: () => boolean, what: string, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error(`timed out after ${timeoutMs}ms waiting for ${what}`)
+    await new Promise<void>((resolve) => setTimeout(resolve, 10))
+  }
+}
+
+/**
  * There is no test here for a command that exits the instant it starts.
  *
  * There was one — `pwd`, asserting on its exit code and then on its rendered
@@ -384,11 +403,14 @@ describe('PtyManager', () => {
     let latestViewportText = ''
     let latestViewportY = 0
 
+    let renders = 0
+
     manager.on('render', (tabId, viewport) => {
       if (tabId !== 'tab-6') {
         return
       }
 
+      renders += 1
       latestViewportText = viewport.lines
         .map((line) => line.spans.map((span) => span.text).join(''))
         .join('\n')
@@ -403,20 +425,23 @@ describe('PtyManager', () => {
       tabId: 'tab-6',
     })
 
-    await new Promise<void>((resolve) => setTimeout(resolve, 50))
+    await waitFor(() => renders > 0, 'the shell to draw its first frame')
     manager.write('tab-6', 'for i in $(seq 1 20); do printf "line-$i\\r\\n"; done\r')
-    await new Promise<void>((resolve) => setTimeout(resolve, 150))
+    // Twenty lines into an eight-row terminal: the last one on screen is what
+    // says the whole loop ran and the earlier ones are in scrollback.
+    await waitFor(() => latestViewportText.includes('line-20'), 'the shell to print twenty lines')
 
     const atBottomViewportY = latestViewportY
     manager.scrollViewport('tab-6', -3)
-    await new Promise<void>((resolve) => setTimeout(resolve, 20))
+    await waitFor(() => latestViewportY < atBottomViewportY, 'the viewport to scroll up')
 
-    expect(latestViewportY).toBeLessThan(atBottomViewportY)
     expect(latestViewportText).toContain('line-11')
 
     manager.scrollViewportToBottom('tab-6')
-    await new Promise<void>((resolve) => setTimeout(resolve, 20))
-    expect(latestViewportY).toBeGreaterThanOrEqual(atBottomViewportY)
+    await waitFor(
+      () => latestViewportY >= atBottomViewportY,
+      'the viewport to return to the bottom'
+    )
 
     manager.disposeAll()
   })
