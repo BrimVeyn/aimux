@@ -632,6 +632,17 @@ async, le chemin de rendu ne l'est pas). Un canal de transformation sync sur le
 bus, ~20 lignes. À faire seulement si quelqu'un veut décorer le viewport ; sinon
 l'overlay est très bien là où il est.
 
+## 6.4 bis · La fente est faite (2026-09-03)
+
+`ctx.ui.git.provideCommitMessage`, plus `ctx.ui.git.status()` et l'événement
+`git:workingTreeChanged`. Une seule fente, premier arrivé ; décliner retombe
+sur la suggestion d'aimux ; et un fournisseur remplace l'appel au modèle **et
+ses prérequis** — auto-commit ne refuse plus faute de `claude` dans le PATH.
+
+Reste la migration d'`auto-commit` elle-même, qui a maintenant où poser son
+état. Et la fente vaut déjà sans elle, ce qui était l'argument pour la faire
+d'abord.
+
 ## 6.6 Ordre proposé
 
 1. Publier le paquet (6.2). Rien d'autre ne compte tant que c'est faux.
