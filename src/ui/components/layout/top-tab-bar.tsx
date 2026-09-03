@@ -16,7 +16,7 @@ import { filterTabsForActiveWorkspace } from '../../../state/project-workspaces'
 import { buildTabEntries, type GroupEntry, type TabEntry } from '../../../state/tab-entries'
 import { useScrollActiveIntoView } from '../../hooks/use-scroll-active-into-view'
 import { moveIdToIdPosition } from '../../project-ordering'
-import { useTheme } from '../../theme'
+import { useTheme, useTransparent } from '../../theme'
 import { FlashLabelBadge } from '../flash/flash-label-badge'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { TabItem } from './sidebar/tab-item'
@@ -199,7 +199,13 @@ function entryTabIds(entry: TabEntry): string[] {
 
 export function TopTabBar({ panesReplaced = false }: TopTabBarProps) {
   const t = useTheme()
-  const headerBg = t.backgroundPanel
+  // Transparent mode paints the tabs, not the strip they sit in: past the last
+  // tab the bar is empty space, and a band of chrome around nothing is exactly
+  // what transparency is for getting rid of. Each cell carries the surface
+  // instead, so a tab still reads as a tab and the tail is a void.
+  const transparent = useTransparent()
+  const headerBg = transparent ? undefined : t.backgroundPanel
+  const idleTabBg = transparent ? t.backgroundPanel : undefined
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
   const bar = useAppStore((s) => s.projectBar)
@@ -396,7 +402,7 @@ export function TopTabBar({ panesReplaced = false }: TopTabBarProps) {
                 onDrag={handleDrag}
                 onDrop={commitDrop}
                 onDragCancel={cancelDrag}
-                backgroundColor={isActive || dragging ? t.backgroundElement : undefined}
+                backgroundColor={isActive || dragging ? t.backgroundElement : idleTabBg}
               >
                 <TabItem
                   id={`top-tab-${tab.id}`}
@@ -420,7 +426,7 @@ export function TopTabBar({ panesReplaced = false }: TopTabBarProps) {
               onDrag={handleDrag}
               onDrop={commitDrop}
               onDragCancel={cancelDrag}
-              backgroundColor={isActive || dragging ? t.backgroundElement : undefined}
+              backgroundColor={isActive || dragging ? t.backgroundElement : idleTabBg}
             >
               <GroupTabItem
                 entry={entry}
@@ -440,6 +446,7 @@ export function TopTabBar({ panesReplaced = false }: TopTabBarProps) {
             flexShrink={0}
             paddingLeft={1}
             paddingRight={1}
+            backgroundColor={idleTabBg}
             onMouseDown={handleNewTab}
           >
             <text fg={t.textMuted} selectable={false}>

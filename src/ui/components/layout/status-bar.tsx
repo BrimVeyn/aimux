@@ -12,7 +12,7 @@ import { useAppStore } from '../../../state/app-store'
 import { useKeymap } from '../../keymap-context'
 import { getStatusBarModel, type IdentitySegment } from '../../status-bar-model'
 import { useStatusBarSegments } from '../../status-bar-segments'
-import { useBaseTheme, useTheme } from '../../theme'
+import { useBaseTheme, useTheme, useTransparent } from '../../theme'
 
 // Powerline-style separator glyph pairs.
 // `right` is rendered between left-anchored tiles (A→B, B→filler).
@@ -101,7 +101,15 @@ function Segments({ segments, t }: { segments: IdentitySegment[]; t: ResolvedTui
   )
 }
 
-function Separator({ bg, fg, glyph }: { bg: string; fg: string; glyph: string }) {
+function Separator({
+  bg,
+  fg,
+  glyph,
+}: {
+  bg: string | undefined
+  fg: string | undefined
+  glyph: string
+}) {
   if (glyph === '') return null
   return (
     <box backgroundColor={bg}>
@@ -118,6 +126,7 @@ export function StatusBar() {
   // render invisible with a transparent chrome color — always use the base
   // (opaque) background token for contrast against those tiles.
   const base = useBaseTheme()
+  const transparent = useTransparent()
   const state = useAppStore((s) => s)
   const config = useKeymap()
   const model = getStatusBarModel(state, config)
@@ -134,10 +143,20 @@ export function StatusBar() {
   // panel to keep a step between tile and filler. Which of the three tones is
   // lighter is a theme's business (catppuccin recesses, aimux lifts); all that
   // matters is that they are three different tokens.
-  const tileB = t.backgroundPanel
-  const tileFiller = t.backgroundElement
+  //
+  // Transparent mode keeps only the right pair. The filler is the middle of the
+  // bar and carries nothing, so it goes; mode and project go with it and read as
+  // labels laid on the terminal rather than tiles laid on a band. Usage and the
+  // version stay chips — they were already the one part of the row that is a
+  // component rather than a stretch of bar — and the mode colour moves from the
+  // fill to the ink so the mode is still said.
+  const tileA = transparent ? undefined : modeColor
+  const tileB = transparent ? undefined : t.backgroundPanel
+  const tileFiller = transparent ? undefined : t.backgroundElement
   const tileX = t.backgroundPanel
   const tileY = modeColor
+  // The caps between two unpainted zones separate nothing.
+  const leftGlyph = transparent ? '' : glyphs.right
 
   const hasB = model.projectSegments.length > 0
   const hasX = segments.length > 0
@@ -153,14 +172,14 @@ export function StatusBar() {
       {/* Row 1 — lualine tiles */}
       <box height={1} flexShrink={0} flexDirection="row" overflow="hidden">
         {/* A: mode */}
-        <box backgroundColor={modeColor} paddingLeft={1} paddingRight={1}>
-          <text fg={base.background} selectable={false}>
+        <box backgroundColor={tileA} paddingLeft={1} paddingRight={1}>
+          <text fg={transparent ? modeColor : base.background} selectable={false}>
             {getModeBadge(state.focusMode)}
           </text>
         </box>
 
         {/* A → B (or A → filler if B empty) */}
-        <Separator glyph={glyphs.right} bg={hasB ? tileB : tileFiller} fg={modeColor} />
+        <Separator glyph={leftGlyph} bg={hasB ? tileB : tileFiller} fg={modeColor} />
 
         {hasB ? (
           <>
@@ -174,7 +193,7 @@ export function StatusBar() {
             >
               <Segments segments={model.projectSegments} t={t} />
             </box>
-            <Separator glyph={glyphs.right} bg={tileFiller} fg={tileB} />
+            <Separator glyph={leftGlyph} bg={tileFiller} fg={tileB} />
           </>
         ) : null}
 

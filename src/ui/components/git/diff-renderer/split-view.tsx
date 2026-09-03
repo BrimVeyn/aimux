@@ -20,7 +20,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../../git-view-controls'
-import { useTheme, useTransparent } from '../../../theme'
+import { useTheme } from '../../../theme'
 import {
   type DiffSegment,
   estimatedSegmentHeight,
@@ -274,7 +274,6 @@ function HalfRow({
 }) {
   const t = useTheme()
   const headerBg = t.diffContextBg
-  const transparent = useTransparent()
   if (cell.type === 'filler') {
     return <box backgroundColor={headerBg} height={height} />
   }
@@ -293,7 +292,7 @@ function HalfRow({
   const num = String(cell.lineNumber).padStart(gw, ' ')
   const lineTokens = tokens[cell.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={height}>
+    <box flexDirection="row" backgroundColor={bg} height={height}>
       <text fg={t.textMuted}>{` ${num} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={cell.content} tokens={lineTokens} />

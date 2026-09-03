@@ -12,7 +12,7 @@ import { usePrStatusStore } from '../../../../state/pr-status-store'
 import { getActiveWorkspace } from '../../../../state/project-workspaces'
 import { toast } from '../../../../state/toast-store'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
-import { type ResolvedTuiTheme, useTheme, useTransparent } from '../../../theme'
+import { type ResolvedTuiTheme, useTheme } from '../../../theme'
 
 function toneColor(tone: PrActionState['tone'], t: ResolvedTuiTheme): string {
   if (tone === 'ok') return t.success
@@ -22,10 +22,7 @@ function toneColor(tone: PrActionState['tone'], t: ResolvedTuiTheme): string {
 
 export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPath: string }) {
   const t = useTheme()
-  // Transparent mode drops every painted background rather than punching a hole
-  // in whatever the terminal is showing behind aimux.
-  const transparent = useTransparent()
-  const bg = transparent ? undefined : t.backgroundElement
+  const bg = t.backgroundElement
   const result = usePrStatusStore((s) => s.result)
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const projects = useAppStore((s) => s.projects)

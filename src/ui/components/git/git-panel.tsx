@@ -18,7 +18,7 @@ import {
   type GitTreeFileRow,
   type GitTreeFolderRow,
 } from '../../../state/git-tree'
-import { getCurrentTheme, useTheme, useTransparent } from '../../theme'
+import { getCurrentTheme, useTheme } from '../../theme'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -179,8 +179,7 @@ const FolderRow = memo(function FolderRow({
   isSelected: boolean
 }) {
   const t = useTheme()
-  const transparent = useTransparent()
-  const bg = isSelected && !transparent ? t.backgroundElement : undefined
+  const bg = isSelected ? t.backgroundElement : undefined
   const onSelect = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }, [row.key])
@@ -226,10 +225,9 @@ const FileRow = memo(function FileRow({
   repoPrefixes: Record<string, string>
 }) {
   const t = useTheme()
-  const transparent = useTransparent()
   const file = row.file
   const hasNumstat = file.added !== null || file.removed !== null
-  const bg = isSelected && !transparent ? t.backgroundElement : undefined
+  const bg = isSelected ? t.backgroundElement : undefined
   const onSelect = useCallback(() => {
     dispatchGlobal({ key: row.key, type: 'git-mode-select-entry-by-key' })
   }, [row.key])
@@ -397,7 +395,6 @@ export const GitPanel = memo(function GitPanel({
   showRemoteTracking = true,
 }: GitPanelProps) {
   const t = useTheme()
-  useTransparent()
   const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
   const isSingleSection = headOffset > 0 || (baseLabel != null && baseLabel !== '')
   const sectionOrder = isSingleSection ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER

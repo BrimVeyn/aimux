@@ -10,8 +10,7 @@ import {
   subscribeContextMenu,
 } from '../../../context-menu/controller'
 import { useSelectionInk } from '../../../selection-ink'
-import { useTheme, useTransparent } from '../../../theme'
-import { fillBorderedBoxInterior } from '../../../transparent-fill'
+import { useTheme } from '../../../theme'
 
 const MenuItem = memo(function MenuItem({
   active,
@@ -62,7 +61,6 @@ export function ContextMenuOverlay() {
   const [menu, setMenu] = useState<ContextMenuState | null>(null)
   const [selected, setSelected] = useState(0)
   const t = useTheme()
-  const transparent = useTransparent()
   const terminalCols = useAppStore((s) => s.layout.terminalCols)
   const terminalRows = useAppStore((s) => s.layout.terminalRows)
 
@@ -135,12 +133,8 @@ export function ContextMenuOverlay() {
         flexDirection="column"
         // backgroundElement, not backgroundPanel: this pops up over the bars as
         // often as over the terminal, and the bars are panel — a panel menu on a
-        // panel bar has no edge. Transparent mode keeps the border for the same
-        // reason the modal does: there is no background there to stand on.
-        border={transparent}
-        borderColor={t.border}
-        backgroundColor={transparent ? 'transparent' : t.backgroundElement}
-        renderAfter={transparent ? fillBorderedBoxInterior : undefined}
+        // panel bar has no edge.
+        backgroundColor={t.backgroundElement}
         onMouseDown={handleMenuMouseDown}
       >
         {menu.items.map(([label, onSelect], index) => (

@@ -17,7 +17,7 @@ import { openUrl } from '../../../../platform/open-url'
 import { usePrStatusStore } from '../../../../state/pr-status-store'
 import { toast } from '../../../../state/toast-store'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
-import { type ResolvedTuiTheme, useTheme, useTransparent } from '../../../theme'
+import { type ResolvedTuiTheme, useTheme } from '../../../theme'
 
 /** Below this the workflow column crowds out the check name. */
 const WORKFLOW_MIN_WIDTH = 34
@@ -195,9 +195,8 @@ export const PrChecksPanel = memo(function PrChecksPanel({
 }) {
   const t = useTheme()
   // A tone apart from the PR state row above, so the two zones read as
-  // separate bands. Transparent mode paints neither.
-  const transparent = useTransparent()
-  const bg = transparent ? undefined : t.backgroundPanel
+  // separate bands.
+  const bg = t.backgroundPanel
   const result = usePrStatusStore((s) => s.result)
   const stale = usePrStatusStore((s) => s.stale)
   const [expanded, setExpanded] = useState(false)
