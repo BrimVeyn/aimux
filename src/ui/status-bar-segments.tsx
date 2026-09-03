@@ -49,6 +49,11 @@ function subscribe(listener: () => void): () => void {
   }
 }
 
+/** Ids only, for introspection — `aimux ui state` answers with these. */
+export function statusBarSegmentIds(): string[] {
+  return snapshot.map((segment) => segment.id)
+}
+
 /** The tiles to draw, in registration order. */
 export function useStatusBarSegments(): readonly StatusBarSegmentDefinition[] {
   return useSyncExternalStore(

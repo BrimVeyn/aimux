@@ -20,8 +20,14 @@ restart.
 
 ```bash
 aimux plugin doctor --help     # confirm this aimux has the plugin kernel
+aimux profile list --running   # which aimux your commands will talk to
 aimux plugin list              # what is already loaded, and from where
 ```
+
+`activeFrom` in the profile output is the one to read: `only-running` means
+nothing was asked and a single live aimux answered for itself, which is the
+normal case for an agent. `default` with several profiles running means your
+commands may not be talking to the aimux the user is looking at.
 
 If `plugin` is not a known group, this aimux predates the plugin kernel — say
 so and stop rather than writing against an API that is not there.
@@ -37,7 +43,30 @@ aimux plugin log acme.thing                  # what it has been saying
 ```
 
 Then edit and save. A linked plugin reloads in place; `aimux plugin reload
-acme.thing` forces it. `aimux plugin doctor .` is the command to run after
+acme.thing` forces it.
+
+Declare what the interface should do with it in the manifest's `contributes`
+block — where the widget goes, which key runs the action — rather than telling
+the user to edit `aimux.config.ts`. See `references/manifest.md`.
+
+Then check your own work from outside, which is the half that used to be
+impossible:
+
+```bash
+aimux ui state                       # is the widget there, and is it drawable?
+aimux keymap resolve '<leader>+'     # bound? and is it yours, or the user's?
+aimux action run acme.thing.open     # fire it without a keyboard, then look again
+```
+
+`ui state` marks each widget `renderable`: placed but not drawable means the
+plugin is disabled, still loading or failed, and the bar skips it — which looks
+exactly like a widget that was never placed. `keymap resolve` reports
+`origin: "config" | "plugin"`: a key the user already bound is refused, not
+taken, and without this a refusal looks the same as a working binding. Never
+report a plugin as done on `doctor` alone — `doctor` says it loads, these say
+it is reachable.
+
+`aimux plugin doctor .` is the command to run after
 every meaningful change — it validates the manifest, imports each half, applies
 it against a sandbox context, and lists what that `apply` registered. A field
 name and a reason come back, not "invalid manifest".
@@ -113,6 +142,8 @@ expect(harness.effectCount()).toBe(0) // an unload leaves nothing behind
 
 - `aimux plugin doctor .` — `ok: true`, and the `registrations` it reports are
   the ones you meant to make.
+- `aimux ui state` and `aimux keymap resolve` — the widget is `renderable`
+  where you meant it, and the key resolves to your plugin.
 - `bun test` in the plugin — including the dispose assertion above.
 - `README.md` — what it does, what it configures, which halves it ships.
 - The manifest's `description` and `config` descriptions are written for

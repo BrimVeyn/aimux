@@ -32,6 +32,7 @@ export {
   type PluginKeymapContribution,
   type PluginManifest,
 } from './manifest'
+export { createTestUiSurface, type TestUiRegistrations, type TestUiSurface } from './test-ui'
 export {
   createTestContext,
   type TestContextHandle,

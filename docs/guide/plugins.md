@@ -164,6 +164,22 @@ aimux plugin set acme.telegram-notify botToken --value-stdin < ~/.token
 It is still stored as plaintext JSON in your profile. That is shoulder-surfing
 hygiene, not encryption.
 
+## Checking what actually happened
+
+```
+aimux ui state                       # bars, widgets, status bar, current mode
+aimux keymap resolve '<leader>+'     # what that key does, and who bound it
+aimux action run acme.thing.open     # fire an action without a keyboard
+aimux profile list --running         # which aimux these are talking to
+```
+
+These answer from the running interface, so they need one attached. `ui state`
+marks each widget `renderable`: a widget listed but not drawable belongs to a
+plugin that is disabled, still loading or failed, and bars skip it — which
+looks exactly like a widget that was never placed. `keymap resolve` says
+`origin: "config"` or `"plugin"`, which is the difference between your binding
+and a plugin's request for the same key.
+
 ## When something is wrong
 
 ```

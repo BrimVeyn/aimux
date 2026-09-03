@@ -12,13 +12,16 @@ import { listExecCommands, runExecCommand } from '../plugins/exec-adapter'
 import { PluginRuntime } from '../plugins/loader'
 import {
   isReplyEnvelope,
+  PLUGIN_CONTROL_ACTION_RUN,
   PLUGIN_CONTROL_CLI_RUN,
   PLUGIN_CONTROL_EXEC_LIST,
   PLUGIN_CONTROL_EXEC_RUN,
   PLUGIN_CONTROL_ID,
+  PLUGIN_CONTROL_KEYMAP_RESOLVE,
   PLUGIN_CONTROL_LIST,
   PLUGIN_CONTROL_REFRESH,
   PLUGIN_CONTROL_RELOAD,
+  PLUGIN_CONTROL_UI_STATE,
   PLUGIN_RPC_REPLY_VERB,
 } from '../plugins/rpc-envelope'
 import { type DaemonEventName, onDaemonEvent } from './daemon-events'
@@ -229,6 +232,19 @@ export async function startDaemonPluginHost(
         return {
           result: await command.run(request.args ?? { flags: {}, positionals: [] }),
         }
+      }
+      case PLUGIN_CONTROL_UI_STATE:
+      case PLUGIN_CONTROL_KEYMAP_RESOLVE:
+      case PLUGIN_CONTROL_ACTION_RUN: {
+        // Only the UI knows any of this. Forwarded rather than answered, and a
+        // missing UI is an answer — `attached: false` — not a timeout: a CLI
+        // that hangs for thirty seconds because nobody is looking at aimux is
+        // worse than one that says so.
+        if (!options.hasUiClient()) {
+          return { attached: false, detail: 'no UI attached — is aimux running on this profile?' }
+        }
+        const answer = await transport.call(PLUGIN_CONTROL_ID, verb, payload)
+        return { attached: true, ...(answer as Record<string, unknown>) }
       }
       case PLUGIN_CONTROL_LIST:
         return {

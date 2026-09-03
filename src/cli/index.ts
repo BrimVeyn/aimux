@@ -2,6 +2,7 @@ import type { DaemonClient } from './client/daemon-client'
 import type { CliContext } from './context'
 
 import { readPluginCliSidecar } from '../plugins/cli-commands'
+import { resolveAmbientProfile } from '../profile-detect'
 import { connectToDaemon, DaemonUnreachableError } from './client/bootstrap'
 import { listProjects, resolveProjectWithOrigin } from './client/project-resolver'
 import { runPluginCliCommand } from './commands/plugin/shared'
@@ -236,6 +237,20 @@ export async function runCli(argv: readonly string[]): Promise<number> {
     printHelp()
     return EXIT_USAGE
   }
+
+  // Which aimux is this command for? Nothing asked, so the answer is what is
+  // running — see `src/profile-detect.ts`. Set on the environment rather than
+  // threaded through, because every path helper downstream reads it there, and
+  // half of them run before any command does.
+  const profile = resolveAmbientProfile()
+  if (profile.from === 'ambiguous') {
+    writeError(
+      `several aimux profiles are running (${profile.running.join(', ')}) and none of them is ` +
+        '"default": set AIMUX_PROFILE to say which one you mean'
+    )
+    return EXIT_USAGE
+  }
+  if (profile.from === 'only-running') process.env.AIMUX_PROFILE = profile.profile
 
   const command = resolveCommand(group, verb) ?? resolvePluginCommand(group, verb)
   if (!command) {

@@ -1,0 +1,11 @@
+{
+  "id": "aimux-test.gearbox",
+  "name": "Gearbox",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "entries": { "ui": "./ui.ts" },
+  "contributes": {
+    "bars": [{ "widget": "gear", "side": "right", "grow": 30 }],
+    "keymaps": [{ "mode": "navigation", "key": "<leader>+", "action": "up" }]
+  }
+}

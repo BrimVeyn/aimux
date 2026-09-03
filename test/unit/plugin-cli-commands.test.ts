@@ -112,11 +112,13 @@ describe('completion with plugin commands', () => {
     { group: 'acme', pluginId: 'acme.thing', summary: 'Stop the robot', verb: 'stop' },
   ]
 
-  test('the plugin group is offered at the top level', () => {
+  test('the plugin group is offered at the top level, beside the built-in ones', () => {
     const plan = planCompletion(['aimux', 'ac'], 1, specs)
     expect(plan.kind).toBe('candidates')
     if (plan.kind !== 'candidates') return
-    expect(plan.candidates.map((candidate) => candidate.value)).toEqual(['acme'])
+    // `action` is aimux's own group; a plugin's sits next to it rather than
+    // in a section of its own, which is the whole point of the merge.
+    expect(plan.candidates.map((candidate) => candidate.value)).toEqual(['action', 'acme'])
   })
 
   test('its verbs are offered inside the group', () => {

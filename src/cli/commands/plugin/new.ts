@@ -127,6 +127,12 @@ echo "hello from ${id} (\\$AIMUX_PLUGIN_ROOT)"
 function testFile(id: string, shapes: { ui: boolean; daemon: boolean }): string {
   const half = shapes.ui ? 'ui' : 'daemon'
   const host = shapes.ui ? 'ui' : 'daemon'
+  const registered = shapes.ui
+    ? `
+    // What it registered, as the host recorded it.
+    expect(harness.ui?.registrations.widgets).toEqual(['panel'])
+`
+    : ''
   return `import { createTestContext } from '@brimveyn/aimux-plugin'
 import { describe, expect, test } from 'bun:test'
 
@@ -142,8 +148,7 @@ describe('${id}', () => {
     const harness = createTestContext({ host: '${host}', id: '${id}' })
 
     await harness.apply(plugin)
-    expect(harness.effectCount()).toBeGreaterThanOrEqual(0)
-
+${registered}
     // The property everything rests on: an unload leaves nothing behind.
     await harness.dispose()
     expect(harness.effectCount()).toBe(0)

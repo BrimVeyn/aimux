@@ -95,7 +95,7 @@ export function registerKeymapLayer(
 
     // The action is resolved on every press, not here: the plugin's UI half
     // registers the verb during its own `apply`, which may be after this.
-    const entry: TrieBinding = { group: pluginId, result: pluginAction(binding.action) }
+    const entry: TrieBinding = { group: pluginId, pluginId, result: pluginAction(binding.action) }
     handler.trie.insert(sequence, entry)
     inserted.push({ binding: entry, sequence, trie: handler.trie })
     applied.push(binding)
