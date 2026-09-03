@@ -43,8 +43,14 @@
         "@types/react": "^19.2.14",
       },
       "peerDependencies": {
+        "@opentui/core": ">=0.1.90",
+        "@opentui/react": ">=0.1.90",
         "react": ">=19",
       },
+      "optionalPeers": [
+        "@opentui/core",
+        "@opentui/react",
+      ],
     },
   },
   "packages": {

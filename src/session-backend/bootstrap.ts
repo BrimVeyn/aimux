@@ -272,6 +272,27 @@ async function stopTerminalManager(): Promise<void> {
   removeTerminalManagerSocketIfExists()
 }
 
+/**
+ * Does the live terminal-manager speak a manager protocol this build refuses?
+ *
+ * The manager protocol can break while the IPC wire stays compatible: a fix
+ * that lives inside the TM process raises `MANAGER_PROTOCOL_MIN_VERSION`
+ * without touching `IPC_PROTOCOL_MIN_VERSION`, which the additive contract
+ * (src/ipc/README.md) deliberately leaves alone for a field-only change. Up to
+ * v1.26.2 the restart gate read the IPC verdict alone, so such a release
+ * reattached to the old TM and shipped silently broken — every manager bump
+ * before it only ever forced a restart as a side effect of an IPC bump landing
+ * in the same commit.
+ *
+ * `undefined` is not stale: the daemon has no TM yet (cold start) or predates
+ * the field, and there is nothing to kill.
+ */
+export function isTerminalManagerStale(managerSelectedVersion: number | undefined): boolean {
+  return (
+    managerSelectedVersion !== undefined && managerSelectedVersion < MANAGER_PROTOCOL_MIN_VERSION
+  )
+}
+
 export async function createSessionBackend(opts?: {
   onBreakingUpdateRequired?: () => Promise<void>
   autoRenameConfig?: AutoRenameConfigSnapshot
@@ -296,16 +317,21 @@ export async function createSessionBackend(opts?: {
   }
 
   const handshake = await probeDaemonProtocolCompatibility(socketPath)
+  const managerStale = isTerminalManagerStale(handshake.managerSelectedVersion)
   logDebug('backend.create.handshake', {
     compatible: handshake.compatible,
     error: handshake.error ?? null,
+    managerSelectedVersion: handshake.managerSelectedVersion ?? null,
+    managerStale,
     processVersion: handshake.processVersion ?? null,
     selectedVersion: handshake.selectedVersion ?? null,
     socketPath,
   })
-  if (!handshake.compatible) {
+  if (!handshake.compatible || managerStale) {
     logDebug('backend.create.restartForHandshake', {
-      error: handshake.error ?? 'incompatible daemon handshake',
+      error:
+        handshake.error ??
+        (managerStale ? 'stale terminal-manager' : 'incompatible daemon handshake'),
       socketPath,
     })
     // Ring 3: prefer hot-reexec over the legacy stopTM+restart path when

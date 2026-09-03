@@ -4,6 +4,7 @@ import { createServer, type Socket } from 'node:net'
 import { dirname } from 'node:path'
 
 import { getIpcDaemonSocketPath } from '../../src/daemon/runtime-paths'
+import { MANAGER_PROTOCOL_MIN_VERSION } from '../../src/ipc/manager-protocol'
 import {
   type ClientRequest,
   encodeMessage,
@@ -11,7 +12,10 @@ import {
   MessageDecoder,
   type ServerResponse,
 } from '../../src/ipc/protocol'
-import { probeDaemonProtocolCompatibility } from '../../src/session-backend/bootstrap'
+import {
+  isTerminalManagerStale,
+  probeDaemonProtocolCompatibility,
+} from '../../src/session-backend/bootstrap'
 
 describe('project backend bootstrap handshake', () => {
   const originalRuntimeDir = process.env.XDG_RUNTIME_DIR
@@ -171,5 +175,20 @@ describe('project backend bootstrap handshake', () => {
         })
       })
     }
+  })
+})
+
+describe('stale terminal-manager detection', () => {
+  test('a TM below MIN is stale — the IPC wire can still be compatible', () => {
+    expect(isTerminalManagerStale(MANAGER_PROTOCOL_MIN_VERSION - 1)).toBe(true)
+  })
+
+  test('a TM at or above MIN is not stale', () => {
+    expect(isTerminalManagerStale(MANAGER_PROTOCOL_MIN_VERSION)).toBe(false)
+    expect(isTerminalManagerStale(MANAGER_PROTOCOL_MIN_VERSION + 1)).toBe(false)
+  })
+
+  test('no reported version is not stale — cold start, no TM to kill', () => {
+    expect(isTerminalManagerStale(undefined)).toBe(false)
   })
 })
