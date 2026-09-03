@@ -1,5 +1,6 @@
 import type { ResolvedTuiTheme } from '@brimveyn/aimux-config'
-import type { ReactNode } from 'react'
+
+import { isValidElement, type ReactNode } from 'react'
 
 import { ListItem } from './components/primitives/list-item'
 import { Surface } from './components/primitives/surface'
@@ -27,6 +28,29 @@ import { useTheme } from './theme'
  */
 export function usePluginTheme(): ResolvedTuiTheme {
   return useTheme()
+}
+
+/**
+ * Whether a node belongs *inside* a `<text>` or *instead of* one.
+ *
+ * opentui's text node takes strings, spans and styled text and nothing else: a
+ * `<text>` nested in a `<text>` throws at mount rather than merely drawing
+ * wrong, and it takes the whole screen down with it. The kit's slots are
+ * `ReactNode` on purpose — a row's subject is sometimes a word and sometimes a
+ * glyph the caller has already coloured — so the kit is the one that has to
+ * tell them apart. A word gets the slot's colour; anything that paints itself
+ * is placed exactly as it is.
+ */
+function isInline(node: ReactNode): boolean {
+  if (node === null || node === undefined || typeof node === 'boolean') return true
+  if (typeof node === 'string' || typeof node === 'number') return true
+  if (Array.isArray(node)) return node.every((child) => isInline(child as ReactNode))
+  return isValidElement(node) && node.type === 'span'
+}
+
+/** The slot's own colour on inline content, and hands off anything else. */
+function paint(node: ReactNode, fg: string): ReactNode {
+  return isInline(node) ? <text fg={fg}>{node}</text> : node
 }
 
 export interface PanelProps {
@@ -76,10 +100,8 @@ export function Row({ dim = false, label, value }: RowProps): ReactNode {
   const t = usePluginTheme()
   return (
     <box flexDirection="row" paddingLeft={1} paddingRight={1}>
-      <box flexGrow={1}>
-        <text fg={dim ? t.textMuted : t.text}>{label}</text>
-      </box>
-      {value === undefined ? null : <text fg={t.textMuted}>{value}</text>}
+      <box flexGrow={1}>{paint(label, dim ? t.textMuted : t.text)}</box>
+      {value === undefined ? null : paint(value, t.textMuted)}
     </box>
   )
 }
@@ -112,7 +134,7 @@ export function List<T>({
 }: ListProps<T>): ReactNode {
   const t = usePluginTheme()
   if (items.length === 0) {
-    return empty === undefined ? null : <text fg={t.textMuted}>{empty}</text>
+    return empty === undefined ? null : paint(empty, t.textMuted)
   }
   return (
     <box flexDirection="column">
