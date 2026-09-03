@@ -82,7 +82,17 @@ export function registerKeymapLayer(
   const inserted: { trie: KeyTrie; sequence: KeyChord[]; binding: TrieBinding }[] = []
 
   for (const binding of bindings) {
-    const sequence = parseKeyNotation(binding.keys, leader)
+    // `parseKeyNotation` throws on notation it cannot read — a malformed chord,
+    // or `<leader>` on a keymap that defines no leader. That is right for a
+    // config file the user is editing and wrong here: a manifest is a *request*,
+    // and one bad key in it must cost that key, not the plugin. Refused is the
+    // outcome this whole loop already knows how to report.
+    let sequence: KeyChord[] = []
+    try {
+      sequence = parseKeyNotation(binding.keys, leader)
+    } catch {
+      sequence = []
+    }
     const handler = sequence.length === 0 ? null : handlerFor(binding.mode as ModeId)
     if (handler === null) {
       refused.push({ binding, reason: 'unparseable' })
