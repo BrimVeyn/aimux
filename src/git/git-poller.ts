@@ -2,8 +2,10 @@ import { useEffect } from 'react'
 
 import type { DiscoveredRepo, GitFileEntry, GitRefreshPayload } from '../state/types'
 
+import { workingTreeHash } from '../auto-commit/working-tree-hash'
 import { useAppStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
+import { emitUiPluginEvent } from '../ui/plugin-events-ref'
 import { collectGitStatus, type GitCollectResult } from './git-status'
 
 const BASE_INTERVAL_MS = 1000
@@ -71,6 +73,55 @@ async function collectAggregated(
   return { kind: 'ok', payload }
 }
 
+/** The event name a plugin listens for with `ctx.on(...)`. */
+export const GIT_WORKING_TREE_CHANGED = 'git:workingTreeChanged'
+
+export interface WorkingTreeChangedEvent {
+  repoRoot: string
+  branch: string | null
+  ahead: number
+  behind: number
+  files: {
+    path: string
+    status: string
+    section: string
+    added: number | null
+    removed: number | null
+  }[]
+}
+
+/**
+ * The event for a poll, or null when the tree has not moved.
+ *
+ * The poll runs every few seconds whether or not anything changed, and a plugin
+ * woken on every tick is a plugin nobody keeps installed — so the hash decides,
+ * and it is the same hash auto-commit uses to know its suggestion went stale.
+ */
+export function workingTreeChange(
+  payload: GitRefreshPayload,
+  repoRoot: string,
+  lastHash: string
+): { hash: string; event: WorkingTreeChangedEvent } | null {
+  const hash = workingTreeHash(payload)
+  if (hash === lastHash) return null
+  return {
+    event: {
+      ahead: payload.ahead,
+      behind: payload.behind,
+      branch: payload.branch,
+      files: payload.files.map((file) => ({
+        added: file.added,
+        path: file.path,
+        removed: file.removed,
+        section: file.section,
+        status: file.status,
+      })),
+      repoRoot,
+    },
+    hash,
+  }
+}
+
 export function useGitPanelPolling({
   compareRef,
   enabled,
@@ -89,6 +140,9 @@ export function useGitPanelPolling({
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | null = null
     let delay = BASE_INTERVAL_MS
+    // Per-effect, so switching project re-announces the tree rather than
+    // staying silent because the previous one happened to hash the same.
+    let lastHash = ''
 
     const schedule = () => {
       if (cancelled) return
@@ -107,6 +161,11 @@ export function useGitPanelPolling({
             ? { ...result.payload, files: tagFiles(result.payload.files, projectPath) }
             : result.payload
         dispatchGlobal({ payload, type: 'git-refresh-success' })
+        const moved = workingTreeChange(payload, projectPath, lastHash)
+        if (moved !== null) {
+          lastHash = moved.hash
+          emitUiPluginEvent(GIT_WORKING_TREE_CHANGED, moved.event)
+        }
         delay = BASE_INTERVAL_MS
       } else if (result.kind === 'out-of-range') {
         dispatchGlobal({ offset: result.maxOffset, type: 'git-mode-set-head-offset' })

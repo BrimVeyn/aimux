@@ -96,6 +96,53 @@ log. A mode nobody has bound — a plugin pane's own mode — gets a handler bui
 and registered for it, wired through `setKeymapHandlerWiring` so it gets the
 same callbacks `registerAllModes` handed the others.
 
+## Git: a slot, not a subsystem
+
+Git mode is not a point of extension — it is the application: a screen, a diff
+renderer, a command queue, a PR panel, ~40 files. Turning it into a plugin
+would make the plugin API aimux's internal API, which is the one thing
+`apiVersion: 1` promises not to be.
+
+What is worth opening is the single decision inside it with no right answer:
+the words of the commit.
+
+```ts
+ctx.ui.git.provideCommitMessage(async (request, signal) => {
+  // request: { projectId, repoRoot, branch, diff, recentCommits, files, sessionTail? }
+  return { title: 'feat: …', body: '…' } // or null to decline
+})
+```
+
+aimux keeps the trigger, the working-tree hash, the abort and the panel; the
+plugin answers one question. Three rules make it safe to hand over:
+
+- **One slot, first registration wins.** A message that depends on load order
+  is worse than no message, so the second plugin is refused and told why in its
+  own log.
+- **Declining is not failing.** `null` — or a throw, which is logged against
+  the plugin — falls back to aimux's own suggestion rather than leaving the
+  user with nothing.
+- **A provider replaces the headless model call, including its prerequisites.**
+  With one registered, auto-commit no longer refuses because `claude` is
+  missing from PATH: a machine without it is exactly where a plugin writing
+  commit messages is most useful.
+
+Alongside it, two read-only pieces for anything that reacts to the repository:
+
+- `ctx.ui.git.status()` — the panel's last refresh, narrowed to
+  `{ branch, ahead, behind, files }`. A snapshot of aimux's poll, not a fresh
+  `git status`: it is what the user is looking at, and it is empty until a
+  project with a path is open.
+- `git:workingTreeChanged` — emitted only when the tree actually moved. The
+  poll runs every few seconds; a plugin woken on every tick is a plugin nobody
+  keeps installed, so the decision uses the same working-tree hash auto-commit
+  uses to know its suggestion went stale.
+
+The UI's own events reach plugins through `src/ui/plugin-events-ref.ts`: the
+host publishes one emitter, and a call site emits without importing the kernel
+— the same shape as `dispatchGlobal`. The daemon needs no such thing, because
+everything it emits already passes through one place.
+
 ## Locations
 
 All per-profile, like the sockets — the `dev` profile has its own plugins.

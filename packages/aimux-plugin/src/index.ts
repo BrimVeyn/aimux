@@ -43,7 +43,12 @@ export {
 export type {
   PluginActionsApi,
   PluginBarWidget,
+  PluginCommitMessage,
+  PluginCommitMessageRequest,
   PluginComponent,
+  PluginGitApi,
+  PluginGitFile,
+  PluginGitStatus,
   PluginKit,
   PluginModal,
   PluginModalsApi,

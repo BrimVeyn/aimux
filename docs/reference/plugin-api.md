@@ -638,7 +638,79 @@ export interface PluginKit {
 ```
 
 ```ts
+/** One changed file, as the git panel sees it. */
+export interface PluginGitFile {
+  path: string
+  /** Porcelain-ish status: `modified`, `new`, `deleted`, `renamed`, … */
+  status: string
+  /** Which half of the panel it sits in — staged or not. */
+  section: string
+  added: number | null
+  removed: number | null
+}
+```
+
+```ts
+/**
+ * The working tree as the panel last saw it. A snapshot of aimux's poll, not a
+ * fresh `git status`: it is what the user is looking at, which is the point,
+ * and it is empty until a project with a path is open.
+ */
+export interface PluginGitStatus {
+  branch: string | null
+  ahead: number
+  behind: number
+  files: PluginGitFile[]
+}
+```
+
+```ts
+/** Everything aimux gathered before asking for a commit message. */
+export interface PluginCommitMessageRequest {
+  projectId: string
+  repoRoot: string
+  branch: string
+  /** Staged diff when anything is staged, the working-tree diff otherwise. */
+  diff: string
+  /** `git log --oneline`, for house style rather than for content. */
+  recentCommits: string
+  files: PluginGitFile[]
+  /** The tail of what the agent in the tab was doing, when there is one. */
+  sessionTail?: string
+}
+```
+
+```ts
+export interface PluginCommitMessage {
+  title: string
+  body?: string
+}
+```
+
+```ts
+export interface PluginGitApi {
+  /** The panel's last refresh. */
+  status: () => PluginGitStatus
+  /**
+   * Answers "what should this commit say", replacing the headless model call
+   * aimux would otherwise make. Return `null` to decline this one — aimux falls
+   * back to its own suggestion rather than leaving the user with nothing.
+   *
+   * One plugin at a time: the second to ask is refused, and told so in its log,
+   * because a message that depends on load order is worse than no message.
+   */
+  provideCommitMessage: (
+    provider: (
+      request: PluginCommitMessageRequest,
+      signal: AbortSignal
+    ) => Promise<PluginCommitMessage | null> | PluginCommitMessage | null
+  ) => Disposer
+}
+```
+
+```ts
 export interface PluginUiApi {
+  git: PluginGitApi
   widgets: PluginWidgetsApi
   views: PluginViewsApi
   modals: PluginModalsApi
