@@ -3,15 +3,25 @@
 Five gears for the model the active assistant is running on, and a status-bar
 tile showing which one you are in.
 
+Its manifest asks for the two keys it needs, so linking it is enough:
+
+```jsonc
+"contributes": {
+  "keymaps": [
+    { "mode": "navigation", "key": "<leader>+", "action": "up" },
+    { "mode": "navigation", "key": "<leader>-", "action": "down" }
+  ]
+}
+```
+
+A key you have already bound is never taken — the plugin's request is refused
+and says so in `aimux plugin log`. The five gears are bindable the same way,
+from the manifest or from your own config:
+
 ```ts
-// aimux.config.ts
+// aimux.config.ts — yours outranks the manifest, always
 keymaps: (k) =>
-  k.mode('navigation', (m) =>
-    m
-      .map('<leader>+', k.plugin('aimux-examples.shifter.up'))
-      .map('<leader>-', k.plugin('aimux-examples.shifter.down'))
-      .map('<leader>3', k.plugin('aimux-examples.shifter.gear3'))
-  )
+  k.mode('navigation', (m) => m.map('<leader>3', k.plugin('aimux-examples.shifter.gear3')))
 ```
 
 ## What it demonstrates

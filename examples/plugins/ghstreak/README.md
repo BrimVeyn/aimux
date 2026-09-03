@@ -2,12 +2,10 @@
 
 A year of commits as a grid, in a bar widget.
 
-```ts
-bars: {
-  left: {
-    widgets: ['projects', 'aimux-examples.ghstreak.commits']
-  }
-}
+Placed by its own manifest — link it and it is in the left bar:
+
+```jsonc
+"contributes": { "bars": [{ "widget": "commits", "side": "left" }] }
 ```
 
 ## What it demonstrates

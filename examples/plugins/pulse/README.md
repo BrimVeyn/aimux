@@ -2,14 +2,16 @@
 
 A pane beside your agent, showing what aimux knows about its own use.
 
-```ts
-// aimux.config.ts
-keymaps: (k) =>
-  k.mode('navigation', (m) =>
-    m
-      .map('<leader>p', k.plugin('aimux-examples.pulse.open'))
-      .map('<leader>P', k.plugin('aimux-examples.pulse.close'))
-  )
+`<leader>p` opens it, `q` closes it from inside — both asked for by the
+manifest, so linking the plugin is the whole setup:
+
+```jsonc
+"contributes": {
+  "keymaps": [
+    { "mode": "navigation", "key": "<leader>p", "action": "open" },
+    { "mode": "plugin.pane.aimux-examples.pulse.stats", "key": "q", "action": "close" }
+  ]
+}
 ```
 
 ## What it demonstrates
@@ -41,11 +43,6 @@ this plugin does not change that — it reads what is already on disk.
 Opening does not move the keyboard: `<leader>p` puts the pane beside your
 terminal and the terminal keeps the cursor. Walk into it with the ordinary
 pane-navigation keys, and it takes the keys — its border lights up. Its own
-bindings live in its own mode:
-
-```ts
-keymaps: (k) =>
-  k.mode('plugin.pane.aimux-examples.pulse.stats', (m) =>
-    m.map('q', k.plugin('aimux-examples.pulse.close'))
-  )
-```
+bindings live in its own mode, `plugin.pane.<qualified pane id>`, which is the
+second entry in the manifest block above — a mode nobody had bound before the
+plugin existed, and one the host creates for it.

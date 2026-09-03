@@ -51,6 +51,8 @@ export interface PersistedBarWidget {
   id: string
   grow: number
   visible: boolean
+  /** See `BarWidget.placedBy`: the plugin put it here, the user has not moved it. */
+  placedBy?: 'plugin'
 }
 
 export interface PersistedBar {
@@ -160,7 +162,8 @@ function isPersistedBar(value: unknown): value is PersistedBar {
       typeof widget.grow === 'number' &&
       Number.isFinite(widget.grow) &&
       widget.grow > 0 &&
-      typeof widget.visible === 'boolean'
+      typeof widget.visible === 'boolean' &&
+      (widget.placedBy === undefined || widget.placedBy === 'plugin')
     )
   })
 }

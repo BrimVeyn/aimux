@@ -327,6 +327,13 @@ export interface BarWidget {
   id: string
   grow: number
   visible: boolean
+  /**
+   * Set when a plugin's manifest asked for this placement rather than the
+   * user. It is what lets an unload withdraw what the plugin put there without
+   * touching what the user arranged — and the moment the user moves or hides
+   * the widget the mark is dropped, because the placement has become theirs.
+   */
+  placedBy?: 'plugin'
 }
 
 export interface BarState {
@@ -1279,6 +1286,16 @@ export type UIAction =
   | { type: 'resize-bar'; side: BarSide; delta: number }
   | { type: 'set-bar-width'; side: BarSide; width: number }
   | { type: 'toggle-widget'; widgetId: string }
+  | {
+      type: 'add-widget'
+      widgetId: string
+      side: BarSide
+      /** Defaults to the end of the bar. */
+      index?: number
+      grow?: number
+      placedBy?: 'plugin'
+    }
+  | { type: 'remove-plugin-widget'; widgetId: string }
   | { type: 'move-widget'; widgetId: string; side: BarSide; index: number }
   | { type: 'set-bar-boundary'; side: BarSide; index: number; ratio: number }
   | { type: 'resize-widget'; widgetId: string; delta: number }

@@ -18,11 +18,19 @@ function evalBinding(binding: TrieBinding, ctx: ModeContext): KeyResult | null {
 
 export class KeymapModeHandler implements ModeHandler {
   readonly id: ModeId
+  /**
+   * The live trie. Exposed because a plugin's bindings are inserted into the
+   * handler that already exists rather than rebuilt into a new one: rebuilding
+   * would hand `app.tsx` a stale handler — the one its timeout and
+   * pending-chord callbacks are wired to.
+   */
+  readonly trie: KeyTrie
   private readonly resolver: SequenceResolver
   private readonly isPassthrough: boolean
 
   constructor(id: ModeId, trie: KeyTrie, opts: { timeoutMs: number; passthrough?: boolean }) {
     this.id = id
+    this.trie = trie
     this.isPassthrough = opts.passthrough ?? false
     this.resolver = new SequenceResolver(trie, { timeoutMs: opts.timeoutMs })
   }

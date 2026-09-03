@@ -2,7 +2,13 @@ import { expect, test } from 'bun:test'
 
 import type { AppState } from '../../src/state/types'
 
-import { BAR_MAX_WIDTH, BAR_MIN_WIDTH, getBarWidth, visibleWidgets } from '../../src/state/bars'
+import {
+  BAR_MAX_WIDTH,
+  BAR_MIN_WIDTH,
+  DEFAULT_WIDGET_GROW,
+  getBarWidth,
+  visibleWidgets,
+} from '../../src/state/bars'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 function seedState(): AppState {
@@ -124,4 +130,80 @@ test('a hidden widget is excluded from boundary math', () => {
   // Only one visible widget left — there is no boundary to move.
   const s1 = appReducer(hidden, { index: 0, ratio: 0.7, side: 'left', type: 'set-bar-boundary' })
   expect(s1).toBe(hidden)
+})
+
+/**
+ * Placing a widget nothing had placed. The mark a plugin's placement carries is
+ * the whole point: it is what lets an unload withdraw what the plugin put there
+ * without touching the arrangement the user made.
+ */
+test('add-widget places a widget that is in neither bar, at the end by default', () => {
+  const s0 = appReducer(seedState(), { type: 'remove-plugin-widget', widgetId: 'git' })
+  // Nothing marked, so nothing removed — the guard below is the real assertion.
+  expect(s0.bars.left.widgets.map((w) => w.id)).toEqual(['projects', 'git', 'setup'])
+
+  const s1 = appReducer(s0, { side: 'right', type: 'add-widget', widgetId: 'acme.thing.board' })
+  expect(s1.bars.right.widgets.map((w) => w.id)).toEqual(['acme.thing.board'])
+  // A widget placed in a closed bar is a widget nobody sees.
+  expect(s1.bars.right.visible).toBe(true)
+  expect(s1.bars.right.widgets[0]?.grow).toBe(DEFAULT_WIDGET_GROW)
+})
+
+test('add-widget honours an index and a grow', () => {
+  const s1 = appReducer(seedState(), {
+    grow: 25,
+    index: 1,
+    side: 'left',
+    type: 'add-widget',
+    widgetId: 'acme.thing.board',
+  })
+  expect(s1.bars.left.widgets.map((w) => w.id)).toEqual([
+    'projects',
+    'acme.thing.board',
+    'git',
+    'setup',
+  ])
+  expect(s1.bars.left.widgets[1]?.grow).toBe(25)
+})
+
+test('add-widget is idempotent, and never moves a widget the user has placed', () => {
+  const s1 = appReducer(seedState(), { side: 'left', type: 'add-widget', widgetId: 'acme.x' })
+  const s2 = appReducer(s1, { index: 0, side: 'right', type: 'add-widget', widgetId: 'acme.x' })
+  expect(s2).toBe(s1)
+  expect(s2.bars.right.widgets).toEqual([])
+})
+
+test('remove-plugin-widget withdraws what the plugin placed', () => {
+  const s1 = appReducer(seedState(), {
+    placedBy: 'plugin',
+    side: 'right',
+    type: 'add-widget',
+    widgetId: 'acme.x',
+  })
+  expect(s1.bars.right.widgets[0]?.placedBy).toBe('plugin')
+
+  const s2 = appReducer(s1, { type: 'remove-plugin-widget', widgetId: 'acme.x' })
+  expect(s2.bars.right.widgets).toEqual([])
+})
+
+test('moving or hiding a plugin-placed widget makes the placement the user’s', () => {
+  const placed = appReducer(seedState(), {
+    placedBy: 'plugin',
+    side: 'right',
+    type: 'add-widget',
+    widgetId: 'acme.x',
+  })
+
+  const moved = appReducer(placed, {
+    index: 0,
+    side: 'left',
+    type: 'move-widget',
+    widgetId: 'acme.x',
+  })
+  expect(moved.bars.left.widgets.find((w) => w.id === 'acme.x')?.placedBy).toBeUndefined()
+  // And so an unload leaves it exactly where the user put it.
+  expect(appReducer(moved, { type: 'remove-plugin-widget', widgetId: 'acme.x' })).toBe(moved)
+
+  const hidden = appReducer(placed, { type: 'toggle-widget', widgetId: 'acme.x' })
+  expect(hidden.bars.right.widgets[0]?.placedBy).toBeUndefined()
 })

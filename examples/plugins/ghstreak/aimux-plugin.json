@@ -27,5 +27,13 @@
       "description": "Used instead of the `gh` CLI. Needs read:user. Leave empty to use `gh`.",
       "secret": true
     }
+  },
+  "contributes": {
+    "bars": [
+      {
+        "widget": "commits",
+        "side": "left"
+      }
+    ]
   }
 }

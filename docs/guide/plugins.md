@@ -46,6 +46,33 @@ Remove with `aimux plugin uninstall <id>` or `aimux plugin unlink <id>`. Both
 leave your configuration for that plugin alone unless you pass `--purge`, so
 reinstalling does not mean setting it up again.
 
+## Where a plugin's widget and keys come from
+
+A plugin can ask for a place in a bar and for keys to run its actions. It
+declares that in its manifest, aimux applies it when the plugin loads, and
+unlinking takes it back out — there is nothing to write in `aimux.config.ts`
+and nothing to restart.
+
+It is a request, not a claim:
+
+- **A key you have already bound is never taken.** `aimux.config.ts` outranks
+  every plugin. A refused binding says so in `aimux plugin log <id>`, rather
+  than quietly doing nothing.
+- **A placement happens once.** Move the widget, hide it, or drop it from the
+  bar's right-click menu, and the arrangement is yours — reloading the plugin
+  will not move it back, and unloading it will not take it away.
+- **You can place anything yourself.** The right-click menu on a bar or a
+  widget now offers `Add <widget>` for everything a plugin has registered and
+  nothing has placed.
+
+Binding a key yourself, whatever the manifest asked for:
+
+```ts
+export default {
+  keymaps: (k) => k.mode('navigation', (m) => m.map('<leader>g', k.plugin('acme.thing.open'))),
+}
+```
+
 ## Turning one off
 
 ```

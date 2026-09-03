@@ -938,6 +938,19 @@ nu, et des assertions sur l'état final : plugin lié et `active`, tuile visible
 `<leader>+` résolvant vers son action, `action run` qui change la vitesse, zéro
 redémarrage, zéro intervention. Le critère de fin de phase, et le seul.
 
+## 8.2 bis · Avancement
+
+| Chantier                        | État                                                        |
+| ------------------------------- | ------------------------------------------------------------ |
+| C0 · publier                    | PR #143 fusionnée ; le tag reste à couper (`bun bump`)       |
+| C1 · keymap à chaud             | fait — `registerKeymapLayer`, insertion dans le trie vivant  |
+| C2 · placement à chaud          | fait — `add-widget`, `remove-plugin-widget`, menu « Add »    |
+| C3 · `contributes`              | fait — validé, appliqué, retiré, et les 4 exemples l'utilisent |
+| C4 · les yeux du CLI            | à faire                                                      |
+| C5 · profil deviné              | à faire                                                      |
+| C6 · réparer ce qui ment        | fait pour les READMEs des exemples et la doc                 |
+| C7 · l'eval « reproduis shifter » | à faire — c'est lui qui clôt la phase                      |
+
 ## 8.3 Laissé dehors, exprès
 
 Recharger `aimux.config.ts` à chaud (D3) ; un `contributes` qui poserait des

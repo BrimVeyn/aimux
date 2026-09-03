@@ -11,6 +11,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { SideEffectContext } from './app-runtime/side-effect-context'
 import type { KeyChord } from './input/keymap/key-chord'
+import type { KeymapModeHandler } from './input/keymap/keymap-mode-handler'
 import type { TrieBinding } from './input/keymap/trie'
 import type { KeyResult, ModeContext, ModeId } from './input/modes/types'
 import type { TerminalContentOrigin } from './input/raw-input-handler'
@@ -30,6 +31,7 @@ import { builtinPlugins } from './builtin-plugins'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
+import { setKeymapHandlerWiring } from './input/keymap/handler-wiring'
 import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
@@ -499,7 +501,7 @@ export function App({
   setActiveSideEffectRunner((effect) => executeSideEffect(effect, sideEffectCtx))
 
   useLayoutEffect(() => {
-    for (const handler of keymapHandlers) {
+    const wire = (handler: KeymapModeHandler): void => {
       handler.setTimeoutCallback((binding: TrieBinding) => {
         const currentState = stateRef.current
         const modeId = deriveModeId(currentState)
@@ -513,6 +515,10 @@ export function App({
         dispatch({ chords, type: 'set-pending-chords' })
       })
     }
+    for (const handler of keymapHandlers) wire(handler)
+    // A plugin can introduce a mode of its own after this ran — its pane's
+    // mode — and the handler built for it needs the same two callbacks.
+    setKeymapHandlerWiring(wire)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const flashPendingJump = useAppStore((s) =>

@@ -15,5 +15,19 @@
       "description": "How far back the pane looks.",
       "default": 14
     }
+  },
+  "contributes": {
+    "keymaps": [
+      {
+        "mode": "navigation",
+        "key": "<leader>p",
+        "action": "open"
+      },
+      {
+        "mode": "plugin.pane.aimux-examples.pulse.stats",
+        "key": "q",
+        "action": "close"
+      }
+    ]
   }
 }

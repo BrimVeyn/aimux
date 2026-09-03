@@ -23,10 +23,13 @@ export { EffectStack } from './effects'
 export { type EventBusOptions, PluginEventBus } from './event-bus'
 export {
   PLUGIN_API_VERSION,
+  type PluginBarContribution,
   type PluginCommandSpec,
   type PluginConfigField,
   type PluginConfigFieldType,
+  type PluginContributions,
   type PluginHost,
+  type PluginKeymapContribution,
   type PluginManifest,
 } from './manifest'
 export {

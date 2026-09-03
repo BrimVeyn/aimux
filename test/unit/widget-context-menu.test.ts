@@ -37,12 +37,24 @@ function capture(run: () => void): AppAction[] {
 
 test('first widget of two offers move-across, move-down and hide', () => {
   const menu = buildWidgetContextMenu(bars(), 'left', 'projects')
-  expect(menu.map(([label]) => label)).toEqual(['Move to right bar', 'Move down', 'Hide'])
+  // `setup` ships unplaced, so it is offered as an addition — see the
+  // add-widget tests at the bottom.
+  expect(menu.map(([label]) => label)).toEqual([
+    'Move to right bar',
+    'Move down',
+    'Hide',
+    'Add Setup',
+  ])
 })
 
 test('last widget offers move-up instead of move-down', () => {
   const menu = buildWidgetContextMenu(bars(), 'left', 'git')
-  expect(menu.map(([label]) => label)).toEqual(['Move to right bar', 'Move up', 'Hide'])
+  expect(menu.map(([label]) => label)).toEqual([
+    'Move to right bar',
+    'Move up',
+    'Hide',
+    'Add Setup',
+  ])
 })
 
 test('move-across appends the widget to the other bar', () => {
@@ -62,7 +74,7 @@ test('the last visible widget cannot be hidden', () => {
     left: { visible: true, widgets: [{ grow: 100, id: 'projects', visible: true }], width: 28 },
   })
   const menu = buildWidgetContextMenu(single, 'left', 'projects')
-  expect(menu.map(([label]) => label)).toEqual(['Move to right bar'])
+  expect(menu.map(([label]) => label)).toEqual(['Move to right bar', 'Add Git', 'Add Setup'])
 })
 
 const withHidden = bars({
@@ -108,4 +120,23 @@ test('a hidden widget in the other bar is still offered', () => {
   })
   const menu = buildWidgetContextMenu(rightHidden, 'left', 'git')
   expect(menu.map(([label]) => label)).toContain('Show Setup')
+})
+
+/**
+ * Adding a widget that is in neither bar. Until this existed, a widget nothing
+ * had placed — every plugin's widget, on first load — could be registered,
+ * renderable and listed, and still be impossible to put anywhere without
+ * editing `aimux.json` by hand.
+ */
+test('a widget in neither bar is offered, and lands in the bar whose menu offered it', () => {
+  const menu = buildBarContextMenu(bars(), 'right')
+  expect(menu.map(([label]) => label)).toEqual(['Hide right bar', 'Add Setup'])
+
+  const actions = capture(() => menu[1]?.[1]())
+  expect(actions).toEqual([{ side: 'right', type: 'add-widget', widgetId: 'setup' }])
+})
+
+test('a widget already placed is never offered as an addition', () => {
+  const menu = buildBarContextMenu(withHidden, 'left')
+  expect(menu.map(([label]) => label).filter((label) => label.startsWith('Add '))).toEqual([])
 })

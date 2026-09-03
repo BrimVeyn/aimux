@@ -46,6 +46,13 @@ export function isWidgetRenderable(id: string): boolean {
   return (BUILTIN_WIDGET_IDS as readonly string[]).includes(id) || pluginWidgetIds.has(id)
 }
 
+/**
+ * The share a widget gets when nothing asked for one. Every shipped widget was
+ * persisted at 50, so a new arrival lands beside them as an equal rather than
+ * squeezing them.
+ */
+export const DEFAULT_WIDGET_GROW = 50
+
 /** Smallest share of a bar a single widget may shrink to, as a fraction. */
 const MIN_WIDGET_SHARE = 0.1
 

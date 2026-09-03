@@ -24,5 +24,19 @@
       "description": "Fable with reasoning turned up — point this at whatever your assistant accepts",
       "default": "/model fable"
     }
+  },
+  "contributes": {
+    "keymaps": [
+      {
+        "mode": "navigation",
+        "key": "<leader>+",
+        "action": "up"
+      },
+      {
+        "mode": "navigation",
+        "key": "<leader>-",
+        "action": "down"
+      }
+    ]
   }
 }

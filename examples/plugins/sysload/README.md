@@ -2,14 +2,15 @@
 
 CPU and GPU load as sparklines, in a bar widget.
 
-```ts
-// aimux.config.ts — place it in a bar like any other widget
-bars: {
-  left: {
-    widgets: ['projects', 'aimux-examples.sysload.load']
-  }
-}
+Its manifest asks for its own place, so linking it is enough — the widget
+appears in the left bar, and unlinking takes it back out:
+
+```jsonc
+"contributes": { "bars": [{ "widget": "load", "side": "left" }] }
 ```
+
+Move it, hide it or throw it out from the bar's right-click menu; from then on
+the placement is yours and no reload will move it back.
 
 ## What it demonstrates
 
