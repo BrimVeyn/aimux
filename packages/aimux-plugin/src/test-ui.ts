@@ -173,6 +173,7 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
       open: (id) => opened.push(`modal:${id}`),
       register: (modal) => record(registrations.modals, modal.id),
     },
+    navigate: (screen) => opened.push(`screen:${screen}`),
     panes: {
       close: (id) => opened.push(`pane:close:${id}`),
       open: (id) => opened.push(`pane:${id}`),

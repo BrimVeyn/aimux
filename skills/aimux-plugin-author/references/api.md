@@ -363,11 +363,25 @@ export interface PluginToastApi {
 ```
 
 ```ts
+/** The room a bar widget has been given, in cells. */
+export interface PluginWidgetSize {
+  cols: number
+  rows: number
+}
+```
+
+```ts
 export interface PluginBarWidget {
   /** Unqualified; the host prefixes the plugin id. */
   id: string
   label: string
-  render: (contentWidth: number) => PluginNode
+  /**
+   * `size` is the second argument rather than a replacement for the first: the
+   * width already shipped as a number under `apiVersion: 1`, and swapping it
+   * would break every published plugin to save one parameter. `size.cols` is
+   * the same value.
+   */
+  render: (contentWidth: number, size: PluginWidgetSize) => PluginNode
 }
 ```
 
@@ -709,7 +723,18 @@ export interface PluginGitApi {
 ```
 
 ```ts
+/** The screens a plugin may send the user to. */
+export type PluginScreen = 'git' | 'stats' | 'settings' | 'terminal'
+```
+
+```ts
 export interface PluginUiApi {
+  /**
+   * Opens one of aimux's own screens, or `terminal` to leave the one you are
+   * on. Deliberately four names and not an id space: exposing modal or view ids
+   * would make them API, and they are not.
+   */
+  navigate: (screen: PluginScreen) => void
   git: PluginGitApi
   widgets: PluginWidgetsApi
   views: PluginViewsApi

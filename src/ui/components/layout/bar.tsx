@@ -1,6 +1,6 @@
 import type { BoxRenderable, MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { BarSide } from '../../../state/types'
 
@@ -12,6 +12,9 @@ import { getWidgetRenderer } from '../../widgets/registry'
 import { buildBarContextMenu, buildWidgetContextMenu } from '../../widgets/widget-context-menu'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { BarFooter } from './bar-footer'
+
+/** Same settle delay as the pane measurement: one opentui layout tick. */
+const WIDGET_SETTLE_DELAY_MS = 32
 
 export interface BarBoundaryResizeInfo {
   containerStart: number
@@ -175,6 +178,37 @@ function BarWidgetSlot({
   useAppStore((s) => s.pluginRegistryVersion)
   const render = getWidgetRenderer(widgetId)
 
+  // How tall this slot actually came out. A widget knew its width and had to
+  // guess its height, which is the difference between a sparkline that fills
+  // its panel and one that draws six rows into a space that has four. Measured
+  // rather than computed: the flex share is opentui's arithmetic, not ours.
+  const [rows, setRows] = useState(0)
+  const slotRef = useRef<BoxRenderable | null>(null)
+  const measure = useCallback(() => {
+    const box = slotRef.current
+    if (!box) return
+    const next = Math.round(box.height)
+    if (next < 1) return
+    setRows((prev) => (prev === next ? prev : next))
+  }, [])
+  // Twice, for the same reason `usePaneSizeReport` does: opentui settles layout
+  // on its own tick after React commits, and a bar toggled on an idle screen
+  // produces no second commit to observe it in.
+  useEffect(() => {
+    measure()
+    const timer = setTimeout(measure, WIDGET_SETTLE_DELAY_MS)
+    return () => {
+      clearTimeout(timer)
+    }
+  })
+  const attach = useCallback(
+    (node: BoxRenderable | null) => {
+      slotRef.current = node
+      if (node) measure()
+    },
+    [measure]
+  )
+
   const handleBoundaryMouseDown = useCallback(
     (event: OtuiMouseEvent) => {
       const body = bodyRef.current
@@ -201,9 +235,10 @@ function BarWidgetSlot({
         flexShrink={1}
         flexBasis={0}
         overflow="hidden"
+        ref={attach}
         rightClickMenu={buildWidgetContextMenu(bars, side, widgetId)}
       >
-        {render(contentWidth)}
+        {render(contentWidth, { cols: contentWidth, rows })}
       </ContextMenuBox>
       {/* The boundary between two widgets: a blank grabbable row, no rule drawn
           in it. Widgets read as separate because of the gap, the same way

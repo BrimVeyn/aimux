@@ -366,3 +366,28 @@ ctx.on('git:workingTreeChanged', ({ branch, files }) => {
 })
 const now = ctx.ui.git.status() // the panel's last refresh
 ```
+
+## Send the user somewhere, and know your own height
+
+```ts
+ctx.ui.navigate('git') // 'git' | 'stats' | 'settings' | 'terminal'
+```
+
+Four names, not an id space: exposing modal or view ids would make them API.
+`terminal` leaves whichever screen the user is on, and aimux leaves the current
+one before opening another — the way a key press does.
+
+A bar widget is handed both its width and the room it actually got:
+
+```ts
+ctx.ui.widgets.register({
+  id: 'load',
+  label: 'Load',
+  render: (contentWidth, { cols, rows }) => <Sparkline width={cols} height={rows - 2} />,
+})
+```
+
+`size.cols` is the same number as `contentWidth` — the width already shipped
+under `apiVersion: 1`, and swapping it for an object would break every
+published plugin to save one parameter. `rows` is measured after layout, so it
+is what the widget really has, not a guess from the bar's height.

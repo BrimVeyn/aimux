@@ -8,6 +8,7 @@ import {
 } from '../../src/git/commit-message-provider'
 import { workingTreeChange } from '../../src/git/git-poller'
 import { appStore } from '../../src/state/app-store'
+import { setActiveDispatch } from '../../src/state/dispatch-ref'
 import { createInitialState } from '../../src/state/store'
 import { extendUiPluginContext } from '../../src/ui/plugin-ui-services'
 
@@ -156,5 +157,45 @@ describe('git:workingTreeChanged', () => {
       ],
     }
     expect(workingTreeChange(changed, '/repo', first?.hash ?? '')).not.toBeNull()
+  })
+})
+
+describe('ctx.ui.navigate', () => {
+  test('opens a screen, and leaves the one it was on first', async () => {
+    const dispatched: string[] = []
+    setActiveDispatch((action) => dispatched.push(action.type))
+    appStore.setState({ focusMode: 'git' })
+
+    const handle = harness()
+    await handle.apply({
+      apply(context) {
+        const ctx = context as typeof context & { ui: PluginUiApi }
+        ctx.ui.navigate('stats')
+      },
+    })
+
+    // Entering a second screen from inside the first would leave the one
+    // behind it holding state nobody closed.
+    expect(dispatched).toEqual(['exit-git-mode', 'enter-stats'])
+    await handle.dispose()
+    setActiveDispatch(null)
+  })
+
+  test('`terminal` is how a plugin gets out of the way', async () => {
+    const dispatched: string[] = []
+    setActiveDispatch((action) => dispatched.push(action.type))
+    appStore.setState({ focusMode: 'stats' })
+
+    const handle = harness()
+    await handle.apply({
+      apply(context) {
+        const ctx = context as typeof context & { ui: PluginUiApi }
+        ctx.ui.navigate('terminal')
+      },
+    })
+
+    expect(dispatched).toEqual(['exit-stats'])
+    await handle.dispose()
+    setActiveDispatch(null)
   })
 })

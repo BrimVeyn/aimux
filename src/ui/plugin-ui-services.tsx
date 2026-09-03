@@ -21,6 +21,7 @@ import {
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
+import type { AppAction } from '../state/actions'
 import type { AppState, GitFileEntry } from '../state/types'
 
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
@@ -138,6 +139,19 @@ function describeFiles(files: readonly GitFileEntry[]): PluginGitFile[] {
   }))
 }
 
+/** Leaving whichever screen the user is on, before opening another. */
+const EXIT_BY_FOCUS: Partial<Record<string, AppAction>> = {
+  git: { type: 'exit-git-mode' },
+  settings: { type: 'exit-settings' },
+  stats: { type: 'exit-stats' },
+}
+
+const ENTER_BY_SCREEN = {
+  git: { type: 'enter-git-mode' },
+  settings: { type: 'enter-settings' },
+  stats: { type: 'enter-stats' },
+} as const satisfies Record<string, AppAction>
+
 function buildUi(ctx: PluginContext): PluginUiApi {
   const { id } = ctx
   return {
@@ -184,6 +198,14 @@ function buildUi(ctx: PluginContext): PluginUiApi {
             title: modal.title,
           })
         ),
+    },
+    navigate: (screen) => {
+      const exit = EXIT_BY_FOCUS[appStore.getState().focusMode]
+      // Leave first, the way a key press would: entering a second screen from
+      // inside the first leaves the one behind it holding state nobody closed.
+      if (exit !== undefined) dispatchGlobal(exit)
+      if (screen === 'terminal') return
+      dispatchGlobal(ENTER_BY_SCREEN[screen])
     },
     panes: {
       close: (paneId) => {
@@ -309,7 +331,7 @@ function buildUi(ctx: PluginContext): PluginUiApi {
           registerBarWidget({
             id: qualify(id, widget.id),
             label: widget.label,
-            render: (contentWidth) => widget.render(contentWidth) as ReactNode,
+            render: (contentWidth, size) => widget.render(contentWidth, size) as ReactNode,
           })
         ),
     },

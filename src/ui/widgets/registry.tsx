@@ -15,7 +15,17 @@ export { isWidgetRenderable } from '../../state/bars'
  * exactly that.
  */
 
-export type WidgetRenderer = (contentWidth: number) => ReactNode
+/**
+ * `size` is a second argument rather than a replacement for the width: the
+ * number already shipped under `apiVersion: 1`, and swapping it would break
+ * every published plugin to save one parameter. `size.cols` is that number.
+ */
+export type WidgetRenderer = (contentWidth: number, size: WidgetSize) => ReactNode
+
+export interface WidgetSize {
+  cols: number
+  rows: number
+}
 
 interface WidgetEntry {
   render: WidgetRenderer
