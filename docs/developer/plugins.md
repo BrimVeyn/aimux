@@ -568,6 +568,33 @@ filled in before it landed.
 | ----------------------------------------- | ----------------------------------------------------------------------------- |
 | `aimux.claude` (theme sync, hook install) | reading the active theme outside React, and reading aimux's own settings rows |
 | `aimux.ai-usage` (quota tile)             | a status-bar registry, and seeding `ctx.config` from aimux's config           |
+| `aimux.auto-rename` (naming tabs)         | `ctx.tabs.rename`, `tab:prompt`, `tab:renamed`, `tab:closed`, and `unnamed`   |
+
+### `auto-rename`, and what the migration cost
+
+The one that proves the _daemon_ API rather than the UI one: it reacts to an
+event, decides, calls a model, and writes a tab's title, with no privileged
+access to any of the three. What stayed in aimux is what a tab _is_ — its
+title, and whether anyone has named it. What moved is every decision about what
+to call it: when to ask, what counts as a title-worthy prompt, how long to wait
+for more, which model, how many retries, and the local fallback.
+
+It needed four things, and none of them is auto-rename's:
+
+- `ctx.tabs.rename` — a title that reaches the manager, the session and every
+  UI. What any plugin needs to name anything.
+- `tab:prompt` — what the user actually asked. Its own refactor; see above.
+- `tab:renamed` and `tab:closed` — a namer must stop when someone else names
+  the tab, and drop what it holds when the tab goes.
+- `PluginTabView.unnamed` — "does this tab still carry the title it was born
+  with". aimux's own `autoRenameStatus` under a name that describes the tab
+  rather than the feature: it is set at creation, cleared by any rename, and
+  it is what stops two namers fighting over one tab.
+
+`autoRenameStatus` itself stayed exactly where it was — in the tab entry, on
+the IPC and terminal-manager protocols, in the persisted session. Moving it
+into the plugin would have been a protocol migration wearing a plugin
+migration's clothes.
 
 ### Not migrated, and why
 
@@ -575,11 +602,6 @@ filled in before it landed.
   pane. Moving it means moving its state into a plugin slice and its UI into a
   plugin view — a bigger change than the migration, and one that would make the
   git pane worse before it made it better.
-- **`auto-rename`** watches the raw PTY byte stream to catch the user's prompt.
-  There is no plugin event for that and there should not be a firehose one; the
-  clean seam is for prompt capture to stay core and emit a `tab:prompt` event,
-  with the naming half — which decides and calls a model — as the plugin. That
-  needs `ctx.tabs.rename`, which does not exist yet.
 - **The `setup` widget** is addressable by id in a user's `bars` config. A
   plugin's ids are namespaced by the host, on purpose, so migrating it would
   rename `setup` to `aimux.setup.setup` and silently drop it out of existing

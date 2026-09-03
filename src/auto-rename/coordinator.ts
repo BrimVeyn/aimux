@@ -100,6 +100,17 @@ export class AutoRenameCoordinator {
   }
 
   /**
+   * Drops every tab it is watching, aborting whatever is in flight. What the
+   * plugin's unload calls: a generation that outlived the plugin would apply a
+   * title from a coordinator nobody owns any more.
+   */
+  disposeAll(): void {
+    // Snapshot the ids: `unregister` deletes from the map being walked.
+    const watched = [...this.states.keys()]
+    for (const tabId of watched) this.unregister(tabId)
+  }
+
+  /**
    * A prompt the user submitted, from `PromptObserver` — hook or reconstructed
    * keystrokes, the observer having already decided which to trust.
    *

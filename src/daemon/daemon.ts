@@ -4,7 +4,7 @@ import { connect, createServer, type Socket } from 'node:net'
 import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
 
 import { version as APP_VERSION } from '../../package.json'
-import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
+import { initialAutoRenameStatus } from '../auto-rename/coordinator'
 import { builtinPlugins } from '../builtin-plugins'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
@@ -382,6 +382,9 @@ export async function runDaemon(): Promise<void> {
     if (!entry) return
     if (patch.title !== undefined) entry.title = patch.title
     if (patch.autoRenameStatus !== undefined) entry.autoRenameStatus = patch.autoRenameStatus
+    if (patch.title !== undefined) {
+      emitDaemonEvent('tab:renamed', { projectId: entry.projectId, tabId, title: patch.title })
+    }
     void (async () => {
       try {
         await manager.updateTabMetadata(entry.projectId, tabId, patch)
@@ -409,23 +412,7 @@ export async function runDaemon(): Promise<void> {
       if (entry) {
         emitDaemonEvent('tab:prompt', { projectId: entry.projectId, prompt, source, tabId })
       }
-      autoRename.onPrompt(tabId, prompt)
     },
-  })
-
-  const autoRename = new AutoRenameCoordinator({
-    config: resolvedConfig.autoRename,
-    getTab: (tabId) => {
-      const entry = tabRegistry.get(tabId)
-      if (!entry) return
-      return {
-        assistant: entry.assistant,
-        autoRenameStatus: entry.autoRenameStatus,
-        id: tabId,
-        title: entry.title ?? '',
-      }
-    },
-    updateTab: applyTabMetadata,
   })
 
   // Count UI attachers so project/workspace handlers can decide whether to
@@ -464,8 +451,9 @@ export async function runDaemon(): Promise<void> {
   })
   manager.on('exit', (projectId, tabId, exitCode) => {
     logDebug('daemon.manager.exit', { exitCode, projectId, tabId })
+    const closing = tabRegistry.get(tabId)
     tabRegistry.delete(tabId)
-    autoRename.unregister(tabId)
+    if (closing) emitDaemonEvent('tab:closed', { projectId: closing.projectId, tabId })
     if (projectActiveTabIds.get(projectId) === tabId) {
       projectActiveTabIds.set(projectId, null)
     }
@@ -678,7 +666,6 @@ export async function runDaemon(): Promise<void> {
       payload: { projectId: input.projectId, tab: synthesizedTab },
       type: 'tabAdded',
     })
-    autoRename.register(synthesizedTab)
     return tabId
   }
 
@@ -702,7 +689,9 @@ export async function runDaemon(): Promise<void> {
         // rename and aimux's own reach the manager, the session and every UI
         // identically, so neither can produce a title the other cannot.
         renameTab: (tabId, title) => {
-          applyTabMetadata(tabId, { title })
+          // `attempted` alongside the title: a named tab is a named tab,
+          // whoever named it, and the next namer must be able to tell.
+          applyTabMetadata(tabId, { autoRenameStatus: 'attempted', title })
         },
         spawnTab: spawnTabForPlugin,
         tabs: () => tabRegistry,
@@ -879,7 +868,7 @@ export async function runDaemon(): Promise<void> {
                   })
                   projectActiveTabIds.set(message.payload.projectId, attachResult.activeTabId)
                   for (const tab of attachResult.tabs) {
-                    const remembered = rememberTab(
+                    rememberTab(
                       message.payload.projectId,
                       tab.id,
                       tab.assistant,
@@ -893,12 +882,6 @@ export async function runDaemon(): Promise<void> {
                         workspaceId: tab.workspaceId,
                       }
                     )
-                    autoRename.register({
-                      assistant: remembered.assistant,
-                      autoRenameStatus: remembered.autoRenameStatus,
-                      id: tab.id,
-                      title: remembered.title ?? tab.title,
-                    })
                   }
                   // Classify synchronously BEFORE sending attachResult so
                   // each tab's activity and the full project-status snapshot
@@ -1071,7 +1054,6 @@ export async function runDaemon(): Promise<void> {
                     payload: { projectId, tab: synthesizedTab },
                     type: 'tabAdded',
                   })
-                  autoRename.register(synthesizedTab)
                   logDebug('daemon.request.createTab.success', {
                     projectId,
                     tabId: message.payload.tabId,
@@ -1092,7 +1074,6 @@ export async function runDaemon(): Promise<void> {
                   if (tabRegistry.get(message.payload.tabId)?.projectId !== projectId) {
                     throw new Error(`Tab not found in attached project: ${message.payload.tabId}`)
                   }
-                  autoRename.manualRename(message.payload.tabId)
                   applyTabMetadata(message.payload.tabId, {
                     autoRenameStatus: 'attempted',
                     title: message.payload.title.trim(),
@@ -1153,7 +1134,7 @@ export async function runDaemon(): Promise<void> {
                   const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   tabRegistry.delete(message.payload.tabId)
-                  autoRename.unregister(message.payload.tabId)
+                  emitDaemonEvent('tab:closed', { projectId, tabId: message.payload.tabId })
                   if (projectActiveTabIds.get(projectId) === message.payload.tabId) {
                     projectActiveTabIds.set(projectId, null)
                   }
@@ -1201,7 +1182,7 @@ export async function runDaemon(): Promise<void> {
                   if (projectId != null && projectId !== '') {
                     for (const [tabId, entry] of tabRegistry) {
                       if (entry.projectId === projectId) {
-                        autoRename.unregister(tabId)
+                        emitDaemonEvent('tab:closed', { projectId, tabId })
                         tabRegistry.delete(tabId)
                       }
                     }

@@ -643,6 +643,27 @@ Reste la migration d'`auto-commit` elle-même, qui a maintenant où poser son
 état. Et la fente vaut déjà sans elle, ce qui était l'argument pour la faire
 d'abord.
 
+## 6.5 bis · `auto-rename` a migré (2026-09-03)
+
+Troisième built-in, et le premier qui éprouve l'API **daemon** plutôt que
+l'UI : il réagit à un événement, décide, appelle un modèle et écrit le titre
+d'un onglet, sans accès privilégié à aucun des trois.
+
+Ce qui est resté à aimux, c'est ce qu'un onglet _est_ : son titre, et le fait
+que quelqu'un l'ait nommé ou non. Ce qui est parti, c'est chaque décision sur
+comment l'appeler.
+
+Il a fallu quatre choses, dont aucune n'appartient à auto-rename :
+`ctx.tabs.rename` (déjà là), `tab:prompt` (son propre refactor), `tab:renamed`
+et `tab:closed` (un nommeur doit s'arrêter quand un autre a nommé, et lâcher ce
+qu'il tient quand l'onglet part), et `PluginTabView.unnamed` — le
+`autoRenameStatus` d'aimux sous un nom qui décrit l'onglet et non la feature.
+
+`autoRenameStatus` lui-même n'a pas bougé : il est dans l'entrée d'onglet, sur
+les protocoles IPC et terminal-manager, et dans la session persistée. Le
+déplacer dans le plugin aurait été une migration de protocole déguisée en
+migration de plugin.
+
 ## 6.6 Ordre proposé
 
 1. Publier le paquet (6.2). Rien d'autre ne compte tant que c'est faux.

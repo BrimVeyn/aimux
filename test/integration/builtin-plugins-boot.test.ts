@@ -86,7 +86,7 @@ describe('the plugins aimux ships', () => {
     expect(instance.statuses()).toEqual([])
   })
 
-  test('the daemon runs none of them, and still knows all of them', async () => {
+  test('the daemon runs the half that is its own, and knows all of them', async () => {
     const resolved = resolveConfig({})
     const instance = new PluginRuntime({
       builtins: builtinPlugins(resolved),
@@ -97,14 +97,16 @@ describe('the plugins aimux ships', () => {
     runtime = instance
     await instance.start()
 
-    // Both are UI-only today. The daemon must still list them, or
-    // `aimux plugin list` would deny the existence of a running plugin.
-    expect(instance.statuses()).toEqual([])
+    // `auto-rename` is the daemon-half built-in: it reacts to prompts and
+    // writes titles, neither of which the UI can do. The other two are UI-only,
+    // and the daemon must still list them — `aimux plugin list` would otherwise
+    // deny the existence of a plugin that is running.
+    expect(instance.statuses().map((status) => status.id)).toEqual(['aimux.auto-rename'])
     expect(
       instance
         .knownRecords()
         .map((record) => record.id)
         .sort()
-    ).toEqual(['aimux.ai-usage', 'aimux.claude'])
+    ).toEqual(['aimux.ai-usage', 'aimux.auto-rename', 'aimux.claude'])
   })
 })

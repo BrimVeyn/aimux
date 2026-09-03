@@ -63,6 +63,17 @@ export interface DaemonEvents {
   }
   /** A tab was created, by the UI or by a headless CLI. */
   'tab:added': { projectId: string; tab: TabSession }
+  /**
+   * A tab's title changed — by the user, by aimux, or by a plugin. A plugin
+   * that names tabs stops watching one on this: an in-flight generation that
+   * lands after the user has typed their own title would overwrite it.
+   */
+  'tab:renamed': { tabId: string; projectId: string; title: string }
+  /**
+   * The tab is gone: closed, its process exited, or its project was closed
+   * under it. Anything holding per-tab state drops it here.
+   */
+  'tab:closed': { tabId: string; projectId: string }
   /** A project's aggregate status changed. */
   'project:status': { projectId: string; status: ProjectStatus }
   'project:created': { name: string; projectPath?: string }
