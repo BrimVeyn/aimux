@@ -1,3 +1,5 @@
+import type { PluginCommitMessage, PluginCommitMessageRequest } from '@brimveyn/aimux-plugin'
+
 import { $ } from 'bun'
 
 import type { AppAction } from '../state/actions'
@@ -9,6 +11,8 @@ import { hasStagedFiles } from '../auto-commit/staging-mode'
 import { stripAnsi } from '../auto-commit/strip-ansi'
 import { runSuggestion } from '../auto-commit/suggestion-runner'
 import { workingTreeHash } from '../auto-commit/working-tree-hash'
+import { getCommitMessageProvider } from '../git/commit-message-provider'
+import { createPluginLogger } from '../plugins/log'
 import { isCommandAvailable } from '../pty/command-registry'
 import { toast } from '../state/toast-store'
 
@@ -189,13 +193,44 @@ export async function onManualTrigger(
   // Manual trigger is always user-intent to regenerate, even if a ready
   // suggestion exists at the same hash — the user explicitly asked for it.
 
-  const probe = buildHeadlessInvocation(args.assistant, '__probe__', config.models[args.assistant])
-  if (!probe) return fail(`no headless invocation for ${args.assistant}`)
-  if (!isCommandAvailable(probe.executable)) {
-    return fail(`'${probe.executable}' not found in PATH`)
+  // Same reason as in `runGeneration`: with a plugin answering, the absence of
+  // a headless model is not a reason to refuse.
+  if (getCommitMessageProvider() === null) {
+    const probe = buildHeadlessInvocation(
+      args.assistant,
+      '__probe__',
+      config.models[args.assistant]
+    )
+    if (!probe) return fail(`no headless invocation for ${args.assistant}`)
+    if (!isCommandAvailable(probe.executable)) {
+      return fail(`'${probe.executable}' not found in PATH`)
+    }
   }
 
   await runGeneration(deps, args, currentHash, config)
+}
+
+/**
+ * Asks the plugin holding the slot. Its failure is its own: a provider that
+ * throws must cost this one message, not the feature — aimux falls back to its
+ * own suggestion and says so in the plugin's log.
+ */
+async function askProvider(
+  slot: NonNullable<ReturnType<typeof getCommitMessageProvider>>,
+  request: PluginCommitMessageRequest,
+  signal: AbortSignal
+): Promise<PluginCommitMessage | null> {
+  try {
+    const answer = await slot.provide(request, signal)
+    if (answer === null || answer === undefined) return null
+    if (typeof answer.title !== 'string' || answer.title.trim() === '') return null
+    return answer
+  } catch (error) {
+    createPluginLogger(slot.pluginId, 'ui').error('commit message provider failed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
+  }
 }
 
 async function runGeneration(
@@ -204,9 +239,19 @@ async function runGeneration(
   currentHash: string,
   config: AutoCommitConfigSnapshot
 ): Promise<void> {
-  const probe = buildHeadlessInvocation(args.assistant, '__probe__', config.models[args.assistant])
-  if (!probe) return
-  if (!isCommandAvailable(probe.executable)) return
+  // A plugin holding the commit-message slot answers instead of a headless
+  // model call, so the checks for *that* model must not gate the run: a plugin
+  // that writes messages should work on a machine with no `claude` installed.
+  const provider = getCommitMessageProvider()
+  if (provider === null) {
+    const probe = buildHeadlessInvocation(
+      args.assistant,
+      '__probe__',
+      config.models[args.assistant]
+    )
+    if (!probe) return
+    if (!isCommandAvailable(probe.executable)) return
+  }
 
   // Supersede any in-flight generation for this project. Without this, a
   // rapid sequence of activity transitions (each with a different working
@@ -240,6 +285,42 @@ async function runGeneration(
   }
   const tab = deps.getState().tabs.find((t) => t.id === args.tabId)
   const sessionTail = extractSessionTail(tab?.buffer)
+
+  if (provider !== null) {
+    const suggestion = await askProvider(
+      provider,
+      {
+        branch: ctx.branch,
+        diff: ctx.diff,
+        files: (args.git?.files ?? []).map((file) => ({
+          added: file.added,
+          path: file.path,
+          removed: file.removed,
+          section: file.section,
+          status: file.status,
+        })),
+        projectId: args.projectId,
+        recentCommits: ctx.recentCommits,
+        repoRoot: args.projectPath as string,
+        ...(sessionTail === undefined ? {} : { sessionTail }),
+      },
+      controller.signal
+    )
+    if (suggestion !== null) {
+      deps.dispatch({
+        body: suggestion.body ?? '',
+        generatedAt: Date.now(),
+        projectId: args.projectId,
+        title: suggestion.title,
+        type: 'auto-commit-generation-ready',
+        workingTreeHash: currentHash,
+      })
+      return
+    }
+    // A provider that declines is not a provider that failed: fall through to
+    // aimux's own suggestion rather than leaving the user with nothing.
+  }
+
   const prompt = composePromptFromTemplate(template, { ...ctx, sessionTail })
   const finalInvocation = buildHeadlessInvocation(
     args.assistant,

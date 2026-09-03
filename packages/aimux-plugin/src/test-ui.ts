@@ -2,6 +2,9 @@ import type { EffectStack } from './effects'
 import type { Disposer } from './types'
 import type {
   PluginActionsApi,
+  PluginCommitMessage,
+  PluginCommitMessageRequest,
+  PluginGitStatus,
   PluginSettingValue,
   PluginStoreApi,
   PluginThemeSnapshot,
@@ -36,6 +39,8 @@ export interface TestUiRegistrations {
   statsPages: string[]
   themes: string[]
   settingsSections: number
+  /** Whether the plugin claimed the commit-message slot. */
+  commitMessageProvider: boolean
   actions: string[]
   effects: string[]
 }
@@ -55,6 +60,16 @@ export interface TestUiSurface {
   setSetting: (id: string, value: PluginSettingValue) => void
   /** Drives `ctx.ui.themes.onChange` and what `current()` answers. */
   setTheme: (snapshot: PluginThemeSnapshot) => void
+  /** Drives `ctx.ui.git.status`. */
+  setGitStatus: (status: PluginGitStatus) => void
+  /**
+   * Asks the provider the plugin registered, as the commit flow would. Throws
+   * when it registered none, because a test that silently asserts nothing is
+   * the failure this whole harness exists to avoid.
+   */
+  askForCommitMessage: (
+    request?: Partial<PluginCommitMessageRequest>
+  ) => Promise<PluginCommitMessage | null>
 }
 
 const EMPTY_STATE: PluginUiState = {
@@ -66,12 +81,24 @@ const EMPTY_STATE: PluginUiState = {
 
 const DEFAULT_THEME: PluginThemeSnapshot = { colors: {}, mode: 'dark' }
 
+const EMPTY_GIT: PluginGitStatus = { ahead: 0, behind: 0, branch: null, files: [] }
+
+const EMPTY_REQUEST: PluginCommitMessageRequest = {
+  branch: 'main',
+  diff: '',
+  files: [],
+  projectId: 'p1',
+  recentCommits: '',
+  repoRoot: '/tmp/repo',
+}
+
 /** A component that renders nothing: a test asserts on registrations, not pixels. */
 const nothing = (): null => null
 
 export function createTestUiSurface(effects: EffectStack): TestUiSurface {
   const registrations: TestUiRegistrations = {
     actions: [],
+    commitMessageProvider: false,
     effects: [],
     modals: [],
     panes: [],
@@ -92,6 +119,13 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
   let theme: PluginThemeSnapshot = DEFAULT_THEME
   const themeListeners = new Set<(snapshot: PluginThemeSnapshot) => void>()
   let slice: unknown
+  let git: PluginGitStatus = EMPTY_GIT
+  let commitProvider:
+    | ((
+        request: PluginCommitMessageRequest,
+        signal: AbortSignal
+      ) => Promise<PluginCommitMessage | null> | PluginCommitMessage | null)
+    | null = null
 
   /** Records a registration and hands back a disposer that unrecords it. */
   function record(into: string[], id: string): Disposer {
@@ -114,6 +148,19 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
   }
 
   const ui: PluginUiApi = {
+    git: {
+      provideCommitMessage: (provider) => {
+        commitProvider = provider
+        registrations.commitMessageProvider = true
+        const dispose = (): void => {
+          if (commitProvider === provider) commitProvider = null
+          registrations.commitMessageProvider = false
+        }
+        effects.add(dispose)
+        return dispose
+      },
+      status: () => git,
+    },
     kit: {
       KeyHint: nothing,
       List: nothing,
@@ -207,8 +254,15 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
 
   return {
     actions,
+    askForCommitMessage: async (request) => {
+      if (commitProvider === null) throw new Error('the plugin registered no commit provider')
+      return commitProvider({ ...EMPTY_REQUEST, ...request }, new AbortController().signal)
+    },
     opened,
     registrations,
+    setGitStatus: (status) => {
+      git = status
+    },
     setSetting: (id, value) => {
       settings.set(id, value)
       for (const listener of settingListeners.get(id) ?? []) listener(value)

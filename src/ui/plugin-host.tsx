@@ -25,6 +25,7 @@ import { dispatchGlobal } from '../state/dispatch-ref'
 import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
 import { describeUiState, resolveKeymap, runPluginActionByName } from './introspection'
+import { setUiPluginEmitter } from './plugin-events-ref'
 import { onPluginModalsChanged } from './plugin-modals'
 import { onPluginPanesChanged } from './plugin-panes'
 import { setPluginRefresh } from './plugin-refresh-ref'
@@ -271,11 +272,17 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
     ]
 
     backend.on('pluginEvent', onPluginEvent)
+    // aimux's own UI events reach plugins through this: a call site emits
+    // without importing the kernel, and emits into nothing before we mount.
+    setUiPluginEmitter((event, payload) => {
+      runtime.kernel.emit(event, payload)
+    })
     void runtime.start()
 
     return () => {
       stopped = true
       setPluginRefresh(null)
+      setUiPluginEmitter(null)
       for (const unwatch of unwatchRegistries) unwatch()
       backend.off('pluginEvent', onPluginEvent)
       void runtime.stop()

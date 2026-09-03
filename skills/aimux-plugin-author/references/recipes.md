@@ -340,3 +340,29 @@ ctx.effect(() => {
 
 A plugin holding a module-level `setInterval` survives its own unload, and no
 amount of care elsewhere fixes that.
+
+## Write the commit message
+
+Git mode stays aimux's; the sentence is yours.
+
+```ts
+ctx.ui.git.provideCommitMessage(async (request, signal) => {
+  const ticket = /([A-Z]+-\d+)/.exec(request.branch)?.[1]
+  if (!ticket) return null // declining hands it back to aimux
+  return { body: request.diff.slice(0, 400), title: `${ticket}: ${summarise(request.diff)}` }
+})
+```
+
+`request` carries `{ projectId, repoRoot, branch, diff, recentCommits, files,
+sessionTail? }` — the staged diff when anything is staged, the working tree's
+otherwise. One plugin holds the slot at a time; the second to ask is refused
+and told so in its log.
+
+React to the repository without owning it:
+
+```ts
+ctx.on('git:workingTreeChanged', ({ branch, files }) => {
+  ctx.log.info(`${files.length} files on ${branch}`)
+})
+const now = ctx.ui.git.status() // the panel's last refresh
+```

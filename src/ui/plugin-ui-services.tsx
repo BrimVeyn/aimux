@@ -2,6 +2,7 @@ import type {
   Disposer,
   PluginActionsApi,
   PluginContext,
+  PluginGitFile,
   PluginKit,
   PluginStoreApi,
   PluginTabInfo,
@@ -20,9 +21,10 @@ import {
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
-import type { AppState } from '../state/types'
+import type { AppState, GitFileEntry } from '../state/types'
 
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
+import { registerCommitMessageProvider } from '../git/commit-message-provider'
 import { registerKeymapLayer } from '../input/keymap/plugin-layer'
 import { registerSettingSection } from '../settings/sections'
 import { settingsStore } from '../settings/settings-store'
@@ -125,9 +127,45 @@ const KIT: PluginKit = {
   useTheme: () => usePluginTheme() as unknown as Record<string, string>,
 }
 
+/** `GitFileEntry` narrowed to what a plugin has any business seeing. */
+function describeFiles(files: readonly GitFileEntry[]): PluginGitFile[] {
+  return files.map((file) => ({
+    added: file.added,
+    path: file.path,
+    removed: file.removed,
+    section: file.section,
+    status: file.status,
+  }))
+}
+
 function buildUi(ctx: PluginContext): PluginUiApi {
   const { id } = ctx
   return {
+    git: {
+      provideCommitMessage: (provider) => {
+        const registration = registerCommitMessageProvider(id, provider)
+        if (!registration.accepted) {
+          // Silence here would mean a plugin whose whole purpose never runs,
+          // with nothing anywhere saying why.
+          ctx.log.warn('commit messages are already provided by another plugin', {
+            reason: registration.reason,
+          })
+          return () => {
+            /* the slot was never taken; there is nothing to give back */
+          }
+        }
+        return own(ctx, registration.dispose)
+      },
+      status: () => {
+        const { gitPanel } = appStore.getState()
+        return {
+          ahead: gitPanel.ahead,
+          behind: gitPanel.behind,
+          branch: gitPanel.branch,
+          files: describeFiles(gitPanel.files),
+        }
+      },
+    },
     kit: KIT,
     modals: {
       close: () => {
