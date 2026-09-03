@@ -1,7 +1,15 @@
 import type { CursorStyle, MouseEvent as OtuiMouseEvent, TextRenderable } from '@opentui/core'
 
 import { useRenderer } from '@opentui/react'
-import { memo, type ReactNode, useCallback, useEffect, useMemo } from 'react'
+import {
+  memo,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+} from 'react'
 
 import type { TerminalContentOrigin } from '../../../input/raw-input-handler'
 import type { JunctionEdgeInfo, JunctionEdges } from '../../../state/layout-tree'
@@ -87,6 +95,7 @@ export interface TerminalViewportProps {
   viewport: TerminalSnapshot | undefined
   buffer: string
   softCursor: boolean
+  textNodeRef?: RefObject<TextRenderable | null>
 }
 
 const OPENTUI_CURSOR_STYLES: Record<TerminalCursorStyle, CursorStyle> = {
@@ -190,13 +199,23 @@ const pinTerminalScroll = (node: TextRenderable | null): void => {
 export const TerminalViewport = memo(function TerminalViewport({
   buffer,
   softCursor,
+  textNodeRef,
   viewport,
 }: TerminalViewportProps) {
   const t = useTheme()
+  const mergedRef = useCallback(
+    (node: TextRenderable | null): void => {
+      pinTerminalScroll(node)
+      if (textNodeRef) {
+        textNodeRef.current = node
+      }
+    },
+    [textNodeRef]
+  )
   if (viewport && viewport.lines.length > 0) {
     const lines = viewport.lines
     return (
-      <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
+      <text ref={mergedRef} fg={t.text} wrapMode="none">
         {lines.map((line, lineIndex) => (
           // Terminal rows are a fixed positional grid; the row index is the identity.
           // eslint-disable-next-line react/no-array-index-key
@@ -210,7 +229,7 @@ export const TerminalViewport = memo(function TerminalViewport({
   }
 
   return (
-    <text ref={pinTerminalScroll} fg={t.text} wrapMode="none">
+    <text ref={mergedRef} fg={t.text} wrapMode="none">
       {buffer.length > 0 ? buffer : 'Waiting for project output...'}
     </text>
   )
@@ -241,6 +260,7 @@ export function TerminalPane({
   const setContentBox = usePaneSizeReport(tabId, !!tab, onMeasure)
   const editorBg = t.background
   const paneIsActive = isActive ?? true
+  const textNodeRef = useRef<TextRenderable | null>(null)
   // Restored/disconnected tabs carry a frozen snapshot whose persisted
   // cursorVisible/cursorRow/cursorCol never update again — parking the
   // hardware cursor there would leave a stray blinking cursor at a stale
@@ -438,20 +458,20 @@ export function TerminalPane({
       // text away from state.viewport.lines by one wheel step. The drift
       // accumulates until the user refreshes aimux (re-mounts the text).
       // Reset _scrollY here, right after the child finished scrolling.
-      const scrollTarget = event.target
-      if (scrollTarget !== null && typeof scrollTarget === 'object') {
-        const currentScrollY = Reflect.get(scrollTarget, 'scrollY')
+      const node = textNodeRef.current
+      if (node !== null) {
+        const currentScrollY = Reflect.get(node, 'scrollY')
         if (typeof currentScrollY === 'number' && currentScrollY !== 0) {
           try {
-            Reflect.set(scrollTarget, 'scrollY', 0)
+            Reflect.set(node, 'scrollY', 0)
           } catch {
             // Not all renderables expose a setter; best-effort only.
           }
         }
-        const currentScrollX = Reflect.get(scrollTarget, 'scrollX')
+        const currentScrollX = Reflect.get(node, 'scrollX')
         if (typeof currentScrollX === 'number' && currentScrollX !== 0) {
           try {
-            Reflect.set(scrollTarget, 'scrollX', 0)
+            Reflect.set(node, 'scrollX', 0)
           } catch {
             // Not all renderables expose a setter; best-effort only.
           }
@@ -478,6 +498,7 @@ export function TerminalPane({
       contentOrigin,
       onTerminalMouseEvent,
       onTerminalScrollEvent,
+      textNodeRef,
     ]
   )
   const handleNoTabMouseDown = useCallback((event: OtuiMouseEvent) => {
@@ -564,6 +585,7 @@ export function TerminalPane({
               viewport={tab.viewport}
               buffer={tab.buffer}
               softCursor={!showHardwareCursor}
+              textNodeRef={textNodeRef}
             />
           </box>
         )}
