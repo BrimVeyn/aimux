@@ -6,6 +6,7 @@ import {
   type AutoRenameTab,
   initialAutoRenameStatus,
 } from '../../src/auto-rename/coordinator'
+import { PromptObserver } from '../../src/prompts/prompt-observer'
 
 const config: AutoRenameConfigSnapshot = {
   enabled: true,
@@ -25,11 +26,19 @@ function makeTab(): AutoRenameTab {
   return { assistant: 'claude', autoRenameStatus: 'eligible', id: 'tab-1', title: 'Claude' }
 }
 
+/**
+ * The coordinator with the observer in front of it, which is how the daemon
+ * wires them: keystrokes and hook payloads reach `PromptObserver`, and what it
+ * is confident about reaches auto-rename. The tests below type bytes and expect
+ * titles, so they need the pair rather than either half.
+ */
 function makeCoordinator(
   tab: AutoRenameTab,
   spawn: NonNullable<ConstructorParameters<typeof AutoRenameCoordinator>[0]['spawn']>,
   overrides: Partial<AutoRenameConfigSnapshot> = {}
-): AutoRenameCoordinator {
+): AutoRenameCoordinator & { observeWrite: PromptObserver['observeWrite'] } & {
+  observePrompt: PromptObserver['observePrompt']
+} {
   const coordinator = new AutoRenameCoordinator({
     config: { ...config, ...overrides },
     getTab: () => tab,
@@ -37,7 +46,13 @@ function makeCoordinator(
     updateTab: (_tabId, patch) => Object.assign(tab, patch),
   })
   coordinator.register(tab)
-  return coordinator
+  const observer = new PromptObserver({
+    onPrompt: (tabId, prompt) => coordinator.onPrompt(tabId, prompt),
+  })
+  return Object.assign(coordinator, {
+    observePrompt: (tabId: string, prompt: string) => observer.observePrompt(tabId, prompt),
+    observeWrite: (tabId: string, input: string) => observer.observeWrite(tabId, input),
+  })
 }
 
 test('only marks supported candidate tabs as eligible', () => {

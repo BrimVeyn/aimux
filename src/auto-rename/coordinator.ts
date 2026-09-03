@@ -2,7 +2,6 @@ import type { AssistantId } from '../state/types'
 
 import { isSupportedProvider } from '../auto-commit/headless-commands'
 import { heuristicTitle } from './heuristic-title'
-import { PromptCapture } from './prompt-capture'
 import { classifyPrompt } from './prompt-gate'
 import { generateTabTitle, type TitleSpawnFn } from './title-runner'
 
@@ -41,7 +40,6 @@ const MAX_PENDING_PROMPTS = 3
 const MAX_CONCURRENT_GENERATIONS = 2
 
 interface TabRenameState {
-  capture: PromptCapture
   /** Title-worthy prompts collected for the next generation, oldest first. */
   prompts: string[]
   /** First title-worthy prompt seen, kept as the source for the local fallback. */
@@ -49,12 +47,6 @@ interface TabRenameState {
   attempts: number
   settleTimer: ReturnType<typeof setTimeout> | null
   controller: AbortController | null
-  /**
-   * True once a provider hook delivered a real prompt. Hook payloads are ground
-   * truth — dialog keystrokes never reach them — so keystroke reconstruction is
-   * ignored from then on.
-   */
-  hookDriven: boolean
 }
 
 function normalize(text: string): string {
@@ -107,35 +99,19 @@ export class AutoRenameCoordinator {
     this.unregister(tabId)
   }
 
-  /** Keystroke fallback: reconstruct submissions from the bytes written to the PTY. */
-  observeWrite(tabId: string, input: string): void {
-    const tab = this.eligibleTab(tabId)
-    if (!tab) return
-    const state = this.ensureState(tabId)
-    if (state.hookDriven) return
-
-    const result = state.capture.feed(input)
-    if (result.type === 'pending') return
-    // A submission we could not reconstruct faithfully is dropped, not counted:
-    // history recall, Tab completion and unknown escapes must not cost the tab
-    // its only chance at a name.
-    if (result.prompt === null) return
-    this.acceptPrompt(tabId, state, result.prompt)
-  }
-
   /**
-   * Ground truth from a provider hook (Claude's `UserPromptSubmit`): the exact
-   * prompt text, delivered only for real submissions.
+   * A prompt the user submitted, from `PromptObserver` — hook or reconstructed
+   * keystrokes, the observer having already decided which to trust.
+   *
+   * The eligibility check lives here and not in the observer: "has this tab
+   * been named yet" is auto-rename's question, and asking it upstream is what
+   * used to make prompt observation go silent for everyone else the moment a
+   * tab got its title.
    */
-  observePrompt(tabId: string, prompt: string): void {
+  onPrompt(tabId: string, prompt: string): void {
     const tab = this.eligibleTab(tabId)
     if (!tab) return
-    const state = this.ensureState(tabId)
-    if (!state.hookDriven) {
-      state.hookDriven = true
-      state.capture.reset()
-    }
-    this.acceptPrompt(tabId, state, prompt)
+    this.acceptPrompt(tabId, this.ensureState(tabId), prompt)
   }
 
   private eligibleTab(tabId: string): AutoRenameTab | undefined {
@@ -244,10 +220,8 @@ export class AutoRenameCoordinator {
 function createState(): TabRenameState {
   return {
     attempts: 0,
-    capture: new PromptCapture(),
     controller: null,
     firstPrompt: null,
-    hookDriven: false,
     prompts: [],
     settleTimer: null,
   }

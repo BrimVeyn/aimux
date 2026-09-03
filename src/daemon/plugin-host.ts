@@ -53,6 +53,7 @@ const OUTBOUND_CALL_TIMEOUT_MS = 10_000
 const DAEMON_EVENT_NAMES: readonly DaemonEventName[] = [
   'tab:status',
   'tab:turnComplete',
+  'tab:prompt',
   'tab:question',
   'tab:added',
   'project:status',
