@@ -5,15 +5,12 @@ import { $ } from 'bun'
 import type { AppAction } from '../state/actions'
 import type { AppState, AssistantId, AutoCommitState, GitRefreshPayload } from '../state/types'
 
-import { buildHeadlessInvocation, isSupportedProvider } from '../auto-commit/headless-commands'
-import { composePromptFromTemplate, loadBriefingTemplate } from '../auto-commit/prompt-loader'
+import { isSupportedProvider } from '../auto-commit/headless-commands'
 import { hasStagedFiles } from '../auto-commit/staging-mode'
 import { stripAnsi } from '../auto-commit/strip-ansi'
-import { runSuggestion } from '../auto-commit/suggestion-runner'
 import { workingTreeHash } from '../auto-commit/working-tree-hash'
 import { getCommitMessageProvider } from '../git/commit-message-provider'
 import { createPluginLogger } from '../plugins/log'
-import { isCommandAvailable } from '../pty/command-registry'
 import { toast } from '../state/toast-store'
 
 export interface TriggerInput {
@@ -49,14 +46,6 @@ export interface DriverDeps {
   dispatch: (action: AppAction) => void
   getConfig: () => AutoCommitConfigSnapshot
   getProfileConfigRoot: () => string
-}
-
-let cachedTemplate: string | null = null
-
-async function getTemplate(deps: DriverDeps): Promise<string> {
-  if (cachedTemplate !== null) return cachedTemplate
-  cachedTemplate = await loadBriefingTemplate({ profileConfigRoot: deps.getProfileConfigRoot() })
-  return cachedTemplate
 }
 
 const UNTRACKED_FILE_BYTES_CAP = 8_000
@@ -167,7 +156,7 @@ export async function onActivityTransition(
   })
   if (!should) return
 
-  await runGeneration(deps, args, currentHash, config)
+  await runGeneration(deps, args, currentHash)
 }
 
 export async function onManualTrigger(
@@ -193,27 +182,19 @@ export async function onManualTrigger(
   // Manual trigger is always user-intent to regenerate, even if a ready
   // suggestion exists at the same hash — the user explicitly asked for it.
 
-  // Same reason as in `runGeneration`: with a plugin answering, the absence of
-  // a headless model is not a reason to refuse.
+  // Whether a model is reachable is the provider's business now, not the
+  // driver's: it is the one that calls it.
   if (getCommitMessageProvider() === null) {
-    const probe = buildHeadlessInvocation(
-      args.assistant,
-      '__probe__',
-      config.models[args.assistant]
-    )
-    if (!probe) return fail(`no headless invocation for ${args.assistant}`)
-    if (!isCommandAvailable(probe.executable)) {
-      return fail(`'${probe.executable}' not found in PATH`)
-    }
+    return fail('no plugin writes commit messages — is aimux.auto-commit disabled?')
   }
 
-  await runGeneration(deps, args, currentHash, config)
+  await runGeneration(deps, args, currentHash)
 }
 
 /**
- * Asks the plugin holding the slot. Its failure is its own: a provider that
- * throws must cost this one message, not the feature — aimux falls back to its
- * own suggestion and says so in the plugin's log.
+ * Asks whoever holds the slot. Its failure is its own: a provider that throws
+ * costs this one message and says so in its log, rather than taking the
+ * feature down with it.
  */
 async function askProvider(
   slot: NonNullable<ReturnType<typeof getCommitMessageProvider>>,
@@ -236,27 +217,12 @@ async function askProvider(
 async function runGeneration(
   deps: DriverDeps,
   args: ActivityTransitionArgs,
-  currentHash: string,
-  config: AutoCommitConfigSnapshot
+  currentHash: string
 ): Promise<void> {
-  // A plugin holding the commit-message slot answers instead of a headless
-  // model call, so the checks for *that* model must not gate the run: a plugin
-  // that writes messages should work on a machine with no `claude` installed.
-  const provider = getCommitMessageProvider()
-  if (provider === null) {
-    const probe = buildHeadlessInvocation(
-      args.assistant,
-      '__probe__',
-      config.models[args.assistant]
-    )
-    if (!probe) return
-    if (!isCommandAvailable(probe.executable)) return
-  }
-
   // Supersede any in-flight generation for this project. Without this, a
   // rapid sequence of activity transitions (each with a different working
-  // tree hash) would leak concurrent headless subprocesses until each hit
-  // its 60 s timeout — burning real API credits.
+  // tree hash) would leak concurrent generations until each hit its timeout —
+  // burning real API credits.
   const existing = deps.getState().autoCommit.byProject[args.projectId]
   if (existing && existing.kind === 'generating') {
     try {
@@ -266,7 +232,17 @@ async function runGeneration(
     }
   }
 
+  const provider = getCommitMessageProvider()
   const controller = new AbortController()
+  const give = (): void => {
+    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
+  }
+  if (provider === null) {
+    // Nobody writes commit messages: the built-in is disabled and no plugin
+    // replaced it. Not an error — a switch the user turned off.
+    return
+  }
+
   deps.dispatch({
     abortController: controller,
     projectId: args.projectId,
@@ -276,76 +252,40 @@ async function runGeneration(
     workingTreeHash: currentHash,
   })
 
-  const template = await getTemplate(deps)
   const stagedOnly = args.git ? hasStagedFiles(args.git) : false
   const ctx = await gatherContext(args.projectPath as string, stagedOnly)
-  if (!ctx) {
-    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
-    return
-  }
+  if (!ctx) return give()
+
   const tab = deps.getState().tabs.find((t) => t.id === args.tabId)
   const sessionTail = extractSessionTail(tab?.buffer)
 
-  if (provider !== null) {
-    const suggestion = await askProvider(
-      provider,
-      {
-        branch: ctx.branch,
-        diff: ctx.diff,
-        files: (args.git?.files ?? []).map((file) => ({
-          added: file.added,
-          path: file.path,
-          removed: file.removed,
-          section: file.section,
-          status: file.status,
-        })),
-        projectId: args.projectId,
-        recentCommits: ctx.recentCommits,
-        repoRoot: args.projectPath as string,
-        ...(sessionTail === undefined ? {} : { sessionTail }),
-      },
-      controller.signal
-    )
-    if (suggestion !== null) {
-      deps.dispatch({
-        body: suggestion.body ?? '',
-        generatedAt: Date.now(),
-        projectId: args.projectId,
-        title: suggestion.title,
-        type: 'auto-commit-generation-ready',
-        workingTreeHash: currentHash,
-      })
-      return
-    }
-    // A provider that declines is not a provider that failed: fall through to
-    // aimux's own suggestion rather than leaving the user with nothing.
-  }
-
-  const prompt = composePromptFromTemplate(template, { ...ctx, sessionTail })
-  const finalInvocation = buildHeadlessInvocation(
-    args.assistant,
-    prompt,
-    config.models[args.assistant]
+  const suggestion = await askProvider(
+    provider,
+    {
+      assistant: args.assistant,
+      branch: ctx.branch,
+      diff: ctx.diff,
+      files: (args.git?.files ?? []).map((file) => ({
+        added: file.added,
+        path: file.path,
+        removed: file.removed,
+        section: file.section,
+        status: file.status,
+      })),
+      projectId: args.projectId,
+      recentCommits: ctx.recentCommits,
+      repoRoot: args.projectPath as string,
+      ...(sessionTail === undefined ? {} : { sessionTail }),
+    },
+    controller.signal
   )
-  if (!finalInvocation) {
-    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
-    return
-  }
+  if (suggestion === null) return give()
 
-  const parsed = await runSuggestion({
-    invocation: finalInvocation,
-    signal: controller.signal,
-    timeoutMs: config.timeoutMs,
-  })
-  if (!parsed) {
-    deps.dispatch({ projectId: args.projectId, type: 'auto-commit-clear' })
-    return
-  }
   deps.dispatch({
-    body: parsed.body,
+    body: suggestion.body ?? '',
     generatedAt: Date.now(),
     projectId: args.projectId,
-    title: parsed.title,
+    title: suggestion.title,
     type: 'auto-commit-generation-ready',
     workingTreeHash: currentHash,
   })

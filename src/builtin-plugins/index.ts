@@ -3,6 +3,7 @@ import type { ResolvedConfig } from '@brimveyn/aimux-config'
 import type { BuiltinPlugin } from '../plugins/builtin'
 
 import { aiUsagePlugin } from './ai-usage'
+import { autoCommitPlugin } from './auto-commit'
 import { autoRenamePlugin } from './auto-rename'
 import { CLAUDE_PLUGIN } from './claude'
 
@@ -26,5 +27,5 @@ import { CLAUDE_PLUGIN } from './claude'
  * the ids are wanted.
  */
 export function builtinPlugins(config?: ResolvedConfig): readonly BuiltinPlugin[] {
-  return [CLAUDE_PLUGIN, aiUsagePlugin(config), autoRenamePlugin(config)]
+  return [CLAUDE_PLUGIN, aiUsagePlugin(config), autoRenamePlugin(config), autoCommitPlugin(config)]
 }

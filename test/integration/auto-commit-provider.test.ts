@@ -22,11 +22,14 @@ import { createInitialState } from '../../src/state/store'
  * with no `claude` in PATH is exactly where a plugin providing commit messages
  * is most useful, and the old code refused before it ever asked.
  *
- * The assistant below is deliberately one aimux has no headless invocation for.
- * With `claude` the fallback path spawns the real thing — which the first draft
- * of this file did, taking five seconds and burning credits to assert nothing.
- * Here, declining lands on "aimux has nothing either", which is the branch worth
- * pinning: the plugin is asked, and its answer decides.
+ * Since the migration there is no second path: whoever holds the slot writes
+ * the message, and aimux's own answer is a built-in plugin holding it like any
+ * other. Declining means no suggestion this time, not a fallback.
+ *
+ * The assistant below has no headless invocation, which keeps the built-in from
+ * spawning anything if it ever ends up registered here — the first draft of
+ * this file spawned the real `claude`, taking five seconds and burning credits
+ * to assert nothing.
  */
 
 /** No headless invocation exists for this one, so nothing is ever spawned. */
@@ -104,7 +107,7 @@ test('a plugin writes the message, and no headless model is required', async () 
   })
 })
 
-test('a provider that declines hands the question back to aimux', async () => {
+test('a provider that declines leaves the suggestion cleared', async () => {
   const root = await makeRepo()
   let asked = 0
   registerCommitMessageProvider('acme.commits', () => {
@@ -122,9 +125,8 @@ test('a provider that declines hands the question back to aimux', async () => {
   })
 
   expect(asked).toBe(1)
-  // Declining is not failing: aimux went on to its own path, which here has
-  // nothing to offer either — so the run clears instead of committing the
-  // plugin's silence as an answer.
+  // Declining clears the suggestion rather than committing the plugin's
+  // silence as an answer. aimux waits for the next working-tree change.
   expect(dispatched.some((action) => action.type === 'auto-commit-generation-started')).toBe(true)
   expect(dispatched.some((action) => action.type === 'auto-commit-clear')).toBe(true)
   expect(dispatched.some((action) => action.type === 'auto-commit-generation-ready')).toBe(false)
@@ -145,8 +147,8 @@ test('a provider that throws costs one message, not the feature', async () => {
     tabId: 't1',
   })
 
-  // Same shape as declining: the throw is logged against the plugin, and aimux
-  // carries on rather than the whole feature going down with it.
+  // Same shape as declining: the throw is logged against the plugin, and the
+  // feature survives it — nothing is applied, and the next change tries again.
   expect(dispatched.some((action) => action.type === 'auto-commit-generation-started')).toBe(true)
   expect(dispatched.some((action) => action.type === 'auto-commit-generation-ready')).toBe(false)
 })

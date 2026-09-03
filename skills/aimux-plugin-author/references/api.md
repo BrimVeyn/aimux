@@ -684,6 +684,12 @@ export interface PluginCommitMessageRequest {
   projectId: string
   repoRoot: string
   branch: string
+  /**
+   * The assistant in the tab the commit is being written for — `claude`,
+   * `codex`, … A provider that calls a model headlessly needs to know which
+   * one the user is already working with.
+   */
+  assistant: string
   /** Staged diff when anything is staged, the working-tree diff otherwise. */
   diff: string
   /** `git log --oneline`, for house style rather than for content. */

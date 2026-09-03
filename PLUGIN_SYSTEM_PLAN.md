@@ -664,6 +664,28 @@ les protocoles IPC et terminal-manager, et dans la session persistée. Le
 déplacer dans le plugin aurait été une migration de protocole déguisée en
 migration de plugin.
 
+## 6.5 ter · `auto-commit` a migré (2026-09-03)
+
+Pas la feature : sa phrase. Ce qui fait d'auto-commit une feature reste à
+aimux — quand ça se déclenche, le hash qui dit qu'une suggestion est périmée,
+l'abandon qui supplante une génération en vol, le panneau où elle s'affiche.
+Ce qui part, c'est l'appel au modèle : le gabarit de briefing, la composition
+du prompt, l'invocation headless, l'analyse de la réponse.
+
+`aimux.auto-commit` tient la fente par le même `ctx.ui.git.provideCommitMessage`
+qu'un plugin tiers, sans chemin privilégié — la seule façon de rendre la fente
+croyable, un built-in qui tricherait ne prouvant rien.
+
+Ça a imposé une règle dans la fente : **des rangs**. Un built-in enregistré au
+démarrage gagne à tous les coups une fente « premier arrivé », donc aucun plugin
+installé par l'utilisateur ne pourrait jamais la tenir. Un plugin utilisateur
+déplace maintenant le built-in et la lui rend au déchargement ; deux plugins
+utilisateur restent un refus.
+
+Le driver a perdu son propre appel au modèle dans l'échange : il n'y a plus de
+second chemin, et un fournisseur qui décline veut dire « pas de suggestion cette
+fois » plutôt qu'un repli sur quelque chose qu'aimux garderait en réserve.
+
 ## 6.6 Ordre proposé
 
 1. Publier le paquet (6.2). Rien d'autre ne compte tant que c'est faux.
