@@ -1,9 +1,11 @@
+import type { PluginManifest } from '@brimveyn/aimux-plugin'
+
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { CliCommand } from '../../registry'
 
-import { runPluginBuild } from '../../../plugins/build'
+import { type PluginBuildResult, runPluginBuild } from '../../../plugins/build'
 import { formatManifestIssues, readManifest } from '../../../plugins/manifest'
 import { getInstalledPluginDir, getPluginsRootDir } from '../../../plugins/paths'
 import { upsertPluginRegistryEntry } from '../../../plugins/registry-file'
@@ -18,10 +20,14 @@ import { notifyRunningDaemon } from './shared'
  */
 const SPEC_PATTERN = /^([\w.-]+)\/([\w.-]+)(?:\/(.+))?$/
 
-interface ParsedSpec {
+export interface ParsedSpec {
   owner: string
   repo: string
   subdir?: string
+}
+
+export function formatInstallSpec(spec: ParsedSpec): string {
+  return `${spec.owner}/${spec.repo}${spec.subdir === undefined ? '' : `/${spec.subdir}`}`
 }
 
 export function parseInstallSpec(spec: string): ParsedSpec {
@@ -31,6 +37,63 @@ export function parseInstallSpec(spec: string): ParsedSpec {
   }
   const [, owner = '', repo = '', subdir] = match
   return subdir === undefined ? { owner, repo } : { owner, repo, subdir }
+}
+
+/**
+ * Clone into a staging directory and read the manifest there. The caller
+ * owns `staging` and removes it — install after copying, update after
+ * comparing versions.
+ */
+export async function fetchPluginFromGitHub(spec: ParsedSpec): Promise<{
+  staging: string
+  root: string
+  manifest: PluginManifest | null
+  issues: string | null
+}> {
+  mkdirSync(getPluginsRootDir(), { recursive: true })
+  const staging = join(getPluginsRootDir(), `.staging-${Date.now()}`)
+  rmSync(staging, { force: true, recursive: true })
+  await cloneShallow(spec, staging)
+  const root = spec.subdir === undefined ? staging : join(staging, spec.subdir)
+  const result = await readManifest(root)
+  return result.ok
+    ? { issues: null, manifest: result.manifest, root, staging }
+    : { issues: formatManifestIssues(result.issues), manifest: null, root, staging }
+}
+
+/**
+ * Copies a fetched checkout into `<profile>/plugins/<id>`, runs `build`, and
+ * records it. A failed build removes the copy: an installed plugin that
+ * cannot load is worse than one that is not installed.
+ */
+export async function placeInstalledPlugin(
+  root: string,
+  manifest: PluginManifest,
+  origin: string
+): Promise<{ target: string; build: PluginBuildResult }> {
+  const target = getInstalledPluginDir(manifest.id)
+  if (existsSync(target)) rmSync(target, { force: true, recursive: true })
+  mkdirSync(target, { recursive: true })
+  // `cp -R <root>/. <target>` keeps the subdir case simple and preserves
+  // dotfiles, which a glob copy would miss.
+  const copy = Bun.spawn(['cp', '-R', `${root}/.`, target], { stderr: 'pipe' })
+  if ((await copy.exited) !== 0) {
+    throw new Error(`failed to copy plugin into ${target}`)
+  }
+  const build = await runPluginBuild(manifest, target)
+  if (build.failed !== undefined) {
+    rmSync(target, { force: true, recursive: true })
+    return { build, target }
+  }
+  upsertPluginRegistryEntry({
+    enabled: true,
+    id: manifest.id,
+    origin,
+    path: target,
+    source: 'install',
+    version: manifest.version,
+  })
+  return { build, target }
 }
 
 async function cloneShallow(spec: ParsedSpec, into: string): Promise<void> {
@@ -68,22 +131,17 @@ export const pluginInstall: CliCommand = {
   group: 'plugin',
   run: async (ctx) => {
     const spec = parseInstallSpec(ctx.args.positionals[0] ?? '')
-    const origin = `${spec.owner}/${spec.repo}${spec.subdir === undefined ? '' : `/${spec.subdir}`}`
+    const origin = formatInstallSpec(spec)
 
-    mkdirSync(getPluginsRootDir(), { recursive: true })
-    const staging = join(getPluginsRootDir(), `.staging-${Date.now()}`)
-    rmSync(staging, { force: true, recursive: true })
-
+    const fetched = await fetchPluginFromGitHub(spec)
+    const { root, staging } = fetched
     try {
-      await cloneShallow(spec, staging)
-      const root = spec.subdir === undefined ? staging : join(staging, spec.subdir)
-      const result = await readManifest(root)
-      if (!result.ok) {
-        writeError(`${origin}: ${formatManifestIssues(result.issues)}`)
-        writeJson({ error: formatManifestIssues(result.issues), kind: 'invalid-manifest', origin })
+      if (fetched.manifest === null) {
+        writeError(`${origin}: ${fetched.issues ?? 'invalid manifest'}`)
+        writeJson({ error: fetched.issues, kind: 'invalid-manifest', origin })
         return EXIT_RUNTIME
       }
-      const { manifest } = result
+      const { manifest } = fetched
 
       // Preview on stderr: stdout stays one JSON object, per the CLI contract.
       writeError(`about to install ${manifest.id}@${manifest.version} from ${origin}`)
@@ -104,32 +162,12 @@ export const pluginInstall: CliCommand = {
         return EXIT_USAGE
       }
 
-      const target = getInstalledPluginDir(manifest.id)
-      if (existsSync(target)) rmSync(target, { force: true, recursive: true })
-      mkdirSync(target, { recursive: true })
-      // `cp -R <root>/. <target>` keeps the subdir case simple and preserves
-      // dotfiles, which a glob copy would miss.
-      const copy = Bun.spawn(['cp', '-R', `${root}/.`, target], { stderr: 'pipe' })
-      if ((await copy.exited) !== 0) {
-        throw new Error(`failed to copy plugin into ${target}`)
-      }
-
-      const build = await runPluginBuild(manifest, target)
+      const { build, target } = await placeInstalledPlugin(root, manifest, origin)
       if (build.failed !== undefined) {
-        rmSync(target, { force: true, recursive: true })
         writeError(`build step failed: ${build.failed}`)
         writeJson({ error: build.failed, id: manifest.id, kind: 'build-failed', origin })
         return EXIT_RUNTIME
       }
-
-      upsertPluginRegistryEntry({
-        enabled: true,
-        id: manifest.id,
-        origin,
-        path: target,
-        source: 'install',
-        version: manifest.version,
-      })
 
       const refreshed = await notifyRunningDaemon('refresh')
       writeJson({
