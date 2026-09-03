@@ -23,6 +23,7 @@ import {
 import type { AppState } from '../state/types'
 
 import { registerPluginEffect } from '../app-runtime/plugin-effects'
+import { registerKeymapLayer } from '../input/keymap/plugin-layer'
 import { registerSettingSection } from '../settings/sections'
 import { settingsStore } from '../settings/settings-store'
 import { appStore, useAppStore } from '../state/app-store'
@@ -319,6 +320,57 @@ function buildStore(ctx: PluginContext): PluginStoreApi {
  * The `extendContext` the UI kernel is built with. Attaches the three service
  * objects to every UI-half context.
  */
+/**
+ * What the manifest's `contributes` block asks the interface for: a place for
+ * a widget, a key for an action.
+ *
+ * Applied before the plugin's own `apply` runs, which is deliberate and
+ * harmless in both directions — a placed widget whose renderer is not
+ * registered yet is an orphan, which bars already skip, and a bound key
+ * resolves its action at press time. Both come back off through the fiber, so
+ * an unload leaves neither a widget nobody can draw nor a key nobody answers.
+ */
+function applyContributions(ctx: PluginContext): void {
+  const contributes = ctx.manifest.contributes
+  if (contributes === undefined) return
+
+  for (const placement of contributes.bars ?? []) {
+    const widgetId = qualify(ctx.id, placement.widget)
+    dispatchGlobal({
+      ...(placement.grow === undefined ? {} : { grow: placement.grow }),
+      ...(placement.position === 'start' ? { index: 0 } : {}),
+      placedBy: 'plugin',
+      side: placement.side ?? 'left',
+      type: 'add-widget',
+      widgetId,
+    })
+    ctx.effect(() => () => {
+      dispatchGlobal({ type: 'remove-plugin-widget', widgetId })
+    })
+  }
+
+  const bindings = contributes.keymaps ?? []
+  if (bindings.length === 0) return
+  const layer = registerKeymapLayer(
+    ctx.id,
+    bindings.map((binding) => ({
+      action: qualify(ctx.id, binding.action),
+      keys: binding.key,
+      mode: binding.mode,
+    }))
+  )
+  for (const { binding, reason } of layer.refused) {
+    // A key that silently does nothing is the worst outcome here, so the
+    // reason goes in the plugin's own log where `plugin log` will find it.
+    ctx.log.warn(`keybinding not applied: ${binding.keys} in ${binding.mode}`, {
+      reason: reason === 'taken' ? 'already bound — aimux.config.ts wins' : 'unparseable',
+    })
+  }
+  ctx.effect(() => () => {
+    layer.dispose()
+  })
+}
+
 export function extendUiPluginContext(ctx: PluginContext): void {
   const extended = ctx as PluginContext & {
     ui: PluginUiApi
@@ -328,4 +380,5 @@ export function extendUiPluginContext(ctx: PluginContext): void {
   extended.ui = buildUi(ctx)
   extended.actions = buildActions(ctx)
   extended.store = buildStore(ctx)
+  applyContributions(ctx)
 }

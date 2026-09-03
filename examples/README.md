@@ -24,6 +24,11 @@ aimux plugin doctor .
 aimux plugin log aimux-examples.shifter
 ```
 
+Linking is the whole setup: each manifest declares where its widget goes and
+which keys run its actions, and the host applies that on load and withdraws it
+on unload. Nothing to write in `aimux.config.ts`, and no restart — though what
+you write there still outranks anything a plugin asks for.
+
 They are not registered by default: linking one is a deliberate act, and these
 write to your terminals.
 

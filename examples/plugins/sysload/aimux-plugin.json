@@ -21,5 +21,13 @@
       "description": "Prints a percentage on stdout. Empty disables the GPU line.",
       "default": "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits"
     }
+  },
+  "contributes": {
+    "bars": [
+      {
+        "widget": "load",
+        "side": "left"
+      }
+    ]
   }
 }

@@ -53,9 +53,48 @@ my-plugin/
 
 The manifest carries everything the host must know _before_ running plugin
 code: which halves exist (hence which process a change reloads), the API
-generation, the config schema (hence the generated settings rows), and the
-subprocess commands. See `@brimveyn/aimux-plugin`'s `PluginManifest` for the
-full schema.
+generation, the config schema (hence the generated settings rows), the
+subprocess commands, and what the plugin asks the interface for. See
+`@brimveyn/aimux-plugin`'s `PluginManifest` for the full schema.
+
+## Contributions — placement and keys
+
+Registering a widget makes it _drawable_; it does not put it anywhere. Bars
+draw what `aimux.json` lists, and the same asymmetry applies to actions: a
+registered action is bound to nothing until a keymap names it. Left there, a
+plugin that loaded perfectly is a plugin nobody can see or reach, and the fix
+was a hand-edited config file plus a restart.
+
+`contributes` closes that. The host applies it while it extends the plugin's
+context — before the plugin's own `apply`, which is harmless in both
+directions: a placed widget whose renderer is not registered yet is an orphan,
+and bars already skip those; a bound key resolves its action at press time.
+
+```jsonc
+"contributes": {
+  "bars": [{ "widget": "load", "side": "left" }],
+  "keymaps": [{ "mode": "navigation", "key": "<leader>+", "action": "up" }],
+}
+```
+
+**Placement** dispatches `add-widget` with `placedBy: 'plugin'`. That mark is
+the whole design: `remove-plugin-widget` withdraws only what carries it, and
+`move-widget` and `toggle-widget` strip it — the moment the user arranges the
+widget, the placement is theirs and neither a reload nor an unload touches it.
+`add-widget` is also idempotent, because a plugin re-applies its manifest on
+every reload.
+
+**Keys** go through `registerKeymapLayer` (`src/input/keymap/plugin-layer.ts`),
+which inserts into the _live_ trie of the mode's existing handler rather than
+rebuilding it. Rebuilding would hand `app.tsx` a stale handler — the one its
+timeout and pending-chord callbacks are wired to, and the one the
+terminal-input fast path holds. Removal is symmetric and identity-checked: a
+key rebound in the meantime is not the layer's to take back.
+
+A binding the user already owns is **refused**, with the reason in the plugin's
+log. A mode nobody has bound — a plugin pane's own mode — gets a handler built
+and registered for it, wired through `setKeymapHandlerWiring` so it gets the
+same callbacks `registerAllModes` handed the others.
 
 ## Locations
 

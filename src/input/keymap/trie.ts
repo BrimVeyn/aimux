@@ -47,6 +47,20 @@ export class KeyTrie {
   }
 
   /**
+   * The binding at an exact sequence, or null. Used before a plugin inserts
+   * one: a key the user has already bound is not a key a plugin may take.
+   */
+  find(sequence: KeyChord[]): TrieBinding | null {
+    let node: TrieNode = this.root
+    for (const chord of sequence) {
+      const child = node.children.get(chord)
+      if (!child) return null
+      node = child
+    }
+    return node.binding
+  }
+
+  /**
    * Remove a key sequence. Returns true if it was found and removed.
    */
   remove(sequence: KeyChord[]): boolean {

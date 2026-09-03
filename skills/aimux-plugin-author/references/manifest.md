@@ -35,6 +35,10 @@ plugin with a broken manifest fails with a field name rather than a stack.
     "quietMinutes": { "type": "number", "label": "Stay quiet for", "default": 5 },
   },
   "commands": [{ "id": "test", "title": "Send a test message", "command": ["./send.sh", "test"] }],
+  "contributes": {
+    "bars": [{ "widget": "board", "side": "left", "position": "end", "grow": 30 }],
+    "keymaps": [{ "mode": "navigation", "key": "<leader>t", "action": "open" }],
+  },
 }
 ```
 
@@ -52,6 +56,7 @@ plugin with a broken manifest fails with a field name rather than a stack.
 | `build`           | no       | argv arrays run once at link/install time, e.g. `[["bun","install"]]`       |
 | `config`          | no       | field name → `{ type, label?, description?, default?, required?, secret? }` |
 | `commands`        | no\*     | `{ id, command: argv, title?, contexts? }`                                  |
+| `contributes`     | no       | `bars` and/or `keymaps` — where the widget goes, which key runs the action  |
 
 \* A plugin must contribute _something_: `entries.ui`, `entries.daemon`, or a
 non-empty `commands`. A manifest with none of the three is rejected.
@@ -132,3 +137,47 @@ to generate settings rows, not to be a wall.
 A field marked `required` with no value anywhere makes the plugin fail to load,
 which is the honest outcome: a notifier with no bot token cannot notify, and
 failing at load says so once instead of at every event.
+
+## `contributes` — asking the interface for something
+
+Without it, a widget a plugin registers is renderable and placed nowhere, and an
+action it registers is bound to nothing: the user has to edit `aimux.json` or
+`aimux.config.ts` and restart. With it, linking the plugin is the whole setup.
+
+```jsonc
+"contributes": {
+  "bars": [{ "widget": "board", "side": "left", "position": "end", "grow": 30 }],
+  "keymaps": [
+    { "mode": "navigation", "key": "<leader>t", "action": "open" },
+    { "mode": "plugin.pane.acme.thing.board", "key": "q", "action": "close" },
+  ],
+}
+```
+
+| Field              | Rule                                                           |
+| ------------------ | -------------------------------------------------------------- |
+| `bars[].widget`    | the **unqualified** id you passed to `ctx.ui.widgets.register` |
+| `bars[].side`      | `left` or `right`; default `left`                              |
+| `bars[].position`  | `start` or `end`; default `end`                                |
+| `bars[].grow`      | share of the bar, `> 0`; default 50                            |
+| `keymaps[].mode`   | a mode id — `navigation`, or `plugin.pane.<qualified pane id>` |
+| `keymaps[].key`    | key notation, `<leader>` included                              |
+| `keymaps[].action` | the **unqualified** verb you passed to `ctx.actions.register`  |
+
+Both ids are unqualified: the host prefixes them with your plugin id, the same
+way it does everywhere else.
+
+Three rules make this a proposal rather than a claim:
+
+- **A placement happens once.** The widget is placed with a mark saying the
+  plugin put it there. Move it, hide it, or drop it and the mark is gone — a
+  reload will not put it back where the manifest wanted it.
+- **An unload withdraws only what it placed.** A widget the user has since
+  moved stays exactly where they left it.
+- **A key the user has bound is never taken.** `aimux.config.ts` outranks the
+  manifest; a refused binding is reported in `aimux plugin log <id>` with the
+  reason, rather than silently doing nothing.
+
+A mode nobody has bound — your pane's own mode — gets a handler created for it,
+which is what lets a pane ship with `q` to close without the user writing a
+keymap for a mode they have never heard of.

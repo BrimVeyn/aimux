@@ -1,9 +1,27 @@
 import type { BarSide, BarsState } from '../../state/types'
 import type { ContextMenuItem } from '../context-menu/controller'
 
-import { visibleWidgets } from '../../state/bars'
+import { getKnownWidgetIds, visibleWidgets } from '../../state/bars'
 import { dispatchGlobal } from '../../state/dispatch-ref'
 import { getWidgetLabel, isWidgetRenderable } from './registry'
+
+/**
+ * `Add <label>` for every widget something can draw that is in neither bar.
+ *
+ * Until this existed a widget nothing had placed was unreachable: the menu
+ * offered `Show` only for widgets already sitting in a bar, so a plugin's
+ * widget could be loaded, renderable and listed — and impossible to put
+ * anywhere without hand-editing `aimux.json`.
+ */
+function addableItems(bars: BarsState, side: BarSide): ContextMenuItem[] {
+  const placed = new Set([...bars.left.widgets, ...bars.right.widgets].map((w) => w.id))
+  return getKnownWidgetIds()
+    .filter((id) => !placed.has(id))
+    .map((id) => [
+      `Add ${getWidgetLabel(id)}`,
+      () => dispatchGlobal({ side, type: 'add-widget', widgetId: id }),
+    ])
+}
 
 /** `Show <label>` for every hidden widget in either bar. */
 function showHiddenItems(bars: BarsState): ContextMenuItem[] {
@@ -76,6 +94,7 @@ export function buildWidgetContextMenu(
   }
 
   items.push(...showHiddenItems(bars))
+  items.push(...addableItems(bars, side))
   return items
 }
 
@@ -84,5 +103,6 @@ export function buildBarContextMenu(bars: BarsState, side: BarSide): ContextMenu
   return [
     [`Hide ${side} bar`, () => dispatchGlobal({ side, type: 'toggle-bar' })],
     ...showHiddenItems(bars),
+    ...addableItems(bars, side),
   ]
 }

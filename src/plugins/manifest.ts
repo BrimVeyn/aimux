@@ -1,8 +1,11 @@
 import {
   PLUGIN_API_VERSION,
+  type PluginBarContribution,
   type PluginCommandSpec,
   type PluginConfigField,
+  type PluginContributions,
   type PluginHost,
+  type PluginKeymapContribution,
   type PluginManifest,
 } from '@brimveyn/aimux-plugin'
 import { join } from 'node:path'
@@ -213,6 +216,101 @@ function validateCommands(
 }
 
 /**
+ * What the plugin asks the interface for. Every issue names the offending
+ * entry — `contributes.bars[0].side` — because this block is written by hand
+ * (often by an agent), and "invalid contributes" would send them reading the
+ * source instead of the message.
+ */
+function validateContributes(
+  value: unknown,
+  issues: ManifestIssue[]
+): PluginContributions | undefined {
+  if (value === undefined) return undefined
+  if (!isRecord(value)) {
+    issues.push({
+      field: 'contributes',
+      message: 'must be an object with "bars" and/or "keymaps"',
+    })
+    return undefined
+  }
+
+  const contributions: PluginContributions = {}
+
+  if (value.bars !== undefined) {
+    if (!Array.isArray(value.bars)) {
+      issues.push({ field: 'contributes.bars', message: 'must be an array of placements' })
+    } else {
+      const bars: PluginBarContribution[] = []
+      for (const [index, raw] of value.bars.entries()) {
+        const at = `contributes.bars[${index}]`
+        if (!isRecord(raw)) {
+          issues.push({ field: at, message: 'must be an object' })
+          continue
+        }
+        if (!isNonEmptyString(raw.widget)) {
+          issues.push({
+            field: `${at}.widget`,
+            message: 'must be the unqualified widget id, as passed to ctx.ui.widgets.register',
+          })
+          continue
+        }
+        if (raw.side !== undefined && raw.side !== 'left' && raw.side !== 'right') {
+          issues.push({ field: `${at}.side`, message: 'must be "left" or "right"' })
+          continue
+        }
+        if (raw.position !== undefined && raw.position !== 'start' && raw.position !== 'end') {
+          issues.push({ field: `${at}.position`, message: 'must be "start" or "end"' })
+          continue
+        }
+        if (
+          raw.grow !== undefined &&
+          (typeof raw.grow !== 'number' || !Number.isFinite(raw.grow) || raw.grow <= 0)
+        ) {
+          issues.push({ field: `${at}.grow`, message: 'must be a number greater than 0' })
+          continue
+        }
+        const entry: PluginBarContribution = { widget: raw.widget }
+        if (raw.side !== undefined) entry.side = raw.side
+        if (raw.position !== undefined) entry.position = raw.position
+        if (typeof raw.grow === 'number') entry.grow = raw.grow
+        bars.push(entry)
+      }
+      contributions.bars = bars
+    }
+  }
+
+  if (value.keymaps !== undefined) {
+    if (!Array.isArray(value.keymaps)) {
+      issues.push({ field: 'contributes.keymaps', message: 'must be an array of bindings' })
+    } else {
+      const keymaps: PluginKeymapContribution[] = []
+      for (const [index, raw] of value.keymaps.entries()) {
+        const at = `contributes.keymaps[${index}]`
+        if (!isRecord(raw)) {
+          issues.push({ field: at, message: 'must be an object' })
+          continue
+        }
+        const missing = (['mode', 'key', 'action'] as const).find(
+          (field) => !isNonEmptyString(raw[field])
+        )
+        if (missing !== undefined) {
+          issues.push({ field: `${at}.${missing}`, message: 'must be a non-empty string' })
+          continue
+        }
+        keymaps.push({
+          action: raw.action as string,
+          key: raw.key as string,
+          mode: raw.mode as string,
+        })
+      }
+      contributions.keymaps = keymaps
+    }
+  }
+
+  return contributions
+}
+
+/**
  * Validates a parsed `aimux-plugin.json`. Collects every issue rather than
  * throwing on the first: an author fixing a manifest wants the whole list.
  */
@@ -257,6 +355,7 @@ export function parseManifest(value: unknown): ManifestResult {
   const config = validateConfigSchema(value.config, issues)
   const build = validateBuild(value.build, issues)
   const commands = validateCommands(value.commands, issues)
+  const contributes = validateContributes(value.contributes, issues)
 
   const hasHalf =
     entries !== undefined && (entries.ui !== undefined || entries.daemon !== undefined)
@@ -283,6 +382,7 @@ export function parseManifest(value: unknown): ManifestResult {
   if (build !== undefined) manifest.build = build
   if (config !== undefined) manifest.config = config
   if (commands !== undefined) manifest.commands = commands
+  if (contributes !== undefined) manifest.contributes = contributes
 
   return { manifest, ok: true }
 }

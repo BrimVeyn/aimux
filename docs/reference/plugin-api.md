@@ -72,6 +72,50 @@ export interface PluginCommandSpec {
 ```
 
 ```ts
+/**
+ * Where a plugin's bar widget goes when nothing has placed it yet.
+ *
+ * A proposal, not a claim: the host places it once, marks the placement as the
+ * plugin's, and never re-places it — so a user who moves it, hides it, or
+ * throws it out has the last word, and an unload withdraws only what it put
+ * there and the user left alone.
+ */
+export interface PluginBarContribution {
+  /** Unqualified widget id — the same one `ctx.ui.widgets.register` takes. */
+  widget: string
+  /** Default `left`. */
+  side?: 'left' | 'right'
+  /** Default `end`. */
+  position?: 'start' | 'end'
+  /** Share of the bar, relative to its neighbours. Default 50. */
+  grow?: number
+}
+```
+
+```ts
+/**
+ * A keybinding a plugin asks for. Refused rather than applied when the key is
+ * already bound in `aimux.config.ts`: the file the user writes by hand outranks
+ * every plugin, here as everywhere else.
+ */
+export interface PluginKeymapContribution {
+  /** Mode id, e.g. `navigation`, or the plugin's own pane mode. */
+  mode: string
+  /** Key notation, `<leader>` included. */
+  key: string
+  /** Unqualified action verb — the host prefixes it with the plugin id. */
+  action: string
+}
+```
+
+```ts
+export interface PluginContributions {
+  bars?: PluginBarContribution[]
+  keymaps?: PluginKeymapContribution[]
+}
+```
+
+```ts
 export interface PluginManifest {
   /** Reverse-DNS-ish, `<vendor>.<name>`; the namespace for every registration. */
   id: string
@@ -88,6 +132,12 @@ export interface PluginManifest {
   build?: string[][]
   config?: Record<string, PluginConfigField>
   commands?: PluginCommandSpec[]
+  /**
+   * What the plugin asks the interface for: a place for its widget, a key for
+   * its action. Applied by the host when the UI half loads, withdrawn when it
+   * unloads, and outranked by anything the user has decided.
+   */
+  contributes?: PluginContributions
 }
 ```
 
