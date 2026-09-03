@@ -1,6 +1,6 @@
 {
   "name": "@brimveyn/aimux-plugin",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Plugin authoring API for aimux — context, effects, events and RPC for in-process plugins.",
   "keywords": [
     "aimux",
