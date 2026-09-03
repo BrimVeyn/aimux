@@ -11,10 +11,14 @@ export type {
 } from '@brimveyn/aimux-config'
 
 export {
+  BUILTIN_THEME_IDS,
+  clearRuntimeThemes,
+  getTuiTheme,
   isKnownThemeId,
   migrateThemeId,
+  registerTuiTheme,
   resolveTuiTheme,
-  THEME_IDS,
+  themeIds,
   TUI_COLOR_TOKENS,
   TUI_THEMES,
 } from '@brimveyn/aimux-config'

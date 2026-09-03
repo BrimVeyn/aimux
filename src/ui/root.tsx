@@ -47,6 +47,8 @@ import { ToastViewport } from './components/overlays/toast/toast-viewport'
 import { WorkspaceDeletingOverlay } from './components/overlays/workspace-deleting-overlay'
 import { SettingsView } from './components/settings/settings-view'
 import { StatsView } from './components/stats/stats-view'
+import { PluginModalHost } from './plugin-modals'
+import { PluginViewHost } from './plugin-views'
 import { useTheme } from './theme'
 
 const EMPTY_WORKSPACES: WorkspaceRecord[] = []
@@ -280,6 +282,8 @@ function renderModal(
     case 'flash-jump':
       // Pure overlay — rendered inline by FlashLabelBadge inside the rows.
       return null
+    case 'plugin-modal':
+      return <PluginModalHost modalId={modal.modalId} props={modal.props} />
     case null:
       return null
     default:
@@ -339,6 +343,7 @@ export function RootView({
   const editorBg = t.background
   const tabs = useAppStore((s) => s.tabs)
   const activeTabId = useAppStore((s) => s.activeTabId)
+  const activePluginPaneId = useAppStore((s) => s.activePluginPaneId)
   const layoutTrees = useAppStore((s) => s.layoutTrees)
   const tabGroupMap = useAppStore((s) => s.tabGroupMap)
   const focusMode = useAppStore((s) => s.focusMode)
@@ -439,6 +444,9 @@ export function RootView({
   // Read-only, so unlike settings it has no modal that belongs to it and no
   // second condition: the screen is up exactly while focus is on it.
   else if (focusMode === 'stats') replacesPanes = <StatsView />
+  // A plugin view replaces the panes the same way, and for the same reason:
+  // everything else on screen is identical, so only the centre branches.
+  else if (focusMode === 'plugin-view') replacesPanes = <PluginViewHost />
 
   const center =
     replacesPanes !== null ? (
@@ -463,6 +471,7 @@ export function RootView({
                 node={activeTree}
                 tabs={tabs}
                 activeTabId={activeTabId}
+                activePluginPaneId={activePluginPaneId}
                 focusMode={focusMode}
                 contentOrigin={splitContentOrigin}
                 mouseForwardingEnabled={mouseForwardingEnabled}

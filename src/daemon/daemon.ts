@@ -5,9 +5,10 @@ import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../st
 
 import { version as APP_VERSION } from '../../package.json'
 import { AutoRenameCoordinator, initialAutoRenameStatus } from '../auto-rename/coordinator'
+import { builtinPlugins } from '../builtin-plugins'
 import { loadUserConfig } from '../config/loader'
 import { logDebug } from '../debug/input-log'
-import { type ClaudeHookServer, startClaudeHookServer } from '../integrations/claude-hook-server'
+import { type HookServer, startHookServer } from '../integrations/hook-server'
 import { MANAGER_CAPABILITY_WORKER_METADATA } from '../ipc/manager-protocol'
 import {
   type ClientRequest,
@@ -36,6 +37,9 @@ import {
   deleteFromCatalog,
   removeWorkspaceFromCatalog,
 } from './catalog-writer'
+import { emitDaemonEvent } from './daemon-events'
+import { type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
+import { createDaemonContextExtender } from './plugin-services'
 import {
   consumeDaemonHandoff,
   getClaudeHookUrlFilePath,
@@ -351,6 +355,24 @@ export async function runDaemon(): Promise<void> {
     }
   }
 
+  /**
+   * Plugin events reach UI processes only: a thin CLI attacher runs no plugin
+   * kernel, and a pre-v19 peer's `parseServerMessage` would throw on the
+   * unknown type and drop its connection.
+   */
+  const broadcastPluginEvent = (event: {
+    pluginId: string
+    verb: string
+    payload?: unknown
+  }): void => {
+    for (const socket of sockets) {
+      if (thinAttachers.has(socket)) continue
+      const version = negotiatedVersions.get(socket)
+      if (version === undefined || version < 19) continue
+      send(socket, { payload: event, type: 'pluginEvent' })
+    }
+  }
+
   const applyTabMetadata = (
     tabId: string,
     patch: { title?: string; autoRenameStatus?: 'eligible' | 'attempted' }
@@ -464,10 +486,18 @@ export async function runDaemon(): Promise<void> {
     listTabs: listTabsForProject,
     onProjectStatus: (projectId, status) => {
       logDebug('daemon.status.project', { projectId, status })
+      emitDaemonEvent('project:status', { projectId, status })
       broadcastAll({ payload: { projectId, status }, type: 'projectStatus' })
     },
     onTabQuestion: (tabId, projectId, detail) => {
       logDebug('daemon.status.question', { kind: detail.kind, projectId, tabId })
+      emitDaemonEvent('tab:question', {
+        kind: detail.kind,
+        options: detail.options,
+        projectId,
+        prompt: detail.prompt,
+        tabId,
+      })
       // v13 / capability `questionEvents`. Same v13 send-time gate as below.
       broadcastAllVersioned(13, {
         payload: {
@@ -482,6 +512,7 @@ export async function runDaemon(): Promise<void> {
     },
     onTabStatus: (tabId, status, projectId, workspaceId) => {
       logDebug('daemon.status.tab', { projectId, status, tabId })
+      emitDaemonEvent('tab:status', { projectId, status, tabId, workspaceId })
       // Broadcast to every client. Clients silently ignore events for tabIds
       // they don't know about, so there's no UI impact — this costs one
       // extra socket write per tab per change, which is trivial, and
@@ -491,6 +522,7 @@ export async function runDaemon(): Promise<void> {
     },
     onTurnComplete: (tabId, projectId, idleMs, workspaceId) => {
       logDebug('daemon.status.turnComplete', { idleMs, projectId, tabId })
+      emitDaemonEvent('tab:turnComplete', { idleMs, projectId, tabId, workspaceId })
       // v13 / capability `turnLifecycle`. Gate at send time — pre-v13 parsers
       // throw on unknown event types and would drop the connection. MIN stays
       // at 10, so we fan this only to peers that negotiated at least v13.
@@ -507,29 +539,31 @@ export async function runDaemon(): Promise<void> {
   // shipped shell bridge reads on every invocation, so PTYs spawned by a
   // *previous* daemon transparently follow URL changes after a restart.
   // Failure to start is non-fatal — detection falls back to the visual PTY scanner.
-  let hookServer: ClaudeHookServer | null = null
+  let hookServer: HookServer | null = null
   const hookUrlFilePath = getClaudeHookUrlFilePath()
   try {
-    hookServer = startClaudeHookServer({
-      onEvent: (event) => {
-        statusLoop.recordHookEvent({
-          hookEventName: event.hookEventName,
-          paneId: event.paneId,
-          payload: event.payload,
-          receivedAt: event.receivedAt,
-        })
-        // `UserPromptSubmit` carries the exact prompt at the exact moment it is
-        // submitted, so auto-rename prefers it over reconstructing keystrokes:
-        // trust dialogs, menus and completions never produce one.
-        if (event.hookEventName === 'UserPromptSubmit') {
-          const prompt = event.payload.prompt
-          const parentToolUseId = event.payload.parent_tool_use_id
-          const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
-          if (typeof prompt === 'string' && !fromSubagent) {
-            autoRename.observePrompt(event.paneId, prompt)
-          }
+    hookServer = startHookServer()
+    // Claude registers like anything else. It is the first route rather than a
+    // special one, which is what makes a plugin's route the same mechanism.
+    hookServer.route('claude', (event) => {
+      statusLoop.recordHookEvent({
+        hookEventName: event.hookEventName,
+        paneId: event.paneId,
+        payload: event.payload,
+        receivedAt: event.receivedAt,
+        source: event.source,
+      })
+      // `UserPromptSubmit` carries the exact prompt at the exact moment it is
+      // submitted, so auto-rename prefers it over reconstructing keystrokes:
+      // trust dialogs, menus and completions never produce one.
+      if (event.hookEventName === 'UserPromptSubmit') {
+        const prompt = event.payload.prompt
+        const parentToolUseId = event.payload.parent_tool_use_id
+        const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
+        if (typeof prompt === 'string' && !fromSubagent) {
+          autoRename.observePrompt(event.paneId, prompt)
         }
-      },
+      }
     })
     try {
       writeFileSync(hookUrlFilePath, hookServer.url, { mode: 0o600 })
@@ -542,6 +576,131 @@ export async function runDaemon(): Promise<void> {
     }
   } catch (error) {
     logDebug('daemon.hookServer.startFailed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
+
+  // Plugin host. Started after the hook server so a daemon plugin can already
+  // see a working hook pipeline in its `apply`, and before the socket opens so
+  // the `pluginRpc` capability is honest the moment a client can ask for it.
+  //
+  // Every failure here is contained: a plugin that throws lands in `FAILED`
+  // with its error in its own log, and the daemon serves tabs as if it were
+  // not there.
+  /**
+   * Spawns a tab on a plugin's behalf. The same steps the `createTab` request
+   * takes, minus the socket: remember the tab first so early render events have
+   * metadata to merge into, then create it, then announce it.
+   *
+   * Size comes from the project's last attached dimensions, because a plugin has
+   * no viewport of its own — the same fallback the headless CLI uses, and the
+   * same error when no UI has ever attached.
+   */
+  const spawnTabForPlugin = async (input: {
+    projectId: string
+    assistant: string
+    title: string
+    command: string
+    args?: string[]
+    cwd?: string
+    workspaceId?: string
+  }): Promise<string> => {
+    const dimensions = projectDimensions.get(input.projectId)
+    if (!dimensions) {
+      throw new Error(
+        `no UI has attached to project ${input.projectId} yet, so there is no size to spawn a tab with`
+      )
+    }
+    const tabId = crypto.randomUUID()
+    const fullCommand = [input.command, ...(input.args ?? [])].join(' ')
+    const autoRenameStatus = initialAutoRenameStatus(
+      resolvedConfig.autoRename,
+      input.assistant,
+      false
+    )
+    rememberTab(input.projectId, tabId, input.assistant, fullCommand, undefined, {
+      autoRenameStatus,
+      status: 'starting',
+      title: input.title,
+      workspaceId: input.workspaceId,
+    })
+    const env: Record<string, string> = { AIMUX_PANE_ID: tabId }
+    if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
+    try {
+      await manager.createTab({
+        args: input.args,
+        assistant: input.assistant,
+        autoRenameStatus,
+        cols: dimensions.cols,
+        command: input.command,
+        cwd: input.cwd,
+        env,
+        projectId: input.projectId,
+        rows: dimensions.rows,
+        tabId,
+        title: input.title,
+        workspaceId: input.workspaceId,
+      })
+    } catch (error) {
+      tabRegistry.delete(tabId)
+      throw error
+    }
+    const synthesizedTab: TabSession = {
+      activity: 'idle',
+      assistant: input.assistant,
+      autoRenameStatus,
+      buffer: '',
+      command: fullCommand,
+      id: tabId,
+      status: 'starting',
+      terminalModes: createDefaultTerminalModes(),
+      title: input.title,
+      workspaceId: input.workspaceId,
+    }
+    emitDaemonEvent('tab:added', { projectId: input.projectId, tab: synthesizedTab })
+    broadcastForProjectVersioned(input.projectId, 11, {
+      payload: { projectId: input.projectId, tab: synthesizedTab },
+      type: 'tabAdded',
+    })
+    autoRename.register(synthesizedTab)
+    return tabId
+  }
+
+  let pluginHost: DaemonPluginHost | null = null
+  try {
+    pluginHost = await startDaemonPluginHost({
+      broadcast: (event) => {
+        broadcastPluginEvent(event)
+      },
+      builtins: builtinPlugins(resolvedConfig),
+      extendContext: createDaemonContextExtender({
+        activeTabId: (projectId) => projectActiveTabIds.get(projectId) ?? null,
+        closeTab: async (tabId) => {
+          const entry = tabRegistry.get(tabId)
+          if (!entry) throw new Error(`unknown tab: ${tabId}`)
+          await manager.closeTab(entry.projectId, tabId)
+        },
+        focus: async (projectId, tabId) => manager.setActiveTab(projectId, tabId),
+        hookServer: () => hookServer,
+        // The same path auto-rename uses, which is the point: a plugin's
+        // rename and aimux's own reach the manager, the session and every UI
+        // identically, so neither can produce a title the other cannot.
+        renameTab: (tabId, title) => {
+          applyTabMetadata(tabId, { title })
+        },
+        spawnTab: spawnTabForPlugin,
+        tabs: () => tabRegistry,
+        write: async (tabId, data) => {
+          const entry = tabRegistry.get(tabId)
+          if (!entry) throw new Error(`unknown tab: ${tabId}`)
+          await manager.write(entry.projectId, tabId, data)
+        },
+      }),
+      hasUiClient: () => countUiAttachers() > 0,
+      userPlugins: resolvedConfig.plugins,
+    })
+  } catch (error) {
+    logDebug('daemon.pluginHost.startFailed', {
       error: error instanceof Error ? error.message : String(error),
     })
   }
@@ -891,6 +1050,7 @@ export async function runDaemon(): Promise<void> {
                     workerName: message.payload.workerName,
                     workspaceId: message.payload.workspaceId,
                   }
+                  emitDaemonEvent('tab:added', { projectId, tab: synthesizedTab })
                   broadcastForProjectVersioned(projectId, 11, {
                     payload: { projectId, tab: synthesizedTab },
                     type: 'tabAdded',
@@ -1050,6 +1210,7 @@ export async function runDaemon(): Promise<void> {
                 case 'createProject': {
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { name, projectPath, switch: doSwitch } = message.payload
+                  emitDaemonEvent('project:created', { name, projectPath })
                   if (countUiAttachers() > 0) {
                     // Relay to the UI so it can preserve the live snapshot
                     // of the currently-open project before appending the
@@ -1106,6 +1267,9 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'closeProject': {
+                  emitDaemonEvent('project:closed', {
+                    projectId: message.payload.targetProjectId,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { targetProjectId } = message.payload
                   assertProjectInCatalog(targetProjectId)
@@ -1123,6 +1287,7 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'announceProjectSwitched': {
+                  emitDaemonEvent('project:switched', { projectId: message.payload.projectId })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   // UI-emitted acknowledgement. Relay so any --wait CLI can
                   // exit. We don't validate that the announcement matches
@@ -1136,6 +1301,10 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'addWorkspaceRecord': {
+                  emitDaemonEvent('workspace:added', {
+                    projectId: message.payload.projectId,
+                    workspace: message.payload.workspace,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { projectId: targetProjectId, workspace } = message.payload
                   if (countUiAttachers() > 0) {
@@ -1157,7 +1326,23 @@ export async function runDaemon(): Promise<void> {
                   sendOk(socket, message.id)
                   break
                 }
+                case 'pluginRequest': {
+                  if (!pluginHost) {
+                    throw new Error('plugin host is not running in this daemon')
+                  }
+                  const result = await pluginHost.handleRequest(
+                    message.payload.pluginId,
+                    message.payload.verb,
+                    message.payload.payload
+                  )
+                  send(socket, { id: message.id, payload: { result }, type: 'pluginResult' })
+                  break
+                }
                 case 'removeWorkspaceRecord': {
+                  emitDaemonEvent('workspace:removed', {
+                    projectId: message.payload.projectId,
+                    workspaceId: message.payload.workspaceId,
+                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   const { projectId: targetProjectId, workspaceId } = message.payload
                   if (countUiAttachers() > 0) {
@@ -1269,6 +1454,9 @@ export async function runDaemon(): Promise<void> {
     }
     draining = true
     logDebug('daemon.reexec.start', { pid: process.pid, reason: reason ?? null })
+    // One chance for a plugin holding external state to flush it: the process
+    // exits a few hundred milliseconds from here.
+    emitDaemonEvent('daemon:reexec', { reason })
 
     const oldSocketPath = getDaemonOldSocketPath()
     // Clear any stale dirent from a previous botched reexec.
@@ -1357,6 +1545,7 @@ export async function runDaemon(): Promise<void> {
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
+    if (pluginHost) void pluginHost.stop()
     if (hookServer) {
       void hookServer.stop()
       try {

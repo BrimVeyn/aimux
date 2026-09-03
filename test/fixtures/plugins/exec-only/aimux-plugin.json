@@ -1,0 +1,11 @@
+{
+  "id": "aimux-test.execonly",
+  "name": "Exec only",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "commands": [
+    { "id": "env", "title": "Print the injected env", "command": ["./print-env.sh"] },
+    { "id": "echo", "title": "Echo arguments", "command": ["echo"] },
+    { "id": "fail", "title": "Exit non-zero", "command": ["sh", "-c", "echo oops >&2; exit 3"] }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "id": "aimux-examples.sysload",
+  "name": "System load",
+  "version": "1.0.0",
+  "description": "CPU and GPU load, sampled in the daemon and drawn as sparklines",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "pollSeconds": {
+      "type": "number",
+      "label": "Sample every",
+      "description": "Seconds between samples. Below 1 is clamped to 1.",
+      "default": 3
+    },
+    "gpuCommand": {
+      "type": "string",
+      "label": "GPU command",
+      "description": "Prints a percentage on stdout. Empty disables the GPU line.",
+      "default": "nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits"
+    }
+  }
+}

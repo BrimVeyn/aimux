@@ -64,7 +64,7 @@ export function ModalShell({
           {footer != null ? <box>{footer}</box> : null}
         </box>
       </box>
-      {keybindsModeId ? <ModalKeybindsOverlay modeId={keybindsModeId} /> : null}
+      {keybindsModeId === undefined ? null : <ModalKeybindsOverlay modeId={keybindsModeId} />}
     </box>
   )
 }

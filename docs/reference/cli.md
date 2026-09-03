@@ -508,6 +508,135 @@ aimux workspace remove <id|path> [--force] [--project W]
 -> { id, name, path }
 ```
 
+### `aimux skill`
+
+Where the skills aimux ships actually live. An agent asked to author a plugin
+needs the directory before it can read anything in it, and the path depends on
+how aimux was installed.
+
+```
+aimux skill list
+-> { skills: [{ id, summary, path, present }] }
+
+aimux skill path <id>
+-> { id, path, summary }
+```
+
+### `aimux plugin`
+
+Manages the plugin kernel (`docs/developer/plugins.md`). The CLI process never
+loads plugin code: these verbs read manifests and the registry, and hand
+anything needing a live kernel to the daemon, which reloads its own halves and
+forwards the same instruction to every attached UI.
+
+```
+aimux plugin new <id> [--ui] [--daemon] [--exec] [--dir PATH]
+-> { id, root, shapes, created: [...files], next: [...commands] }
+
+aimux plugin list
+-> { plugins: [{ id, name, version, source, root, enabled, enabledFrom,
+                 halves, state: { ui, daemon }, error, hasConfigSchema, config }],
+     running: [{ id, host, state, revision, effects, error?, missing? }] | null,
+     issues: [string], daemon }
+
+aimux plugin link <path> [--no-build]
+-> { id, version, root, halves, linked, build, daemon }
+
+aimux plugin unlink <id>
+-> { id, root, unlinked, daemon }
+
+aimux plugin install <owner/repo[/subdir]> [--yes] [--dry-run]
+-> { id, version, origin, root, installed, build, daemon }
+
+aimux plugin uninstall <id> [--purge]
+-> { id, removed, uninstalled, configKept, daemon }
+
+aimux plugin enable <id>
+aimux plugin disable <id>
+-> { id, enabled, source, storedIn, shadowedBy, daemon }
+
+aimux plugin config <id>
+-> { id, name, version, source, enabled, enabledFrom,
+     fields: [{ key, type, label, description?, required, secret,
+                default?, value, isSet, origin, shadowedBy? }],
+     extraKeys }
+
+aimux plugin set <id> <key> <value> [--value-stdin]
+-> { id, key, value, written, shadowedBy, daemon }
+
+aimux plugin unset <id> <key>
+-> { id, key, removed, value, origin, daemon }
+
+aimux plugin show <id> [--lines N] [--level debug|info|warn|error]
+-> { id, name, version, source, root, enabled, enabledFrom, halves,
+     state: { ui, daemon }, errors, missing, issues, config, extraKeys,
+     paths, log, daemon }
+-> { id, enabled, daemon }
+
+aimux plugin reload [id]
+-> { id, reloaded, result }
+
+aimux plugin log <id> [--lines N] [--level debug|info|warn|error]
+-> { id, path, entries: [{ at, host, level, message, data? }] }
+
+aimux plugin doctor [path-or-id] [--no-apply] [--no-types]
+-> { ok, id, version, root, manifest, issues, halves, types, aimuxVersion }
+
+aimux plugin commands
+-> { commands: [{ pluginId, id, title, command, contexts? }] }
+
+aimux plugin exec <plugin-id> <command-id> [args...]
+-> { pluginId, commandId, exitCode, stdout, stderr, timedOut }
+```
+
+`enable`, `disable`, `set` and `unset` work on **every** plugin — built-in,
+linked, installed, or declared in `aimux.config.ts` — because the state goes
+into the registry's `overrides` block, keyed by id, rather than into a row only
+some of them have.
+
+`enabledFrom` (`default` / `registry` / `config`) is the field to read before
+acting: a `disable` that `aimux.config.ts` will overrule at the next launch is
+not a disable. When a write is outranked, `shadowedBy` names the file, the write
+still happens, and stderr says so — exit stays `0`.
+
+`set` coerces the value against the manifest's declared type and refuses a key
+the manifest does not declare, listing the ones it does. `resolvePluginConfig`
+would let an undeclared key through silently, and a typo that lands somewhere no
+plugin reads is the worst outcome available.
+
+None of `enable`, `disable`, `set`, `unset`, `list` or `show` starts a daemon
+that is not running: the write is durable and the next launch picks it up. They
+report `"daemon": "unreachable"` and still exit `0`.
+
+`commands` and `exec` are the manifest-declared subprocess half: a plugin whose
+manifest has `commands[]` and no `entries` needs no TypeScript at all. The
+spawn happens in the daemon, so the same command is reachable from an event or
+a keybinding and not only from a shell, and the command's exit code becomes the
+CLI's own.
+
+A plugin can also contribute its own group and verbs — `aimux <group> <verb>`.
+Those run in the daemon too; the CLI learns their flags and args from a sidecar
+the daemon writes, so `--help`, argument validation and TAB completion work
+without the CLI loading any plugin code.
+
+`link` registers a directory in place and watches it for edits; `install`
+clones into `<profile>/plugins/<id>` and owns that copy. `unlink` and
+`uninstall` are therefore not interchangeable, and each refuses the other's
+plugins rather than deleting a directory it does not own.
+
+`install` prints the manifest and the `build` argv on stderr and then refuses
+without `--yes`: build steps run arbitrary commands with your privileges, and
+there is no sandbox. `--dry-run` prints the manifest and stops.
+
+`doctor` is the author loop. It validates the manifest field by field, bundles
+each half, applies it against a throwaway context, and reports what that apply
+registered — effects, events, RPC verbs, services — plus `tsc --noEmit` when
+the plugin ships a tsconfig. Exit 3 when anything failed. It is the one verb
+that executes plugin code; nothing it runs touches the running aimux.
+
+Secrets declared with `"secret": true` in the manifest are printed as
+`<secret>` by `list`.
+
 ## JSON Output Conventions
 
 - One JSON object per invocation on stdout (`tab wait` and `tab tail` are

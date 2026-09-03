@@ -8,9 +8,10 @@
  * generates `--help`, so completion cannot drift from the documented CLI.
  */
 
+import type { PluginCliCommandSpec } from '../../plugins/cli-commands'
 import type { CompletionSource, DynamicCompletionSource, FlagSpec } from '../flags'
 
-import { COMMANDS, resolveCommand } from '../registry'
+import { type CliCommand, COMMANDS, resolveCommand } from '../registry'
 
 export interface CompletionCandidate {
   description?: string
@@ -20,8 +21,21 @@ export interface CompletionCandidate {
 export type CompletionPlan =
   /** Ready-to-print candidates, already filtered and prefixed. */
   | { candidates: CompletionCandidate[]; kind: 'candidates' }
-  /** Needs live state. `prefix` is re-applied to each resolved value. */
-  | { kind: 'dynamic'; prefix: string; source: DynamicCompletionSource; word: string }
+  /**
+   * Needs live state. `prefix` is re-applied to each resolved value.
+   *
+   * `positionals` are the ones already typed, because one source needs them:
+   * a plugin's config keys depend on which plugin the previous positional
+   * named. Resolving them here would mean I/O in the planner, which is the
+   * one thing it must not do — it runs on every TAB press.
+   */
+  | {
+      kind: 'dynamic'
+      prefix: string
+      source: DynamicCompletionSource
+      word: string
+      positionals: readonly string[]
+    }
   /** Hand off to the shell's own filename completion. */
   | { kind: 'files' }
   /** Free text — offer nothing. */
@@ -57,10 +71,22 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   workspace: 'Git workspaces attached to the active project',
 }
 
-function groupCandidates(): CompletionCandidate[] {
+/** A sidecar spec, shaped like a `CliCommand` for the planner's purposes. */
+function asCommands(specs: readonly PluginCliCommandSpec[]): CliCommand[] {
+  return specs.map((spec) => ({
+    args: spec.args ?? [],
+    flags: spec.flags ?? [],
+    group: spec.group,
+    run: async () => 0,
+    summary: spec.summary,
+    verb: spec.verb,
+  }))
+}
+
+function groupCandidates(pluginCommands: readonly PluginCliCommandSpec[]): CompletionCandidate[] {
   const seen = new Set<string>()
   const candidates: CompletionCandidate[] = []
-  for (const command of COMMANDS) {
+  for (const command of [...COMMANDS, ...asCommands(pluginCommands)]) {
     if (seen.has(command.group)) continue
     seen.add(command.group)
     candidates.push({ description: GROUP_DESCRIPTIONS[command.group], value: command.group })
@@ -78,12 +104,13 @@ function filtered(candidates: readonly CompletionCandidate[], word: string): Com
 function fromSource(
   source: CompletionSource | undefined,
   word: string,
-  prefix: string
+  prefix: string,
+  positionals: readonly string[] = []
 ): CompletionPlan {
   if (!source) return NONE
   switch (source.kind) {
     case 'dynamic':
-      return { kind: 'dynamic', prefix, source: source.source, word }
+      return { kind: 'dynamic', positionals, prefix, source: source.source, word }
     case 'file':
       return { kind: 'files' }
     case 'values': {
@@ -102,6 +129,8 @@ interface TokenScan {
   /** Set when the last token was a flag still waiting for its value. */
   awaitingValueFor: FlagSpec | null
   positionalCount: number
+  /** The positional tokens themselves, in order. */
+  positionals: string[]
   stoppedFlags: boolean
   usedFlags: Set<string>
 }
@@ -115,6 +144,7 @@ function scanTokens(tokens: readonly string[], flags: readonly FlagSpec[]): Toke
   const scan: TokenScan = {
     awaitingValueFor: null,
     positionalCount: 0,
+    positionals: [],
     stoppedFlags: false,
     usedFlags: new Set<string>(),
   }
@@ -140,12 +170,16 @@ function scanTokens(tokens: readonly string[], flags: readonly FlagSpec[]): Toke
       continue
     }
     scan.positionalCount++
+    scan.positionals.push(token)
   }
 
   return scan
 }
 
-function planTopLevel(word: string): CompletionPlan {
+function planTopLevel(
+  word: string,
+  pluginCommands: readonly PluginCliCommandSpec[]
+): CompletionPlan {
   if (word.startsWith('-')) {
     return filtered(
       [
@@ -155,21 +189,30 @@ function planTopLevel(word: string): CompletionPlan {
       word
     )
   }
-  return filtered([...groupCandidates(), ...TOP_LEVEL_COMMANDS], word)
+  return filtered([...groupCandidates(pluginCommands), ...TOP_LEVEL_COMMANDS], word)
 }
 
 /**
  * @param words Full command line tokens, including the program name at index 0.
  * @param cword Index into `words` of the token being completed.
  */
-export function planCompletion(words: readonly string[], cword: number): CompletionPlan {
+export function planCompletion(
+  words: readonly string[],
+  cword: number,
+  /**
+   * Plugin verbs, read from the daemon's sidecar by the caller. Passed in
+   * rather than read here so this module keeps its no-I/O property, which is
+   * what makes every branch of it unit-testable.
+   */
+  pluginCommands: readonly PluginCliCommandSpec[] = []
+): CompletionPlan {
   const index = Math.max(0, cword)
   const word = words[index] ?? ''
   const argIndex = index - 1
   if (argIndex < 0) return NONE
 
   const args = words.slice(1)
-  if (argIndex === 0) return planTopLevel(word)
+  if (argIndex === 0) return planTopLevel(word, pluginCommands)
 
   const group = args[0] ?? ''
 
@@ -177,7 +220,9 @@ export function planCompletion(words: readonly string[], cword: number): Complet
     return argIndex === 1 ? filtered(COMPLETION_SUBCOMMANDS, word) : NONE
   }
 
-  const verbs = COMMANDS.filter((command) => command.group === group)
+  const verbs = [...COMMANDS, ...asCommands(pluginCommands)].filter(
+    (command) => command.group === group
+  )
   if (verbs.length === 0) return NONE
 
   if (argIndex === 1) {
@@ -212,5 +257,5 @@ export function planCompletion(words: readonly string[], cword: number): Complet
     )
   }
 
-  return fromSource(command.args[scan.positionalCount]?.complete, word, '')
+  return fromSource(command.args[scan.positionalCount]?.complete, word, '', scan.positionals)
 }

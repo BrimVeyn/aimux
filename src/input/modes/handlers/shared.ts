@@ -8,7 +8,7 @@ export function result(
   effects: SideEffect[] = [],
   transition?: ModeId
 ): KeyResult {
-  return transition ? { actions, effects, transition } : { actions, effects }
+  return transition === undefined ? { actions, effects } : { actions, effects, transition }
 }
 
 export function closeModalResult(

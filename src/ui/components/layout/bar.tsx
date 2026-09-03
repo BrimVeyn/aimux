@@ -8,7 +8,7 @@ import { useAppStore } from '../../../state/app-store'
 import { getBarWidth, visibleWidgets } from '../../../state/bars'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import { useTheme } from '../../theme'
-import { WIDGET_RENDERERS } from '../../widgets/registry'
+import { getWidgetRenderer } from '../../widgets/registry'
 import { buildBarContextMenu, buildWidgetContextMenu } from '../../widgets/widget-context-menu'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
 import { BarFooter } from './bar-footer'
@@ -170,7 +170,10 @@ function BarWidgetSlot({
   onBoundaryResizeStart?: (info: BarBoundaryResizeInfo) => void
 }) {
   const bars = useAppStore((s) => s.bars)
-  const render = WIDGET_RENDERERS[widgetId]
+  // Re-read on every registry change: a hot-reloaded plugin widget swaps its
+  // renderer, and the registry is not part of the store.
+  useAppStore((s) => s.pluginRegistryVersion)
+  const render = getWidgetRenderer(widgetId)
 
   const handleBoundaryMouseDown = useCallback(
     (event: OtuiMouseEvent) => {

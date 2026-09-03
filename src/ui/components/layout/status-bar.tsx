@@ -8,12 +8,11 @@ import type { AppState } from '../../../state/types'
 
 import { version as APP_VERSION } from '../../../../package.json'
 import { useStatusBarHints } from '../../../settings/live'
-import { useAIUsageStore } from '../../../state/ai-usage-store'
 import { useAppStore } from '../../../state/app-store'
 import { useKeymap } from '../../keymap-context'
 import { getStatusBarModel, type IdentitySegment } from '../../status-bar-model'
+import { useStatusBarSegments } from '../../status-bar-segments'
 import { useBaseTheme, useTheme } from '../../theme'
-import { AIUsageIndicator } from '../overlays/ai-usage/ai-usage-indicator'
 
 // Powerline-style separator glyph pairs.
 // `right` is rendered between left-anchored tiles (A→B, B→filler).
@@ -124,7 +123,7 @@ export function StatusBar() {
   const model = getStatusBarModel(state, config)
   const modeColor = getModeColor(state.focusMode, t)
   const ambient = composeAmbient(model.right, model.help)
-  const aiEnabled = useAIUsageStore((s) => s.enabled)
+  const segments = useStatusBarSegments()
   const showHints = useStatusBarHints()
 
   const glyphs = SEPARATOR_GLYPHS[getStatusBarSeparator()]
@@ -141,7 +140,7 @@ export function StatusBar() {
   const tileY = modeColor
 
   const hasB = model.projectSegments.length > 0
-  const hasX = aiEnabled
+  const hasX = segments.length > 0
 
   return (
     <box
@@ -192,7 +191,11 @@ export function StatusBar() {
               flexDirection="row"
               flexShrink={0}
             >
-              <AIUsageIndicator />
+              {segments.map((segment) => (
+                <box key={segment.id} flexDirection="row">
+                  {segment.render()}
+                </box>
+              ))}
             </box>
             <Separator glyph={glyphs.left} bg={tileX} fg={tileY} />
           </>

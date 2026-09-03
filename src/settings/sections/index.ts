@@ -1,6 +1,7 @@
 import type { ProjectRecord } from '../../state/types'
 import type { SettingRow, SettingSection } from '../types'
 
+import { pluginConfigSections } from '../plugin-config-rows'
 import { ABOUT_SECTION } from './about'
 import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
@@ -11,15 +12,17 @@ import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
 import { NOTIFICATIONS_SECTION } from './notifications'
+import { PLUGINS_SECTION } from './plugins'
 import { SETUP_SECTION } from './setup'
 import { STATUS_BAR_SECTION } from './status-bar'
 import { WORKSPACE_SECTION } from './workspace'
 
 /**
- * Every section, in the order the screen lists them. Adding a setting is one
- * entry in one of these files — no component, no reducer branch, no keybind.
+ * Every section aimux ships, in the order the screen lists them. Adding a
+ * setting is one entry in one of these files — no component, no reducer
+ * branch, no keybind.
  */
-export const SETTING_SECTIONS: readonly SettingSection[] = [
+export const BUILTIN_SETTING_SECTIONS: readonly SettingSection[] = [
   APPEARANCE_SECTION,
   LAYOUT_SECTION,
   AUTOMATION_SECTION,
@@ -32,20 +35,98 @@ export const SETTING_SECTIONS: readonly SettingSection[] = [
   STATUS_BAR_SECTION,
   INTEGRATIONS_SECTION,
   EXPERIMENTAL_SECTION,
+  PLUGINS_SECTION,
   ABOUT_SECTION,
 ]
+
+const pluginSections = new Map<string, SettingSection>()
+const listeners = new Set<() => void>()
+
+function notify(): void {
+  const current = [...listeners]
+  for (const listener of current) listener()
+}
+
+export function onSettingSectionsChanged(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+/**
+ * Registers a plugin's section. It lands after the built-ins and before
+ * `About`, which is where a reader looks for "things this install added" —
+ * and never between two built-ins, so the screen a user learned does not
+ * reshuffle when they install something.
+ *
+ * Returns the disposer the plugin's fiber holds.
+ */
+export function registerSettingSection(section: SettingSection): () => void {
+  pluginSections.set(section.id, section)
+  notify()
+  return () => {
+    if (pluginSections.get(section.id) === section) pluginSections.delete(section.id)
+    notify()
+  }
+}
+
+/** Test seam. Never called by the app. */
+export function clearSettingSections(): void {
+  pluginSections.clear()
+  notify()
+}
+
+/**
+ * The sections the screen lists, built-ins plus whatever plugins registered.
+ * Read fresh on every call: the cursor bounds, the search index and the screen
+ * all derive from it, and a plugin loaded after boot has to move all three.
+ */
+/**
+ * Every section on screen: the built-ins, then one generated per configurable
+ * plugin, then whatever a plugin registered for itself, then About.
+ *
+ * The generated ones come from the plugin store rather than from a plugin's
+ * own fiber, deliberately: a section a plugin registered would vanish the
+ * moment it stopped loading, which is exactly when someone needs to change its
+ * configuration.
+ */
+export function settingSections(): readonly SettingSection[] {
+  const generated = pluginConfigSections(pluginUserConfigRef)
+  if (pluginSections.size === 0 && generated.length === 0) return BUILTIN_SETTING_SECTIONS
+  const about = BUILTIN_SETTING_SECTIONS.at(-1)
+  const rest = BUILTIN_SETTING_SECTIONS.slice(0, -1)
+  const middle = [...generated, ...pluginSections.values()]
+  return about ? [...rest, ...middle, about] : middle
+}
+
+/**
+ * `aimux.config.ts`'s plugin entries, needed to know which keys the file
+ * declares — and therefore which rows carry the "comes back on restart" mark.
+ * Set once at boot by the app; empty is the honest default everywhere else.
+ */
+let pluginUserConfigRef: readonly { id?: string; config?: Record<string, unknown> }[] = []
+
+export function setPluginUserConfig(
+  entries: readonly { id?: string; config?: Record<string, unknown> }[]
+): void {
+  pluginUserConfigRef = entries
+}
 
 /**
  * The rows that exist regardless of state, which is what hydration resolves. A
  * section that builds its rows from state is a view over something that has its
  * own home — a file, a project record — so it has nothing to hydrate.
+ *
+ * Built-ins only: hydration runs once at boot, before any plugin has loaded,
+ * and a plugin's settings are hydrated by its own fiber from its own config.
  */
-export const ALL_SETTING_ROWS: readonly SettingRow[] = SETTING_SECTIONS.flatMap((section) =>
+export const ALL_SETTING_ROWS: readonly SettingRow[] = BUILTIN_SETTING_SECTIONS.flatMap((section) =>
   Array.isArray(section.rows) ? section.rows : []
 )
 
 export function getSection(sectionId: string): SettingSection | undefined {
-  return SETTING_SECTIONS.find((section) => section.id === sectionId)
+  return settingSections().find((section) => section.id === sectionId)
 }
 
 export function sectionRows(
@@ -75,7 +156,7 @@ export function sectionRowCount(
  */
 export function totalRowCount(projects: readonly ProjectRecord[]): number {
   let total = 0
-  for (const section of SETTING_SECTIONS) total += sectionRowCount(section, projects)
+  for (const section of settingSections()) total += sectionRowCount(section, projects)
   return total
 }
 
@@ -87,7 +168,7 @@ export function totalRowCount(projects: readonly ProjectRecord[]): number {
 export function sectionStartIndexes(projects: readonly ProjectRecord[]): number[] {
   const starts: number[] = []
   let index = 0
-  for (const section of SETTING_SECTIONS) {
+  for (const section of settingSections()) {
     const count = sectionRowCount(section, projects)
     if (count > 0) starts.push(index)
     index += count
@@ -100,7 +181,7 @@ export function findSettingRow(
   id: string,
   projects: readonly ProjectRecord[]
 ): SettingRow | undefined {
-  for (const section of SETTING_SECTIONS) {
+  for (const section of settingSections()) {
     const row = sectionRows(section, projects).find((entry) => entry.id === id)
     if (row) return row
   }

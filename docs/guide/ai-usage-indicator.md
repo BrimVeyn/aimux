@@ -12,6 +12,11 @@ metrics.
 The indicator is fully opt-in via config — if you don't enable it, nothing is
 spawned, no network calls happen, and nothing is rendered.
 
+It is a plugin aimux ships (`aimux.ai-usage`). The settings below are
+unchanged; to remove it outright rather than switch it off, add
+`plugins: [{ id: 'aimux.ai-usage', enabled: false }]` to your config — see
+[Plugins](plugins.md).
+
 ## What It Shows
 
 For each enabled tool the indicator renders a compact dot + percent in the

@@ -1,0 +1,6 @@
+{
+  "id": "aimux-test.broken",
+  "version": "1.0.0",
+  "apiVersion": 1,
+  "entries": { "daemon": "./daemon.ts" }
+}

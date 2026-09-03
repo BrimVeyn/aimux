@@ -1,0 +1,35 @@
+# Example plugins
+
+Four plugins that exist to be read, and to keep the plugin API honest.
+
+They are in this repository rather than in a gallery somewhere because they are
+typechecked with it: `bun run check` covers `examples/`, so a change to
+`@brimveyn/aimux-plugin` that would break a real plugin breaks the build here
+first. Every one of them was written before the API had what it needed, and
+each found something — that is why they exist.
+
+| Plugin     | Shows                                                              |
+| ---------- | ------------------------------------------------------------------ |
+| `shifter`  | status-bar tile, keybindings, config, UI → daemon RPC, `tabs.send` |
+| `sysload`  | bar widget, a polling daemon half, daemon → UI broadcast           |
+| `ghstreak` | subprocess in the daemon, `ctx.projects`, a drawn grid             |
+| `pulse`    | a pane, `ctx.metrics`, `ctx.ui.state`                              |
+
+## Trying one
+
+```bash
+cd examples/plugins/shifter
+aimux plugin link .
+aimux plugin doctor .
+aimux plugin log aimux-examples.shifter
+```
+
+They are not registered by default: linking one is a deliberate act, and these
+write to your terminals.
+
+## What they are not
+
+Not a component library, and not a style guide for TypeScript. They are the
+shortest honest version of four real things, and each one names in its README
+the part where it had to guess — a model alias, a GPU counter — so you can
+point it at what your machine actually has.

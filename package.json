@@ -35,6 +35,7 @@
   "files": [
     "src",
     "skills",
+    "assets/claude-hooks",
     "README.md",
     "LICENSE"
   ],
@@ -61,12 +62,14 @@
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "knip": "knip-bun",
+    "docs:plugin-api": "bun run scripts/gen-plugin-api-doc.ts",
     "bump": "bun run scripts/bump.ts",
     "bump:ipc": "bun run scripts/bump-protocol.ts ipc",
     "bump:terminal_manager": "bun run scripts/bump-protocol.ts terminal-manager"
   },
   "dependencies": {
     "@brimveyn/aimux-config": "workspace:*",
+    "@brimveyn/aimux-plugin": "workspace:*",
     "@opentui/core": "^0.1.90",
     "@opentui/react": "^0.1.90",
     "@resvg/resvg-wasm": "^2.6.2",

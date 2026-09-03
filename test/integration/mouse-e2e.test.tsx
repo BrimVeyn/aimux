@@ -390,7 +390,19 @@ function ResizeHarness({ bars }: { bars: BarsState }) {
   })
 
   useLayoutEffect(() => {
+    // The harness drives a local `useReducer` and mirrors it into the global
+    // store so `RootView`'s selectors see it. `dispatch` goes in too, because
+    // components that dispatch out of band read it from there.
+    //
+    // Put back on unmount: the store is a module singleton shared by every
+    // test file in the process, and leaving a React `dispatch` in it makes
+    // anyone dispatching afterwards update this component instead of the
+    // store.
+    const previous = appStore.getState().dispatch
     appStore.setState({ ...state, dispatch })
+    return () => {
+      appStore.setState({ dispatch: previous })
+    }
   }, [dispatch, state])
 
   return (

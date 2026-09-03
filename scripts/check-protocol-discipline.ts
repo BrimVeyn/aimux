@@ -10,7 +10,11 @@
 //      commit in the range branch...main (or in the env var
 //      `AIMUX_PROTOCOL_BREAKING_REASON`, useful for CI on `main` itself).
 //
-//   2. `stopTerminalManager(` may only be called from the dedicated
+//   2. `src/terminal-manager/**` may not import `src/plugins/**`. The TM is
+//      the process holding every PTY; loading plugin code there would put
+//      session survival at the mercy of third-party code.
+//
+//   3. `stopTerminalManager(` may only be called from the dedicated
 //      restart-terminal-manager command path. Anywhere else, the call must
 //      be opted in with an `AIMUX_ALLOW_KILL_PTYS:` marker on the same or
 //      preceding line — the marker is the engineer saying out loud "I know
@@ -56,6 +60,12 @@ const STOP_TM_OPT_IN_MARKER = 'AIMUX_ALLOW_KILL_PTYS'
 const STOP_TM_MARKER_LOOKBACK = 6
 
 const BREAKING_MARKER = /\bBREAKING:/
+
+// The terminal manager holds every PTY. A plugin crashing or hanging there
+// would take live sessions with it, so the plugin kernel is barred from that
+// process by construction rather than by convention.
+const TM_PREFIX = 'src/terminal-manager/'
+const PLUGIN_IMPORT = /from\s+['"][^'"]*\bplugins\//
 
 interface Finding {
   rule: string
@@ -188,9 +198,37 @@ function checkStopTerminalManagerCallers(): void {
   }
 }
 
+function checkTerminalManagerPluginImports(): void {
+  const tracked =
+    git('ls-files -- "src/terminal-manager/*.ts" "src/terminal-manager/*.tsx"')
+      ?.split('\n')
+      .filter((f) => f.length > 0) ?? []
+
+  for (const file of tracked) {
+    if (!file.startsWith(TM_PREFIX)) continue
+    let content: string
+    try {
+      content = readFileSync(join(ROOT, file), 'utf8')
+    } catch {
+      continue
+    }
+    const lines = content.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] ?? ''
+      if (!PLUGIN_IMPORT.test(line)) continue
+      findings.push({
+        hint: 'Move the shared code into a module neither process owns, or reach the plugin kernel through the daemon. See docs/developer/plugins.md.',
+        message: `${file}:${i + 1}: the terminal manager must not import the plugin kernel.`,
+        rule: 'terminal-manager-plugin-isolation',
+      })
+    }
+  }
+}
+
 function main(): void {
   checkMinBumps()
   checkStopTerminalManagerCallers()
+  checkTerminalManagerPluginImports()
 
   if (findings.length === 0) {
     console.log('[discipline] OK')

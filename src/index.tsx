@@ -19,10 +19,23 @@ if (command === 'completion') {
 // CLI control plane (docs/reference/cli.md). Branch BEFORE the UI bootstrap so
 // `aimux tab list` from a non-TTY shell never spins up the React renderer.
 // Dynamic import keeps the CLI code out of the UI's cold-start cost.
-const CLI_GROUPS = new Set(['tab', 'project', 'workspace', 'worker'])
+const { CLI_GROUPS } = await import('./cli/groups')
 if (typeof command === 'string' && CLI_GROUPS.has(command)) {
   const { runCli } = await import('./cli')
   process.exit(await runCli(process.argv.slice(2)))
+}
+
+// A group contributed by a plugin. Checked after the built-in set and only
+// when a verb follows, so bare `aimux` still starts the TUI — and only ever
+// one small file read, on a path that was about to boot the whole renderer
+// anyway. The daemon rewrites that sidecar whenever the registry changes; the
+// CLI process still loads no plugin code.
+if (typeof command === 'string' && typeof process.argv[3] === 'string') {
+  const { readPluginCliSidecar } = await import('./plugins/cli-commands')
+  if (readPluginCliSidecar().some((spec) => spec.group === command)) {
+    const { runCli } = await import('./cli')
+    process.exit(await runCli(process.argv.slice(2)))
+  }
 }
 
 if (command === '--version' || command === '-v' || command === 'version') {

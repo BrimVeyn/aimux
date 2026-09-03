@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { BAR_MAX_WIDTH, BAR_MIN_WIDTH } from '../../src/state/bars'
+import { BAR_MAX_WIDTH, BAR_MIN_WIDTH, visibleWidgets } from '../../src/state/bars'
 import { appReducer, createInitialState } from '../../src/state/store'
 
 describe('initial state', () => {
@@ -25,7 +25,7 @@ describe('initial state', () => {
     expect(state.bars.left.widgets.map((w) => w.id)).toEqual(['git', 'projects', 'setup'])
   })
 
-  test('clamps persisted bar width and drops unknown widget ids', () => {
+  test('clamps persisted bar width and keeps an unrenderable widget id', () => {
     const state = createInitialState({}, [], [], false, {
       bars: {
         left: { visible: true, widgets: [{ grow: 100, id: 'nope', visible: true }], width: 2 },
@@ -35,7 +35,12 @@ describe('initial state', () => {
 
     expect(state.bars.left.width).toBe(18)
     expect(state.bars.right.width).toBe(80)
-    expect(state.bars.left.widgets.map((w) => w.id)).not.toContain('nope')
+    // Kept, not pruned. An id nothing can render used to mean corruption;
+    // since plugins it usually means a plugin that is disabled or still
+    // loading, and dropping it would delete the user's placement and write the
+    // deletion back to `aimux.json`. `visibleWidgets` skips it instead.
+    expect(state.bars.left.widgets.map((w) => w.id)).toContain('nope')
+    expect(visibleWidgets(state.bars.left).map((w) => w.id)).not.toContain('nope')
   })
 
   test('restores a widget that is in neither bar', () => {

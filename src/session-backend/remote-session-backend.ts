@@ -10,6 +10,7 @@ import {
   type AttachResult,
   type ClientRequest,
   encodeMessage,
+  IPC_CAPABILITY_PLUGIN_RPC,
   IPC_CAPABILITY_TAB_METADATA,
   IPC_PROTOCOL_MIN_VERSION,
   IPC_PROTOCOL_VERSION,
@@ -252,6 +253,14 @@ export class RemoteSessionBackend
         break
       case 'workspaceRemoved':
         this.emit('workspaceRemoved', message.payload.projectId, message.payload.workspaceId)
+        break
+      case 'pluginEvent':
+        this.emit(
+          'pluginEvent',
+          message.payload.pluginId,
+          message.payload.verb,
+          message.payload.payload
+        )
         break
     }
   }
@@ -556,6 +565,28 @@ export class RemoteSessionBackend
         type: 'announceProjectSwitched',
       },
       'announceProjectSwitched'
+    )
+  }
+
+  /**
+   * v19 plugin channel, UI → daemon. Unlike every other method here this one
+   * awaits its reply: a plugin's `ctx.rpc.call` is a request/response, and the
+   * caller is plugin code that has to see either a value or an error.
+   */
+  async pluginRequest(pluginId: string, verb: string, payload?: unknown): Promise<unknown> {
+    if (!this.daemonAdvertises(IPC_CAPABILITY_PLUGIN_RPC)) {
+      throw new Error('the connected daemon does not support plugin RPC (pre-v19)')
+    }
+    const response = await this.send({
+      id: crypto.randomUUID(),
+      payload: { payload, pluginId, verb },
+      type: 'pluginRequest',
+    })
+    if (response.type === 'pluginResult') return response.payload.result
+    throw new Error(
+      response.type === 'error'
+        ? response.payload.message
+        : `unexpected plugin rpc response: ${response.type}`
     )
   }
 

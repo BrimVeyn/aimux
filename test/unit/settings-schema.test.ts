@@ -4,9 +4,9 @@ import type { ProjectRecord } from '../../src/state/types'
 
 import {
   ALL_SETTING_ROWS,
+  BUILTIN_SETTING_SECTIONS,
   sectionRowCount,
   sectionRows,
-  SETTING_SECTIONS,
 } from '../../src/settings/sections'
 import { readRow } from '../../src/settings/settings-store'
 import { createInitialState } from '../../src/state/store'
@@ -34,7 +34,7 @@ test('every row id is unique', () => {
 })
 
 test('every section has a label, and static ones have rows', () => {
-  for (const section of SETTING_SECTIONS) {
+  for (const section of BUILTIN_SETTING_SECTIONS) {
     expect(section.label.length).toBeGreaterThan(0)
     // `section.rows.length` would be a function's arity for the dynamic ones —
     // 1, always, which is how this assertion once passed without looking at a
@@ -169,7 +169,7 @@ test('no row id changes by accident', () => {
 })
 
 test('a section that builds its rows counts them without building them', () => {
-  for (const section of SETTING_SECTIONS) {
+  for (const section of BUILTIN_SETTING_SECTIONS) {
     // The reducer clamps the cursor with `rowCount` precisely so it never builds
     // rows — building a Setup row reads a file. A count that disagrees with the
     // list is a cursor that stops one row short of the end, or one past it.
@@ -183,7 +183,7 @@ test('a section that builds its rows counts them without building them', () => {
 })
 
 test('a row built from state never claims the settings file owns its value', () => {
-  for (const section of SETTING_SECTIONS) {
+  for (const section of BUILTIN_SETTING_SECTIONS) {
     if (Array.isArray(section.rows)) continue
     for (const row of sectionRows(section, PROJECTS)) {
       // Hydration only walks the static rows, so a dynamic `storage: 'settings'`

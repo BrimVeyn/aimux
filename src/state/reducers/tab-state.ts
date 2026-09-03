@@ -2,12 +2,15 @@ import type { AppAction } from '../actions'
 import type { AppState, TabSession } from '../types'
 
 import {
-  allLeafIds,
+  allTabIds,
   createGroupId,
   createLeaf,
+  createPluginLeaf,
   getAdjacentLeaf,
+  getAdjacentPane,
   getGroupIdForTab,
   getTreeForTab,
+  isTabLeaf,
   type LayoutNode,
   pruneLayoutTree,
   removeNode,
@@ -129,7 +132,7 @@ function moveLayoutGroup(
     const adjacentTree =
       adjacentGroupId != null && adjacentGroupId !== '' ? state.layoutTrees[adjacentGroupId] : null
     if (adjacentTree && adjacentTree.type === 'split') {
-      const adjacentIds = new Set(allLeafIds(adjacentTree))
+      const adjacentIds = new Set(allTabIds(adjacentTree))
       let otherEnd = groupEnd + 1
       while (
         otherEnd < tabs.length - 1 &&
@@ -161,7 +164,7 @@ function moveLayoutGroup(
     const adjacentTree =
       adjacentGroupId != null && adjacentGroupId !== '' ? state.layoutTrees[adjacentGroupId] : null
     if (adjacentTree && adjacentTree.type === 'split') {
-      const adjacentIds = new Set(allLeafIds(adjacentTree))
+      const adjacentIds = new Set(allTabIds(adjacentTree))
       let otherStart = groupStart - 1
       while (otherStart > 0 && adjacentIds.has(getTabIdAtIndex(tabs, otherStart - 1) ?? '')) {
         otherStart--
@@ -214,7 +217,10 @@ function withActiveTabWorkspace(
   // Opening the tab is reading its notification, whatever else this helper
   // decides about the workspace. Every path that makes a tab the active one
   // goes through here.
-  const seen = { ...state, tabs: clearTabUnseen(state.tabs, tabId) }
+  // A tab becoming active is the one signal that a plugin pane no longer holds
+  // the keyboard. Doing it here rather than at each call site is the point of
+  // the helper: every path that makes a tab active goes through it.
+  const seen = { ...state, activePluginPaneId: null, tabs: clearTabUnseen(state.tabs, tabId) }
   if (!(seen.currentProjectId != null && seen.currentProjectId !== '')) return seen
   const tab = seen.tabs.find((entry) => entry.id === tabId)
   if (!(tab?.workspaceId != null && tab?.workspaceId !== '')) return seen
@@ -388,7 +394,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           const pruned = pruneLayoutTree(tree, tabIds)
           if (pruned && pruned.type === 'split') {
             hydratedTrees[gId] = pruned
-            for (const leafId of allLeafIds(pruned)) {
+            for (const leafId of allTabIds(pruned)) {
               hydratedGroupMap[leafId] = gId
             }
           }
@@ -400,7 +406,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         if (pruned && pruned.type === 'split') {
           const gId = createGroupId()
           hydratedTrees[gId] = pruned
-          for (const leafId of allLeafIds(pruned)) {
+          for (const leafId of allTabIds(pruned)) {
             hydratedGroupMap[leafId] = gId
           }
         }
@@ -459,7 +465,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
           : null
       const activeGroupTree =
         activeGroupId != null && activeGroupId !== '' ? state.layoutTrees[activeGroupId] : null
-      const layoutIds = activeGroupTree ? allLeafIds(activeGroupTree) : []
+      const layoutIds = activeGroupTree ? allTabIds(activeGroupTree) : []
       if (
         layoutIds.length > 1 &&
         state.activeTabId != null &&
@@ -494,7 +500,7 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       const targetTree =
         targetGroupId != null && targetGroupId !== '' ? state.layoutTrees[targetGroupId] : null
       if (targetTree && targetTree.type === 'split') {
-        const targetIds = new Set(allLeafIds(targetTree))
+        const targetIds = new Set(allTabIds(targetTree))
         const tabs = moveTabAcrossTargetGroup(
           state.tabs,
           activeIndex,
@@ -649,10 +655,10 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         tree = createLeaf(state.activeTabId)
       }
 
-      const newTree = splitNode(tree, state.activeTabId, action.direction, newTab.id)
+      const newTree = splitNode(tree, state.activeTabId, action.direction, createLeaf(newTab.id))
 
       // Insert newTab right after the last layout group member
-      const layoutIdSet = new Set(allLeafIds(tree))
+      const layoutIdSet = new Set(allTabIds(tree))
       let insertIndex = state.tabs.length
       for (let i = state.tabs.length - 1; i >= 0; i--) {
         const tabId = getTabIdAtIndex(state.tabs, i)
@@ -682,19 +688,104 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
       const idx = state.tabs.findIndex((tab) => tab.id === action.tabId)
       return closeTabAtIndex(state, idx)
     }
-    case 'focus-pane-direction': {
+    case 'open-plugin-pane': {
       if (!(state.activeTabId != null && state.activeTabId !== '')) {
         return state
       }
-      const focusTree = getTreeForTab(state.layoutTrees, state.tabGroupMap, state.activeTabId)
+      // One instance per registered pane. Opening an open pane is a no-op
+      // rather than a second copy: the id is the plugin's name for it, and two
+      // panes claiming it would make "close it" ambiguous.
+      if (state.tabGroupMap[action.paneId] !== undefined) {
+        return state
+      }
+
+      let paneGroupId = getGroupIdForTab(state.tabGroupMap, state.activeTabId)
+      const existing =
+        paneGroupId != null && paneGroupId !== '' ? state.layoutTrees[paneGroupId] : undefined
+      let paneTree: LayoutNode
+      if (paneGroupId != null && paneGroupId !== '' && existing) {
+        paneTree = existing
+      } else {
+        paneGroupId = createGroupId()
+        paneTree = createLeaf(state.activeTabId)
+      }
+
+      const withPane = splitNode(
+        paneTree,
+        state.activeTabId,
+        action.direction,
+        createPluginLeaf(action.paneId)
+      )
+      if (withPane === paneTree) {
+        return state
+      }
+
+      // The active tab does not change: a plugin pane cannot hold focus, so
+      // opening one beside a terminal must not take the keyboard away from it.
+      return {
+        ...state,
+        layoutTrees: { ...state.layoutTrees, [paneGroupId]: withPane },
+        tabGroupMap: {
+          ...state.tabGroupMap,
+          [action.paneId]: paneGroupId,
+          [state.activeTabId]: paneGroupId,
+        },
+      }
+    }
+    case 'close-plugin-pane': {
+      const closeGroupId = state.tabGroupMap[action.paneId]
+      const closeTree =
+        closeGroupId != null && closeGroupId !== '' ? state.layoutTrees[closeGroupId] : undefined
+      if (closeGroupId == null || closeGroupId === '' || !closeTree) {
+        return state
+      }
+
+      const remaining = removeNode(closeTree, action.paneId)
+      const nextTrees = { ...state.layoutTrees }
+      // Whatever held the keys is gone; the terminal it was beside gets them.
+      const nextPaneFocus =
+        state.activePluginPaneId === action.paneId ? null : state.activePluginPaneId
+      const nextGroupMap = { ...state.tabGroupMap }
+      delete nextGroupMap[action.paneId]
+      // A group that is down to one pane is not a split any more, and the
+      // surviving tab goes back to being an ordinary tab — the same collapse
+      // closing a tab performs.
+      if (remaining === null || remaining.type === 'leaf') {
+        delete nextTrees[closeGroupId]
+        if (remaining?.type === 'leaf') delete nextGroupMap[remaining.tabId]
+      } else {
+        nextTrees[closeGroupId] = remaining
+      }
+
+      return {
+        ...state,
+        activePluginPaneId: nextPaneFocus,
+        layoutTrees: nextTrees,
+        tabGroupMap: nextGroupMap,
+      }
+    }
+    case 'focus-pane-direction': {
+      // Navigation starts from whatever holds the keyboard, which may be a
+      // plugin pane — otherwise moving off one would jump from the terminal
+      // it was opened beside instead of from the pane itself.
+      const focusFrom = state.activePluginPaneId ?? state.activeTabId
+      if (!(focusFrom != null && focusFrom !== '')) {
+        return state
+      }
+      const focusTree = getTreeForTab(state.layoutTrees, state.tabGroupMap, focusFrom)
       if (!focusTree) {
         return state
       }
-      const neighbor = getAdjacentLeaf(focusTree, state.activeTabId, action.direction)
-      if (!(neighbor != null && neighbor !== '')) {
+      const neighbor = getAdjacentPane(focusTree, focusFrom, action.direction)
+      if (neighbor === null) {
         return state
       }
-      return withActiveTabWorkspace({ ...state, activeTabId: neighbor }, neighbor)
+      if (!isTabLeaf(neighbor)) {
+        // The pane takes the keys; `activeTabId` keeps naming the terminal, so
+        // moving back is a move rather than a restore.
+        return { ...state, activePluginPaneId: neighbor.tabId }
+      }
+      return withActiveTabWorkspace({ ...state, activeTabId: neighbor.tabId }, neighbor.tabId)
     }
     case 'resize-pane': {
       const resizeGroupId = getGroupIdForTab(state.tabGroupMap, action.tabId)

@@ -17,6 +17,9 @@ export type DynamicCompletionSource =
   | 'worker'
   | 'project'
   | 'workspace'
+  | 'plugin'
+  /** Resolved from the plugin id in the positional before this one. */
+  | 'plugin-config-key'
 
 /**
  * Where a flag value or positional draws its shell-completion candidates.

@@ -26,6 +26,7 @@ import { useProjectAutosave } from './app-runtime/use-project-autosave'
 import { useRendererBindings } from './app-runtime/use-renderer-bindings'
 import { useSetupRunner } from './app-runtime/use-setup-runner'
 import { useTerminalResize } from './app-runtime/use-terminal-resize'
+import { builtinPlugins } from './builtin-plugins'
 import { loadConfig, saveConfig } from './config'
 import { enqueueGitOp } from './git/command-queue'
 import { pruneOrphanAimuxBranches } from './git/worktree'
@@ -33,21 +34,13 @@ import { setActiveKeymap } from './input/keymap/keymap-ref'
 import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
-import { ensureClaudeSettingsHooks } from './integrations/claude-hooks-install'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
-import { ensureClaudeSettingsThemePref, syncClaudeTheme } from './integrations/claude-theme-sync'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
-import { startAIUsageService } from './services/ai-usage/provider'
 import { bump } from './services/aimux-counters'
-import {
-  useAIUsageConfig,
-  useAutoCommitConfig,
-  useHarmonizeClaudeTheme,
-  useSnippetTriggerChar,
-} from './settings/live'
-import { ALL_SETTING_ROWS } from './settings/sections'
+import { observeCounters } from './services/aimux-counters/observe'
+import { useAutoCommitConfig, useSnippetTriggerChar } from './settings/live'
+import { ALL_SETTING_ROWS, setPluginUserConfig } from './settings/sections'
 import { hydrateSettings } from './settings/settings-store'
-import { aiUsageStore } from './state/ai-usage-store'
 import { appStore, useAppStore } from './state/app-store'
 import {
   runSideEffectGlobal,
@@ -60,16 +53,11 @@ import { loadSnippetCatalog, mergeConfigSnippets } from './state/snippet-catalog
 import { createInitialState } from './state/store'
 import { toast } from './state/toast-store'
 import { KeymapContext } from './ui/keymap-context'
+import { usePluginHost } from './ui/plugin-host'
 import { RootView } from './ui/root'
-import {
-  applyTheme,
-  getCurrentMode,
-  getCurrentTheme,
-  setMode,
-  setTransparent,
-  subscribeThemeChanges,
-} from './ui/theme'
+import { applyTheme, setMode, setTransparent } from './ui/theme'
 import { isKnownThemeId, type ThemeId } from './ui/themes'
+import { loadUserThemes } from './ui/user-themes'
 import {
   fetchLatestNpmVersion,
   getCurrentPackageVersion,
@@ -109,9 +97,25 @@ export function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
+  // Plugin host. Mounted after `registerAllModes` so a plugin's `apply` sees a
+  // fully-registered mode table, and before the first paint so a widget it
+  // contributes is present on the initial render rather than popping in.
+  usePluginHost({
+    backend,
+    builtins: builtinPlugins(resolvedConfig),
+    userPlugins: resolvedConfig.plugins,
+  })
+
   const renderer = useRenderer()
   const dimensions = useTerminalDimensions()
   const [themeId, setThemeId] = useState<ThemeId>(() => {
+    // Before the first `applyTheme`: a persisted `themeId` naming a theme from
+    // `<profile>/themes/` has to resolve, or the app would fall back to
+    // `aimux` and then write that fallback back to the config file.
+    const userThemes = loadUserThemes()
+    for (const issue of userThemes.issues) {
+      toast.error(`theme ${issue.file}: ${issue.message}`)
+    }
     const config = loadConfig()
     const persisted =
       config.themeId != null && config.themeId !== '' && isKnownThemeId(config.themeId)
@@ -180,11 +184,12 @@ export function App({
   // Config the settings screen can change under us. The resolved config file is
   // the baseline each of these falls back to.
   const autoCommitConfig = useAutoCommitConfig(resolvedConfig.autoCommit)
-  const aiUsageConfig = useAIUsageConfig(resolvedConfig.statusBar?.aiUsage)
-  const harmonizeClaudeTheme = useHarmonizeClaudeTheme(
-    resolvedConfig.theme?.beta?.harmonizeClaudeTheme
-  )
   const snippetTriggerChar = useSnippetTriggerChar(resolvedConfig.snippetTriggerChar)
+
+  // The counters are a subscriber to the app event bus, not a hard-wired
+  // consumer of it. Subscribed once per app instance, alongside the dispatch
+  // wiring they observe.
+  useLayoutEffect(() => observeCounters(), [])
 
   useLayoutEffect(() => {
     setActiveDispatch(dispatch)
@@ -201,47 +206,13 @@ export function App({
   // Layout effect, so it lands before the first paint.
   useLayoutEffect(() => {
     hydrateSettings(ALL_SETTING_ROWS, userConfig)
+    // Which plugin config keys the file declares, so those rows can say they
+    // come back on restart. Read once, like everything else here.
+    setPluginUserConfig(resolvedConfig.plugins)
     // Once per launch: the config file is read at startup and does not change
     // under us, and every later write goes through `writeRow`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  useEffect(() => {
-    if (!harmonizeClaudeTheme) return
-    ensureClaudeSettingsThemePref()
-    syncClaudeTheme(getCurrentTheme(), getCurrentMode())
-    return subscribeThemeChanges((resolved, mode) => {
-      syncClaudeTheme(resolved, mode)
-    })
-  }, [harmonizeClaudeTheme])
-
-  useEffect(() => {
-    // Opt-in via `integrations.claudeHooks` in aimux.config.ts. When enabled,
-    // idempotently patches ~/.claude/settings.json so Claude Code's hooks
-    // call back into the daemon for per-tab activity detection. Silent on
-    // failure; the visual PTY detector is the fallback either way.
-    if (resolvedConfig.integrations.claudeHooks) {
-      ensureClaudeSettingsHooks()
-    }
-  }, [resolvedConfig.integrations.claudeHooks])
-
-  useEffect(() => {
-    if (!(aiUsageConfig.enabled === true)) {
-      aiUsageStore.getState().setEnabled(false)
-      return
-    }
-    aiUsageStore.getState().setEnabled(true)
-    const handle = startAIUsageService(aiUsageConfig, (snap) => {
-      aiUsageStore.getState().setSnapshot(snap)
-    })
-    return () => {
-      handle.stop()
-      aiUsageStore.getState().clear()
-      aiUsageStore.getState().setEnabled(false)
-    }
-    // Memoized by `useAIUsageConfig`, so toggling the indicator restarts the
-    // service and nothing else does.
-  }, [aiUsageConfig])
 
   useEffect(() => {
     if (process.env.AIMUX_DISABLE_UPDATE_CHECK === '1') return
@@ -506,7 +477,7 @@ export function App({
       dispatch(action)
     }
 
-    if (result.transition) {
+    if (result.transition !== undefined) {
       const transResult = transitionTo(modeId, result.transition, { state })
       for (const action of transResult.actions) {
         dispatch(action)

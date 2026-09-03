@@ -8,8 +8,7 @@ import { logInputDebug } from '../debug/input-log'
 import { enqueueGitOp } from '../git/command-queue'
 import { countDirtyFiles } from '../git/move-workspace'
 import { getCurrentBranch, getDefaultBranch, listLocalBranches } from '../git/worktree'
-import { countEffect } from '../services/aimux-counters/observe'
-import { allLeafIds, getGroupIdForTab } from '../state/layout-tree'
+import { allTabIds, getGroupIdForTab } from '../state/layout-tree'
 import { saveCurrentProject } from '../state/project-save'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
@@ -17,6 +16,7 @@ import { beginWorkspaceDelete, endWorkspaceDelete } from '../state/workspace-del
 import { filterThemeIds } from '../ui/filter-themes'
 import { scrollGitDiff } from '../ui/git-view-controls'
 import { applyTheme, getCurrentMode, getTransparent, setMode, setTransparent } from '../ui/theme'
+import { emitAppEvent } from './app-events'
 import { openFileInEditor, openSelectedSnippetSourceInEditor } from './editor-actions'
 import {
   runGenerateAutoCommitNow,
@@ -32,6 +32,7 @@ import {
   handleSwitchProjectByIndex,
   handleSwitchTabByIndex,
 } from './navigation-actions'
+import { runPluginEffect } from './plugin-effects'
 import {
   handleCreateProjectEffect,
   handleDeleteProjectEffect,
@@ -139,7 +140,7 @@ function pasteSnippetToActiveGroup(ctx: SideEffectContext): void {
     return
   }
 
-  for (const tabId of allLeafIds(groupTree)) {
+  for (const tabId of allTabIds(groupTree)) {
     const tab = state.tabs.find((entry) => entry.id === tabId)
     if (tab) {
       pasteSnippetToTab(backend, tabId, tab, snippet)
@@ -218,7 +219,7 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
 
   // Every effect path funnels through here, including the mouse and IPC ones,
   // so this is the one place that sees them all.
-  countEffect(effect)
+  emitAppEvent('effect', { effect })
 
   switch (effect.type) {
     case 'quit': {
@@ -639,6 +640,13 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'commit-setting-text': {
       commitSettingText(ctx, effect.settingId, effect.value)
+      return
+    }
+    // The one arm the core does not implement: routed to whichever plugin
+    // registered `effectId`, and contained there so a throwing plugin cannot
+    // abort the rest of this keystroke's effects.
+    case 'plugin-effect': {
+      runPluginEffect(effect.pluginId, effect.effectId, effect.payload, ctx)
       return
     }
     default:

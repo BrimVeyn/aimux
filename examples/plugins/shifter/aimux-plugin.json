@@ -1,0 +1,28 @@
+{
+  "id": "aimux-examples.shifter",
+  "name": "Model shifter",
+  "version": "1.0.0",
+  "description": "Five gears for the model the active assistant is running on",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "gear1": {
+      "type": "string",
+      "label": "Gear 1",
+      "description": "What to type into the assistant for the first gear",
+      "default": "/model haiku"
+    },
+    "gear2": { "type": "string", "label": "Gear 2", "default": "/model sonnet" },
+    "gear3": { "type": "string", "label": "Gear 3", "default": "/model opus" },
+    "gear4": { "type": "string", "label": "Gear 4", "default": "/model fable" },
+    "gear5": {
+      "type": "string",
+      "label": "Gear 5",
+      "description": "Fable with reasoning turned up — point this at whatever your assistant accepts",
+      "default": "/model fable"
+    }
+  }
+}

@@ -36,11 +36,15 @@
         "src/restart-terminal-manager.ts",
         "src/daemon/**/*.{ts,tsx}",
         "src/terminal-manager/**/*.{ts,tsx}",
-        "test/**/*.{ts,tsx}"
+        "test/**/*.{ts,tsx}",
+        "examples/**/*.{ts,tsx}"
       ],
-      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "examples/**/*.{ts,tsx}"]
     },
     "packages/aimux-config": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/aimux-plugin": {
       "project": ["src/**/*.ts"]
     }
   }

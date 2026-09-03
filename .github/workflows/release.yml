@@ -63,20 +63,37 @@ jobs:
             echo "@brimveyn/aimux-config@$VERSION already published, skipping"
           fi
 
-      - name: Verify aimux-config workspace dep resolves correctly
+      # Published before the app, like aimux-config: the app's `workspace:*`
+      # resolves to whatever npm has, so a version that is not up there yet
+      # ships an app pinned to a package nobody can install.
+      - name: Publish @brimveyn/aimux-plugin
+        working-directory: packages/aimux-plugin
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          EXPECTED=$(node -p "require('./packages/aimux-config/package.json').version")
+          VERSION=$(node -p "require('./package.json').version")
+          if [ -z "$(npm view @brimveyn/aimux-plugin@$VERSION version 2>/dev/null)" ]; then
+            bun publish --access public
+          else
+            echo "@brimveyn/aimux-plugin@$VERSION already published, skipping"
+          fi
+
+      - name: Verify workspace deps resolve correctly
+        run: |
           mkdir -p /tmp/aimux-verify
           bun pm pack --destination /tmp/aimux-verify
           cd /tmp/aimux-verify
           tar xzf *.tgz
-          ACTUAL=$(node -p "require('./package/package.json').dependencies['@brimveyn/aimux-config']")
-          echo "expected aimux-config dep = $EXPECTED"
-          echo "actual   aimux-config dep = $ACTUAL"
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "ERROR: bun resolved workspace:* to $ACTUAL, but packages/aimux-config is at $EXPECTED. Refusing to publish a stale dependency. Regenerate bun.lock or pin the dep explicitly." >&2
-            exit 1
-          fi
+          for PKG in aimux-config aimux-plugin; do
+            EXPECTED=$(node -p "require('$GITHUB_WORKSPACE/packages/$PKG/package.json').version")
+            ACTUAL=$(node -p "require('./package/package.json').dependencies['@brimveyn/$PKG']")
+            echo "expected $PKG dep = $EXPECTED"
+            echo "actual   $PKG dep = $ACTUAL"
+            if [ "$ACTUAL" != "$EXPECTED" ]; then
+              echo "ERROR: bun resolved workspace:* to $ACTUAL, but packages/$PKG is at $EXPECTED. Refusing to publish a stale dependency. Regenerate bun.lock or pin the dep explicitly." >&2
+              exit 1
+            fi
+          done
 
       - name: Publish @brimveyn/aimux
         env:

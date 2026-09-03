@@ -2,6 +2,7 @@ import type { AIUsageTool, AIUsageToolConfig } from '@brimveyn/aimux-config'
 
 import type { UsageSnapshot } from './types'
 
+import { getAssistantDefinition } from '../../pty/assistant-registry'
 import { fetchClaudeUsage } from './adapters/claude'
 import { fetchCodexUsage } from './adapters/codex'
 import { loadCachedSnapshot, saveCachedSnapshot } from './cache'
@@ -16,6 +17,21 @@ import { loadCachedSnapshot, saveCachedSnapshot } from './cache'
 const MIN_POLL_SECONDS = 180
 const DEFAULT_TOOLS: AIUsageTool[] = ['claude', 'codex']
 
+function emptySnapshot(tool: AIUsageTool): UsageSnapshot {
+  return {
+    burnRatePerHour: null,
+    costUSD: null,
+    lastUpdated: new Date().toISOString(),
+    percent: null,
+    planTier: null,
+    resetAt: null,
+    timeRemaining: null,
+    tokens: { cache: 0, input: 0, output: 0, total: 0 },
+    tool,
+    windows: [],
+  }
+}
+
 export interface AIUsageServiceHandle {
   stop: () => void
   refresh: () => void
@@ -27,6 +43,13 @@ async function fetchFor(tool: AIUsageTool, config: AIUsageToolConfig): Promise<U
       return fetchClaudeUsage(config)
     case 'codex':
       return fetchCodexUsage(config)
+    default: {
+      // A plugin assistant that declared a `usage` adapter. Anything else has
+      // no quota to report; an empty snapshot renders as "no data" rather than
+      // as an error the user cannot act on.
+      const usage = getAssistantDefinition(tool)?.usage
+      return usage ? usage(config) : emptySnapshot(tool)
+    }
   }
 }
 
@@ -61,7 +84,7 @@ export function startAIUsageService(
       for (let i = 0; i < results.length; i++) {
         const result = results[i]
         const tool = toFetch[i]
-        if (!result || !tool) continue
+        if (!result || tool === undefined) continue
         if (result.status === 'fulfilled') {
           saveCachedSnapshot(result.value)
           onUpdate(result.value)

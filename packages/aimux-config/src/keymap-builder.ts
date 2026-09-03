@@ -10,6 +10,8 @@ import type {
   ResolvedKeymapConfig,
 } from './types'
 
+import { pluginAction } from './plugin-actions-runtime'
+
 // ---------------------------------------------------------------------------
 // GroupBuilder — sugar for <leader>-prefixed sub-trees
 // ---------------------------------------------------------------------------
@@ -99,6 +101,10 @@ export class KeymapBuilder implements KeymapBuilderApi {
   timeout(ms: number): this {
     this._timeout = ms
     return this
+  }
+
+  plugin(name: string): Action {
+    return pluginAction(name)
   }
 
   mode(

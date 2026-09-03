@@ -52,8 +52,15 @@ import { isProjectSnapshotV1, isWorkspaceRecord } from '../state/validation'
 // it attributes the tab to a workspace row, and one that doesn't (or a v17
 // daemon that never sends it) simply has no workspace-level indicator. MIN
 // stays at 17 so a running v17 daemon keeps serving until it is restarted.
+//
+// v19: additive — the plugin RPC channel. `pluginRequest` carries an opaque
+// call from one half of a plugin to the other and comes back as
+// `pluginResult`; `pluginEvent` is the one-way fanout. All three validate the
+// envelope (`pluginId`, `verb`) and never the payload — a plugin must never
+// have a reason to bump the wire protocol. Gated behind `pluginRpc`; MIN
+// stays at 17.
 export const IPC_PROTOCOL_MIN_VERSION = 17
-export const IPC_PROTOCOL_VERSION = 18
+export const IPC_PROTOCOL_VERSION = 19
 
 /**
  * Capability advertised by a daemon that knows how to drain + handoff its
@@ -157,6 +164,19 @@ export const IPC_CAPABILITY_LIST_TABS_LAST_LINE = 'listTabsLastLine'
 export const IPC_CAPABILITY_TAB_METADATA = 'tabMetadata'
 
 /**
+ * v19 — capability gating `pluginRequest` / `pluginResult` / `pluginEvent`.
+ * The daemon advertises it once its plugin host is up; a UI checks for it
+ * before letting a plugin's `ctx.rpc.call` leave the process, so a plugin
+ * talking to an older daemon gets a clean rejection instead of an
+ * `unknown request` disconnect.
+ *
+ * This is the only capability plugins ever need. Everything a plugin sends
+ * travels inside the opaque payload of these three messages, which is what
+ * keeps the wire protocol independent of the plugin API.
+ */
+export const IPC_CAPABILITY_PLUGIN_RPC = 'pluginRpc'
+
+/**
  * Capabilities advertised by *this* process in its `helloResult`. Additive
  * features should be introduced as new capability strings here rather than
  * via a MIN bump. See `src/ipc/README.md` for the discipline.
@@ -181,6 +201,7 @@ export const IPC_PROTOCOL_CAPABILITIES: readonly string[] = [
   IPC_CAPABILITY_LIST_TABS_LAST_LINE,
   IPC_CAPABILITY_TAB_METADATA,
   IPC_CAPABILITY_WORKER_METADATA,
+  IPC_CAPABILITY_PLUGIN_RPC,
 ]
 
 export interface ProtocolHelloRequest {
@@ -370,6 +391,14 @@ export type ClientRequest =
       type: 'removeWorkspaceRecord'
       payload: { projectId: string; workspaceId: string }
     }
+  // v19 / capability `pluginRpc`. An opaque call addressed to one plugin's
+  // handler in the receiving process. `payload` is deliberately `unknown`:
+  // the protocol owns the envelope, the plugin owns the contents.
+  | {
+      id: string
+      type: 'pluginRequest'
+      payload: { pluginId: string; verb: string; payload?: unknown }
+    }
 
 export type ServerResponse =
   | { id: string; type: 'helloResult'; payload: ProtocolHelloResult }
@@ -377,6 +406,7 @@ export type ServerResponse =
   | { id: string; type: 'attachResult'; payload: AttachResult }
   | { id: string; type: 'listTabsResult'; payload: ListTabsResult }
   | { id: string; type: 'error'; payload: { message: string } }
+  | { id: string; type: 'pluginResult'; payload: { result?: unknown } }
   | {
       id: string
       type: 'reexecAck'
@@ -486,6 +516,13 @@ export type ServerEvent =
   | {
       type: 'workspaceRemoved'
       payload: { projectId: string; workspaceId: string }
+    }
+  // v19 / capability `pluginRpc`. One-way fanout for a plugin half, plus the
+  // channel `aimux plugin reload` uses to reach UI processes (pluginId
+  // `aimux`, verb `reload`).
+  | {
+      type: 'pluginEvent'
+      payload: { pluginId: string; verb: string; payload?: unknown }
     }
 
 export type IpcMessage = ClientRequest | ServerResponse | ServerEvent
@@ -868,6 +905,18 @@ export function parseClientRequest(value: unknown): ClientRequest {
         'removeWorkspaceRecord.workspaceId must be a string'
       )
       return value as ClientRequest
+    case 'pluginRequest':
+      // Envelope only. `payload.payload` stays `unknown` by design — this is
+      // the seam that lets the plugin API evolve without a protocol bump.
+      assert(
+        isString(value.payload.pluginId) && value.payload.pluginId.length > 0,
+        'pluginRequest.pluginId must be a non-empty string'
+      )
+      assert(
+        isString(value.payload.verb) && value.payload.verb.length > 0,
+        'pluginRequest.verb must be a non-empty string'
+      )
+      return value as ClientRequest
     default:
       throw new IpcProtocolError(`Unknown IPC request type: ${String(value.type)}`)
   }
@@ -898,6 +947,19 @@ export function parseServerMessage(value: unknown): ServerResponse | ServerEvent
       assert(isString(value.id), 'listTabsResult.id must be a string')
       assert(isListTabsResult(value.payload), 'listTabsResult.payload is invalid')
       return value as ServerResponse
+    case 'pluginResult':
+      assert(isString(value.id), 'pluginResult.id must be a string')
+      return value as ServerResponse
+    case 'pluginEvent':
+      assert(
+        isString(value.payload.pluginId) && value.payload.pluginId.length > 0,
+        'pluginEvent.pluginId must be a non-empty string'
+      )
+      assert(
+        isString(value.payload.verb) && value.payload.verb.length > 0,
+        'pluginEvent.verb must be a non-empty string'
+      )
+      return value as ServerEvent
     case 'error':
       assert(isString(value.id), 'error.id must be a string')
       assert(isString(value.payload.message), 'error.message must be a string')

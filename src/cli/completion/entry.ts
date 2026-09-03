@@ -9,6 +9,7 @@
  * stay tiny — no daemon client, no UI. See `test/unit/cli-completion-graph`.
  */
 
+import { readPluginCliSidecar } from '../../plugins/cli-commands'
 import { EXIT_OK, EXIT_USAGE, writeError } from '../output'
 import { detectShell, installCompletionScript, shellConfigHint } from './install'
 import { type CompletionPlan, planCompletion } from './plan'
@@ -76,7 +77,12 @@ async function resolvePlan(plan: CompletionPlan, descriptions: boolean): Promise
     }
     case 'dynamic': {
       const { resolveDynamicCandidates } = await import('./sources')
-      const candidates = await resolveDynamicCandidates(plan.source, plan.word, plan.prefix)
+      const candidates = await resolveDynamicCandidates(
+        plan.source,
+        plan.word,
+        plan.prefix,
+        plan.positionals
+      )
       if (candidates.length === 0) return DIRECTIVE_NONE
       return `${renderCandidates(candidates, descriptions)}\n${DIRECTIVE_LIST}`
     }
@@ -91,7 +97,10 @@ async function resolvePlan(plan: CompletionPlan, descriptions: boolean): Promise
 export async function runComplete(argv: readonly string[]): Promise<number> {
   try {
     const request = parseCompleteRequest(argv)
-    const plan = planCompletion(request.words, request.cword)
+    // One small JSON read, not a socket: `__complete` runs on every TAB press
+    // and must not wait on the daemon, but it should still offer a plugin's
+    // verbs. The daemon rewrites the sidecar whenever the registry changes.
+    const plan = planCompletion(request.words, request.cword, readPluginCliSidecar())
     process.stdout.write(`${await resolvePlan(plan, request.descriptions)}\n`)
   } catch {
     process.stdout.write(`${DIRECTIVE_NONE}\n`)

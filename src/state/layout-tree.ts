@@ -1,17 +1,17 @@
-export type SplitDirection = 'horizontal' | 'vertical'
+// The layout shapes themselves live in `@brimveyn/aimux-config`, which is the
+// single definition for every type a user's config or a plugin can see. They
+// used to be declared here as well, "kept structurally identical" by hand —
+// a promise no compiler was checking. Re-exporting keeps the import sites
+// unchanged while making drift impossible.
+export type {
+  LayoutLeaf,
+  LayoutLeafKind,
+  LayoutNode,
+  LayoutSplit,
+  SplitDirection,
+} from '@brimveyn/aimux-config'
 
-export interface LayoutLeaf {
-  type: 'leaf'
-  tabId: string
-}
-export interface LayoutSplit {
-  type: 'split'
-  direction: SplitDirection
-  ratio: number
-  first: LayoutNode
-  second: LayoutNode
-}
-export type LayoutNode = LayoutLeaf | LayoutSplit
+import type { LayoutLeaf, LayoutNode, SplitDirection } from '@brimveyn/aimux-config'
 
 export interface PaneRect {
   x: number
@@ -53,11 +53,30 @@ export function createLeaf(tabId: string): LayoutLeaf {
   return { tabId, type: 'leaf' }
 }
 
+/**
+ * A pane holding a plugin's renderer. `paneId` is already qualified —
+ * `<pluginId>.<paneId>` — because the host namespaces it, like every other id
+ * a plugin registers.
+ */
+export function createPluginLeaf(paneId: string): LayoutLeaf {
+  return { kind: 'plugin', tabId: paneId, type: 'leaf' }
+}
+
+/** A terminal pane. The default: every leaf written before plugins had panes. */
+export function isTabLeaf(leaf: LayoutLeaf): boolean {
+  return leaf.kind !== 'plugin'
+}
+
+/**
+ * Splits the pane holding `targetTabId` and puts `newLeaf` beside it. Takes a
+ * leaf rather than an id so a caller can put a plugin pane there — the tree
+ * itself has no opinion about what a leaf holds.
+ */
 export function splitNode(
   tree: LayoutNode,
   targetTabId: string,
   direction: SplitDirection,
-  newTabId: string
+  newLeaf: LayoutLeaf
 ): LayoutNode {
   if (tree.type === 'leaf') {
     if (tree.tabId === targetTabId) {
@@ -65,19 +84,19 @@ export function splitNode(
         direction,
         first: tree,
         ratio: 0.5,
-        second: createLeaf(newTabId),
+        second: newLeaf,
         type: 'split',
       }
     }
     return tree
   }
 
-  const newFirst = splitNode(tree.first, targetTabId, direction, newTabId)
+  const newFirst = splitNode(tree.first, targetTabId, direction, newLeaf)
   if (newFirst !== tree.first) {
     return { ...tree, first: newFirst }
   }
 
-  const newSecond = splitNode(tree.second, targetTabId, direction, newTabId)
+  const newSecond = splitNode(tree.second, targetTabId, direction, newLeaf)
   if (newSecond !== tree.second) {
     return { ...tree, second: newSecond }
   }
@@ -117,11 +136,28 @@ export function findLeaf(tree: LayoutNode, tabId: string): boolean {
   return findLeaf(tree.first, tabId) || findLeaf(tree.second, tabId)
 }
 
-export function allLeafIds(tree: LayoutNode): string[] {
+/**
+ * Every leaf id in the tree, whatever it holds. Geometry wants this one: a
+ * plugin pane takes up space exactly like a terminal does.
+ */
+export function allPaneIds(tree: LayoutNode): string[] {
   if (tree.type === 'leaf') {
     return [tree.tabId]
   }
-  return [...allLeafIds(tree.first), ...allLeafIds(tree.second)]
+  return [...allPaneIds(tree.first), ...allPaneIds(tree.second)]
+}
+
+/**
+ * Only the terminals. Anything that looks an id up in `state.tabs`, resizes a
+ * PTY, or orders the tab strip wants this one — and every caller that existed
+ * before plugin panes meant this, which is why the ambiguous `allLeafIds` no
+ * longer exists.
+ */
+export function allTabIds(tree: LayoutNode): string[] {
+  if (tree.type === 'leaf') {
+    return isTabLeaf(tree) ? [tree.tabId] : []
+  }
+  return [...allTabIds(tree.first), ...allTabIds(tree.second)]
 }
 
 export type BoundarySide = 'left' | 'right' | 'top' | 'bottom'
@@ -232,6 +268,28 @@ export function computeJunctionEdges(
       })
     }
   }
+}
+
+/**
+ * The tree with every plugin pane taken out.
+ *
+ * Used on the way to disk. A plugin pane is session-scoped by design — the
+ * plugin that draws it may be disabled, still loading, or gone by the next
+ * launch — and writing its id into a user's `aimux.json` would leave a
+ * reference nothing can resolve. Restoring already prunes anything that is not
+ * a live tab, so this is about not writing it in the first place.
+ */
+export function stripPluginPanes(tree: LayoutNode): LayoutNode | null {
+  if (tree.type === 'leaf') {
+    return isTabLeaf(tree) ? tree : null
+  }
+  const first = stripPluginPanes(tree.first)
+  const second = stripPluginPanes(tree.second)
+  if (!first && !second) return null
+  if (!first) return second
+  if (!second) return first
+  if (first === tree.first && second === tree.second) return tree
+  return { ...tree, first, second }
 }
 
 export function pruneLayoutTree(tree: LayoutNode, validTabIds: Set<string>): LayoutNode | null {
@@ -379,14 +437,64 @@ export function computePaneRects(tree: LayoutNode, bounds: PaneRect): Map<string
 
 type NavDirection = 'left' | 'right' | 'up' | 'down'
 
-function firstLeafId(node: LayoutNode): string {
-  if (node.type === 'leaf') return node.tabId
-  return firstLeafId(node.first)
+function firstTabId(node: LayoutNode): string | null {
+  return allTabIds(node)[0] ?? null
 }
 
-function lastLeafId(node: LayoutNode): string {
-  if (node.type === 'leaf') return node.tabId
-  return lastLeafId(node.second)
+function lastTabId(node: LayoutNode): string | null {
+  return allTabIds(node).at(-1) ?? null
+}
+
+/** Every leaf, in draw order — the traversal both neighbour helpers share. */
+function leaves(node: LayoutNode): LayoutLeaf[] {
+  if (node.type === 'leaf') return [node]
+  return [...leaves(node.first), ...leaves(node.second)]
+}
+
+function firstLeaf(node: LayoutNode): LayoutLeaf | null {
+  return leaves(node)[0] ?? null
+}
+
+function lastLeaf(node: LayoutNode): LayoutLeaf | null {
+  return leaves(node).at(-1) ?? null
+}
+
+/**
+ * The pane next to `fromId`, whatever it holds.
+ *
+ * The variant navigation uses: a plugin pane can hold the keyboard, so it is a
+ * destination like any other. `getAdjacentLeaf` below is the tab-only one, for
+ * the callers that need somewhere to put `activeTabId` — closing a tab, mainly,
+ * where a plugin pane is not an answer.
+ */
+export function getAdjacentPane(
+  tree: LayoutNode,
+  fromId: string,
+  direction: NavDirection
+): LayoutLeaf | null {
+  if (tree.type === 'leaf') return null
+
+  const inFirst = findLeaf(tree.first, fromId)
+  const inSecond = findLeaf(tree.second, fromId)
+  if (!inFirst && !inSecond) return null
+
+  const isMatchingDirection =
+    (tree.direction === 'vertical' && (direction === 'left' || direction === 'right')) ||
+    (tree.direction === 'horizontal' && (direction === 'up' || direction === 'down'))
+
+  if (isMatchingDirection) {
+    const goingToSecond = direction === 'right' || direction === 'down'
+    if (inFirst && goingToSecond) {
+      return getAdjacentPane(tree.first, fromId, direction) ?? firstLeaf(tree.second)
+    }
+    if (inSecond && !goingToSecond) {
+      return getAdjacentPane(tree.second, fromId, direction) ?? lastLeaf(tree.first)
+    }
+  }
+
+  return inFirst
+    ? getAdjacentPane(tree.first, fromId, direction)
+    : getAdjacentPane(tree.second, fromId, direction)
 }
 
 export function getAdjacentLeaf(
@@ -418,13 +526,13 @@ export function getAdjacentLeaf(
       const deeper = getAdjacentLeaf(tree.first, fromTabId, direction)
       if (deeper != null && deeper !== '') return deeper
       // Cross boundary: go to first leaf of second child
-      return firstLeafId(tree.second)
+      return firstTabId(tree.second)
     }
 
     if (inSecond && !goingToSecond) {
       const deeper = getAdjacentLeaf(tree.second, fromTabId, direction)
       if (deeper != null && deeper !== '') return deeper
-      return lastLeafId(tree.first)
+      return lastTabId(tree.first)
     }
   }
 

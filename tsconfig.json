@@ -20,5 +20,5 @@
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun-types", "node", "react"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test", "examples"]
 }

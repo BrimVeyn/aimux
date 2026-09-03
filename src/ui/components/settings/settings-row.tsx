@@ -2,6 +2,7 @@ import { memo } from 'react'
 
 import type { SettingRow } from '../../../settings/types'
 
+import { rowMarks } from '../../../settings/row-marks'
 import { readRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
 import { useTheme } from '../../theme'
@@ -99,8 +100,11 @@ export const SettingsRow = memo(function SettingsRow({
   width,
 }: SettingsRowProps) {
   const t = useTheme()
-  const fromConfigFile = useSettingsStore((s) => s.fromConfigFile.has(row.id))
-  const touched = useSettingsStore((s) => s.touched.has(row.id))
+  const storeMarks = {
+    fromConfigFile: useSettingsStore((s) => s.fromConfigFile.has(row.id)),
+    touched: useSettingsStore((s) => s.touched.has(row.id)),
+  }
+  const { fromConfigFile, touched } = rowMarks(row, storeMarks)
   // A blank when neither applies, never nothing: a marker that comes and goes
   // would shift the label of every row it is missing from.
   let mark = ' '

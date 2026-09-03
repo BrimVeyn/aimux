@@ -150,6 +150,10 @@ export function storedRow(row: SettingRow): StoredSettingRow | null {
 export function readRow(row: SettingRow, ctx: SettingCtx): SettingValue {
   if (row.kind === 'info' || row.kind === 'action') return row.value(ctx)
   if (row.storage === 'app') return row.read(ctx)
+  // A plugin row's value lives in the plugin registry, not in either store, so
+  // it brings its own reader. Secrets are redacted by the reader itself: a
+  // token must not reach this screen's value, its footer, or its edit modal.
+  if (row.storage === 'plugin') return row.read()
   return ctx.values[row.id] ?? row.fallback
 }
 
@@ -164,6 +168,11 @@ export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx):
   if (readRow(row, ctx) === value) return
   if (row.storage === 'app') {
     row.write(value, ctx)
+    bumpRevision()
+    return
+  }
+  if (row.storage === 'plugin') {
+    row.write(value)
     bumpRevision()
     return
   }
@@ -183,6 +192,11 @@ export function writeRow(row: SettingRow, value: SettingValue, ctx: SettingCtx):
  * and its own idea of a default.
  */
 export function resetRow(row: SettingRow): void {
+  if (row.kind !== 'info' && row.kind !== 'action' && row.storage === 'plugin') {
+    row.reset()
+    bumpRevision()
+    return
+  }
   const owned = storedRow(row)
   if (!owned) return
   if (!settingsStore.getState().touched.has(owned.id)) return

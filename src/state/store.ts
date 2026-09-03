@@ -1,11 +1,12 @@
 import type { AppAction } from './actions'
 
-import { clampBarWidth, KNOWN_WIDGET_IDS } from './bars'
+import { clampBarWidth } from './bars'
 import { reduceAutoCommit } from './reducers/auto-commit-state'
 import { emptyGitMode, reduceGitModeState } from './reducers/git-mode-state'
 import { emptyGitPanel, reduceGitPanelState } from './reducers/git-panel-state'
 import { emptyModal, reduceModalState } from './reducers/modal-state'
 import { reduceMultiRepoState } from './reducers/multi-repo-state'
+import { reducePluginSlices } from './reducers/plugin-slices'
 import { reduceProjectState } from './reducers/project-state'
 import { emptySettingsUI, reduceSettingsState } from './reducers/settings-state'
 import { emptyStatsUI, reduceStatsState } from './reducers/stats-state'
@@ -67,15 +68,21 @@ export const DEFAULT_BARS: BarsState = {
 const LEGACY_WIDGET_IDS: Record<string, string> = { workspaces: 'projects' }
 
 /**
- * Drop widget ids this build cannot render (config written by a newer or
- * patched version) and normalise widths — the only place unknown ids can enter.
+ * Normalise a persisted bar layout: apply the rename shims, clamp the widths,
+ * and make sure every default widget has a home.
+ *
+ * It deliberately does NOT drop ids it does not recognise any more. It used
+ * to, back when the only unknown id was corruption; now an unknown id is
+ * usually a plugin that is disabled, still loading, or failed. Pruning it
+ * would delete the user's placement and write the deletion straight back to
+ * `aimux.json`, so re-enabling the plugin would put the widget somewhere else
+ * — or nowhere. `visibleWidgets` skips what cannot be drawn instead.
  */
 function sanitizeBars(bars: BarsState): BarsState {
   const sanitizeBar = (bar: BarsState[keyof BarsState]): BarsState[keyof BarsState] => ({
     ...bar,
     widgets: bar.widgets
       .map((widget) => ({ ...widget, id: LEGACY_WIDGET_IDS[widget.id] ?? widget.id }))
-      .filter((widget) => (KNOWN_WIDGET_IDS as readonly string[]).includes(widget.id))
       .map((widget) => ({ ...widget, grow: Math.max(1, Math.round(widget.grow)) })),
     width: clampBarWidth(bar.width),
   })
@@ -107,6 +114,8 @@ export function createInitialState(
   overrides: InitialStateOverrides = {}
 ): AppState {
   return {
+    activePluginPaneId: null,
+    activePluginView: null,
     activeTabId: null,
     autoCommit: EMPTY_AUTO_COMMIT_STATE,
     bars: sanitizeBars(overrides.bars ?? DEFAULT_BARS),
@@ -133,6 +142,8 @@ export function createInitialState(
       : emptyModal(),
     multiRepo: EMPTY_MULTI_REPO_STATE,
     pendingChords: null,
+    pluginRegistryVersion: 0,
+    plugins: {},
     projectBar: {
       visible: overrides.projectBarVisible ?? true,
     },
@@ -178,6 +189,11 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
   const statsState = reduceStatsState(state, action)
   if (statsState) return statsState
+
+  // Last: by now every built-in reducer has declined the action, so a plugin
+  // can never shadow a core one by registering a slice with a colliding name.
+  const pluginState = reducePluginSlices(state, action)
+  if (pluginState) return pluginState
 
   switch (action.type) {
     case 'set-snippets':

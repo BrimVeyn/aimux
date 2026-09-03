@@ -253,7 +253,7 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       const keymap = getActiveKeymap()
       const scope = action.scope ?? null
       const allEntries = keymap ? collectHelpEntries(keymap) : []
-      const scopedEntries = scope ? allEntries.filter((e) => e.mode === scope) : allEntries
+      const scopedEntries = scope === null ? allEntries : allEntries.filter((e) => e.mode === scope)
       return {
         ...state,
         modal: {
@@ -472,6 +472,22 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           returnTo: action.returnTo,
           selectedIndex: 0,
           type: 'theme-picker',
+        },
+      }
+    case 'open-plugin-modal':
+      return {
+        ...state,
+        focusMode: 'modal',
+        modal: {
+          cursorPos: 0,
+          editBuffer: null,
+          modalId: `${action.pluginId}.${action.modalId}`,
+          pluginId: action.pluginId,
+          projectTargetId: null,
+          props: action.props,
+          selectedIndex: 0,
+          type: 'plugin-modal',
+          ...(action.returnTo === undefined ? {} : { returnTo: action.returnTo }),
         },
       }
     case 'open-quotas-modal':

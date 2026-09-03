@@ -10,7 +10,7 @@ function r(
   effects: KeyResult['effects'] = [],
   transition?: KeyResult['transition']
 ): KeyResult {
-  return transition ? { actions, effects, transition } : { actions, effects }
+  return transition === undefined ? { actions, effects } : { actions, effects, transition }
 }
 
 // ---------------------------------------------------------------------------

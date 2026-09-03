@@ -14,6 +14,7 @@
  */
 import type { AssistantId, QuestionKind, TerminalSnapshot } from '../state/types'
 
+import { getAssistantDefinition } from './assistant-registry'
 import { extractTailLines } from './assistant-status-detector'
 
 /** How many trailing non-blank lines to capture as the prompt text. Wider than
@@ -69,7 +70,12 @@ export function extractQuestion(
   const prompt = lines.join('\n')
   const haystack = prompt.toLowerCase()
   const kind = detectKind(assistant, haystack)
-  const options = parseOptions(lines, haystack)
+  // A plugin's parser is tried first and may decline: it knows its own CLI's
+  // menu shape, and the shared parser below is a fallback that happens to work
+  // for most of them rather than a rule any of them follow.
+  const options =
+    getAssistantDefinition(assistant)?.extractOptions?.({ kind, lines, prompt }) ??
+    parseOptions(lines, haystack)
   return options ? { kind, options, prompt } : { kind, prompt }
 }
 

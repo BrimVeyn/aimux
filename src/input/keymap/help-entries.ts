@@ -7,7 +7,12 @@ export interface HelpEntry extends DescribedBinding {
   modeLabel: string
 }
 
-export const HELP_MODE_LABELS: { modeId: ModeId; label: string }[] = [
+export interface HelpModeLabel {
+  modeId: ModeId
+  label: string
+}
+
+const BUILTIN_MODE_LABELS: HelpModeLabel[] = [
   { label: 'Navigation', modeId: 'navigation' },
   { label: 'Terminal input', modeId: 'terminal-input' },
   { label: 'Git mode', modeId: 'git-mode' },
@@ -33,9 +38,45 @@ export const HELP_MODE_LABELS: { modeId: ModeId; label: string }[] = [
   { label: 'Update available', modeId: 'modal.update-available' },
 ]
 
+const pluginModeLabels = new Map<string, string>()
+
+/**
+ * Registers a plugin mode's help heading. Returns the disposer the plugin's
+ * fiber holds — an unloaded plugin's mode should vanish from the help overlay
+ * along with the bindings it can no longer answer.
+ *
+ * Without this a plugin's keybindings would still be resolvable but invisible:
+ * the help screen iterates a fixed list of modes, so a mode missing from it
+ * simply has no bindings as far as the user can tell.
+ */
+export function registerHelpModeLabel(modeId: ModeId, label: string): () => void {
+  pluginModeLabels.set(modeId, label)
+  return () => {
+    pluginModeLabels.delete(modeId)
+  }
+}
+
+/** Test seam. Never called by the app. */
+export function clearHelpModeLabels(): void {
+  pluginModeLabels.clear()
+}
+
+/**
+ * The built-in headings plus whatever plugins have registered. Read fresh on
+ * every call rather than captured once, so a plugin loaded after boot shows up
+ * without a restart.
+ */
+export function helpModeLabels(): HelpModeLabel[] {
+  const plugins = [...pluginModeLabels].map(([modeId, label]) => ({
+    label,
+    modeId: modeId as ModeId,
+  }))
+  return [...BUILTIN_MODE_LABELS, ...plugins]
+}
+
 export function collectHelpEntries(config: ResolvedKeymapConfig): HelpEntry[] {
   const entries: HelpEntry[] = []
-  for (const { label, modeId } of HELP_MODE_LABELS) {
+  for (const { label, modeId } of helpModeLabels()) {
     const bindings = describeBindings(config, modeId, {
       dedupeByDescription: true,
       withDescriptionOnly: true,

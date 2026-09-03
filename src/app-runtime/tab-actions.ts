@@ -258,7 +258,7 @@ export function executeSplitPane(
 
   const existingTree = getTreeForTab(state.layoutTrees, state.tabGroupMap, activeTabId)
   const baseTree = existingTree ?? createLeaf(activeTabId)
-  const newTree = splitNode(baseTree, activeTabId, direction, tab.id)
+  const newTree = splitNode(baseTree, activeTabId, direction, createLeaf(tab.id))
   const bounds = createTerminalBounds(state.layout.terminalCols, state.layout.terminalRows)
   const paneRect = computePaneRects(newTree, bounds).get(tab.id)
 

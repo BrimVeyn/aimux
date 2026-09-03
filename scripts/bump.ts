@@ -1,12 +1,13 @@
 #!/usr/bin/env bun
 /* eslint-disable no-console -- release CLI: console is the UI */
-// Cut a new release: bump the root `@brimveyn/aimux` package and optionally
-// `@brimveyn/aimux-config`, commit, tag, push.
+// Cut a new release: bump the root `@brimveyn/aimux` package and, optionally,
+// either published workspace package; commit, tag, push.
 //
-// Usage: bun bump <root-kind> [config-kind]
+// Usage: bun bump <root-kind> [config-kind] [plugin-kind]
 //
 // - root-kind:   major | minor | patch        (required)
 // - config-kind: major | minor | patch | none (optional, default: none)
+// - plugin-kind: major | minor | patch | none (optional, default: none)
 
 import { spawnSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -18,6 +19,24 @@ type ConfigArg = BumpKind | 'none'
 const ROOT = new URL('..', import.meta.url).pathname
 const ROOT_PKG = join(ROOT, 'package.json')
 const CONFIG_PKG = join(ROOT, 'packages/aimux-config/package.json')
+const PLUGIN_PKG = join(ROOT, 'packages/aimux-plugin/package.json')
+
+/**
+ * The workspace packages that are published, and the source directory whose
+ * changes mean the package has to go up with the release. Both are `workspace:*`
+ * dependencies of the app, which resolves to whatever npm has — so a package
+ * that moved and was not bumped ships an app pinned to a stale copy.
+ */
+interface WorkspacePackage {
+  slug: string
+  manifest: string
+  src: string
+}
+
+const WORKSPACE_PACKAGES: readonly WorkspacePackage[] = [
+  { manifest: CONFIG_PKG, slug: 'aimux-config', src: 'packages/aimux-config/src' },
+  { manifest: PLUGIN_PKG, slug: 'aimux-plugin', src: 'packages/aimux-plugin/src' },
+]
 const LOCKFILE = join(ROOT, 'bun.lock')
 
 function fail(msg: string): never {
@@ -79,15 +98,15 @@ function rewriteVersion(raw: string, next: string): string {
 }
 
 /**
- * Surgically update the `packages/aimux-config` workspace entry's version in
- * bun.lock. We intentionally do NOT regenerate the lockfile during a release:
- * a full regen would re-resolve every dependency, potentially dragging in
- * unrelated upstream updates into a release commit.
+ * Surgically update one workspace entry's version in bun.lock. We intentionally
+ * do NOT regenerate the lockfile during a release: a full regen would re-resolve
+ * every dependency, potentially dragging in unrelated upstream updates into a
+ * release commit.
  */
-function rewriteLockfileConfigVersion(raw: string, next: string): string {
-  const pattern = /("packages\/aimux-config"\s*:\s*\{[^}]*?"version"\s*:\s*")[^"]+(")/
+function rewriteLockfileWorkspaceVersion(raw: string, slug: string, next: string): string {
+  const pattern = new RegExp(`("packages/${slug}"\\s*:\\s*\\{[^}]*?"version"\\s*:\\s*")[^"]+(")`)
   const updated = raw.replace(pattern, (_m, a: string, b: string) => `${a}${next}${b}`)
-  if (updated === raw) fail('could not locate aimux-config version entry in bun.lock')
+  if (updated === raw) fail(`could not locate ${slug} version entry in bun.lock`)
   return updated
 }
 
@@ -110,20 +129,14 @@ function requireCleanTree(): void {
  * rewrite against aimux-config 0.10.2, whose keymap still bound `h`/`←` to a
  * pane that no longer existed, and the whole screen went dead to the arrows.
  */
-function requireConfigReleased(configVersion: string): void {
-  const lastRelease = sh('git', ['log', '-1', '--format=%H', '--', CONFIG_PKG], { capture: true })
+function requirePackageReleased(pkg: WorkspacePackage, version: string, argName: string): void {
+  const lastRelease = sh('git', ['log', '-1', '--format=%H', '--', pkg.manifest], { capture: true })
   if (lastRelease === '') return
-  const diff = spawnSync(
-    'git',
-    ['diff', '--quiet', lastRelease, '--', 'packages/aimux-config/src'],
-    {
-      cwd: ROOT,
-    }
-  )
+  const diff = spawnSync('git', ['diff', '--quiet', lastRelease, '--', pkg.src], { cwd: ROOT })
   if (diff.status === 0) return
   fail(
-    `packages/aimux-config/src changed since v${configVersion} was cut — pass a config-kind ` +
-      `(e.g. \`bun bump patch patch\`), or the release ships against the published ${configVersion}`
+    `${pkg.src} changed since v${version} was cut — pass a ${argName} ` +
+      `(e.g. \`bun bump patch patch patch\`), or the release ships against the published ${version}`
   )
 }
 
@@ -159,12 +172,13 @@ async function confirm(question: string): Promise<boolean> {
   return /^\s*y(es)?\s*$/i.test(answer)
 }
 
-const USAGE = `Usage: bun bump <root-kind> [config-kind]
+const USAGE = `Usage: bun bump <root-kind> [config-kind] [plugin-kind]
 
-  bun bump patch              # only root
-  bun bump minor patch        # root minor + aimux-config patch
-  bun bump major major        # both major
-  bun bump patch none         # explicit: root only
+  bun bump patch                # only root
+  bun bump minor patch          # root minor + aimux-config patch
+  bun bump patch none patch     # root + aimux-plugin, leaving aimux-config
+  bun bump major major major    # all three
+  bun bump patch none none      # explicit: root only
 `
 
 async function main() {
@@ -174,7 +188,7 @@ async function main() {
     process.exit(firstArg === undefined ? 1 : 0)
   }
   const rootKind = parseKind(firstArg, 'root-kind')
-  const configArg = parseConfigArg(process.argv[3])
+  const kindArgs: ConfigArg[] = [parseConfigArg(process.argv[3]), parseConfigArg(process.argv[4])]
 
   requireCleanTree()
 
@@ -184,41 +198,56 @@ async function main() {
   const tag = `v${rootNext}`
   if (tagExists(tag)) fail(`tag ${tag} already exists`)
 
-  let configPlan: { prev: string; next: string; name: string; raw: string } | null = null
-  if (configArg === 'none') {
-    requireConfigReleased(readPackage(CONFIG_PKG).version)
-  } else {
-    const configPkg = readPackage(CONFIG_PKG)
-    configPlan = {
-      name: configPkg.name,
-      next: bump(configPkg.version, configArg, 'aimux-config'),
-      prev: configPkg.version,
-      raw: configPkg.raw,
+  interface PackagePlan extends WorkspacePackage {
+    name: string
+    prev: string
+    next: string
+    raw: string
+    kind: BumpKind
+  }
+
+  const plans: PackagePlan[] = []
+  for (const [index, pkg] of WORKSPACE_PACKAGES.entries()) {
+    const kind = kindArgs[index] ?? 'none'
+    const current = readPackage(pkg.manifest)
+    if (kind === 'none') {
+      requirePackageReleased(pkg, current.version, `${pkg.slug.replace('aimux-', '')}-kind`)
+      continue
     }
+    plans.push({
+      ...pkg,
+      kind,
+      name: current.name,
+      next: bump(current.version, kind, pkg.slug),
+      prev: current.version,
+      raw: current.raw,
+    })
   }
 
   const branch = currentBranch()
   console.log(
     `\u001b[36m${rootPkg.name}\u001b[0m ${rootPrev} → \u001b[32m${rootNext}\u001b[0m (${rootKind})`
   )
-  if (configPlan) {
-    console.log(
-      `\u001b[36m${configPlan.name}\u001b[0m ${configPlan.prev} → \u001b[32m${configPlan.next}\u001b[0m (${configArg})`
-    )
-  } else {
-    console.log('aimux-config: not bumped')
+  for (const pkg of WORKSPACE_PACKAGES) {
+    const plan = plans.find((entry) => entry.slug === pkg.slug)
+    if (plan) {
+      console.log(
+        `\u001b[36m${plan.name}\u001b[0m ${plan.prev} → \u001b[32m${plan.next}\u001b[0m (${plan.kind})`
+      )
+    } else {
+      console.log(`${pkg.slug}: not bumped`)
+    }
   }
   console.log(`branch: ${branch}`)
-  const commitMsg = configPlan
-    ? `chore(release): ${tag} (aimux-config v${configPlan.next})`
-    : `chore(release): ${tag}`
+  const bumped = plans.map((plan) => `${plan.slug} v${plan.next}`).join(', ')
+  const commitMsg = bumped === '' ? `chore(release): ${tag}` : `chore(release): ${tag} (${bumped})`
   console.log('will:')
   let step = 1
   console.log(`  ${step++}. run pre-push checks (lint, format, typecheck, test)`)
   console.log(`  ${step++}. rewrite package.json version → ${rootNext}`)
-  if (configPlan) {
-    console.log(`  ${step++}. rewrite packages/aimux-config/package.json → ${configPlan.next}`)
-    console.log(`  ${step++}. patch aimux-config version in bun.lock → ${configPlan.next}`)
+  for (const plan of plans) {
+    console.log(`  ${step++}. rewrite packages/${plan.slug}/package.json → ${plan.next}`)
+    console.log(`  ${step++}. patch ${plan.slug} version in bun.lock → ${plan.next}`)
   }
   console.log(`  ${step++}. commit "${commitMsg}"`)
   console.log(`  ${step++}. create annotated tag ${tag}`)
@@ -237,17 +266,16 @@ async function main() {
   sh('bunx', ['lefthook', 'run', 'pre-push'])
 
   writeFileSync(ROOT_PKG, rewriteVersion(rootPkg.raw, rootNext))
-  if (configPlan) {
-    writeFileSync(CONFIG_PKG, rewriteVersion(configPlan.raw, configPlan.next))
+  const stageFiles = ['package.json']
+  for (const plan of plans) {
+    writeFileSync(plan.manifest, rewriteVersion(plan.raw, plan.next))
     // Patch bun.lock in place. `bun pack` resolves `workspace:*` by reading
     // the workspace entry's version from the lockfile — if that entry is
-    // stale, the published tarball pins the wrong aimux-config version.
+    // stale, the published tarball pins the wrong version.
     const lockRaw = readFileSync(LOCKFILE, 'utf8')
-    writeFileSync(LOCKFILE, rewriteLockfileConfigVersion(lockRaw, configPlan.next))
+    writeFileSync(LOCKFILE, rewriteLockfileWorkspaceVersion(lockRaw, plan.slug, plan.next))
+    stageFiles.push(`packages/${plan.slug}/package.json`, 'bun.lock')
   }
-
-  const stageFiles = ['package.json']
-  if (configPlan) stageFiles.push('packages/aimux-config/package.json', 'bun.lock')
   sh('git', ['add', ...stageFiles])
   sh('git', ['commit', '-m', commitMsg])
   sh('git', ['tag', '-a', tag, '-m', `Release ${tag}`])

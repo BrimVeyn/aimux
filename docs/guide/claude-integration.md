@@ -32,11 +32,17 @@ export default defineConfig({
 })
 ```
 
-On the next aimux launch the installer runs once, patches
-`~/.claude/settings.json`, and the daemon starts publishing its hook URL.
-Setting the flag back to `false` (or removing the key) stops aimux from
-_re-installing_ on subsequent launches — but already-installed entries stay
-until you remove them manually (see [Opting Out](#opting-out)).
+Or flip **Claude Code hooks** on the settings screen, which now takes effect
+immediately: the installer patches `~/.claude/settings.json` when the row turns
+on, and the daemon starts publishing its hook URL. Setting the flag back to
+`false` (or removing the key) stops aimux from _re-installing_ — but
+already-installed entries stay until you remove them manually (see [Opting
+Out](#opting-out)).
+
+This integration, and the theme bridge below it, are a plugin aimux ships
+(`aimux.claude`). To turn both off at once rather than one flag at a time, add
+`plugins: [{ id: 'aimux.claude', enabled: false }]` to your config — see
+[Plugins](plugins.md).
 
 ## What aimux Installs
 

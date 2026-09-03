@@ -1,6 +1,6 @@
 import type { TabSession } from './types'
 
-import { allLeafIds, type LayoutNode } from './layout-tree'
+import { allTabIds, type LayoutNode } from './layout-tree'
 
 export interface SingleEntry {
   kind: 'single'
@@ -32,10 +32,11 @@ export function buildTabEntries(
   tabGroupMap: Record<string, string>,
   activeTabId: string | null
 ): TabEntry[] {
-  // Set of groupIds that are real splits (>= 2 leaves).
+  // Set of groupIds that are real splits (>= 2 *tabs*). A tab sharing its
+  // group with a plugin pane is still one tab, and the strip lists tabs.
   const splitGroupIds = new Set<string>()
   for (const [groupId, tree] of Object.entries(layoutTrees)) {
-    if (allLeafIds(tree).length >= 2) {
+    if (allTabIds(tree).length >= 2) {
       splitGroupIds.add(groupId)
     }
   }

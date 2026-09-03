@@ -3,6 +3,8 @@ import { basename, join } from 'node:path'
 
 import type { AssistantId } from '../state/types'
 
+import { pluginAssistantOptions } from './assistant-registry'
+
 /**
  * How an assistant renders a vendor-neutral model / reasoning-effort selection
  * into its own CLI args. Vendor flag syntax lives here on the assistant
@@ -177,17 +179,28 @@ export function getAssistantOption(index: number): AssistantOption {
   return option
 }
 
+/**
+ * Every assistant the user can pick: the built-ins, then whatever plugins have
+ * registered, then bare custom commands.
+ *
+ * Order is precedence as well as display order. A custom command keyed by a
+ * built-in or plugin id is a *command override* for that assistant, not a new
+ * one — that is how `customCommands` has always worked, and a plugin
+ * contributing `acme.robot` must not be shadowed into a second entry when the
+ * user overrides its command.
+ */
 export function getAllAssistantOptions(customCommands: Record<string, string>): AssistantOption[] {
-  const builtinIds = new Set(ASSISTANT_OPTIONS.map((o) => o.id))
+  const plugins = pluginAssistantOptions()
+  const known = new Set([...ASSISTANT_OPTIONS, ...plugins].map((o) => o.id))
   const customOptions: AssistantOption[] = Object.entries(customCommands)
-    .filter(([id]) => !builtinIds.has(id))
+    .filter(([id]) => !known.has(id))
     .map(([id, command]) => ({
       command,
       description: `Custom (${command})`,
       id,
       label: id.charAt(0).toUpperCase() + id.slice(1),
     }))
-  return [...ASSISTANT_OPTIONS, ...customOptions]
+  return [...ASSISTANT_OPTIONS, ...plugins, ...customOptions]
 }
 
 /**

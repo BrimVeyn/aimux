@@ -1,11 +1,25 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { pluginConfig, pluginSet, pluginUnset } from './commands/plugin/config'
+import { pluginDoctor } from './commands/plugin/doctor'
+import { pluginDisable, pluginEnable } from './commands/plugin/enable'
+import { pluginCommands, pluginExec } from './commands/plugin/exec'
+import { pluginInstall } from './commands/plugin/install'
+import { pluginLink } from './commands/plugin/link'
+import { pluginList } from './commands/plugin/list'
+import { pluginLog } from './commands/plugin/log'
+import { pluginNew } from './commands/plugin/new'
+import { pluginReload } from './commands/plugin/reload'
+import { pluginShow } from './commands/plugin/show'
+import { pluginUninstall } from './commands/plugin/uninstall'
+import { pluginUnlink } from './commands/plugin/unlink'
 import { projectClose } from './commands/project/close'
 import { projectCreate } from './commands/project/create'
 import { projectList } from './commands/project/list'
 import { projectShow } from './commands/project/show'
 import { projectSwitch } from './commands/project/switch'
+import { skillList, skillPathCommand } from './commands/skill'
 import { tabAwait } from './commands/tab/await'
 import { tabClose } from './commands/tab/close'
 import { tabCreate } from './commands/tab/create'
@@ -62,6 +76,25 @@ export const COMMANDS: readonly CliCommand[] = [
   workerList,
   workerStop,
   workerDoctor,
+  pluginNew,
+  pluginList,
+  pluginLink,
+  pluginUnlink,
+  pluginInstall,
+  pluginUninstall,
+  pluginEnable,
+  pluginDisable,
+  pluginReload,
+  pluginLog,
+  pluginDoctor,
+  pluginShow,
+  pluginConfig,
+  pluginSet,
+  pluginUnset,
+  skillList,
+  skillPathCommand,
+  pluginCommands,
+  pluginExec,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {
