@@ -50,6 +50,8 @@ export class RemoteSessionBackend
   private daemonCapabilities: ReadonlySet<string> = new Set()
   private reconnectPromise: Promise<void> | null = null
   private shouldReconnect = false
+  /** Resolved by the next successful handshake. See `awaitHandshake`. */
+  private handshakeWaiters: (() => void)[] = []
 
   /**
    * Capability strings advertised by the connected daemon on the last
@@ -327,6 +329,9 @@ export class RemoteSessionBackend
 
     this.selectedProtocolVersion = response.payload.selectedVersion
     this.daemonCapabilities = new Set(response.payload.capabilities)
+    const waiters = this.handshakeWaiters
+    this.handshakeWaiters = []
+    for (const waiter of waiters) waiter()
     logDebug('backend.remote.hello.success', {
       capabilities: response.payload.capabilities,
       processVersion: response.payload.processVersion,
@@ -569,11 +574,45 @@ export class RemoteSessionBackend
   }
 
   /**
+   * Resolves once a handshake has completed, or rejects if none does in time.
+   *
+   * An empty capability set means one of two very different things: a daemon
+   * too old to answer, or a daemon we have simply not said hello to yet. The
+   * second is the normal state for the first moments of a UI's life — the
+   * attach is deliberately delayed so that holding `j` through the sidebar does
+   * not attach once per keypress, and it is what carries the handshake — while
+   * a plugin's `ctx.effect` runs the instant the host starts. Reading the
+   * capability set in that window and reporting "pre-v19" is a wrong answer
+   * that then sticks for as long as the plugin's refresh interval: a
+   * half-hourly widget stays wrong for half an hour, through as many daemon
+   * restarts as you care to do.
+   */
+  private async awaitHandshake(): Promise<void> {
+    if (this.selectedProtocolVersion !== null) return
+    await new Promise<void>((resolve, reject) => {
+      let waiter: () => void = () => {
+        /* replaced below; assigned first so the timer can drop it */
+      }
+      const timer = setTimeout(() => {
+        this.handshakeWaiters = this.handshakeWaiters.filter((entry) => entry !== waiter)
+        reject(new Error(`no daemon connection after ${IPC_REQUEST_TIMEOUT_MS}ms`))
+      }, IPC_REQUEST_TIMEOUT_MS)
+      waiter = () => {
+        clearTimeout(timer)
+        resolve()
+      }
+      this.handshakeWaiters.push(waiter)
+    })
+  }
+
+  /**
    * v19 plugin channel, UI → daemon. Unlike every other method here this one
    * awaits its reply: a plugin's `ctx.rpc.call` is a request/response, and the
    * caller is plugin code that has to see either a value or an error.
    */
   async pluginRequest(pluginId: string, verb: string, payload?: unknown): Promise<unknown> {
+    // Ask what the daemon can do only once it has told us.
+    await this.awaitHandshake()
     if (!this.daemonAdvertises(IPC_CAPABILITY_PLUGIN_RPC)) {
       throw new Error('the connected daemon does not support plugin RPC (pre-v19)')
     }
