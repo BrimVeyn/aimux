@@ -5,7 +5,7 @@ import type { GitPanelState } from '../../../../state/types'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { selectPrRowVisible, usePrStatusStore } from '../../../../state/pr-status-store'
-import { useTheme, useTransparent } from '../../../theme'
+import { useTheme } from '../../../theme'
 import { PrStateRow } from './pr-state-row'
 
 export type GitPaneTab = 'diff' | 'github'
@@ -29,10 +29,7 @@ export const GitPaneHeader = memo(function GitPaneHeader({
   tab,
 }: GitPaneHeaderProps) {
   const t = useTheme()
-  // Transparent mode drops every painted background, so the active tab falls
-  // back to colour alone rather than punching a hole in the terminal image.
-  const transparent = useTransparent()
-  const activeTabBg = transparent ? undefined : t.backgroundElement
+  const activeTabBg = t.backgroundElement
   const prRowVisible = usePrStatusStore(selectPrRowVisible)
   const fileListMode = useAppStore((s) => s.gitPane.fileListMode)
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'

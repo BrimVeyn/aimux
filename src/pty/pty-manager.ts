@@ -13,6 +13,92 @@ import { logDebug } from '../debug/input-log'
 import { applyGhosttyShellIntegration } from './ghostty-shell-integration'
 import { areTerminalSnapshotsEqual, snapshotTerminal } from './terminal-snapshot'
 
+/**
+ * Name of the env var the client puts the host terminal's colours on. Read
+ * here, never by the child: env is simply the transport `createTab` already
+ * carries into this process, and only the client can see the real terminal.
+ */
+const TERM_COLORS_ENV = 'AIMUX_TERM_COLORS'
+
+interface TermColors {
+  bg?: string
+  cursor?: string
+  fg?: string
+  palette?: string[]
+}
+
+/** `#1e1e2e` → the `rgb:RRRR/GGGG/BBBB` form an OSC colour reply uses. */
+export function toOscColor(hex: string | undefined): string | undefined {
+  const match = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(hex ?? '')
+  if (!match) return undefined
+  const [, r, g, b] = match
+  return `rgb:${r}${r}/${g}${g}/${b}${b}`
+}
+
+/**
+ * Which palette indices an OSC 4 payload is *asking* about. The payload is a
+ * run of index/value pairs (`1;?;2;#ff0000;3;?`), so a query is any pair whose
+ * value is `?` — the rest are sets, which xterm's own handler applies.
+ */
+export function paletteQueryIndices(data: string): number[] {
+  const parts = data.split(';')
+  const indices: number[] = []
+  for (let i = 0; i + 1 < parts.length; i += 2) {
+    if (parts[i + 1] !== '?') continue
+    const index = Number(parts[i])
+    if (Number.isInteger(index) && index >= 0 && index <= 255) indices.push(index)
+  }
+  return indices
+}
+
+/**
+ * Answer OSC 10/11/12 (default fg/bg/cursor) and OSC 4 (palette) queries.
+ *
+ * xterm.js parses these and fires an internal `onColor` event for a frontend
+ * to answer; the headless build has no frontend, so under aimux the query dies
+ * here and the child gives up and assumes. That assumption is visible: a
+ * program that probes uses the answer to decide whether to paint its own
+ * surface — opencode paints an opaque near-black background when nothing
+ * answers and leaves the surface bare when something does — so the silence is
+ * what makes a pane swallow the host terminal instead of showing through it.
+ *
+ * The colours are what the pane actually shows (the aimux theme, or the host
+ * terminal's own in transparent mode), decided client-side where the real
+ * terminal is visible. Handlers return false so xterm's own still runs.
+ */
+function registerColorQueryHandlers(emulator: XTerm, pty: IPty, raw: string | undefined): void {
+  if (raw === undefined || raw === '') return
+  let colors: TermColors
+  try {
+    colors = JSON.parse(raw) as TermColors
+  } catch {
+    logDebug('ptyManager.termColors.parseFailed', { raw })
+    return
+  }
+
+  const special: Record<number, string | undefined> = {
+    10: colors.fg,
+    11: colors.bg,
+    12: colors.cursor,
+  }
+  for (const code of [10, 11, 12]) {
+    emulator.parser.registerOscHandler(code, (data) => {
+      if (data !== '?') return false
+      const value = toOscColor(special[code])
+      if (value !== undefined) pty.write(`\u001b]${code};${value}\u001b\\`)
+      return false
+    })
+  }
+
+  emulator.parser.registerOscHandler(4, (data) => {
+    for (const index of paletteQueryIndices(data)) {
+      const value = toOscColor(colors.palette?.[index])
+      if (value !== undefined) pty.write(`\u001b]4;${index};${value}\u001b\\`)
+    }
+    return false
+  })
+}
+
 interface PtyManagerEvents {
   render: [tabId: string, viewport: TerminalSnapshot, terminalModes: TerminalModeState]
   exit: [tabId: string, exitCode: number]
@@ -340,6 +426,8 @@ export class PtyManager extends EventEmitter<PtyManagerEvents> {
         session.cursorBlink = tracked.cursorBlink
         return false
       })
+
+      registerColorQueryHandlers(emulator, pty, options.env?.[TERM_COLORS_ENV])
 
       // Wire the emulator's reply channel back to the pty. When a program
       // writes a query sequence — CPR (ESC[6n), Device Attributes (ESC[c),

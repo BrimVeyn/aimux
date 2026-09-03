@@ -41,8 +41,16 @@ import {
 //
 // v11: breaking release boundary — force a fresh terminal-manager so named
 // worker metadata is guaranteed to survive daemon reattach and process swaps.
-export const MANAGER_PROTOCOL_MIN_VERSION = 12
-export const MANAGER_PROTOCOL_VERSION = 12
+//
+// v13: breaking release boundary — the TM now answers a child's OSC 10/11/12/4
+// colour probes from `AIMUX_TERM_COLORS` on the tab env (see pty-manager).
+// Nothing on the wire changed, but the fix lives in the TM process and a TM
+// that predates it keeps the old silence for every new tab — which is what
+// makes a probing program (opencode) paint an opaque background over a
+// transparent pane. Raising MIN turns "silently still broken" into the one
+// forced restart.
+export const MANAGER_PROTOCOL_MIN_VERSION = 13
+export const MANAGER_PROTOCOL_VERSION = 13
 
 /**
  * Capability strings advertised by *this* process in its `helloResult`. New

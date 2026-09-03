@@ -23,6 +23,7 @@ import {
   getSnapshotTrees,
   toTerminalContentSize,
 } from '../state/layout-resize'
+import { serializeTerminalColors } from '../ui/host-palette'
 
 export class LocalSessionBackend
   extends EventEmitter<ProjectBackendEvents>
@@ -184,7 +185,11 @@ export class LocalSessionBackend
       options.assistant,
       options.autoRenameCandidate === true
     )
-    this.sessionManager.createTab(this.currentProjectId, { ...options, autoRenameStatus })
+    this.sessionManager.createTab(this.currentProjectId, {
+      ...options,
+      autoRenameStatus,
+      env: { AIMUX_TERM_COLORS: serializeTerminalColors() },
+    })
     const tab = this.findTab(options.tabId)?.tab
     if (tab) this.autoRename.register(tab)
   }

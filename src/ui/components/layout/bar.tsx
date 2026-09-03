@@ -7,7 +7,7 @@ import type { BarSide } from '../../../state/types'
 import { useAppStore } from '../../../state/app-store'
 import { getBarWidth, visibleWidgets } from '../../../state/bars'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
-import { useTheme } from '../../theme'
+import { useTheme, useTransparent } from '../../theme'
 import { getWidgetRenderer } from '../../widgets/registry'
 import { buildBarContextMenu, buildWidgetContextMenu } from '../../widgets/widget-context-menu'
 import { ContextMenuBox } from '../overlays/context-menu/context-menu-box'
@@ -33,9 +33,9 @@ const GUTTER = 2
 const BOUNDARY_RULE = '─'
 
 /**
- * One row of rule, full bar width. Every seam in the bar — under the tab bar,
- * between two widgets, under the footer — is this, gutter included: the widgets
- * are inset from the terminal, the seams between them are not.
+ * One row of rule, full bar width. Every seam in the bar is this, gutter
+ * included: the widgets are inset from the terminal, the seams between them are
+ * not. Only the seams between two widgets survive transparent mode — see `Bar`.
  */
 function BarRule({ width }: { width: number }) {
   const t = useTheme()
@@ -66,6 +66,14 @@ export function Bar({
   side,
 }: BarProps) {
   const t = useTheme()
+  // The seam above the widgets and the seam under the footer belong to no
+  // widget — they are where the bar stops. Opaque, they are a rule on the bar's
+  // own surface; transparent, there is nothing for a rule to sit on and nothing
+  // to separate, so the surface is painted on the widget stack alone and the two
+  // seams become the gap they were always describing.
+  const transparent = useTransparent()
+  const columnBg = transparent ? undefined : t.backgroundPanel
+  const surfaceBg = transparent ? t.backgroundPanel : undefined
   const bars = useAppStore((s) => s.bars)
   const focusMode = useAppStore((s) => s.focusMode)
   const bodyRef = useRef<BoxRenderable | null>(null)
@@ -121,7 +129,13 @@ export function Bar({
   )
 
   const body = (
-    <box ref={bodyRef} flexDirection="column" flexGrow={1} overflow="hidden">
+    <box
+      ref={bodyRef}
+      flexDirection="column"
+      flexGrow={1}
+      overflow="hidden"
+      backgroundColor={surfaceBg}
+    >
       {visible.map((widget, index) => (
         <BarWidgetSlot
           key={widget.id}
@@ -144,7 +158,7 @@ export function Bar({
       width={width}
       padding={0}
       flexDirection="column"
-      backgroundColor={t.backgroundPanel}
+      backgroundColor={columnBg}
       gap={0}
       overflow="hidden"
       rightClickMenu={buildBarContextMenu(bars, side)}
@@ -152,24 +166,25 @@ export function Bar({
       onMouseDrag={handleMouseDrag}
       onMouseUp={handleMouseUp}
     >
-      {/* The bar is one surface, top to bottom: widgets, the gaps between them,
-          the footer and the gutter all share it, and it runs straight into the
-          tab bar above. Painting each widget separately left the gaps and the
-          footer showing the page colour through, which read as seams. */}
+      {/* The bar is one surface: widgets, the gaps between them, the footer and
+          the gutter all share it. Painting each widget separately left the gaps
+          and the footer showing the layer underneath, which read as seams. */}
       {/* Left only: this seam separates the widgets from the tab bar, which the
           left bar sits under and the right bar does not. */}
       {side === 'left' ? (
-        <box flexShrink={0}>
-          <BarRule width={width} />
+        <box flexShrink={0} minHeight={1}>
+          {transparent ? null : <BarRule width={width} />}
         </box>
       ) : null}
       {body}
       {side === 'left' ? (
         <box flexShrink={0} flexDirection="column">
-          <box paddingRight={GUTTER}>
+          <box paddingRight={GUTTER} backgroundColor={surfaceBg}>
             <BarFooter contentWidth={contentWidth} />
           </box>
-          <BarRule width={width} />
+          <box flexShrink={0} minHeight={1}>
+            {transparent ? null : <BarRule width={width} />}
+          </box>
         </box>
       ) : null}
       {edge}

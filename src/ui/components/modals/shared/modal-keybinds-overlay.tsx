@@ -2,8 +2,7 @@ import type { ModeId } from '@brimveyn/aimux-config'
 
 import { describeBindings } from '../../../../input/keymap/describe-bindings'
 import { useKeymap } from '../../../keymap-context'
-import { useTheme, useTransparent } from '../../../theme'
-import { fillBoxInterior } from '../../../transparent-fill'
+import { useTheme } from '../../../theme'
 
 const KEYS_COLUMN_WIDTH = 12
 
@@ -14,7 +13,6 @@ interface ModalKeybindsOverlayProps {
 
 export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProps) {
   const t = useTheme()
-  const transparent = useTransparent()
   const config = useKeymap()
   const bindings = describeBindings(config, modeId, {
     mergeAlternativesByDescription: true,
@@ -32,7 +30,6 @@ export function ModalKeybindsOverlay({ limit, modeId }: ModalKeybindsOverlayProp
         paddingRight={2}
         paddingTop={1}
         paddingBottom={1}
-        renderAfter={transparent ? fillBoxInterior : undefined}
       >
         {entries.map((binding) => (
           <box key={binding.description ?? binding.keys} flexDirection="row">

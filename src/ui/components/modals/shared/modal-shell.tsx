@@ -1,8 +1,7 @@
 import type { ModeId } from '@brimveyn/aimux-config'
 import type { ReactNode } from 'react'
 
-import { useTheme, useTransparent } from '../../../theme'
-import { fillBorderedBoxInterior } from '../../../transparent-fill'
+import { useTheme } from '../../../theme'
 import { ModalKeybindsOverlay } from './modal-keybinds-overlay'
 
 interface ModalShellProps {
@@ -25,8 +24,6 @@ export function ModalShell({
   width,
 }: ModalShellProps) {
   const t = useTheme()
-  const transparent = useTransparent()
-  const bg = transparent ? 'transparent' : t.backgroundPanel
   return (
     <box
       position="absolute"
@@ -39,21 +36,14 @@ export function ModalShell({
     >
       {/* No frame, like everything else — the panel background is what lifts the
           modal off the terminal, and the extra column either side is what makes
-          it read as a card rather than a box drawn on the screen.
-
-          Transparent mode is the one exception that keeps the border: there is
-          no background there to lift anything, so without a rule the modal has
-          no edge at all. */}
+          it read as a card rather than a box drawn on the screen. */}
       <box
-        border={transparent}
-        borderColor={t.border}
-        backgroundColor={bg}
+        backgroundColor={t.backgroundPanel}
         paddingTop={1}
         paddingBottom={1}
         paddingLeft={2}
         paddingRight={2}
         width={width}
-        renderAfter={transparent ? fillBorderedBoxInterior : undefined}
       >
         <box width="100%" flexDirection="column" gap={listGap}>
           <box flexDirection="column">

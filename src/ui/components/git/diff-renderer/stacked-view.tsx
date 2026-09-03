@@ -20,7 +20,7 @@ import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
 import { scrollGitDiff } from '../../../git-view-controls'
-import { useTheme, useTransparent } from '../../../theme'
+import { useTheme } from '../../../theme'
 import {
   type DiffSegment,
   estimatedSegmentHeight,
@@ -199,7 +199,6 @@ function UnifiedRowRender({
 }) {
   const t = useTheme()
   const headerBg = t.diffContextBg
-  const transparent = useTransparent()
   if (row.type === 'hunk-header') {
     return (
       <box flexDirection="row" backgroundColor={headerBg} paddingLeft={1} paddingRight={1}>
@@ -232,7 +231,7 @@ function UnifiedRowRender({
   const addNum = row.type === 'addition' ? row.lineNumber : undefined
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
-    <box flexDirection="row" backgroundColor={transparent ? undefined : bg} height={row.height}>
+    <box flexDirection="row" backgroundColor={bg} height={row.height}>
       <text fg={t.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
       <text fg={signColor}>{`${sign} `}</text>
       <LineContent content={row.content} tokens={tokens} />

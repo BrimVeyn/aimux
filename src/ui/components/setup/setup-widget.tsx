@@ -9,7 +9,7 @@ import { useAppStore } from '../../../state/app-store'
 import { runSideEffectGlobal } from '../../../state/dispatch-ref'
 import { hasSetupScript } from '../../../state/project-data'
 import { getActiveWorkspace, getCurrentProject } from '../../../state/project-workspaces'
-import { useTheme, useTransparent } from '../../theme'
+import { useTheme } from '../../theme'
 import { TerminalViewport } from '../layout/terminal-pane'
 
 /**
@@ -29,7 +29,6 @@ const PROMOTE: SideEffect = { type: 'promote-setup-tab' }
 
 function Button({ effect, label }: { effect: SideEffect; label: string }) {
   const t = useTheme()
-  const transparent = useTransparent()
   const onMouseDown = useCallback(() => runSideEffectGlobal(effect), [effect])
 
   return (
@@ -37,7 +36,7 @@ function Button({ effect, label }: { effect: SideEffect; label: string }) {
       paddingLeft={1}
       paddingRight={1}
       flexShrink={0}
-      backgroundColor={transparent ? undefined : t.backgroundElement}
+      backgroundColor={t.backgroundElement}
       onMouseDown={onMouseDown}
     >
       <text selectable={false} fg={t.text} wrapMode="none">

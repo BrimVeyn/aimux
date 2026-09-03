@@ -31,11 +31,11 @@ document is about.
 
 Three background tokens, three roles. The role is fixed; the appearance is not.
 
-| token               | role                                                                                                          | examples                                        |
-| ------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| `background`        | **the page.** Content the user came to read or type into.                                                     | terminal panes, the settings body               |
-| `backgroundPanel`   | **chrome.** Things that frame the page and are not the point of the screen.                                   | side bars, the tab bar, modals, cards           |
-| `backgroundElement` | **an element on a surface.** Something you act on, or a band that must stand apart from the chrome around it. | buttons, inputs, the status bar, floating menus |
+| token               | role                                                                                                                                                                                                | examples                                        |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `background`        | **the page.** Content the user came to read or type into. Transparent mode empties this one, and only this one — the host terminal shows through the page while every chrome surface stays painted. | terminal panes, the settings body               |
+| `backgroundPanel`   | **chrome.** Things that frame the page and are not the point of the screen.                                                                                                                         | side bars, the tab bar, modals, cards           |
+| `backgroundElement` | **an element on a surface.** Something you act on, or a band that must stand apart from the chrome around it.                                                                                       | buttons, inputs, the status bar, floating menus |
 
 Two rules make this work, and both are violated by accident constantly:
 
@@ -79,8 +79,8 @@ reliably does. Therefore:
   warning marks, accent badges: on the selected row they are all the same colour.
   Do not try to preserve a scale on top of a fill.
 - Use the _opaque_ page background for that ink, not the live theme token —
-  transparent mode resolves the token to nothing and the text disappears while
-  the fill, which is an accent, stays.
+  transparent mode empties the token and the text disappears while the fill,
+  which is an accent, stays.
 - A row that carries a colour scale of its own — a gauge, a value whose colour
   _is_ its state — cannot be filled without swallowing the thing it exists to
   show. Those rows get the element tone instead. This is a real exception, not an
@@ -88,15 +88,12 @@ reliably does. Therefore:
 
 ## 5. When a frame is still allowed
 
-Three cases, and they are the only ones:
+Two cases, and they are the only ones:
 
-1. **There is no background to separate with.** In transparent mode every chrome
-   token resolves to nothing, so a floating surface has no edge at all. It gets a
-   border there and only there.
-2. **The border colour is the information.** A severity outline, a focus ring
+1. **The border colour is the information.** A severity outline, a focus ring
    that says which pane has keyboard focus. Here the border is content, not
    decoration.
-3. Nothing else. In particular, a _filled_ control does not also get a frame —
+2. Nothing else. In particular, a _filled_ control does not also get a frame —
    the fill already said it is a control, and the frame costs two rows to repeat
    it. Buttons are filled, never outlined.
 
@@ -166,9 +163,9 @@ looking at.
 - Choose tokens **by role**, never by how they look in the current theme.
 - Any colour you pick must come from the token set. A literal hex in a component
   is a bug in every theme but one.
-- Check that a state survives transparent mode, where the chrome backgrounds
-  resolve away. Anything whose _only_ signal is a chrome background disappears
-  there and needs a second signal or an explicit opaque colour.
+- Check that a state survives transparent mode, where the page background
+  resolves away. Anything drawn _in_ the page colour — an ink on a fill, a band
+  meant to read against the page — needs the opaque token there.
 - When you need a state to remain visible against a surface that might be
   anything, an accent works and a grey does not.
 

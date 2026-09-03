@@ -29,17 +29,11 @@ let cachedMode: ThemeMode | null = null
 let cachedBase: ResolvedTuiTheme | null = null
 let cachedOverlay: ResolvedTuiTheme | null = null
 
-// Chrome surface tokens: when transparent mode is on we replace these with
-// 'transparent' so opentui's BoxRenderable skips its fill (alpha=0 early-returns
-// in setCellWithAlphaBlending) and the host terminal background shows through
-// every chrome site (root, sidebar, tabs, status bar, modals, …) without
-// patching ~30 components one-by-one.
-const CHROME_BG_TOKENS = [
-  'background',
-  'backgroundPanel',
-  'backgroundElement',
-  'backgroundMenu',
-] as const
+// Transparent mode empties the page surface only: the root canvas and the
+// terminal panes. Chrome (`backgroundPanel`, `backgroundElement`,
+// `backgroundMenu`) stays painted — the bars, the tab bar, the status bar,
+// modals and floating menus sit in front of the page, and their surface is the
+// only thing that gives them an edge.
 
 // Both the opaque base and the transparent overlay are cached side-by-side
 // (both keyed by id+mode). A single-slot cache would thrash when useTheme() and
@@ -57,9 +51,7 @@ function derive(id: ThemeId, mode: ThemeMode, transparent: boolean): ResolvedTui
   }
   if (!transparent) return cachedBase
   if (!cachedOverlay) {
-    const overlay: ResolvedTuiTheme = { ...cachedBase }
-    for (const key of CHROME_BG_TOKENS) overlay[key] = 'transparent'
-    cachedOverlay = overlay
+    cachedOverlay = { ...cachedBase, background: 'transparent' }
   }
   return cachedOverlay
 }
@@ -70,13 +62,19 @@ export function useTheme(): ResolvedTuiTheme {
 }
 
 /**
- * Resolved TUI theme WITHOUT the transparent chrome overlay. Use for the rare
- * chrome sites that must stay opaque even in transparent mode — e.g. the
- * sidebar selection highlight (would otherwise vanish) and the status-bar
- * badge foregrounds (would otherwise render as transparent-on-color).
+ * Resolved TUI theme WITHOUT the transparent page overlay. Use where the page
+ * background is needed as an *ink* rather than a fill — the selection row's
+ * text on a `primary` fill, the status-bar badge foregrounds — which would
+ * otherwise render as transparent-on-colour.
  */
 export function useBaseTheme(): ResolvedTuiTheme {
   return useStore(themeStore, (s) => derive(s.id, s.mode, false))
+}
+
+/** `useBaseTheme()` for non-React callers: the opaque palette, overlay or not. */
+export function getBaseTheme(): ResolvedTuiTheme {
+  const s = themeStore.getState()
+  return derive(s.id, s.mode, false)
 }
 
 /** Synchronous snapshot of the resolved theme for non-React callers. */

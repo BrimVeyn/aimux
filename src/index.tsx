@@ -104,7 +104,7 @@ const [
   { App },
   { loadUserConfig },
   { BreakingUpdateScreen },
-  { setHostPalette },
+  { setHostPalette, setHostSpecialColors },
   { createSessionBackend },
   { maybeAutoInstallCompletion },
   { maybeSpawnUsageRollup },
@@ -155,9 +155,12 @@ const renderer = await createCliRenderer({
 // emit indexed colors render with the user's configured terminal theme
 // instead of hardcoded xterm defaults. Best-effort: terminals that don't
 // respond keep the fallback xterm palette.
+// The same probe answers OSC 10/11/12; those are kept too and handed to every
+// PTY child that asks the terminal what colour it is (see host-palette).
 try {
-  const { palette } = await renderer.getPalette({ size: 256, timeout: 200 })
-  setHostPalette(palette)
+  const colors = await renderer.getPalette({ size: 256, timeout: 200 })
+  setHostPalette(colors.palette)
+  setHostSpecialColors(colors)
 } catch (error) {
   logDebug('index.paletteDetectFailed', {
     message: error instanceof Error ? error.message : String(error),
