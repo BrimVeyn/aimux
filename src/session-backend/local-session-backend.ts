@@ -15,6 +15,7 @@ import {
 } from '../auto-rename/coordinator'
 import { SessionManager } from '../daemon/session-manager'
 import { logDebug } from '../debug/input-log'
+import { PromptObserver } from '../prompts/prompt-observer'
 import { runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import {
   createTerminalBounds,
@@ -46,6 +47,7 @@ export class LocalSessionBackend
     { viewport: TerminalSnapshot; terminalModes: TerminalModeState }
   >()
   private readonly autoRename: AutoRenameCoordinator
+  private readonly prompts: PromptObserver
   private readonly autoRenameConfig: AutoRenameConfigSnapshot
 
   constructor(
@@ -63,6 +65,11 @@ export class LocalSessionBackend
         if (found.projectId === this.currentProjectId) {
           this.emit('tabMetadataUpdated', found.projectId, tabId, patch)
         }
+      },
+    })
+    this.prompts = new PromptObserver({
+      onPrompt: (tabId, prompt) => {
+        this.autoRename.onPrompt(tabId, prompt)
       },
     })
     this.sessionManager.on('render', (projectId, tabId, viewport, terminalModes) => {
@@ -209,7 +216,9 @@ export class LocalSessionBackend
       projectId: this.currentProjectId,
       tabId,
     })
-    this.autoRename.observeWrite(tabId, input)
+    // No daemon here, so no `tab:prompt` on the daemon bus — this path exists
+    // to keep auto-rename working when aimux runs without one.
+    this.prompts.observeWrite(tabId, input)
     this.sessionManager.write(this.currentProjectId, tabId, input)
   }
 

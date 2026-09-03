@@ -111,6 +111,31 @@ opentui settles layout — the height is a flex share, so recomputing it here
 would be a second implementation of someone else's arithmetic, correct until it
 was not.
 
+## `tab:prompt`, and why it took a refactor
+
+A plugin that reacts to what the user asked wants the prompt. Reconstructing it
+from keystrokes already existed — inside `AutoRenameCoordinator`, behind that
+feature's rule: watch a tab until it has a title, then stop. Right for
+auto-rename, and wrong for an event. Emitted from there, `tab:prompt` would
+have fired for a tab's first prompts and then gone silent forever, with nothing
+in the payload saying so.
+
+So observation moved out to `src/prompts/prompt-observer.ts`, which watches
+every tab, and auto-rename became one subscriber among others — its eligibility
+check now sits next to the decision it guards.
+
+```ts
+ctx.on('tab:prompt', ({ tabId, projectId, prompt, source }) => { … })
+```
+
+`source` is `hook` (ground truth from a provider's `UserPromptSubmit`) or
+`keystrokes` (reconstructed from PTY bytes, the fallback for assistants with no
+hook). Once a hook has spoken for a tab, its keystrokes are ignored — the same
+submission would otherwise arrive twice, once right and once approximately. A
+reconstruction the observer cannot trust (history recall, tab completion,
+unknown escapes) is dropped: a missing event is possible, a wrong one should
+not be.
+
 ## Git: a slot, not a subsystem
 
 Git mode is not a point of extension — it is the application: a screen, a diff

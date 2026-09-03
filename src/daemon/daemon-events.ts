@@ -45,6 +45,22 @@ export interface DaemonEvents {
     prompt: string
     options?: string[]
   }
+  /**
+   * The user submitted a prompt to an agent.
+   *
+   * `source` says how it was learned: `hook` is ground truth from a provider
+   * (Claude's `UserPromptSubmit`), `keystrokes` is reconstructed from the bytes
+   * written to the PTY, which is the fallback for assistants with no hook. A
+   * reconstruction the observer could not trust — history recall, tab
+   * completion, unknown escapes — is dropped rather than reported wrong, so a
+   * missing event is possible and a wrong one should not be.
+   */
+  'tab:prompt': {
+    tabId: string
+    projectId: string
+    prompt: string
+    source: 'hook' | 'keystrokes'
+  }
   /** A tab was created, by the UI or by a headless CLI. */
   'tab:added': { projectId: string; tab: TabSession }
   /** A project's aggregate status changed. */

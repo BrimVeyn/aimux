@@ -25,6 +25,7 @@ import {
   type TabSessionSummary,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
+import { PromptObserver } from '../prompts/prompt-observer'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { lastNonBlankLine } from '../pty/last-line'
 import { createDefaultTerminalModes } from '../state/terminal-modes'
@@ -397,6 +398,21 @@ export async function runDaemon(): Promise<void> {
     })
   }
 
+  /**
+   * Prompt observation is its own thing now: it watches every tab, and both
+   * `tab:prompt` and auto-rename are subscribers. Emitting from inside the
+   * coordinator would have meant an event that stops once a tab has a title.
+   */
+  const prompts = new PromptObserver({
+    onPrompt: (tabId, prompt, source) => {
+      const entry = tabRegistry.get(tabId)
+      if (entry) {
+        emitDaemonEvent('tab:prompt', { projectId: entry.projectId, prompt, source, tabId })
+      }
+      autoRename.onPrompt(tabId, prompt)
+    },
+  })
+
   const autoRename = new AutoRenameCoordinator({
     config: resolvedConfig.autoRename,
     getTab: (tabId) => {
@@ -561,7 +577,7 @@ export async function runDaemon(): Promise<void> {
         const parentToolUseId = event.payload.parent_tool_use_id
         const fromSubagent = typeof parentToolUseId === 'string' && parentToolUseId.length > 0
         if (typeof prompt === 'string' && !fromSubagent) {
-          autoRename.observePrompt(event.paneId, prompt)
+          prompts.observePrompt(event.paneId, prompt)
         }
       }
     })
@@ -1066,7 +1082,7 @@ export async function runDaemon(): Promise<void> {
                   const projectId = requireProject(socket, attachedProjects)
                   requireNegotiatedVersion(socket, negotiatedVersions)
                   await manager.write(projectId, message.payload.tabId, message.payload.data)
-                  autoRename.observeWrite(message.payload.tabId, message.payload.data)
+                  prompts.observeWrite(message.payload.tabId, message.payload.data)
                   sendOk(socket, message.id)
                   break
                 }
