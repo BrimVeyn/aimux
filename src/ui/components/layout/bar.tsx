@@ -29,6 +29,23 @@ export interface BarBoundaryResizeInfo {
  */
 const GUTTER = 2
 
+/** The rule drawn on the rows that separate the bar's regions. */
+const BOUNDARY_RULE = '─'
+
+/**
+ * One row of rule, full bar width. Every seam in the bar — under the tab bar,
+ * between two widgets, under the footer — is this, gutter included: the widgets
+ * are inset from the terminal, the seams between them are not.
+ */
+function BarRule({ width }: { width: number }) {
+  const t = useTheme()
+  return (
+    <text fg={t.border} selectable={false} wrapMode="none">
+      {BOUNDARY_RULE.repeat(Math.max(1, width))}
+    </text>
+  )
+}
+
 interface BarProps {
   side: BarSide
   onResizeDrag?: (event: OtuiMouseEvent) => boolean
@@ -89,15 +106,16 @@ export function Bar({
 
   // The gutter on the side facing the terminal: the resize grip and the widgets'
   // inset from the terminal are the same two columns — the padding is not dead
-  // space, both cells start a resize. Painted with the bar, not in the page
-  // colour: a page-coloured strip here left a seam between the bar and the tab
-  // bar above it, which are the same panel. What separates the bar from the
-  // terminal is the terminal's own background, nothing drawn.
+  // space, both cells start a resize. Overlaid rather than sat in a column of
+  // its own, and unpainted so the bar shows through it: the widget boundaries
+  // run the full width of the bar, under it.
   const edge = (
     <box
+      position="absolute"
+      top={0}
+      {...(side === 'left' ? { right: 0 } : { left: 0 })}
       width={GUTTER}
-      flexShrink={0}
-      backgroundColor={t.backgroundPanel}
+      height="100%"
       onMouseDown={handleEdgeMouseDown}
     />
   )
@@ -107,6 +125,7 @@ export function Bar({
       {visible.map((widget, index) => (
         <BarWidgetSlot
           key={widget.id}
+          barWidth={width}
           bodyRef={bodyRef}
           contentWidth={contentWidth}
           grow={widget.grow}
@@ -124,7 +143,7 @@ export function Bar({
     <ContextMenuBox
       width={width}
       padding={0}
-      flexDirection="row"
+      flexDirection="column"
       backgroundColor={t.backgroundPanel}
       gap={0}
       overflow="hidden"
@@ -133,27 +152,33 @@ export function Bar({
       onMouseDrag={handleMouseDrag}
       onMouseUp={handleMouseUp}
     >
-      {side === 'right' ? edge : null}
       {/* The bar is one surface, top to bottom: widgets, the gaps between them,
           the footer and the gutter all share it, and it runs straight into the
           tab bar above. Painting each widget separately left the gaps and the
           footer showing the page colour through, which read as seams. */}
-      <box
-        width={contentWidth}
-        flexGrow={1}
-        flexDirection="column"
-        overflow="hidden"
-        backgroundColor={t.backgroundPanel}
-      >
-        {body}
-        {side === 'left' ? <BarFooter contentWidth={contentWidth} /> : null}
-      </box>
-      {side === 'left' ? edge : null}
+      {/* Left only: this seam separates the widgets from the tab bar, which the
+          left bar sits under and the right bar does not. */}
+      {side === 'left' ? (
+        <box flexShrink={0}>
+          <BarRule width={width} />
+        </box>
+      ) : null}
+      {body}
+      {side === 'left' ? (
+        <box flexShrink={0} flexDirection="column">
+          <box paddingRight={GUTTER}>
+            <BarFooter contentWidth={contentWidth} />
+          </box>
+          <BarRule width={width} />
+        </box>
+      ) : null}
+      {edge}
     </ContextMenuBox>
   )
 }
 
 function BarWidgetSlot({
+  barWidth,
   bodyRef,
   contentWidth,
   grow,
@@ -163,6 +188,7 @@ function BarWidgetSlot({
   side,
   widgetId,
 }: {
+  barWidth: number
   bodyRef: React.RefObject<BoxRenderable | null>
   contentWidth: number
   grow: number
@@ -236,20 +262,17 @@ function BarWidgetSlot({
         flexBasis={0}
         overflow="hidden"
         ref={attach}
+        {...(side === 'left' ? { paddingRight: GUTTER } : { paddingLeft: GUTTER })}
         rightClickMenu={buildWidgetContextMenu(bars, side, widgetId)}
       >
         {render(contentWidth, { cols: contentWidth, rows })}
       </ContextMenuBox>
-      {/* The boundary between two widgets: a blank grabbable row, no rule drawn
-          in it. Widgets read as separate because of the gap, the same way
-          opencode separates its surfaces. */}
+      {/* Drawn, not blank: a grabbable row nobody can see is an affordance that
+          does not exist. */}
       {isLast ? null : (
-        <box
-          minHeight={1}
-          width={contentWidth}
-          flexShrink={0}
-          onMouseDown={handleBoundaryMouseDown}
-        />
+        <box minHeight={1} width={barWidth} flexShrink={0} onMouseDown={handleBoundaryMouseDown}>
+          <BarRule width={barWidth} />
+        </box>
       )}
     </>
   )

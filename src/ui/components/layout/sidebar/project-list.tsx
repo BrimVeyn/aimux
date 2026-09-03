@@ -29,7 +29,6 @@ interface ProjectListProps {
 
 const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
 
-const RULE = '─'
 /** Heavier than the chrome rules, so the drop preview never reads as a border. */
 const DROP_BAR = '━'
 const HEADER_TITLE = 'Projects'
@@ -168,8 +167,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
     dispatchGlobal({ returnToProjectPicker: false, type: 'open-create-project-modal' })
   }, [])
 
-  const rule = RULE.repeat(Math.max(1, contentWidth))
-
   return (
     // Drag and release are handled here, not on the row that started them:
     // opentui captures the pointer at the first drag event, wherever it lands,
@@ -184,11 +181,8 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
       onMouseUp={commitDrop}
       onMouseDragEnd={commitDrop}
     >
-      <box flexShrink={0}>
-        <text fg={t.border} selectable={false} wrapMode="none">
-          {rule}
-        </text>
-      </box>
+      {/* No rule above the heading: the bar draws its own seams, full width,
+          and this widget is not always the one at the top. */}
       <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
         <text fg={t.text} selectable={false} wrapMode="none">
           {HEADER_TITLE}
