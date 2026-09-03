@@ -45,7 +45,8 @@
       "project": ["src/**/*.ts"]
     },
     "packages/aimux-plugin": {
-      "project": ["src/**/*.ts"]
+      "project": ["src/**/*.ts"],
+      "ignoreDependencies": ["@opentui/core", "@opentui/react"]
     }
   }
 }

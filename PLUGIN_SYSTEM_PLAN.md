@@ -983,6 +983,26 @@ premier `bun test` d'un auteur était un rouge qu'il n'avait pas écrit.
 Invisible depuis ce repo, où tous les tests passent `extend` avec les vrais
 services.
 
+## 8.5 · Le reste de la liste (2026-09-03)
+
+Fait dans la foulée : `ctx.ui.navigate`, la hauteur d'un widget passée à
+`render` en second argument (additif — la largeur a été publiée comme un nombre
+sous `apiVersion: 1`), `@brimveyn/aimux-plugin/testing` pour tester le rendu
+hors du dépôt, `tab:prompt` avec l'observation sortie d'auto-rename, et le
+flake `scrollViewport` qui attend maintenant la sortie plutôt qu'une horloge.
+
+`scripts/eval-plugin-agent.ts` est le harnais de 8.4 : le prompt nu, puis des
+assertions sur ce qu'un agent peut se tromper tout seul — le plugin existe, le
+manifeste valide, `doctor` charge les deux moitiés, et les touches sont
+déclarées plutôt que laissées dans une phrase disant d'éditer
+`aimux.config.ts`. Hors CI, exprès : il dépense une session par exécution, et
+une suite qui coûte de l'argent à chaque push est une suite qu'on désactive.
+
+Une trouvaille en chemin : `scripts/` n'est pas dans l'`include` du tsconfig, donc
+`bun run check` ne le vérifie pas et le lint type-aware y voit `any`. L'y
+ajouter révèle des erreurs préexistantes dans `bench-pty-pipeline` et
+`manual-reexec-test` — un chantier à part, pas un effet de bord de celui-ci.
+
 ## 8.3 Laissé dehors, exprès
 
 Recharger `aimux.config.ts` à chaud (D3) ; un `contributes` qui poserait des
