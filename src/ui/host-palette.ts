@@ -1,3 +1,5 @@
+import { getBaseTheme, getCurrentTheme, getTransparent } from './theme'
+
 // Resolves ANSI palette indices (0-255) to hex strings using the host
 // terminal's actual palette, queried via OSC 4 at startup (see index.tsx).
 //
@@ -72,4 +74,53 @@ export function resolvePaletteIndex(index: number): string {
   if (index < 16) return FALLBACK_PALETTE.at(index) ?? BLACK
   if (index > 255) return WHITE
   return paletteFromFormula(index)
+}
+
+// The default fg/bg/cursor the host terminal reported alongside its palette
+// (OSC 10/11/12, answered by the same `getPalette()` probe as OSC 4). Empty
+// until detection completes, and on terminals that answer the palette but not
+// these.
+const hostSpecials: { background?: string; cursor?: string; foreground?: string } = {}
+
+function isHex(value: string | null | undefined): value is string {
+  return typeof value === 'string' && value.length > 0
+}
+
+export function setHostSpecialColors(colors: {
+  defaultBackground?: string | null
+  defaultForeground?: string | null
+  cursorColor?: string | null
+}): void {
+  if (isHex(colors.defaultBackground)) hostSpecials.background = colors.defaultBackground
+  if (isHex(colors.defaultForeground)) hostSpecials.foreground = colors.defaultForeground
+  if (isHex(colors.cursorColor)) hostSpecials.cursor = colors.cursorColor
+}
+
+/**
+ * What a PTY child should be told when it asks the terminal for its colours.
+ *
+ * Programs that probe (OSC 10/11/12/4) use the answer to decide whether to
+ * paint their own surface: opencode paints an opaque near-black background
+ * when nothing answers, and leaves the surface unpainted when something does —
+ * which is the difference between a pane that swallows the host terminal and
+ * one that shows through it.
+ *
+ * The answer is what the pane actually shows: in transparent mode the host
+ * terminal's own colours, otherwise the aimux theme. Serialised here rather
+ * than sent as structured IPC because it rides to the PTY process on the env
+ * that `createTab` already carries — see `AIMUX_TERM_COLORS` in pty-manager.
+ */
+export function serializeTerminalColors(): string {
+  const theme = getCurrentTheme()
+  const transparent = getTransparent()
+  // Any answer beats none — silence is what makes a child paint — so when the
+  // host never answered the probe, transparent mode still reports the theme.
+  const bg = transparent ? hostSpecials.background : undefined
+  const fg = transparent ? hostSpecials.foreground : undefined
+  return JSON.stringify({
+    bg: bg ?? getBaseTheme().background,
+    cursor: hostSpecials.cursor,
+    fg: fg ?? theme.text,
+    palette: hostPalette.slice(0, 16),
+  })
 }

@@ -5,6 +5,7 @@
 export type { ResolvedTuiTheme, TuiColorToken } from './themes'
 export {
   applyTheme,
+  getBaseTheme,
   getCurrentMode,
   getCurrentTheme,
   getCurrentThemeId,

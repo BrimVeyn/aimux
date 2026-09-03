@@ -20,6 +20,7 @@ import {
   type ServerEvent,
   type ServerResponse,
 } from '../ipc/protocol'
+import { serializeTerminalColors } from '../ui/host-palette'
 
 const IPC_REQUEST_TIMEOUT_MS = 10_000
 const RECONNECT_DELAY_MS = 250
@@ -452,7 +453,14 @@ export class RemoteSessionBackend
     }
 
     this.dispatchCommand(
-      { id: crypto.randomUUID(), payload: options, type: 'createTab' },
+      {
+        id: crypto.randomUUID(),
+        // Attached here rather than at the call sites: every tab wants it, and
+        // this is the last point that still runs in the client process, where
+        // the host terminal's colours are known.
+        payload: { ...options, termColors: serializeTerminalColors() },
+        type: 'createTab',
+      },
       'createTab',
       options.tabId
     )

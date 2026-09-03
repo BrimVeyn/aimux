@@ -320,6 +320,14 @@ export type ClientRequest =
         workerName?: string
         /** True only when the creator did not provide an explicit title. */
         autoRenameCandidate?: boolean
+        /**
+         * Additive: the host terminal's colours, as the client sees them, for
+         * the PTY process to answer the child's OSC 10/11/12/4 probes with.
+         * Serialised by `serializeTerminalColors`; the daemon only moves it
+         * onto the tab's env. Older daemons drop the field and the child gets
+         * the old silence, so no version gate.
+         */
+        termColors?: string
       }
     }
   | { id: string; type: 'write'; payload: { tabId: string; data: string } }
@@ -815,6 +823,10 @@ export function parseClientRequest(value: unknown): ClientRequest {
         value.payload.autoRenameCandidate === undefined ||
           typeof value.payload.autoRenameCandidate === 'boolean',
         'createTab.autoRenameCandidate must be a boolean when present'
+      )
+      assert(
+        value.payload.termColors === undefined || isString(value.payload.termColors),
+        'createTab.termColors must be a string when present'
       )
       return value as ClientRequest
     case 'write':

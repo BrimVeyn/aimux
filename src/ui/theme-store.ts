@@ -71,6 +71,12 @@ export function useBaseTheme(): ResolvedTuiTheme {
   return useStore(themeStore, (s) => derive(s.id, s.mode, false))
 }
 
+/** `useBaseTheme()` for non-React callers: the opaque palette, overlay or not. */
+export function getBaseTheme(): ResolvedTuiTheme {
+  const s = themeStore.getState()
+  return derive(s.id, s.mode, false)
+}
+
 /** Synchronous snapshot of the resolved theme for non-React callers. */
 export function getCurrentTheme(): ResolvedTuiTheme {
   const s = themeStore.getState()

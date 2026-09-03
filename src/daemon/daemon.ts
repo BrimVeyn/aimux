@@ -1012,8 +1012,17 @@ export async function runDaemon(): Promise<void> {
                   // even on PTYs that outlive this daemon process.
                   const env: Record<string, string> = { AIMUX_PANE_ID: message.payload.tabId }
                   if (hookServer) env.AIMUX_HOOK_URL_FILE = hookUrlFilePath
-                  const { autoRenameCandidate: _autoRenameCandidate, ...managerTabPayload } =
-                    message.payload
+                  // Only the client can see the real terminal, so it sends the
+                  // colours a child's OSC probe should be answered with; we do
+                  // nothing but hand them to the PTY process.
+                  if (message.payload.termColors !== undefined) {
+                    env.AIMUX_TERM_COLORS = message.payload.termColors
+                  }
+                  const {
+                    autoRenameCandidate: _autoRenameCandidate,
+                    termColors: _termColors,
+                    ...managerTabPayload
+                  } = message.payload
                   try {
                     await manager.createTab({
                       ...managerTabPayload,
