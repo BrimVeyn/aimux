@@ -5,6 +5,7 @@ import { useCallback, useLayoutEffect, useMemo } from 'react'
 import { collectHelpEntries, helpModeLabels } from '../../../../input/keymap/help-entries'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useKeymap } from '../../../keymap-context'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -24,6 +25,7 @@ function matchesFilter(needle: string, ...fields: (string | undefined)[]): boole
 
 export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const config = useKeymap()
   const allEntries = useMemo(() => collectHelpEntries(config), [config])
   const scoped = useMemo(
@@ -50,21 +52,24 @@ export function HelpModal({ cursorPos, filter, scope, selectedIndex }: HelpModal
 
   const items = useMemo<PickerItem[]>(
     () =>
-      filtered.map((entry, index) => ({
-        group: entry.modeLabel,
-        key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
-        title: (
-          <text fg={t.textMuted} wrapMode="none">
-            {entry.description ?? ''}
-          </text>
-        ),
-        trailing: (
-          <text fg={t.textMuted} wrapMode="none">
-            {entry.keysDisplay}
-          </text>
-        ),
-      })),
-    [filtered, t]
+      filtered.map((entry, index) => {
+        const active = index === selectedIndex
+        return {
+          group: entry.modeLabel,
+          key: `${entry.mode}::${entry.keysDisplay}::${entry.description ?? ''}::${index}`,
+          title: (
+            <text fg={active ? ink : t.textMuted} wrapMode="none">
+              {entry.description ?? ''}
+            </text>
+          ),
+          trailing: (
+            <text fg={active ? ink : t.textMuted} wrapMode="none">
+              {entry.keysDisplay}
+            </text>
+          ),
+        }
+      }),
+    [filtered, ink, selectedIndex, t]
   )
 
   const handleHover = useCallback(

@@ -86,6 +86,7 @@
     {
       "files": [
         "src/daemon/daemon.ts",
+        "packages/aimux-config/src/app-types.ts",
         "packages/aimux-config/src/types.ts",
         "test/unit/store.test.ts"
       ],

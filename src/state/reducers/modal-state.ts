@@ -16,6 +16,7 @@ import {
   filterSnippets,
   getNewTabAssistantOptions,
 } from '../selectors'
+import { applyEdit, moveCursor } from '../text-cursor'
 import { reduceGitCommitModalState } from './git-commit-modal-state'
 
 function emptyModal() {
@@ -104,6 +105,19 @@ function getCreateWorkspaceFieldValue(
   field: CreateWorkspaceField
 ): string {
   return field === 'prompt' ? modal.prompt : modal.baseQuery
+}
+
+/**
+ * The buffer a cursor motion applies to. Every modal but one keeps the field it
+ * is editing in `editBuffer` — the multi-field ones (snippet editor, commit
+ * message) swap it on Tab — so that is the default. Create-workspace is the
+ * exception: its two fields are named, and neither is `editBuffer`.
+ */
+function getModalCursorText(state: AppState): string | null {
+  if (state.modal.type === 'create-workspace') {
+    return getCreateWorkspaceFieldValue(state.modal, state.modal.activeField)
+  }
+  return state.modal.editBuffer
 }
 
 export function reduceModalState(state: AppState, action: AppAction): AppState | null {
@@ -620,14 +634,10 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       return { ...state, modal: { ...state.modal, selectedIndex: clamped } }
     }
     case 'move-modal-cursor': {
-      if (state.modal.editBuffer === null) return state
-      const len = state.modal.editBuffer.length
-      const current = state.modal.cursorPos ?? len
-      let next = current
-      if (action.to === 'home') next = 0
-      else if (action.to === 'end') next = len
-      else if (typeof action.delta === 'number') next = current + action.delta
-      next = clampCursor(next, len)
+      const text = getModalCursorText(state)
+      if (text === null) return state
+      const current = clampCursor(state.modal.cursorPos ?? text.length, text.length)
+      const next = moveCursor(text, current, action)
       if (next === current) return state
       return { ...state, modal: { ...state.modal, cursorPos: next } }
     }
@@ -672,16 +682,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
         const field = state.modal.activeField
         const current = getCreateWorkspaceFieldValue(state.modal, field)
         const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)
-        let text: string
-        let pos: number
-        if (action.char === '\b') {
-          if (at === 0) return state
-          text = current.slice(0, at - 1) + current.slice(at)
-          pos = at - 1
-        } else {
-          text = current.slice(0, at) + action.char + current.slice(at)
-          pos = at + action.char.length
-        }
+        const edit = applyEdit(current, at, action.char)
+        if (edit === null) return state
+        const { pos, text } = edit
         if (field === 'prompt') {
           return {
             ...state,
@@ -706,16 +709,9 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       }
       const buffer = state.modal.editBuffer
       const cursor = clampCursor(state.modal.cursorPos ?? buffer.length, buffer.length)
-      let nextBuffer: string
-      let nextCursor: number
-      if (action.char === '\b') {
-        if (cursor === 0) return state
-        nextBuffer = buffer.slice(0, cursor - 1) + buffer.slice(cursor)
-        nextCursor = cursor - 1
-      } else {
-        nextBuffer = buffer.slice(0, cursor) + action.char + buffer.slice(cursor)
-        nextCursor = cursor + action.char.length
-      }
+      const edit = applyEdit(buffer, cursor, action.char)
+      if (edit === null) return state
+      const { pos: nextCursor, text: nextBuffer } = edit
       const isNewTabEditing = state.modal.type === 'new-tab' && state.modal.editingCommand !== null
       const resetIndex =
         !isNewTabEditing &&

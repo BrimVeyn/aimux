@@ -172,9 +172,9 @@ export function GitCommitModal({
 
       {isConfirm || isGenerating || !isAutoCommitEnabled() ? null : (
         <box flexDirection="row" gap={1} marginTop={1} alignItems="center">
+          {/* Filled, not framed — the same button the setup widget uses. */}
           <box
-            border
-            borderColor={t.border}
+            backgroundColor={t.backgroundElement}
             paddingLeft={1}
             paddingRight={1}
             flexDirection="row"

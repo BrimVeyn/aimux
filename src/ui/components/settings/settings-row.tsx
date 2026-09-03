@@ -123,6 +123,9 @@ export const SettingsRow = memo(function SettingsRow({
     <ListItem
       id={`setting-row-${row.id}`}
       active={active}
+      // Lifted, not filled: the gauge is drawn in `primary` and the value's
+      // colour is its state, both of which an accent fill would swallow.
+      fill="elevated"
       index={index}
       onClickIndex={onSelect}
       leading={<text fg={fromConfigFile ? t.warning : t.secondary}>{mark}</text>}

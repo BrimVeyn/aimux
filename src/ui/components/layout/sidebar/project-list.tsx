@@ -234,7 +234,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
               <ProjectRow
                 key={`ws:${project.id}`}
                 project={project}
-                inCurrentGroup={isCurrentProject}
                 projectIndex={projectIndex}
                 dragging={draggingId === project.id}
                 contentWidth={contentWidth}
@@ -249,7 +248,6 @@ export function ProjectList({ contentWidth }: ProjectListProps) {
                   workspace={workspace}
                   projectIndex={projectIndex}
                   isActiveItem={isCurrentProject && workspace.id === activeWorkspaceId}
-                  inCurrentGroup={isCurrentProject}
                   contentWidth={contentWidth}
                 />
               )
@@ -300,13 +298,6 @@ function DropGap({ active, contentWidth, index, setGapRef }: DropGapProps) {
 
 interface ProjectRowProps {
   project: ProjectRecord
-  /**
-   * True when this row belongs to the current project (selection scope).
-   *
-   * There is deliberately no `isActiveItem`: the cursor lives on workspace
-   * rows, and this row is the heading they sit under.
-   */
-  inCurrentGroup: boolean
   /** 1-based index in the visible order, so the "+" can switch projects first. */
   projectIndex: number
   dragging: boolean
@@ -318,7 +309,6 @@ interface ProjectRowProps {
 const ProjectRow = memo(function ProjectRow({
   contentWidth,
   dragging,
-  inCurrentGroup,
   onDragStart,
   project,
   projectIndex,
@@ -329,12 +319,12 @@ const ProjectRow = memo(function ProjectRow({
   const base = useBaseTheme()
   // Only the drag highlight is "selected"-strength here. A heading that lights
   // up like a cursor row is what made the project look like a workspace.
-  let bgColor: string | undefined
-  if (dragging) {
-    bgColor = base.backgroundElement
-  } else if (inCurrentGroup) {
-    bgColor = base.backgroundPanel
-  }
+  // No band for "this row's project is the current one": the bar is a single
+  // backgroundPanel surface now and backgroundElement is spoken for by the
+  // cursor row, which leaves no third tone that works in every theme. The
+  // cursor row — one step off the panel, plus its accent bar — is what says
+  // where you are; the group it sits in follows from that.
+  const bgColor = dragging ? base.backgroundElement : undefined
   const currentProjectId = useAppStore((s) => s.currentProjectId)
 
   const handleMouseDown = useCallback(

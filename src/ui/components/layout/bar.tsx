@@ -20,6 +20,12 @@ export interface BarBoundaryResizeInfo {
   totalSize: number
 }
 
+/**
+ * Columns between the widgets and the terminal: one to grab for a resize, one so
+ * the content is not flush against the edge. Both grab.
+ */
+const GUTTER = 2
+
 interface BarProps {
   side: BarSide
   onResizeDrag?: (event: OtuiMouseEvent) => boolean
@@ -27,8 +33,6 @@ interface BarProps {
   onEdgeResizeStart?: (info: { initialWidth: number; screenStart: number; side: BarSide }) => void
   onBoundaryResizeStart?: (info: BarBoundaryResizeInfo) => void
 }
-
-const RESIZE_HANDLE = '─'
 
 /**
  * One edge bar hosting a vertical stack of widgets. Both bars are this
@@ -78,11 +82,21 @@ export function Bar({
   if (width === 0) return null
 
   const visible = visibleWidgets(bar)
-  const contentWidth = Math.max(1, width - 1)
+  const contentWidth = Math.max(1, width - GUTTER)
 
-  // Drag handle on the side facing the terminal.
+  // The gutter on the side facing the terminal: the resize grip and the widgets'
+  // inset from the terminal are the same two columns — the padding is not dead
+  // space, both cells start a resize. Painted with the bar, not in the page
+  // colour: a page-coloured strip here left a seam between the bar and the tab
+  // bar above it, which are the same panel. What separates the bar from the
+  // terminal is the terminal's own background, nothing drawn.
   const edge = (
-    <box width={1} flexShrink={0} backgroundColor={t.border} onMouseDown={handleEdgeMouseDown} />
+    <box
+      width={GUTTER}
+      flexShrink={0}
+      backgroundColor={t.backgroundPanel}
+      onMouseDown={handleEdgeMouseDown}
+    />
   )
 
   const body = (
@@ -93,7 +107,6 @@ export function Bar({
           bodyRef={bodyRef}
           contentWidth={contentWidth}
           grow={widget.grow}
-          handleColor={t.border}
           index={index}
           isLast={index === visible.length - 1}
           onBoundaryResizeStart={onBoundaryResizeStart}
@@ -109,7 +122,7 @@ export function Bar({
       width={width}
       padding={0}
       flexDirection="row"
-      backgroundColor={t.background}
+      backgroundColor={t.backgroundPanel}
       gap={0}
       overflow="hidden"
       rightClickMenu={buildBarContextMenu(bars, side)}
@@ -118,7 +131,17 @@ export function Bar({
       onMouseUp={handleMouseUp}
     >
       {side === 'right' ? edge : null}
-      <box width={contentWidth} flexGrow={1} flexDirection="column" overflow="hidden">
+      {/* The bar is one surface, top to bottom: widgets, the gaps between them,
+          the footer and the gutter all share it, and it runs straight into the
+          tab bar above. Painting each widget separately left the gaps and the
+          footer showing the page colour through, which read as seams. */}
+      <box
+        width={contentWidth}
+        flexGrow={1}
+        flexDirection="column"
+        overflow="hidden"
+        backgroundColor={t.backgroundPanel}
+      >
         {body}
         {side === 'left' ? <BarFooter contentWidth={contentWidth} /> : null}
       </box>
@@ -131,7 +154,6 @@ function BarWidgetSlot({
   bodyRef,
   contentWidth,
   grow,
-  handleColor,
   index,
   isLast,
   onBoundaryResizeStart,
@@ -141,7 +163,6 @@ function BarWidgetSlot({
   bodyRef: React.RefObject<BoxRenderable | null>
   contentWidth: number
   grow: number
-  handleColor: string
   index: number
   isLast: boolean
   side: BarSide
@@ -184,12 +205,16 @@ function BarWidgetSlot({
       >
         {render(contentWidth)}
       </ContextMenuBox>
+      {/* The boundary between two widgets: a blank grabbable row, no rule drawn
+          in it. Widgets read as separate because of the gap, the same way
+          opencode separates its surfaces. */}
       {isLast ? null : (
-        <box minHeight={1} flexShrink={0} onMouseDown={handleBoundaryMouseDown}>
-          <text fg={handleColor} selectable={false}>
-            {RESIZE_HANDLE.repeat(Math.max(1, contentWidth))}
-          </text>
-        </box>
+        <box
+          minHeight={1}
+          width={contentWidth}
+          flexShrink={0}
+          onMouseDown={handleBoundaryMouseDown}
+        />
       )}
     </>
   )

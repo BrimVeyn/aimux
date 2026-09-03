@@ -5,6 +5,7 @@ import type { AssistantId } from '../../../../state/types'
 import { getAllAssistantOptions, getAssistantOption } from '../../../../pty/command-registry'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { getNewTabAssistantOptions } from '../../../../state/selectors'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Form, TextField } from '../shared/form'
@@ -35,6 +36,7 @@ export function NewTabModal({
   selectedIndex,
 }: NewTabModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const excludeTerminal = pendingPrompt != null && pendingPrompt.trim() !== ''
   const footerText =
     pendingPrompt == null
@@ -66,16 +68,16 @@ export function NewTabModal({
             dispatchGlobal({ assistantId: option.id, type: 'open-edit-custom-command' }),
           subtitle: (
             <box flexDirection="column">
-              <text fg={t.textMuted}>{option.description}</text>
+              <text fg={active ? ink : t.textMuted}>{option.description}</text>
               {customCmd != null && customCmd !== '' ? (
-                <text fg={t.primary}>{customCmd}</text>
+                <text fg={active ? ink : t.primary}>{customCmd}</text>
               ) : null}
             </box>
           ),
-          title: <text fg={active ? t.text : t.textMuted}>{option.label}</text>,
+          title: <text fg={active ? ink : t.textMuted}>{option.label}</text>,
         }
       }),
-    [customCommands, filtered, selectedIndex, t]
+    [customCommands, filtered, ink, selectedIndex, t]
   )
 
   if (editingCommand !== null) {
@@ -86,20 +88,16 @@ export function NewTabModal({
         keybindsModeId="modal.new-tab.editing-command"
         width={uiTokens.modalWidth.md}
       >
-        <TextField
-          active
-          description={<>blank to reset to default: {option.command}</>}
-          value={editBuffer}
-          cursorPos={cursorPos}
-          placeholder={option.command}
-        />
+        {/* No description: the placeholder is the default command, so the field
+            already shows what leaving it blank gets you. */}
+        <TextField active value={editBuffer} cursorPos={cursorPos} placeholder={option.command} />
       </Form>
     )
   }
 
   return (
     <Picker
-      title="New tab: choose assistant"
+      title="New tab"
       keybindsModeId="modal.new-tab.command-edit"
       width={uiTokens.modalWidth.md}
       gap={1}

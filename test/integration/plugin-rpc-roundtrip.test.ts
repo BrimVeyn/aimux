@@ -24,6 +24,32 @@ import { PLUGIN_RPC_REPLY_VERB } from '../../src/plugins/rpc-envelope'
 const FIXTURES = join(new URL('..', import.meta.url).pathname, 'fixtures', 'plugins')
 
 /**
+ * Points HOME and the profile at a throwaway directory for one test, and hands
+ * back its path. Without it a test reads whatever the developer's own profile
+ * has linked — which is how "no plugin loaded" passed on CI and failed on a
+ * machine with an example plugin linked.
+ */
+function useTempProfile(cleanups: (() => void)[]): string {
+  const tempHome = mkdtempSync(join(tmpdir(), 'aimux-plugin-rpc-'))
+  const previousHome = process.env.HOME
+  const previousProfile = process.env.AIMUX_PROFILE
+  const previousWatch = process.env.AIMUX_PLUGIN_WATCH
+  process.env.HOME = tempHome
+  process.env.AIMUX_PROFILE = 'plugin-rpc-test'
+  process.env.AIMUX_PLUGIN_WATCH = '0'
+  cleanups.push(() => {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousProfile === undefined) delete process.env.AIMUX_PROFILE
+    else process.env.AIMUX_PROFILE = previousProfile
+    if (previousWatch === undefined) delete process.env.AIMUX_PLUGIN_WATCH
+    else process.env.AIMUX_PLUGIN_WATCH = previousWatch
+    rmSync(tempHome, { force: true, recursive: true })
+  })
+  return tempHome
+}
+
+/**
  * The v19 plugin channel on the wire, plus the daemon-side switchboard that
  * sits behind it. The point being pinned down: the protocol validates the
  * *envelope* — `pluginId`, `verb` — and never the payload, which is what lets
@@ -216,22 +242,7 @@ describe('plugin RPC — over a socket', () => {
   })
 
   test('a daemon → UI call travels as an event and is answered on the reply verb', async () => {
-    const tempHome = mkdtempSync(join(tmpdir(), 'aimux-plugin-call-'))
-    const previousHome = process.env.HOME
-    const previousProfile = process.env.AIMUX_PROFILE
-    const previousWatch = process.env.AIMUX_PLUGIN_WATCH
-    process.env.HOME = tempHome
-    process.env.AIMUX_PROFILE = 'plugin-rpc-test'
-    process.env.AIMUX_PLUGIN_WATCH = '0'
-    cleanups.push(() => {
-      if (previousHome === undefined) delete process.env.HOME
-      else process.env.HOME = previousHome
-      if (previousProfile === undefined) delete process.env.AIMUX_PROFILE
-      else process.env.AIMUX_PROFILE = previousProfile
-      if (previousWatch === undefined) delete process.env.AIMUX_PLUGIN_WATCH
-      else process.env.AIMUX_PLUGIN_WATCH = previousWatch
-      rmSync(tempHome, { force: true, recursive: true })
-    })
+    const tempHome = useTempProfile(cleanups)
 
     const root = join(tempHome, 'caller')
     cpSync(join(FIXTURES, 'caller'), root, { recursive: true })
@@ -281,6 +292,7 @@ describe('plugin RPC — over a socket', () => {
   })
 
   test('the control channel answers list without any plugin loaded', async () => {
+    useTempProfile(cleanups)
     const host = await startDaemonPluginHost({
       broadcast: () => {},
       builtins: [],

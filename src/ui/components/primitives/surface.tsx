@@ -10,8 +10,11 @@ function toneToToken(tone: SurfaceTone): TuiColorToken {
   switch (tone) {
     case 'elevated':
       return 'backgroundElement'
+    // Filled with the theme's own accent, not another step of grey: a
+    // selection is the one thing on the screen you always need to find without
+    // reading. Everything drawn on it uses `useSelectionInk`.
     case 'selected':
-      return 'backgroundElement'
+      return 'primary'
     case 'input':
       return 'backgroundElement'
     case 'inputActive':

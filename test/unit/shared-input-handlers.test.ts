@@ -51,7 +51,51 @@ describe('handleTextInput', () => {
     expect(handleTextInput(key({ name: 'escape' }))).toBeNull()
     expect(handleTextInput(key({ name: 'return' }))).toBeNull()
     expect(handleTextInput(key({ name: 'tab' }))).toBeNull()
-    expect(handleTextInput(key({ name: 'up' }))).toBeNull()
+  })
+
+  test('delete removes the character in front of the cursor', () => {
+    expect(handleTextInput(key({ name: 'delete' }))).toEqual({
+      actions: [{ char: '\x7f', type: 'update-command-edit' }],
+      effects: [],
+    })
+  })
+
+  test('arrows move the cursor rather than falling through', () => {
+    expect(handleTextInput(key({ name: 'left' }))).toEqual({
+      actions: [{ delta: -1, type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ name: 'right' }))).toEqual({
+      actions: [{ delta: 1, type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ name: 'up' }))).toEqual({
+      actions: [{ to: 'line-up', type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ name: 'down' }))).toEqual({
+      actions: [{ to: 'line-down', type: 'move-modal-cursor' }],
+      effects: [],
+    })
+  })
+
+  test('home and end are line-wise, ctrl/alt + arrow is word-wise', () => {
+    expect(handleTextInput(key({ name: 'home' }))).toEqual({
+      actions: [{ to: 'home', type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ name: 'end' }))).toEqual({
+      actions: [{ to: 'end', type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ ctrl: true, name: 'left' }))).toEqual({
+      actions: [{ to: 'word-left', type: 'move-modal-cursor' }],
+      effects: [],
+    })
+    expect(handleTextInput(key({ meta: true, name: 'right' }))).toEqual({
+      actions: [{ to: 'word-right', type: 'move-modal-cursor' }],
+      effects: [],
+    })
   })
 })
 

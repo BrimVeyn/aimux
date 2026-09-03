@@ -648,7 +648,7 @@ export interface ModalWorkspaceDeleteConfirm extends ModalBase {
   projectId: string
   workspaceId: string
   workspaceLabel: string
-  reason: string
+  reason?: string
   closeTabs: boolean
   /** Whether confirming force-deletes — true only after a recoverable failure. */
   force: boolean
@@ -1086,7 +1086,11 @@ export interface KeyInput {
 // ─── AppAction union ──────────────────────────────────────────────────────────
 
 export type ModalAction =
-  | { type: 'move-modal-cursor'; delta?: number; to?: 'home' | 'end' }
+  | {
+      type: 'move-modal-cursor'
+      delta?: number
+      to?: 'end' | 'home' | 'line-down' | 'line-up' | 'word-left' | 'word-right'
+    }
   | {
       type: 'open-new-tab-modal'
       pendingWorkspace?: PendingWorkspaceLaunch
@@ -1148,7 +1152,7 @@ export type ModalAction =
       projectId: string
       workspaceId: string
       workspaceLabel: string
-      reason: string
+      reason?: string
       closeTabs: boolean
       force: boolean
     }

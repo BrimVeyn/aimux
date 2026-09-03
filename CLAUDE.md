@@ -1,3 +1,4 @@
 - For any file search or grep in the current git indexed directory use fff tools
 - Always run bun lint && bun format before ending the execution of a plan
 - When asked about tickets / tasks / todos, use plane mcp to gather informations
+- Any change to how the TUI is drawn follows `STYLE.md` at the repo root — surfaces not rules, say each thing once

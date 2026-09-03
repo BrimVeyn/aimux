@@ -2,8 +2,11 @@ import { type KeyChord, parseKeyNotation } from './key-chord'
 
 const SPECIAL_DISPLAY: Record<string, string> = {
   backspace: 'Backspace',
+  delete: 'Del',
   down: '↓',
+  end: 'End',
   escape: 'Esc',
+  home: 'Home',
   left: '←',
   return: 'Enter',
   right: '→',
@@ -25,6 +28,10 @@ export function formatChord(chord: KeyChord, leader?: KeyChord): string {
 
   let ctrl = false
   let meta = false
+  // Shift rides as an `S-` prefix on named keys (`S-return`), and as an
+  // uppercase letter on the rest. Both end up as "Shift+…" here; without this
+  // the help overlay printed the raw chord.
+  let shift = false
   let rest = chord
 
   while (true) {
@@ -38,10 +45,15 @@ export function formatChord(chord: KeyChord, leader?: KeyChord): string {
       rest = rest.slice(2)
       continue
     }
+    if (rest.startsWith('S-')) {
+      shift = true
+      rest = rest.slice(2)
+      continue
+    }
     break
   }
 
-  if (!ctrl && !meta) {
+  if (!ctrl && !meta && !shift) {
     if (rest.length === 1 && /^[A-Z]$/.test(rest)) {
       return `Shift+${rest}`
     }
@@ -51,6 +63,7 @@ export function formatChord(chord: KeyChord, leader?: KeyChord): string {
   const parts: string[] = []
   if (ctrl) parts.push('Ctrl')
   if (meta) parts.push('Alt')
+  if (shift) parts.push('Shift')
   parts.push(formatModifierKey(rest))
   return parts.join('+')
 }

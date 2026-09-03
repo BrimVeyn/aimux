@@ -5,6 +5,7 @@ import type { SnippetRecord } from '../../../../state/types'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { filterSnippets } from '../../../../state/selectors'
 import { isConfigSnippetId } from '../../../../state/snippet-catalog'
+import { useSelectionInk } from '../../../selection-ink'
 import { useTheme } from '../../../theme'
 import { uiTokens } from '../../../ui-tokens'
 import { Picker, type PickerItem } from '../shared/picker'
@@ -33,6 +34,7 @@ export function SnippetPickerModal({
   snippets,
 }: SnippetPickerModalProps) {
   const t = useTheme()
+  const ink = useSelectionInk()
   const filtered = useMemo(() => filterSnippets(snippets, filter), [filter, snippets])
 
   const items = useMemo<PickerItem[]>(
@@ -52,21 +54,21 @@ export function SnippetPickerModal({
           onEdit: fromConfig
             ? undefined
             : () => runSideEffectGlobal({ type: 'edit-selected-snippet' }),
-          subtitle: <text fg={t.textMuted}>{truncateContent(snippet.content)}</text>,
+          subtitle: <text fg={active ? ink : t.textMuted}>{truncateContent(snippet.content)}</text>,
           title: (
             <box flexDirection="row">
-              <text fg={active ? t.text : t.textMuted}>
+              <text fg={active ? ink : t.textMuted}>
                 <strong>{snippet.name}</strong>
               </text>
               {snippet.trigger != null && snippet.trigger !== '' ? (
-                <text fg={t.textMuted}>{` :${snippet.trigger}`}</text>
+                <text fg={active ? ink : t.textMuted}>{` :${snippet.trigger}`}</text>
               ) : null}
-              {fromConfig ? <text fg={t.textMuted}>{' [config]'}</text> : null}
+              {fromConfig ? <text fg={active ? ink : t.textMuted}>{' [config]'}</text> : null}
             </box>
           ),
         }
       }),
-    [filtered, selectedIndex, t]
+    [filtered, ink, selectedIndex, t]
   )
 
   const handleHover = useCallback(

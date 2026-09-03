@@ -261,6 +261,32 @@ export const confirmCreateWorkspace: KeyResult = r([], [{ type: 'create-workspac
  * from the commit modal on purpose: there the body is the whole point, here
  * most prompts are one line and creating must stay the cheapest keystroke.
  */
+/**
+ * Up/Down in a modal that has both a list and a field you can type paragraphs
+ * into. On that field they walk its lines; anywhere else in the modal they drive
+ * the list, which is all they used to do — typing a second line and then having
+ * no way back up to the first is the whole complaint.
+ */
+export function moveModalSelectionOrLine(delta: -1 | 1): ActionFn {
+  return (ctx: ModeContext) => {
+    const { modal } = ctx.state
+    const onTextField =
+      (modal.type === 'create-workspace' && modal.activeField === 'prompt') ||
+      (modal.type === 'snippet-editor' && modal.activeField === 'content')
+    if (onTextField) {
+      return r([{ to: delta === 1 ? 'line-down' : 'line-up', type: 'move-modal-cursor' }])
+    }
+    return r([{ delta, type: 'move-modal-selection' }])
+  }
+}
+
+export const snippetEditorNewline: ActionFn = (ctx: ModeContext) => {
+  const { modal } = ctx.state
+  if (modal.type !== 'snippet-editor') return r([])
+  if (modal.activeField !== 'content') return r([])
+  return r([{ char: '\n', type: 'update-command-edit' }])
+}
+
 export const createWorkspaceNewline: ActionFn = (ctx: ModeContext) => {
   const { modal } = ctx.state
   if (modal.type !== 'create-workspace') return r([])

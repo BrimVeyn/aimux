@@ -9,6 +9,7 @@ import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-
 import { formatDiffStat } from '../../../../state/project-workspaces'
 // eslint-disable-next-line no-duplicate-imports
 import { IDLE_WORKSPACE_ACTIVITY } from '../../../../state/types'
+import { useWorkspaceDeleteStore } from '../../../../state/workspace-delete-store'
 import { useActivitySprite } from '../../../hooks/use-activity-sprite'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 // eslint-disable-next-line no-duplicate-imports
@@ -33,14 +34,11 @@ interface WorkspaceRowProps {
   projectIndex: number
   /** True when this row is the active cursor item. */
   isActiveItem: boolean
-  /** True when this row's project is the current project (selection scope). */
-  inCurrentGroup: boolean
   contentWidth: number
 }
 
 export const WorkspaceRow = memo(function WorkspaceRow({
   contentWidth,
-  inCurrentGroup,
   isActiveItem,
   project,
   projectIndex,
@@ -59,9 +57,13 @@ export const WorkspaceRow = memo(function WorkspaceRow({
   // own: one shape is what keeps a cell from resolving to the wrong image.
   const hasBranch = workspace.branch != null && workspace.branch !== ''
   const sprite = useActivitySprite(hasBranch ? spriteStateFor(activity) : null)
+  // A delete takes seconds of git work with the row still on screen. The branch
+  // line is where it says so — the name above it is what you are looking for,
+  // and the branch under it is the one fact the delete is about to take away.
+  const isDeleting = useWorkspaceDeleteStore((s) => s.deleting[workspace.id] !== undefined)
   // Only the working case animates, so the timer is off for every other row —
   // and off entirely when a sprite is drawing this row instead.
-  const spinner = useBusySpinner(activity.working && sprite === null)
+  const spinner = useBusySpinner(isDeleting || (activity.working && sprite === null))
   // A primitive, so the selector stays referentially stable across renders.
   const hasSleepingTabs = useAppStore((s) =>
     s.tabs.some((tab) => tab.workspaceId === workspace.id && tab.hibernated === true)
@@ -124,7 +126,6 @@ export const WorkspaceRow = memo(function WorkspaceRow({
             closeTabs: true,
             force: false,
             projectId: project.id,
-            reason: 'Its assistant tabs will be closed and the worktree removed.',
             type: 'open-workspace-delete-confirm',
             workspaceId: workspace.id,
             workspaceLabel: workspace.branch ?? workspace.name,
@@ -134,12 +135,12 @@ export const WorkspaceRow = memo(function WorkspaceRow({
     return entries
   }, [project.id, workspace.branch, workspace.id, workspace.name, workspace.source])
 
-  let bgColor: string | undefined
-  if (isActiveItem) {
-    bgColor = base.backgroundElement
-  } else if (inCurrentGroup) {
-    bgColor = base.backgroundPanel
-  }
+  // No band for "this row's project is the current one": the bar is a single
+  // backgroundPanel surface now and backgroundElement is spoken for by the
+  // cursor row, which leaves no third tone that works in every theme. The
+  // cursor row — one step off the panel, plus its accent bar — is what says
+  // where you are; the group it sits in follows from that.
+  const bgColor = isActiveItem ? base.backgroundElement : undefined
   // The cursor: a full-height accent bar down the left of the row, both lines
   // of it. The background alone is one step of grey and gets lost among rows
   // that carry colour of their own; a bar the height of the row is found
@@ -246,7 +247,7 @@ export const WorkspaceRow = memo(function WorkspaceRow({
           </text>
         ) : null}
       </box>
-      {branchLabel == null ? null : (
+      {branchLabel == null && !isDeleting ? null : (
         <box flexDirection="row" alignItems="center">
           <text fg={t.primary} selectable={false} wrapMode="none">
             {cursorGlyph}
@@ -257,9 +258,15 @@ export const WorkspaceRow = memo(function WorkspaceRow({
           <text fg={statusColor} selectable={false} wrapMode="none">
             {sprite?.glyphs[1] ?? '  '}
           </text>
-          <text fg={t.textMuted} selectable={false} wrapMode="none">
-            {'\u{e702}'} {branchLabel}
-          </text>
+          {isDeleting ? (
+            <text fg={t.error} selectable={false} wrapMode="none">
+              {spinner} Deleting…
+            </text>
+          ) : (
+            <text fg={t.textMuted} selectable={false} wrapMode="none">
+              {'\u{e702}'} {branchLabel}
+            </text>
+          )}
         </box>
       )}
     </ContextMenuBox>
