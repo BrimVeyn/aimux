@@ -940,16 +940,37 @@ redémarrage, zéro intervention. Le critère de fin de phase, et le seul.
 
 ## 8.2 bis · Avancement
 
-| Chantier                          | État                                                           |
-| --------------------------------- | -------------------------------------------------------------- |
-| C0 · publier                      | PR #143 fusionnée ; le tag reste à couper (`bun bump`)         |
-| C1 · keymap à chaud               | fait — `registerKeymapLayer`, insertion dans le trie vivant    |
-| C2 · placement à chaud            | fait — `add-widget`, `remove-plugin-widget`, menu « Add »      |
-| C3 · `contributes`                | fait — validé, appliqué, retiré, et les 4 exemples l'utilisent |
-| C4 · les yeux du CLI              | à faire                                                        |
-| C5 · profil deviné                | à faire                                                        |
-| C6 · réparer ce qui ment          | fait pour les READMEs des exemples et la doc                   |
-| C7 · l'eval « reproduis shifter » | à faire — c'est lui qui clôt la phase                          |
+| Chantier                          | État                                                            |
+| --------------------------------- | --------------------------------------------------------------- |
+| C0 · publier                      | **fait** — v1.25.1, `@brimveyn/aimux-plugin@0.1.2` sur npm      |
+| C1 · keymap à chaud               | fait — `registerKeymapLayer`, insertion dans le trie vivant     |
+| C2 · placement à chaud            | fait — `add-widget`, `remove-plugin-widget`, menu « Add »       |
+| C3 · `contributes`                | fait — validé, appliqué, retiré, et les 4 exemples l'utilisent  |
+| C4 · les yeux du CLI              | fait — `ui state`, `keymap resolve`, `action run`               |
+| C5 · profil deviné                | fait — `profile list`, adoption du seul profil qui tourne       |
+| C6 · réparer ce qui ment          | fait — READMEs, doc, skill, et le test que le scaffold générait |
+| C7 · l'eval « reproduis shifter » | **à moitié** — voir 8.4                                         |
+
+## 8.4 Ce que C7 couvre, et ce qu'il ne couvre pas
+
+`test/integration/plugin-agent-loop.test.ts` fait tourner la boucle complète
+sans personne : un plugin arrive sur le disque avec un `contributes`, et le
+test vérifie — à travers les trois fonctions mêmes dont `ui state`,
+`keymap resolve` et `action run` sont les façades — qu'il est placé, dessinable,
+lié, déclenchable et réversible. Zéro édition de config, zéro redémarrage.
+
+Ce qu'il ne couvre pas : **l'agent qui écrit le plugin**. Cette moitié-là est un
+prompt, pas une assertion, et la faire tourner en CI voudrait dire une session
+non interactive facturée à chaque push. Le reste de C7 est donc un harnais
+optionnel (`claude -p` + le prompt nu + les mêmes assertions), pas une porte de
+CI — et il faut le dire plutôt que de laisser croire que la case est cochée.
+
+Un bug trouvé en vérifiant C0, et corrigé au passage : `createTestContext`
+n'offrait aucune moitié UI hors d'aimux, donc le test que `plugin new`
+échafaude, contre la moitié qu'il échafaude, plantait à la première ligne. Le
+premier `bun test` d'un auteur était un rouge qu'il n'avait pas écrit.
+Invisible depuis ce repo, où tous les tests passent `extend` avec les vrais
+services.
 
 ## 8.3 Laissé dehors, exprès
 

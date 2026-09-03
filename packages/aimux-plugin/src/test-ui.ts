@@ -1,0 +1,228 @@
+import type { EffectStack } from './effects'
+import type { Disposer } from './types'
+import type {
+  PluginActionsApi,
+  PluginSettingValue,
+  PluginStoreApi,
+  PluginThemeSnapshot,
+  PluginUiApi,
+  PluginUiState,
+} from './ui'
+
+/**
+ * The UI half of a plugin, with no aimux drawing anything.
+ *
+ * `createTestContext` gives a daemon plugin everything it needs — the real bus,
+ * the real effect stack, recorded RPC — but a UI plugin's first line is
+ * `ctx.ui.widgets.register(...)`, and `ctx.ui` simply was not there. So the
+ * test the scaffold generates, against the half the scaffold generates, threw
+ * on the first statement: the author's first run of `bun test` was a red they
+ * had not written. Inside this repo it was invisible, because aimux's own tests
+ * pass `extend` with the real services.
+ *
+ * Everything here records rather than draws, and every registration goes on the
+ * same effect stack the rest of the context uses — so `effectCount()` counts
+ * them and `dispose()` unwinds them, which is the property a plugin test is
+ * really there to check.
+ */
+
+/** What the plugin registered, by surface. Mirrors what `plugin doctor` reports. */
+export interface TestUiRegistrations {
+  widgets: string[]
+  views: string[]
+  modals: string[]
+  panes: string[]
+  statusBar: string[]
+  statsPages: string[]
+  themes: string[]
+  settingsSections: number
+  actions: string[]
+  effects: string[]
+}
+
+export interface TestUiSurface {
+  ui: PluginUiApi
+  actions: PluginActionsApi
+  store: PluginStoreApi
+  registrations: TestUiRegistrations
+  /** Everything `ctx.ui.toast` was asked to show, newest last. */
+  toasts: { level: 'info' | 'success' | 'error'; message: string }[]
+  /** Panes and views the plugin asked to open or close, in order. */
+  opened: string[]
+  /** Drives `ctx.ui.state`: set it, and subscribers hear about it. */
+  setState: (next: Partial<PluginUiState>) => void
+  /** Drives `ctx.ui.settings.watch` and what `get` answers. */
+  setSetting: (id: string, value: PluginSettingValue) => void
+  /** Drives `ctx.ui.themes.onChange` and what `current()` answers. */
+  setTheme: (snapshot: PluginThemeSnapshot) => void
+}
+
+const EMPTY_STATE: PluginUiState = {
+  activeTab: null,
+  activeTabId: null,
+  projectId: null,
+  tabs: [],
+}
+
+const DEFAULT_THEME: PluginThemeSnapshot = { colors: {}, mode: 'dark' }
+
+/** A component that renders nothing: a test asserts on registrations, not pixels. */
+const nothing = (): null => null
+
+export function createTestUiSurface(effects: EffectStack): TestUiSurface {
+  const registrations: TestUiRegistrations = {
+    actions: [],
+    effects: [],
+    modals: [],
+    panes: [],
+    settingsSections: 0,
+    statsPages: [],
+    statusBar: [],
+    themes: [],
+    views: [],
+    widgets: [],
+  }
+  const toasts: TestUiSurface['toasts'] = []
+  const opened: string[] = []
+
+  let state: PluginUiState = EMPTY_STATE
+  const stateListeners = new Set<(next: PluginUiState) => void>()
+  const settings = new Map<string, PluginSettingValue>()
+  const settingListeners = new Map<string, Set<(value: PluginSettingValue) => void>>()
+  let theme: PluginThemeSnapshot = DEFAULT_THEME
+  const themeListeners = new Set<(snapshot: PluginThemeSnapshot) => void>()
+  let slice: unknown
+
+  /** Records a registration and hands back a disposer that unrecords it. */
+  function record(into: string[], id: string): Disposer {
+    into.push(id)
+    const dispose = (): void => {
+      const at = into.indexOf(id)
+      if (at !== -1) into.splice(at, 1)
+    }
+    effects.add(dispose)
+    return dispose
+  }
+
+  function own<T>(set: Set<T>, listener: T): Disposer {
+    set.add(listener)
+    const dispose = (): void => {
+      set.delete(listener)
+    }
+    effects.add(dispose)
+    return dispose
+  }
+
+  const ui: PluginUiApi = {
+    kit: {
+      KeyHint: nothing,
+      List: nothing,
+      Panel: nothing,
+      Row: nothing,
+      useTheme: () => theme.colors,
+    },
+    modals: {
+      close: () => opened.push('modal:close'),
+      open: (id) => opened.push(`modal:${id}`),
+      register: (modal) => record(registrations.modals, modal.id),
+    },
+    panes: {
+      close: (id) => opened.push(`pane:close:${id}`),
+      open: (id) => opened.push(`pane:${id}`),
+      register: (pane) => record(registrations.panes, pane.id),
+    },
+    settings: {
+      get: (id) => settings.get(id),
+      registerSection: () => {
+        registrations.settingsSections += 1
+        const dispose = (): void => {
+          registrations.settingsSections -= 1
+        }
+        effects.add(dispose)
+        return dispose
+      },
+      watch: (id, listener) => {
+        const set = settingListeners.get(id) ?? new Set()
+        settingListeners.set(id, set)
+        return own(set, listener)
+      },
+    },
+    state: {
+      get: () => state,
+      subscribe: (listener) => {
+        // Fires once immediately, exactly as the real one does.
+        listener(state)
+        return own(stateListeners, listener)
+      },
+      use: (select) => select(state),
+    },
+    stats: {
+      registerPage: (page) => record(registrations.statsPages, page.id),
+    },
+    statusBar: {
+      register: (segment) => record(registrations.statusBar, segment.id),
+    },
+    themes: {
+      current: () => theme,
+      onChange: (listener) => own(themeListeners, listener),
+      register: (id) => record(registrations.themes, id),
+    },
+    toast: {
+      error: (message) => toasts.push({ level: 'error', message }),
+      info: (message) => toasts.push({ level: 'info', message }),
+      success: (message) => toasts.push({ level: 'success', message }),
+    },
+    views: {
+      close: () => opened.push('view:close'),
+      open: (id) => opened.push(`view:${id}`),
+      register: (view) => record(registrations.views, view.id),
+    },
+    widgets: {
+      register: (widget) => record(registrations.widgets, widget.id),
+    },
+  }
+
+  const actions: PluginActionsApi = {
+    effect: (effectId) => record(registrations.effects, effectId),
+    register: (verb) => record(registrations.actions, verb),
+  }
+
+  const store: PluginStoreApi = {
+    dispatch: () => {
+      /* a slice reducer is the plugin's; a bare context has none to run */
+    },
+    get: () => slice,
+    reducer: () => {
+      const dispose = (): void => {
+        /* nothing was installed, so nothing comes off */
+      }
+      effects.add(dispose)
+      return dispose
+    },
+    set: (next) => {
+      slice = next
+    },
+    use: () => slice,
+  }
+
+  return {
+    actions,
+    opened,
+    registrations,
+    setSetting: (id, value) => {
+      settings.set(id, value)
+      for (const listener of settingListeners.get(id) ?? []) listener(value)
+    },
+    setState: (next) => {
+      state = { ...state, ...next }
+      for (const listener of stateListeners) listener(state)
+    },
+    setTheme: (snapshot) => {
+      theme = snapshot
+      for (const listener of themeListeners) listener(snapshot)
+    },
+    store,
+    toasts,
+    ui,
+  }
+}

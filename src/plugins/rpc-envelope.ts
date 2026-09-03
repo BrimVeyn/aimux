@@ -25,6 +25,23 @@ export const PLUGIN_CONTROL_LIST = 'list'
 /** Runs a plugin's CLI command in the daemon; see `src/plugins/cli-commands.ts`. */
 export const PLUGIN_CONTROL_CLI_RUN = 'cli:run'
 /** Lists the manifest `commands[]` across every loaded plugin. */
+/**
+ * Verbs the *UI* answers, forwarded by the daemon. Everything else on this
+ * channel is answered where it is asked; these three cannot be — only the
+ * process drawing the screen knows what is on it, what a key resolves to, or
+ * how to run an action the way a key press would.
+ */
+export const PLUGIN_CONTROL_UI_STATE = 'ui:state'
+export const PLUGIN_CONTROL_KEYMAP_RESOLVE = 'keymap:resolve'
+export const PLUGIN_CONTROL_ACTION_RUN = 'action:run'
+
+/** The three above, for the daemon's forwarding switch. */
+export const PLUGIN_CONTROL_UI_VERBS: readonly string[] = [
+  PLUGIN_CONTROL_UI_STATE,
+  PLUGIN_CONTROL_KEYMAP_RESOLVE,
+  PLUGIN_CONTROL_ACTION_RUN,
+]
+
 export const PLUGIN_CONTROL_EXEC_LIST = 'exec:list'
 /** Spawns one manifest command; see `src/plugins/exec-adapter.ts`. */
 export const PLUGIN_CONTROL_EXEC_RUN = 'exec:run'

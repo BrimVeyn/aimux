@@ -1,6 +1,8 @@
 import type { CliContext } from './context'
 import type { ArgSpec, FlagSpec } from './flags'
 
+import { actionRun } from './commands/action/run'
+import { keymapResolve } from './commands/keymap/resolve'
 import { pluginConfig, pluginSet, pluginUnset } from './commands/plugin/config'
 import { pluginDoctor } from './commands/plugin/doctor'
 import { pluginDisable, pluginEnable } from './commands/plugin/enable'
@@ -14,6 +16,7 @@ import { pluginReload } from './commands/plugin/reload'
 import { pluginShow } from './commands/plugin/show'
 import { pluginUninstall } from './commands/plugin/uninstall'
 import { pluginUnlink } from './commands/plugin/unlink'
+import { profileList } from './commands/profile/list'
 import { projectClose } from './commands/project/close'
 import { projectCreate } from './commands/project/create'
 import { projectList } from './commands/project/list'
@@ -30,6 +33,7 @@ import { tabSend } from './commands/tab/send'
 import { tabSnapshot } from './commands/tab/snapshot'
 import { tabTail } from './commands/tab/tail'
 import { tabWait } from './commands/tab/wait'
+import { uiState } from './commands/ui/state'
 import { workerAwait } from './commands/worker/await'
 import { workerDoctor } from './commands/worker/doctor'
 import { workerList } from './commands/worker/list'
@@ -95,6 +99,10 @@ export const COMMANDS: readonly CliCommand[] = [
   skillPathCommand,
   pluginCommands,
   pluginExec,
+  profileList,
+  uiState,
+  keymapResolve,
+  actionRun,
 ]
 
 export function resolveCommand(group: string, verb: string): CliCommand | null {

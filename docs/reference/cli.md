@@ -637,6 +637,63 @@ that executes plugin code; nothing it runs touches the running aimux.
 Secrets declared with `"secret": true` in the manifest are printed as
 `<secret>` by `list`.
 
+### `aimux ui`, `aimux keymap`, `aimux action`
+
+What the interface is showing, what a key does, and running an action without
+one. These three answer from the **UI** process — the daemon forwards them —
+so each needs an aimux running on the profile; with none attached they exit 3
+and say so rather than hanging.
+
+```
+aimux ui state
+-> { attached, bars: { left, right }, statusBar: [...], mode, activeTabId,
+     activePluginPaneId, focusMode, tabs: [...] }
+
+aimux keymap resolve <keys> [--mode MODE]
+-> { attached, mode, keys, bound, origin?: "config" | "plugin", pluginId?, group?, reason? }
+
+aimux action run <pluginId>.<verb>
+-> { attached, name, ran, actions, effects, reason? }
+```
+
+Each bar widget comes back with `visible`, `grow`, `renderable` and
+`placedBy`. `renderable` is the one that matters when something is missing: a
+widget listed but not drawable is an _orphan_ — its plugin is disabled, still
+loading, or failed — and bars skip it, which looks exactly like a widget that
+was never placed. `placedBy: "plugin"` means the manifest asked for that spot
+and the user has not moved it since.
+
+`keymap resolve` defaults to the mode the keyboard is in. `origin` is the
+keyboard's `enabledFrom`: a plugin's binding that the user's `aimux.config.ts`
+already owns is refused, and from the outside a refusal and a working binding
+look identical without this. Not being bound is an answer, not a failure —
+exit 0, `bound: false`.
+
+`action run` fires the action through the same two channels a key press does,
+so it cannot drift from the binding. It exits 2 for an action nobody
+registered, because a typo that exits 0 is how an agent concludes its
+keybinding works. It is not `plugin exec`: that one spawns a subprocess a
+manifest declared, this one runs code inside the UI.
+
+### `aimux profile`
+
+```
+aimux profile list [--running]
+-> { active, activeFrom: "env" | "only-running" | "default", profiles: [...], running: [...] }
+```
+
+`activeFrom` says why: `env` when `AIMUX_PROFILE` is set, `only-running` when
+nothing asked and exactly one aimux is up, `default` otherwise. A shell that
+never exported the variable gets `default` — right for a person, whose shell
+and aimux share an environment, and wrong for an agent, whose shell has none
+of it: linking a plugin into a profile nobody is looking at succeeds and shows
+nothing.
+
+So when nothing was asked for and exactly one profile has a live daemon, every
+command adopts it. Several running with `default` among them keeps `default`;
+several without it is refused with the list, since any choice would be a guess.
+Liveness is the daemon's pid file, not its socket — a socket survives a crash.
+
 ## JSON Output Conventions
 
 - One JSON object per invocation on stdout (`tab wait` and `tab tail` are

@@ -12,8 +12,11 @@ import { publishPluginRecords, publishPluginStatuses } from '../plugins/plugin-s
 import {
   isCallEnvelope,
   PLUGIN_CONTROL_ID,
+  PLUGIN_CONTROL_KEYMAP_RESOLVE,
   PLUGIN_CONTROL_REFRESH,
   PLUGIN_CONTROL_RELOAD,
+  PLUGIN_CONTROL_UI_STATE,
+  PLUGIN_CONTROL_UI_VERBS,
   PLUGIN_RPC_REPLY_VERB,
   type PluginCallEnvelope,
 } from '../plugins/rpc-envelope'
@@ -21,6 +24,7 @@ import { onSettingSectionsChanged } from '../settings/sections'
 import { dispatchGlobal } from '../state/dispatch-ref'
 import { onStatsPagesChanged } from '../state/stats-pages'
 import { toast } from '../state/toast-store'
+import { describeUiState, resolveKeymap, runPluginActionByName } from './introspection'
 import { onPluginModalsChanged } from './plugin-modals'
 import { onPluginPanesChanged } from './plugin-panes'
 import { setPluginRefresh } from './plugin-refresh-ref'
@@ -183,8 +187,51 @@ export function usePluginHost(options: UsePluginHostOptions): PluginHostHandle {
       }
     }
 
+    /**
+     * The three verbs only this process can answer: what the screen shows, what
+     * a key resolves to, and running an action the way a press would. They
+     * arrive as ordinary calls on the reserved control id, forwarded by the
+     * daemon on behalf of the CLI.
+     */
+    const answerControl = (verb: string, envelope: PluginCallEnvelope): void => {
+      try {
+        const payload = envelope.payload as { keys?: string; mode?: string; name?: string }
+        if (verb === PLUGIN_CONTROL_UI_STATE) {
+          reply(envelope.__call, true, describeUiState())
+          return
+        }
+        if (verb === PLUGIN_CONTROL_KEYMAP_RESOLVE) {
+          reply(
+            envelope.__call,
+            true,
+            resolveKeymap(
+              typeof payload.keys === 'string' ? payload.keys : '',
+              typeof payload.mode === 'string' ? payload.mode : undefined
+            )
+          )
+          return
+        }
+        reply(
+          envelope.__call,
+          true,
+          runPluginActionByName(typeof payload.name === 'string' ? payload.name : '')
+        )
+      } catch (error) {
+        reply(
+          envelope.__call,
+          false,
+          undefined,
+          error instanceof Error ? error.message : String(error)
+        )
+      }
+    }
+
     const onPluginEvent = (pluginId: string, verb: string, payload: unknown): void => {
       if (pluginId === PLUGIN_CONTROL_ID) {
+        if (PLUGIN_CONTROL_UI_VERBS.includes(verb) && isCallEnvelope(payload)) {
+          answerControl(verb, payload)
+          return
+        }
         if (verb === PLUGIN_CONTROL_RELOAD) {
           const id =
             typeof (payload as { id?: unknown })?.id === 'string'

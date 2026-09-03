@@ -1030,6 +1030,13 @@ export interface TestContextHandle {
   effectCount: () => number
   /** Unwind, exactly as an unload would. Resolves with any disposer errors. */
   dispose: () => Promise<unknown[]>
+  /**
+   * The recording UI half, when `host` is `'ui'` and no `extend` replaced it:
+   * what the plugin registered, the toasts it raised, and the levers that drive
+   * `ctx.ui.state`, `ctx.ui.settings` and `ctx.ui.themes`. Absent for a daemon
+   * plugin, which has no `ctx.ui` to record.
+   */
+  ui?: TestUiSurface
 }
 ```
 
@@ -1150,9 +1157,28 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
     waterfall: async <T>(event: string, value: T) => bus.waterfall(event, value),
   }
 
+  /**
+   * A UI plugin's first line is `ctx.ui.something.register(...)`, so a `ui`
+   * context without `ctx.ui` cannot run one at all. `extend` still wins: the
+   * real hosts and `plugin doctor` pass their own services, and this stub is
+   * what an author outside aimux gets instead.
+   */
+  const surface = host === 'ui' ? createTestUiSurface(effects) : undefined
+  if (surface) {
+    const extended = ctx as PluginContext & {
+      ui: unknown
+      actions: unknown
+      store: unknown
+    }
+    extended.ui = surface.ui
+    extended.actions = surface.actions
+    extended.store = surface.store
+  }
+
   options.extend?.(ctx)
 
   return {
+    ...(surface === undefined ? {} : { ui: surface }),
     apply: async (definition) => {
       await (definition as PluginDefinition).apply(ctx)
     },

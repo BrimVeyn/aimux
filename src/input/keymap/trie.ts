@@ -7,6 +7,12 @@ export interface TrieBinding {
   result: KeyResult | ActionFn
   group?: string
   repeatable?: boolean
+  /**
+   * Set when a plugin's layer inserted this binding rather than the user's
+   * keymap. `aimux keymap resolve` reports it, which is how an agent tells
+   * "my binding took" from "the config already owned that key".
+   */
+  pluginId?: string
 }
 
 export interface TrieNode {
