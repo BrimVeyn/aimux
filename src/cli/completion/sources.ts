@@ -87,6 +87,19 @@ async function pluginConfigKeyCandidates(
   }))
 }
 
+async function pluginKeymapIdCandidates(
+  positionals: readonly string[]
+): Promise<CompletionCandidate[]> {
+  const pluginId = positionals.at(-1)
+  if (pluginId === undefined || pluginId === '') return []
+  const { manifestForPluginId } = await import('./plugin-manifests')
+  const manifest = await manifestForPluginId(pluginId)
+  return (manifest?.contributes?.keymaps ?? []).map((binding) => ({
+    description: binding.description ?? binding.action,
+    value: binding.id ?? binding.action,
+  }))
+}
+
 async function resolveSource(
   source: DynamicCompletionSource,
   positionals: readonly string[]
@@ -98,6 +111,8 @@ async function resolveSource(
       return await pluginCandidates()
     case 'plugin-config-key':
       return await pluginConfigKeyCandidates(positionals)
+    case 'plugin-keymap-id':
+      return await pluginKeymapIdCandidates(positionals)
     case 'project':
       return await projectCandidates()
     // Phase 2: 'tab' | 'worker' | 'workspace' need a daemon round-trip under a

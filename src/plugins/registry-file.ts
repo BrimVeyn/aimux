@@ -48,7 +48,7 @@ export interface PluginRegistryEntry {
 export interface PluginOverride {
   enabled?: boolean
   config?: Record<string, unknown>
-  keymaps?: Record<string, string | null>
+  keymaps?: Record<string, string | null | undefined>
 }
 
 export interface PluginRegistry {

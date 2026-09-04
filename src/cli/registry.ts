@@ -10,6 +10,7 @@ import { pluginDoctor } from './commands/plugin/doctor'
 import { pluginDisable, pluginEnable } from './commands/plugin/enable'
 import { pluginCommands, pluginExec } from './commands/plugin/exec'
 import { pluginInstall } from './commands/plugin/install'
+import { pluginBind, pluginKeymaps, pluginUnbind } from './commands/plugin/keymaps'
 import { pluginLink } from './commands/plugin/link'
 import { pluginList } from './commands/plugin/list'
 import { pluginLog } from './commands/plugin/log'
@@ -102,6 +103,9 @@ export const COMMANDS: readonly CliCommand[] = [
   pluginDoctor,
   pluginShow,
   pluginConfig,
+  pluginKeymaps,
+  pluginBind,
+  pluginUnbind,
   pluginSet,
   pluginUnset,
   skillList,

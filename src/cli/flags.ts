@@ -20,6 +20,7 @@ export type DynamicCompletionSource =
   | 'plugin'
   /** Resolved from the plugin id in the positional before this one. */
   | 'plugin-config-key'
+  | 'plugin-keymap-id'
 
 /**
  * Where a flag value or positional draws its shell-completion candidates.

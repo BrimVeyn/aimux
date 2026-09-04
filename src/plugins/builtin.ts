@@ -106,7 +106,11 @@ export function buildBuiltinRecords(
   /** The registry's `overrides` block: what the settings screen and the CLI write. */
   registryOverrides: ReadonlyMap<
     string,
-    { enabled?: boolean; config?: Record<string, unknown>; keymaps?: Record<string, string | null> }
+    {
+      enabled?: boolean
+      config?: Record<string, unknown>
+      keymaps?: Record<string, string | null | undefined>
+    }
   >
 ): BuiltinRecordsResult {
   const records: PluginRecord[] = []
