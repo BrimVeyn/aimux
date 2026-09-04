@@ -31,14 +31,14 @@
     },
     "packages/aimux-config": {
       "name": "@brimveyn/aimux-config",
-      "version": "0.11.2",
+      "version": "0.11.3",
       "dependencies": {
         "shiki": "^4.0.2",
       },
     },
     "packages/aimux-plugin": {
       "name": "@brimveyn/aimux-plugin",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "devDependencies": {
         "@types/react": "^19.2.14",
       },
