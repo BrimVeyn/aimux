@@ -111,6 +111,7 @@ export function registerKeymapLayer(
     // registers the verb during its own `apply`, which may be after this.
     const entry: TrieBinding = {
       group: pluginId,
+      pluginAction: binding.action,
       pluginId,
       result: pluginAction(binding.action),
       ...(binding.id === undefined ? {} : { bindingId: binding.id }),

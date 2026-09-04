@@ -1,7 +1,9 @@
 import type { Action, ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 
-import { parseKeyNotation } from './key-chord'
+import { getHandler } from '../modes/registry'
+import { chordsToNotation, parseKeyNotation } from './key-chord'
 import { formatNotationForDisplay } from './key-format'
+import { KeymapModeHandler } from './keymap-mode-handler'
 
 export interface DescribedBinding {
   keys: string
@@ -44,8 +46,6 @@ export function describeBindings(
   options: DescribeOptions = {}
 ): DescribedBinding[] {
   const mode = config.modes.get(modeId)
-  if (!mode) return []
-
   const leaderChord = parseKeyNotation(config.leader)[0]
   const seenDescriptions = new Set<string>()
   const result: DescribedBinding[] = []
@@ -53,7 +53,7 @@ export function describeBindings(
   const resultIndexByAction = new Map<string, number>()
   const seenKeysDisplayByIndex = new Map<number, Set<string>>()
 
-  for (const binding of mode.bindings) {
+  for (const binding of mode?.bindings ?? []) {
     const keysDisplay = formatNotationForDisplay(binding.keys, leaderChord)
 
     if (options.mergeAlternativesByDescription === true) {
@@ -123,6 +123,22 @@ export function describeBindings(
       keys: binding.keys,
       keysDisplay,
     })
+  }
+
+  const handler = getHandler(modeId)
+  if (handler instanceof KeymapModeHandler) {
+    for (const { binding, sequence } of handler.trie.entries()) {
+      if (binding.pluginId === undefined) continue
+      const description = binding.description ?? binding.pluginAction ?? binding.bindingId
+      if (options.withDescriptionOnly === true && description === undefined) continue
+      const keys = chordsToNotation(sequence, leaderChord)
+      result.push({
+        description,
+        group: binding.pluginId,
+        keys,
+        keysDisplay: formatNotationForDisplay(keys, leaderChord),
+      })
+    }
   }
 
   return result
