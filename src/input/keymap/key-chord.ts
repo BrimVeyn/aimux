@@ -108,6 +108,34 @@ export function parseKeyNotation(notation: string, leader?: KeyChord): KeyChord[
   return chords
 }
 
+const CHORD_TO_SPECIAL: Record<string, string> = {
+  backspace: 'BS',
+  delete: 'Del',
+  down: 'Down',
+  end: 'End',
+  escape: 'Esc',
+  home: 'Home',
+  left: 'Left',
+  return: 'CR',
+  right: 'Right',
+  space: 'Space',
+  tab: 'Tab',
+  up: 'Up',
+}
+
+/** Turn captured canonical chords back into the notation accepted by the parser. */
+export function chordsToNotation(chords: readonly KeyChord[], leader?: KeyChord): string {
+  return chords
+    .map((chord) => {
+      if (leader !== undefined && chord === leader) return '<leader>'
+      const special = CHORD_TO_SPECIAL[chord]
+      if (special !== undefined) return `<${special}>`
+      if (chord.length === 1) return chord
+      return `<${chord}>`
+    })
+    .join('')
+}
+
 function parseAngleBracketToken(inner: string): KeyChord {
   // Check if it's a special name (no modifiers)
   const specialInner = SPECIAL_NAMES[inner]

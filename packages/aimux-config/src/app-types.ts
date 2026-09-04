@@ -100,6 +100,7 @@ export type ModalType =
   | 'workspace-delete-confirm'
   | 'flash-jump'
   | 'setting-text'
+  | 'setting-keybind'
   | 'settings-search'
   /**
    * Every plugin modal, the way `plugin-view` covers every plugin view. Which
@@ -534,6 +535,15 @@ export interface ModalSettingText extends ModalBase {
   settingId: string
   settingLabel: string
 }
+export interface ModalSettingKeybind extends ModalBase {
+  type: 'setting-keybind'
+  settingId: string
+  settingLabel: string
+  mode: string
+  captured: string[]
+  conflict: string | null
+  returnTo: 'settings'
+}
 
 export interface ModalRenameWorkspace extends ModalBase {
   type: 'rename-workspace'
@@ -745,6 +755,7 @@ export type ModalState =
   | ModalWorkspaceDeleteConfirm
   | ModalFlashJump
   | ModalSettingText
+  | ModalSettingKeybind
   | ModalSettingsSearch
   | ModalPlugin
 
@@ -941,6 +952,7 @@ export type BuiltinModeId =
   | 'modal.rename-tab'
   | 'modal.rename-workspace'
   | 'modal.setting-text'
+  | 'modal.setting-keybind'
   | 'modal.settings-search.filtering'
   | 'modal.snippet-picker.filtering'
   | 'modal.snippet-editor'
@@ -1071,6 +1083,7 @@ export type SideEffect =
   | { type: 'reset-settings-row' }
   | { type: 'confirm-settings-search' }
   | { type: 'commit-setting-text'; settingId: string; value: string }
+  | { type: 'commit-setting-keybind'; settingId: string; value: string }
   | PluginSideEffect
 
 export interface KeyResult {
@@ -1325,6 +1338,9 @@ export type SettingsAction =
   | { type: 'settings-select-row'; rowIndex: number }
   | { type: 'open-settings-search' }
   | { type: 'open-setting-text-modal'; settingId: string; label: string; value: string }
+  | { type: 'open-setting-keybind-modal'; settingId: string; label: string; mode: string }
+  | { type: 'keybind-capture-push'; chord: string }
+  | { type: 'keybind-capture-pop' }
 
 export type StatsAction =
   | { type: 'enter-stats' }

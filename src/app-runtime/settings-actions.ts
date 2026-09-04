@@ -117,7 +117,14 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
       if (delta === undefined) openField(row, current)
       return
     case 'keybind':
-      // The capture modal is wired by the keybind-modal chantier.
+      if (delta === undefined) {
+        dispatchGlobal({
+          label: row.label.trim(),
+          mode: row.description ?? 'navigation',
+          settingId: row.id,
+          type: 'open-setting-keybind-modal',
+        })
+      }
       return
     case 'action':
       // Not a value, so a direction means nothing to it either.
@@ -184,4 +191,15 @@ export function commitSettingText(
 
   if (row.kind !== 'text') return
   writeRow(row, value.trim(), ctx)
+}
+
+export function commitSettingKeybind(
+  runtime: SettingsContext,
+  settingId: string,
+  value: string
+): void {
+  const state = runtime.getState()
+  const row = findSettingRow(settingId, state.projects)
+  if (!row || row.kind !== 'keybind') return
+  writeRow(row, value, readCtx(state))
 }

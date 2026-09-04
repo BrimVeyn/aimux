@@ -21,6 +21,7 @@ const COMMAND_EDIT_MODE_IDS: Partial<Record<SupportedModalType, ModeId>> = {
   'project-picker': 'modal.project-picker.filtering',
   'rename-tab': 'modal.rename-tab',
   'rename-workspace': 'modal.rename-workspace',
+  'setting-keybind': 'modal.setting-keybind',
   'setting-text': 'modal.setting-text',
   'settings-search': 'modal.settings-search.filtering',
   'snippet-editor': 'modal.snippet-editor',

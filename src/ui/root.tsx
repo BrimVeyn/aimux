@@ -32,6 +32,7 @@ import { GitCommitModal } from './components/modals/git/git-commit-modal'
 import { CreateProjectModal } from './components/modals/projects/create-project-modal'
 import { ProjectNameModal } from './components/modals/projects/project-name-modal'
 import { ProjectPickerModal } from './components/modals/projects/project-picker-modal'
+import { SettingKeybindModal } from './components/modals/settings/setting-keybind-modal'
 import { SettingsSearchModal } from './components/modals/settings/settings-search-modal'
 import { WorkspaceDeleteConfirm } from './components/modals/shared/workspace-delete-confirm'
 import { SnippetEditorModal } from './components/modals/snippets/snippet-editor-modal'
@@ -163,6 +164,14 @@ function renderModal(
       return <ProjectNameModal title="Rename tab" value={modal.editBuffer ?? ''} />
     case 'setting-text':
       return <ProjectNameModal title={modal.settingLabel} value={modal.editBuffer ?? ''} />
+    case 'setting-keybind':
+      return (
+        <SettingKeybindModal
+          captured={modal.captured}
+          conflict={modal.conflict}
+          label={modal.settingLabel}
+        />
+      )
     case 'settings-search':
       return (
         <SettingsSearchModal
@@ -441,7 +450,10 @@ export function RootView({
   // move. Previewing it on the settings screen is not the answer to "how does this
   // theme look" — so it gets the panes, and closing still comes back here.
   const inSettings =
-    focusMode === 'settings' || modal.type === 'setting-text' || modal.type === 'settings-search'
+    focusMode === 'settings' ||
+    modal.type === 'setting-text' ||
+    modal.type === 'setting-keybind' ||
+    modal.type === 'settings-search'
   let replacesPanes: ReactNode = null
   if (inGitMode) replacesPanes = <GitView themeId={themeId} />
   else if (inSettings) replacesPanes = <SettingsView />
