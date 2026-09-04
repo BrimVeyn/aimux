@@ -216,6 +216,6 @@ export function resetRow(row: SettingRow): void {
  * row's value can live outside both stores — the setup script is a file — and
  * nothing else would make the list read it again.
  */
-function bumpRevision(): void {
+export function bumpRevision(): void {
   settingsStore.setState((state) => ({ revision: state.revision + 1 }))
 }

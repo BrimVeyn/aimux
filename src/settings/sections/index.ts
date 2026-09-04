@@ -1,7 +1,6 @@
 import type { ProjectRecord } from '../../state/types'
 import type { SettingRow, SettingSection } from '../types'
 
-import { pluginConfigSections } from '../plugin-config-rows'
 import { ABOUT_SECTION } from './about'
 import { APPEARANCE_SECTION } from './appearance'
 import { AUTOMATION_SECTION } from './automation'
@@ -12,7 +11,7 @@ import { GIT_SECTION } from './git'
 import { INTEGRATIONS_SECTION } from './integrations'
 import { LAYOUT_SECTION } from './layout'
 import { NOTIFICATIONS_SECTION } from './notifications'
-import { PLUGINS_SECTION } from './plugins'
+import { PLUGINS_SECTION, setPluginUserConfig as setPluginsSectionUserConfig } from './plugins'
 import { SETUP_SECTION } from './setup'
 import { STATUS_BAR_SECTION } from './status-bar'
 import { WORKSPACE_SECTION } from './workspace'
@@ -92,11 +91,10 @@ export function clearSettingSections(): void {
  * configuration.
  */
 export function settingSections(): readonly SettingSection[] {
-  const generated = pluginConfigSections(pluginUserConfigRef)
-  if (pluginSections.size === 0 && generated.length === 0) return BUILTIN_SETTING_SECTIONS
+  if (pluginSections.size === 0) return BUILTIN_SETTING_SECTIONS
   const about = BUILTIN_SETTING_SECTIONS.at(-1)
   const rest = BUILTIN_SETTING_SECTIONS.slice(0, -1)
-  const middle = [...generated, ...pluginSections.values()]
+  const middle = [...pluginSections.values()]
   return about ? [...rest, ...middle, about] : middle
 }
 
@@ -105,12 +103,14 @@ export function settingSections(): readonly SettingSection[] {
  * declares — and therefore which rows carry the "comes back on restart" mark.
  * Set once at boot by the app; empty is the honest default everywhere else.
  */
-let pluginUserConfigRef: readonly { id?: string; config?: Record<string, unknown> }[] = []
-
 export function setPluginUserConfig(
-  entries: readonly { id?: string; config?: Record<string, unknown> }[]
+  entries: readonly {
+    id?: string
+    config?: Record<string, unknown>
+    keymaps?: Record<string, string | null>
+  }[]
 ): void {
-  pluginUserConfigRef = entries
+  setPluginsSectionUserConfig(entries)
 }
 
 /**

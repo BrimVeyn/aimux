@@ -3,7 +3,9 @@ import type { ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { KeymapModeHandler } from '../../keymap/keymap-mode-handler'
 
 import { buildKeymapHandlers } from '../../keymap/build-handlers'
+import { registerHelpModeLabel } from '../../keymap/help-entries'
 import { registerMode } from '../registry'
+import { SettingKeybindHandler } from '../setting-keybind-handler'
 
 /**
  * Build and register all mode handlers from a resolved keymap config.
@@ -14,5 +16,7 @@ export function registerAllModes(config: ResolvedKeymapConfig): KeymapModeHandle
   for (const handler of handlers) {
     registerMode(handler)
   }
+  registerMode(new SettingKeybindHandler())
+  registerHelpModeLabel('modal.setting-keybind', 'Capture plugin shortcut')
   return handlers
 }

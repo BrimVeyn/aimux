@@ -17,6 +17,7 @@ import {
   resizeSplit,
   setSplitRatio,
   splitNode,
+  swapLeaves,
 } from '../layout-tree'
 import { normalizeGroupedTabOrder } from '../project-persistence'
 import {
@@ -786,6 +787,21 @@ export function reduceTabState(state: AppState, action: AppAction): AppState | n
         return { ...state, activePluginPaneId: neighbor.tabId }
       }
       return withActiveTabWorkspace({ ...state, activeTabId: neighbor.tabId }, neighbor.tabId)
+    }
+    case 'swap-pane': {
+      const swapFrom = state.activePluginPaneId ?? state.activeTabId
+      if (!(swapFrom != null && swapFrom !== '')) return state
+      const swapGroupId = getGroupIdForTab(state.tabGroupMap, swapFrom)
+      const swapTree =
+        swapGroupId != null && swapGroupId !== '' ? state.layoutTrees[swapGroupId] : null
+      if (swapGroupId == null || swapGroupId === '' || !swapTree) return state
+      const partner = getAdjacentPane(swapTree, swapFrom, action.direction)
+      if (partner === null) return state
+      const swapped = swapLeaves(swapTree, swapFrom, partner.tabId)
+      if (swapped === swapTree) return state
+      // The ids traded places; whoever held the keyboard still holds it, in
+      // the other slot. Nothing about focus changes.
+      return { ...state, layoutTrees: { ...state.layoutTrees, [swapGroupId]: swapped } }
     }
     case 'resize-pane': {
       const resizeGroupId = getGroupIdForTab(state.tabGroupMap, action.tabId)

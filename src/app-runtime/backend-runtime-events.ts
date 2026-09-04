@@ -15,6 +15,7 @@ import { logInputDebug } from '../debug/input-log'
 import { clearTabSyntaxState, highlightSnapshot } from '../integrations/claude-syntax-overlay'
 import { appStore } from '../state/app-store'
 import { loadProjectCatalog, saveProjectCatalog } from '../state/project-catalog'
+import { recordCommandPaneExit } from '../ui/plugin-command-panes'
 import {
   handleCreateProjectEffect,
   handleDeleteProjectEffect,
@@ -84,6 +85,10 @@ export function bindBackendRuntimeEvents({
     // read. Record the outcome and leave the dead tab holding its last frame;
     // a re-run, a workspace removal, or a project switch clears it.
     if (recordSetupExit(tabId, exitCode, dispatch)) return
+    // A plugin's command pane is kept for the same reason: the program's last
+    // words are what the user needs, and a plugin that spawned lazygit wants
+    // a pane saying "exited" rather than a layout that quietly collapsed.
+    if (recordCommandPaneExit(tabId, exitCode)) return
     dispatch({ tabId, type: 'close-tab' })
   }
 

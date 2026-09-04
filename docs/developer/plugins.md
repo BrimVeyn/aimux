@@ -73,7 +73,7 @@ and bars already skip those; a bound key resolves its action at press time.
 ```jsonc
 "contributes": {
   "bars": [{ "widget": "load", "side": "left" }],
-  "keymaps": [{ "mode": "navigation", "key": "<leader>+", "action": "up" }],
+  "keymaps": [{ "id": "up", "description": "Shift model up", "mode": "navigation", "key": "<leader>+", "action": "up" }],
 }
 ```
 
@@ -693,6 +693,126 @@ modal's seed are covered by one rule instead of three.
 `SettingSection`'s `rows` is a plain function of the projects, deliberately, so
 it has no way to reach the running host.
 
+## Phase 9 — hosting a library
+
+Measured against herdr's 954 public plugins rather than designed from taste:
+the API was already richer than herdr's, and what was missing was three
+surfaces that carry most of the catalogue. Each is below with the decision it
+implements.
+
+### A pane that runs a program
+
+`ctx.ui.panes.registerCommand({ id, title, command: argv, cwd? })`, or the
+same block as `panes[]` in the manifest with no TypeScript. Opening one spawns
+a real terminal tab aimux owns for the plugin, marked `TabSession.pluginPane`,
+so the whole lifecycle question is answered by that one mark:
+
+- **Reload** re-registers the same id and `open` finds the tab already there;
+  the program never notices the plugin restarted.
+- **Unlink, uninstall, disable** take the record away and
+  `reconcileCommandPanes` closes every tab carrying the plugin's prefix —
+  program included. Declared panes are registered from the _record_ by the UI
+  host, not from a fiber, which is what lets a manifest-only plugin have them
+  and what ties their life to the record rather than to a reload.
+- **The program exits** and the tab stays with its last frame and a line
+  saying so, the same choice the setup runner makes: the output is what the
+  user needs to read. `Ctrl+r` restarts it.
+
+The spawn goes through a host-owned `plugin-effect` (`aimux` is not a legal
+plugin id, so the host can own effects under it), which is why it runs in the
+side-effect executor with a real context rather than reaching for the backend
+from a service. Command panes are session-scoped like React panes: never
+persisted, and not on the wire — after a UI restart against a live daemon they
+come back as plain terminal tabs running the same argv.
+
+### The layout as an API
+
+`ctx.ui.layout` — `split`, `focus`, `swap`, `resize`, `close`, `tree`,
+`panes` — dispatches the same actions the keys do, so a plugin cannot make a
+layout the user could not have made by hand. `swap` was the one verb the
+keyboard lacked; it gained a `swap-pane` action, `swapLeaves` in the tree, and
+a `swapPane(direction)` factory for keymaps. Exchanging _leaves_ rather than
+ids was a test-found bug: a plugin pane swapped by id alone became a
+terminal. Zoom, move-into-a-slot and `apply(tree)` were left out: the first
+needs a rendering mode the app does not have, the other two are `swap` and
+`split` in a loop.
+
+`ctx.workspaces.create` / `remove` reuse the CLI's core through a
+`WorkspaceRegistrar` interface — the CLI hands the daemon over a socket, the
+daemon hands itself — so a plugin and `aimux workspace create` cannot produce
+two kinds of workspace. The request handlers and the plugin services now share
+one `recordWorkspaceAdded` / `recordWorkspaceRemoved` pair in the daemon.
+
+### Enumerable commands
+
+`actions.register(verb, handler, { title, description })` keeps its metadata
+in the action registry, and `ctx.commands.list()` folds three sources that
+never knew about each other into one list — actions, manifest `commands[]`
+(from the published records), CLI verbs (from the sidecar). `aimux action
+list` is the same list from outside. A palette written by a third party is
+now a `List` over it and `ctx.commands.run(id)`.
+
+### Services and the event stream
+
+`services[]` is the daemon's other process shape: `commands[]` is an argv with
+a timeout, a relay or a watcher is not a command that finishes.
+`ServiceSupervisor` follows _records_ through the runtime's new
+`onRecordsChange` — a plugin with `services[]` and no `entries.daemon` never
+gets a fiber and still gets its process — restarts per policy with a doubling
+backoff capped at thirty seconds, pipes output to the plugin's log, and kills
+with SIGTERM then SIGKILL when the plugin goes. Same `AIMUX_*` environment as
+a command.
+
+`aimux events follow` is `daemon/plugin-host.ts`'s event list, out of the
+process as NDJSON. The subscription is a control verb answered in `daemon.ts`
+rather than in the host, because only the socket layer knows which connection
+asked; the fanout reuses the `pluginEvent` message under the control id, so
+the wire protocol did not change. It deliberately reaches thin attachers,
+which `broadcastPluginEvent` never does.
+
+### Notifications
+
+`ctx.ui.notifications.notify` and `provide(sink)`, on the commit-message
+model: one sink, the second refused and told in its log, and while a sink
+holds the slot the native sound does not play. `workspace-activity.ts` raises
+its two events through `ui/notifications.ts` instead of playing the sound
+itself, which is the one place the "replace, never double" rule is enforced.
+UI-side only: the sound lives there, and a daemon plugin already has
+`tab:turnComplete` to push from.
+
+### Session and usage
+
+`ctx.assistants.session(tabId)` parses the id and the model out of the argv
+the daemon already keeps, rather than adding a field to the registry — a tab
+created by any client on any protocol version answers the same way. The
+transcript path is found by globbing the uuid under `~/.claude/projects`, as
+`hasConversation` does. `usage(tabId)` reads the transcript with the rollup's
+line filter and de-duplication rule but cumulative rather than per day.
+`resume(tabId)` closes and respawns with the vendor's resume args, in the
+workspace's directory when it had one.
+
+### Git in writing
+
+`diff`, `stage`, `unstage`, `discard`, `commit` in `git/plugin-git-writes.ts`,
+argv only, through the same queue git mode uses so two panes cannot race on
+the index lock. `discard` decides tracked-or-not from `git ls-files` rather
+than from the panel, so a plugin acting on its own listing is not at the mercy
+of the poll interval.
+
+### Distribution
+
+The index is the GitHub topic `aimux-plugin`; `plugin search` is the marketplace
+page and `plugin update` re-fetches from the recorded `origin`. `install` was
+split into `fetchPluginFromGitHub` and `placeInstalledPlugin` so `update` is
+the same two steps with a version comparison between them.
+
+### Left out, on purpose
+
+The daemon half in a `Worker` (phase 5's isolation item) — a supervised
+service reduces its urgency without removing it. A clock in the daemon: a
+service with its own `setInterval` is the routines family. Zoom and
+`layout.apply`, above. A daemon-side `notifications` API.
+
 ## API contract
 
 `apiVersion: 1` is frozen as of this document. Within generation 1:
@@ -707,6 +827,14 @@ it has no way to reach the running host.
 
 Every context API returns a disposer or is registered through `ctx.effect`.
 That is the invariant the whole system rests on.
+
+## Configurable keymaps
+
+Each `contributes.keymaps` entry may declare a stable `id` and a human-facing
+`description`. IDs are unique per plugin and key both registry and
+`aimux.config.ts` overrides. Resolution follows the config ladder: manifest,
+registry override, then hand-written config. A resolved `null` is not inserted
+into the live trie; changing the registry rebuilds the owning fiber.
 
 ## Security
 

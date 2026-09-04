@@ -1,7 +1,13 @@
 import { existsSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { connect, createServer, type Socket } from 'node:net'
 
-import type { AssistantId, TabSession, TabStatus, TerminalSnapshot } from '../state/types'
+import type {
+  AssistantId,
+  TabSession,
+  TabStatus,
+  TerminalSnapshot,
+  WorkspaceRecord,
+} from '../state/types'
 
 import { version as APP_VERSION } from '../../package.json'
 import { initialAutoRenameStatus } from '../auto-rename/coordinator'
@@ -25,6 +31,11 @@ import {
   type TabSessionSummary,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
+import {
+  PLUGIN_CONTROL_EVENT,
+  PLUGIN_CONTROL_EVENTS_SUBSCRIBE,
+  PLUGIN_CONTROL_ID,
+} from '../plugins/rpc-envelope'
 import { PromptObserver } from '../prompts/prompt-observer'
 import { type LoopTabView, runStatusDetectionLoop } from '../pty/assistant-status-detection-loop'
 import { lastNonBlankLine } from '../pty/last-line'
@@ -38,8 +49,8 @@ import {
   deleteFromCatalog,
   removeWorkspaceFromCatalog,
 } from './catalog-writer'
-import { emitDaemonEvent } from './daemon-events'
-import { type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
+import { emitDaemonEvent, onDaemonEvent } from './daemon-events'
+import { DAEMON_EVENT_NAMES, type DaemonPluginHost, startDaemonPluginHost } from './plugin-host'
 import { createDaemonContextExtender } from './plugin-services'
 import {
   consumeDaemonHandoff,
@@ -260,6 +271,40 @@ export async function runDaemon(): Promise<void> {
   // deciding whether project/workspace mutations go via broadcast (UI does
   // the write) or via catalog-writer (daemon does the write).
   const thinAttachers = new Set<Socket>()
+  // Sockets that asked for the daemon's events as NDJSON — `aimux events
+  // follow`. Thin by nature, so `broadcastPluginEvent` never reaches them;
+  // this is the one fanout that does.
+  const eventFollowers = new Set<Socket>()
+
+  /**
+   * `tab:added` carries a whole `TabSession`; on the wire to a shell script
+   * the scrollback and the viewport are dead weight. Everything else passes
+   * through as the plugin bus sees it.
+   */
+  const slimEventPayload = (payload: unknown): unknown => {
+    if (typeof payload !== 'object' || payload === null) return payload
+    const record = payload as Record<string, unknown>
+    if (typeof record.tab !== 'object' || record.tab === null) return payload
+    const { buffer: _buffer, viewport: _viewport, ...tab } = record.tab as Record<string, unknown>
+    return { ...record, tab }
+  }
+  const forwardEventToFollowers = (event: string, payload: unknown): void => {
+    if (eventFollowers.size === 0) return
+    const message: ServerEvent = {
+      payload: {
+        payload: { at: new Date().toISOString(), event, payload: slimEventPayload(payload) },
+        pluginId: PLUGIN_CONTROL_ID,
+        verb: PLUGIN_CONTROL_EVENT,
+      },
+      type: 'pluginEvent',
+    }
+    for (const socket of eventFollowers) send(socket, message)
+  }
+  const unfollowEvents = DAEMON_EVENT_NAMES.map((event) =>
+    onDaemonEvent(event, (payload) => {
+      forwardEventToFollowers(event, payload)
+    })
+  )
 
   // Per-tab registry so the status-detection loop can poll every terminal
   // continuously, not just the one the UI is currently attached to.
@@ -669,6 +714,51 @@ export async function runDaemon(): Promise<void> {
     return tabId
   }
 
+  /**
+   * What `addWorkspaceRecord` / `removeWorkspaceRecord` do, as functions the
+   * request handlers and the plugin services share: relayed to the attached
+   * UI when there is one — its reducer owns the write — and applied to the
+   * catalog directly otherwise.
+   */
+  const recordWorkspaceAdded = (targetProjectId: string, workspace: WorkspaceRecord): void => {
+    emitDaemonEvent('workspace:added', { projectId: targetProjectId, workspace })
+    if (countUiAttachers() > 0) {
+      broadcastAllVersioned(12, {
+        payload: { projectId: targetProjectId, workspace },
+        type: 'workspaceAdded',
+      })
+      logDebug('daemon.request.addWorkspaceRecord.relay', {
+        projectId: targetProjectId,
+        workspaceId: workspace.id,
+      })
+    } else {
+      addWorkspaceToCatalog(targetProjectId, workspace)
+      logDebug('daemon.request.addWorkspaceRecord.direct', {
+        projectId: targetProjectId,
+        workspaceId: workspace.id,
+      })
+    }
+  }
+  const recordWorkspaceRemoved = (targetProjectId: string, workspaceId: string): void => {
+    emitDaemonEvent('workspace:removed', { projectId: targetProjectId, workspaceId })
+    if (countUiAttachers() > 0) {
+      broadcastAllVersioned(12, {
+        payload: { projectId: targetProjectId, workspaceId },
+        type: 'workspaceRemoved',
+      })
+      logDebug('daemon.request.removeWorkspaceRecord.relay', {
+        projectId: targetProjectId,
+        workspaceId,
+      })
+    } else {
+      removeWorkspaceFromCatalog(targetProjectId, workspaceId)
+      logDebug('daemon.request.removeWorkspaceRecord.direct', {
+        projectId: targetProjectId,
+        workspaceId,
+      })
+    }
+  }
+
   let pluginHost: DaemonPluginHost | null = null
   try {
     pluginHost = await startDaemonPluginHost({
@@ -695,6 +785,16 @@ export async function runDaemon(): Promise<void> {
         },
         spawnTab: spawnTabForPlugin,
         tabs: () => tabRegistry,
+        workspaces: {
+          addWorkspaceRecord: async (targetProjectId, workspace) => {
+            recordWorkspaceAdded(targetProjectId, workspace)
+          },
+          liveTabs: async (targetProjectId) => listTabsForProject(targetProjectId),
+          removeWorkspaceRecord: async (targetProjectId, workspaceId) => {
+            recordWorkspaceRemoved(targetProjectId, workspaceId)
+          },
+          supportsWorkspaceLifecycle: () => true,
+        },
         write: async (tabId, data) => {
           const entry = tabRegistry.get(tabId)
           if (!entry) throw new Error(`unknown tab: ${tabId}`)
@@ -1307,32 +1407,26 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'addWorkspaceRecord': {
-                  emitDaemonEvent('workspace:added', {
-                    projectId: message.payload.projectId,
-                    workspace: message.payload.workspace,
-                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { projectId: targetProjectId, workspace } = message.payload
-                  if (countUiAttachers() > 0) {
-                    broadcastAllVersioned(12, {
-                      payload: { projectId: targetProjectId, workspace },
-                      type: 'workspaceAdded',
-                    })
-                    logDebug('daemon.request.addWorkspaceRecord.relay', {
-                      projectId: targetProjectId,
-                      workspaceId: workspace.id,
-                    })
-                  } else {
-                    addWorkspaceToCatalog(targetProjectId, workspace)
-                    logDebug('daemon.request.addWorkspaceRecord.direct', {
-                      projectId: targetProjectId,
-                      workspaceId: workspace.id,
-                    })
-                  }
+                  recordWorkspaceAdded(message.payload.projectId, message.payload.workspace)
                   sendOk(socket, message.id)
                   break
                 }
                 case 'pluginRequest': {
+                  if (
+                    message.payload.pluginId === PLUGIN_CONTROL_ID &&
+                    message.payload.verb === PLUGIN_CONTROL_EVENTS_SUBSCRIBE
+                  ) {
+                    // Answered here, not in the host: the host routes by verb
+                    // and never sees a socket, and this reply is "yes, *you*".
+                    eventFollowers.add(socket)
+                    send(socket, {
+                      id: message.id,
+                      payload: { result: { events: [...DAEMON_EVENT_NAMES], subscribed: true } },
+                      type: 'pluginResult',
+                    })
+                    break
+                  }
                   if (!pluginHost) {
                     throw new Error('plugin host is not running in this daemon')
                   }
@@ -1345,28 +1439,8 @@ export async function runDaemon(): Promise<void> {
                   break
                 }
                 case 'removeWorkspaceRecord': {
-                  emitDaemonEvent('workspace:removed', {
-                    projectId: message.payload.projectId,
-                    workspaceId: message.payload.workspaceId,
-                  })
                   requireNegotiatedVersion(socket, negotiatedVersions)
-                  const { projectId: targetProjectId, workspaceId } = message.payload
-                  if (countUiAttachers() > 0) {
-                    broadcastAllVersioned(12, {
-                      payload: { projectId: targetProjectId, workspaceId },
-                      type: 'workspaceRemoved',
-                    })
-                    logDebug('daemon.request.removeWorkspaceRecord.relay', {
-                      projectId: targetProjectId,
-                      workspaceId,
-                    })
-                  } else {
-                    removeWorkspaceFromCatalog(targetProjectId, workspaceId)
-                    logDebug('daemon.request.removeWorkspaceRecord.direct', {
-                      projectId: targetProjectId,
-                      workspaceId,
-                    })
-                  }
+                  recordWorkspaceRemoved(message.payload.projectId, message.payload.workspaceId)
                   sendOk(socket, message.id)
                   break
                 }
@@ -1396,6 +1470,7 @@ export async function runDaemon(): Promise<void> {
       attachedProjects.delete(socket)
       negotiatedVersions.delete(socket)
       thinAttachers.delete(socket)
+      eventFollowers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
     socket.on('error', () => {
@@ -1404,6 +1479,7 @@ export async function runDaemon(): Promise<void> {
       attachedProjects.delete(socket)
       negotiatedVersions.delete(socket)
       thinAttachers.delete(socket)
+      eventFollowers.delete(socket)
       if (sockets.size === 0) updateTmBroadcastForClientCount(0)
     })
   })
@@ -1551,6 +1627,7 @@ export async function runDaemon(): Promise<void> {
   const gracefulShutdown = (signal: string) => {
     logDebug(`daemon.${signal}`)
     statusLoop.stop()
+    for (const unfollow of unfollowEvents) unfollow()
     if (pluginHost) void pluginHost.stop()
     if (hookServer) {
       void hookServer.stop()

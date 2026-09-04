@@ -1,12 +1,16 @@
 import { basename } from 'node:path'
 
+import type { ModeId } from '../../input/modes/types'
 import type { AppAction } from '../actions'
 import type { AppState } from '../types'
 
 import { collectHelpEntries } from '../../input/keymap/help-entries'
+import { KeymapModeHandler } from '../../input/keymap/keymap-mode-handler'
 import { getActiveKeymap } from '../../input/keymap/keymap-ref'
+import { getHandler } from '../../input/modes/registry'
 import { getAllAssistantOptions } from '../../pty/command-registry'
 import { filterSettingRows } from '../../settings/search'
+import { findSettingRow } from '../../settings/sections'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
 import {
@@ -882,6 +886,43 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           type: 'setting-text',
         },
       }
+    case 'open-setting-keybind-modal':
+      return {
+        ...state,
+        focusMode: 'command-edit',
+        modal: {
+          captured: [],
+          conflict: null,
+          editBuffer: null,
+          mode: action.mode,
+          projectTargetId: null,
+          returnTo: 'settings',
+          selectedIndex: 0,
+          settingId: action.settingId,
+          settingLabel: action.label,
+          type: 'setting-keybind',
+        },
+      }
+    case 'keybind-capture-pop':
+      if (state.modal.type !== 'setting-keybind') return state
+      return {
+        ...state,
+        modal: { ...state.modal, captured: state.modal.captured.slice(0, -1), conflict: null },
+      }
+    case 'keybind-capture-push': {
+      if (state.modal.type !== 'setting-keybind') return state
+      const captured = [...state.modal.captured, action.chord]
+      const handler = getHandler(state.modal.mode as ModeId)
+      const found = handler instanceof KeymapModeHandler ? handler.trie.find(captured) : null
+      const row = findSettingRow(state.modal.settingId, state.projects)
+      const own =
+        row?.kind === 'keybind' && row.storage === 'plugin'
+          ? found?.pluginId === row.pluginId && found.bindingId === row.field
+          : false
+      const conflict =
+        found !== null && !own ? (found.description ?? found.group ?? 'existing binding') : null
+      return { ...state, modal: { ...state.modal, captured, conflict } }
+    }
     case 'open-rename-tab-modal': {
       const activeTab =
         state.activeTabId != null && state.activeTabId !== ''

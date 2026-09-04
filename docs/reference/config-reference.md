@@ -126,6 +126,23 @@ Important runtime facts:
 
 See `../guide/keymaps.md` for notation and merge semantics.
 
+Plugin declarations accept `enabled`, `config`, and `keymaps`:
+
+```ts
+plugins: [
+  {
+    id: 'aimux-examples.pulse',
+    enabled: true,
+    config: { days: 30 },
+    keymaps: { open: '<leader>u', close: null },
+  },
+]
+```
+
+Each keymap key is the contribution's stable `id` (or its `action` when `id`
+is omitted). `null` explicitly unbinds it. The hand-written file outranks the
+registry written by the UI and CLI.
+
 ## `projectBar`
 
 Status: `Supported`

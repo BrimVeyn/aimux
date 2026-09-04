@@ -48,6 +48,7 @@ export interface PluginRegistryEntry {
 export interface PluginOverride {
   enabled?: boolean
   config?: Record<string, unknown>
+  keymaps?: Record<string, string | null | undefined>
 }
 
 export interface PluginRegistry {
@@ -79,6 +80,14 @@ function parseOverride(id: string, value: unknown, issues: string[]): PluginOver
   else if (value.enabled !== undefined) issues.push(`overrides.${id}.enabled: not a boolean`)
   if (isRecord(value.config)) override.config = value.config
   else if (value.config !== undefined) issues.push(`overrides.${id}.config: not an object`)
+  if (isRecord(value.keymaps)) {
+    const keymaps: Record<string, string | null> = {}
+    for (const [key, binding] of Object.entries(value.keymaps)) {
+      if (typeof binding === 'string' || binding === null) keymaps[key] = binding
+      else issues.push(`overrides.${id}.keymaps.${key}: not a string or null`)
+    }
+    override.keymaps = keymaps
+  } else if (value.keymaps !== undefined) issues.push(`overrides.${id}.keymaps: not an object`)
   return override
 }
 
@@ -233,8 +242,18 @@ export function setPluginOverride(id: string, patch: PluginOverride): boolean {
     if (Object.keys(config).length === 0) delete next.config
     else next.config = config
   }
+  if (patch.keymaps !== undefined) {
+    const keymaps = { ...current.keymaps }
+    for (const [key, value] of Object.entries(patch.keymaps)) {
+      if (value === undefined) delete keymaps[key]
+      else keymaps[key] = value
+    }
+    if (Object.keys(keymaps).length === 0) delete next.keymaps
+    else next.keymaps = keymaps
+  }
 
-  if (next.enabled === undefined && next.config === undefined) delete registry.overrides[id]
+  if (next.enabled === undefined && next.config === undefined && next.keymaps === undefined)
+    delete registry.overrides[id]
   else registry.overrides[id] = next
   return savePluginRegistry(registry)
 }

@@ -31,7 +31,10 @@ function hintsFor(row: SettingRow | null): [string, string][] {
     hints.push(['←/→', 'adjust'])
   }
   if (row != null && row.kind !== 'info') {
-    hints.push(['↵', row.kind === 'number' || row.kind === 'text' ? 'type a value' : 'change'])
+    let action = 'change'
+    if (row.kind === 'keybind') action = 'capture'
+    else if (row.kind === 'number' || row.kind === 'text') action = 'type a value'
+    hints.push(['↵', action])
   }
   hints.push(['r', 'reset'], ['/', 'search'], ['} {', 'section'], ['esc', 'close'])
   return hints
@@ -84,7 +87,11 @@ function rangeOf(row: SettingRow): string {
  * path is the one kind of value that does not fit its column, and it is also
  * the one you most need to read before changing it.
  */
-function FullValue({ row }: { row: Extract<SettingRow, { kind: 'text' | 'action' | 'info' }> }) {
+function FullValue({
+  row,
+}: {
+  row: Extract<SettingRow, { kind: 'text' | 'keybind' | 'action' | 'info' }>
+}) {
   const t = useTheme()
   const values = useSettingsStore((s) => s.values)
   const value = useAppStore((s) => readRow(row, { state: s, values }))

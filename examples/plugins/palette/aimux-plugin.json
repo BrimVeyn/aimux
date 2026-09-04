@@ -1,0 +1,31 @@
+{
+  "id": "aimux-examples.palette",
+  "name": "Command palette",
+  "version": "1.0.0",
+  "description": "Everything plugins have made runnable, in one list you can run from",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx"
+  },
+  "contributes": {
+    "keymaps": [
+      { "mode": "navigation", "key": "<leader>c", "action": "open" },
+      { "mode": "plugin.pane.aimux-examples.palette.commands", "key": "j", "action": "down" },
+      { "mode": "plugin.pane.aimux-examples.palette.commands", "key": "k", "action": "up" },
+      { "mode": "plugin.pane.aimux-examples.palette.commands", "key": "<CR>", "action": "run" },
+      { "mode": "plugin.pane.aimux-examples.palette.commands", "key": "r", "action": "refresh" },
+      {
+        "id": "close-q",
+        "mode": "plugin.pane.aimux-examples.palette.commands",
+        "key": "q",
+        "action": "close"
+      },
+      {
+        "id": "close-escape",
+        "mode": "plugin.pane.aimux-examples.palette.commands",
+        "key": "<Esc>",
+        "action": "close"
+      }
+    ]
+  }
+}

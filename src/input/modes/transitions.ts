@@ -23,6 +23,7 @@ const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
   'modal.quotas': ['navigation', 'terminal-input'],
   'modal.rename-tab': ['navigation'],
   'modal.rename-workspace': ['navigation'],
+  'modal.setting-keybind': ['settings'],
   'modal.setting-text': ['settings'],
   'modal.settings-search.filtering': ['settings'],
   'modal.snippet-editor': ['navigation', 'modal.snippet-picker.filtering'],
@@ -62,6 +63,7 @@ const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
   'settings': [
     'navigation',
     'modal.setting-text',
+    'modal.setting-keybind',
     'modal.settings-search.filtering',
     'modal.theme-picker.filtering',
     'modal.snippet-picker.filtering',

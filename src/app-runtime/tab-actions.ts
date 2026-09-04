@@ -248,7 +248,8 @@ export function startExistingTab(ctx: SideEffectContext, tab: TabSession): void 
 export function executeSplitPane(
   ctx: SideEffectContext,
   direction: SplitDirection,
-  tab: TabSession
+  tab: TabSession,
+  options: Pick<StartTabSessionOptions, 'autoRenameCandidate' | 'cwd'> = {}
 ): void {
   const { dispatch, state } = ctx
   const activeTabId = state.activeTabId
@@ -264,8 +265,11 @@ export function executeSplitPane(
 
   dispatch({ direction, newTab: tab, type: 'split-pane' })
   startTabSession(ctx, tab, {
+    ...(options.autoRenameCandidate === undefined
+      ? {}
+      : { autoRenameCandidate: options.autoRenameCandidate }),
     cols: Math.max(1, (paneRect?.cols ?? state.layout.terminalCols) - PANE_BORDER * 2),
-    cwd: getTabProjectPath(ctx, tab),
+    cwd: options.cwd ?? getTabProjectPath(ctx, tab),
     rows: Math.max(1, (paneRect?.rows ?? state.layout.terminalRows) - PANE_BORDER * 2),
   })
 }

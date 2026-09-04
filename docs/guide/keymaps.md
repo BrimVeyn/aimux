@@ -282,3 +282,11 @@ filter sub-modes) accepts **all** of the following as equivalent prev / next
 shortcuts: `j` / `k` (where the mode isn't already bound), arrow `Up` /
 `Down`, and `Ctrl+N` / `Ctrl+P`. Use whichever fits your flow — including
 inside filter fields that otherwise pass keystrokes through to the buffer.
+
+## Plugin shortcuts
+
+Plugin manifests may contribute shortcuts with a stable `id` and a human
+`description`. Override them in the plugin drawer, with `aimux plugin bind`, or
+in `aimux.config.ts` through `plugins[].keymaps`. Precedence is manifest default,
+then `aimux-plugins.json`, then `aimux.config.ts`; `null` means unbound. Resolved
+plugin shortcuts appear in help and contextual key hints alongside native ones.

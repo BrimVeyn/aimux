@@ -1,0 +1,35 @@
+{
+  "id": "aimux-examples.lazygit",
+  "name": "lazygit",
+  "version": "1.0.0",
+  "description": "lazygit in a pane beside your agent, in the workspace you are in",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx"
+  },
+  "config": {
+    "direction": {
+      "type": "string",
+      "label": "Split direction",
+      "description": "`vertical` puts lazygit beside the agent, `horizontal` under it.",
+      "default": "vertical"
+    }
+  },
+  "panes": [
+    {
+      "id": "git",
+      "title": "lazygit",
+      "command": ["lazygit"],
+      "cwd": "workspace"
+    }
+  ],
+  "contributes": {
+    "keymaps": [
+      {
+        "mode": "navigation",
+        "key": "<leader>g",
+        "action": "toggle"
+      }
+    ]
+  }
+}

@@ -551,6 +551,18 @@ aimux plugin install <owner/repo[/subdir]> [--yes] [--dry-run]
 aimux plugin uninstall <id> [--purge]
 -> { id, removed, uninstalled, configKept, daemon }
 
+aimux plugin search [query] [--limit N]
+-> { query, topic, total, results: [{ spec, name, description, stars, url, updatedAt }] }
+
+aimux plugin update [id] [--yes] [--force]
+-> { daemon, plugins: [{ id, origin, from, to, updated, reason? }] }
+
+aimux plugin services
+-> { services: [{ pluginId, id, state, pid, restarts, lastExitCode, command }] }
+
+aimux plugin restart-service <plugin-id> <service-id>
+-> { pluginId, serviceId, restarted }
+
 aimux plugin enable <id>
 aimux plugin disable <id>
 -> { id, enabled, source, storedIn, shadowedBy, daemon }
@@ -637,6 +649,30 @@ that executes plugin code; nothing it runs touches the running aimux.
 Secrets declared with `"secret": true` in the manifest are printed as
 `<secret>` by `list`.
 
+`search` queries GitHub for repositories tagged `aimux-plugin` — the topic is
+the index, and tagging a repository is how a plugin gets listed. `update`
+re-fetches every installed plugin from its recorded `origin` and replaces the
+copy when the manifest version moved; it needs `--yes` to actually install,
+for the same reason `install` does, and reports a linked plugin as not its
+business. `services` and `restart-service` are the `services[]` half of the
+manifest: processes the daemon supervises, with their pid, state and restart
+count — the answer to "is my relay running" that `plugin list` cannot give,
+because a service is not a fiber.
+
+### `aimux events`
+
+```
+aimux events follow [--filter NAME|PREFIX*] [--count N] [--timeout MS]
+-> NDJSON: { type: "subscribed", events: [...] }
+          { type: "event", event, at, payload, ts } …
+```
+
+The daemon's events — every name a daemon plugin can `ctx.on(...)` — as one
+JSON line each, for a shell script, a Go binary, a phone relay: the way out of
+the process for the remote / mobile / telemetry family, with no SDK. Attaches
+thin, so it does not make the daemon render. `tab:added` is sent without the
+tab's scrollback and viewport. Exit 124 on `--timeout`.
+
 ### `aimux ui`, `aimux keymap`, `aimux action`
 
 What the interface is showing, what a key does, and running an action without
@@ -654,7 +690,15 @@ aimux keymap resolve <keys> [--mode MODE]
 
 aimux action run <pluginId>.<verb>
 -> { attached, name, ran, actions, effects, reason? }
+
+aimux action list
+-> { attached, commands: [{ kind: "action" | "exec" | "cli", id, pluginId, title, description? }] }
 ```
+
+`action list` is everything runnable plugins have contributed, in one list:
+actions with the title they registered under, manifest `commands[]`, and CLI
+verbs. It is what a command palette is built from, and how an agent checks
+that the action it registered is findable rather than merely registered.
 
 Each bar widget comes back with `visible`, `grow`, `renderable` and
 `placedBy`. `renderable` is the one that matters when something is missing: a
@@ -714,3 +758,16 @@ Runtime-oriented commands use the active profile namespace. That affects:
 Commands such as `aimux version` and `aimux --help` exit early and do not
 need to load profile-scoped runtime state. See `runtime-paths.md` for the
 exact path rules.
+
+### `plugin keymaps`, `plugin bind`, `plugin unbind`
+
+```sh
+aimux plugin keymaps <id>
+aimux plugin bind <id> <binding-id> '<notation>'
+aimux plugin bind <id> <binding-id> --reset
+aimux plugin unbind <id> <binding-id>
+```
+
+`keymaps` prints the resolved binding list with `default`, `registry`, or
+`config` origins. `unbind` stores `null`; `--reset` removes the registry layer.
+An `aimux.config.ts` value still wins and is reported as `shadowedBy`.

@@ -20,4 +20,5 @@ export const CLI_GROUPS: ReadonlySet<string> = new Set([
   'ui',
   'keymap',
   'action',
+  'events',
 ])

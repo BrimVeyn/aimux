@@ -34,13 +34,28 @@ export const PLUGIN_CONTROL_CLI_RUN = 'cli:run'
 export const PLUGIN_CONTROL_UI_STATE = 'ui:state'
 export const PLUGIN_CONTROL_KEYMAP_RESOLVE = 'keymap:resolve'
 export const PLUGIN_CONTROL_ACTION_RUN = 'action:run'
+/** Everything runnable plugins contributed — actions, `commands[]`, CLI verbs. */
+export const PLUGIN_CONTROL_ACTION_LIST = 'action:list'
 
-/** The three above, for the daemon's forwarding switch. */
+/** The verbs above, for the daemon's forwarding switch. */
 export const PLUGIN_CONTROL_UI_VERBS: readonly string[] = [
   PLUGIN_CONTROL_UI_STATE,
   PLUGIN_CONTROL_KEYMAP_RESOLVE,
   PLUGIN_CONTROL_ACTION_RUN,
+  PLUGIN_CONTROL_ACTION_LIST,
 ]
+
+/** Supervised `services[]` across every plugin; see `src/plugins/service-supervisor.ts`. */
+export const PLUGIN_CONTROL_SERVICE_LIST = 'service:list'
+export const PLUGIN_CONTROL_SERVICE_RESTART = 'service:restart'
+/**
+ * Asks the daemon to stream its events to *this* socket as `pluginEvent`
+ * messages under the control id and the verb below. Answered in `daemon.ts`
+ * rather than by the plugin host, because only the socket layer knows which
+ * connection asked.
+ */
+export const PLUGIN_CONTROL_EVENTS_SUBSCRIBE = 'events:subscribe'
+export const PLUGIN_CONTROL_EVENT = 'event'
 
 export const PLUGIN_CONTROL_EXEC_LIST = 'exec:list'
 /** Spawns one manifest command; see `src/plugins/exec-adapter.ts`. */

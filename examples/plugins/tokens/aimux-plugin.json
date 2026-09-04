@@ -1,0 +1,22 @@
+{
+  "id": "aimux-examples.tokens",
+  "name": "Tokens",
+  "version": "1.0.0",
+  "description": "What the conversation in front of you has spent, and a key to resume it",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "warnAt": {
+      "type": "number",
+      "label": "Warn at",
+      "description": "Total tokens (input + output + cache) after which the tab gets one warning. 0 disables it.",
+      "default": 5000000
+    }
+  },
+  "contributes": {
+    "keymaps": [{ "mode": "navigation", "key": "<leader>R", "action": "resume" }]
+  }
+}

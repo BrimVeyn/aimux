@@ -12,6 +12,7 @@ import { listExecCommands, runExecCommand } from '../plugins/exec-adapter'
 import { PluginRuntime } from '../plugins/loader'
 import {
   isReplyEnvelope,
+  PLUGIN_CONTROL_ACTION_LIST,
   PLUGIN_CONTROL_ACTION_RUN,
   PLUGIN_CONTROL_CLI_RUN,
   PLUGIN_CONTROL_EXEC_LIST,
@@ -21,9 +22,12 @@ import {
   PLUGIN_CONTROL_LIST,
   PLUGIN_CONTROL_REFRESH,
   PLUGIN_CONTROL_RELOAD,
+  PLUGIN_CONTROL_SERVICE_LIST,
+  PLUGIN_CONTROL_SERVICE_RESTART,
   PLUGIN_CONTROL_UI_STATE,
   PLUGIN_RPC_REPLY_VERB,
 } from '../plugins/rpc-envelope'
+import { ServiceSupervisor } from '../plugins/service-supervisor'
 import { type DaemonEventName, onDaemonEvent } from './daemon-events'
 
 /**
@@ -50,7 +54,7 @@ const OUTBOUND_CALL_TIMEOUT_MS = 10_000
  * list *is* the published vocabulary: adding an event to `DaemonEvents` should
  * be a decision to expose it, not a side effect of declaring it.
  */
-const DAEMON_EVENT_NAMES: readonly DaemonEventName[] = [
+export const DAEMON_EVENT_NAMES: readonly DaemonEventName[] = [
   'tab:status',
   'tab:turnComplete',
   'tab:prompt',
@@ -90,6 +94,8 @@ export interface DaemonPluginHostOptions {
 
 export interface DaemonPluginHost {
   runtime: PluginRuntime
+  /** The processes `services[]` asked for, and their state. */
+  services: () => ReturnType<ServiceSupervisor['statuses']>
   /** Routes an incoming `pluginRequest`. Resolves with the `pluginResult` body. */
   handleRequest: (pluginId: string, verb: string, payload: unknown) => Promise<unknown>
   /** Publishes a host event onto the daemon-side bus. */
@@ -141,6 +147,10 @@ export async function startDaemonPluginHost(
     },
   }
 
+  // Services follow records, not fibers: a plugin with `services[]` and no
+  // `entries.daemon` never gets a fiber here, and still gets its process.
+  const supervisor = new ServiceSupervisor()
+
   const runtime = new PluginRuntime({
     ...(options.extendContext === undefined ? {} : { extendContext: options.extendContext }),
     builtins: options.builtins,
@@ -149,6 +159,9 @@ export async function startDaemonPluginHost(
       for (const issue of issues) {
         logDebug('daemon.plugin.issue', { ...issue })
       }
+    },
+    onRecordsChange: (records) => {
+      supervisor.reconcile(records)
     },
     transport,
     userPlugins: options.userPlugins,
@@ -204,6 +217,18 @@ export async function startDaemonPluginHost(
       }
       case PLUGIN_CONTROL_EXEC_LIST:
         return { commands: listExecCommands(runtime.knownRecords()) }
+      case PLUGIN_CONTROL_SERVICE_LIST:
+        return { services: supervisor.statuses() }
+      case PLUGIN_CONTROL_SERVICE_RESTART: {
+        const request = payload as { pluginId?: string; serviceId?: string }
+        const restarted = supervisor.restart(String(request.pluginId), String(request.serviceId))
+        if (!restarted) {
+          throw new Error(
+            `no such service: ${String(request.pluginId)}/${String(request.serviceId)}`
+          )
+        }
+        return { restarted: true }
+      }
       case PLUGIN_CONTROL_EXEC_RUN: {
         const request = payload as {
           pluginId?: string
@@ -238,7 +263,8 @@ export async function startDaemonPluginHost(
       }
       case PLUGIN_CONTROL_UI_STATE:
       case PLUGIN_CONTROL_KEYMAP_RESOLVE:
-      case PLUGIN_CONTROL_ACTION_RUN: {
+      case PLUGIN_CONTROL_ACTION_RUN:
+      case PLUGIN_CONTROL_ACTION_LIST: {
         // Only the UI knows any of this. Forwarded rather than answered, and a
         // missing UI is an answer — `attached: false` — not a timeout: a CLI
         // that hangs for thirty seconds because nobody is looking at aimux is
@@ -294,6 +320,7 @@ export async function startDaemonPluginHost(
     },
     issues: () => runtime.issues,
     runtime,
+    services: () => supervisor.statuses(),
     statuses: () => runtime.statuses(),
     stop: async () => {
       for (const [, entry] of pending) {
@@ -302,6 +329,7 @@ export async function startDaemonPluginHost(
       }
       pending.clear()
       for (const dispose of unbridge) dispose()
+      supervisor.dispose()
       await runtime.stop()
     },
   }

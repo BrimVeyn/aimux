@@ -2,6 +2,7 @@ import type { PluginDefinition, PluginHost, PluginManifest } from '@brimveyn/aim
 
 import type { PluginRecord } from './types'
 
+import { describePluginKeymaps } from './config-origin'
 import { formatManifestIssues, parseManifest, resolvePluginConfig } from './manifest'
 import { getPluginPaths } from './paths'
 
@@ -98,9 +99,19 @@ export interface BuiltinRecordsResult {
 export function buildBuiltinRecords(
   builtins: readonly BuiltinPlugin[],
   /** `aimux.config.ts` entries, by id. The hand-written layer; outranks all. */
-  userOverrides: ReadonlyMap<string, { enabled?: boolean; config?: Record<string, unknown> }>,
+  userOverrides: ReadonlyMap<
+    string,
+    { enabled?: boolean; config?: Record<string, unknown>; keymaps?: Record<string, string | null> }
+  >,
   /** The registry's `overrides` block: what the settings screen and the CLI write. */
-  registryOverrides: ReadonlyMap<string, { enabled?: boolean; config?: Record<string, unknown> }>
+  registryOverrides: ReadonlyMap<
+    string,
+    {
+      enabled?: boolean
+      config?: Record<string, unknown>
+      keymaps?: Record<string, string | null | undefined>
+    }
+  >
 ): BuiltinRecordsResult {
   const records: PluginRecord[] = []
   const issues: BuiltinRecordsResult['issues'] = []
@@ -140,6 +151,10 @@ export function buildBuiltinRecords(
       enabled: user?.enabled ?? registry?.enabled ?? true,
       enabledFrom: enabledOrigin(user?.enabled, registry?.enabled),
       id: parsed.manifest.id,
+      keymaps: describePluginKeymaps(parsed.manifest, {
+        ...(registry === undefined ? {} : { override: registry }),
+        ...(user?.keymaps === undefined ? {} : { userConfig: user.keymaps }),
+      }),
       manifest: parsed.manifest,
       paths: getPluginPaths(parsed.manifest.id, BUILTIN_ROOT),
       root: BUILTIN_ROOT,

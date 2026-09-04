@@ -7,17 +7,18 @@
  * aggregate per workspace is dispatched into `AppState.workspaceActivity` —
  * which is what the sidebar draws for every project, current or not.
  *
- * Both notification sounds are triggered from here so the glyph and the sound
- * can never disagree about what happened:
+ * Both notifications are raised from here so the glyph and the sound can
+ * never disagree about what happened (a plugin sink may deliver them instead
+ * of the sound; see `ui/notifications.ts`):
  *   - a tab entering `waiting-input` (the agent is asking something),
  *   - a tab completing a turn (the daemon's settled end-of-turn signal).
  * Neither fires for the tab you are looking at.
  */
 import type { TabActivity } from '../state/types'
 
-import { playNotificationSound } from '../settings/sections/notifications'
 import { appStore } from '../state/app-store'
 import { dispatchGlobal } from '../state/dispatch-ref'
+import { notifyTurnComplete, notifyWaitingInput } from '../ui/notifications'
 
 interface Entry {
   status: TabActivity
@@ -91,7 +92,7 @@ export function recordTabStatus(
     previous?.status !== 'waiting-input' &&
     !isBeingWatched(tabId)
   ) {
-    playNotificationSound()
+    notifyWaitingInput(tabId, known)
   }
 }
 
@@ -122,7 +123,7 @@ export function recordTurnComplete(tabId: string, workspaceId: string | undefine
   // The workspace tick says where to look; this says which tab rang. A no-op
   // for a tab this client doesn't hold — its workspace row is the answer there.
   dispatchGlobal({ tabId, type: 'mark-tab-unseen' })
-  playNotificationSound()
+  notifyTurnComplete(tabId, workspaceId)
 }
 
 export function forgetTabActivity(tabId: string): void {

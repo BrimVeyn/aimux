@@ -10,7 +10,8 @@ import type { SettingCtx, SettingRow } from '../../src/settings/types'
 import { SECRET_PLACEHOLDER } from '../../src/plugins/config-origin'
 import { clearPluginStore, publishPluginRecords } from '../../src/plugins/plugin-store'
 import { getPluginOverride, setPluginOverride } from '../../src/plugins/registry-file'
-import { buildPluginConfigSection } from '../../src/settings/plugin-config-rows'
+import { pluginConfigRows } from '../../src/settings/plugin-config-rows'
+import { isExpanded, toggleDrawer } from '../../src/settings/plugin-drawers'
 import { PLUGINS_SECTION } from '../../src/settings/sections/plugins'
 import { readRow, resetRow, writeRow } from '../../src/settings/settings-store'
 import { createInitialState } from '../../src/state/store'
@@ -47,6 +48,7 @@ function record(config: Record<string, unknown>): PluginRecord {
     enabled: true,
     enabledFrom: 'default',
     id: 'acme.thing',
+    keymaps: [],
     manifest: MANIFEST,
     paths: { config: '/c', log: '/l', root: '/r', state: '/s' },
     root: '/r',
@@ -58,8 +60,7 @@ function rowsOf(
   config: Record<string, unknown>,
   userConfig?: Record<string, unknown>
 ): SettingRow[] {
-  const section = buildPluginConfigSection(record(config), userConfig)
-  return section === null ? [] : (section.rows as SettingRow[])
+  return pluginConfigRows(record(config), userConfig)
 }
 
 function rowNamed(rows: SettingRow[], field: string): SettingRow {
@@ -100,7 +101,7 @@ describe('rows generated from a manifest schema', () => {
     // A heading with nothing under it is what the cursor logic goes out of its
     // way to avoid.
     const bare = { ...record({}), manifest: { ...MANIFEST, config: undefined } }
-    expect(buildPluginConfigSection(bare, undefined)).toBeNull()
+    expect(pluginConfigRows(bare, undefined)).toEqual([])
   })
 
   test('reading goes to the resolved value, not to the settings block', () => {
@@ -157,20 +158,21 @@ describe('the marks a plugin row carries', () => {
 })
 
 describe('the Plugins section', () => {
-  test('two rows per plugin, and rowCount agrees without building them', () => {
+  test('one closed drawer per plugin, and rowCount agrees without building them', () => {
     publishPluginRecords([record({}), { ...record({}), id: 'acme.other' }], [])
 
     const rows = typeof PLUGINS_SECTION.rows === 'function' ? PLUGINS_SECTION.rows([]) : []
     // The reducer counts rows without building them; a disagreement would put
     // the cursor on a row nobody drew.
-    expect(rows).toHaveLength(4)
-    expect(PLUGINS_SECTION.rowCount?.([])).toBe(4)
+    expect(rows).toHaveLength(2)
+    expect(PLUGINS_SECTION.rowCount?.([])).toBe(2)
   })
 
   test('the switch reads the record and writes an override', () => {
     publishPluginRecords([record({})], [])
+    if (!isExpanded('acme.thing')) toggleDrawer('acme.thing')
     const rows = typeof PLUGINS_SECTION.rows === 'function' ? PLUGINS_SECTION.rows([]) : []
-    const toggle = rows[0]
+    const toggle = rows[1]
     if (!toggle) throw new Error('no toggle row')
 
     expect(readRow(toggle, CTX)).toBe(true)

@@ -159,6 +159,32 @@ export interface PluginPane {
   render: () => PluginNode
 }
 
+/**
+ * A pane that hosts a *program* rather than React: lazygit, yazi, a Rust TUI
+ * the plugin ships. Same story the daemon's `commands[]` tells — a plugin in
+ * any language — applied to the interface.
+ *
+ * Opening one spawns the argv in a terminal pane aimux owns on the plugin's
+ * behalf: it is a real PTY tab, so it takes the keyboard like any terminal
+ * does. The pane outlives a reload of the plugin (a re-registration under the
+ * same id adopts it) and dies with the plugin (unlink, uninstall, disable). A
+ * program that exits leaves a pane that says so, and `Ctrl+r` restarts it.
+ */
+export interface PluginCommandPane {
+  /** Unqualified; the host prefixes the plugin id. */
+  id: string
+  /** Drawn in the pane's border and in the tab strip. */
+  title: string
+  /** argv, not a shell string — no quoting rules to get wrong. */
+  command: string[]
+  /**
+   * Where to run it. `workspace` (the default) is the active workspace's
+   * directory, `project` the project's, `plugin` the plugin's own root; any
+   * other value is taken as an absolute path.
+   */
+  cwd?: 'workspace' | 'project' | 'plugin' | (string & {})
+}
+
 export interface PluginPanesApi {
   /**
    * Declares a pane: a leaf in the layout tree that draws something other than
@@ -169,6 +195,12 @@ export interface PluginPanesApi {
    * Registering does not put it on screen; `open` does.
    */
   register: (pane: PluginPane) => Disposer
+  /**
+   * Declares a pane that runs a program. The manifest's `panes[]` block is the
+   * same declaration without a line of TypeScript. `open` and `close` take the
+   * same unqualified id either way.
+   */
+  registerCommand: (pane: PluginCommandPane) => Disposer
   /**
    * Splits the pane the user is in and puts this one beside it. Takes the
    * unqualified id. Opening one that is already open does nothing: the id is
@@ -181,8 +213,112 @@ export interface PluginPanesApi {
    * in its own mode — `plugin.pane.<pluginId>.<id>`.
    */
   open: (id: string, direction?: 'horizontal' | 'vertical') => void
-  /** Takes it off screen. The layout collapses as it would for a closed tab. */
+  /**
+   * Takes it off screen. The layout collapses as it would for a closed tab.
+   * For a command pane this also kills the program.
+   */
   close: (id: string) => void
+  /**
+   * Which command panes are on screen right now, by unqualified id. A React
+   * pane is either registered or not; a command pane also has a process, and
+   * a plugin that wants to toggle one needs to know.
+   */
+  openCommandPanes: () => string[]
+}
+
+/** The layout of one group, as a plugin reads it. Same shape aimux persists. */
+export type PluginLayoutNode =
+  | { type: 'leaf'; id: string; kind: 'tab' | 'plugin' }
+  | {
+      type: 'split'
+      direction: 'horizontal' | 'vertical'
+      ratio: number
+      first: PluginLayoutNode
+      second: PluginLayoutNode
+    }
+
+export type PluginPaneDirection = 'left' | 'right' | 'up' | 'down'
+
+/**
+ * The layout as an API rather than as keys. Every verb here is one the
+ * keyboard already has, dispatched through the same reducer, so a plugin
+ * cannot reach a layout the user could not have made by hand.
+ *
+ * Everything acts on the pane holding the keyboard unless a `tabId` says
+ * otherwise; nothing here throws for a pane that cannot move, because a
+ * key press does not either.
+ */
+export interface PluginLayoutApi {
+  /** Splits the active pane and puts a new terminal beside it, same assistant. */
+  split: (direction: 'horizontal' | 'vertical') => void
+  /** Moves the keyboard to the neighbouring pane. */
+  focus: (direction: PluginPaneDirection) => void
+  /** Exchanges the active pane with its neighbour in that direction. */
+  swap: (direction: PluginPaneDirection) => void
+  /** Nudges the split the active pane sits in. `delta` is in steps, ±1 typically. */
+  resize: (delta: number, axis: 'horizontal' | 'vertical') => void
+  /** Closes a pane — the active one when no id is given. Kills its process. */
+  close: (tabId?: string) => void
+  /** The active group's tree, or null when the active tab is not split. */
+  tree: () => PluginLayoutNode | null
+  /** Every pane id in the active group, in draw order. One id when unsplit. */
+  panes: () => string[]
+}
+
+/** What a notification says. */
+export interface PluginNotification {
+  title: string
+  message?: string
+  level?: 'info' | 'success' | 'warning' | 'error'
+}
+
+/**
+ * A notification aimux is about to make — its own (`waiting-input`,
+ * `turn-complete`) or one a plugin raised (`custom`). What a sink receives.
+ */
+export interface PluginNotificationEvent extends PluginNotification {
+  kind: 'waiting-input' | 'turn-complete' | 'custom'
+  tabId?: string
+  workspaceId?: string
+  /** The plugin that raised it; absent on aimux's own. */
+  pluginId?: string
+}
+
+export interface PluginNotificationsApi {
+  /** Shows a toast — or hands it to the sink, when a plugin provides one. */
+  notify: (notification: PluginNotification) => void
+  /**
+   * Replaces aimux's own notifications: the sound on an agent asking a
+   * question or finishing a turn stops playing, and every event — aimux's
+   * and other plugins' — lands here instead. A ntfy or Telegram plugin
+   * *replaces* the native toast rather than doubling it.
+   *
+   * One plugin at a time, on the `provideCommitMessage` model: the second to
+   * ask is refused and told so in its log.
+   */
+  provide: (sink: (event: PluginNotificationEvent) => void | Promise<void>) => Disposer
+}
+
+/** One entry of what `ctx.commands.list()` enumerates. */
+export interface PluginCommandEntry {
+  /** `action` runs in the UI, `exec` is a manifest `commands[]` subprocess, `cli` an `aimux <group> <verb>`. */
+  kind: 'action' | 'exec' | 'cli'
+  /** The name to run it by: the qualified action, `<pluginId> <commandId>`, or `<group> <verb>`. */
+  id: string
+  pluginId: string
+  title: string
+  description?: string
+}
+
+/**
+ * Everything runnable that plugins have contributed, in one list. Without it
+ * a command palette written by a third party has nothing to show; with it,
+ * `run` fires an action the way its key would.
+ */
+export interface PluginCommandsApi {
+  list: () => PluginCommandEntry[]
+  /** Runs an `action` entry by its qualified id. Returns false when nothing answered. */
+  run: (id: string) => boolean
 }
 
 export interface PluginStatusBarSegment {
@@ -329,9 +465,33 @@ export interface PluginCommitMessage {
   body?: string
 }
 
+export interface PluginGitCommitInput {
+  title: string
+  body?: string
+}
+
 export interface PluginGitApi {
   /** The panel's last refresh. */
   status: () => PluginGitStatus
+  /**
+   * The diff of one file, unified. `staged` reads the index against HEAD; the
+   * default reads the working tree against the index, which is what the
+   * panel shows for an unstaged file. Empty for an untracked file — git has
+   * nothing to compare it with — so read the file itself in that case.
+   */
+  diff: (path: string, options?: { staged?: boolean }) => Promise<string>
+  /** `git add -- <paths>`. Rejects with git's own message on failure. */
+  stage: (paths: readonly string[]) => Promise<void>
+  /** `git restore --staged -- <paths>`. */
+  unstage: (paths: readonly string[]) => Promise<void>
+  /**
+   * Throws away working-tree changes: `git checkout --` for a tracked file,
+   * deletion for an untracked one. There is no undo, which is why it takes
+   * paths rather than "everything".
+   */
+  discard: (paths: readonly string[]) => Promise<void>
+  /** Commits what is staged. Rejects when nothing is, with git's own words. */
+  commit: (input: PluginGitCommitInput) => Promise<void>
   /**
    * Answers "what should this commit say", replacing the headless model call
    * aimux would otherwise make. Return `null` to decline this one — aimux falls
@@ -366,6 +526,8 @@ export interface PluginUiApi {
   themes: PluginThemesApi
   toast: PluginToastApi
   panes: PluginPanesApi
+  layout: PluginLayoutApi
+  notifications: PluginNotificationsApi
   state: PluginStateApi
   stats: PluginStatsApi
   statusBar: PluginStatusBarApi
@@ -376,13 +538,22 @@ export interface PluginUiApi {
  * Keyboard actions and their effects. Registered by unqualified verb; a user's
  * keymap binds the qualified name with `k.plugin('acme.thing.open')`.
  */
+/** What a palette shows for an action. Optional: an action without one lists under its verb. */
+export interface PluginActionMeta {
+  title?: string
+  description?: string
+}
+
 export interface PluginActionsApi {
   /**
    * The action a key produces. Receives the mode context and returns a
    * `KeyResult` — the same value a built-in binding produces — or null for
    * "not handled here".
+   *
+   * `meta` gives it a title. An action with one is something a palette can
+   * list and a user can find; without it the verb is all anyone sees.
    */
-  register: (verb: string, handler: (ctx: unknown) => unknown) => Disposer
+  register: (verb: string, handler: (ctx: unknown) => unknown, meta?: PluginActionMeta) => Disposer
   /**
    * The side of a binding that is allowed to do things: spawn a tab, write a
    * file, call out. Reached from an action's `KeyResult` as a `plugin-effect`.

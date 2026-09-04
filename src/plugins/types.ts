@@ -1,6 +1,7 @@
 import type { PluginHost, PluginManifest, PluginPaths } from '@brimveyn/aimux-plugin'
 
 import type { BuiltinHalfLoader } from './builtin'
+import type { ResolvedPluginKeymap } from './config-origin'
 
 /**
  * How aimux came to know about a plugin. It decides two things: whether the
@@ -33,6 +34,7 @@ export interface PluginRecord {
    */
   enabledFrom: 'default' | 'registry' | 'config'
   config: Record<string, unknown>
+  keymaps: ResolvedPluginKeymap[]
   paths: PluginPaths
   /**
    * Present only for `source: 'builtin'`: the halves come from the binary

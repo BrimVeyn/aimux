@@ -49,6 +49,9 @@ Declare what the interface should do with it in the manifest's `contributes`
 block — where the widget goes, which key runs the action — rather than telling
 the user to edit `aimux.config.ts`. See `references/manifest.md`.
 
+Give each contributed keymap a stable `id` and concise `description`: users
+depend on the id for persisted overrides and see the description in key help.
+
 Then check your own work from outside, which is the half that used to be
 impossible:
 

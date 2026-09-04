@@ -2,6 +2,7 @@ import type { SettingCtx, SettingRow, SettingValue } from '../settings/types'
 import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
+import { expandDrawer } from '../settings/plugin-drawers'
 import { filterSettingRows } from '../settings/search'
 import { findSettingRow } from '../settings/sections'
 import { readRow, resetRow, settingsStore, writeRow } from '../settings/settings-store'
@@ -115,6 +116,16 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
       // `-`/`+` have nothing to do on one.
       if (delta === undefined) openField(row, current)
       return
+    case 'keybind':
+      if (delta === undefined) {
+        dispatchGlobal({
+          label: row.label.trim(),
+          mode: row.description ?? 'navigation',
+          settingId: row.id,
+          type: 'open-setting-keybind-modal',
+        })
+      }
+      return
     case 'action':
       // Not a value, so a direction means nothing to it either.
       if (delta === undefined) row.run()
@@ -136,7 +147,13 @@ export function confirmSettingsSearch(runtime: SettingsContext): void {
   const hit = filterSettingRows(state.projects, state.modal.editBuffer)[state.modal.selectedIndex]
   dispatchGlobal({ type: 'close-modal' })
   if (!hit) return
-  dispatchGlobal({ rowIndex: hit.rowIndex, type: 'settings-select-row' })
+  if (hit.row.kind !== 'info' && hit.row.kind !== 'action' && hit.row.storage === 'plugin') {
+    expandDrawer(hit.row.pluginId)
+  }
+  const rowIndex = filterSettingRows(state.projects, null).findIndex(
+    (entry) => entry.row.id === hit.row.id
+  )
+  if (rowIndex >= 0) dispatchGlobal({ rowIndex, type: 'settings-select-row' })
 }
 
 /** Puts the selected row back to what it would be if this screen had never run. */
@@ -174,4 +191,15 @@ export function commitSettingText(
 
   if (row.kind !== 'text') return
   writeRow(row, value.trim(), ctx)
+}
+
+export function commitSettingKeybind(
+  runtime: SettingsContext,
+  settingId: string,
+  value: string
+): void {
+  const state = runtime.getState()
+  const row = findSettingRow(settingId, state.projects)
+  if (!row || row.kind !== 'keybind') return
+  writeRow(row, value, readCtx(state))
 }

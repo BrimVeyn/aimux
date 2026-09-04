@@ -1053,3 +1053,180 @@ thèmes ou des réglages d'écran (les surfaces existantes suffisent) ; laisser 
 plugin réserver une touche contre l'utilisateur ; un pilotage d'écran plus large
 que les trois verbes de C4 — le CLI doit rester l'œil de l'agent, pas devenir
 une seconde interface à maintenir.
+
+# Phase 9 · Accueillir une bibliothèque
+
+Planifiée le 2026-09-03, à partir d'une mesure extérieure plutôt que d'une
+envie : herdr a une bibliothèque de plugins publique, et la question n'est pas
+« notre API est-elle belle » mais **« ces plugins-là, on saurait les
+héberger ? »**
+
+Méthode : la marketplace de `herdr.dev/plugins` est rendue côté client, donc
+l'index a été pris à la source — le topic GitHub `herdr-plugin`, **954 dépôts**
+au 2026-09-03 (le site en annonce 919 sur 903 dépôts), dont les 120 premiers
+par étoiles ont été dépouillés un par un.
+
+## 9.0 Les neuf familles, et ce qu'aimux en ferait
+
+| Famille                              | Exemples herdr                                                                                       | Chez nous                                                                                                       |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Un pane qui héberge un programme** | file-viewer, sidebar, lazygit, yazi, nvim, ghzinga, gitview, jira, linear, browser, floax, hunk      | ❌ `ui.panes` ne rend que du React ; aucun leaf PTY appartenant à un plugin                                     |
+| **Layout et workspaces pilotables**  | spreader, sessionizer, resurrect, drovr, pane-mover, worktrunk, jj-workspace, zoxide, session-parker | ⚠️ `tabs.spawn/focus/close` seulement ; ni split ni move ni zoom, et `workspaces` est en lecture seule          |
+| **Hors-processus longue durée**      | remote, mobile-relay, connect, collie, watch, herdres, push, telemetry                               | ⚠️ `commands[]` est un argv one-shot avec timeout de 600 s ; pas de service supervisé, pas de flux d'événements |
+| **Introspection agent / session**    | agent-quota, token-dashboard, memex, catchup, agent-handoff, auto-retry, pings, agent-inbox          | ⚠️ `tab:turnComplete` et `metrics.counters` ; ni session id, ni transcript, ni quota provider                   |
+| **Notifications**                    | focus-notify, ntfysh, push, pings                                                                    | ❌ aucune API plugin                                                                                            |
+| **Palette de commandes**             | command-palette, command-center, navigator, herdr-bar, palette                                       | ⚠️ `actions.register(verb, handler)` : sans titre, et non énumérable                                            |
+| **Git et revue**                     | reviewr, hunk-diff, annotate, gitview, gh-pr, pr-tracker                                             | ⚠️ `ui.git.status()` en lecture, plus le fournisseur de message de commit                                       |
+| **Automatisation planifiée**         | routines, workflows, auto-pilot, PromptPilot                                                         | ❌ pas d'horloge dans le daemon                                                                                 |
+| **Distribution**                     | plugin-manager, herdr-lazy, plugins-directory                                                        | ✅ `plugin install owner/repo` ; ❌ ni `search`, ni `update`, ni index                                          |
+
+## 9.1 Le constat, qui n'est pas celui qu'on attendait
+
+Notre API est **déjà plus riche que celle de herdr** : noyau typé, deux
+moitiés, reload à chaud, `contributes`, `doctor`, kit de test, le CLI comme œil
+de l'agent. Un plugin herdr est un manifeste TOML et un processus ; le nôtre a
+des services injectables et un cycle de vie.
+
+Ce qui manque n'est donc pas de l'API, ce sont **trois surfaces** — et elles
+portent à elles seules la majorité des 954. Cinq des dix plugins herdr les plus
+étoilés sont un programme externe dans un pane ; c'est un seul trou, et c'est le
+plus gros.
+
+## 9.2 Décisions
+
+**D1 — Un pane peut héberger un processus, pas seulement du React.**
+`LayoutLeaf` a déjà `kind: 'plugin'` ; ce qui lui manque est un pane adossé à un
+PTY que le plugin possède et que la fibre ferme.
+
+```ts
+ctx.ui.panes.registerCommand({
+  id: 'lazygit',
+  title: 'lazygit',
+  command: ['lazygit'],
+  cwd: 'workspace', // ou un chemin absolu
+})
+ctx.ui.panes.open('lazygit', 'vertical')
+```
+
+Et le même en déclaratif dans le manifeste (`panes: [...]`), sans une ligne de
+TypeScript. C'est exactement l'histoire que l'`exec-adapter` donne déjà au
+daemon — « un plugin dans n'importe quel langage » — appliquée à l'interface :
+un binaire Rust ou Go **à côté** d'un agent.
+
+**D2 — Le layout devient une API, pas seulement des touches.** `ctx.ui.layout`
+expose ce que le clavier fait déjà : `split`, `focusDirection`, `move`, `swap`,
+`zoom`, `resize`, `close`, et `apply(tree)` pour un layout déclaratif.
+`ctx.workspaces` gagne `create` / `remove` — le CLI les a déjà
+(`workspace/create-core.ts`), c'est la moitié plugin qui est restée en lecture
+seule.
+
+**D3 — Un plugin peut être un service, pas seulement une commande.**
+
+```jsonc
+{ "services": [{ "id": "relay", "command": ["./bin/relay"], "restart": "on-failure" }] }
+```
+
+Supervisé par le daemon, arrêté avec la fibre, redémarré selon `restart`. Le
+`commands[]` one-shot reste ce qu'il est ; un pont mobile n'est pas une
+commande qui finit.
+
+**D4 — Les événements sortent du processus.** `aimux events --follow` en
+NDJSON, sur les quatorze événements déjà publiés dans
+`daemon/plugin-host.ts` — la liste _est_ le vocabulaire, la décision de
+l'exposer est déjà prise. C'est la porte d'entrée de toute la famille
+mobile/remote/telemetry, dans n'importe quel langage, sans SDK.
+
+**D5 — Une notification a un fournisseur.** `ctx.notifications.notify(...)`,
+et surtout `provide(sink)` sur le modèle de `provideCommitMessage` : un plugin
+ntfy ou Telegram **remplace** le toast natif au lieu de le doubler. Un à la
+fois, le second est refusé et le sait.
+
+**D6 — Une action a un titre.** `actions.register` prend un titre et une
+description, et `ctx.commands.list()` agrège actions, `commands[]` et verbes
+CLI. Sans énumération, une palette écrite par un tiers n'a rien à lister — et
+c'est la famille qui revient le plus souvent après les panes.
+
+**D7 — L'installation ne change pas ; l'index, si.** `plugin install
+owner/repo` tient. Ce qui manque est le topic GitHub `aimux-plugin` comme
+convention, `plugin search` / `plugin update`, une page sur le site de docs, et
+un écran de gestion dans l'app.
+
+## 9.3 Chantiers, par ordre de dépendance
+
+**A · Le pane qui lance un programme** (≈ 2 semaines — le plus rentable).
+`registerCommand` + `panes:` au manifeste + le PTY tenu par la fibre. Tests :
+le pane survit à un reload de plugin, un unlink tue le processus, un programme
+qui meurt laisse un pane qui le dit plutôt qu'un rectangle vide.
+
+**B · Layout et workspaces** (≈ 2 semaines). D2. Les verbes existent déjà comme
+actions clavier ; le travail est de les rendre appelables et de les tester sans
+clavier, via `aimux action run`.
+
+**C · Commandes énumérables** (≈ 3 jours, à faire avec B). D6.
+
+**D · Services et flux d'événements** (≈ 1,5 semaine). D3 et D4.
+
+**E · Notifications** (≈ 3 jours). D5.
+
+**F · Session et usage de l'agent** (≈ 1 semaine).
+`ctx.assistants.session(tabId)` → `{ sessionId, transcriptPath, model }`,
+`usage(tabId)`, `resume(...)`. C'est ce qui manque à un tableau de bord de
+tokens, à un handoff, à une reprise après rate limit.
+
+**G · Git en écriture** (≈ 1 semaine). `diff(path, { staged })`, `stage`,
+`unstage`, `discard`, `commit`.
+
+**H · Distribution** (≈ 1 semaine). D7.
+
+**I · Isolation.** La moitié daemon dans un `Worker` Bun — déjà noté en phase
+5, et un service supervisé (D3) en réduit l'urgence sans la supprimer.
+
+## 9.4 Ordre proposé
+
+**A → B + C → D + E → F → G → H.** A, B et D sont le noyau de parité : après
+eux, un plugin herdr typique a un équivalent aimux écrivable. Le reste est du
+confort qui se rattrape plugin par plugin, quand un plugin réel le réclame.
+
+## 9.6 Avancement (2026-09-03)
+
+Implémenté en une passe, dans l'ordre A → B + C → D + E → F → G → H :
+
+- **A** `ctx.ui.panes.registerCommand` + `panes[]` au manifeste ; le pane est
+  un tab terminal marqué `pluginPane`, survit au reload, meurt à l'unlink,
+  reste à l'écran en disant que le programme est mort. Tests dans
+  `test/integration/plugin-command-panes.test.ts`.
+- **B** `ctx.ui.layout` (`split`, `focus`, `swap`, `resize`, `close`, `tree`,
+  `panes`) et `ctx.workspaces.create/remove` sur le noyau du CLI via un
+  `WorkspaceRegistrar`. `swap-pane` est une action nouvelle. Zoom et
+  `apply(tree)` laissés dehors — voir `docs/developer/plugins.md`.
+- **C** `actions.register(verb, handler, meta)`, `ctx.commands.list()`,
+  `aimux action list`.
+- **D** `services[]` supervisés (`ServiceSupervisor`, `aimux plugin services`,
+  `restart-service`) et `aimux events follow` en NDJSON.
+- **E** `ctx.ui.notifications.notify/provide` ; le son natif se tait quand un
+  plugin tient la fente.
+- **F** `ctx.assistants.session/usage/resume`.
+- **G** `ctx.ui.git.diff/stage/unstage/discard/commit`.
+- **H** `aimux plugin search` (topic GitHub `aimux-plugin`) et `plugin update`.
+- **I** non fait.
+
+## 9.5 Laissé dehors, exprès
+
+Une horloge dans le daemon pour la famille « routines » : un service de D3 avec
+son propre `setInterval` fait le travail, et un cron maison est une surface
+qu'on maintiendrait pour un plugin. Un protocole socket documenté hors CLI :
+la navigation nvim de herdr l'exige pour la latence, on verra après B si le CLI
+suffit. Et un bac à sable pour `build` — le consentement de `plugin install`
+reste ce qu'il est, on ne prétend pas mieux.
+
+# Phase 10 · Un tiroir par plugin, et des raccourcis qu'on règle
+
+La navigation des réglages ne génère plus une section par manifeste : la
+section unique `Plugins` contient un tiroir fermé par plugin. Ouvert, il garde
+ensemble activation, config, raccourcis et diagnostic CLI.
+
+Décisions livrées : D1 tiroirs hors `AppState`, D2 en-têtes `action`, D3 IDs et
+descriptions additives sous API v1, D4 résolution manifeste ← registre ←
+`aimux.config.ts` avec `null` pour délier, D5 capture dédiée, D6 aide fusionnée
+avec le trie vivant. Les écritures UI/CLI restent dans `aimux-plugins.json` et
+reconstruisent la fibre.

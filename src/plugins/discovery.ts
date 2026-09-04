@@ -9,6 +9,7 @@ import { version as APP_VERSION } from '../../package.json'
 import { logDebug } from '../debug/input-log'
 import { getProfileConfigDir } from '../profile-paths'
 import { buildBuiltinRecords, type BuiltinPlugin, enabledOrigin } from './builtin'
+import { describePluginKeymaps } from './config-origin'
 import {
   checkHostCompatibility,
   formatManifestIssues,
@@ -55,6 +56,7 @@ interface Candidate {
   /** Registry-provided config; the user-config layer is applied on top. */
   registryConfig?: Record<string, unknown>
   userConfig?: Record<string, unknown>
+  userKeymaps?: Record<string, string | null>
   /** Id as declared, when the caller claimed one. Checked against the manifest. */
   declaredId?: string
 }
@@ -133,6 +135,7 @@ function collectCandidates(
         ? {}
         : { registryConfig: existing.registryConfig }),
       ...(entry.config === undefined ? {} : { userConfig: entry.config }),
+      ...(entry.keymaps === undefined ? {} : { userKeymaps: entry.keymaps }),
     })
   }
 
@@ -238,6 +241,12 @@ export async function discoverPlugins(
       enabled: fromConfig ?? fromRegistry ?? true,
       enabledFrom: enabledOrigin(fromConfig, fromRegistry),
       id: manifest.id,
+      keymaps: describePluginKeymaps(manifest, {
+        ...(stored === undefined ? {} : { override: stored }),
+        ...((override?.keymaps ?? candidate.userKeymaps) === undefined
+          ? {}
+          : { userConfig: override?.keymaps ?? candidate.userKeymaps }),
+      }),
       manifest,
       paths: getPluginPaths(manifest.id, candidate.root),
       root: candidate.root,

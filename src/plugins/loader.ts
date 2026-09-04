@@ -33,6 +33,13 @@ export interface PluginRuntimeOptions {
   builtins?: readonly BuiltinPlugin[]
   onStatusChange?: (statuses: PluginStatus[]) => void
   /**
+   * Fired after every discovery with the fresh record set — what a host that
+   * owns something per *record* rather than per fiber (a supervised service,
+   * a declared pane) reconciles against. A fiber only exists for a plugin
+   * with an entry for this host; a record exists for every plugin.
+   */
+  onRecordsChange?: (records: readonly PluginRecord[]) => void
+  /**
    * Discovery problems: a missing directory, a malformed manifest, a config
    * value of the wrong type. Surfaced as toasts in the UI and on stderr in the
    * daemon log — never swallowed, because a plugin that silently does not load
@@ -110,6 +117,7 @@ export class PluginRuntime {
     if (issues.length > 0) this.options.onIssues?.(issues)
 
     await this.kernel.apply(records)
+    this.options.onRecordsChange?.(records)
     this.restartWatchers()
   }
 

@@ -146,7 +146,7 @@ export class PluginFiber {
     const stack = this.stack
     const kernel = this.kernel
 
-    return {
+    const ctx: PluginContext = {
       bail: async (event, payload) => kernel.bus.bail(event, payload),
       config: record.config,
       effect: (setup) => {
@@ -187,6 +187,8 @@ export class PluginFiber {
       service: <T = unknown>(name: string): T | undefined => kernel.services.get<T>(name),
       waterfall: async <T>(event: string, value: T) => kernel.bus.waterfall(event, value),
     }
+    ;(ctx as PluginContext & { record: PluginRecord }).record = record
+    return ctx
   }
 
   /**

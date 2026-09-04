@@ -129,6 +129,30 @@ export function removeNode(tree: LayoutNode, tabId: string): LayoutNode | null {
   return tree
 }
 
+/**
+ * The same tree with two leaves exchanged. Ids only: what each leaf holds
+ * (terminal or plugin pane) travels with it, so a plugin pane can be swapped
+ * beside an agent exactly as a terminal can.
+ */
+export function swapLeaves(tree: LayoutNode, a: string, b: string): LayoutNode {
+  if (a === b) return tree
+  const leafA = leaves(tree).find((leaf) => leaf.tabId === a)
+  const leafB = leaves(tree).find((leaf) => leaf.tabId === b)
+  if (!leafA || !leafB) return tree
+  const walk = (node: LayoutNode): LayoutNode => {
+    if (node.type === 'leaf') {
+      if (node.tabId === a) return leafB
+      if (node.tabId === b) return leafA
+      return node
+    }
+    const first = walk(node.first)
+    const second = walk(node.second)
+    if (first === node.first && second === node.second) return node
+    return { ...node, first, second }
+  }
+  return walk(tree)
+}
+
 export function findLeaf(tree: LayoutNode, tabId: string): boolean {
   if (tree.type === 'leaf') {
     return tree.tabId === tabId

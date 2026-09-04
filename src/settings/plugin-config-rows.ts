@@ -1,14 +1,14 @@
 import type { PluginConfigField } from '@brimveyn/aimux-plugin'
 
 import type { PluginRecord } from '../plugins/types'
-import type { PluginSettingRow, SettingRow, SettingSection, SettingValue } from './types'
+import type { PluginSettingRow, SettingRow, SettingValue } from './types'
 
 import {
   describePluginConfig,
+  describePluginKeymaps,
   type PluginConfigFieldReport,
   SECRET_PLACEHOLDER,
 } from '../plugins/config-origin'
-import { pluginStore } from '../plugins/plugin-store'
 import { getPluginOverride, setPluginOverride } from '../plugins/registry-file'
 import { refreshPluginsGlobal } from '../ui/plugin-refresh-ref'
 
@@ -34,7 +34,7 @@ const WRITE_SETTLE_MS = 300
 
 let settleTimer: ReturnType<typeof setTimeout> | null = null
 
-function scheduleRefresh(): void {
+export function scheduleRefresh(): void {
   if (settleTimer) clearTimeout(settleTimer)
   settleTimer = setTimeout(() => {
     settleTimer = null
@@ -59,7 +59,7 @@ function writeValue(pluginId: string, field: string, value: SettingValue | undef
   scheduleRefresh()
 }
 
-function rowFor(record: PluginRecord, report: PluginConfigFieldReport): PluginSettingRow {
+export function rowFor(record: PluginRecord, report: PluginConfigFieldReport): PluginSettingRow {
   const field = record.manifest.config?.[report.key]
   const base = {
     field: report.key,
@@ -68,7 +68,7 @@ function rowFor(record: PluginRecord, report: PluginConfigFieldReport): PluginSe
     fromConfigFile: report.shadowedBy !== undefined,
     id: pluginSettingRowId(record.id, report.key),
     isSet: report.isSet,
-    label: report.label,
+    label: `  ${report.label}`,
     pluginId: record.id,
     read: (): SettingValue => {
       const current = record.config[report.key]
@@ -111,42 +111,49 @@ function rowFor(record: PluginRecord, report: PluginConfigFieldReport): PluginSe
   }
 }
 
-/** The section for one plugin, or null when its manifest declares no config. */
-export function buildPluginConfigSection(
+export function pluginConfigRows(
   record: PluginRecord,
   userConfig: Record<string, unknown> | undefined
-): SettingSection | null {
+): SettingRow[] {
   const schema = record.manifest.config
-  if (!schema || Object.keys(schema).length === 0) return null
+  if (!schema || Object.keys(schema).length === 0) return []
 
   const override = getPluginOverride(record.id)
   const reports = describePluginConfig(record.manifest, record.config, {
     ...(override === undefined ? {} : { override }),
     ...(userConfig === undefined ? {} : { userConfig }),
   })
-  const rows: SettingRow[] = reports.map((report) => rowFor(record, report))
-
-  return {
-    // One cell, text presentation — the rule every section glyph follows.
-    glyph: '\u{2699}',
-    id: `plugin.${record.id}`,
-    label: record.manifest.name ?? record.id,
-    rows,
-    ...(record.manifest.description === undefined
-      ? {}
-      : { description: record.manifest.description }),
-  }
+  return reports.map((report) => rowFor(record, report))
 }
 
-/** A section per configurable plugin, in the order discovery found them. */
-export function pluginConfigSections(
-  userPlugins: readonly { id?: string; config?: Record<string, unknown> }[] = []
-): SettingSection[] {
-  const byId = new Map(userPlugins.filter((entry) => entry.id !== undefined).map((e) => [e.id, e]))
-  const sections: SettingSection[] = []
-  for (const record of pluginStore.getState().records) {
-    const section = buildPluginConfigSection(record, byId.get(record.id)?.config)
-    if (section) sections.push(section)
-  }
-  return sections
+export function pluginKeymapRows(
+  record: PluginRecord,
+  userConfig: Record<string, string | null> | undefined
+): SettingRow[] {
+  const override = getPluginOverride(record.id)
+  return describePluginKeymaps(record.manifest, {
+    ...(override === undefined ? {} : { override }),
+    ...(userConfig === undefined ? {} : { userConfig }),
+  }).map((binding) => ({
+    description: binding.mode,
+    field: binding.id,
+    fromConfigFile: binding.shadowedBy !== undefined,
+    id: `plugin.${record.id}.keymap.${binding.id}`,
+    isSet: binding.origin !== 'default',
+    kind: 'keybind' as const,
+    label: `  ${binding.description ?? binding.action}`,
+    pluginId: record.id,
+    read: () => binding.key ?? '',
+    reset: () => {
+      setPluginOverride(record.id, { keymaps: { [binding.id]: undefined } })
+      scheduleRefresh()
+    },
+    storage: 'plugin' as const,
+    write: (value: SettingValue) => {
+      setPluginOverride(record.id, {
+        keymaps: { [binding.id]: value === '' ? null : String(value) },
+      })
+      scheduleRefresh()
+    },
+  }))
 }

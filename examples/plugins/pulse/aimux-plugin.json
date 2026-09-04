@@ -19,11 +19,15 @@
   "contributes": {
     "keymaps": [
       {
+        "id": "open",
+        "description": "Open Pulse",
         "mode": "navigation",
         "key": "<leader>p",
         "action": "open"
       },
       {
+        "id": "close",
+        "description": "Close Pulse",
         "mode": "plugin.pane.aimux-examples.pulse.stats",
         "key": "q",
         "action": "close"

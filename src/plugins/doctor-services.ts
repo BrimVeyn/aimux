@@ -18,6 +18,8 @@ export interface DoctorRegistrations {
   views: string[]
   modals: string[]
   panes: string[]
+  /** Programs the plugin hosts in a pane — `ctx.ui.panes.registerCommand`. */
+  commandPanes: string[]
   themes: string[]
   statsPages: string[]
   statusBarSegments: string[]
@@ -31,6 +33,8 @@ export interface DoctorRegistrations {
   cliCommands: string[]
   /** True when the plugin installed a state reducer. */
   storeReducer: boolean
+  /** True when the plugin claimed the notification slot. */
+  notificationSink: boolean
 }
 
 export function emptyRegistrations(): DoctorRegistrations {
@@ -38,9 +42,11 @@ export function emptyRegistrations(): DoctorRegistrations {
     actions: [],
     assistants: [],
     cliCommands: [],
+    commandPanes: [],
     effects: [],
     hookRoutes: [],
     modals: [],
+    notificationSink: false,
     panes: [],
     settingsSections: 0,
     settingsWatched: [],
@@ -77,6 +83,23 @@ export function createDoctorExtender(
 
     if (host === 'ui') {
       extended.ui = {
+        git: {
+          commit: async () => {
+            throw new Error('plugin doctor does not write to git')
+          },
+          diff: async () => '',
+          discard: async () => {
+            throw new Error('plugin doctor does not write to git')
+          },
+          provideCommitMessage: () => noop,
+          stage: async () => {
+            throw new Error('plugin doctor does not write to git')
+          },
+          status: () => ({ ahead: 0, behind: 0, branch: null, files: [] }),
+          unstage: async () => {
+            throw new Error('plugin doctor does not write to git')
+          },
+        },
         kit: {
           KeyHint: () => null,
           List: () => null,
@@ -87,15 +110,35 @@ export function createDoctorExtender(
           // into a process that has no screen.
           useTheme: () => ({}),
         },
+        layout: {
+          close: noop,
+          focus: noop,
+          panes: () => [],
+          resize: noop,
+          split: noop,
+          swap: noop,
+          tree: () => null,
+        },
         modals: {
           close: noop,
           open: noop,
           register: (modal: { id: string }) => record(into.modals, modal.id),
         },
+        notifications: {
+          notify: noop,
+          provide: () => {
+            into.notificationSink = true
+            return () => {
+              into.notificationSink = false
+            }
+          },
+        },
         panes: {
           close: noop,
           open: noop,
+          openCommandPanes: () => [],
           register: (pane: { id: string }) => record(into.panes, pane.id),
+          registerCommand: (pane: { id: string }) => record(into.commandPanes, pane.id),
         },
         settings: {
           // `undefined` is the honest dry-run answer — nothing is set in a
@@ -152,6 +195,7 @@ export function createDoctorExtender(
         effect: (effectId: string) => record(into.effects, effectId),
         register: (verb: string) => record(into.actions, verb),
       }
+      extended.commands = { list: () => [], run: () => false }
       extended.store = {
         dispatch: noop,
         get: () => {
@@ -193,11 +237,28 @@ export function createDoctorExtender(
       },
       list: () => [],
     }
-    extended.workspaces = { list: () => [] }
+    extended.workspaces = {
+      create: async () => {
+        throw new Error('plugin doctor does not create workspaces')
+      },
+      list: () => [],
+      remove: async () => {
+        throw new Error('plugin doctor does not remove workspaces')
+      },
+    }
     extended.metrics = { counters: () => [] }
     extended.assistants = {
       register: (definition: { option: { id: string } }) =>
         record(into.assistants, definition.option.id),
+      resume: async () => {
+        throw new Error('plugin doctor does not respawn tabs')
+      },
+      session: () => {
+        /* nothing to find in a dry run */
+      },
+      usage: async () => {
+        /* nothing to find in a dry run */
+      },
     }
     extended.hooks = {
       route: (routeId: string) => record(into.hookRoutes, routeId),

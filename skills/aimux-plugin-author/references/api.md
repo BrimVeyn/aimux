@@ -99,6 +99,10 @@ export interface PluginBarContribution {
  * every plugin, here as everywhere else.
  */
 export interface PluginKeymapContribution {
+  /** Stable id used by user overrides. Defaults to `action`. */
+  id?: string
+  /** Human-readable label shown in settings and key help. */
+  description?: string
   /** Mode id, e.g. `navigation`, or the plugin's own pane mode. */
   mode: string
   /** Key notation, `<leader>` included. */
@@ -112,6 +116,38 @@ export interface PluginKeymapContribution {
 export interface PluginContributions {
   bars?: PluginBarContribution[]
   keymaps?: PluginKeymapContribution[]
+}
+```
+
+```ts
+/**
+ * A pane that runs a program, declared rather than registered — the manifest
+ * twin of `ctx.ui.panes.registerCommand`. `cwd` reads as it does there.
+ */
+export interface PluginCommandPaneSpec {
+  id: string
+  title?: string
+  /** argv, not a shell string. */
+  command: string[]
+  cwd?: string
+}
+```
+
+```ts
+/**
+ * A long-running process the daemon supervises: started when the plugin
+ * loads, stopped when it unloads, restarted according to `restart`. A relay,
+ * a watcher, a bridge — anything that is not a command that finishes.
+ *
+ * Runs with the same `AIMUX_*` environment as `commands[]`, so it can call
+ * back through the CLI in any language.
+ */
+export interface PluginServiceSpec {
+  id: string
+  /** argv, not a shell string. */
+  command: string[]
+  /** Default `on-failure`: a clean exit stays down, a crash comes back. */
+  restart?: 'never' | 'on-failure' | 'always'
 }
 ```
 
@@ -132,6 +168,10 @@ export interface PluginManifest {
   build?: string[][]
   config?: Record<string, PluginConfigField>
   commands?: PluginCommandSpec[]
+  /** Panes that host a program. Applied when the UI half loads — or, with no UI entry, at once. */
+  panes?: PluginCommandPaneSpec[]
+  /** Processes the daemon keeps alive for the plugin. */
+  services?: PluginServiceSpec[]
   /**
    * What the plugin asks the interface for: a place for its widget, a key for
    * its action. Applied by the host when the UI half loads, withdrawn when it
@@ -272,6 +312,7 @@ export interface UiPluginContext<Slice = unknown> extends PluginContext {
   readonly ui: PluginUiApi
   readonly actions: PluginActionsApi
   readonly store: PluginStoreApi<Slice>
+  readonly commands: PluginCommandsApi
 }
 ```
 
@@ -512,6 +553,34 @@ export interface PluginPane {
 ```
 
 ```ts
+/**
+ * A pane that hosts a *program* rather than React: lazygit, yazi, a Rust TUI
+ * the plugin ships. Same story the daemon's `commands[]` tells — a plugin in
+ * any language — applied to the interface.
+ *
+ * Opening one spawns the argv in a terminal pane aimux owns on the plugin's
+ * behalf: it is a real PTY tab, so it takes the keyboard like any terminal
+ * does. The pane outlives a reload of the plugin (a re-registration under the
+ * same id adopts it) and dies with the plugin (unlink, uninstall, disable). A
+ * program that exits leaves a pane that says so, and `Ctrl+r` restarts it.
+ */
+export interface PluginCommandPane {
+  /** Unqualified; the host prefixes the plugin id. */
+  id: string
+  /** Drawn in the pane's border and in the tab strip. */
+  title: string
+  /** argv, not a shell string — no quoting rules to get wrong. */
+  command: string[]
+  /**
+   * Where to run it. `workspace` (the default) is the active workspace's
+   * directory, `project` the project's, `plugin` the plugin's own root; any
+   * other value is taken as an absolute path.
+   */
+  cwd?: 'workspace' | 'project' | 'plugin' | (string & {})
+}
+```
+
+```ts
 export interface PluginPanesApi {
   /**
    * Declares a pane: a leaf in the layout tree that draws something other than
@@ -522,6 +591,12 @@ export interface PluginPanesApi {
    * Registering does not put it on screen; `open` does.
    */
   register: (pane: PluginPane) => Disposer
+  /**
+   * Declares a pane that runs a program. The manifest's `panes[]` block is the
+   * same declaration without a line of TypeScript. `open` and `close` take the
+   * same unqualified id either way.
+   */
+  registerCommand: (pane: PluginCommandPane) => Disposer
   /**
    * Splits the pane the user is in and puts this one beside it. Takes the
    * unqualified id. Opening one that is already open does nothing: the id is
@@ -534,8 +609,128 @@ export interface PluginPanesApi {
    * in its own mode — `plugin.pane.<pluginId>.<id>`.
    */
   open: (id: string, direction?: 'horizontal' | 'vertical') => void
-  /** Takes it off screen. The layout collapses as it would for a closed tab. */
+  /**
+   * Takes it off screen. The layout collapses as it would for a closed tab.
+   * For a command pane this also kills the program.
+   */
   close: (id: string) => void
+  /**
+   * Which command panes are on screen right now, by unqualified id. A React
+   * pane is either registered or not; a command pane also has a process, and
+   * a plugin that wants to toggle one needs to know.
+   */
+  openCommandPanes: () => string[]
+}
+```
+
+```ts
+/** The layout of one group, as a plugin reads it. Same shape aimux persists. */
+export type PluginLayoutNode =
+  | { type: 'leaf'; id: string; kind: 'tab' | 'plugin' }
+  | {
+      type: 'split'
+      direction: 'horizontal' | 'vertical'
+      ratio: number
+      first: PluginLayoutNode
+      second: PluginLayoutNode
+    }
+```
+
+```ts
+export type PluginPaneDirection = 'left' | 'right' | 'up' | 'down'
+```
+
+```ts
+/**
+ * The layout as an API rather than as keys. Every verb here is one the
+ * keyboard already has, dispatched through the same reducer, so a plugin
+ * cannot reach a layout the user could not have made by hand.
+ *
+ * Everything acts on the pane holding the keyboard unless a `tabId` says
+ * otherwise; nothing here throws for a pane that cannot move, because a
+ * key press does not either.
+ */
+export interface PluginLayoutApi {
+  /** Splits the active pane and puts a new terminal beside it, same assistant. */
+  split: (direction: 'horizontal' | 'vertical') => void
+  /** Moves the keyboard to the neighbouring pane. */
+  focus: (direction: PluginPaneDirection) => void
+  /** Exchanges the active pane with its neighbour in that direction. */
+  swap: (direction: PluginPaneDirection) => void
+  /** Nudges the split the active pane sits in. `delta` is in steps, ±1 typically. */
+  resize: (delta: number, axis: 'horizontal' | 'vertical') => void
+  /** Closes a pane — the active one when no id is given. Kills its process. */
+  close: (tabId?: string) => void
+  /** The active group's tree, or null when the active tab is not split. */
+  tree: () => PluginLayoutNode | null
+  /** Every pane id in the active group, in draw order. One id when unsplit. */
+  panes: () => string[]
+}
+```
+
+```ts
+/** What a notification says. */
+export interface PluginNotification {
+  title: string
+  message?: string
+  level?: 'info' | 'success' | 'warning' | 'error'
+}
+```
+
+```ts
+/**
+ * A notification aimux is about to make — its own (`waiting-input`,
+ * `turn-complete`) or one a plugin raised (`custom`). What a sink receives.
+ */
+export interface PluginNotificationEvent extends PluginNotification {
+  kind: 'waiting-input' | 'turn-complete' | 'custom'
+  tabId?: string
+  workspaceId?: string
+  /** The plugin that raised it; absent on aimux's own. */
+  pluginId?: string
+}
+```
+
+```ts
+export interface PluginNotificationsApi {
+  /** Shows a toast — or hands it to the sink, when a plugin provides one. */
+  notify: (notification: PluginNotification) => void
+  /**
+   * Replaces aimux's own notifications: the sound on an agent asking a
+   * question or finishing a turn stops playing, and every event — aimux's
+   * and other plugins' — lands here instead. A ntfy or Telegram plugin
+   * *replaces* the native toast rather than doubling it.
+   *
+   * One plugin at a time, on the `provideCommitMessage` model: the second to
+   * ask is refused and told so in its log.
+   */
+  provide: (sink: (event: PluginNotificationEvent) => void | Promise<void>) => Disposer
+}
+```
+
+```ts
+/** One entry of what `ctx.commands.list()` enumerates. */
+export interface PluginCommandEntry {
+  /** `action` runs in the UI, `exec` is a manifest `commands[]` subprocess, `cli` an `aimux <group> <verb>`. */
+  kind: 'action' | 'exec' | 'cli'
+  /** The name to run it by: the qualified action, `<pluginId> <commandId>`, or `<group> <verb>`. */
+  id: string
+  pluginId: string
+  title: string
+  description?: string
+}
+```
+
+```ts
+/**
+ * Everything runnable that plugins have contributed, in one list. Without it
+ * a command palette written by a third party has nothing to show; with it,
+ * `run` fires an action the way its key would.
+ */
+export interface PluginCommandsApi {
+  list: () => PluginCommandEntry[]
+  /** Runs an `action` entry by its qualified id. Returns false when nothing answered. */
+  run: (id: string) => boolean
 }
 ```
 
@@ -708,9 +903,35 @@ export interface PluginCommitMessage {
 ```
 
 ```ts
+export interface PluginGitCommitInput {
+  title: string
+  body?: string
+}
+```
+
+```ts
 export interface PluginGitApi {
   /** The panel's last refresh. */
   status: () => PluginGitStatus
+  /**
+   * The diff of one file, unified. `staged` reads the index against HEAD; the
+   * default reads the working tree against the index, which is what the
+   * panel shows for an unstaged file. Empty for an untracked file — git has
+   * nothing to compare it with — so read the file itself in that case.
+   */
+  diff: (path: string, options?: { staged?: boolean }) => Promise<string>
+  /** `git add -- <paths>`. Rejects with git's own message on failure. */
+  stage: (paths: readonly string[]) => Promise<void>
+  /** `git restore --staged -- <paths>`. */
+  unstage: (paths: readonly string[]) => Promise<void>
+  /**
+   * Throws away working-tree changes: `git checkout --` for a tracked file,
+   * deletion for an untracked one. There is no undo, which is why it takes
+   * paths rather than "everything".
+   */
+  discard: (paths: readonly string[]) => Promise<void>
+  /** Commits what is staged. Rejects when nothing is, with git's own words. */
+  commit: (input: PluginGitCommitInput) => Promise<void>
   /**
    * Answers "what should this commit say", replacing the headless model call
    * aimux would otherwise make. Return `null` to decline this one — aimux falls
@@ -749,6 +970,8 @@ export interface PluginUiApi {
   themes: PluginThemesApi
   toast: PluginToastApi
   panes: PluginPanesApi
+  layout: PluginLayoutApi
+  notifications: PluginNotificationsApi
   state: PluginStateApi
   stats: PluginStatsApi
   statusBar: PluginStatusBarApi
@@ -757,17 +980,24 @@ export interface PluginUiApi {
 ```
 
 ```ts
-/**
- * Keyboard actions and their effects. Registered by unqualified verb; a user's
- * keymap binds the qualified name with `k.plugin('acme.thing.open')`.
- */
+/** What a palette shows for an action. Optional: an action without one lists under its verb. */
+export interface PluginActionMeta {
+  title?: string
+  description?: string
+}
+```
+
+```ts
 export interface PluginActionsApi {
   /**
    * The action a key produces. Receives the mode context and returns a
    * `KeyResult` — the same value a built-in binding produces — or null for
    * "not handled here".
+   *
+   * `meta` gives it a title. An action with one is something a palette can
+   * list and a user can find; without it the verb is all anyone sees.
    */
-  register: (verb: string, handler: (ctx: unknown) => unknown) => Disposer
+  register: (verb: string, handler: (ctx: unknown) => unknown, meta?: PluginActionMeta) => Disposer
   /**
    * The side of a binding that is allowed to do things: spawn a tab, write a
    * file, call out. Reached from an action's `KeyResult` as a `plugin-effect`.
@@ -914,8 +1144,32 @@ export interface PluginProjectsApi {
 ```
 
 ```ts
+export interface PluginCreateWorkspaceInput {
+  projectId: string
+  name: string
+  /** Defaults to `aimux/<name>`. */
+  branch?: string
+  /** Base ref for the branch. Defaults to `HEAD`. */
+  base?: string
+}
+```
+
+```ts
 export interface PluginWorkspacesApi {
   list: (projectId: string) => PluginWorkspaceView[]
+  /**
+   * Creates a git worktree and its catalog record — what `aimux workspace
+   * create` does, from inside the daemon. Resolves with the record; rejects
+   * with the same messages the CLI prints, a base ref that does not exist
+   * included.
+   */
+  create: (input: PluginCreateWorkspaceInput) => Promise<PluginWorkspaceView>
+  /**
+   * Removes a worktree and its record. Refuses the primary workspace, and
+   * one with live tabs unless `force` says otherwise — a tab running in a
+   * directory that vanishes is a worse outcome than a rejected call.
+   */
+  remove: (projectId: string, workspaceId: string, options?: { force?: boolean }) => Promise<void>
 }
 ```
 
@@ -939,6 +1193,42 @@ export interface PluginMetricsApi {
 ```
 
 ```ts
+/** What aimux knows about the conversation behind a tab. */
+export interface PluginSessionInfo {
+  tabId: string
+  assistant: string
+  /** The vendor's conversation id, when the tab was spawned with one. */
+  sessionId: string | null
+  /** The transcript on disk, when the vendor writes one and it exists yet. */
+  transcriptPath: string | null
+  /** The `--model` the tab was spawned with, when one was given. */
+  model: string | null
+}
+```
+
+```ts
+/**
+ * Token usage of one conversation, read from its transcript. Cumulative
+ * across the whole session, which is what a token dashboard, a handoff
+ * threshold, or a "you are near the limit" nudge wants.
+ */
+export interface PluginSessionUsage {
+  tabId: string
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  total: number
+  /** Billed assistant messages seen. */
+  turns: number
+  /** Total tokens per model id. */
+  models: Record<string, number>
+  /** ISO time of the last billed message, or null with no usage yet. */
+  lastAt: string | null
+}
+```
+
+```ts
 export interface PluginAssistantsApi {
   /**
    * Registers a complete assistant: spawn command, status classifier, question
@@ -946,6 +1236,19 @@ export interface PluginAssistantsApi {
    * `src/pty/assistant-registry.ts` for the shape.
    */
   register: (definition: unknown) => Disposer
+  /** The conversation behind a tab, or undefined for an unknown tab. */
+  session: (tabId: string) => PluginSessionInfo | undefined
+  /**
+   * Reads the transcript. Zero everywhere for a tab whose assistant writes
+   * none, or has not written one yet; undefined for an unknown tab.
+   */
+  usage: (tabId: string) => Promise<PluginSessionUsage | undefined>
+  /**
+   * Closes the tab and spawns a fresh one resuming the same conversation —
+   * the move after a rate limit, a crashed CLI, or a handoff. Resolves with
+   * the new tab id. Rejects when the tab has no session to resume.
+   */
+  resume: (tabId: string) => Promise<string>
 }
 ```
 
@@ -1282,10 +1585,12 @@ export function createTestContext(options: TestContextOptions = {}): TestContext
       ui: unknown
       actions: unknown
       store: unknown
+      commands: unknown
     }
     extended.ui = surface.ui
     extended.actions = surface.actions
     extended.store = surface.store
+    extended.commands = surface.commands
   }
 
   options.extend?.(ctx)

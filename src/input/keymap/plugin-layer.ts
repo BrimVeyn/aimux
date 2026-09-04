@@ -28,6 +28,10 @@ import { KeyTrie, type TrieBinding } from './trie'
  */
 
 export interface PluginKeyBinding {
+  /** Stable binding id within the plugin. */
+  id?: string
+  /** Human-readable label used by help and conflict reporting. */
+  description?: string
   /** Mode id as the keymap writes it, e.g. `navigation`. */
   mode: string
   /** Key notation, `<leader>` included, e.g. `<leader>+`. */
@@ -105,7 +109,14 @@ export function registerKeymapLayer(
 
     // The action is resolved on every press, not here: the plugin's UI half
     // registers the verb during its own `apply`, which may be after this.
-    const entry: TrieBinding = { group: pluginId, pluginId, result: pluginAction(binding.action) }
+    const entry: TrieBinding = {
+      group: pluginId,
+      pluginAction: binding.action,
+      pluginId,
+      result: pluginAction(binding.action),
+      ...(binding.id === undefined ? {} : { bindingId: binding.id }),
+      ...(binding.description === undefined ? {} : { description: binding.description }),
+    }
     handler.trie.insert(sequence, entry)
     inserted.push({ binding: entry, sequence, trie: handler.trie })
     applied.push(binding)

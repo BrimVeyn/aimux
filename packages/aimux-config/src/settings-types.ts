@@ -34,6 +34,7 @@ type SettingKind =
   | { kind: 'number'; min: number; max: number; step: number }
   /** Activating it opens a one-field modal. Empty means "unset", not "empty string". */
   | { kind: 'text'; placeholder?: string }
+  | { kind: 'keybind' }
 
 interface SettingRowBase {
   id: string

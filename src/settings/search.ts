@@ -1,6 +1,7 @@
 import type { ProjectRecord } from '../state/types'
 import type { SettingRow } from './types'
 
+import { withAllExpanded } from './plugin-drawers'
 import { sectionRows, settingSections } from './sections'
 
 export interface SettingSearchHit {
@@ -24,6 +25,14 @@ export interface SettingSearchHit {
  * moves its cursor count the same list.
  */
 export function filterSettingRows(
+  projects: readonly ProjectRecord[],
+  query: string | null
+): SettingSearchHit[] {
+  if (query !== null) return withAllExpanded(() => collectSettingRows(projects, query))
+  return collectSettingRows(projects, query)
+}
+
+function collectSettingRows(
   projects: readonly ProjectRecord[],
   query: string | null
 ): SettingSearchHit[] {

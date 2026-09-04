@@ -2,7 +2,7 @@ import type { CliCommand } from '../../registry'
 
 import { SHARED_FLAGS } from '../../flags'
 import { EXIT_OK, writeJson } from '../../output'
-import { createProjectWorkspace } from './create-core'
+import { createProjectWorkspace, daemonWorkspaceRegistrar } from './create-core'
 
 export const workspaceCreate: CliCommand = {
   args: [],
@@ -39,7 +39,13 @@ export const workspaceCreate: CliCommand = {
 
     const project = ctx.getProject()
     const daemon = await ctx.getDaemon()
-    const record = await createProjectWorkspace({ base, branch, daemon, name, project })
+    const record = await createProjectWorkspace({
+      base,
+      branch,
+      daemon: daemonWorkspaceRegistrar(daemon),
+      name,
+      project,
+    })
 
     writeJson({
       branch: record.branch,

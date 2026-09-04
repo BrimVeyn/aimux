@@ -2,9 +2,11 @@ import type { EffectStack } from './effects'
 import type { Disposer } from './types'
 import type {
   PluginActionsApi,
+  PluginCommandsApi,
   PluginCommitMessage,
   PluginCommitMessageRequest,
   PluginGitStatus,
+  PluginNotificationEvent,
   PluginSettingValue,
   PluginStoreApi,
   PluginThemeSnapshot,
@@ -35,12 +37,16 @@ export interface TestUiRegistrations {
   views: string[]
   modals: string[]
   panes: string[]
+  /** Command panes — programs the plugin asked to host. */
+  commandPanes: string[]
   statusBar: string[]
   statsPages: string[]
   themes: string[]
   settingsSections: number
   /** Whether the plugin claimed the commit-message slot. */
   commitMessageProvider: boolean
+  /** Whether the plugin claimed the notification slot. */
+  notificationSink: boolean
   actions: string[]
   effects: string[]
 }
@@ -49,11 +55,18 @@ export interface TestUiSurface {
   ui: PluginUiApi
   actions: PluginActionsApi
   store: PluginStoreApi
+  commands: PluginCommandsApi
   registrations: TestUiRegistrations
   /** Everything `ctx.ui.toast` was asked to show, newest last. */
   toasts: { level: 'info' | 'success' | 'error'; message: string }[]
+  /** Everything `ctx.ui.notifications.notify` raised, newest last. */
+  notifications: { title: string; message?: string; level?: string }[]
   /** Panes and views the plugin asked to open or close, in order. */
   opened: string[]
+  /** Layout verbs the plugin called, in order — `split:vertical`, `focus:left`, … */
+  layoutCalls: string[]
+  /** Git writes the plugin asked for, in order — `stage:a.ts`, `commit:title`, … */
+  gitWrites: string[]
   /** Drives `ctx.ui.state`: set it, and subscribers hear about it. */
   setState: (next: Partial<PluginUiState>) => void
   /** Drives `ctx.ui.settings.watch` and what `get` answers. */
@@ -70,6 +83,13 @@ export interface TestUiSurface {
   askForCommitMessage: (
     request?: Partial<PluginCommitMessageRequest>
   ) => Promise<PluginCommitMessage | null>
+  /**
+   * Delivers an event to the sink the plugin provided, as aimux would on an
+   * agent finishing a turn. Throws when it provided none.
+   */
+  deliverNotification: (event: PluginNotificationEvent) => Promise<void>
+  /** Drives `ctx.ui.git.diff`. */
+  setGitDiff: (path: string, diff: string) => void
 }
 
 const EMPTY_STATE: PluginUiState = {
@@ -99,9 +119,11 @@ const nothing = (): null => null
 export function createTestUiSurface(effects: EffectStack): TestUiSurface {
   const registrations: TestUiRegistrations = {
     actions: [],
+    commandPanes: [],
     commitMessageProvider: false,
     effects: [],
     modals: [],
+    notificationSink: false,
     panes: [],
     settingsSections: 0,
     statsPages: [],
@@ -111,7 +133,12 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
     widgets: [],
   }
   const toasts: TestUiSurface['toasts'] = []
+  const notifications: TestUiSurface['notifications'] = []
   const opened: string[] = []
+  const layoutCalls: string[] = []
+  const gitWrites: string[] = []
+  const diffs = new Map<string, string>()
+  let notificationSink: ((event: PluginNotificationEvent) => void | Promise<void>) | null = null
 
   let state: PluginUiState = EMPTY_STATE
   const stateListeners = new Set<(next: PluginUiState) => void>()
@@ -150,6 +177,13 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
 
   const ui: PluginUiApi = {
     git: {
+      commit: async (input) => {
+        gitWrites.push(`commit:${input.title}`)
+      },
+      diff: async (path) => diffs.get(path) ?? '',
+      discard: async (paths) => {
+        gitWrites.push(`discard:${paths.join(',')}`)
+      },
       provideCommitMessage: (provider) => {
         commitProvider = provider
         registrations.commitMessageProvider = true
@@ -160,7 +194,13 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
         effects.add(dispose)
         return dispose
       },
+      stage: async (paths) => {
+        gitWrites.push(`stage:${paths.join(',')}`)
+      },
       status: () => git,
+      unstage: async (paths) => {
+        gitWrites.push(`unstage:${paths.join(',')}`)
+      },
     },
     kit: {
       KeyHint: nothing,
@@ -169,16 +209,42 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
       Row: nothing,
       useTheme: () => theme.colors,
     },
+    layout: {
+      close: (tabId) => layoutCalls.push(`close:${tabId ?? 'active'}`),
+      focus: (direction) => layoutCalls.push(`focus:${direction}`),
+      panes: () => (state.activeTabId === null ? [] : [state.activeTabId]),
+      resize: (delta, axis) => layoutCalls.push(`resize:${axis}:${delta}`),
+      split: (direction) => layoutCalls.push(`split:${direction}`),
+      swap: (direction) => layoutCalls.push(`swap:${direction}`),
+      tree: () => null,
+    },
     modals: {
       close: () => opened.push('modal:close'),
       open: (id) => opened.push(`modal:${id}`),
       register: (modal) => record(registrations.modals, modal.id),
     },
     navigate: (screen) => opened.push(`screen:${screen}`),
+    notifications: {
+      notify: (notification) => {
+        notifications.push(notification)
+      },
+      provide: (sink) => {
+        notificationSink = sink
+        registrations.notificationSink = true
+        const dispose = (): void => {
+          if (notificationSink === sink) notificationSink = null
+          registrations.notificationSink = false
+        }
+        effects.add(dispose)
+        return dispose
+      },
+    },
     panes: {
       close: (id) => opened.push(`pane:close:${id}`),
       open: (id) => opened.push(`pane:${id}`),
+      openCommandPanes: () => [],
       register: (pane) => record(registrations.panes, pane.id),
+      registerCommand: (pane) => record(registrations.commandPanes, pane.id),
     },
     settings: {
       get: (id) => settings.get(id),
@@ -236,6 +302,17 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
     register: (verb) => record(registrations.actions, verb),
   }
 
+  const commands: PluginCommandsApi = {
+    list: () =>
+      registrations.actions.map((verb) => ({
+        id: verb,
+        kind: 'action' as const,
+        pluginId: 'test',
+        title: verb,
+      })),
+    run: () => false,
+  }
+
   const store: PluginStoreApi = {
     dispatch: () => {
       /* a slice reducer is the plugin's; a bare context has none to run */
@@ -260,8 +337,19 @@ export function createTestUiSurface(effects: EffectStack): TestUiSurface {
       if (commitProvider === null) throw new Error('the plugin registered no commit provider')
       return commitProvider({ ...EMPTY_REQUEST, ...request }, new AbortController().signal)
     },
+    commands,
+    deliverNotification: async (event) => {
+      if (notificationSink === null) throw new Error('the plugin provided no notification sink')
+      await notificationSink(event)
+    },
+    gitWrites,
+    layoutCalls,
+    notifications,
     opened,
     registrations,
+    setGitDiff: (path, diff) => {
+      diffs.set(path, diff)
+    },
     setGitStatus: (status) => {
       git = status
     },

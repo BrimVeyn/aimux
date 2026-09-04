@@ -43,6 +43,7 @@ import {
 import { getSelectedAssistantOption, getSelectedProject, getSelectedSnippet } from './selection'
 import {
   changeSelectedSetting,
+  commitSettingKeybind,
   commitSettingText,
   confirmSettingsSearch,
   resetSelectedSetting,
@@ -644,6 +645,10 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
     }
     case 'commit-setting-text': {
       commitSettingText(ctx, effect.settingId, effect.value)
+      return
+    }
+    case 'commit-setting-keybind': {
+      commitSettingKeybind(ctx, effect.settingId, effect.value)
       return
     }
     // The one arm the core does not implement: routed to whichever plugin

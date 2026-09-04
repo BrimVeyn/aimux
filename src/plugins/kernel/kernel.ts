@@ -52,6 +52,7 @@ export interface PluginKernelOptions {
 function recordChanged(previous: PluginRecord, next: PluginRecord): boolean {
   if (previous.root !== next.root) return true
   if (previous.manifest.version !== next.manifest.version) return true
+  if (JSON.stringify(previous.keymaps) !== JSON.stringify(next.keymaps)) return true
   const before = Object.keys(previous.config)
   const after = Object.keys(next.config)
   if (before.length !== after.length) return true

@@ -122,6 +122,12 @@ anything off.
 
 ## Configuring one
 
+The Settings screen keeps every plugin in a drawer under the single **Plugins**
+section. Open a drawer to find its enable switch, manifest-defined configuration,
+editable shortcuts, and the corresponding `aimux plugin show` command. Shortcut
+editing captures the keys directly; Enter confirms, Backspace removes, and Esc
+cancels.
+
 A plugin declares its settings in its manifest, and aimux generates rows for
 them on the settings screen — one section per plugin, nothing to write by hand.
 
@@ -130,6 +136,10 @@ From a script, or from an agent:
 ```
 aimux plugin config <id>              # every field, and where its value came from
 aimux plugin set <id> <key> <value>   # coerced against the declared type
+aimux plugin keymaps <id>              # resolved keys and their origins
+aimux plugin bind <id> <binding-id> '<notation>'
+aimux plugin unbind <id> <binding-id>
+aimux plugin bind <id> <binding-id> --reset
 aimux plugin unset <id> <key>         # back to whatever is underneath
 ```
 
@@ -218,3 +228,53 @@ aimux <group> <verb>                   # a verb a plugin registered
 
 Completion knows about both, so `aimux <TAB>` lists plugin groups next to the
 built-in ones.
+
+## Finding one
+
+The index is a GitHub topic: a repository tagged `aimux-plugin` is listed, by
+stars, and that is the whole convention — there is no registry to sign up to.
+
+```
+aimux plugin search             # every tagged repository, most starred first
+aimux plugin search lazygit     # narrowed by GitHub's own search
+aimux plugin install owner/repo
+aimux plugin update             # re-fetch every installed plugin, replace the ones that moved on
+```
+
+`update` prints what moved and refuses to install a newer version without
+`--yes`, for the same reason `install` does: `build` runs with your privileges.
+Linked checkouts are yours and are left alone. If you publish a plugin, tag the
+repository `aimux-plugin` and it appears.
+
+## A program in a pane
+
+Some plugins put a program beside your agent rather than drawing anything of
+their own — lazygit, a file manager, a log viewer. Such a pane is an ordinary
+terminal tab that aimux runs for the plugin: it takes the keyboard like any
+terminal, it shows in the tab strip under the plugin's title, and `Ctrl+r`
+restarts the program if it exits. It survives a reload of the plugin and is
+closed, program included, when the plugin is unlinked, uninstalled or
+disabled. It is not saved with the project: the plugin may be gone by the next
+launch.
+
+## Notifications
+
+aimux plays a sound when an agent asks a question or finishes a turn in a tab
+you are not looking at. A plugin can take that over — forward it to a phone,
+a chat, a desktop notifier — in which case the sound stops: one delivery, not
+two. Only one plugin holds that slot; a second asking for it is refused and
+says so in `aimux plugin log`.
+
+## Following what happens
+
+Everything a daemon-side plugin can subscribe to is also a line of JSON for
+anything else:
+
+```
+aimux events follow                       # every event, as it happens
+aimux events follow --filter 'tab:*'      # a prefix
+aimux events follow --count 1 --timeout 60000
+```
+
+A shell script, a Go binary or a phone relay reads that stream and talks back
+through the CLI. No SDK.

@@ -187,6 +187,11 @@ export function focusPane(direction: 'left' | 'right' | 'up' | 'down'): KeyResul
   )
 }
 
+/** Exchanges the active pane with its neighbour; the keyboard goes with it. */
+export function swapPane(direction: 'left' | 'right' | 'up' | 'down'): KeyResult {
+  return r([{ direction, type: 'swap-pane' }])
+}
+
 export function resizePane(delta: number, axis: 'horizontal' | 'vertical'): ActionFn {
   return (ctx: ModeContext) => {
     const tabId = ctx.state.activeTabId

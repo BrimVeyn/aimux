@@ -56,10 +56,23 @@ plugin with a broken manifest fails with a field name rather than a stack.
 | `build`           | no       | argv arrays run once at link/install time, e.g. `[["bun","install"]]`       |
 | `config`          | no       | field name → `{ type, label?, description?, default?, required?, secret? }` |
 | `commands`        | no\*     | `{ id, command: argv, title?, contexts? }`                                  |
+| `panes`           | no\*     | `{ id, command: argv, title?, cwd? }` — a program hosted in a pane          |
+| `services`        | no\*     | `{ id, command: argv, restart? }` — a process the daemon keeps alive        |
 | `contributes`     | no       | `bars` and/or `keymaps` — where the widget goes, which key runs the action  |
 
 \* A plugin must contribute _something_: `entries.ui`, `entries.daemon`, or a
-non-empty `commands`. A manifest with none of the three is rejected.
+non-empty `commands`, `panes` or `services`. A manifest with none of them is
+rejected.
+
+`panes[]` puts a program — lazygit, yazi, a binary you ship — in a pane beside
+the agent, with no TypeScript: `cwd` is `workspace` (default), `project`,
+`plugin`, or an absolute path, and `aimux action run` cannot open it but
+`ctx.ui.panes.open(id)` from a UI half can, as can a `contributes.keymaps`
+binding to an action that calls it. `services[]` is a process the daemon
+starts when the plugin is enabled, stops when it is not, and restarts per
+`restart` (`on-failure` by default, `always`, `never`) with a doubling backoff;
+its stdout and stderr land in `aimux plugin log`, and `aimux plugin services`
+shows its state. Both run with the same `AIMUX_*` environment as `commands[]`.
 
 The `id` is the namespace for every registration you make — widget ids, keymap
 modes, RPC verbs, hook paths. The dot is required because an unqualified
@@ -154,15 +167,20 @@ action it registers is bound to nothing: the user has to edit `aimux.json` or
 }
 ```
 
-| Field              | Rule                                                           |
-| ------------------ | -------------------------------------------------------------- |
-| `bars[].widget`    | the **unqualified** id you passed to `ctx.ui.widgets.register` |
-| `bars[].side`      | `left` or `right`; default `left`                              |
-| `bars[].position`  | `start` or `end`; default `end`                                |
-| `bars[].grow`      | share of the bar, `> 0`; default 50                            |
-| `keymaps[].mode`   | a mode id — `navigation`, or `plugin.pane.<qualified pane id>` |
-| `keymaps[].key`    | key notation, `<leader>` included                              |
-| `keymaps[].action` | the **unqualified** verb you passed to `ctx.actions.register`  |
+| Field                   | Rule                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `bars[].widget`         | the **unqualified** id you passed to `ctx.ui.widgets.register`       |
+| `bars[].side`           | `left` or `right`; default `left`                                    |
+| `bars[].position`       | `start` or `end`; default `end`                                      |
+| `bars[].grow`           | share of the bar, `> 0`; default 50                                  |
+| `keymaps[].id`          | optional stable override id; defaults to `action`, unique per plugin |
+| `keymaps[].description` | optional human label shown in settings and help                      |
+| `keymaps[].mode`        | a mode id — `navigation`, or `plugin.pane.<qualified pane id>`       |
+| `keymaps[].key`         | default key notation, `<leader>` included                            |
+| `keymaps[].action`      | the **unqualified** verb passed to `ctx.actions.register`            |
+
+Users can override these by id in the registry or `plugins[].keymaps` in
+`aimux.config.ts`. The latter wins; `null` explicitly unbinds a contribution.
 
 Both ids are unqualified: the host prefixes them with your plugin id, the same
 way it does everywhere else.

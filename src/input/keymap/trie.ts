@@ -13,6 +13,10 @@ export interface TrieBinding {
    * "my binding took" from "the config already owned that key".
    */
   pluginId?: string
+  /** Stable id within `pluginId`, when this came from a plugin contribution. */
+  bindingId?: string
+  description?: string
+  pluginAction?: string
 }
 
 export interface TrieNode {
@@ -32,6 +36,16 @@ function createNode(): TrieNode {
 
 export class KeyTrie {
   readonly root: TrieNode = createNode()
+
+  entries(): { sequence: KeyChord[]; binding: TrieBinding }[] {
+    const result: { sequence: KeyChord[]; binding: TrieBinding }[] = []
+    function walk(node: TrieNode, sequence: KeyChord[]): void {
+      if (node.binding !== null) result.push({ binding: node.binding, sequence })
+      for (const [chord, child] of node.children) walk(child, [...sequence, chord])
+    }
+    walk(this.root, [])
+    return result
+  }
 
   /**
    * Insert a key sequence with a binding.

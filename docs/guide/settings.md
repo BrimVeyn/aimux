@@ -16,16 +16,16 @@ here](#what-is-not-here)) — but it is no longer the price of admission.
 
 ## Moving around
 
-Two columns: the sections on the left, that section's settings on the right.
+The section rail stays on the left while the settings form one continuous list.
 
 | Key               | Does                                                                           |
 | ----------------- | ------------------------------------------------------------------------------ |
 | `/`               | Search every setting, whatever section it is in                                |
-| `h` / `←`         | Go to the section list                                                         |
-| `l` / `→`         | Go to the settings of the current section                                      |
+| `h` / `←` / `-`   | Decrease or choose the previous value                                          |
+| `l` / `→` / `+`   | Increase or choose the next value                                              |
 | `j` / `k`         | Move down / up, in whichever column has the cursor                             |
 | `Space` / `Enter` | Change it: flip a checkbox, take the next option, ask for a number or a string |
-| `-` / `+`         | Step a number down / up                                                        |
+| `{` / `}`         | Jump to the previous / next section                                            |
 | `r`               | Put the setting back to its default                                            |
 | `Esc`             | Close the screen                                                               |
 | `?`               | The keybindings for this screen                                                |
@@ -194,7 +194,7 @@ Everything else takes effect as you change it.
 Settings whose value is a list or a function have no row, and stay in
 `aimux.config.ts`:
 
-- `keymaps` — a function, and a screen of its own later
+- native `keymaps` — a function in `aimux.config.ts`; plugin shortcuts are editable in each plugin drawer
 - `hooks` — a function
 - `backends`, `sidebar.widgets` — lists
 - `externalEditor.args` and `externalEditor.terminal` — argv templates

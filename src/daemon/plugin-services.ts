@@ -1,7 +1,10 @@
 import type {
   PluginContext,
   PluginCounterDay,
+  PluginCreateWorkspaceInput,
   PluginProjectView,
+  PluginSessionInfo,
+  PluginSessionUsage,
   PluginWorkspaceView,
 } from '@brimveyn/aimux-plugin'
 
@@ -9,11 +12,19 @@ import type { HookServer } from '../integrations/hook-server'
 import type { ProjectRecord, TerminalSnapshot, WorkspaceRecord } from '../state/types'
 import type { DaemonTabEntry } from './daemon'
 
+import {
+  createProjectWorkspace,
+  removeProjectWorkspace,
+  type WorkspaceRegistrar,
+} from '../cli/commands/workspace/create-core'
 import { registerPluginCliCommand } from '../plugins/cli-commands'
 import { type AssistantDefinition, registerAssistant } from '../pty/assistant-registry'
 import { extractTailLines } from '../pty/assistant-status-detector'
+import { getAllAssistantOptions } from '../pty/command-registry'
 import { readCounters } from '../services/aimux-counters/store'
+import { readSessionUsage } from '../services/usage-history/session-usage'
 import { loadProjectCatalog } from '../state/project-catalog'
+import { findTranscriptPath, parseSessionArgs } from './session-info'
 
 /**
  * Builds the services a daemon-half plugin gets: `ctx.assistants`, `ctx.hooks`,
@@ -78,6 +89,13 @@ export interface DaemonPluginBackings {
   focus: (projectId: string, tabId: string) => Promise<void>
   closeTab: (tabId: string) => Promise<void>
   hookServer: () => HookServer | null
+  /**
+   * Records a workspace the way a CLI `addWorkspaceRecord` would: relayed to
+   * the attached UI when there is one, written to the catalog otherwise.
+   * Optional so a test can build backings without it; the service then says
+   * so instead of failing on a missing function.
+   */
+  workspaces?: WorkspaceRegistrar
 }
 
 export interface PluginTabView {
@@ -173,11 +191,48 @@ export function createDaemonContextExtender(
       list: (): PluginProjectView[] => loadProjectCatalog().map(toProjectView),
     }
 
+    const requireProject = (projectId: string): ProjectRecord => {
+      const project = loadProjectCatalog().find((entry) => entry.id === projectId)
+      if (!project) throw new Error(`unknown project: ${projectId}`)
+      return project
+    }
+    const requireRegistrar = (): WorkspaceRegistrar => {
+      if (!backings.workspaces) throw new Error('this daemon cannot register workspaces')
+      return backings.workspaces
+    }
+
     const workspaces = {
+      /**
+       * `aimux workspace create`, from inside the daemon: the same core, with
+       * the daemon as its own registrar, so a plugin and the CLI cannot
+       * produce two kinds of workspace.
+       */
+      create: async (input: PluginCreateWorkspaceInput): Promise<PluginWorkspaceView> =>
+        toWorkspaceView(
+          await createProjectWorkspace({
+            base: input.base ?? 'HEAD',
+            branch: input.branch ?? `aimux/${input.name}`,
+            daemon: requireRegistrar(),
+            name: input.name,
+            project: requireProject(input.projectId),
+          })
+        ),
       list: (projectId: string): PluginWorkspaceView[] =>
         (loadProjectCatalog().find((project) => project.id === projectId)?.workspaces ?? []).map(
           toWorkspaceView
         ),
+      remove: async (
+        projectId: string,
+        workspaceId: string,
+        options: { force?: boolean } = {}
+      ): Promise<void> => {
+        await removeProjectWorkspace({
+          daemon: requireRegistrar(),
+          force: options.force === true,
+          project: requireProject(projectId),
+          target: workspaceId,
+        })
+      },
     }
 
     const metrics = {
@@ -188,9 +243,65 @@ export function createDaemonContextExtender(
           .map(([day, values]) => ({ day, values: { ...values } as Record<string, number> })),
     }
 
+    /** The conversation behind a tab, read from the argv the daemon already keeps. */
+    const sessionOf = (tabId: string): PluginSessionInfo | undefined => {
+      const entry = backings.tabs().get(tabId)
+      if (!entry) return undefined
+      const { model, sessionId } = parseSessionArgs(entry.command)
+      return {
+        assistant: entry.assistant,
+        model,
+        sessionId,
+        tabId,
+        transcriptPath: findTranscriptPath(entry.assistant, sessionId),
+      }
+    }
+
     const assistants = {
       register: (definition: AssistantDefinition) =>
         ownDisposer(ctx, registerAssistant(definition)),
+      /**
+       * Close, then spawn resuming the same id. The new tab keeps the title,
+       * the workspace and the project; its cwd is the workspace's directory
+       * when it had one, the project's otherwise — the same choice the UI
+       * makes for a tab it restarts.
+       */
+      resume: async (tabId: string): Promise<string> => {
+        const entry = backings.tabs().get(tabId)
+        if (!entry) throw new Error(`unknown tab: ${tabId}`)
+        const { sessionId } = parseSessionArgs(entry.command)
+        const option = getAllAssistantOptions({}).find(
+          (candidate) => candidate.id === entry.assistant
+        )
+        if (sessionId === null || option?.session === undefined) {
+          throw new Error(`tab ${tabId} has no session to resume`)
+        }
+        const project = loadProjectCatalog().find((candidate) => candidate.id === entry.projectId)
+        const workspace = project?.workspaces?.find(
+          (candidate) => candidate.id === entry.workspaceId
+        )
+        const cwd = workspace?.path ?? project?.projectPath
+        await backings.closeTab(tabId)
+        return backings.spawnTab({
+          args: option.session.buildResumeArgs(sessionId),
+          assistant: entry.assistant,
+          command: option.command,
+          projectId: entry.projectId,
+          title: entry.title ?? option.label,
+          ...(cwd === undefined ? {} : { cwd }),
+          ...(entry.workspaceId === undefined ? {} : { workspaceId: entry.workspaceId }),
+        })
+      },
+      session: sessionOf,
+      usage: async (tabId: string): Promise<PluginSessionUsage | undefined> => {
+        const session = sessionOf(tabId)
+        if (!session) return undefined
+        const totals =
+          session.transcriptPath === null
+            ? await readSessionUsage('')
+            : await readSessionUsage(session.transcriptPath)
+        return { tabId, ...totals }
+      },
     }
 
     const hooks = {
