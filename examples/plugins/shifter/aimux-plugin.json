@@ -28,11 +28,15 @@
   "contributes": {
     "keymaps": [
       {
+        "id": "shift-up",
+        "description": "Shift model up",
         "mode": "navigation",
         "key": "<leader>+",
         "action": "up"
       },
       {
+        "id": "shift-down",
+        "description": "Shift model down",
         "mode": "navigation",
         "key": "<leader>-",
         "action": "down"

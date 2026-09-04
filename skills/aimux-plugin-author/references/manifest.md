@@ -167,15 +167,20 @@ action it registers is bound to nothing: the user has to edit `aimux.json` or
 }
 ```
 
-| Field              | Rule                                                           |
-| ------------------ | -------------------------------------------------------------- |
-| `bars[].widget`    | the **unqualified** id you passed to `ctx.ui.widgets.register` |
-| `bars[].side`      | `left` or `right`; default `left`                              |
-| `bars[].position`  | `start` or `end`; default `end`                                |
-| `bars[].grow`      | share of the bar, `> 0`; default 50                            |
-| `keymaps[].mode`   | a mode id — `navigation`, or `plugin.pane.<qualified pane id>` |
-| `keymaps[].key`    | key notation, `<leader>` included                              |
-| `keymaps[].action` | the **unqualified** verb you passed to `ctx.actions.register`  |
+| Field                   | Rule                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `bars[].widget`         | the **unqualified** id you passed to `ctx.ui.widgets.register`       |
+| `bars[].side`           | `left` or `right`; default `left`                                    |
+| `bars[].position`       | `start` or `end`; default `end`                                      |
+| `bars[].grow`           | share of the bar, `> 0`; default 50                                  |
+| `keymaps[].id`          | optional stable override id; defaults to `action`, unique per plugin |
+| `keymaps[].description` | optional human label shown in settings and help                      |
+| `keymaps[].mode`        | a mode id — `navigation`, or `plugin.pane.<qualified pane id>`       |
+| `keymaps[].key`         | default key notation, `<leader>` included                            |
+| `keymaps[].action`      | the **unqualified** verb passed to `ctx.actions.register`            |
+
+Users can override these by id in the registry or `plugins[].keymaps` in
+`aimux.config.ts`. The latter wins; `null` explicitly unbinds a contribution.
 
 Both ids are unqualified: the host prefixes them with your plugin id, the same
 way it does everywhere else.

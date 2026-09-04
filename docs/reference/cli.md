@@ -758,3 +758,16 @@ Runtime-oriented commands use the active profile namespace. That affects:
 Commands such as `aimux version` and `aimux --help` exit early and do not
 need to load profile-scoped runtime state. See `runtime-paths.md` for the
 exact path rules.
+
+### `plugin keymaps`, `plugin bind`, `plugin unbind`
+
+```sh
+aimux plugin keymaps <id>
+aimux plugin bind <id> <binding-id> '<notation>'
+aimux plugin bind <id> <binding-id> --reset
+aimux plugin unbind <id> <binding-id>
+```
+
+`keymaps` prints the resolved binding list with `default`, `registry`, or
+`config` origins. `unbind` stores `null`; `--reset` removes the registry layer.
+An `aimux.config.ts` value still wins and is reported as `shadowedBy`.

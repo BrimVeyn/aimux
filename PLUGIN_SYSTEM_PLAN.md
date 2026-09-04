@@ -1218,3 +1218,15 @@ qu'on maintiendrait pour un plugin. Un protocole socket documenté hors CLI :
 la navigation nvim de herdr l'exige pour la latence, on verra après B si le CLI
 suffit. Et un bac à sable pour `build` — le consentement de `plugin install`
 reste ce qu'il est, on ne prétend pas mieux.
+
+# Phase 10 · Un tiroir par plugin, et des raccourcis qu'on règle
+
+La navigation des réglages ne génère plus une section par manifeste : la
+section unique `Plugins` contient un tiroir fermé par plugin. Ouvert, il garde
+ensemble activation, config, raccourcis et diagnostic CLI.
+
+Décisions livrées : D1 tiroirs hors `AppState`, D2 en-têtes `action`, D3 IDs et
+descriptions additives sous API v1, D4 résolution manifeste ← registre ←
+`aimux.config.ts` avec `null` pour délier, D5 capture dédiée, D6 aide fusionnée
+avec le trie vivant. Les écritures UI/CLI restent dans `aimux-plugins.json` et
+reconstruisent la fibre.

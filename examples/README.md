@@ -37,6 +37,17 @@ you write there still outranks anything a plugin asks for.
 They are not registered by default: linking one is a deliberate act, and these
 write to your terminals.
 
+The hand-written layer can override or unbind contributed keys:
+
+```ts
+plugins: [
+  {
+    id: 'aimux-examples.pulse',
+    keymaps: { open: '<leader>u', close: null },
+  },
+]
+```
+
 ## What they are not
 
 Not a component library, and not a style guide for TypeScript. They are the

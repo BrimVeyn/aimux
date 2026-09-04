@@ -73,7 +73,7 @@ and bars already skip those; a bound key resolves its action at press time.
 ```jsonc
 "contributes": {
   "bars": [{ "widget": "load", "side": "left" }],
-  "keymaps": [{ "mode": "navigation", "key": "<leader>+", "action": "up" }],
+  "keymaps": [{ "id": "up", "description": "Shift model up", "mode": "navigation", "key": "<leader>+", "action": "up" }],
 }
 ```
 
@@ -827,6 +827,14 @@ service with its own `setInterval` is the routines family. Zoom and
 
 Every context API returns a disposer or is registered through `ctx.effect`.
 That is the invariant the whole system rests on.
+
+## Configurable keymaps
+
+Each `contributes.keymaps` entry may declare a stable `id` and a human-facing
+`description`. IDs are unique per plugin and key both registry and
+`aimux.config.ts` overrides. Resolution follows the config ladder: manifest,
+registry override, then hand-written config. A resolved `null` is not inserted
+into the live trie; changing the registry rebuilds the owning fiber.
 
 ## Security
 

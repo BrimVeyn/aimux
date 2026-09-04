@@ -122,6 +122,12 @@ anything off.
 
 ## Configuring one
 
+The Settings screen keeps every plugin in a drawer under the single **Plugins**
+section. Open a drawer to find its enable switch, manifest-defined configuration,
+editable shortcuts, and the corresponding `aimux plugin show` command. Shortcut
+editing captures the keys directly; Enter confirms, Backspace removes, and Esc
+cancels.
+
 A plugin declares its settings in its manifest, and aimux generates rows for
 them on the settings screen — one section per plugin, nothing to write by hand.
 
@@ -130,6 +136,10 @@ From a script, or from an agent:
 ```
 aimux plugin config <id>              # every field, and where its value came from
 aimux plugin set <id> <key> <value>   # coerced against the declared type
+aimux plugin keymaps <id>              # resolved keys and their origins
+aimux plugin bind <id> <binding-id> '<notation>'
+aimux plugin unbind <id> <binding-id>
+aimux plugin bind <id> <binding-id> --reset
 aimux plugin unset <id> <key>         # back to whatever is underneath
 ```
 
