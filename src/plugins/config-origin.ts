@@ -54,6 +54,51 @@ export interface ConfigLayers {
   rowConfig?: Record<string, unknown>
 }
 
+export type PluginKeymapOrigin = 'default' | 'registry' | 'config'
+
+export interface ResolvedPluginKeymap {
+  id: string
+  mode: string
+  action: string
+  description?: string
+  key: string | null
+  default: string
+  origin: PluginKeymapOrigin
+  shadowedBy?: 'aimux.config.ts'
+}
+
+export function describePluginKeymaps(
+  manifest: PluginManifest,
+  layers: { override?: PluginOverride; userConfig?: Record<string, string | null> }
+): ResolvedPluginKeymap[] {
+  return (manifest.contributes?.keymaps ?? []).map((binding) => {
+    const id = binding.id ?? binding.action
+    const fromConfig = layers.userConfig?.[id]
+    const fromRegistry = layers.override?.keymaps?.[id]
+    let key: string | null = binding.key
+    let origin: PluginKeymapOrigin = 'default'
+    if (fromRegistry !== undefined) {
+      key = fromRegistry
+      origin = 'registry'
+    }
+    if (fromConfig !== undefined) {
+      key = fromConfig
+      origin = 'config'
+    }
+    const report: ResolvedPluginKeymap = {
+      action: binding.action,
+      default: binding.key,
+      id,
+      key,
+      mode: binding.mode,
+      origin,
+    }
+    if (binding.description !== undefined) report.description = binding.description
+    if (fromConfig !== undefined) report.shadowedBy = 'aimux.config.ts'
+    return report
+  })
+}
+
 function originOf(key: string, layers: ConfigLayers, hasDefault: boolean): PluginConfigOrigin {
   if (layers.userConfig?.[key] !== undefined) return 'config'
   if (layers.override?.config?.[key] !== undefined) return 'registry'

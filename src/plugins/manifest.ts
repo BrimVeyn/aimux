@@ -374,6 +374,7 @@ function validateContributes(
       issues.push({ field: 'contributes.keymaps', message: 'must be an array of bindings' })
     } else {
       const keymaps: PluginKeymapContribution[] = []
+      const ids = new Map<string, number>()
       for (const [index, raw] of value.keymaps.entries()) {
         const at = `contributes.keymaps[${index}]`
         if (!isRecord(raw)) {
@@ -387,10 +388,24 @@ function validateContributes(
           issues.push({ field: `${at}.${missing}`, message: 'must be a non-empty string' })
           continue
         }
+        for (const field of ['id', 'description'] as const) {
+          if (raw[field] !== undefined && !isNonEmptyString(raw[field])) {
+            issues.push({ field: `${at}.${field}`, message: 'must be a non-empty string' })
+          }
+        }
+        const id = isNonEmptyString(raw.id) ? raw.id : (raw.action as string)
+        const duplicate = ids.get(id)
+        if (duplicate !== undefined) {
+          issues.push({ field: `${at}.id`, message: `duplicate of [${duplicate}]` })
+          continue
+        }
+        ids.set(id, index)
         keymaps.push({
           action: raw.action as string,
           key: raw.key as string,
           mode: raw.mode as string,
+          ...(isNonEmptyString(raw.id) ? { id: raw.id } : {}),
+          ...(isNonEmptyString(raw.description) ? { description: raw.description } : {}),
         })
       }
       contributions.keymaps = keymaps

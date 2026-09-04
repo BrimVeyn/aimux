@@ -48,6 +48,7 @@ function record(
     enabled,
     enabledFrom: 'default',
     id,
+    keymaps: [],
     manifest: { apiVersion: 1, id, panes, version: '1.0.0' },
     paths: getPluginPaths(id, `/tmp/${id}`),
     root: `/tmp/${id}`,

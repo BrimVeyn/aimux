@@ -13,6 +13,9 @@ export interface TrieBinding {
    * "my binding took" from "the config already owned that key".
    */
   pluginId?: string
+  /** Stable id within `pluginId`, when this came from a plugin contribution. */
+  bindingId?: string
+  description?: string
 }
 
 export interface TrieNode {

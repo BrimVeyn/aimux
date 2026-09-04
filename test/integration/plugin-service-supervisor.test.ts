@@ -26,6 +26,7 @@ function record(id: string, services: PluginRecord['manifest']['services']): Plu
     enabled: true,
     enabledFrom: 'default',
     id,
+    keymaps: [],
     manifest: { apiVersion: 1, id, services, version: '1.0.0' },
     paths: getPluginPaths(id, root),
     root,

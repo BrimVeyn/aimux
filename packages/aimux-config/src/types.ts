@@ -118,6 +118,8 @@ export interface PluginConfigEntry {
   enabled?: boolean
   /** Merged over the manifest defaults and the registry, and wins over both. */
   config?: Record<string, unknown>
+  /** Per-binding overrides keyed by the manifest binding id. `null` unbinds it. */
+  keymaps?: Record<string, string | null>
 }
 
 /** A bare string is shorthand for `{ path }`. */

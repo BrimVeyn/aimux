@@ -47,6 +47,7 @@ function record(config: Record<string, unknown>): PluginRecord {
     enabled: true,
     enabledFrom: 'default',
     id: 'acme.thing',
+    keymaps: [],
     manifest: MANIFEST,
     paths: { config: '/c', log: '/l', root: '/r', state: '/s' },
     root: '/r',

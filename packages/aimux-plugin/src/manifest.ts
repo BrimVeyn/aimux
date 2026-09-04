@@ -71,6 +71,10 @@ export interface PluginBarContribution {
  * every plugin, here as everywhere else.
  */
 export interface PluginKeymapContribution {
+  /** Stable id used by user overrides. Defaults to `action`. */
+  id?: string
+  /** Human-readable label shown in settings and key help. */
+  description?: string
   /** Mode id, e.g. `navigation`, or the plugin's own pane mode. */
   mode: string
   /** Key notation, `<leader>` included. */

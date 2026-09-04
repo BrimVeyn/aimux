@@ -23,6 +23,7 @@ import {
   type TuiThemeJson,
 } from '@brimveyn/aimux-config'
 
+import type { PluginRecord } from '../plugins/types'
 import type { AppAction } from '../state/actions'
 import type { AppState, GitFileEntry } from '../state/types'
 
@@ -562,15 +563,27 @@ function applyContributions(ctx: PluginContext): void {
     })
   }
 
-  const bindings = contributes.keymaps ?? []
+  const record = (ctx as PluginContext & { record?: PluginRecord }).record
+  const bindings =
+    record?.keymaps ??
+    (contributes.keymaps ?? []).map((binding) => ({
+      ...binding,
+      default: binding.key,
+      id: binding.id ?? binding.action,
+      origin: 'default' as const,
+    }))
   if (bindings.length === 0) return
   const layer = registerKeymapLayer(
     ctx.id,
-    bindings.map((binding) => ({
-      action: qualify(ctx.id, binding.action),
-      keys: binding.key,
-      mode: binding.mode,
-    }))
+    bindings
+      .filter((binding) => binding.key !== null)
+      .map((binding) => ({
+        action: qualify(ctx.id, binding.action),
+        id: binding.id,
+        keys: binding.key as string,
+        mode: binding.mode,
+        ...(binding.description === undefined ? {} : { description: binding.description }),
+      }))
   )
   for (const { binding, reason } of layer.refused) {
     // A key that silently does nothing is the worst outcome here, so the
