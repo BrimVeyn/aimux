@@ -2,6 +2,7 @@ import type { SettingCtx, SettingRow, SettingValue } from '../settings/types'
 import type { AppState } from '../state/types'
 import type { SideEffectContext } from './side-effect-context'
 
+import { expandDrawer } from '../settings/plugin-drawers'
 import { filterSettingRows } from '../settings/search'
 import { findSettingRow } from '../settings/sections'
 import { readRow, resetRow, settingsStore, writeRow } from '../settings/settings-store'
@@ -115,6 +116,9 @@ export function changeSelectedSetting(runtime: SettingsContext, delta?: 1 | -1):
       // `-`/`+` have nothing to do on one.
       if (delta === undefined) openField(row, current)
       return
+    case 'keybind':
+      // The capture modal is wired by the keybind-modal chantier.
+      return
     case 'action':
       // Not a value, so a direction means nothing to it either.
       if (delta === undefined) row.run()
@@ -136,7 +140,13 @@ export function confirmSettingsSearch(runtime: SettingsContext): void {
   const hit = filterSettingRows(state.projects, state.modal.editBuffer)[state.modal.selectedIndex]
   dispatchGlobal({ type: 'close-modal' })
   if (!hit) return
-  dispatchGlobal({ rowIndex: hit.rowIndex, type: 'settings-select-row' })
+  if (hit.row.kind !== 'info' && hit.row.kind !== 'action' && hit.row.storage === 'plugin') {
+    expandDrawer(hit.row.pluginId)
+  }
+  const rowIndex = filterSettingRows(state.projects, null).findIndex(
+    (entry) => entry.row.id === hit.row.id
+  )
+  if (rowIndex >= 0) dispatchGlobal({ rowIndex, type: 'settings-select-row' })
 }
 
 /** Puts the selected row back to what it would be if this screen had never run. */

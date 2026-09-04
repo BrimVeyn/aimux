@@ -3,6 +3,8 @@ import type { SettingRow, SettingSection } from '../types'
 import { pluginError, pluginStateSummary, pluginStore } from '../../plugins/plugin-store'
 import { setPluginEnabled } from '../../plugins/registry-file'
 import { refreshPluginsGlobal } from '../../ui/plugin-refresh-ref'
+import { pluginConfigRows, pluginKeymapRows } from '../plugin-config-rows'
+import { isExpanded, toggleDrawer } from '../plugin-drawers'
 
 /**
  * Every plugin aimux knows, with a switch.
@@ -15,8 +17,15 @@ import { refreshPluginsGlobal } from '../../ui/plugin-refresh-ref'
  * instead of two, which is the point of the feature.
  */
 
-/** Two rows per plugin: the switch, and the line that says what it is doing. */
-const ROWS_PER_PLUGIN = 2
+let pluginUserConfigRef: readonly {
+  id?: string
+  config?: Record<string, unknown>
+  keymaps?: Record<string, string | null>
+}[] = []
+
+export function setPluginUserConfig(entries: typeof pluginUserConfigRef): void {
+  pluginUserConfigRef = entries
+}
 
 function describe(id: string, source: string, version: string): string {
   const state = pluginStateSummary(id)
@@ -33,9 +42,18 @@ function rowsFor(): SettingRow[] {
     const name = record.manifest.name ?? record.id
     rows.push({
       description: describe(record.id, record.source, record.manifest.version),
+      id: `plugins.${record.id}`,
+      kind: 'action',
+      label: name,
+      run: () => toggleDrawer(record.id),
+      value: () => (isExpanded(record.id) ? '▾' : '▸'),
+    })
+    if (!isExpanded(record.id)) continue
+    const user = pluginUserConfigRef.find((entry) => entry.id === record.id)
+    rows.push({
       id: `plugins.${record.id}.enabled`,
       kind: 'toggle',
-      label: name,
+      label: '  Enabled',
       // `app` storage, not `settings`: the value's home is the plugin
       // registry, and this row is a view over it like every other `app` row.
       read: () => pluginStore.getState().records.find((r) => r.id === record.id)?.enabled ?? false,
@@ -45,6 +63,8 @@ function rowsFor(): SettingRow[] {
         refreshPluginsGlobal()
       },
     })
+    rows.push(...pluginConfigRows(record, user?.config))
+    rows.push(...pluginKeymapRows(record, user?.keymaps))
     rows.push({
       description: record.root,
       id: `plugins.${record.id}.detail`,
@@ -63,6 +83,17 @@ export const PLUGINS_SECTION: SettingSection = {
   glyph: '\u{29C9}',
   id: 'plugins',
   label: 'Plugins',
-  rowCount: () => pluginStore.getState().records.length * ROWS_PER_PLUGIN,
+  rowCount: () => {
+    let count = 0
+    for (const record of pluginStore.getState().records) {
+      count += 1
+      if (!isExpanded(record.id)) continue
+      count +=
+        2 +
+        Object.keys(record.manifest.config ?? {}).length +
+        (record.manifest.contributes?.keymaps?.length ?? 0)
+    }
+    return count
+  },
   rows: () => rowsFor(),
 }

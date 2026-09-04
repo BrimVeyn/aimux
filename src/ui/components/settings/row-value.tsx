@@ -2,6 +2,7 @@ import { memo } from 'react'
 
 import type { SettingRow, SettingValue } from '../../../settings/types'
 
+import { formatNotationForDisplay } from '../../../input/keymap/key-format'
 import { readRow, useSettingsStore } from '../../../settings/settings-store'
 import { useAppStore } from '../../../state/app-store'
 import { type ResolvedTuiTheme, useTheme } from '../../theme'
@@ -26,6 +27,8 @@ export function formatValue(row: SettingRow, value: SettingValue): string {
       const text = String(value)
       return text === '' ? (row.placeholder ?? 'not set') : text
     }
+    case 'keybind':
+      return String(value) === '' ? 'unbound' : formatNotationForDisplay(String(value))
     case 'info':
     case 'action':
       return String(value)
@@ -47,6 +50,8 @@ export function describeValue(row: SettingRow, value: SettingValue): string {
       return row.options.find((entry) => entry.value === value)?.label ?? String(value)
     case 'text':
       return String(value) === '' ? 'empty' : String(value)
+    case 'keybind':
+      return String(value) === '' ? 'unbound' : String(value)
     default:
       return String(value)
   }
