@@ -342,6 +342,12 @@ export interface AimuxThemeConfig {
 export type AIUsageTool = 'claude' | 'codex' | (string & {})
 
 export interface AIUsageToolConfig {
+  /**
+   * Whether the indicator runs. The same switch as
+   * `plugins: [{ id: 'aimux.ai-usage', enabled }]`, kept because it is the key
+   * the feature had before it was a plugin. Off by default: the service reads
+   * the Claude keychain entry and calls two OAuth endpoints.
+   */
   enabled?: boolean
   pollSeconds?: number
   claudePlan?: 'auto' | 'pro' | 'max5' | 'max20'

@@ -12,6 +12,11 @@ import type { BuiltinPlugin } from '../../plugins/builtin'
  * `ctx.config` here rather than read by the plugin. The user's configuration
  * did not move; the mapping is one object, in the declaration, where a reader
  * would look for it.
+ *
+ * `enabled` is seeded the same way, and is the whole switch: the plugin is the
+ * indicator, so loading it is what turns the indicator on. It ships off because
+ * the service reads the Claude keychain entry and calls two OAuth endpoints —
+ * that is asked for, not arrived at.
  */
 export function aiUsagePlugin(config?: ResolvedConfig): BuiltinPlugin {
   const aiUsage = config?.statusBar?.aiUsage
@@ -23,6 +28,8 @@ export function aiUsagePlugin(config?: ResolvedConfig): BuiltinPlugin {
         : { codexWeeklyLimit: aiUsage.codexWeeklyLimit }),
       ...(aiUsage?.tools === undefined ? {} : { tools: aiUsage.tools }),
     },
+    defaultEnabled: false,
+    ...(aiUsage?.enabled === undefined ? {} : { enabled: aiUsage.enabled }),
     halves: {
       ui: async () => (await import('./ui')).default,
     },

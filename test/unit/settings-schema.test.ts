@@ -154,7 +154,6 @@ const FROZEN_ROW_IDS = [
   'notifications.volume',
   'snippets.manage',
   'snippets.triggerChar',
-  'statusBar.aiUsage.enabled',
   'statusBar.aiUsage.pollSeconds',
   'statusBar.hints',
   'statusBar.separator',

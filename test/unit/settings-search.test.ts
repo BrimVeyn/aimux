@@ -25,7 +25,7 @@ test('a label matches', () => {
 
 test('a description matches, so you can search for what a setting does', () => {
   // "quota" appears in no label — only in what the AI usage row says it does.
-  expect(ids('quota')).toEqual(['statusBar.aiUsage.enabled'])
+  expect(ids('quota')).toEqual(['statusBar.aiUsage.pollSeconds'])
 })
 
 test('an id matches, so a key seen in aimux.json can be found', () => {

@@ -6,41 +6,77 @@ description: Bottom-bar indicator showing live Claude Code and Codex session usa
 # AI Usage Indicator
 
 `aimux` can show the current **session usage** of AI CLI tools (Claude Code,
-Codex) in the bottom status bar, with a click-to-open popover for detailed
-metrics.
+Codex) as a widget in the bottom status bar, clickable for the detail per
+provider.
 
-The indicator is fully opt-in via config — if you don't enable it, nothing is
-spawned, no network calls happen, and nothing is rendered.
+It is a plugin aimux ships (`aimux.ai-usage`), and it ships **off**: until you
+switch it on, nothing is spawned, no keychain is read, no network call happens
+and nothing is rendered.
 
-It is a plugin aimux ships (`aimux.ai-usage`). The settings below are
-unchanged; to remove it outright rather than switch it off, add
-`plugins: [{ id: 'aimux.ai-usage', enabled: false }]` to your config — see
+Being loaded is the whole switch. There is no separate settings row for it —
+there was one for a release, beside the plugin's own, and a feature with two
+switches is a feature you can turn on and watch do nothing. See
 [Plugins](plugins.md).
 
 ## What It Shows
 
-For each enabled tool the indicator renders a compact dot + percent in the
-right-hand tile of the status bar:
+A small widget in the status bar, between the filler and the version tile. Each
+polled tool gets its provider glyph and the percentage of its current session
+window (5 hours):
 
 ```
-● 48%    ● 92%
+ 22%   48%
 ```
 
-- a **colored dot** signalling the utilisation tier
-- the **percentage** used in the current session (5-hour window)
+- the **glyph** is a nerd-font icon per provider — `nf-cod-claude` and
+  `nf-cod-openai`, so the tile needs a nerd font just like the status bar
+  separators
+- the **percentage** is the current session window; a provider that reports no
+  percentage shows its compact token total instead
+- before the first poll comes back the tile is a single `…`, and a tool whose
+  last poll failed outright shows its glyph alone rather than a stale number
 
-The dot color comes from the active theme palette:
+The tile carries no status colours — it uses the bar's own ink. Colour is
+reserved for the gauges below, where a bar is a real fraction of a real ceiling
+and means what a bar is supposed to mean.
 
-- `< 60%` → `success` tone (muted-positive)
-- `60–84%` → `warning` tone
-- `≥ 85%` → `error` tone
+## The Detail, Per Provider
 
-Click the indicator to open a popover with per-tool details (tokens, cost,
-burn rate, reset countdown, full segmented bar). Press `Esc` to close.
+**Click the widget** to open the Quotas modal — the same block the Stats screen
+shows under _Quotas_, on its own so the answer to "how much is left" is not
+found among four other sections. `Esc` closes it.
+
+```
+Claude                                            1m ago · Max
+Session  ███████░░░░░░░░░   22%  ·  resets in 59m
+Weekly   ███████████░░░░░   43%  ·  resets in 4d 21h
+         Behind (+13%)
+```
+
+Per provider, one row per window the provider reports:
+
+- a **16-segment gauge**, `success` under 60%, `warning` from 60, `error` from
+  85
+- the **percentage**, and whatever context fits in what is left — usually the
+  reset countdown
+- a second line for the **pace** when there is one to report: behind reads as a
+  warning, ahead as a success, on-track as neither
+
+The header line names the provider, when it was last refreshed, and the plan
+tier the endpoint reported. A provider whose poll failed says so on its own
+line, and the other one keeps working.
 
 ## Enabling It
 
-Add a `statusBar.aiUsage` block to your `aimux.config.ts`:
+The quickest way is the settings screen: **Plugins → AI usage**. The same
+switch from the CLI:
+
+```sh
+aimux plugin enable aimux.ai-usage
+```
+
+Or from `aimux.config.ts`, under the key the feature had before it was a plugin
+— which is where the rest of its settings live anyway:
 
 ```ts
 import { defineConfig } from '@brimveyn/aimux-config'
@@ -56,8 +92,9 @@ export default defineConfig({
 })
 ```
 
-Remove the block or set `enabled: false` to hide the indicator entirely and
-stop all polling.
+`plugins: [{ id: 'aimux.ai-usage', enabled: true }]` says exactly the same
+thing. Either line, being in `aimux.config.ts`, outranks the switch on the
+screen and comes back on every restart.
 
 To show only one tool, pass a single-entry `tools` array:
 
@@ -74,7 +111,7 @@ statusBar: {
 
 | Field              | Type                                   | Default               | Notes                                                                                                                                                              |
 | ------------------ | -------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `enabled`          | `boolean`                              | `false`               | Master switch. When `false`, no polling happens.                                                                                                                   |
+| `enabled`          | `boolean`                              | `false`               | Whether the plugin loads. The same switch as `plugins: [{ id: 'aimux.ai-usage', enabled }]` and as the Plugins drawer; when off, nothing runs.                     |
 | `tools`            | `Array<'claude' \| 'codex'>`           | `['claude', 'codex']` | Which tools to poll and render.                                                                                                                                    |
 | `pollSeconds`      | `number`                               | `180`                 | Polling interval. Clamped to a minimum of 180 — Claude's OAuth endpoint rate-limits anything faster, and the symptom is an indicator that silently stops updating. |
 | `claudePlan`       | `'auto' \| 'pro' \| 'max5' \| 'max20'` | `'auto'`              | Reserved for future use; the current Claude adapter ignores this because the OAuth endpoint returns the true percentage directly.                                  |
@@ -127,21 +164,26 @@ Requirements:
 ## Fault Tolerance
 
 - If the keychain read fails, or `~/.codex/auth.json` is missing, the affected
-  tool's cell renders a short error (`CC —` / `CO —`) and the other tool keeps
-  working.
+  tool falls back to its glyph alone in the widget and says what went wrong in
+  the modal; the other tool keeps working.
 - On `401 / 403` from either endpoint, the cached credentials are evicted and
-  the cell shows `oauth expired — run <cli> to re-auth`.
+  the modal reads `oauth expired — run <cli> to re-auth`.
+- A poll that fails after a good one keeps the last number rather than blanking
+  it, so a blip does not read as a reset quota.
 - All network requests use a 15 s timeout and abort cleanly.
 - No data is written to disk by the indicator.
 
 ## Theming
 
-Every color used by the indicator and popover comes from the active theme's
-palette (`success`, `warning`, `error`, `ink`, `muted`). Switching themes at
-runtime updates the indicator immediately. No hardcoded colors.
+Every color comes from the active theme's palette. The widget uses the status
+bar's own ink; `success` / `warning` / `error` are spent on the modal's gauges
+and on the pace line, which are the only places here where a colour is a
+statement. Switching themes at runtime updates both immediately. No hardcoded
+colors.
 
 ## Removing the Feature
 
-Delete the `statusBar` block from `aimux.config.ts` (or set
-`statusBar.aiUsage.enabled: false`). The indicator disappears, the polling
-service is torn down, and no further network or keychain access occurs.
+Switch the plugin off — **Plugins → AI usage** on the settings screen,
+`aimux plugin disable aimux.ai-usage`, or `statusBar.aiUsage.enabled: false` in
+`aimux.config.ts`. The tile leaves the status bar, the polling service is torn
+down, and no further network or keychain access occurs.

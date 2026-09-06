@@ -49,6 +49,14 @@ afterEach(async () => {
   rmSync(tempHome, { force: true, recursive: true })
 })
 
+/**
+ * `ai-usage` ships off — it reads a keychain entry and calls two OAuth
+ * endpoints — so every boot here asks for it explicitly. Otherwise the test
+ * that exists to catch a failing `apply` would stop looking at the half most
+ * likely to have one.
+ */
+const ASK_FOR_AI_USAGE = { enabled: true, id: 'aimux.ai-usage' }
+
 async function startUiHost(): Promise<PluginRuntime> {
   const resolved = resolveConfig({})
   const instance = new PluginRuntime({
@@ -56,7 +64,7 @@ async function startUiHost(): Promise<PluginRuntime> {
     extendContext: extendUiPluginContext,
     host: 'ui',
     transport: TRANSPORT,
-    userPlugins: resolved.plugins,
+    userPlugins: [...resolved.plugins, ASK_FOR_AI_USAGE],
   })
   runtime = instance
   await instance.start()
@@ -83,6 +91,24 @@ describe('the plugins aimux ships', () => {
     ])
   })
 
+  test('the quota tile is not spawned on a boot that never asked for it', async () => {
+    const resolved = resolveConfig({})
+    const instance = new PluginRuntime({
+      builtins: builtinPlugins(resolved),
+      extendContext: extendUiPluginContext,
+      host: 'ui',
+      transport: TRANSPORT,
+      userPlugins: resolved.plugins,
+    })
+    runtime = instance
+    await instance.start()
+
+    // Known, listed, switchable — just not loaded. A plugin that reads
+    // credentials has to be asked for, and "off" is nothing running at all.
+    expect(instance.statuses().map((status) => status.id)).not.toContain('aimux.ai-usage')
+    expect(instance.knownRecords().map((record) => record.id)).toContain('aimux.ai-usage')
+  })
+
   test('and unloads without leaving anything behind', async () => {
     const instance = await startUiHost()
     for (const status of instance.statuses()) await instance.kernel.unload(status.id)
@@ -96,7 +122,7 @@ describe('the plugins aimux ships', () => {
       builtins: builtinPlugins(resolved),
       host: 'daemon',
       transport: TRANSPORT,
-      userPlugins: resolved.plugins,
+      userPlugins: [...resolved.plugins, ASK_FOR_AI_USAGE],
     })
     runtime = instance
     await instance.start()

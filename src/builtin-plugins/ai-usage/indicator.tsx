@@ -15,7 +15,6 @@ const ICON: Record<AIUsageTool, string> = {
 
 export function AIUsageIndicator() {
   const t = useTheme()
-  const enabled = useAIUsageStore((s) => s.enabled)
   const snapshots = useAIUsageStore((s) => s.snapshots)
 
   const openQuotas = useCallback(
@@ -26,8 +25,6 @@ export function AIUsageIndicator() {
     },
     []
   )
-
-  if (!enabled) return null
 
   const ordered: AIUsageTool[] = ['claude', 'codex']
   const entries = ordered
