@@ -3,7 +3,6 @@ import { setStatusBarSeparator, type StatusBarSeparator } from '@brimveyn/aimux-
 import type { SettingSection } from '../types'
 
 export const HINTS_ENABLED = 'statusBar.hints'
-export const AI_USAGE_ENABLED = 'statusBar.aiUsage.enabled'
 export const AI_USAGE_POLL_SECONDS = 'statusBar.aiUsage.pollSeconds'
 
 const SEPARATORS: { value: StatusBarSeparator; label: string }[] = [
@@ -19,6 +18,12 @@ const SEPARATORS: { value: StatusBarSeparator; label: string }[] = [
  * kind for one. `claudePlan` and `codexWeeklyLimit` are not here either — they are
  * declared in the config type but read nowhere, and a row that does nothing is
  * worse than no row.
+ *
+ * Nor is `statusBar.aiUsage.enabled`, which used to sit here as a second switch
+ * beside the `aimux.ai-usage` plugin's own. Turning the plugin on and watching
+ * nothing appear is the failure that costs an hour; the plugin is the indicator,
+ * so its switch is the switch (Plugins → AI usage), and the row below only says
+ * how often it asks.
  */
 export const STATUS_BAR_SECTION: SettingSection = {
   glyph: '\u{25AC}',
@@ -46,25 +51,17 @@ export const STATUS_BAR_SECTION: SettingSection = {
       storage: 'settings',
     },
     {
-      description: 'Show how much of your Claude or Codex quota is left.',
-      fallback: false,
-      fromConfig: (config) => config.statusBar?.aiUsage?.enabled,
-      id: AI_USAGE_ENABLED,
-      kind: 'toggle',
-      label: 'AI usage indicator',
-      storage: 'settings',
-    },
-    {
       // The floor is 180 rather than a warning at 180: Claude's endpoint answers
       // a faster caller with a rate limit, and the symptom is an indicator that
       // quietly stops updating. A setting whose own description tells you not to
       // use half its range should not have that half.
-      description: "Seconds between checks. Claude's endpoint rate-limits anything faster.",
+      description:
+        "How often the AI usage indicator asks how much quota is left. Claude's endpoint rate-limits anything faster.",
       fallback: 180,
       fromConfig: (config) => config.statusBar?.aiUsage?.pollSeconds,
       id: AI_USAGE_POLL_SECONDS,
       kind: 'number',
-      label: 'Refresh interval',
+      label: 'AI usage refresh',
       max: 3_600,
       min: 180,
       step: 60,

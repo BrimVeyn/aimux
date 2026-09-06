@@ -48,6 +48,19 @@ export interface BuiltinPlugin {
    * manifest's own defaults.
    */
   config?: Record<string, unknown>
+  /**
+   * What `aimux.config.ts` says about this feature under the key it had before
+   * it was a plugin — the same seeding as `config`, for the one value that is
+   * not configuration but existence. It ranks with `plugins: [{ id, enabled }]`
+   * because it comes from the same file and the same hand.
+   */
+  enabled?: boolean
+  /**
+   * Whether this built-in loads when nobody has said otherwise. `true` for
+   * everything aimux simply does; `false` for a feature that reads credentials
+   * or talks to the network, which has to be asked for rather than arrived at.
+   */
+  defaultEnabled?: boolean
 }
 
 /**
@@ -148,8 +161,9 @@ export function buildBuiltinRecords(
     records.push({
       builtin: builtin.halves,
       config: resolved.config,
-      enabled: user?.enabled ?? registry?.enabled ?? true,
-      enabledFrom: enabledOrigin(user?.enabled, registry?.enabled),
+      enabled:
+        user?.enabled ?? builtin.enabled ?? registry?.enabled ?? builtin.defaultEnabled ?? true,
+      enabledFrom: enabledOrigin(user?.enabled ?? builtin.enabled, registry?.enabled),
       id: parsed.manifest.id,
       keymaps: describePluginKeymaps(parsed.manifest, {
         ...(registry === undefined ? {} : { override: registry }),

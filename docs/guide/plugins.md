@@ -113,6 +113,11 @@ Today those are:
 | `aimux.auto-rename` | Names a tab after the first thing you ask its agent                 |
 | `aimux.auto-commit` | Writes the commit message aimux suggests, by asking your assistant  |
 
+`aimux.ai-usage` is the one that ships **off**: it reads the Claude keychain
+entry and calls two OAuth endpoints, so it is asked for rather than arrived at.
+Switch it on in the Plugins drawer, or with
+`aimux plugin enable aimux.ai-usage`.
+
 They keep their own settings rows on the settings screen; disabling the plugin
 turns the feature off outright — with one nuance for `aimux.auto-commit`:
 switching it off leaves the trigger and the panel in place and takes away the

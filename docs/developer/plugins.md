@@ -551,13 +551,29 @@ the legacy key stays visible in the built-in's declaration:
 ```ts
 export function aiUsagePlugin(config?: ResolvedConfig): BuiltinPlugin {
   const aiUsage = config?.statusBar?.aiUsage
-  return { config: { claudePlan: aiUsage?.claudePlan }, halves: { … }, manifest: { … } }
+  return {
+    config: { claudePlan: aiUsage?.claudePlan },
+    defaultEnabled: false,
+    enabled: aiUsage?.enabled,
+    halves: { … },
+    manifest: { … },
+  }
 }
 ```
 
+`enabled` seeds the same way, for the one value that is not configuration but
+existence, and ranks with `plugins: [{ id, enabled }]` — same file, same hand.
+`defaultEnabled` is the bottom of that stack: `true` for everything aimux simply
+does, `false` for a feature that reads credentials or talks to the network,
+which has to be asked for rather than arrived at.
+
 Settings _rows_ need none of that: `ctx.ui.settings.get`/`watch` read aimux's
 own rows by the dotted id the user writes, so a feature can move into a plugin
-while its toggle stays exactly where it was.
+while its settings stay exactly where they were — every row except the one that
+said whether the feature is on. That one is the plugin's own switch now: two
+switches for one feature is a feature you can turn on and watch do nothing.
+A row this screen wrote and no longer reads is carried to its new home by
+`src/plugins/migrations.ts`, which both hosts run before they read the registry.
 
 ### What the migrations changed about the API
 
@@ -567,7 +583,7 @@ filled in before it landed.
 | Migration                                 | What was missing                                                              |
 | ----------------------------------------- | ----------------------------------------------------------------------------- |
 | `aimux.claude` (theme sync, hook install) | reading the active theme outside React, and reading aimux's own settings rows |
-| `aimux.ai-usage` (quota tile)             | a status-bar registry, and seeding `ctx.config` from aimux's config           |
+| `aimux.ai-usage` (quota tile)             | a status-bar registry, seeding `ctx.config` and `enabled` from aimux's config |
 | `aimux.auto-rename` (naming tabs)         | `ctx.tabs.rename`, `tab:prompt`, `tab:renamed`, `tab:closed`, and `unnamed`   |
 
 ### `auto-rename`, and what the migration cost

@@ -200,6 +200,11 @@ Settings whose value is a list or a function have no row, and stay in
 - `externalEditor.args` and `externalEditor.terminal` — argv templates
 - `statusBar.aiUsage.tools` — a list
 
+Whether the AI usage indicator runs has no row either: it is the
+`aimux.ai-usage` plugin's own switch, in the Plugins drawer. A second switch
+beside it could only disagree with it, and for a release it did. **AI usage
+refresh**, under Status bar, still says how often it asks.
+
 Snippets and themes each have a picker that does the job better than a list of rows
 would — filtering as you type, previewing as you move. The screen opens those
 rather than reproducing them, and they come back to it when they close.

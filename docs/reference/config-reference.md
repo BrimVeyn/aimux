@@ -551,7 +551,7 @@ interface StatusBarConfig {
 }
 
 interface AIUsageToolConfig {
-  enabled?: boolean // default false
+  enabled?: boolean // default false; same switch as plugins: [{ id: 'aimux.ai-usage', enabled }]
   tools?: Array<'claude' | 'codex'> // default ['claude', 'codex']
   pollSeconds?: number // default 180; clamped to a minimum of 180 (Claude's endpoint rate-limits faster callers)
   claudePlan?: 'auto' | 'pro' | 'max5' | 'max20' // default 'auto'; reserved
@@ -561,7 +561,9 @@ interface AIUsageToolConfig {
 
 Runtime behavior:
 
-- when `aiUsage.enabled !== true` the indicator is hidden and no polling happens
+- the indicator is the `aimux.ai-usage` plugin, and it ships off: until it is
+  switched on — here, in the Plugins drawer, or with `aimux plugin enable
+aimux.ai-usage` — nothing is spawned, no keychain is read and no request is made
 - the indicator lives on the right side of the status bar and supports click to
   open a details popover
 - Claude data comes from `api.anthropic.com/api/oauth/usage` using the

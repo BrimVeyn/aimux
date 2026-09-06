@@ -37,6 +37,7 @@ import { deriveModeId } from './input/modes/bridge'
 import { registerAllModes } from './input/modes/handlers'
 import { getHandler, transitionTo } from './input/modes/registry'
 import { highlightSnapshot, warmClaudeSyntaxOverlay } from './integrations/claude-syntax-overlay'
+import { runPluginMigrations } from './plugins/migrations'
 import { getProfileConfigDir, getProfileName } from './profile-paths'
 import { bump } from './services/aimux-counters'
 import { observeCounters } from './services/aimux-counters/observe'
@@ -83,6 +84,9 @@ export function App({
   // re-renders on every dispatch, and re-running these would overwrite what the
   // settings screen has since applied on top of the baseline (`hydrateSettings`).
   useState(() => {
+    // Before the plugin host reads the registry: a setting that has moved has
+    // to be in its new home by the time anything looks there.
+    runPluginMigrations()
     setAutoCommitEnabled(resolvedConfig.autoCommit.enabled)
     setMultiRepoConfig(resolvedConfig.multiRepo)
     setExternalEditorConfig(resolvedConfig.externalEditor)

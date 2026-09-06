@@ -31,6 +31,7 @@ import {
   type TabSessionSummary,
 } from '../ipc/protocol'
 import { findSocketProcessPid, spawnDetachedTerminalManager } from '../platform/daemon-control'
+import { runPluginMigrations } from '../plugins/migrations'
 import {
   PLUGIN_CONTROL_EVENT,
   PLUGIN_CONTROL_EVENTS_SUBSCRIBE,
@@ -758,6 +759,11 @@ export async function runDaemon(): Promise<void> {
       })
     }
   }
+
+  // Before the registry is read: a setting that has moved has to be in its new
+  // home by the time anything looks there. Idempotent — the UI calls it too,
+  // and neither process can count on starting first.
+  runPluginMigrations()
 
   let pluginHost: DaemonPluginHost | null = null
   try {

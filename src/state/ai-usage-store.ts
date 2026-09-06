@@ -5,18 +5,20 @@ import { createStore } from 'zustand/vanilla'
 
 import type { UsageSnapshot } from '../services/ai-usage/types'
 
+/**
+ * What the poller has last seen, and nothing else. Whether the indicator is on
+ * is not in here: that is the `aimux.ai-usage` plugin being loaded, which is
+ * also what puts the tile in the status bar — two places saying it would only
+ * let them disagree.
+ */
 export interface AIUsageState {
-  enabled: boolean
   snapshots: Partial<Record<AIUsageTool, UsageSnapshot>>
-  setEnabled: (enabled: boolean) => void
   setSnapshot: (snap: UsageSnapshot) => void
   clear: () => void
 }
 
 export const aiUsageStore = createStore<AIUsageState>((set) => ({
   clear: () => set({ snapshots: {} }),
-  enabled: false,
-  setEnabled: (enabled: boolean) => set({ enabled }),
   setSnapshot: (snap: UsageSnapshot) =>
     set((state) => {
       const prev = state.snapshots[snap.tool]
