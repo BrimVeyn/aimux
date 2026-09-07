@@ -317,11 +317,6 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
       // this indicator exists to answer.
       const deletingLabel = deleting?.branch ?? deleting?.name ?? 'this workspace'
       beginWorkspaceDelete(effect.workspaceId, deletingLabel)
-      // A notice, not a dialog: the delete is git work you wait on, not a
-      // question you answer, so it takes a corner and leaves the app usable.
-      // Sticky (durationMs 0) and dismissed in the `finally` below, so it is on
-      // screen for exactly as long as the work is.
-      const deletingToastId = toast.info(`Deleting ${deletingLabel}\u2026`, { durationMs: 0 })
       void (async () => {
         try {
           await enqueueGitOp(async () =>
@@ -360,7 +355,6 @@ export function executeSideEffect(effect: SideEffect, ctx: SideEffectContext): v
             workspaceLabel: workspace?.branch ?? workspace?.name ?? 'this workspace',
           })
         } finally {
-          toast.dismiss(deletingToastId)
           endWorkspaceDelete(effect.workspaceId)
         }
       })()
