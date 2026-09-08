@@ -6,7 +6,9 @@ import { basename, dirname, join } from 'node:path'
 
 import type { ProjectRecord } from '../../src/state/types'
 
+import { readWorktreeColorCounts, WORKTREE_COLORS } from '../../src/platform/worktree-colors'
 import {
+  allocateWorktreeSlot,
   assertSafeAimuxWorktreePath,
   getAimuxWorktreeRoot,
   isInsideAimuxWorktreeRoot,
@@ -189,6 +191,105 @@ describe('project workspaces', () => {
     })
 
     expect(first).not.toBe(second)
+  })
+
+  test('names worktrees by color under the project, and reuses a freed one', async () => {
+    const { AIMUX_WORKTREE_ROOT, HOME } = process.env
+    const root = await mkdtemp(join(tmpdir(), 'aimux-wt-test-'))
+    const home = await mkdtemp(join(tmpdir(), 'aimux-home-test-'))
+    process.env.AIMUX_WORKTREE_ROOT = root
+    // Allocation tallies every colour it hands out; without this the suite
+    // would write into the developer's own counts.
+    process.env.HOME = home
+    try {
+      const slot = { projectName: 'pragma-once', repoRoot: '/Users/me/pragma-once' }
+      const first = await allocateWorktreeSlot({
+        ...slot,
+        workspaceId: 'workspace-1',
+        workspaceName: 'Actuellement tout les projets',
+      })
+      expect(first.color).toBeString()
+      expect(first.path).toBe(join(root, 'pragma-once', first.color ?? ''))
+      await mkdir(first.path, { recursive: true })
+
+      // Same project, and the branch holding `first.color` outlived its
+      // worktree: neither name may come back.
+      const second = await allocateWorktreeSlot(
+        { ...slot, workspaceId: 'workspace-2', workspaceName: 'other' },
+        ['teal']
+      )
+      expect(second.color).not.toBe(first.color)
+      expect(second.color).not.toBe('teal')
+
+      // A different repo wanting the same project name lands beside it.
+      const other = await allocateWorktreeSlot({
+        projectName: 'pragma-once',
+        repoRoot: '/Users/other/pragma-once',
+        workspaceId: 'workspace-3',
+        workspaceName: 'third',
+      })
+      expect(dirname(other.path)).toBe(join(root, 'pragma-once-1'))
+
+      // Deleting the first workspace frees its color again. Every other color
+      // is taken, so the allocator has exactly one left to hand back — asserted
+      // rather than sampled, because the pick itself is random.
+      await rm(first.path, { force: true, recursive: true })
+      const projectDir = dirname(first.path)
+      for (const color of WORKTREE_COLORS) {
+        if (color !== first.color) await mkdir(join(projectDir, color), { recursive: true })
+      }
+      const reused = await allocateWorktreeSlot({
+        ...slot,
+        workspaceId: 'workspace-4',
+        workspaceName: 'fourth',
+      })
+      expect(reused.color).toBe(first.color)
+    } finally {
+      if (AIMUX_WORKTREE_ROOT === undefined) delete process.env.AIMUX_WORKTREE_ROOT
+      else process.env.AIMUX_WORKTREE_ROOT = AIMUX_WORKTREE_ROOT
+      if (HOME === undefined) delete process.env.HOME
+      else process.env.HOME = HOME
+      await rm(root, { force: true, recursive: true })
+      await rm(home, { force: true, recursive: true })
+    }
+  })
+
+  test('tallies every colour it hands out, so a freed colour still counts', async () => {
+    const { AIMUX_WORKTREE_ROOT, HOME } = process.env
+    const root = await mkdtemp(join(tmpdir(), 'aimux-wt-test-'))
+    const home = await mkdtemp(join(tmpdir(), 'aimux-home-test-'))
+    process.env.AIMUX_WORKTREE_ROOT = root
+    process.env.HOME = home
+    try {
+      expect(readWorktreeColorCounts()).toEqual({})
+      const slot = { projectName: 'tally', repoRoot: '/Users/me/tally' }
+      const first = await allocateWorktreeSlot({
+        ...slot,
+        workspaceId: 'workspace-1',
+        workspaceName: 'one',
+      })
+      // Not created on disk, so the same colour is free again — the tally is
+      // what remembers it, which is the whole reason the file exists.
+      const second = await allocateWorktreeSlot({
+        ...slot,
+        workspaceId: 'workspace-2',
+        workspaceName: 'two',
+      })
+
+      const counts = readWorktreeColorCounts()
+      let total = 0
+      for (const value of Object.values(counts)) total += value
+      expect(total).toBe(2)
+      expect(counts[first.color ?? '']).toBeGreaterThan(0)
+      expect(counts[second.color ?? '']).toBeGreaterThan(0)
+    } finally {
+      if (AIMUX_WORKTREE_ROOT === undefined) delete process.env.AIMUX_WORKTREE_ROOT
+      else process.env.AIMUX_WORKTREE_ROOT = AIMUX_WORKTREE_ROOT
+      if (HOME === undefined) delete process.env.HOME
+      else process.env.HOME = HOME
+      await rm(root, { force: true, recursive: true })
+      await rm(home, { force: true, recursive: true })
+    }
   })
 
   test('prunes missing Aimux temp workspaces on normalization', () => {

@@ -22,8 +22,10 @@ import { type BarShape, buildChart, buildRuler, strideOf } from './chart'
  *
  * Colour follows one rule throughout: **text wears text tokens**. Values and
  * labels stay in `text`/`textMuted`, and a coloured mark beside them carries the
- * meaning. The only coloured glyphs are the sequential heatmap ramp (one hue,
- * light to dark) and the reserved status colours on quota bars.
+ * meaning. Three exceptions, all of them cases where the colour *is* the datum:
+ * the sequential heatmap ramp (one hue, light to dark), the reserved status
+ * colours on quota bars, and the worktree palette, whose swatches are named
+ * after the very colours they are drawn in.
  */
 
 /**
@@ -37,6 +39,7 @@ export const GLYPH = {
   burn: '\u{25B3}',
   calendar: '\u{25A4}',
   clock: '\u{25F4}',
+  colors: '\u{25CF}',
   cost: '\u{0024}',
   distance: '\u{2192}',
   keyboard: '\u{2328}',

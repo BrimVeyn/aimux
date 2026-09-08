@@ -13,15 +13,16 @@ import {
   getHeadSha,
   getMainWorktreeRoot,
   listGitWorktrees,
+  listLocalBranches,
   pruneGitWorktrees,
   removeGitWorktree,
 } from '../git/worktree'
 import { copyWorktreeFiles } from '../git/worktree-files'
 import { createPrefixedId } from '../platform/id'
 import {
+  allocateWorktreeSlot,
   assertSafeAimuxWorktreePath,
   isInsideAimuxWorktreeRoot,
-  makeWorktreePath,
   sanitizePathSegment,
 } from '../platform/worktree-paths'
 import { shouldRefreshBase, worktreeCopyPatterns } from '../settings/flags'
@@ -29,6 +30,9 @@ import { saveProjectCatalog } from '../state/project-catalog'
 import { pruneSnapshotOfWorkspace } from '../state/project-persistence'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
+
+/** Namespace for the throwaway branch a temp workspace starts life on. */
+const AIMUX_BRANCH_PREFIX = 'aimux/'
 
 /**
  * Rewrite one project and hand back the whole list, ready for `set-projects`.
@@ -141,16 +145,24 @@ export async function createAimuxTempWorkspace(
     trimmedName != null && trimmedName !== ''
       ? trimmedName
       : `wt-${sanitizePathSegment(project.name, 12)}`
+  // Colors already spoken for by a branch that outlived its worktree: reusing
+  // one would make `git worktree add` fail on an existing branch.
+  const reservedColors = (await listLocalBranches(repoRoot))
+    .filter((branch) => branch.startsWith(AIMUX_BRANCH_PREFIX))
+    .map((branch) => branch.slice(AIMUX_BRANCH_PREFIX.length))
+  const { color, path: targetPath } = await allocateWorktreeSlot(
+    { projectName: project.name, repoRoot, workspaceId, workspaceName },
+    reservedColors
+  )
   const trimmedBranch = requestedBranchName?.trim()
   const branchName =
     trimmedBranch != null && trimmedBranch !== ''
       ? trimmedBranch
       : // Placeholder only: the model replaces it with a conventional
-        // `<type>/<subject>` branch seconds later. Kept in the `aimux/`
-        // namespace and lowercased so what survives a failed generation still
-        // reads as a throwaway branch rather than a shouted prompt.
-        `aimux/${sanitizePathSegment(workspaceName, 40).toLowerCase()}-${Date.now().toString(36)}`
-  const targetPath = makeWorktreePath({ repoRoot, workspaceId, workspaceName })
+        // `<type>/<subject>` branch seconds later. Named after the workspace's
+        // own directory so what survives a failed generation is `aimux/teal`,
+        // sayable and matching the folder, rather than a shouted prompt.
+        `${AIMUX_BRANCH_PREFIX}${color ?? `${sanitizePathSegment(workspaceName, 40).toLowerCase()}-${Date.now().toString(36)}`}`
 
   const existingWorkspace = (await listGitWorktrees(repoRoot)).find(
     (entry) =>
