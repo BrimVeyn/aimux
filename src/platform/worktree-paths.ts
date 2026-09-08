@@ -9,9 +9,9 @@ import {
   unlink,
   writeFile,
 } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 
-import { recordWorktreeColor, WORKTREE_COLORS } from './worktree-colors'
+import { recordWorktreeColor, WORKTREE_COLOR_HEX, WORKTREE_COLORS } from './worktree-colors'
 
 // Worktrees hold uncommitted work, so they live in the XDG data dir, not /tmp:
 // a reboot clears /tmp on macOS and on most Linux distros, and took the work
@@ -135,6 +135,20 @@ export function isInsideAimuxWorktreeRoot(path: string): boolean {
   return [getAimuxWorktreeRoot(), LEGACY_WORKTREE_ROOT].some((root) =>
     target.startsWith(`${normalizeTmp(resolve(root))}/`)
   )
+}
+
+/**
+ * The colour a workspace is named after, or nothing when it is not one of ours.
+ *
+ * The path is the register — `<root>/<project>/<colour>` — so there is nothing
+ * to store and nothing to keep in sync. The root check is what keeps a checkout
+ * of the user's own that happens to live in a directory called `teal` from
+ * claiming a name it was never handed.
+ */
+export function worktreeColorOf(path: string): string | undefined {
+  if (!isInsideAimuxWorktreeRoot(path)) return undefined
+  const name = basename(resolve(path))
+  return WORKTREE_COLOR_HEX[name] == null ? undefined : name
 }
 
 export async function ensureAimuxWorktreeRoot(): Promise<string> {
