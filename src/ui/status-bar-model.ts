@@ -3,6 +3,7 @@ import type { ModeId, ResolvedKeymapConfig } from '@brimveyn/aimux-config'
 import type { AppState } from '../state/types'
 
 import { describeBindings } from '../input/keymap/describe-bindings'
+import { worktreeColorOf } from '../platform/worktree-paths'
 import { getActiveWorkspacePath } from '../state/project-workspaces'
 import { buildHintText } from './keymap-context'
 import { abbreviatePath } from './path-format'
@@ -30,7 +31,15 @@ function projectSegments(
   const segs: IdentitySegment[] = [{ id: 'project', text: projectName, tone: 'primary' }]
   if (projectPath != null && projectPath !== '') {
     segs.push({ id: 'sep-project-path', text: SEP, tone: 'muted' })
-    segs.push({ id: 'path', text: abbreviatePath(projectPath), tone: 'muted' })
+    // A workspace of ours is said by its colour, not by where it happens to sit:
+    // the path is `<root>/<project>/<colour>`, so the two lines to its left are
+    // the project already named beside it and a root the user never chose. Any
+    // other checkout is somewhere only the path can say.
+    segs.push({
+      id: 'path',
+      text: worktreeColorOf(projectPath) ?? abbreviatePath(projectPath),
+      tone: 'muted',
+    })
   }
   return segs
 }
