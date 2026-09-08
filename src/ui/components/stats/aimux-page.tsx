@@ -9,6 +9,7 @@ import {
 } from '../../../services/aimux-counters/summary'
 import { formatCompact } from '../../format-number'
 import { chartColumns } from './chart'
+import { ColorMosaic } from './color-mosaic'
 import {
   formatCount,
   formatDayLabel,
@@ -233,6 +234,8 @@ export function AimuxPage({ data, width }: { data: StatsData; width: number }) {
       <Section glyph={GLYPH.aimux} title="What you built" note="all time" width={usable}>
         <FactGrid columns={split.twoUp ? 2 : 1} facts={built} width={usable} />
       </Section>
+
+      <ColorMosaic counts={data.worktreeColors} width={usable} />
 
       <RecordsSection
         empty="nothing to beat yet — records appear as aimux is used"
