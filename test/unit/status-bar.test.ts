@@ -11,6 +11,39 @@ function identityText(model: StatusBarModel): string {
 }
 
 describe('getStatusBarModel', () => {
+  test('names a workspace of ours by its colour, and any other by its path', () => {
+    const previousRoot = process.env.AIMUX_WORKTREE_ROOT
+    process.env.AIMUX_WORKTREE_ROOT = '/tmp/aimux-status-test'
+    try {
+      const identityFor = (path: string): string => {
+        const state = {
+          ...createInitialState({}, [
+            {
+              createdAt: '2024-01-01T00:00:00.000Z',
+              id: 'project-1',
+              lastOpenedAt: '2024-01-01T00:00:00.000Z',
+              name: 'aimux',
+              projectPath: path,
+              updatedAt: '2024-01-01T00:00:00.000Z',
+            },
+          ]),
+          currentProjectId: 'project-1',
+        }
+        return identityText(getStatusBarModel(state, CONFIG))
+      }
+
+      expect(identityFor('/tmp/aimux-status-test/aimux/eggshell')).toContain('eggshell')
+      // Outside the root, `eggshell` is a directory the user named, not a
+      // colour we handed out.
+      expect(identityFor('/Users/me/eggshell')).toContain('/Users/me/eggshell')
+      // Inside the root but from before colours existed: the path is all there is.
+      expect(identityFor('/tmp/aimux-status-test/r-8677d8c4/some-slug')).toContain('r-8677d8c4')
+    } finally {
+      if (previousRoot === undefined) delete process.env.AIMUX_WORKTREE_ROOT
+      else process.env.AIMUX_WORKTREE_ROOT = previousRoot
+    }
+  })
+
   test('shows navigation hints when browsing tabs', () => {
     const state = createInitialState()
     const model = getStatusBarModel(state, CONFIG)

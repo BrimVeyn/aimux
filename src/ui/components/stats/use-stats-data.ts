@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 
+import {
+  readWorktreeColorCounts,
+  type WorktreeColorCounts,
+} from '../../../platform/worktree-colors'
 import { type CounterDays, readCounters } from '../../../services/aimux-counters/store'
 import { localDay, readUsageHistory, type UsageDays } from '../../../services/usage-history/store'
 
@@ -12,6 +16,8 @@ export interface StatsData {
   /** Local day key for "today", captured once so every page agrees on it. */
   today: string
   todayDate: Date
+  /** How many workspaces each worktree colour has named, over the install's life. */
+  worktreeColors: WorktreeColorCounts
 }
 
 /**
@@ -36,6 +42,7 @@ export function useStatsData(): StatsData | null {
       // Below every real version: the file is there and unparseable, which also
       // means the rollup is refusing to write over it. Silent until now.
       unreadable: history.version < 1,
+      worktreeColors: readWorktreeColorCounts(),
     })
   }, [])
 

@@ -11,6 +11,7 @@ import { runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { usePrStatusStore } from '../../../../state/pr-status-store'
 import { getActiveWorkspace } from '../../../../state/project-workspaces'
 import { toast } from '../../../../state/toast-store'
+import { useWorkspaceDeleteStore } from '../../../../state/workspace-delete-store'
 import { useBusySpinner } from '../../../hooks/use-busy-spinner'
 import { type ResolvedTuiTheme, useTheme } from '../../../theme'
 
@@ -28,7 +29,6 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
   const projects = useAppStore((s) => s.projects)
   const [confirming, setConfirming] = useState(false)
   const [merging, setMerging] = useState(false)
-  const spinner = useBusySpinner(merging)
 
   const pr = result?.kind === 'ok' ? result.pr : null
   const status = result?.kind === 'ok' ? prActionState(result.pr, result.checks) : null
@@ -41,6 +41,12 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
   const projectId = project?.id ?? null
   const removableWorkspaceId =
     workspace !== undefined && workspace.source !== 'primary' ? workspace.id : null
+  // The delete runs behind the git queue, so the row — not a toast — is where
+  // the wait is shown: the button it replaces is the one that started it.
+  const deleting = useWorkspaceDeleteStore(
+    (s) => removableWorkspaceId !== null && s.deleting[removableWorkspaceId] !== undefined
+  )
+  const spinner = useBusySpinner(merging || deleting)
 
   const base = pr?.base ?? ''
   const cleanupKind =
@@ -101,6 +107,7 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
     else label = 'Merge this PR?'
   }
   if (merging) label = `${spinner} merging…`
+  if (deleting) label = `${spinner} deleting…`
 
   return (
     <box flexDirection="row" gap={1} backgroundColor={bg} paddingLeft={1} paddingRight={1}>
@@ -115,14 +122,14 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
       <box flexGrow={1} flexShrink={1} overflow="hidden">
         <text
           selectable={false}
-          fg={merging || confirming ? t.warning : toneColor(status.tone, t)}
+          fg={merging || deleting || confirming ? t.warning : toneColor(status.tone, t)}
           bg={bg}
           wrapMode="none"
         >
           {label}
         </text>
       </box>
-      {confirming ? (
+      {confirming && !deleting ? (
         <box flexDirection="row" flexShrink={0} gap={1}>
           <text selectable={false} fg={t.success} bg={bg} wrapMode="none" onMouseDown={confirm}>
             <strong>yes</strong>
@@ -132,7 +139,7 @@ export const PrStateRow = memo(function PrStateRow({ projectPath }: { projectPat
           </text>
         </box>
       ) : null}
-      {showAction && !confirming && !merging ? (
+      {showAction && !confirming && !merging && !deleting ? (
         <box flexShrink={0}>
           <text selectable={false} fg={t.primary} bg={bg} wrapMode="none" onMouseDown={askConfirm}>
             <strong>{cleanupKind === null ? 'Merge' : 'Clean up'}</strong>

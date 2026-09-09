@@ -9,9 +9,9 @@ import {
 } from '../../../ipc/protocol'
 import { createPrefixedId } from '../../../platform/id'
 import {
+  allocateWorktreeSlot,
   assertSafeAimuxWorktreePath,
   ensureAimuxWorktreeRoot,
-  makeWorktreePath,
   pruneEmptyWorktreeParent,
 } from '../../../platform/worktree-paths'
 import { shouldRefreshBase, worktreeCopyPatterns } from '../../../settings/flags'
@@ -92,12 +92,13 @@ export async function createProjectWorkspace(
   }
 
   const workspaceId = createPrefixedId('workspace')
-  const targetPath = makeWorktreePath({
+  await ensureAimuxWorktreeRoot()
+  const { path: targetPath } = await allocateWorktreeSlot({
+    projectName: project.name,
     repoRoot: primary.repoRoot,
     workspaceId,
     workspaceName: name,
   })
-  await ensureAimuxWorktreeRoot()
   await assertSafeAimuxWorktreePath(targetPath)
 
   let forkRef: string

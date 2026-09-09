@@ -1,6 +1,17 @@
 import { createHash } from 'node:crypto'
-import { lstat, mkdir, realpath, rmdir } from 'node:fs/promises'
-import { join, resolve } from 'node:path'
+import {
+  lstat,
+  mkdir,
+  readdir,
+  readFile,
+  realpath,
+  rmdir,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import { basename, join, resolve } from 'node:path'
+
+import { recordWorktreeColor, WORKTREE_COLOR_HEX, WORKTREE_COLORS } from './worktree-colors'
 
 // Worktrees hold uncommitted work, so they live in the XDG data dir, not /tmp:
 // a reboot clears /tmp on macOS and on most Linux distros, and took the work
@@ -8,6 +19,12 @@ import { join, resolve } from 'node:path'
 // before this change are still classified and deleted as aimux-managed.
 const LEGACY_WORKTREE_ROOT = '/tmp/aimux-wt'
 const MAX_SLUG_LENGTH = 24
+
+// Written inside `<root>/<project-name>` to record which repo owns that name.
+// Two checkouts of `aimux` at different paths both want the `aimux` directory;
+// the marker is what tells the second one to take `aimux-1` instead.
+const PROJECT_MARKER = '.aimux-repo'
+const MAX_PROJECT_SUFFIX = 100
 
 function defaultWorktreeRoot(): string {
   const xdgData = process.env.XDG_DATA_HOME
@@ -56,12 +73,82 @@ export function makeWorktreePath({
   return join(getAimuxWorktreeRoot(), repoKey, slug)
 }
 
+/**
+ * `<root>/<project-name>`, or `<project-name>-1` when another repo already owns
+ * that name. Creates the directory and stamps it with the owning repo root, so
+ * the answer is stable across runs.
+ */
+async function resolveProjectDir(repoRoot: string, projectName: string): Promise<string> {
+  const base = sanitizePathSegment(projectName)
+  const owner = resolve(repoRoot)
+  for (let suffix = 0; suffix < MAX_PROJECT_SUFFIX; suffix++) {
+    const dir = join(getAimuxWorktreeRoot(), suffix === 0 ? base : `${base}-${suffix}`)
+    const marker = join(dir, PROJECT_MARKER)
+    const claimed = (await readFile(marker, 'utf8').catch(() => '')).trim()
+    if (claimed === owner) return dir
+    if (claimed !== '') continue
+    await mkdir(dir, { recursive: true })
+    await writeFile(marker, owner)
+    return dir
+  }
+  throw new Error(`no free worktree directory for project "${base}"`)
+}
+
+/**
+ * Where a new workspace's worktree goes, and the color that names it.
+ *
+ * A color is reused as soon as the workspace holding it is deleted — the
+ * directory listing IS the ledger, so there is no counter to keep in sync with
+ * what is actually on disk. Falls back to the hashed path from
+ * `makeWorktreePath` when the pool is exhausted or anything at all goes wrong:
+ * a prettier directory name is never worth failing to create the workspace.
+ */
+export async function allocateWorktreeSlot(
+  params: {
+    repoRoot: string
+    projectName: string
+    workspaceName: string
+    workspaceId: string
+  },
+  /** Names spoken for elsewhere — branches outliving the worktree that held them. */
+  reserved: readonly string[] = []
+): Promise<{ path: string; color?: string }> {
+  try {
+    const dir = await resolveProjectDir(params.repoRoot, params.projectName)
+    const taken = new Set([...(await readdir(dir)), ...reserved])
+    const free = WORKTREE_COLORS.filter((color) => !taken.has(color))
+    const color = free[Math.floor(Math.random() * free.length)]
+    if (color != null) {
+      recordWorktreeColor(color)
+      return { color, path: join(dir, color) }
+    }
+  } catch {
+    // Unwritable root, a racing creation, 100 projects sharing a name. Any of
+    // them means: name it the old way and get on with creating the worktree.
+  }
+  return { path: makeWorktreePath(params) }
+}
+
 export function isInsideAimuxWorktreeRoot(path: string): boolean {
   const normalizeTmp = (value: string) => value.replace(/^\/private\/tmp(?=\/|$)/, '/tmp')
   const target = `${normalizeTmp(resolve(path))}/`
   return [getAimuxWorktreeRoot(), LEGACY_WORKTREE_ROOT].some((root) =>
     target.startsWith(`${normalizeTmp(resolve(root))}/`)
   )
+}
+
+/**
+ * The colour a workspace is named after, or nothing when it is not one of ours.
+ *
+ * The path is the register — `<root>/<project>/<colour>` — so there is nothing
+ * to store and nothing to keep in sync. The root check is what keeps a checkout
+ * of the user's own that happens to live in a directory called `teal` from
+ * claiming a name it was never handed.
+ */
+export function worktreeColorOf(path: string): string | undefined {
+  if (!isInsideAimuxWorktreeRoot(path)) return undefined
+  const name = basename(resolve(path))
+  return WORKTREE_COLOR_HEX[name] == null ? undefined : name
 }
 
 export async function ensureAimuxWorktreeRoot(): Promise<string> {
@@ -88,6 +175,12 @@ export async function pruneEmptyWorktreeParent(worktreePath: string): Promise<vo
   if (parent === resolve(getAimuxWorktreeRoot())) return
   if (!isInsideAimuxWorktreeRoot(parent)) return
   try {
+    // The project marker is bookkeeping, not content: a directory holding
+    // nothing else is empty as far as the user is concerned.
+    const entries = await readdir(parent).catch(() => [])
+    if (entries.length === 1 && entries[0] === PROJECT_MARKER) {
+      await unlink(join(parent, PROJECT_MARKER))
+    }
     await rmdir(parent)
   } catch {
     // Non-empty (a sibling worktree is live) or already gone. Either is fine.
