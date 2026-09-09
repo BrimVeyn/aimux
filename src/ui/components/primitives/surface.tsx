@@ -28,6 +28,9 @@ function toneToToken(tone: SurfaceTone): TuiColorToken {
 interface SurfaceProps {
   children: ReactNode
   flexDirection?: 'row' | 'column'
+  /** Grows the filled area, for a surface that is a screen rather than a card. */
+  flexGrow?: number
+  flexShrink?: number
   gap?: number
   minHeight?: number
   padding?: number
@@ -42,6 +45,8 @@ interface SurfaceProps {
 export function Surface({
   children,
   flexDirection = 'column',
+  flexGrow,
+  flexShrink,
   gap = 0,
   minHeight,
   padding,
@@ -57,6 +62,8 @@ export function Surface({
     <box
       backgroundColor={t[toneToToken(tone)]}
       flexDirection={flexDirection}
+      flexGrow={flexGrow}
+      flexShrink={flexShrink}
       gap={gap}
       minHeight={minHeight}
       padding={padding}

@@ -1,0 +1,105 @@
+{
+  "id": "aimux-examples.gitlog",
+  "name": "Git log",
+  "version": "1.0.0",
+  "description": "The history of the repository you are working in, full screen, with each commit's files beside it",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx",
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "count": {
+      "type": "number",
+      "label": "Commits loaded",
+      "description": "How far back `git log` reads. The list is scrolled, not paged, so this is the whole of what you can walk through.",
+      "default": 200
+    },
+    "showMerges": {
+      "type": "boolean",
+      "label": "Show merge commits",
+      "description": "Off passes `--no-merges`, which on a repository that merges pull requests is most of the noise.",
+      "default": true
+    },
+    "maxLines": {
+      "type": "number",
+      "label": "Lines kept per commit",
+      "description": "Where the file list of a very large commit is cut. The pane says when it was.",
+      "default": 500
+    }
+  },
+  "contributes": {
+    "keymaps": [
+      {
+        "id": "open",
+        "description": "Open the repository's history",
+        "mode": "navigation",
+        "key": "<Leader>o",
+        "action": "open"
+      },
+      {
+        "id": "open-insert",
+        "description": "Open the repository's history while typing",
+        "mode": "terminal-input",
+        "key": "<Leader>o",
+        "action": "open"
+      },
+      {
+        "id": "down",
+        "description": "Next commit",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "j",
+        "action": "down"
+      },
+      {
+        "id": "up",
+        "description": "Previous commit",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "k",
+        "action": "up"
+      },
+      {
+        "id": "inspect",
+        "description": "Open git mode on this commit",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "<CR>",
+        "action": "inspect"
+      },
+      {
+        "id": "detail-down",
+        "description": "Scroll the diff down",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "<C-d>",
+        "action": "detailDown"
+      },
+      {
+        "id": "detail-up",
+        "description": "Scroll the diff up",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "<C-u>",
+        "action": "detailUp"
+      },
+      {
+        "id": "refresh",
+        "description": "Read the log again",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "r",
+        "action": "refresh"
+      },
+      {
+        "id": "close-q",
+        "description": "Close the history",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "q",
+        "action": "close"
+      },
+      {
+        "id": "close-escape",
+        "description": "Close the history",
+        "mode": "plugin.aimux-examples.gitlog.log",
+        "key": "<Esc>",
+        "action": "close"
+      }
+    ]
+  }
+}

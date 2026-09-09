@@ -75,11 +75,22 @@ export function Panel({
   return (
     <box flexDirection="column" flexGrow={flexGrow}>
       {title === undefined ? null : (
-        <box paddingLeft={1} paddingRight={1}>
+        // Not shrinkable, for the same reason a row is not: a heading squeezed
+        // by a growing body below it does not get shorter, it disappears.
+        <box flexShrink={0} paddingLeft={1} paddingRight={1}>
           <text fg={t.textMuted}>{title}</text>
         </box>
       )}
-      <Surface flexDirection="column" padding={padding} tone={tone}>
+      {/* The body grows with the panel. Without this the frame grew and its
+          filled area did not, so a plugin's `flexGrow` children were laid out
+          in a box of no height at all — every row drawn on the same line. */}
+      <Surface
+        flexDirection="column"
+        flexGrow={flexGrow}
+        flexShrink={flexGrow === undefined ? undefined : 1}
+        padding={padding}
+        tone={tone}
+      >
         {children}
       </Surface>
     </box>
@@ -99,7 +110,10 @@ export interface RowProps {
 export function Row({ dim = false, label, value }: RowProps): ReactNode {
   const t = usePluginTheme()
   return (
-    <box flexDirection="row" paddingLeft={1} paddingRight={1}>
+    /* Never shrinks: a row is one line by definition, and a column with a
+       growing sibling would otherwise squeeze it to nothing — which does not
+       hide it, it draws it on the line below. */
+    <box flexDirection="row" flexShrink={0} paddingLeft={1} paddingRight={1}>
       <box flexGrow={1}>{paint(label, dim ? t.textMuted : t.text)}</box>
       {value === undefined ? null : paint(value, t.textMuted)}
     </box>
@@ -141,6 +155,10 @@ export function List<T>({
       {items.map((item, index) => (
         <ListItem
           active={index === selectedIndex}
+          // The same string as the React key, as a renderable id: a list long
+          // enough to scroll is one whose cursor has to be scrolled *to*, and
+          // `scrollChildIntoView` needs a name for the row.
+          id={keyOf?.(item, index) ?? String(index)}
           index={index}
           key={keyOf?.(item, index) ?? String(index)}
           onClickIndex={onSelect}

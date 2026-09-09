@@ -105,5 +105,13 @@ export function PluginViewHost(): ReactNode {
   const activeId = useAppStore((s) => s.activePluginView)
   useAppStore((s) => s.pluginRegistryVersion)
   const view = getPluginView(activeId)
-  return view?.render() ?? null
+  if (view === undefined) return null
+  // The slot, not the plugin, decides how much screen there is. A view that
+  // grows would otherwise be laid out against no height at all and paint over
+  // the status bar under it — which is not a plugin's mistake to make.
+  return (
+    <box flexBasis={0} flexDirection="column" flexGrow={1} flexShrink={1} overflow="hidden">
+      {view.render()}
+    </box>
+  )
 }

@@ -10,6 +10,7 @@ import { PluginRuntime } from '../../src/plugins/loader'
 import { clearPluginWidgetIds, getKnownWidgetIds } from '../../src/state/bars'
 import { clearPluginPanes, PluginPaneContent } from '../../src/ui/plugin-panes'
 import { extendUiPluginContext } from '../../src/ui/plugin-ui-services'
+import { clearPluginViews, getPluginView } from '../../src/ui/plugin-views'
 import { useStatusBarSegments } from '../../src/ui/status-bar-segments'
 import { clearBarWidgets, getWidgetRenderer } from '../../src/ui/widgets/registry'
 
@@ -32,6 +33,7 @@ const EXAMPLES = join(new URL('../..', import.meta.url).pathname, 'examples', 'p
 const TRANSPORT: PluginRpcTransport = { broadcast: () => {}, call: async () => null }
 const NAMES = [
   'ghstreak',
+  'gitlog',
   'journal',
   'lazygit',
   'ntfy',
@@ -51,6 +53,7 @@ afterEach(async () => {
   clearBarWidgets()
   clearPluginWidgetIds()
   clearPluginPanes()
+  clearPluginViews()
   while (cleanups.length > 0) cleanups.pop()?.()
 })
 
@@ -76,6 +79,9 @@ function useTempProfile(): void {
 /** The pane pulse registers. Panes only draw once opened, so it is named here. */
 const PANE_ID = 'aimux-examples.pulse.stats'
 
+/** The view gitlog registers. A view replaces the panes, so it is drawn apart. */
+const VIEW_ID = 'aimux-examples.gitlog.log'
+
 /** Every plugin widget, pane and status-bar tile, side by side in one tree. */
 function Everything({ widgetIds }: { widgetIds: readonly string[] }) {
   const segments = useStatusBarSegments()
@@ -90,6 +96,11 @@ function Everything({ widgetIds }: { widgetIds: readonly string[] }) {
         <box key={segment.id}>{segment.render()}</box>
       ))}
       <PluginPaneContent paneId={PANE_ID} />
+      {/* A view fills whatever it is given; boxed here so it cannot squash
+          the widgets it is standing next to only in this test. */}
+      <box height={20} flexShrink={0}>
+        {getPluginView(VIEW_ID)?.render() ?? null}
+      </box>
     </box>
   )
 }
@@ -125,5 +136,8 @@ test('every example plugin loads and draws its first frame', async () => {
   expect(rendered.frame).toContain('Open tabs')
   // The tokens tile, for a tab the daemon half has not answered about yet.
   expect(rendered.frame).toContain('⌁')
+  // And the view, whose first frame is the one where the daemon has answered
+  // neither the log nor the commit — the state a boot actually starts in.
+  expect(rendered.frame).toContain('Commits')
   rendered.dispose()
 })
