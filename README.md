@@ -1,8 +1,9 @@
 # aimux
 
-A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode, and normal
-shell tabs side by side in one TUI with persistent projects, split panes,
-snippets, themes, and fully configurable keymaps.
+A terminal multiplexer for AI CLIs. Run Claude, Codex, OpenCode and normal
+shell tabs side by side in one TUI, across several projects at once, with
+git worktrees per branch, an in-app diff and pull-request review, split panes,
+snippets, themes, plugins, and fully configurable keymaps.
 
 ![Built with Bun](https://img.shields.io/badge/runtime-Bun-f9f1e1)
 ![TypeScript](https://img.shields.io/badge/lang-TypeScript-3178c6)
@@ -13,7 +14,8 @@ snippets, themes, and fully configurable keymaps.
 ## Features
 
 - multi-project workflow with a dedicated project picker
-- tabs for `claude`, `codex`, `opencode`, `grok`, `kimi`, and `terminal`
+- tabs for `claude`, `codex`, `opencode`, `grok`, `kimi`, `antigravity`, and
+  `terminal`
 - split panes with pane focus and resize shortcuts
 - persistent projects with saved layout and tab state
 - profile-isolated config, catalogs, daemon sockets, and runtime state
@@ -22,9 +24,13 @@ snippets, themes, and fully configurable keymaps.
 - configurable git pane (embedded in the sidebar or as a standalone pane) and a
   dedicated [git mode](docs/guide/git-mode.md) for review / stage / commit /
   push with a split or stacked diff view and shiki-powered highlighting
+- the same pane's `github` tab (`g`) reads the branch's open pull request
+  through `gh` — title, body, and every CI check with its state and duration
 - [git worktrees](docs/guide/workspaces.md) for running agents on parallel
   branches — create per-branch workspaces, review each against its base, and
   squash-move a workspace's work into another
+- a [plugin system](docs/guide/plugins.md) with its own typed API, plus
+  `aimux plugin` to search, install and link them
 - built-in help generated from the resolved keymap
 - theme picker with 67 built-in themes (shiki catalog + aimux house themes) and a `/` filter
 
@@ -148,16 +154,17 @@ See [`docs/guide/keymaps.md`](docs/guide/keymaps.md).
 ## Default Everyday Shortcuts
 
 - `?` - open help
-- `i` - focus terminal
-- `Ctrl+Z` - leave terminal-input mode
-- `Ctrl+N` - open new-tab modal
-- `Ctrl+G` - open project picker
-- `Ctrl+S` - open snippet picker
-- `Ctrl+T` - open theme picker
+- `i` - focus terminal, `Ctrl+Z` - leave it
+- `h` / `l` - previous / next tab, `j` / `k` - previous / next project
+- `r` - rename tab, `d d` - close tab, `S` - flash jump
+- `Ctrl+N` - new tab, `Ctrl+P` - new workspace, `Ctrl+G` - project picker
+- `Ctrl+S` - snippet picker, `Ctrl+T` - theme picker
 - `Ctrl+B` - toggle sidebar
-- `Ctrl+D` - enter git mode
-- `Ctrl+W b` - toggle project bar
-- `Ctrl+W 1` through `Ctrl+W 9` - switch projects by index
+- `Ctrl+D` - enter git mode, `G` - toggle the git pane, `g` - its diff /
+  github tabs
+- `Ctrl+W` is the leader: `Ctrl+W b` project bar, `Ctrl+W u` stats,
+  `Ctrl+W ,` settings, `Ctrl+W 1` … `Ctrl+W 9` switch tab by index
+- in a terminal: `Ctrl+W |` / `Ctrl+W -` split, `Ctrl+W h j k l` focus a pane
 
 The help modal reflects the resolved keymap, so it includes your overrides.
 
@@ -167,6 +174,11 @@ The help modal reflects the resolved keymap, so it includes your overrides.
 aimux
 aimux worker doctor
 aimux worker run --name investigate --assistant claude "inspect this repository"
+aimux project list
+aimux tab create --assistant claude --new-workspace
+aimux plugin search git
+aimux profile list
+aimux completion install --shell zsh
 aimux version
 aimux doctor
 aimux update
@@ -201,13 +213,22 @@ See [`docs/developer/architecture.md`](docs/developer/architecture.md).
 - [`docs/concepts/config-and-state.md`](docs/concepts/config-and-state.md)
 - [`docs/concepts/profiles.md`](docs/concepts/profiles.md)
 - [`docs/guide/projects.md`](docs/guide/projects.md)
+- [`docs/guide/workspaces.md`](docs/guide/workspaces.md)
+- [`docs/guide/git-mode.md`](docs/guide/git-mode.md)
 - [`docs/guide/keymaps.md`](docs/guide/keymaps.md)
 - [`docs/guide/themes.md`](docs/guide/themes.md)
+- [`docs/guide/settings.md`](docs/guide/settings.md)
+- [`docs/guide/snippets.md`](docs/guide/snippets.md)
+- [`docs/guide/plugins.md`](docs/guide/plugins.md)
+- [`docs/guide/claude-integration.md`](docs/guide/claude-integration.md)
+- [`docs/guide/ai-usage-indicator.md`](docs/guide/ai-usage-indicator.md)
+- [`docs/guide/usage-history.md`](docs/guide/usage-history.md)
 - [`docs/reference/cli.md`](docs/reference/cli.md)
 - [`docs/reference/config-reference.md`](docs/reference/config-reference.md)
+- [`docs/reference/plugin-api.md`](docs/reference/plugin-api.md)
 - [`docs/reference/runtime-paths.md`](docs/reference/runtime-paths.md)
-- [`docs/guide/git-mode.md`](docs/guide/git-mode.md)
 - [`docs/developer/architecture.md`](docs/developer/architecture.md)
+- [`docs/developer/plugins.md`](docs/developer/plugins.md)
 - [`docs/developer/aimux-config-internals.md`](docs/developer/aimux-config-internals.md)
 
 ## Development
@@ -221,7 +242,13 @@ bun run start
 bun test
 bun run check
 bun run lint
+bun run knip
 ```
+
+The GIF at the top is reproducible: `bun run demo` seeds a throwaway `demo`
+profile and records [`assets/demo.tape`](assets/demo.tape) with
+[vhs](https://github.com/charmbracelet/vhs). The tape's header says what it
+needs.
 
 The repository dev scripts use `AIMUX_PROFILE=dev`, so local development does
 not collide with a globally installed `aimux` instance.
