@@ -40,6 +40,7 @@ const DEFAULT_GIT_PANE: GitPaneState = {
   fileListMode: 'tree',
   path: { enabled: true },
   prefetchRadius: 5,
+  tab: 'diff',
   treeCompaction: true,
 }
 

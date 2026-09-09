@@ -78,20 +78,27 @@ function nonEmptyLines(raw: string): string[] {
 
 /** Strip the wrappers a model reaches for even when told not to: labels, list markers, quotes. */
 function unwrapLine(line: string, label: RegExp): string {
-  return line
-    .replace(label, '')
-    .replace(/^(?:\d+[.)]|[-*])\s*/u, '')
-    .replaceAll(/^["'`“”‘’]+|["'`“”‘’]+$/gu, '')
+  return (
+    line
+      // Emphasis first: `**Tab title:** x` otherwise survives as `*Tab title:** x`,
+      // because the list-marker rule below eats exactly one of the two stars.
+      .replaceAll(/\*\*|__/gu, '')
+      .trim()
+      .replace(label, '')
+      .replace(/^(?:\d+[.)]|[-*])\s*/u, '')
+      .replaceAll(/^["'`“”‘’]+|["'`“”‘’]+$/gu, '')
+      .trim()
+  )
 }
 
 export function sanitizeGeneratedTitle(raw: string): string | null {
   const first = nonEmptyLines(raw)[0]
   if (first == null) return null
-  return clampTitle(unwrapLine(first, /^TITLE\s*:\s*/iu))
+  return clampTitle(unwrapLine(first, /^(?:tab\s+)?title\s*:\s*/iu))
 }
 
 export function sanitizeGeneratedBranch(raw: string): string | null {
-  const line = unwrapLine(raw.trim(), /^BRANCH\s*:\s*/iu)
+  const line = unwrapLine(raw.trim(), /^(?:git\s+)?branch\s*:\s*/iu)
   const slash = line.indexOf('/')
   if (slash < 0) return null
   const type = line.slice(0, slash).trim().toLowerCase()

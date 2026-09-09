@@ -361,8 +361,12 @@ export interface GitPaneDiffCountConfig {
   enabled: boolean
 }
 
+export type GitPaneTab = 'diff' | 'github'
+
 export interface GitPaneState {
   diffModeRatio: number
+  /** Which face of the pane is showing: the working-copy diff, or the PR. */
+  tab: GitPaneTab
   fileListMode: GitFileListMode
   treeCompaction: boolean
   path: GitPanePathConfig
@@ -1390,6 +1394,7 @@ export type GitModeAction =
   | { type: 'git-mode-expand-selection' }
   | { type: 'git-mode-toggle-file-list-mode' }
   | { type: 'git-mode-toggle-tree-compaction' }
+  | { type: 'git-pane-toggle-tab' }
   | { type: 'git-mode-set-diff'; key: string; diff: DiffData; hash: string }
   | {
       type: 'git-mode-set-parsed'

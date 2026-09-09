@@ -234,6 +234,10 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       delete nextCollapsed[row.key]
       return { ...state, gitMode: { ...state.gitMode, collapsedFolders: nextCollapsed } }
     }
+    case 'git-pane-toggle-tab': {
+      const tab = state.gitPane.tab === 'diff' ? 'github' : 'diff'
+      return { ...state, gitPane: { ...state.gitPane, tab } }
+    }
     case 'git-mode-toggle-file-list-mode': {
       const fileListMode = state.gitPane.fileListMode === 'tree' ? 'flat' : 'tree'
       return {

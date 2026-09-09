@@ -42,6 +42,7 @@ export type {
   GitPanelState,
   GitPanePathConfig,
   GitPaneState,
+  GitPaneTab,
   GitRefreshPayload,
   HighlightsEntry,
   LayoutState,
