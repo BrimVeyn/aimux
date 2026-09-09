@@ -123,6 +123,25 @@ Two git-mode bindings act on [workspaces](workspaces.md):
 
 See the [Workspaces guide](workspaces.md) for the full flow.
 
+## The Git Pane: diff / github
+
+Full-screen git mode is one of two faces on the repo. The sidebar git pane
+(`G` toggles it) carries the same file tree plus a second tab:
+
+- **diff** — the working-copy panel, same as git mode
+- **github** — the open pull request for the current branch: title, body,
+  and every CI check with its state and duration
+
+Press `g` in navigation mode to switch between them, or click either tab
+label. The github tab reads `gh pr view`, so it needs the
+[GitHub CLI](https://cli.github.com) authenticated for the repo; without a
+PR it says so rather than staying blank. Clicking a check row opens that
+run in the browser, and clicking the PR row opens the PR.
+
+When a PR exists, the row above the tabs replaces the branch line — it
+already carries the branch identity — and offers a merge confirmation
+inline.
+
 ## Help Modal
 
 Press `?` inside git mode to open a help modal scoped to git-mode

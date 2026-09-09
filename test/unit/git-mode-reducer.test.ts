@@ -211,3 +211,11 @@ test('git-mode diff cache stays isolated for the same path in different sections
   expect(s2.gitMode.diffs['unstaged:src/app.ts']).toBeUndefined()
   expect(s2.gitMode.loading['unstaged:src/app.ts']).toBeUndefined()
 })
+
+test('git-pane-toggle-tab flips the pane between diff and github', () => {
+  const s0 = createInitialState()
+  expect(s0.gitPane.tab).toBe('diff')
+  const s1 = appReducer(s0, { type: 'git-pane-toggle-tab' })
+  expect(s1.gitPane.tab).toBe('github')
+  expect(appReducer(s1, { type: 'git-pane-toggle-tab' }).gitPane.tab).toBe('diff')
+})

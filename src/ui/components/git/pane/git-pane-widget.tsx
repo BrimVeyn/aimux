@@ -1,15 +1,16 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useCallback, useRef } from 'react'
 
-import type { GitPanelState } from '../../../../state/types'
+import type { GitPanelState, GitPaneTab } from '../../../../state/types'
 
 import { useGitPanelPolling } from '../../../../git/git-poller'
 import { usePrStatusPolling } from '../../../../git/pr-status-poller'
 import { useRepoDiscovery } from '../../../../git/use-repo-discovery'
 import { useAppStore } from '../../../../state/app-store'
+import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { getActiveWorkspacePath } from '../../../../state/project-workspaces'
 import { useSettled } from '../../../hooks/use-settled'
 import { GitPanel } from '../git-panel'
-import { GitPaneHeader, type GitPaneTab } from './git-pane-header'
+import { GitPaneHeader } from './git-pane-header'
 import { PrChecksPanel } from './pr-checks-panel'
 
 /** Long enough to swallow key repeat, short enough to read as instant. */
@@ -40,7 +41,14 @@ export const GitPaneWidget = memo(function GitPaneWidget({
   // when it changes, and holding `j`/`k` in the sidebar changes it per keypress.
   const projectPath = useSettled(getActiveWorkspacePath(currentProject), PATH_SETTLE_MS)
 
-  const [tab, setTab] = useState<GitPaneTab>('diff')
+  // In the store, not local state, so the `g` keybinding can reach it.
+  const tab = useAppStore((s) => s.gitPane.tab)
+  const setTab = useCallback(
+    (next: GitPaneTab) => {
+      if (next !== tab) dispatchGlobal({ type: 'git-pane-toggle-tab' })
+    },
+    [tab]
+  )
 
   useRepoDiscovery(projectPath)
   useGitPanelPolling({ enabled: pollingEnabled, headOffset: 0, projectPath })

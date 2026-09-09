@@ -720,6 +720,8 @@ export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-vie
 
 export const toggleGitReviewBase: KeyResult = r([{ type: 'git-mode-toggle-review-base' }])
 
+export const toggleGitPaneTab: KeyResult = r([{ type: 'git-pane-toggle-tab' }])
+
 export function shiftGitHeadOffset(delta: number): KeyResult {
   return r([
     { delta, type: 'git-mode-shift-head-offset' },

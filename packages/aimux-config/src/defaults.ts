@@ -60,6 +60,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<C-h>', actions.resizeSidebar(-2), 'Sidebar narrower')
         .map('<C-l>', actions.resizeSidebar(2), 'Sidebar wider')
         .map('G', actions.toggleGitPane, 'Toggle git pane')
+        .map('g', actions.toggleGitPaneTab, 'Git pane diff/github')
         .map('<C-d>', actions.enterGitMode, 'Enter git mode')
         .map('<C-j>', actions.resizeGitPane(-0.05), 'Git pane smaller')
         .map('<C-k>', actions.resizeGitPane(0.05), 'Git pane larger')

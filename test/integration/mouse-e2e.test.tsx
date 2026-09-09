@@ -225,6 +225,7 @@ function MouseHarness({
         fileListMode: 'tree' as const,
         path: { enabled: true },
         prefetchRadius: 0,
+        tab: 'diff' as const,
         treeCompaction: false,
       },
       layout: {

@@ -1,14 +1,12 @@
 import { memo, useCallback } from 'react'
 
-import type { GitPanelState } from '../../../../state/types'
+import type { GitPanelState, GitPaneTab } from '../../../../state/types'
 
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal, runSideEffectGlobal } from '../../../../state/dispatch-ref'
 import { selectPrRowVisible, usePrStatusStore } from '../../../../state/pr-status-store'
 import { useTheme } from '../../../theme'
 import { PrStateRow } from './pr-state-row'
-
-export type GitPaneTab = 'diff' | 'github'
 
 interface GitPaneHeaderProps {
   gitPanel: GitPanelState
