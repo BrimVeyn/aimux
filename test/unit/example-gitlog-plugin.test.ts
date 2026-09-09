@@ -5,6 +5,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+import type { SideEffectContext } from '../../src/app-runtime/side-effect-context'
+
 import gitlogDaemon from '../../examples/plugins/gitlog/src/daemon'
 import {
   type Commit,
@@ -14,6 +16,7 @@ import {
   relative,
 } from '../../examples/plugins/gitlog/src/parse'
 import gitlogUi from '../../examples/plugins/gitlog/src/ui'
+import { runPluginEffect } from '../../src/app-runtime/plugin-effects'
 import { deriveModeId } from '../../src/input/modes/bridge'
 import { appStore } from '../../src/state/app-store'
 import { setActiveDispatch } from '../../src/state/dispatch-ref'
@@ -259,5 +262,60 @@ describe('the enter key', () => {
     await handle.dispose()
     setActiveDispatch(null)
     expect(pluginActionNames()).toEqual([])
+  })
+})
+
+describe('a socket that dies mid-walk', () => {
+  test('the rejection reaches the log, never the process', async () => {
+    const seen: unknown[] = []
+    const record = (reason: unknown): void => {
+      seen.push(reason)
+    }
+    process.on('unhandledRejection', record)
+
+    const handle = createTestContext({
+      extend: extendUiPluginContext,
+      host: 'ui',
+      id: 'aimux-examples.gitlog',
+      // What `backend.destroy()` does to everything in flight when the user
+      // switches project — the plugin asked for nothing and gets an error.
+      onCall: async () => {
+        await Promise.reject(new Error('Remote backend destroyed'))
+      },
+    })
+    await handle.apply(gitlogUi)
+    setActiveDispatch(appStore.getState().dispatch)
+
+    const ctx = handle.ctx as UiPluginContext
+    ctx.store.dispatch('loaded', {
+      branch: 'trunk',
+      commits: [
+        {
+          author: 'Test',
+          date: '2026-09-09T12:00:00Z',
+          sha: 'a'.repeat(40),
+          short: 'aaaaaaa',
+          subject: 'a',
+        },
+        {
+          author: 'Test',
+          date: '2026-09-09T12:00:00Z',
+          sha: 'b'.repeat(40),
+          short: 'bbbbbbb',
+          subject: 'b',
+        },
+      ],
+      repoRoot: '/tmp/repo',
+    })
+
+    runPluginEffect('aimux-examples.gitlog', 'down', undefined, {} as SideEffectContext)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+
+    process.off('unhandledRejection', record)
+    expect(seen).toEqual([])
+    expect(handle.logs.at(-1)?.message).toBe('git show')
+
+    await handle.dispose()
+    setActiveDispatch(null)
   })
 })

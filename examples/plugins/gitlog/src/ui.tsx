@@ -110,19 +110,33 @@ export default definePlugin({
     /** The file column's scrollbox, so a key can scroll something React drew. */
     let diffBox: ScrollBoxRenderable | null = null
 
+    /**
+     * The one call that is made in the background rather than for a screen the
+     * user is waiting on, so it swallows its own failure: an RPC is a socket,
+     * and a socket dies for reasons that have nothing to do with this plugin —
+     * switching project destroys the backend and rejects everything in flight.
+     * A log line is the right report for that; a toast per project switch is
+     * not, and an escaping rejection is a stack trace over the interface.
+     */
     const loadDetail = async (): Promise<void> => {
       const slice = ctx.store.get() ?? EMPTY
       const commit = slice.commits[slice.selected]
       if (commit === undefined) return
-      const answer = await ctx.rpc.call<Failure | ShowResult>('show', {
-        projectId: projectId(),
-        sha: commit.sha,
-      })
-      if (isFailure(answer)) {
-        ctx.log.warn('git show', { error: answer.error })
-        return
+      try {
+        const answer = await ctx.rpc.call<Failure | ShowResult>('show', {
+          projectId: projectId(),
+          sha: commit.sha,
+        })
+        if (isFailure(answer)) {
+          ctx.log.warn('git show', { error: answer.error })
+          return
+        }
+        ctx.store.dispatch('detail', answer)
+      } catch (error) {
+        ctx.log.warn('git show', {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
-      ctx.store.dispatch('detail', answer)
     }
 
     const refresh = async (): Promise<void> => {
@@ -164,9 +178,9 @@ export default definePlugin({
 
     bind(
       'open',
-      () => {
+      async () => {
         ctx.ui.views.open('log')
-        void refresh()
+        await refresh()
       },
       {
         description: "The repository's history, and the diff of the commit you are on",
@@ -177,13 +191,15 @@ export default definePlugin({
       ctx.ui.views.close()
     })
     bind('refresh', refresh)
-    bind('down', () => {
+    // Awaited, not `void`ed: aimux contains what an effect throws, and a
+    // promise started inside one and left behind escapes that containment.
+    bind('down', async () => {
       ctx.store.dispatch('move', 1)
-      void loadDetail()
+      await loadDetail()
     })
-    bind('up', () => {
+    bind('up', async () => {
       ctx.store.dispatch('move', -1)
-      void loadDetail()
+      await loadDetail()
     })
     bind('detailDown', () => {
       diffBox?.scrollBy({ x: 0, y: halfPage() })
@@ -339,6 +355,8 @@ export default definePlugin({
             empty={<text fg={theme.textMuted}>{slice.loading ? 'reading…' : 'no commits'}</text>}
             onHover={(index) => {
               ctx.store.dispatch('select', index)
+              // A mouse handler has no effect around it, so the catch inside
+              // `loadDetail` is what keeps this one from escaping.
               void loadDetail()
             }}
             onSelect={(index) => {
