@@ -791,6 +791,7 @@ export async function runDaemon(): Promise<void> {
         },
         spawnTab: spawnTabForPlugin,
         tabs: () => tabRegistry,
+        uiAttachers: countUiAttachers,
         workspaces: {
           addWorkspaceRecord: async (targetProjectId, workspace) => {
             recordWorkspaceAdded(targetProjectId, workspace)

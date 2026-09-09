@@ -1,0 +1,30 @@
+{
+  "id": "aimux-examples.discord",
+  "name": "Discord presence",
+  "version": "1.0.0",
+  "description": "What your agents are doing, on your Discord profile — the project, how many are working, and which one is waiting on you",
+  "apiVersion": 1,
+  "entries": {
+    "daemon": "src/daemon.ts"
+  },
+  "config": {
+    "applicationId": {
+      "type": "string",
+      "label": "Application ID",
+      "description": "The id of a Discord application you own — discord.com/developers/applications, General Information. Its name is the line Discord prints above the presence.",
+      "required": true
+    },
+    "showProject": {
+      "type": "boolean",
+      "label": "Show the project name",
+      "description": "Off puts `aimux` there instead. Repository names are the part of this that leaves your machine.",
+      "default": true
+    },
+    "largeImage": {
+      "type": "string",
+      "label": "Art asset key",
+      "description": "Name of an image uploaded under Rich Presence → Art Assets. Empty shows no icon.",
+      "default": ""
+    }
+  }
+}

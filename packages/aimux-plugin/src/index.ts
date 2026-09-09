@@ -7,6 +7,7 @@
 export type {
   PluginAssistantsApi,
   PluginCliApi,
+  PluginClientsApi,
   PluginCounterDay,
   PluginCreateWorkspaceInput,
   PluginHooksApi,
