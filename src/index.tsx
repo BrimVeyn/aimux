@@ -109,6 +109,7 @@ const [
   { maybeAutoInstallCompletion },
   { maybeSpawnUsageRollup },
   { startCounters },
+  { installUnhandledRejectionHandler },
 ] = await Promise.all([
   import('@opentui/react'),
   import('./app'),
@@ -119,7 +120,13 @@ const [
   import('./cli/completion/install'),
   import('./services/usage-history/store'),
   import('./services/aimux-counters'),
+  import('./app-runtime/unhandled-rejections'),
 ])
+
+// Before the renderer: from here on, stderr belongs to the alternate screen,
+// and Node's default report for a promise nobody awaited is a stack trace
+// painted over the interface. It goes to the debug log and a toast instead.
+installUnhandledRejectionHandler()
 const { resolved: resolvedConfig, user: userConfig } = await loadUserConfig()
 
 // First launch (and after every upgrade): drop the shell completion script in
