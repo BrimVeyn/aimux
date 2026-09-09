@@ -1,6 +1,6 @@
 # Example plugins
 
-Nine plugins that exist to be read, and to keep the plugin API honest.
+Eleven plugins that exist to be read, and to keep the plugin API honest.
 
 They are in this repository rather than in a gallery somewhere because they are
 typechecked with it: `bun run check` covers `examples/`, so a change to
@@ -19,6 +19,8 @@ each found something — that is why they exist.
 | `ntfy`     | the notification slot (`notifications.provide`), a secret token         |
 | `tokens`   | `ctx.assistants.session/usage/resume`, a stats page, `tab:turnComplete` |
 | `journal`  | a supervised service, `aimux events follow`, `registerCommand`          |
+| `gitlog`   | a full-screen view, a daemon half that shells out to git                |
+| `discord`  | a daemon-only plugin, a socket protocol, `tab:status` as the only input |
 
 ## Trying one
 
@@ -51,6 +53,6 @@ plugins: [
 ## What they are not
 
 Not a component library, and not a style guide for TypeScript. They are the
-shortest honest version of nine real things, and each one names in its README
+shortest honest version of eleven real things, and each one names in its README
 the part where it had to guess — a model alias, a GPU counter — so you can
 point it at what your machine actually has.
