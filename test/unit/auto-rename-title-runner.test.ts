@@ -149,3 +149,16 @@ test('reports a missing CLI as unavailable without spawning', async () => {
   expect(result).toEqual({ status: 'unavailable' })
   expect(spawned).toBe(false)
 })
+
+test('strips markdown emphasis around a label the model was told not to write', () => {
+  expect(sanitizeGeneratedTitle('**Tab title:** Store setup and reducer')).toBe(
+    'Store setup and reducer'
+  )
+  expect(sanitizeGeneratedTitle('__Title:__ Corriger le cache')).toBe('Corriger le cache')
+})
+
+test('strips markdown emphasis from a generated branch line', () => {
+  expect(sanitizeGeneratedBranch('**Branch:** fix/scroll-drift-on-resize')).toBe(
+    'fix/scroll-drift-on-resize'
+  )
+})
