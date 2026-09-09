@@ -330,6 +330,7 @@ export interface DaemonPluginContext extends PluginContext {
   readonly hooks: PluginHooksApi
   readonly cli: PluginCliApi
   readonly metrics: PluginMetricsApi
+  readonly clients: PluginClientsApi
 }
 ```
 
@@ -1249,6 +1250,20 @@ export interface PluginAssistantsApi {
    * the new tab id. Rejects when the tab has no session to resume.
    */
   resume: (tabId: string) => Promise<string>
+}
+```
+
+```ts
+export interface PluginClientsApi {
+  /**
+   * How many UI processes are attached right now.
+   *
+   * Zero is the daemon running headless — sessions alive, nobody looking. A
+   * plugin whose work only means something to a watching human reads this and
+   * stops: publishing a presence, holding a socket open, or paying a poll for
+   * a screen that is not on.
+   */
+  ui: () => number
 }
 ```
 

@@ -26,6 +26,7 @@ export default definePlugin<DaemonPluginContext>({
     })
 
     ctx.rpc.handle('tabCount', () => ctx.tabs.list().length)
+    ctx.rpc.handle('uiClients', () => ctx.clients.ui())
     ctx.rpc.handle('spawnWorker', async () =>
       ctx.tabs.spawn({
         assistant: 'acme.robot',

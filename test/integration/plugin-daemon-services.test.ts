@@ -72,6 +72,7 @@ async function start(): Promise<PluginRuntime> {
         return 'tab-new'
       },
       tabs: () => tabs,
+      uiAttachers: () => 1,
       write: async (tabId, data) => {
         writes.push({ data, tabId })
       },
@@ -154,6 +155,14 @@ describe('daemon plugin services', () => {
 
     // The fixture answers over RPC, which is how the daemon half is reached.
     expect(await instance.kernel.handleRpc('aimux-test.daemonkit', 'tabCount', undefined)).toBe(1)
+  })
+
+  test('ctx.clients.ui counts the attached interfaces', async () => {
+    const instance = await start()
+
+    // What a plugin whose work only matters to a watching human reads before
+    // doing any of it.
+    expect(await instance.kernel.handleRpc('aimux-test.daemonkit', 'uiClients', undefined)).toBe(1)
   })
 
   test('a daemon event reaches the plugin through the kernel bus', async () => {
