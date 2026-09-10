@@ -89,8 +89,6 @@ export interface DaemonPluginBackings {
   focus: (projectId: string, tabId: string) => Promise<void>
   closeTab: (tabId: string) => Promise<void>
   hookServer: () => HookServer | null
-  /** Attached UI processes, thin CLI attachers excluded. */
-  uiAttachers: () => number
   /**
    * Records a workspace the way a CLI `addWorkspaceRecord` would: relayed to
    * the attached UI when there is one, written to the catalog otherwise.
@@ -350,8 +348,6 @@ export function createDaemonContextExtender(
         ),
     }
 
-    const clients = { ui: (): number => backings.uiAttachers() }
-
     const extended = ctx as PluginContext & Record<string, unknown>
     extended.tabs = tabs
     extended.projects = projects
@@ -360,6 +356,5 @@ export function createDaemonContextExtender(
     extended.assistants = assistants
     extended.hooks = hooks
     extended.cli = cli
-    extended.clients = clients
   }
 }

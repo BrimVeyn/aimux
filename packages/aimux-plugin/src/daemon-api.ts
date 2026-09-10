@@ -204,18 +204,6 @@ export interface PluginAssistantsApi {
   resume: (tabId: string) => Promise<string>
 }
 
-export interface PluginClientsApi {
-  /**
-   * How many UI processes are attached right now.
-   *
-   * Zero is the daemon running headless — sessions alive, nobody looking. A
-   * plugin whose work only means something to a watching human reads this and
-   * stops: publishing a presence, holding a socket open, or paying a poll for
-   * a screen that is not on.
-   */
-  ui: () => number
-}
-
 export interface PluginHooksApi {
   /**
    * Adds an HTTP hook route. The id is namespaced, so the path a bridge script

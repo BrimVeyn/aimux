@@ -36,7 +36,6 @@ function backings(tabs: Map<string, DaemonTabEntry>): DaemonPluginBackings {
       return 'tab-new'
     },
     tabs: () => tabs,
-    uiAttachers: () => 1,
     write: async () => {},
   }
 }

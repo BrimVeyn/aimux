@@ -247,7 +247,6 @@ export function createDoctorExtender(
       },
     }
     extended.metrics = { counters: () => [] }
-    extended.clients = { ui: () => 0 }
     extended.assistants = {
       register: (definition: { option: { id: string } }) =>
         record(into.assistants, definition.option.id),
