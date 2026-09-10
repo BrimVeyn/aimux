@@ -138,6 +138,12 @@ export function reduceUIState(state: AppState, action: AppAction): AppState | nu
       return withBar(state, side, { ...bar, widgets })
     }
     case 'set-focus-mode':
+      // The raw input handler reads `focusMode` and routes straight to the PTY,
+      // before `deriveModeId` is ever consulted. So while a modal is up —
+      // `deriveModeId` routes input to it — focusMode has to stay put, or a
+      // background launch, a mouse click reaching a pane behind the modal, or a
+      // re-attach would leave the modal deaf and leak typing into the terminal.
+      if (state.modal.type !== null) return state
       return { ...state, focusMode: action.focusMode }
     case 'set-terminal-size':
       return { ...state, layout: { terminalCols: action.cols, terminalRows: action.rows } }
