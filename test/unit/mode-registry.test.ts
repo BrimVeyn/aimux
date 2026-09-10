@@ -5,7 +5,7 @@ import type { AppState } from '../../src/state/types'
 
 import { deriveModeId } from '../../src/input/modes/bridge'
 import { registerMode, transitionTo } from '../../src/input/modes/registry'
-import { createInitialState } from '../../src/state/store'
+import { appReducer, createInitialState } from '../../src/state/store'
 
 function makeState(overrides: Partial<AppState>): AppState {
   return { ...createInitialState(), ...overrides }
@@ -33,7 +33,14 @@ describe('deriveModeId', () => {
     ).toBe('modal.snippet-picker.filtering')
   })
 
-  test('falls back to navigation for unsupported modal and focus combinations', () => {
+  test('an open modal wins over a clobbered focusMode', () => {
+    // focusMode records whoever opened the modal, but a background side effect
+    // can rewrite it while the modal is still up. The modal still owns input.
+    const workspace = appReducer(createInitialState(), { type: 'open-create-workspace-modal' })
+    expect(deriveModeId({ ...workspace, focusMode: 'terminal-input' })).toBe(
+      'modal.create-workspace'
+    )
+
     expect(
       deriveModeId(
         makeState({
@@ -45,7 +52,14 @@ describe('deriveModeId', () => {
           },
         })
       )
-    ).toBe('navigation')
+    ).toBe('modal.project-name')
+  })
+
+  test('falls back to navigation for a focus with no mode of its own and no modal', () => {
+    // `command-edit` and `modal` only ever name a mode through the modal that
+    // is open. With the modal closed there is nothing to route to.
+    expect(deriveModeId(makeState({ focusMode: 'command-edit' }))).toBe('navigation')
+    expect(deriveModeId(makeState({ focusMode: 'modal' }))).toBe('navigation')
   })
 })
 

@@ -75,6 +75,26 @@ for (const [label, open] of CLOSES) {
   })
 }
 
+test('focusMode does not move while a modal is open', () => {
+  let state: AppState = { ...createInitialState(), currentProjectId: 'sess-1' }
+  state = appReducer(state, { type: 'open-create-workspace-modal' })
+  state = appReducer(state, { focusMode: 'terminal-input', type: 'set-focus-mode' })
+  expect(state.focusMode).toBe('command-edit')
+})
+
+/**
+ * The raw input handler runs before `deriveModeId` and reads `focusMode`, so a
+ * background side effect writing `focusMode: terminal-input` while a modal is
+ * up used to send every key — Esc included — to the PTY instead of the modal.
+ * Each modal pins focus, so Esc still reaches it.
+ */
+for (const [label, open] of CLOSES) {
+  test(`Esc closes the ${label} modal after focus is stolen`, () => {
+    const stolen: AppAction[] = [...open, { focusMode: 'terminal-input', type: 'set-focus-mode' }]
+    expect(pressEscape(stolen).modal.type).toBeNull()
+  })
+}
+
 /** Sub-states Esc steps back out of — never into a mode that cannot handle keys. */
 const STEPS_BACK: [string, AppAction[], ModeId][] = [
   [
