@@ -43,7 +43,18 @@ function sameDivergence(
   for (const key of aKeys) {
     const x = a[key]
     const y = b[key]
-    if (x == null || y == null || x.ahead !== y.ahead || x.behind !== y.behind) return false
+    // Line counts too, not just commits: an agent editing a workspace without
+    // committing moves only `added`/`removed`, and ignoring them here froze the
+    // sidebar's `+X -Y` until the next commit.
+    if (
+      x == null ||
+      y == null ||
+      x.ahead !== y.ahead ||
+      x.behind !== y.behind ||
+      x.added !== y.added ||
+      x.removed !== y.removed
+    )
+      return false
   }
   return true
 }
