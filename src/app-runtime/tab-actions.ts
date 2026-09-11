@@ -4,7 +4,7 @@ import type { SideEffectContext } from './side-effect-context'
 import { logInputDebug } from '../debug/input-log'
 import { createPrefixedId } from '../platform/id'
 import {
-  assistantAcceptsPromptArg,
+  buildAssistantPromptArgs,
   buildAssistantSessionArgs,
   getAllAssistantOptions,
   getAssistantOption,
@@ -157,7 +157,7 @@ export function startTabSession(
  * Returns the id of the tab it created, so a caller can write into it.
  *
  * `initialPromptArgs` hands the prompt to the CLI at spawn — see
- * `assistantAcceptsPromptArg`. Callers pass it only for assistants that support
+ * `buildAssistantPromptArgs`. Callers pass it only for assistants that support
  * it, and fall back to `injectPromptWhenReady` otherwise.
  */
 export function launchAssistant(
@@ -205,16 +205,16 @@ export function launchWithPrompt(
   prompt: string,
   workspaceId: string | undefined
 ): void {
-  const atSpawn = prompt !== '' && assistantAcceptsPromptArg(assistant, ctx.state.customCommands)
+  const promptArgs = buildAssistantPromptArgs(assistant, ctx.state.customCommands, prompt)
   logInputDebug('app.launchSelectedAssistant', {
     assistant,
     chained: workspaceId != null,
-    promptAtSpawn: atSpawn,
+    promptAtSpawn: promptArgs != null,
     promptLength: prompt.length,
   })
 
-  const tabId = launchAssistant(ctx, assistant, workspaceId, atSpawn ? [prompt] : undefined)
-  if (prompt !== '' && !atSpawn) {
+  const tabId = launchAssistant(ctx, assistant, workspaceId, promptArgs ?? undefined)
+  if (prompt !== '' && promptArgs == null) {
     void injectPromptWhenReady({
       backend: ctx.backend,
       getState: ctx.getState,

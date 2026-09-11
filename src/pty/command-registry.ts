@@ -57,20 +57,20 @@ export interface AssistantOption {
   model?: AssistantModelSpec
   session?: AssistantSessionSpec
   /**
-   * The CLI starts an interactive session with a positional prompt argument
-   * (`claude "…"`, `codex "…"`). When it does, handing the prompt over at spawn
-   * beats pasting it into the running TUI afterwards: no readiness poll, no
-   * screen probe, no retries.
+   * Args that start an interactive session already holding `prompt` — a
+   * positional for `claude "…"`, `codex "…"` and `grok "…"`, a flag for
+   * `opencode --prompt "…"` and `agy --prompt-interactive "…"`. Handing the
+   * prompt over at spawn beats pasting it into the running TUI afterwards: no
+   * readiness poll, no screen probe, no retries.
+   *
+   * Read the vendor's help before adding one: `--prompt` means the interactive
+   * TUI on opencode but a headless single turn on antigravity, grok and kimi,
+   * and a CLI that answers once and exits would take the tab down with it.
    *
    * Absent means "unknown or not supported" and the caller falls back to
-   * `injectPromptWhenReady`. `opencode`'s positional is a project path and its
-   * `run` subcommand is non-interactive, so it stays on the fallback.
-   *
-   * ponytail: a boolean, because both CLIs that support it are positional.
-   * Promote to a builder — as `AssistantModelSpec` already does for flags — when
-   * a `--prompt <x>`-shaped one shows up.
+   * `injectPromptWhenReady`.
    */
-  acceptsPromptArg?: boolean
+  buildPromptArgs?: (prompt: string) => string[]
 }
 
 /**
@@ -96,7 +96,7 @@ const SHELL_NAME = DEFAULT_SHELL.split('/').pop() ?? 'shell'
 
 export const ASSISTANT_OPTIONS: AssistantOption[] = [
   {
-    acceptsPromptArg: true,
+    buildPromptArgs: (prompt) => [prompt],
     command: 'claude',
     description: 'Anthropic Claude CLI',
     id: 'claude',
@@ -115,7 +115,7 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
-    acceptsPromptArg: true,
+    buildPromptArgs: (prompt) => [prompt],
     command: 'codex',
     description: 'OpenAI Codex CLI',
     id: 'codex',
@@ -126,6 +126,9 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    // `opencode "…"` is a project path, and `opencode run` is non-interactive —
+    // `--prompt` is the one that opens the TUI with the prompt already sent.
+    buildPromptArgs: (prompt) => ['--prompt', prompt],
     command: 'opencode',
     description: 'OpenCode CLI',
     id: 'opencode',
@@ -136,6 +139,7 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    buildPromptArgs: (prompt) => [prompt],
     command: 'grok',
     description: 'xAI Grok Build CLI',
     id: 'grok',
@@ -147,6 +151,8 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    // No prompt argument that keeps the TUI: kimi's `--prompt` streams one turn
+    // to stdout and exits, so it stays on the paste fallback.
     command: 'kimi',
     description: 'Moonshot Kimi Code CLI',
     id: 'kimi',
@@ -157,6 +163,9 @@ export const ASSISTANT_OPTIONS: AssistantOption[] = [
     },
   },
   {
+    // `--prompt-interactive`, not `--prompt` — the latter is an alias for
+    // `--print`, which answers once on stdout and exits.
+    buildPromptArgs: (prompt) => ['--prompt-interactive', prompt],
     command: 'agy',
     description: 'Antigravity CLI',
     id: 'antigravity',
@@ -204,20 +213,24 @@ export function getAllAssistantOptions(customCommands: Record<string, string>): 
 }
 
 /**
- * Whether this assistant can take the initial prompt as a spawn argument.
+ * The args that hand `prompt` to this assistant at spawn, or null when it has
+ * no such argument and the caller must paste into the running TUI instead.
  *
  * A custom command counts only while it still runs the same program — extra
  * flags are fine, a wrapper is not. A wrapper that forgets `"$@"` would swallow
  * the prompt with no error anywhere, and pasting works for any command, so the
  * unrecognised executable falls back rather than gambling.
  */
-export function assistantAcceptsPromptArg(
+export function buildAssistantPromptArgs(
   assistant: AssistantId,
-  customCommands: Record<string, string>
-): boolean {
+  customCommands: Record<string, string>,
+  prompt: string
+): string[] | null {
+  if (prompt === '') return null
   const option = getAllAssistantOptions(customCommands).find((entry) => entry.id === assistant)
-  if (option?.acceptsPromptArg !== true) return false
-  return runsVendorProgram(option, customCommands)
+  if (!option?.buildPromptArgs) return null
+  if (!runsVendorProgram(option, customCommands)) return null
+  return option.buildPromptArgs(prompt)
 }
 
 /**
