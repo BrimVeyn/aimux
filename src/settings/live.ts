@@ -1,10 +1,14 @@
 import type { AutoCommitConfig } from '@brimveyn/aimux-config'
 
-import { AUTO_COMMIT_ENABLED, AUTO_COMMIT_TIMEOUT } from './sections/automation'
+import {
+  AUTO_COMMIT_ENABLED,
+  AUTO_COMMIT_TIMEOUT,
+  AUTO_RENAME_BRANCH_INSTRUCTIONS,
+} from './sections/automation'
 import { AUTO_COMMIT_MODEL_PREFIX, SNIPPET_TRIGGER_CHAR } from './sections/commands'
 import { ACTIVITY_SPRITES } from './sections/experimental'
 import { HINTS_ENABLED } from './sections/status-bar'
-import { useSettingsStore } from './settings-store'
+import { settingsStore, useSettingsStore } from './settings-store'
 
 /**
  * The read side of the settings screen: where a consumer used to take a value
@@ -69,4 +73,10 @@ export function useActivitySprites(): boolean {
 /** Whether the status bar draws its second row of keybinding hints. */
 export function useStatusBarHints(): boolean {
   return useSettingsStore((s) => s.values[HINTS_ENABLED] !== false)
+}
+
+/** Extra branch naming rules for the workspace naming call. Read at call time, so an edit applies to the next workspace. */
+export function branchNamingInstructions(): string {
+  const value = settingsStore.getState().values[AUTO_RENAME_BRANCH_INSTRUCTIONS]
+  return typeof value === 'string' ? value : ''
 }

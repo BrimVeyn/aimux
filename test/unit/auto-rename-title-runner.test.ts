@@ -3,6 +3,7 @@ import { expect, test } from 'bun:test'
 import {
   generateTabTitle,
   generateWorkspaceNaming,
+  sanitizeCustomBranch,
   sanitizeGeneratedBranch,
   sanitizeGeneratedTitle,
 } from '../../src/auto-rename/title-runner'
@@ -161,4 +162,29 @@ test('strips markdown emphasis from a generated branch line', () => {
   expect(sanitizeGeneratedBranch('**Branch:** fix/scroll-drift-on-resize')).toBe(
     'fix/scroll-drift-on-resize'
   )
+})
+
+test('user branch rules reach the prompt and replace the conventional-commit check', async () => {
+  let prompt = ''
+  const result = await generateWorkspaceNaming({
+    branchInstructions: 'Prefix with the ticket id: ABC-123/short-subject',
+    firstPrompt: 'ABC-42 corrige le formulaire de login',
+    provider: 'claude',
+    signal: new AbortController().signal,
+    spawn: async (invocation) => {
+      prompt = invocation.args.join(' ')
+      return { exitCode: 0, stdout: 'Corriger le login\nABC-42/login-form\n' }
+    },
+    timeoutMs: 1_000,
+  })
+  expect(prompt).toContain('Prefix with the ticket id')
+  expect(result).toEqual({ branch: 'ABC-42/login-form', status: 'ok', title: 'Corriger le login' })
+})
+
+test('a custom-convention branch is only held to what git accepts', () => {
+  expect(sanitizeCustomBranch('Branch: `nathan/fix login é`')).toBe('nathan/fix-login-e')
+  expect(sanitizeCustomBranch('a..b')).toBeNull()
+  expect(sanitizeCustomBranch('feat/.hidden')).toBeNull()
+  expect(sanitizeCustomBranch('feat/x.lock')).toBeNull()
+  expect(sanitizeCustomBranch('   ')).toBeNull()
 })

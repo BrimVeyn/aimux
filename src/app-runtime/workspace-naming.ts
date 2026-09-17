@@ -11,6 +11,8 @@
 // so the model is asked for it separately, in English and under a
 // conventional-commit type. A branch is only renamed when the model returns one
 // in that shape — the placeholder is a better outcome than a bad convention.
+// Unless the user wrote their own rules (`autoRename.branchInstructions`): then
+// their convention wins and the name is only held to what git accepts.
 
 import type { AssistantId, WorkspaceRecord } from '../state/types'
 
@@ -43,6 +45,8 @@ export interface WorkspaceNamingDeps {
   renameBranch?: (repoRoot: string, from: string, to: string) => Promise<boolean>
   spawn?: TitleSpawnFn
   signal?: AbortSignal
+  /** User rules for the branch name; empty keeps the built-in conventional-commit shape. */
+  branchInstructions?: string
 }
 
 /**
@@ -59,6 +63,7 @@ export async function renameWorkspaceFromPrompt(
   deps: WorkspaceNamingDeps
 ): Promise<void> {
   const result = await generateWorkspaceNaming({
+    branchInstructions: deps.branchInstructions,
     firstPrompt: target.prompt,
     provider: target.provider,
     signal: deps.signal ?? new AbortController().signal,

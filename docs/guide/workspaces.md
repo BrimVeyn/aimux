@@ -73,6 +73,19 @@ answers with one of `feat` `fix` `refactor` `perf` `docs` `test` `chore` `ci`
 `style` `build` followed by `/` and a subject — keeping the `aimux/`
 placeholder beats inventing a convention.
 
+Your repo has its own convention? Write it down under **Settings → Automation →
+Branch naming rules**, or in `aimux.config.ts`:
+
+```ts
+autoRename: {
+  branchInstructions: 'Prefix with the Jira ticket from the prompt: ABC-123/short-subject',
+},
+```
+
+The rules are added to the naming prompt and take precedence over the built-in
+`<type>/<subject>` shape; the answer is then only checked for being a valid git
+branch name. An edit applies to the next workspace, no restart needed.
+
 Deleting a temp workspace deletes its branch with it, whatever it ended up
 called.
 

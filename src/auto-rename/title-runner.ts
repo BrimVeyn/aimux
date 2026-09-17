@@ -54,7 +54,8 @@ export function buildTitlePrompt(firstPrompt: string): string {
   ].join('\n')
 }
 
-export function buildWorkspaceNamingPrompt(firstPrompt: string): string {
+export function buildWorkspaceNamingPrompt(firstPrompt: string, branchInstructions = ''): string {
+  const custom = branchInstructions.trim()
   return [
     'Name a workspace for the user request below.',
     'Return exactly two lines and nothing else.',
@@ -63,6 +64,12 @@ export function buildWorkspaceNamingPrompt(firstPrompt: string): string {
     '<type> is one of: feat, fix, refactor, perf, docs, test, chore, ci, style, build.',
     '<subject> is 2 to 5 lowercase words joined by hyphens, naming what changes rather than restating the request.',
     'Example line 2: fix/scroll-drift-on-resize',
+    ...(custom === ''
+      ? []
+      : [
+          'The branch rules below come from the user and take precedence over the ones above, including the <type>/<subject> shape:',
+          custom.slice(0, 2_000),
+        ]),
     'No quotes, no labels, no numbering, no markdown, no ending punctuation.',
     '',
     firstPrompt.slice(0, 8_000),
@@ -113,6 +120,23 @@ export function sanitizeGeneratedBranch(raw: string): string | null {
   return subject === '' ? null : `${type}/${subject}`
 }
 
+/**
+ * A branch written under the user's own convention (`ABC-123/login-form`,
+ * `nathan/feat/x`, …) cannot be held to the conventional-commit shape, so it is
+ * only held to what git accepts — see `git check-ref-format`.
+ */
+export function sanitizeCustomBranch(raw: string): string | null {
+  const line = unwrapLine(raw.trim(), /^(?:git\s+)?branch\s*:\s*/iu)
+  const name = foldDiacritics(line)
+    .replaceAll(/\s+/gu, '-')
+    .replaceAll(/[^A-Za-z0-9._/-]/gu, '')
+    .replaceAll(/\/{2,}/gu, '/')
+    .replaceAll(/^[/.-]+|[/.]+$/gu, '')
+  if (name === '' || name.includes('..') || name.endsWith('.lock')) return null
+  if (name.split('/').some((part) => part === '' || part.startsWith('.'))) return null
+  return name
+}
+
 function executableOnPath(executable: string): boolean {
   try {
     return typeof Bun !== 'undefined' && Bun.which(executable) != null
@@ -129,6 +153,8 @@ export interface NamingOptions {
   timeoutMs: number
   signal: AbortSignal
   spawn?: TitleSpawnFn
+  /** Free-form branch naming rules from the settings screen; empty keeps the built-in convention. */
+  branchInstructions?: string
   isExecutableAvailable?: (executable: string) => boolean
 }
 
@@ -164,13 +190,18 @@ export async function generateTabTitle(options: NamingOptions): Promise<TitleRes
 
 /** One model call for both names — a workspace must not wait on two. */
 export async function generateWorkspaceNaming(options: NamingOptions): Promise<NamingResult> {
-  const run = await runNamingModel(options, buildWorkspaceNamingPrompt(options.firstPrompt))
+  const instructions = options.branchInstructions?.trim() ?? ''
+  const run = await runNamingModel(
+    options,
+    buildWorkspaceNamingPrompt(options.firstPrompt, instructions)
+  )
   if (run.status !== 'ok') return run
   const [titleLine, branchLine] = nonEmptyLines(run.stdout)
   const title = titleLine == null ? null : sanitizeGeneratedTitle(titleLine)
   if (title == null) return { status: 'failed' }
+  const sanitizeBranch = instructions === '' ? sanitizeGeneratedBranch : sanitizeCustomBranch
   return {
-    branch: branchLine == null ? null : sanitizeGeneratedBranch(branchLine),
+    branch: branchLine == null ? null : sanitizeBranch(branchLine),
     status: 'ok',
     title,
   }

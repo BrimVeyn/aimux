@@ -5,6 +5,7 @@ import type { SettingSection } from '../types'
 /** Ids `src/settings/live.ts` reads back — spelled once, here, next to the rows. */
 export const AUTO_COMMIT_ENABLED = 'autoCommit.enabled'
 export const AUTO_COMMIT_TIMEOUT = 'autoCommit.timeoutMs'
+export const AUTO_RENAME_BRANCH_INSTRUCTIONS = 'autoRename.branchInstructions'
 
 /**
  * Auto-commit applies live: the driver reads its config through a ref that this
@@ -12,7 +13,8 @@ export const AUTO_COMMIT_TIMEOUT = 'autoCommit.timeoutMs'
  *
  * Auto-rename does not. Its config is handed to the session backend at bootstrap,
  * before this screen exists, so a change reaches it on the next launch — which is
- * what `restart` puts on the row.
+ * what `restart` puts on the row. Branch rules are the exception: workspace
+ * naming runs in this process and reads them when a workspace is named.
  */
 export const AUTOMATION_SECTION: SettingSection = {
   glyph: '\u{27F3}',
@@ -100,6 +102,17 @@ export const AUTOMATION_SECTION: SettingSection = {
       min: 5_000,
       restart: true,
       step: 5_000,
+      storage: 'settings',
+    },
+    {
+      description:
+        'Your own rules for generated workspace branch names, e.g. "prefix with the ticket id: ABC-123/short-subject".',
+      fallback: '',
+      fromConfig: (config) => config.autoRename?.branchInstructions,
+      id: AUTO_RENAME_BRANCH_INSTRUCTIONS,
+      kind: 'text',
+      label: 'Branch naming rules',
+      placeholder: 'type/kebab-subject, in English',
       storage: 'settings',
     },
   ],
