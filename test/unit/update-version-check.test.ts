@@ -51,3 +51,37 @@ describe('fetchLatestNpmVersion env override', () => {
     expect(result).toBe('9.9.9')
   })
 })
+
+describe('fetchLatestNpmVersion sibling deps', () => {
+  const originalFetch = globalThis.fetch
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  function mockRegistry(configVersions: string[]): void {
+    globalThis.fetch = (async (input: string) => {
+      const url = decodeURIComponent(input)
+      if (url.endsWith('/@brimveyn/aimux/latest')) {
+        return Response.json({
+          dependencies: { '@brimveyn/aimux-config': '0.11.6', 'react': '^19.2.4' },
+          version: '1.26.12',
+        })
+      }
+      if (url.endsWith('/@brimveyn/aimux-config')) {
+        return Response.json({ versions: Object.fromEntries(configVersions.map((v) => [v, {}])) })
+      }
+      return new Response(null, { status: 404 })
+    }) as typeof fetch
+  }
+
+  test('returns the version once pinned @brimveyn deps are published', async () => {
+    mockRegistry(['0.11.5', '0.11.6'])
+    expect(await fetchLatestNpmVersion('@brimveyn/aimux')).toBe('1.26.12')
+  })
+
+  test('returns null while a pinned @brimveyn dep is not served yet', async () => {
+    mockRegistry(['0.11.5'])
+    expect(await fetchLatestNpmVersion('@brimveyn/aimux')).toBeNull()
+  })
+})

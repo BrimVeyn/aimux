@@ -13,18 +13,21 @@ export async function fetchLatestNpmVersion(packageName: string): Promise<string
     return debugOverride
   }
 
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5_000)
   try {
     const url = `${NPM_REGISTRY_BASE}/${encodeURIComponent(packageName).replace('%40', '@')}/latest`
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5_000)
     const res = await fetch(url, { signal: controller.signal })
-    clearTimeout(timer)
     if (!res.ok) {
       logDebug('update.fetchLatest.nonOk', { packageName, status: res.status })
       return null
     }
-    const data = (await res.json()) as { version?: unknown }
+    const data = (await res.json()) as { dependencies?: Record<string, string>; version?: unknown }
     if (typeof data.version !== 'string' || data.version.length === 0) {
+      return null
+    }
+    if (!(await siblingDepsPublished(data.dependencies ?? {}, controller.signal))) {
+      logDebug('update.fetchLatest.depsNotReady', { packageName, version: data.version })
       return null
     }
     return data.version
@@ -34,7 +37,33 @@ export async function fetchLatestNpmVersion(packageName: string): Promise<string
       packageName,
     })
     return null
+  } finally {
+    clearTimeout(timer)
   }
+}
+
+// A release publishes @brimveyn/aimux-config and the app seconds apart, but
+// the registry serves each package's metadata from its own CDN cache (5 min).
+// Until the pinned sibling version shows up in the metadata `bun install`
+// reads, installing the app fails with "No version matching". Offer the update
+// only once every pinned @brimveyn/* dep is installable.
+async function siblingDepsPublished(
+  dependencies: Record<string, string>,
+  signal: AbortSignal
+): Promise<boolean> {
+  const pinned = Object.entries(dependencies).filter(([name]) => name.startsWith('@brimveyn/'))
+  const results = await Promise.all(
+    pinned.map(async ([name, version]) => {
+      const res = await fetch(`${NPM_REGISTRY_BASE}/${name}`, {
+        headers: { Accept: 'application/vnd.npm.install-v1+json' },
+        signal,
+      })
+      if (!res.ok) return false
+      const data = (await res.json()) as { versions?: Record<string, unknown> }
+      return data.versions?.[version] !== undefined
+    })
+  )
+  return results.every(Boolean)
 }
 
 function parseSemver(version: string): number[] | null {
