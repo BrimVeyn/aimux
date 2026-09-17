@@ -3,6 +3,7 @@ import type { SideEffectContext } from './side-effect-context'
 
 import { enqueueGitOp } from '../git/command-queue'
 import { createPrefixedId } from '../platform/id'
+import { branchNamingInstructions } from '../settings/live'
 import { hasSetupScript } from '../state/project-data'
 import { findWorkspace } from '../state/project-workspaces'
 import { toast } from '../state/toast-store'
@@ -105,6 +106,7 @@ function renameWorkspaceFromLaunch(
     {
       applyName: (projectId, workspaceId, patch) =>
         ctx.dispatch({ patch, projectId, type: 'update-workspace-record', workspaceId }),
+      branchInstructions: branchNamingInstructions(),
     }
   )
 }

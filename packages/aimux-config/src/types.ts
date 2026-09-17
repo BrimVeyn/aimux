@@ -293,6 +293,13 @@ export interface AutoRenameConfig {
    * confirmations and ignored (they do not consume an attempt).
    */
   minPromptWords: number
+  /**
+   * Extra rules for the branch name generated when a workspace is created from
+   * a prompt, appended to the naming prompt (e.g. `"Prefix with the Jira ticket:
+   * ABC-123/short-subject"`). They override the built-in `<type>/<subject>`
+   * convention; the result is then only checked for being a valid git ref.
+   */
+  branchInstructions?: string
 }
 
 export interface MultiRepoConfig {

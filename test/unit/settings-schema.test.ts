@@ -121,6 +121,7 @@ const FROZEN_ROW_IDS = [
   'autoCommit.models.claude',
   'autoCommit.models.codex',
   'autoCommit.timeoutMs',
+  'autoRename.branchInstructions',
   'autoRename.enabled',
   'autoRename.maxAttempts',
   'autoRename.minPromptWords',
