@@ -1,32 +1,26 @@
 import { getDaemonSocketPath } from './daemon/runtime-paths'
 import { findIpcDaemonPid, findTerminalManagerPid } from './platform/daemon-control'
 import { runRestartDaemon } from './restart-daemon'
-
-const REPO = 'BrimVeyn/aimux'
-
-async function getLatestRelease(): Promise<string | null> {
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`)
-  if (!res.ok) return null
-  const data = (await res.json()) as { tag_name: string }
-  return data.tag_name
-}
-
-async function getCurrentVersion(): Promise<string> {
-  const { version } = await import('../package.json')
-  return `v${version}`
-}
+import {
+  fetchLatestNpmVersion,
+  getCurrentPackageVersion,
+  isNewerVersion,
+} from './update/version-check'
 
 export async function runUpdate(): Promise<number> {
   process.stdout.write('Checking for updates...\n')
 
-  const latest = await getLatestRelease()
+  // The GitHub release is created before npm publishes, and npm then takes a few
+  // minutes to serve every package: null covers both "unreachable" and "not
+  // installable yet".
+  const latest = await fetchLatestNpmVersion('@brimveyn/aimux')
   if (latest === null) {
-    process.stderr.write('Failed to fetch latest release from GitHub.\n')
+    process.stderr.write('No installable release found on npm yet. Try again in a few minutes.\n')
     return 1
   }
 
-  const current = await getCurrentVersion()
-  if (latest === current) {
+  const current = await getCurrentPackageVersion()
+  if (!isNewerVersion(latest, current)) {
     process.stdout.write(`Already up to date (${current}).\n`)
     return 0
   }
@@ -39,8 +33,7 @@ export async function runUpdate(): Promise<number> {
   })
   await remove.exited
 
-  const version = latest.startsWith('v') ? latest.slice(1) : latest
-  const install = Bun.spawn(['bun', 'install', '-g', `@brimveyn/aimux@${version}`], {
+  const install = Bun.spawn(['bun', 'install', '-g', `@brimveyn/aimux@${latest}`], {
     stderr: 'inherit',
     stdout: 'inherit',
   })
