@@ -284,7 +284,9 @@ aimux tab send <tabId> --keys "<CR>" --await-submit    # submit a pending prompt
 Chord syntax mirrors `@brimveyn/aimux-config`'s keymap builder:
 `<C-x>`, `<Esc>`, `<CR>`, `<Tab>`, `<Up>`, chained (`<Up><Up>`), etc.
 Multi-line text is auto-wrapped in bracketed-paste so the receiver doesn't
-misread newlines as submit. With `--enter`, the submitting `\r` is sent as a
+misread newlines as submit; so is a single line over 512 bytes, which the tty
+would otherwise hand over in ~1 KiB reads that Claude Code treats as separate
+pastes and drops on submit. With `--enter`, the submitting `\r` is sent as a
 separate, settled write after the paste — a paste-aware TUI (e.g. Claude Code)
 would otherwise fold a same-burst `\r` into the paste buffer and never submit.
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 
-import { bracketedPaste, notationToBytes } from '../../src/cli/chord'
+import { bracketedPaste, notationToBytes, PASTE_MIN_BYTES } from '../../src/cli/chord'
 
 describe('cli chord encoder', () => {
   test('lowers Ctrl-letter into the control byte', () => {
@@ -27,8 +27,18 @@ describe('cli chord encoder', () => {
     expect(notationToBytes('<Esc><CR>ab')).toEqual(Buffer.from([0x1b, 0x0d, 0x61, 0x62]))
   })
 
-  test('bracketed paste only wraps multi-line strings', () => {
+  test('bracketed paste wraps multi-line strings, passes short lines through', () => {
     expect(bracketedPaste('hi')).toBe('hi')
     expect(bracketedPaste('a\nb')).toBe('\x1b[200~a\nb\x1b[201~')
+  })
+
+  test('bracketed paste wraps a long single line', () => {
+    // Regression: a >1 KiB single line was typed, split into tty-sized reads,
+    // and Claude Code kept only the last read on submit.
+    const long = 'é'.repeat(PASTE_MIN_BYTES) // 2 bytes each
+    expect(bracketedPaste(long)).toBe(`\x1b[200~${long}\x1b[201~`)
+    const atLimit = 'a'.repeat(PASTE_MIN_BYTES)
+    expect(bracketedPaste(atLimit)).toBe(atLimit)
+    expect(bracketedPaste(`${atLimit}a`)).toBe(`\x1b[200~${atLimit}a\x1b[201~`)
   })
 })

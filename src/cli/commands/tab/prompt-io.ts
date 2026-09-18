@@ -70,7 +70,7 @@ export interface PromptPayload {
 /**
  * Build the payload for a prompt. `asKeys` interprets the text as a vim-style
  * chord (e.g. `<C-c>`); otherwise it's wrapped as a bracketed paste when
- * multi-line.
+ * multi-line or long (see PASTE_MIN_BYTES).
  */
 export function buildPromptPayload(text: string, asKeys: boolean): PromptPayload {
   if (asKeys) {
