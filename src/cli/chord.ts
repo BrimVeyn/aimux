@@ -68,10 +68,22 @@ const BRACKETED_PASTE_START = '\x1b[200~'
 const BRACKETED_PASTE_END = '\x1b[201~'
 
 /**
- * Wrap a multi-line block in bracketed-paste markers so the receiver does not
- * treat each `\n` as a submit keystroke. Single-line text is passed through.
+ * Byte length above which a single line is pasted rather than typed. The
+ * kernel hands a burst to the reader in tty-sized reads (~1 KiB on macOS), and
+ * Claude Code treats every unbracketed read longer than 800 chars as its own
+ * paste — then drops those pastes on submit, keeping only the typed tail. A
+ * bracketed paste is reassembled whole whatever the read size, so anything
+ * that could span a read goes that way; short lines (shell commands, answers)
+ * stay plain for receivers that never enable bracketed paste.
+ */
+export const PASTE_MIN_BYTES = 512
+
+/**
+ * Wrap a block in bracketed-paste markers when it is multi-line (so the
+ * receiver does not treat each `\n` as a submit keystroke) or longer than
+ * PASTE_MIN_BYTES (so it arrives as one paste). Short single lines pass through.
  */
 export function bracketedPaste(text: string): string {
-  if (!text.includes('\n')) return text
+  if (!text.includes('\n') && Buffer.byteLength(text, 'utf8') <= PASTE_MIN_BYTES) return text
   return `${BRACKETED_PASTE_START}${text}${BRACKETED_PASTE_END}`
 }

@@ -89,4 +89,22 @@ describe('deprecated flag aliases from the project/workspace rename', () => {
   test('an alias is ignored when the command has no such current flag', () => {
     expect(() => parseArgs(['--worktree', 'x'], SHARED_FLAGS, [])).toThrow(CliUsageError)
   })
+
+  test('an alias given alongside its target is a usage error, in either order', () => {
+    // Regression: `worker await w --project p --workspace <id>` let the alias
+    // overwrite --project and failed with "project not found: <id>".
+    const message = '--workspace is a deprecated alias of --project on this command'
+    expect(() =>
+      parseArgs(['--project', 'p', '--workspace', 'worktree-1'], SHARED_FLAGS, [])
+    ).toThrow(message)
+    expect(() => parseArgs(['--workspace=worktree-1', '--project', 'p'], SHARED_FLAGS, [])).toThrow(
+      message
+    )
+  })
+
+  test('repeating the canonical spelling keeps last-wins', () => {
+    expect(parseArgs(['--project', 'a', '--project', 'b'], SHARED_FLAGS, []).flags.project).toBe(
+      'b'
+    )
+  })
 })

@@ -72,9 +72,10 @@ export function parseArgs(
   const flagByName = new Map<string, FlagSpec>()
   for (const spec of flagSpecs) flagByName.set(spec.name, spec)
   // Deprecated aliases from the project/workspace rename. Unlike the command
-  // groups these are safe to map silently: --workspace named a project and
-  // --worktree named what is now a workspace, so each old name still points at
-  // the same object.
+  // groups these are safe to map silently on their own: --workspace named a
+  // project and --worktree named what is now a workspace, so each old name
+  // still points at the same object. Given together with their target they
+  // are rejected below.
   // ponytail: drop with the aimux-sessions.json fallback.
   // Resolved against the declared specs, never against another alias —
   // otherwise --worktree would chain through the --workspace alias onto
@@ -91,6 +92,11 @@ export function parseArgs(
 
   const flags: Record<string, string | number | boolean> = {}
   const positionals: string[] = []
+  // Spelling each canonical flag was first given under. An alias and its
+  // target both on one line (`--project p --workspace <id>` on a verb that has
+  // no --workspace of its own) would otherwise let the last one silently win —
+  // turning a workspace id into a "project not found" lookup.
+  const spelledAs = new Map<string, string>()
   let stopFlags = false
 
   for (let i = 0; i < argv.length; i++) {
@@ -109,6 +115,14 @@ export function parseArgs(
       // Deprecated aliases resolve to the current spec, so results are always
       // keyed by the canonical name regardless of which spelling was typed.
       const key = spec.name
+      const previous = spelledAs.get(key)
+      if (previous !== undefined && previous !== name) {
+        const alias = previous === key ? name : previous
+        throw new CliUsageError(
+          `--${alias} is a deprecated alias of --${key} on this command; pass --${key} only`
+        )
+      }
+      spelledAs.set(key, name)
       if (spec.kind === 'boolean') {
         if (eq !== -1) {
           throw new CliUsageError(`flag --${name} does not take a value`)
