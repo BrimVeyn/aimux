@@ -8,7 +8,7 @@ import type {
 } from '../types'
 
 import { clampGitPaneRatio } from '../git-pane-sizing'
-import { reconcileSelectedGitEntryKey } from '../git-tree'
+import { activeGitFileFilter, filterGitFiles, reconcileSelectedGitEntryKey } from '../git-tree'
 import { clearDiffCacheForPaths } from './diff-cache'
 
 const SECTION_RANK: Record<GitFileSection, number> = {
@@ -130,7 +130,7 @@ export function reduceGitPanelState(state: AppState, action: AppAction): AppStat
       const next = action.payload
       const sortedNext = sortFilesBySection(next.files)
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        sortedNext,
+        filterGitFiles(sortedNext, activeGitFileFilter(state)),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,

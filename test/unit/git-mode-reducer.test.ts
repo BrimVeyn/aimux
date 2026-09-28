@@ -219,3 +219,82 @@ test('git-pane-toggle-tab flips the pane between diff and github', () => {
   expect(s1.gitPane.tab).toBe('github')
   expect(appReducer(s1, { type: 'git-pane-toggle-tab' }).gitPane.tab).toBe('diff')
 })
+
+function typeFilter(state: AppState, text: string): AppState {
+  let next = state
+  for (const char of text) next = appReducer(next, { char, type: 'update-command-edit' })
+  return next
+}
+
+function inGitMode(paths: string[]): AppState {
+  return appReducer(seedWithFiles(paths.map(entry)), { type: 'enter-git-mode' })
+}
+
+test('typing in the file filter narrows the list and moves the selection onto a match', () => {
+  const s0 = inGitMode(['a.ts', 'b.ts', 'bb.md'])
+  expect(s0.gitMode.selectedEntryKey).toBe('unstaged:a.ts')
+  const s1 = typeFilter(appReducer(s0, { type: 'open-git-file-filter' }), 'b')
+  expect(s1.modal.type).toBe('git-file-filter')
+  expect(s1.focusMode).toBe('git')
+  expect(s1.gitMode.fileFilter).toBe('')
+  expect(s1.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+})
+
+test('j/k stay inside the filtered files', () => {
+  const s0 = typeFilter(
+    appReducer(inGitMode(['a.ts', 'b.ts', 'bb.md']), { type: 'open-git-file-filter' }),
+    'b'
+  )
+  const s1 = appReducer(s0, { delta: 1, type: 'git-mode-move-selection' })
+  expect(s1.gitMode.selectedEntryKey).toBe('unstaged:bb.md')
+  const s2 = appReducer(s1, { delta: 1, type: 'git-mode-move-selection' })
+  expect(s2.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+})
+
+test('commit-git-file-filter applies the draft and closes the bar', () => {
+  const s0 = typeFilter(
+    appReducer(inGitMode(['a.ts', 'b.ts']), { type: 'open-git-file-filter' }),
+    'b'
+  )
+  const s1 = appReducer(s0, { type: 'commit-git-file-filter' })
+  expect(s1.modal.type).toBeNull()
+  expect(s1.focusMode).toBe('git')
+  expect(s1.gitMode.fileFilter).toBe('b')
+  expect(s1.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+})
+
+test('closing the filter bar restores the applied filter and a visible selection', () => {
+  let s = inGitMode(['a.ts', 'b.ts', 'c.md'])
+  s = typeFilter(appReducer(s, { type: 'open-git-file-filter' }), '.ts')
+  s = appReducer(s, { type: 'commit-git-file-filter' })
+  expect(s.gitMode.fileFilter).toBe('.ts')
+
+  s = appReducer(s, { type: 'open-git-file-filter' })
+  expect(s.modal.editBuffer).toBe('.ts')
+  s = appReducer(s, { char: '\b', type: 'update-command-edit' })
+  s = appReducer(s, { char: '\b', type: 'update-command-edit' })
+  s = appReducer(s, { char: '\b', type: 'update-command-edit' })
+  s = typeFilter(s, 'c')
+  expect(s.gitMode.selectedEntryKey).toBe('unstaged:c.md')
+
+  s = appReducer(s, { type: 'close-modal' })
+  expect(s.modal.type).toBeNull()
+  expect(s.focusMode).toBe('git')
+  expect(s.gitMode.fileFilter).toBe('.ts')
+  expect(s.gitMode.selectedEntryKey).toBe('unstaged:a.ts')
+})
+
+test('clear-git-file-filter shows every file again', () => {
+  let s = typeFilter(appReducer(inGitMode(['a.ts', 'b.ts']), { type: 'open-git-file-filter' }), 'b')
+  s = appReducer(s, { type: 'commit-git-file-filter' })
+  s = appReducer(s, { type: 'clear-git-file-filter' })
+  expect(s.gitMode.fileFilter).toBe('')
+  expect(s.gitMode.selectedEntryKey).toBe('unstaged:b.ts')
+})
+
+test('exit-git-mode drops the file filter', () => {
+  let s = typeFilter(appReducer(inGitMode(['a.ts', 'b.ts']), { type: 'open-git-file-filter' }), 'b')
+  s = appReducer(s, { type: 'commit-git-file-filter' })
+  s = appReducer(s, { type: 'exit-git-mode' })
+  expect(s.gitMode.fileFilter).toBe('')
+})

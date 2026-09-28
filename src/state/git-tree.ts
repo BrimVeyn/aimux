@@ -1,4 +1,4 @@
-import type { GitFileEntry, GitFileListMode, GitFileSection } from './types'
+import type { AppState, GitFileEntry, GitFileListMode, GitFileSection } from './types'
 
 const SECTION_ORDER: GitFileSection[] = ['historical', 'staged', 'unstaged', 'untracked']
 
@@ -48,6 +48,29 @@ export function gitFileKey(
   return file.repoPath != null && file.repoPath !== ''
     ? `${file.section}:${file.repoPath}:${file.path}`
     : `${file.section}:${file.path}`
+}
+
+/** Files whose path contains `filter`, ignoring case. An empty filter keeps them all. */
+export function filterGitFiles(files: GitFileEntry[], filter: string | null): GitFileEntry[] {
+  if (filter == null || filter === '') return files
+  const lower = filter.toLowerCase()
+  return files.filter((file) => file.path.toLowerCase().includes(lower))
+}
+
+/**
+ * The filter the diff sidebar is showing: the draft while the filter bar is
+ * open, so the list narrows as you type, and the applied one otherwise.
+ */
+export function activeGitFileFilter(state: Pick<AppState, 'gitMode' | 'modal'>): string {
+  if (state.modal.type === 'git-file-filter') return state.modal.editBuffer ?? ''
+  return state.gitMode.fileFilter
+}
+
+/** The files git mode lists, navigates and selects among. */
+export function gitModeVisibleFiles(
+  state: Pick<AppState, 'gitMode' | 'gitPanel' | 'modal'>
+): GitFileEntry[] {
+  return filterGitFiles(state.gitPanel.files, activeGitFileFilter(state))
 }
 
 export function gitFolderKey(section: GitFileSection, folderPath: string): string {
@@ -128,6 +151,23 @@ export function reconcileSelectedGitEntryKey(
     if (visibleRows.some((row) => row.key === key)) return key
   }
   return visibleRows[0]?.key ?? null
+}
+
+/**
+ * Keeps git mode's selection on a row the sidebar still shows, after the files
+ * or the filter changed. Returns the state untouched when it already is.
+ */
+export function reconcileGitSelection<S extends AppState>(state: S): S {
+  const selectedEntryKey = reconcileSelectedGitEntryKey(
+    gitModeVisibleFiles(state),
+    state.gitMode.collapsedFolders,
+    state.gitPane.fileListMode,
+    state.gitMode.selectedEntryKey,
+    [],
+    state.gitPane.treeCompaction
+  )
+  if (selectedEntryKey === state.gitMode.selectedEntryKey) return state
+  return { ...state, gitMode: { ...state.gitMode, pendingDeletePath: null, selectedEntryKey } }
 }
 
 export function moveGitSelection(

@@ -3,10 +3,14 @@ import type { AppAction } from '../actions'
 
 import { collectFoldables } from '../../ui/components/git/diff-renderer/build-rows'
 import {
+  activeGitFileFilter,
+  filterGitFiles,
   getSelectedGitRow,
   gitFileKey,
+  gitModeVisibleFiles,
   moveGitFileSelection,
   moveGitSelection,
+  reconcileGitSelection,
   reconcileSelectedGitEntryKey,
 } from '../git-tree'
 import {
@@ -18,6 +22,7 @@ import {
 } from '../types'
 import { clearDiffCacheForPath, clearDiffCacheForPaths } from './diff-cache'
 import { sortFilesBySection } from './git-panel-state'
+import { emptyModal } from './modal-state'
 
 function applyFold(state: AppState, key: string, foldId: string, next: FoldState): AppState {
   const perPath = state.gitMode.folds[key] ?? {}
@@ -38,12 +43,22 @@ function applyFold(state: AppState, key: string, foldId: string, next: FoldState
   return { ...state, gitMode: { ...state.gitMode, folds: nextFolds } }
 }
 
+/** Applies a file filter and closes the filter bar. */
+function withGitFileFilter(state: AppState, fileFilter: string): AppState {
+  return reconcileGitSelection({
+    ...state,
+    gitMode: { ...state.gitMode, fileFilter },
+    modal: state.modal.type === 'git-file-filter' ? emptyModal() : state.modal,
+  })
+}
+
 export function emptyGitMode(): GitModeState {
   return {
     actionMessage: null,
     collapsedFolders: {},
     diffs: {},
     diffView: 'split',
+    fileFilter: '',
     folds: {},
     headOffset: 0,
     highlights: {},
@@ -67,7 +82,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           actionMessage: null,
           pendingDeletePath: null,
           selectedEntryKey: reconcileSelectedGitEntryKey(
-            state.gitPanel.files,
+            gitModeVisibleFiles(state),
             state.gitMode.collapsedFolders,
             state.gitPane.fileListMode,
             null,
@@ -86,6 +101,8 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           ...state.gitMode,
           actionMessage: null,
           diffs: {},
+          // A filter over this set of changes means nothing the next time in.
+          fileFilter: '',
           folds: {},
           headOffset: 0,
           highlights: {},
@@ -95,9 +112,17 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         },
       }
     }
+    case 'commit-git-file-filter': {
+      if (state.modal.type !== 'git-file-filter') return state
+      return withGitFileFilter(state, state.modal.editBuffer ?? '')
+    }
+    case 'clear-git-file-filter': {
+      if (state.gitMode.fileFilter === '') return state
+      return withGitFileFilter(state, '')
+    }
     case 'git-mode-move-selection': {
       const next = moveGitSelection(
-        state.gitPanel.files,
+        gitModeVisibleFiles(state),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
@@ -116,7 +141,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     }
     case 'git-mode-move-file-selection': {
       const next = moveGitFileSelection(
-        state.gitPanel.files,
+        gitModeVisibleFiles(state),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
@@ -135,7 +160,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     }
     case 'git-mode-select-entry-by-key': {
       const next = reconcileSelectedGitEntryKey(
-        state.gitPanel.files,
+        gitModeVisibleFiles(state),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         state.gitMode.selectedEntryKey,
@@ -159,7 +184,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       }
     }
     case 'git-mode-toggle-folder': {
-      const row = getSelectedGitRow(state.gitPanel.files, {
+      const row = getSelectedGitRow(gitModeVisibleFiles(state), {
         collapsedFolders: state.gitMode.collapsedFolders,
         compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
@@ -175,7 +200,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       return { ...state, gitMode: { ...state.gitMode, collapsedFolders: nextCollapsed } }
     }
     case 'git-mode-toggle-selected-folder': {
-      const row = getSelectedGitRow(state.gitPanel.files, {
+      const row = getSelectedGitRow(gitModeVisibleFiles(state), {
         collapsedFolders: state.gitMode.collapsedFolders,
         compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
@@ -191,7 +216,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       return { ...state, gitMode: { ...state.gitMode, collapsedFolders: nextCollapsed } }
     }
     case 'git-mode-collapse-selection': {
-      const row = getSelectedGitRow(state.gitPanel.files, {
+      const row = getSelectedGitRow(gitModeVisibleFiles(state), {
         collapsedFolders: state.gitMode.collapsedFolders,
         compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
@@ -223,7 +248,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
       }
     }
     case 'git-mode-expand-selection': {
-      const row = getSelectedGitRow(state.gitPanel.files, {
+      const row = getSelectedGitRow(gitModeVisibleFiles(state), {
         collapsedFolders: state.gitMode.collapsedFolders,
         compact: state.gitPane.treeCompaction,
         fileListMode: state.gitPane.fileListMode,
@@ -246,7 +271,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           ...state.gitMode,
           pendingDeletePath: null,
           selectedEntryKey: reconcileSelectedGitEntryKey(
-            state.gitPanel.files,
+            gitModeVisibleFiles(state),
             state.gitMode.collapsedFolders,
             fileListMode,
             state.gitMode.selectedEntryKey,
@@ -265,7 +290,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           ...state.gitMode,
           pendingDeletePath: null,
           selectedEntryKey: reconcileSelectedGitEntryKey(
-            state.gitPanel.files,
+            gitModeVisibleFiles(state),
             state.gitMode.collapsedFolders,
             state.gitPane.fileListMode,
             state.gitMode.selectedEntryKey,
@@ -534,7 +559,7 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
           ? [gitFileKey({ path: action.path, section: toSection })]
           : []
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        nextFiles,
+        filterGitFiles(nextFiles, activeGitFileFilter(state)),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         currentKey,

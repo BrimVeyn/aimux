@@ -37,6 +37,9 @@ interface GitPanelProps {
   // top ↑n ↓m remote-tracking line so a wrapper can own them at panel level.
   showFileListToggle?: boolean
   showRemoteTracking?: boolean
+  // True when `gitPanel.files` is already narrowed by a filter, so an empty list
+  // means nothing matched rather than a clean tree.
+  filtered?: boolean
 }
 
 function sectionTitle(section: GitFileSection, headOffset: number, baseLabel?: string): string {
@@ -341,8 +344,12 @@ interface StatusPlaceholder {
   labelColor: string
 }
 
-function renderStatus(gitPanel: GitPanelState, hasProjectPath: boolean): ReactNode | null {
-  const placeholder = computeStatusPlaceholder(gitPanel, hasProjectPath)
+function renderStatus(
+  gitPanel: GitPanelState,
+  hasProjectPath: boolean,
+  filtered: boolean
+): ReactNode | null {
+  const placeholder = computeStatusPlaceholder(gitPanel, hasProjectPath, filtered)
   if (!placeholder) return null
   return (
     <box flexGrow={1} flexDirection="column" alignItems="center" paddingTop={1}>
@@ -355,7 +362,8 @@ function renderStatus(gitPanel: GitPanelState, hasProjectPath: boolean): ReactNo
 
 function computeStatusPlaceholder(
   gitPanel: GitPanelState,
-  hasProjectPath: boolean
+  hasProjectPath: boolean,
+  filtered: boolean
 ): StatusPlaceholder | null {
   const t = getCurrentTheme()
   if (!hasProjectPath) {
@@ -368,7 +376,7 @@ function computeStatusPlaceholder(
     return { label: 'Git error', labelColor: t.error }
   }
   if (gitPanel.files.length === 0) {
-    return { label: 'Working tree clean', labelColor: t.textMuted }
+    return { label: filtered ? 'No file matches' : 'Working tree clean', labelColor: t.textMuted }
   }
   return null
 }
@@ -386,6 +394,7 @@ export const GitPanel = memo(function GitPanel({
   compact = false,
   diffCountConfig = DEFAULT_DIFF_COUNT_CONFIG,
   fileListMode = 'tree',
+  filtered = false,
   gitPanel,
   headOffset = 0,
   pathConfig = DEFAULT_PATH_CONFIG,
@@ -408,7 +417,7 @@ export const GitPanel = memo(function GitPanel({
     [gitPanel.files]
   )
 
-  const statusNode = renderStatus(gitPanel, !!(projectPath != null && projectPath !== ''))
+  const statusNode = renderStatus(gitPanel, !!(projectPath != null && projectPath !== ''), filtered)
 
   const hasRemoteTracking = showRemoteTracking && (gitPanel.ahead > 0 || gitPanel.behind > 0)
   const toggleSection = showFileListToggle

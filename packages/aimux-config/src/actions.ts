@@ -664,6 +664,27 @@ function selectedGitFile(ctx: ModeContext) {
 
 export const exitGitMode: KeyResult = r([{ type: 'exit-git-mode' }], [], 'navigation')
 
+/**
+ * Esc in git mode peels one layer at a time: an applied file filter goes
+ * first, so the full list is one key away, and the next Esc leaves.
+ */
+export const escapeGitMode: ActionFn = (ctx: ModeContext) =>
+  ctx.state.gitMode.fileFilter === '' ? exitGitMode : r([{ type: 'clear-git-file-filter' }])
+
+export const openGitFileFilter: KeyResult = r(
+  [{ type: 'open-git-file-filter' }],
+  [],
+  'modal.git-file-filter'
+)
+
+export const commitGitFileFilter: KeyResult = r(
+  [{ type: 'commit-git-file-filter' }],
+  [],
+  'git-mode'
+)
+
+export const cancelGitFileFilter: KeyResult = r([{ type: 'close-modal' }], [], 'git-mode')
+
 export function selectGitFile(delta: -1 | 1): ActionFn {
   return (ctx: ModeContext) => {
     if (ctx.state.gitPanel.files.length === 0) return r([])

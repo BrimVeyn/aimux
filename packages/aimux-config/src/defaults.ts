@@ -139,7 +139,8 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map(']', actions.shiftGitHeadOffset(-1), 'Newer commit')
         .map('[', actions.shiftGitHeadOffset(1), 'Older commit')
         .map('?', actions.helpModal('git-mode'), 'Help')
-        .map('<Esc>', actions.exitGitMode, 'Exit git')
+        .map('/', actions.openGitFileFilter, 'Search files')
+        .map('<Esc>', actions.escapeGitMode, 'Clear filter, then exit git')
         .map('j', actions.selectGitFile(1), 'Next entry')
         .map('k', actions.selectGitFile(-1), 'Prev entry')
         .map('<C-n>', actions.selectGitFileOnly(1), 'Next file')
@@ -155,6 +156,21 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('<Right>', actions.expandGitSelection, 'Expand folder')
         .map('<Down>', actions.scrollGitDiff(1), 'Scroll down')
         .map('<Up>', actions.scrollGitDiff(-1), 'Scroll up')
+    )
+
+    // -----------------------------------------------------------------------
+    // Git mode: the sidebar's file filter, typed in place. The list narrows as
+    // you type; <CR> keeps the filter, <Esc> puts back the one you had.
+    // -----------------------------------------------------------------------
+    .mode('modal.git-file-filter', (m) =>
+      m
+        .map('<Esc>', actions.cancelGitFileFilter, 'Cancel')
+        .map('<CR>', actions.commitGitFileFilter, 'Apply filter')
+        .map('<C-n>', actions.selectGitFileOnly(1), 'Next file')
+        .map('<C-p>', actions.selectGitFileOnly(-1), 'Prev file')
+        .map('<Down>', actions.selectGitFileOnly(1))
+        .map('<Up>', actions.selectGitFileOnly(-1))
+        .passthrough()
     )
 
     // -----------------------------------------------------------------------
