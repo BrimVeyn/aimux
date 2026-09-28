@@ -72,7 +72,8 @@ Actions on the selected file:
 | `]`   | Older commit (HEAD~N → N+1)                      |
 | `[`   | Newer commit (HEAD~N → N-1)                      |
 | `?`   | Help (scoped to git mode)                        |
-| `Esc` | Exit git mode                                    |
+| `/`   | Filter the file list                             |
+| `Esc` | Clear the file filter, then exit git mode        |
 
 Navigation in the panel:
 
@@ -80,6 +81,17 @@ Navigation in the panel:
 - `Ctrl+N` / `Ctrl+P` — next / prev file (skips folders)
 - `h` / `l` — toggle the selected folder
 - `Left` / `Right` — collapse / expand the selected folder
+
+Filtering the file list:
+
+- `/` — open the filter bar at the top of the file list; the list narrows as
+  you type (case-insensitive match on the path) and the diff follows the
+  first match
+- `Enter` — keep the filter; the bar stays up showing it and the match count
+- `Esc` — cancel, putting back the filter you had before
+- `Ctrl+N` / `Ctrl+P` (or `Down` / `Up`) — next / prev match while typing
+
+The filter is dropped when you leave git mode.
 
 Diff view scroll and layout:
 

@@ -1,7 +1,7 @@
 import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 
 import { useTerminalDimensions } from '@opentui/react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
@@ -14,13 +14,19 @@ import { useGitPanelPolling } from '../../../git/git-poller'
 import { useRepoDiscovery } from '../../../git/use-repo-discovery'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
-import { getSelectedGitFile, gitFileKey } from '../../../state/git-tree'
+import {
+  activeGitFileFilter,
+  filterGitFiles,
+  getSelectedGitFile,
+  gitFileKey,
+} from '../../../state/git-tree'
 import { getActiveWorkspace, getActiveWorkspacePath } from '../../../state/project-workspaces'
 import { setGitDiffScroller } from '../../git-view-controls'
 import { formatBytes } from '../../terminal-graphics/dimensions'
 import { useTheme } from '../../theme'
 import { PierreDiff, type PierreDiffHandle } from './diff-renderer'
 import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
+import { GitFileFilterBar } from './git-file-filter-bar'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
 import { GitPaneHeader } from './pane/git-pane-header'
@@ -134,6 +140,7 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
   const currentProjectId = useAppStore((s) => s.currentProjectId)
   const projects = useAppStore((s) => s.projects)
   const focusMode = useAppStore((s) => s.focusMode)
+  const fileFilter = useAppStore(activeGitFileFilter)
   const diffRef = useRef<PierreDiffHandle | null>(null)
 
   const currentProject =
@@ -175,7 +182,14 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
 
   const fileBarWidth = Math.max(20, Math.floor(dimensions.width * gitPane.diffModeRatio))
 
-  const selectedFile = getSelectedGitFile(gitPanel.files, {
+  // The sidebar, the selection and the diff all read the filtered list, so
+  // nothing on screen can point at a file the filter hides.
+  const visibleGitPanel = useMemo(
+    () => ({ ...gitPanel, files: filterGitFiles(gitPanel.files, fileFilter) }),
+    [gitPanel, fileFilter]
+  )
+
+  const selectedFile = getSelectedGitFile(visibleGitPanel.files, {
     collapsedFolders: gitMode.collapsedFolders,
     compact: gitPane.treeCompaction,
     fileListMode: gitPane.fileListMode,
@@ -302,12 +316,14 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             headOffset={gitMode.headOffset}
             projectPath={projectPath}
           />
+          <GitFileFilterBar matches={visibleGitPanel.files.length} total={gitPanel.files.length} />
           <GitPanel
             baseLabel={baseLabel}
             collapsedFolders={gitMode.collapsedFolders}
             compact={gitPane.treeCompaction}
             fileListMode={gitPane.fileListMode}
-            gitPanel={gitPanel}
+            filtered={fileFilter !== ''}
+            gitPanel={visibleGitPanel}
             headOffset={gitMode.headOffset}
             projectPath={projectPath}
             selectedEntryKey={gitMode.selectedEntryKey}

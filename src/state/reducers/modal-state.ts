@@ -13,6 +13,7 @@ import { filterSettingRows } from '../../settings/search'
 import { findSettingRow } from '../../settings/sections'
 import { filterThemeIds } from '../../ui/filter-themes'
 import { buildFlashJumpLabels } from '../../ui/flash/build-labels'
+import { reconcileGitSelection } from '../git-tree'
 import {
   type BaseRefOption,
   buildBaseRefOptions,
@@ -556,6 +557,11 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
       ) {
         return { ...state, modal: emptyModal() }
       }
+      // Cancelling the filter bar puts the applied filter back, and the
+      // selection with it when the draft had moved it somewhere now hidden.
+      if (closingType === 'git-file-filter') {
+        return reconcileGitSelection({ ...state, modal: emptyModal() })
+      }
       // Whoever opened it said where to go back to, because that is who knows
       // what is drawn behind it. Everything else came from the panes.
       return { ...state, focusMode: state.modal.returnTo ?? 'navigation', modal: emptyModal() }
@@ -708,6 +714,18 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
           },
         }
       }
+      // The diff sidebar narrows as you type, and the diff beside it follows
+      // the selection onto the first match once the old one is filtered out.
+      if (state.modal.type === 'git-file-filter') {
+        const current = state.modal.editBuffer ?? ''
+        const at = clampCursor(state.modal.cursorPos ?? current.length, current.length)
+        const edit = applyEdit(current, at, action.char)
+        if (edit === null) return state
+        return reconcileGitSelection({
+          ...state,
+          modal: { ...state.modal, cursorPos: edit.pos, editBuffer: edit.text },
+        })
+      }
       if (state.modal.editBuffer === null) {
         return state
       }
@@ -855,6 +873,22 @@ export function reduceModalState(state: AppState, action: AppAction): AppState |
               ? (state.modal.editBuffer ?? '')
               : state.modal.nameBuffer,
           pendingProjectPath: selected.path,
+        },
+      }
+    }
+    case 'open-git-file-filter': {
+      // Overlay, like the workspace move: focus stays on git mode so the diff
+      // view stays mounted, and the bar is drawn inside its sidebar.
+      if (state.focusMode !== 'git') return state
+      const current = state.gitMode.fileFilter
+      return {
+        ...state,
+        modal: {
+          cursorPos: current.length,
+          editBuffer: current,
+          projectTargetId: null,
+          selectedIndex: 0,
+          type: 'git-file-filter',
         },
       }
     }

@@ -52,6 +52,7 @@ const CLOSES: [string, AppAction[]][] = [
     [{ label: 'X', settingId: 'theme', type: 'open-setting-text-modal', value: 'v' }],
   ],
   ['workspace-move', [{ sourceWorkspaceId: 'ws-1', type: 'open-workspace-move-modal' }]],
+  ['git-file-filter', [{ type: 'enter-git-mode' }, { type: 'open-git-file-filter' }]],
   [
     'rename-workspace',
     [

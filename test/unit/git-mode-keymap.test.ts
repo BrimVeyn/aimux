@@ -66,3 +66,35 @@ test('git-mode Ctrl+h narrows the file bar', () => {
   expect(result?.actions).toEqual([{ delta: -0.05, type: 'resize-git-diff-pane' }])
   expect(result?.effects).toEqual([{ ratio: 0.3, type: 'persist-git-diff-mode-ratio' }])
 })
+
+test('git-mode / opens the file filter bar', () => {
+  const result = getHandler('git-mode')?.handleKey(key('/'), ctx())
+  expect(result?.actions).toEqual([{ type: 'open-git-file-filter' }])
+  expect(result?.transition).toBe('modal.git-file-filter')
+})
+
+test('git-mode Esc clears an applied filter before leaving', () => {
+  const handler = getHandler('git-mode')
+  const base = ctx()
+  expect(handler?.handleKey(key('escape'), base)?.actions).toEqual([{ type: 'exit-git-mode' }])
+  const filtered: ModeContext = {
+    state: { ...base.state, gitMode: { ...base.state.gitMode, fileFilter: 'a' } },
+  }
+  expect(handler?.handleKey(key('escape'), filtered)?.actions).toEqual([
+    { type: 'clear-git-file-filter' },
+  ])
+})
+
+test('file filter bar: Enter applies, Esc cancels, letters type', () => {
+  const handler = getHandler('modal.git-file-filter')
+  const state = appReducer(ctx().state, { type: 'open-git-file-filter' })
+  const enter = handler?.handleKey(key('return'), { state })
+  expect(enter?.actions).toEqual([{ type: 'commit-git-file-filter' }])
+  expect(enter?.transition).toBe('git-mode')
+  const esc = handler?.handleKey(key('escape'), { state })
+  expect(esc?.actions).toEqual([{ type: 'close-modal' }])
+  expect(esc?.transition).toBe('git-mode')
+  expect(handler?.handleKey(key('j'), { state })?.actions).toEqual([
+    { char: 'j', type: 'update-command-edit' },
+  ])
+})

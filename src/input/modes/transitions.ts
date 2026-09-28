@@ -8,13 +8,14 @@ import type { BuiltinModeId, ModeId } from '@brimveyn/aimux-config'
  * build time. They are governed by `pluginModeTransitions` below.
  */
 const TRANSITIONS: Record<BuiltinModeId, readonly ModeId[]> = {
-  'git-mode': ['navigation', 'modal.git-commit', 'modal.workspace-move'],
+  'git-mode': ['navigation', 'modal.git-commit', 'modal.workspace-move', 'modal.git-file-filter'],
   'modal.create-project': ['navigation', 'modal.project-picker.filtering'],
   'modal.create-workspace': ['navigation', 'terminal-input'],
   'modal.flash-jump': ['navigation'],
   'modal.git-commit': ['git-mode', 'modal.git-commit.confirm', 'modal.git-commit.generating'],
   'modal.git-commit.confirm': ['modal.git-commit', 'git-mode'],
   'modal.git-commit.generating': ['modal.git-commit', 'modal.git-commit.confirm', 'git-mode'],
+  'modal.git-file-filter': ['git-mode'],
   'modal.help.filtering': ['navigation'],
   'modal.new-tab.command-edit': ['navigation', 'modal.new-tab.editing-command'],
   'modal.new-tab.editing-command': ['navigation', 'modal.new-tab.command-edit'],

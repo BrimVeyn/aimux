@@ -290,6 +290,9 @@ function renderModal(
     case 'flash-jump':
       // Pure overlay — rendered inline by FlashLabelBadge inside the rows.
       return null
+    case 'git-file-filter':
+      // Drawn in place, as the diff sidebar's filter bar.
+      return null
     case 'plugin-modal':
       return <PluginModalHost modalId={modal.modalId} props={modal.props} />
     case null:

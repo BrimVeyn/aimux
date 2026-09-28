@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import type { GitFileEntry } from '../../src/state/types'
 
-import { buildGitTreeRows, gitFolderKey } from '../../src/state/git-tree'
+import { buildGitTreeRows, filterGitFiles, gitFolderKey } from '../../src/state/git-tree'
 
 test('buildGitTreeRows keeps section trees isolated for identical paths', () => {
   const files: GitFileEntry[] = [
@@ -29,4 +29,20 @@ test('buildGitTreeRows hides descendants of collapsed folders', () => {
     gitFolderKey('unstaged', 'src'),
     'unstaged:readme.md',
   ])
+})
+
+test('filterGitFiles keeps paths containing the filter, ignoring case', () => {
+  const files: GitFileEntry[] = [
+    { added: 0, path: 'src/App.ts', removed: 0, section: 'unstaged', status: 'M' },
+    { added: 0, path: 'test/app.test.ts', removed: 0, section: 'unstaged', status: 'M' },
+    { added: 0, path: 'README.md', removed: 0, section: 'untracked', status: '?' },
+  ]
+  expect(filterGitFiles(files, 'APP').map((f) => f.path)).toEqual([
+    'src/App.ts',
+    'test/app.test.ts',
+  ])
+  expect(filterGitFiles(files, 'src/').map((f) => f.path)).toEqual(['src/App.ts'])
+  expect(filterGitFiles(files, 'nope')).toEqual([])
+  expect(filterGitFiles(files, '')).toBe(files)
+  expect(filterGitFiles(files, null)).toBe(files)
 })

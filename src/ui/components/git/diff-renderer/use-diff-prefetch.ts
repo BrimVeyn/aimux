@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 import type { GitFileEntry } from '../../../../state/types'
 
@@ -6,7 +6,7 @@ import { diffHash } from '../../../../git/diff-hash'
 import { fetchDiff } from '../../../../git/git-diff'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
-import { buildGitTreeRows } from '../../../../state/git-tree'
+import { activeGitFileFilter, buildGitTreeRows, filterGitFiles } from '../../../../state/git-tree'
 import { prepareDiff } from './prepare-diff'
 
 interface PrefetchOptions {
@@ -89,7 +89,10 @@ export function useDiffPrefetch(
   radius: number,
   opts: PrefetchOptions
 ): void {
-  const files = useAppStore((s) => s.gitPanel.files)
+  const allFiles = useAppStore((s) => s.gitPanel.files)
+  const fileFilter = useAppStore(activeGitFileFilter)
+  // Neighbours in the list the user is looking at, not in the one it filters.
+  const files = useMemo(() => filterGitFiles(allFiles, fileFilter), [allFiles, fileFilter])
   const diffs = useAppStore((s) => s.gitMode.diffs)
   const parsed = useAppStore((s) => s.gitMode.parsedFiles)
   const loading = useAppStore((s) => s.gitMode.loading)

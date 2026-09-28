@@ -52,6 +52,7 @@ export type {
   ModalCreateWorkspace,
   ModalFlashJump,
   ModalGitCommit,
+  ModalGitFileFilter,
   ModalHelp,
   ModalNewTab,
   ModalProjectName,

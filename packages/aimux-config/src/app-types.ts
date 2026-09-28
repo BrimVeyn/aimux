@@ -102,6 +102,7 @@ export type ModalType =
   | 'setting-text'
   | 'setting-keybind'
   | 'settings-search'
+  | 'git-file-filter'
   /**
    * Every plugin modal, the way `plugin-view` covers every plugin view. Which
    * one is on `ModalPlugin.modalId`, so adding a modal is a registration
@@ -462,6 +463,12 @@ export interface GitModeState {
   headOffset: number
   /** When true, diff the active workspace's working tree against its fork point. */
   reviewBase: boolean
+  /**
+   * The applied file filter: a case-insensitive substring of the path. Empty
+   * shows every file. While the filter bar is open, the draft in its modal's
+   * `editBuffer` is what the sidebar shows instead.
+   */
+  fileFilter: string
 }
 
 interface ModalBase {
@@ -533,6 +540,13 @@ export interface ModalRenameTab extends ModalBase {
 /** Fuzzy-ish search across every setting, from inside the settings screen. */
 export interface ModalSettingsSearch extends ModalBase {
   type: 'settings-search'
+}
+/**
+ * The diff sidebar's file filter being typed. An overlay: focus stays on git
+ * mode, and the bar is drawn in the sidebar rather than floating over it.
+ */
+export interface ModalGitFileFilter extends ModalBase {
+  type: 'git-file-filter'
 }
 export interface ModalSettingText extends ModalBase {
   type: 'setting-text'
@@ -761,6 +775,7 @@ export type ModalState =
   | ModalSettingText
   | ModalSettingKeybind
   | ModalSettingsSearch
+  | ModalGitFileFilter
   | ModalPlugin
 
 export interface LayoutState {
@@ -969,6 +984,7 @@ export type BuiltinModeId =
   | 'modal.update-available'
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
+  | 'modal.git-file-filter'
   | 'modal.flash-jump'
   | 'modal.quotas'
   | 'settings'
@@ -1385,6 +1401,9 @@ export type AutoCommitAction =
 export type GitModeAction =
   | { type: 'enter-git-mode' }
   | { type: 'exit-git-mode' }
+  | { type: 'open-git-file-filter' }
+  | { type: 'commit-git-file-filter' }
+  | { type: 'clear-git-file-filter' }
   | { type: 'git-mode-move-selection'; delta: -1 | 1 }
   | { type: 'git-mode-move-file-selection'; delta: -1 | 1 }
   | { type: 'git-mode-select-entry-by-key'; key: string }

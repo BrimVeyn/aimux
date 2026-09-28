@@ -25,6 +25,7 @@ const MODAL_MODE_IDS: Record<SupportedModalType, ModeId | null> = {
   'create-workspace': 'modal.create-workspace',
   'flash-jump': 'modal.flash-jump',
   'git-commit': 'modal.git-commit',
+  'git-file-filter': 'modal.git-file-filter',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
   'plugin-modal': null,
