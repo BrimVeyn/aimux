@@ -408,6 +408,7 @@ export type DiffFileStatus =
   | 'binary'
   | 'renamed'
   | 'image'
+  | 'pdf'
   | 'too-large'
 
 export interface DiffData {
@@ -422,6 +423,8 @@ export interface DiffData {
   imageBytesAfter?: Uint8Array
   imageMime?: string
   imageFormatLabel?: string
+  pdfBytesBefore?: Uint8Array
+  pdfBytesAfter?: Uint8Array
 }
 
 export type GitDiffView = 'split' | 'stacked'

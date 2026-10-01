@@ -2,7 +2,7 @@ import { $ } from 'bun'
 
 import type { DiffData, DiffFileStatus, GitFileEntry } from '../state/types'
 
-import { MAX_DIFF_BYTES } from './diff-limits'
+import { diffByteLimit, isPdfPath } from './diff-limits'
 import { imageFormatLabel, imageMimeFromPath, isImagePath } from './image-detect'
 
 function resolveStatus(entry: GitFileEntry): { status: DiffFileStatus; oldPath?: string } {
@@ -126,6 +126,19 @@ async function diffSizes(
   return { after, before }
 }
 
+async function readBothSides(
+  cwd: string,
+  ref: string,
+  path: string,
+  headPath: string,
+  status: DiffFileStatus
+): Promise<[Uint8Array | undefined, Uint8Array | undefined]> {
+  return Promise.all([
+    status === 'new' ? Promise.resolve(undefined) : readHeadBlob(cwd, ref, headPath),
+    status === 'deleted' ? Promise.resolve(undefined) : readWorkingBytes(cwd, path),
+  ])
+}
+
 export async function fetchDiff(
   cwd: string,
   file: GitFileEntry,
@@ -144,9 +157,10 @@ export async function fetchDiff(
     status
   )
 
-  // Ahead of the image branch on purpose: a multi-gigabyte .png must not be read
-  // into memory either.
-  if (sizeBefore > MAX_DIFF_BYTES || sizeAfter > MAX_DIFF_BYTES) {
+  // Ahead of the image and PDF branches on purpose: a multi-gigabyte .png must not be
+  // read into memory either.
+  const limit = diffByteLimit(file.path)
+  if (sizeBefore > limit || sizeAfter > limit) {
     const data: DiffData = {
       binarySizeAfter: sizeAfter,
       binarySizeBefore: sizeBefore,
@@ -158,13 +172,35 @@ export async function fetchDiff(
     return data
   }
 
+  if (isPdfPath(file.path)) {
+    const [pdfBytesBefore, pdfBytesAfter] = await readBothSides(
+      cwd,
+      ref,
+      file.path,
+      headPath,
+      status
+    )
+    const data: DiffData = {
+      binarySizeAfter: pdfBytesAfter?.byteLength ?? 0,
+      binarySizeBefore: pdfBytesBefore?.byteLength ?? 0,
+      path: file.path,
+      rawDiff: '',
+      status: 'pdf',
+    }
+    if (pdfBytesBefore) data.pdfBytesBefore = pdfBytesBefore
+    if (pdfBytesAfter) data.pdfBytesAfter = pdfBytesAfter
+    if (oldPath != null && oldPath !== '') data.oldPath = oldPath
+    return data
+  }
+
   if (isImagePath(file.path)) {
-    const wantsBefore = status !== 'new'
-    const wantsAfter = status !== 'deleted'
-    const [imageBytesBefore, imageBytesAfter] = await Promise.all([
-      wantsBefore ? readHeadBlob(cwd, ref, headPath) : Promise.resolve(undefined),
-      wantsAfter ? readWorkingBytes(cwd, file.path) : Promise.resolve(undefined),
-    ])
+    const [imageBytesBefore, imageBytesAfter] = await readBothSides(
+      cwd,
+      ref,
+      file.path,
+      headPath,
+      status
+    )
     const data: DiffData = {
       binarySizeAfter: imageBytesAfter?.byteLength ?? 0,
       binarySizeBefore: imageBytesBefore?.byteLength ?? 0,

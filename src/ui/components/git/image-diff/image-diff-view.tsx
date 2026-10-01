@@ -12,6 +12,14 @@ import { formatBytes, readImageDimensions } from '../../../terminal-graphics/dim
 import { useTheme } from '../../../theme'
 import { TerminalImagePane } from './terminal-image-pane'
 
+/** What to tell the user about their terminal before showing them pixels, if anything. */
+export function graphicsBanner(protocol: 'kitty' | 'iterm' | 'none', what: string): string | null {
+  if (protocol === 'kitty') return isInsideTmux() ? 'tmux: requires allow-passthrough on' : null
+  if (protocol === 'iterm')
+    return `${what} preview unavailable in iTerm2 (open externally to view).`
+  return `${what} preview requires a Kitty-compatible terminal (Kitty, Ghostty, WezTerm). Detected: ${terminalLabel()}.`
+}
+
 interface ImageDiffViewProps {
   diff: DiffData
 }
@@ -66,12 +74,7 @@ export const ImageDiffView = memo(function ImageDiffView({ diff }: ImageDiffView
   const mime = diff.imageMime ?? 'application/octet-stream'
   const formatLabel = diff.imageFormatLabel ?? 'image'
 
-  const banner = (() => {
-    if (protocol === 'kitty') return isInsideTmux() ? 'tmux: requires allow-passthrough on' : null
-    if (protocol === 'iterm')
-      return 'Image preview unavailable in iTerm2 (open externally to view).'
-    return `Image preview requires a Kitty-compatible terminal (Kitty, Ghostty, WezTerm). Detected: ${terminalLabel()}.`
-  })()
+  const banner = graphicsBanner(protocol, 'Image')
 
   const showBoth = before && after
   return (
