@@ -55,6 +55,21 @@ Syntax highlighting is provided by [shiki](https://shiki.style), using
 the shiki theme variant bound to the active aimux theme, so the diff
 colors stay consistent with the rest of the UI.
 
+### PDFs
+
+A changed `.pdf` (up to 15 MB) is shown as pages, not as a binary
+placeholder: the old page on the left, the new one on the right, scaled
+to fit. Pages are compared by how they render, so the header lists the
+pages that actually look different, and the view opens on the first of
+them.
+
+- `↑` / `↓`, `Ctrl+U` / `Ctrl+D`, the mouse wheel — previous / next page,
+  changed or not
+
+Rendering needs [poppler](https://poppler.freedesktop.org)
+(`brew install poppler`, `apt install poppler-utils`) and, like image
+diffs, a Kitty-compatible terminal (Kitty, Ghostty, WezTerm).
+
 ## Keybindings
 
 Actions on the selected file:

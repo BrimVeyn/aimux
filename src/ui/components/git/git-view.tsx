@@ -7,7 +7,7 @@ import type { DiffData, GitDiffView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
-import { MAX_DIFF_BYTES } from '../../../git/diff-limits'
+import { diffByteLimit } from '../../../git/diff-limits'
 import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
@@ -30,6 +30,7 @@ import { GitFileFilterBar } from './git-file-filter-bar'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
 import { GitPaneHeader } from './pane/git-pane-header'
+import { PdfDiffView } from './pdf-diff'
 
 interface DiffStageProps {
   diff: DiffData | undefined
@@ -45,7 +46,7 @@ function placeholderText(diff: DiffData): string | null {
     const before = diff.binarySizeBefore ?? 0
     const after = diff.binarySizeAfter ?? 0
     const largest = Math.max(before, after)
-    return `(file too large to diff — ${formatBytes(largest)}, limit ${formatBytes(MAX_DIFF_BYTES)})`
+    return `(file too large to diff — ${formatBytes(largest)}, limit ${formatBytes(diffByteLimit(diff.path))})`
   }
   if (diff.status === 'binary') {
     const before = diff.binarySizeBefore ?? 0
@@ -93,6 +94,10 @@ const DiffStage = memo(function DiffStage({
 
   if (diff.status === 'image') {
     return <ImageDiffView diff={diff} />
+  }
+
+  if (diff.status === 'pdf') {
+    return <PdfDiffView diff={diff} />
   }
 
   const placeholder = placeholderText(diff)

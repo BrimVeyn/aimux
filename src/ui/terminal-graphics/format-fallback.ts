@@ -12,7 +12,7 @@ function cacheKey(bytes: Uint8Array): string {
   return new Bun.CryptoHasher('sha1').update(bytes).digest('hex')
 }
 
-async function tryConverter(
+export async function tryConverter(
   cmd: string[],
   bytes: Uint8Array,
   timeoutMs: number
