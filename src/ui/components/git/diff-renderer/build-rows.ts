@@ -106,25 +106,40 @@ export interface DiffSegmentBuild {
   segments: DiffSegment[]
 }
 
-function wrapCount(content: string, width: number): number {
+/** What a tab is drawn as: the renderer and the row-height arithmetic must agree. */
+const TAB = '    '
+
+export function expandTabs(text: string): string {
+  return text.includes('\t') ? text.replaceAll('\t', TAB) : text
+}
+
+/**
+ * Terminal rows a line takes when wrapped at `width` columns. Every row is drawn
+ * at exactly this height, so it has to match what the renderer does with the
+ * text: wrapped by character (`wrapMode="char"`), tabs expanded, and measured in
+ * display columns — a CJK character or an emoji is two of them.
+ */
+export function wrapCount(content: string, width: number): number {
   if (width <= 0) return 1
-  return Math.max(1, Math.ceil(content.length / width))
+  return Math.max(1, Math.ceil(Bun.stringWidth(expandTabs(content)) / width))
 }
 
-function cellWraps(content: string, width: number): number {
-  return wrapCount(content, width)
+/** Text columns on each side of a split, after the line-number gutter. */
+export interface SplitWidths {
+  left: number
+  right: number
 }
 
-function pairHeight(l: SplitCell, r: SplitCell, contentWidth: number): number {
-  const lh =
-    l.type === 'context' || l.type === 'addition' || l.type === 'deletion'
-      ? cellWraps(l.content, contentWidth)
-      : 1
-  const rh =
-    r.type === 'context' || r.type === 'addition' || r.type === 'deletion'
-      ? cellWraps(r.content, contentWidth)
-      : 1
-  return Math.max(lh, rh)
+const NO_WIDTHS: SplitWidths = { left: 0, right: 0 }
+
+function cellHeight(cell: SplitCell, width: number): number {
+  return cell.type === 'context' || cell.type === 'addition' || cell.type === 'deletion'
+    ? wrapCount(cell.content, width)
+    : 1
+}
+
+function pairHeight(l: SplitCell, r: SplitCell, widths: SplitWidths): number {
+  return Math.max(cellHeight(l, widths.left), cellHeight(r, widths.right))
 }
 
 function sliceContext(
@@ -319,7 +334,7 @@ export function buildDiffSegments(file: FileDiffMetadata, folds: FoldMap = {}): 
 export function expandSplitSegment(
   file: FileDiffMetadata,
   segment: DiffSegment,
-  contentWidth = 0
+  widths: SplitWidths = NO_WIDTHS
 ): SplitRowOrHeader[] {
   if (segment.kind === 'hunk-header') {
     return [{ context: segment.context, spec: segment.spec, type: 'hunk-header' }]
@@ -352,7 +367,7 @@ export function expandSplitSegment(
         lineNumber: segment.addLineNumberStart + i,
         type: 'context',
       }
-      rows.push({ height: pairHeight(left, right, contentWidth), left, right, type: 'row' })
+      rows.push({ height: pairHeight(left, right, widths), left, right, type: 'row' })
     }
     return rows
   }
@@ -379,7 +394,7 @@ export function expandSplitSegment(
             type: 'addition',
           }
         : { type: 'filler' }
-    rows.push({ height: pairHeight(left, right, contentWidth), left, right, type: 'row' })
+    rows.push({ height: pairHeight(left, right, widths), left, right, type: 'row' })
   }
   return rows
 }
@@ -402,7 +417,7 @@ export function expandUnifiedSegment(
         addLineNumber: segment.addLineNumberStart + i,
         content: text,
         delLineNumber: segment.delLineNumberStart + i,
-        height: cellWraps(text, contentWidth),
+        height: wrapCount(text, contentWidth),
         lineIdx: addIdx,
         type: 'context',
       })
@@ -415,7 +430,7 @@ export function expandUnifiedSegment(
     const text = stripNewline(file.deletionLines[delIdx] ?? '')
     rows.push({
       content: text,
-      height: cellWraps(text, contentWidth),
+      height: wrapCount(text, contentWidth),
       lineIdx: delIdx,
       lineNumber: segment.delLineNumberStart + i,
       type: 'deletion',
@@ -426,7 +441,7 @@ export function expandUnifiedSegment(
     const text = stripNewline(file.additionLines[addIdx] ?? '')
     rows.push({
       content: text,
-      height: cellWraps(text, contentWidth),
+      height: wrapCount(text, contentWidth),
       lineIdx: addIdx,
       lineNumber: segment.addLineNumberStart + i,
       type: 'addition',
@@ -459,7 +474,7 @@ export function estimatedSegmentHeight(segment: DiffSegment, view: 'split' | 'st
 export function firstChangeSegmentOffset(
   file: FileDiffMetadata,
   folds: FoldMap,
-  contentWidth: number,
+  widths: SplitWidths,
   view: 'split' | 'stacked'
 ): number {
   const { segments } = buildDiffSegments(file, folds)
@@ -468,8 +483,8 @@ export function firstChangeSegmentOffset(
     if (segment.kind === 'change') return offset
     const rows =
       view === 'split'
-        ? expandSplitSegment(file, segment, contentWidth)
-        : expandUnifiedSegment(file, segment, contentWidth)
+        ? expandSplitSegment(file, segment, widths)
+        : expandUnifiedSegment(file, segment, widths.left)
     for (const row of rows) offset += rowHeight(row)
   }
   return -1

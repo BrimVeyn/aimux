@@ -1,16 +1,23 @@
 import type { ScrollBoxRenderable } from '@opentui/core'
 import type { ThemedToken } from 'shiki'
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from 'react'
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 
 import type { FoldState } from '../../../../state/types'
 import type { ThemeId } from '../../../themes'
 
 import { useAppStore } from '../../../../state/app-store'
-import { getBarWidth } from '../../../../state/bars'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
-import { buildDiffSegments, firstChangeSegmentOffset, gutterWidth } from './build-rows'
+import { buildDiffSegments, firstChangeSegmentOffset, type SplitWidths } from './build-rows'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
 import { useDiffPreparation } from './use-diff-preparation'
@@ -41,6 +48,7 @@ interface Props {
 }
 
 const EMPTY_FOLDS: Record<string, FoldState> = {}
+const NO_WIDTHS: SplitWidths = { left: 0, right: 0 }
 
 export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDiff(
   { cacheKey, diff, path, themeId, view },
@@ -51,16 +59,16 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   const file = preparation.file ?? undefined
   const highlights: DiffHighlights = preparation.highlights
 
-  const terminalCols = useAppStore((s) => s.layout.terminalCols)
-  const sidebarWidth = useAppStore((s) => getBarWidth(s.bars.left))
-  const contentWidth = useMemo(() => {
-    if (!file) return 0
-    const gw = gutterWidth(file)
-    const usable = Math.max(0, terminalCols - sidebarWidth - 1)
-    const paneCols = view === 'split' ? Math.max(0, Math.floor(usable / 2) - 1) : usable
-    const prefix = view === 'split' ? gw + 4 : gw * 2 + 5
-    return Math.max(1, paneCols - prefix)
-  }, [file, view, terminalCols, sidebarWidth])
+  // Text columns per side, as the views measure them once laid out. Until then
+  // every line counts as one row; the first frame corrects it.
+  const [widths, setWidths] = useState<SplitWidths>(NO_WIDTHS)
+  const onSplitMeasure = useCallback((next: SplitWidths) => {
+    setWidths((prev) => (prev.left === next.left && prev.right === next.right ? prev : next))
+  }, [])
+  const onStackedMeasure = useCallback(
+    (width: number) => onSplitMeasure({ left: width, right: width }),
+    [onSplitMeasure]
+  )
 
   const folds = useAppStore((s) => s.gitMode.folds[cacheKey]) ?? EMPTY_FOLDS
   const segments = useMemo(
@@ -97,11 +105,13 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   )
 
   useEffect(() => {
-    if (!file) return
+    // Wait for the first measurement: offsets taken before it count every line
+    // as one row, and a wrapped prologue would land the view short of the change.
+    if (!file || widths.left <= 0) return
     const autoScrollKey = `${cacheKey}:${view}`
     if (autoScrollKeyRef.current === autoScrollKey) return
     autoScrollKeyRef.current = autoScrollKey
-    const offset = firstChangeSegmentOffset(file, EMPTY_FOLDS, contentWidth, view)
+    const offset = firstChangeSegmentOffset(file, EMPTY_FOLDS, widths, view)
     if (offset < 0) return
     const target = Math.max(0, offset - 2)
     const apply = (): void => {
@@ -119,7 +129,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
       raf = requestAnimationFrame(apply)
     })
     return () => cancelAnimationFrame(raf)
-  }, [cacheKey, contentWidth, file, view])
+  }, [cacheKey, widths, file, view])
 
   if (!file) {
     return (
@@ -135,7 +145,8 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     return (
       <StackedView
         ref={stackedRef}
-        contentWidth={contentWidth}
+        onMeasure={onStackedMeasure}
+        width={widths.left}
         file={file}
         foldDispatch={foldDispatch}
         highlights={highlights}
@@ -147,7 +158,8 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   return (
     <SplitView
       ref={splitRef}
-      contentWidth={contentWidth}
+      onMeasure={onSplitMeasure}
+      widths={widths}
       file={file}
       foldDispatch={foldDispatch}
       highlights={highlights}
