@@ -7,6 +7,7 @@ import { type ImageDimensions, readImageDimensions } from '../../../terminal-gra
 import { convertToPng, isPng } from '../../../terminal-graphics/format-fallback'
 import {
   deleteImageEscape,
+  deletePlacementsEscape,
   imageIdToRgb,
   nextImageId,
   uploadPngEscape,
@@ -19,6 +20,19 @@ interface TerminalImagePaneProps {
   /** Scale the image down or up to the pane, keeping its aspect, centred. */
   fit?: boolean
   mime: string
+  /**
+   * The screen rectangle the image may draw in — a scroll viewport. A Kitty image
+   * is drawn over the cells, not clipped with them, so one that is not wholly
+   * inside is taken off screen rather than left to spill over its neighbours.
+   */
+  visibleIn?: () => ScreenRect | null
+}
+
+export interface ScreenRect {
+  height: number
+  width: number
+  x: number
+  y: number
 }
 
 interface PaneState {
@@ -82,6 +96,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
   bytes,
   fit = false,
   mime,
+  visibleIn,
 }: TerminalImagePaneProps) {
   const t = useTheme()
   const renderer = useRenderer()
@@ -131,9 +146,21 @@ export const TerminalImagePane = memo(function TerminalImagePane({
     function (this: BoxRenderable): void {
       const state = stateRef.current
       if (!state.uploaded || state.imageId === null) return
-      const key = `${this.screenX},${this.screenY},${this.width},${this.height}`
+      const clip = visibleIn?.() ?? null
+      const inside =
+        clip === null ||
+        (this.screenY >= clip.y &&
+          this.screenY + this.height <= clip.y + clip.height &&
+          this.screenX >= clip.x &&
+          this.screenX + this.width <= clip.x + clip.width)
+      const key = inside ? `${this.screenX},${this.screenY},${this.width},${this.height}` : 'hidden'
       if (state.lastKey === key) return
       state.lastKey = key
+      if (!inside) {
+        const id = state.imageId
+        process.nextTick(() => writeRaw(deletePlacementsEscape(id)))
+        return
+      }
       const pane = { height: this.height, width: this.width, x: this.screenX, y: this.screenY }
       const box =
         fit && state.dims && pane.width > 0 && pane.height > 0
@@ -143,7 +170,7 @@ export const TerminalImagePane = memo(function TerminalImagePane({
       // Queue write to land AFTER opentui's native cell flush in this frame.
       process.nextTick(() => writeRaw(seq))
     },
-    [fit, renderer]
+    [fit, renderer, visibleIn]
   )
 
   if (error != null && error !== '') {

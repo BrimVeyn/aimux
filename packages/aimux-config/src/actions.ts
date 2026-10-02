@@ -652,6 +652,10 @@ function gitFileKey(section: string, path: string, repoPath?: string): string {
     : `${section}:${path}`
 }
 
+function isMarkdownPath(path: string): boolean {
+  return /\.(md|markdown)$/i.test(path)
+}
+
 function selectedGitFile(ctx: ModeContext) {
   const key = ctx.state.gitMode.selectedEntryKey
   if (!(key != null && key !== '')) return null
@@ -739,6 +743,8 @@ export function scrollGitDiff(delta: number): KeyResult {
 
 export const toggleGitDiffView: KeyResult = r([{ type: 'git-mode-toggle-diff-view' }])
 
+export const toggleGitMarkdownView: KeyResult = r([{ type: 'git-mode-toggle-markdown-view' }])
+
 export const toggleGitReviewBase: KeyResult = r([{ type: 'git-mode-toggle-review-base' }])
 
 export const toggleGitPaneTab: KeyResult = r([{ type: 'git-pane-toggle-tab' }])
@@ -820,6 +826,9 @@ export const gitToggleFoldAll: ActionFn = (ctx: ModeContext) => {
   const file = selectedGitFile(ctx)
   if (!file) return r([])
   const key = gitFileKey(file.section, file.path, file.repoPath)
+  if (ctx.state.gitMode.markdownView === 'rendered' && isMarkdownPath(file.path)) {
+    return r([{ key, type: 'git-mode-markdown-toggle-expand' }])
+  }
   return r([{ key, type: 'git-mode-fold-toggle-all' }])
 }
 
