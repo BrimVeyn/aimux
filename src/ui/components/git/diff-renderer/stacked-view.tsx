@@ -1,10 +1,5 @@
-import type { ThemedToken } from 'shiki'
+import type { MouseEvent as OtuiMouseEvent, ScrollBoxRenderable } from '@opentui/core'
 
-import {
-  type MouseEvent as OtuiMouseEvent,
-  type ScrollBoxRenderable,
-  TextAttributes,
-} from '@opentui/core'
 import {
   forwardRef,
   useCallback,
@@ -29,7 +24,7 @@ import {
   type UnifiedRowOrHeader,
 } from './build-rows'
 import { FoldStrip } from './fold-strip'
-import { tokenToSpan } from './highlight'
+import { LineContent } from './line-content'
 import { useSegmentVirtualization } from './use-segment-virtualization'
 
 const OVERSCAN = 24
@@ -60,9 +55,11 @@ interface Props {
   file: FileDiffMetadata
   highlights: DiffHighlights
   foldDispatch: FoldDispatch
-  contentWidth: number
+  /** Reports the text columns a line really has, once laid out. */
+  onMeasure: (width: number) => void
   requestSegmentHighlights: (segments: readonly DiffSegment[]) => void
   segments: DiffSegment[]
+  width: number
 }
 
 interface RenderedSegment {
@@ -80,7 +77,7 @@ function handleScroll(e: OtuiMouseEvent): void {
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { contentWidth, file, foldDispatch, highlights, requestSegmentHighlights, segments },
+  { file, foldDispatch, highlights, onMeasure, requestSegmentHighlights, segments, width },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
@@ -103,7 +100,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
     if (Object.keys(measuredHeightsRef.current).length === 0) return
     measuredHeightsRef.current = {}
     setMeasurementVersion((version) => version + 1)
-  }, [contentWidth, file])
+  }, [width, file])
 
   useEffect(() => {
     return () => cancelAnimationFrame(commitFrameRef.current)
@@ -125,7 +122,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
 
   const renderedSegments = useMemo<RenderedSegment[]>(() => {
     return visibleWindow.visible.map((segment) => {
-      const rows = expandUnifiedSegment(file, segment, contentWidth)
+      const rows = expandUnifiedSegment(file, segment, width)
       return {
         exactHeight: rows.reduce(
           (sum, row) => sum + (row.type === 'hunk-header' || row.type === 'fold' ? 1 : row.height),
@@ -135,7 +132,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
         segment,
       }
     })
-  }, [contentWidth, file, visibleWindow.visible])
+  }, [width, file, visibleWindow.visible])
 
   useEffect(() => {
     requestSegmentHighlights(visibleWindow.visible)
@@ -160,10 +157,19 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
 
   const gw = useMemo(() => gutterWidth(file), [file])
 
+  // Read off the laid-out viewport, not worked out from the screen. Two line
+  // numbers and a sign come first: ` 12 34 ` and `+ `.
+  const measure = useCallback(() => {
+    const viewport = scrollRef.current?.viewport.width ?? 0
+    if (viewport <= 0) return
+    onMeasure(Math.max(1, viewport - (gw * 2 + 5)))
+  }, [gw, onMeasure])
+
   return (
     <scrollbox
       ref={scrollRef}
       flexGrow={1}
+      renderAfter={measure}
       scrollY
       viewportCulling
       contentOptions={COLUMN_CONTENT_OPTIONS}
@@ -178,6 +184,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
             gw={gw}
             highlights={highlights}
             row={row}
+            textWidth={width}
           />
         ))
       )}
@@ -191,11 +198,13 @@ function UnifiedRowRender({
   gw,
   highlights,
   row,
+  textWidth,
 }: {
   foldDispatch: FoldDispatch
   gw: number
   highlights: DiffHighlights
   row: UnifiedRowOrHeader
+  textWidth: number
 }) {
   const t = useTheme()
   const headerBg = t.diffContextBg
@@ -218,9 +227,14 @@ function UnifiedRowRender({
     const tokens = highlights.add[row.lineIdx]
     return (
       <box flexDirection="row" height={row.height}>
-        <text fg={t.textMuted}>{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
-        <text fg={t.text}> </text>
-        <LineContent content={row.content} tokens={tokens} />
+        <text
+          flexShrink={0}
+          fg={t.textMuted}
+        >{` ${pad(row.delLineNumber)} ${pad(row.addLineNumber)} `}</text>
+        <text flexShrink={0} fg={t.text}>
+          {'  '}
+        </text>
+        <LineContent content={row.content} tokens={tokens} width={textWidth} />
       </box>
     )
   }
@@ -232,34 +246,9 @@ function UnifiedRowRender({
   const tokens = row.type === 'addition' ? highlights.add[row.lineIdx] : highlights.del[row.lineIdx]
   return (
     <box flexDirection="row" backgroundColor={bg} height={row.height}>
-      <text fg={t.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
-      <text fg={signColor}>{`${sign} `}</text>
-      <LineContent content={row.content} tokens={tokens} />
+      <text flexShrink={0} fg={t.textMuted}>{` ${pad(delNum)} ${pad(addNum)} `}</text>
+      <text flexShrink={0} fg={signColor}>{`${sign} `}</text>
+      <LineContent content={row.content} tokens={tokens} width={textWidth} />
     </box>
-  )
-}
-
-function LineContent({ content, tokens }: { content: string; tokens: ThemedToken[] | undefined }) {
-  const t = useTheme()
-  if (!tokens || tokens.length === 0) {
-    return <text fg={t.text}>{content}</text>
-  }
-  return (
-    <text>
-      {tokens.map((tok, i) => {
-        const s = tokenToSpan(tok)
-        let attributes = 0
-        if (s.bold === true) attributes |= TextAttributes.BOLD
-        if (s.italic === true) attributes |= TextAttributes.ITALIC
-        if (s.underline === true) attributes |= TextAttributes.UNDERLINE
-        return (
-          // Syntax tokens are positional within a single line and never reorder.
-          // eslint-disable-next-line react/no-array-index-key
-          <span key={i} fg={s.fg ?? t.text} attributes={attributes}>
-            {s.text}
-          </span>
-        )
-      })}
-    </text>
   )
 }
