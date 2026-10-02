@@ -133,6 +133,7 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
         .map('m', actions.openWorkspaceMove, 'Move workspace')
         .map('p', actions.gitPush, 'Push')
         .map('v', actions.toggleGitDiffView, 'Toggle split/stacked')
+        .map('r', actions.toggleGitMarkdownView, 'Toggle rendered/source Markdown')
         .map('b', actions.toggleGitReviewBase, 'Review vs base')
         .map('t', actions.toggleGitFileListMode, 'Toggle flat/tree')
         .map('T', actions.toggleTreeCompaction, 'Toggle tree compaction')

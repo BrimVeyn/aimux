@@ -83,6 +83,11 @@ export function deleteImageEscape(id: number): string {
   return wrapForTmux(`${ESC}_Ga=d,d=I,i=${id},q=2;${ST}`)
 }
 
+/** Takes the image off screen but keeps its data, so placing it again is free. */
+export function deletePlacementsEscape(id: number): string {
+  return wrapForTmux(`${ESC}_Ga=d,d=i,i=${id},q=2;${ST}`)
+}
+
 export function imageIdToRgb(id: number): [number, number, number] {
   return idToRgb(id)
 }

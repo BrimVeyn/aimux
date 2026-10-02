@@ -428,6 +428,8 @@ export interface DiffData {
 }
 
 export type GitDiffView = 'split' | 'stacked'
+/** How a Markdown file's diff is drawn: as the document it renders to, or as source lines. */
+export type GitMarkdownView = 'rendered' | 'source'
 export type GitFileListMode = 'tree' | 'flat'
 
 export interface FoldState {
@@ -461,6 +463,9 @@ export interface GitModeState {
   pendingDeletePath: string | null
   actionMessage: string | null
   diffView: GitDiffView
+  markdownView: GitMarkdownView
+  /** Rendered Markdown diffs whose unchanged runs are all unfolded, keyed by fileKey. */
+  markdownExpanded: Record<string, true>
   folds: Record<string, Record<string, FoldState>>
   /** Working-tree-vs-HEAD~N offset. 0 = working tree vs HEAD (default). */
   headOffset: number
@@ -1447,6 +1452,8 @@ export type GitModeAction =
   | { type: 'git-mode-set-message'; message: string | null }
   | { type: 'snippet-picker-set-message'; message: string | null }
   | { type: 'git-mode-toggle-diff-view' }
+  | { type: 'git-mode-toggle-markdown-view' }
+  | { type: 'git-mode-markdown-toggle-expand'; key: string }
   | { type: 'git-mode-toggle-review-base' }
   | { type: 'git-mode-shift-head-offset'; delta: number }
   | { type: 'git-mode-set-head-offset'; offset: number }

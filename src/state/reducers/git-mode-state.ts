@@ -63,6 +63,8 @@ export function emptyGitMode(): GitModeState {
     headOffset: 0,
     highlights: {},
     loading: {},
+    markdownExpanded: {},
+    markdownView: 'rendered',
     parsedFiles: {},
     pendingDeletePath: null,
     reviewBase: false,
@@ -439,6 +441,16 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
     case 'git-mode-toggle-diff-view': {
       const next = state.gitMode.diffView === 'split' ? 'stacked' : 'split'
       return { ...state, gitMode: { ...state.gitMode, diffView: next } }
+    }
+    case 'git-mode-toggle-markdown-view': {
+      const next = state.gitMode.markdownView === 'rendered' ? 'source' : 'rendered'
+      return { ...state, gitMode: { ...state.gitMode, markdownView: next } }
+    }
+    case 'git-mode-markdown-toggle-expand': {
+      const markdownExpanded = { ...state.gitMode.markdownExpanded }
+      if (markdownExpanded[action.key]) delete markdownExpanded[action.key]
+      else markdownExpanded[action.key] = true
+      return { ...state, gitMode: { ...state.gitMode, markdownExpanded } }
     }
     case 'git-mode-toggle-review-base': {
       // Base review and history walking are mutually exclusive views; entering

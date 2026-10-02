@@ -36,6 +36,7 @@ export type {
   GitFileListMode,
   GitFileSection,
   GitFileStatus,
+  GitMarkdownView,
   GitModeState,
   GitPaneDiffCountConfig,
   GitPanelError,

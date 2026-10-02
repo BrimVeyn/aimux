@@ -3,7 +3,7 @@ import type { MouseEvent as OtuiMouseEvent } from '@opentui/core'
 import { useTerminalDimensions } from '@opentui/react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import type { DiffData, GitDiffView } from '../../../state/types'
+import type { DiffData, GitDiffView, GitMarkdownView } from '../../../state/types'
 import type { ThemeId } from '../../themes'
 
 import { diffHash } from '../../../git/diff-hash'
@@ -12,6 +12,7 @@ import { getMergeBase } from '../../../git/divergence'
 import { fetchDiff } from '../../../git/git-diff'
 import { useGitPanelPolling } from '../../../git/git-poller'
 import { useRepoDiscovery } from '../../../git/use-repo-discovery'
+import { isMarkdownPath } from '../../../markdown-diff'
 import { useAppStore } from '../../../state/app-store'
 import { dispatchGlobal } from '../../../state/dispatch-ref'
 import {
@@ -29,6 +30,7 @@ import { useDiffPrefetch } from './diff-renderer/use-diff-prefetch'
 import { GitFileFilterBar } from './git-file-filter-bar'
 import { GitPanel } from './git-panel'
 import { ImageDiffView } from './image-diff'
+import { MarkdownDiffView } from './markdown-diff'
 import { GitPaneHeader } from './pane/git-pane-header'
 import { PdfDiffView } from './pdf-diff'
 
@@ -36,6 +38,9 @@ interface DiffStageProps {
   diff: DiffData | undefined
   diffKey: string | null
   loading: boolean
+  markdownExpanded: boolean
+  markdownView: GitMarkdownView
+  repoRoot: string | null
   diffRef: React.RefObject<PierreDiffHandle | null>
   themeId: ThemeId
   view: GitDiffView
@@ -66,6 +71,9 @@ const DiffStage = memo(function DiffStage({
   diffKey,
   diffRef,
   loading,
+  markdownExpanded,
+  markdownView,
+  repoRoot,
   themeId,
   view,
 }: DiffStageProps) {
@@ -106,6 +114,18 @@ const DiffStage = memo(function DiffStage({
       <box flexGrow={1} padding={1}>
         <text fg={t.textMuted}>{placeholder}</text>
       </box>
+    )
+  }
+
+  if (markdownView === 'rendered' && isMarkdownPath(diff.path)) {
+    return (
+      <MarkdownDiffView
+        diff={diff}
+        expandAll={markdownExpanded}
+        repoRoot={repoRoot}
+        themeId={themeId}
+        view={view}
+      />
     )
   }
 
@@ -365,6 +385,11 @@ export const GitView = memo(function GitView({ themeId }: GitViewProps) {
             diffKey={selectedDiffKey}
             diffRef={diffRef}
             loading={loading}
+            markdownExpanded={
+              selectedDiffKey != null && gitMode.markdownExpanded[selectedDiffKey] === true
+            }
+            markdownView={gitMode.markdownView}
+            repoRoot={selectedFile?.repoPath ?? projectPath ?? null}
             themeId={themeId}
             view={gitMode.diffView}
           />

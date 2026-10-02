@@ -55,6 +55,28 @@ Syntax highlighting is provided by [shiki](https://shiki.style), using
 the shiki theme variant bound to the active aimux theme, so the diff
 colors stay consistent with the rest of the UI.
 
+### Markdown
+
+A changed `.md` / `.markdown` file is shown as the document it renders to:
+headings, lists, tables, quotes and code blocks drawn in the theme's
+Markdown colours, with the diff marked on top of them.
+
+- an edited paragraph, heading or list item stays one block, with the
+  words that changed highlighted (removed ones also struck through)
+- added and removed blocks are tinted, and signed `+` / `-` in the gutter;
+  an edited one is signed `~`
+- code blocks are highlighted by shiki and diffed line by line; tables
+  row by row
+- `v` switches between one interleaved document (`stacked`) and the two
+  versions side by side, aligned block by block (`split`)
+- long runs of unchanged blocks fold away; click a fold to open it, or
+  press `e` to open them all
+- images that point at a file in the repo are drawn in a Kitty-compatible
+  terminal (from the working tree, on both sides); others show as their
+  alt text and link
+
+`r` switches to the plain line diff of the source, and back.
+
 ### PDFs
 
 A changed `.pdf` (up to 15 MB) is shown as pages, not as a binary
@@ -83,6 +105,8 @@ Actions on the selected file:
 | `b`   | Toggle review vs base (workspaces)               |
 | `m`   | Move this workspace's changes into another       |
 | `v`   | Toggle split / stacked diff                      |
+| `r`   | Toggle rendered / source diff for Markdown       |
+| `e`   | Expand / collapse all folds                      |
 | `t`   | Toggle flat / tree list                          |
 | `]`   | Older commit (HEAD~N → N+1)                      |
 | `[`   | Newer commit (HEAD~N → N-1)                      |
