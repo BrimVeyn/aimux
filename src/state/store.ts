@@ -38,6 +38,7 @@ const DEFAULT_GIT_PANE: GitPaneState = {
   diffCount: { enabled: true },
   diffModeRatio: 0.35,
   fileListMode: 'tree',
+  icons: { enabled: true },
   path: { enabled: true },
   prefetchRadius: 5,
   tab: 'diff',

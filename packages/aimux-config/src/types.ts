@@ -14,6 +14,7 @@ export type * from './app-types'
 import type {
   GitFileListMode,
   GitPaneDiffCountConfig,
+  GitPaneIconsConfig,
   GitPanePathConfig,
   KeyResult,
   ModeContext,
@@ -236,6 +237,7 @@ interface GitPaneBaseConfig {
   initialTreeCompaction?: boolean
   path?: GitPanePathConfig
   diffCount?: GitPaneDiffCountConfig
+  icons?: GitPaneIconsConfig
   /** Prefetch N neighbouring diffs around the cursor; 0 disables. */
   prefetchRadius?: number
   /** @deprecated Use `initialVisible` instead. */
@@ -507,6 +509,7 @@ export interface ResolvedConfig {
     initialTreeCompaction?: boolean
     path?: GitPanePathConfig
     diffCount?: GitPaneDiffCountConfig
+    icons?: GitPaneIconsConfig
     prefetchRadius?: number
   }
   hooks: HooksConfig

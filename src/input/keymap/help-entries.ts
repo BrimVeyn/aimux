@@ -20,6 +20,7 @@ const BUILTIN_MODE_LABELS: HelpModeLabel[] = [
   { label: 'Stats', modeId: 'stats' },
   { label: 'Git commit', modeId: 'modal.git-commit' },
   { label: 'Git file filter', modeId: 'modal.git-file-filter' },
+  { label: 'Plugin text field', modeId: 'modal.plugin-input' },
   { label: 'New tab', modeId: 'modal.new-tab.command-edit' },
   { label: 'New tab — command', modeId: 'modal.new-tab.command-edit' },
   { label: 'Project picker', modeId: 'modal.project-picker.filtering' },

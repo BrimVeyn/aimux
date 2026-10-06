@@ -161,7 +161,7 @@ export function parsePorcelainEntries(
   return files
 }
 
-async function countUntrackedLines(cwd: string, path: string): Promise<number | null> {
+export async function countUntrackedLines(cwd: string, path: string): Promise<number | null> {
   try {
     const file = Bun.file(`${cwd}/${path}`)
     if (!(await file.exists())) return null

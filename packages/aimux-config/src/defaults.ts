@@ -160,6 +160,17 @@ export function getDefaultKeymapConfig(): ResolvedKeymapConfig {
     )
 
     // -----------------------------------------------------------------------
+    // A plugin's text field: typed in place over the plugin's own UI. The
+    // plugin hears every change; <CR> keeps the text, <Esc> says to drop it.
+    // -----------------------------------------------------------------------
+    .mode('modal.plugin-input', (m) =>
+      m
+        .map('<Esc>', actions.cancelPluginInput, 'Cancel')
+        .map('<CR>', actions.submitPluginInput, 'Apply')
+        .passthrough()
+    )
+
+    // -----------------------------------------------------------------------
     // Git mode: the sidebar's file filter, typed in place. The list narrows as
     // you type; <CR> keeps the filter, <Esc> puts back the one you had.
     // -----------------------------------------------------------------------

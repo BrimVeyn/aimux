@@ -1,6 +1,4 @@
-import type { ScrollBoxRenderable } from '@opentui/core'
-
-import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, type ReactNode, useCallback, useMemo } from 'react'
 
 import type {
   GitFileEntry,
@@ -17,8 +15,11 @@ import {
   buildGitTreeRows,
   type GitTreeFileRow,
   type GitTreeFolderRow,
+  treeGuides,
 } from '../../../state/git-tree'
+import { fileIcon, folderIcon, type Icon } from '../../file-icons'
 import { getCurrentTheme, useTheme } from '../../theme'
+import { VirtualRows } from '../primitives/virtual-rows'
 
 interface GitPanelProps {
   collapsedFolders?: Record<string, true>
@@ -108,7 +109,8 @@ function stripTrailingSlash(prefix: string): string {
 function renderFileLabel(
   file: GitFileEntry,
   pathConfig: GitPanePathConfig,
-  fileListMode: GitFileListMode
+  fileListMode: GitFileListMode,
+  lead: ReactNode
 ): ReactNode {
   const t = getCurrentTheme()
   const transform = pathConfig.enabled ? pathConfig.pathFn : undefined
@@ -119,6 +121,7 @@ function renderFileLabel(
   if (!(file.renamedFrom != null && file.renamedFrom !== '')) {
     return (
       <text selectable={false} wrapMode="none">
+        {lead}
         <span fg={t.text}>{basename}</span>
         {showDir ? <span fg={t.textMuted}> {dir}</span> : null}
       </text>
@@ -129,6 +132,7 @@ function renderFileLabel(
   const renamedDir = stripTrailingSlash(renamed.prefix)
   return (
     <text selectable={false} wrapMode="none">
+      {lead}
       <span fg={t.textMuted}>{renamed.basename}</span>
       {showDir && renamedDir ? <span fg={t.textMuted}> {renamedDir}</span> : null}
       <span fg={t.textMuted}> → </span>
@@ -174,11 +178,29 @@ function renderDiffCount(
   )
 }
 
+/**
+ * What leads a row's name: the guides that tie it to its folder, then its
+ * icon. The guides take the two columns a level the indent used to.
+ */
+function Lead({ guide, icon }: { guide: string; icon: Icon | null }): ReactNode {
+  const t = useTheme()
+  return (
+    <>
+      {guide === '' ? null : <span fg={t.textMuted}>{guide}</span>}
+      {icon === null ? null : <span fg={t[icon.tone]}>{`${icon.glyph} `}</span>}
+    </>
+  )
+}
+
 const FolderRow = memo(function FolderRow({
+  guide,
+  icons,
   isSelected,
   row,
 }: {
   row: GitTreeFolderRow
+  guide: string
+  icons: boolean
   isSelected: boolean
 }) {
   const t = useTheme()
@@ -191,15 +213,16 @@ const FolderRow = memo(function FolderRow({
   }, [row.key])
   return (
     <box flexDirection="row" gap={1} backgroundColor={bg} onMouseDown={onSelect}>
-      <box flexGrow={1} overflow="hidden" paddingLeft={row.depth * 2}>
-        <box flexDirection="row" gap={1} onMouseDown={onToggle}>
-          <text selectable={false} fg={t.textMuted} bg={bg}>
-            {row.isCollapsed ? '▸' : '▾'}
-          </text>
-          <text selectable={false} fg={t.textMuted} bg={bg}>
-            {row.isCollapsed ? '\uf07b' : '\uf07c'}
-          </text>
+      {/* The status column a file row has, left empty: without it a folder's
+          guides start three columns left of its files' and the lines break. */}
+      <box width={2} flexShrink={0} />
+      <box flexGrow={1} overflow="hidden">
+        <box flexDirection="row" onMouseDown={onToggle}>
+          {/* With icons the folder's glyph says open or closed, as nvim-tree
+              draws it; without, the arrow does. */}
           <text selectable={false} fg={t.textMuted} bg={bg} wrapMode="none">
+            <Lead guide={guide} icon={icons ? folderIcon(!row.isCollapsed) : null} />
+            {icons ? null : `${row.isCollapsed ? '▸' : '▾'} `}
             {row.name}
           </text>
         </box>
@@ -212,6 +235,8 @@ const FileRow = memo(function FileRow({
   addedW,
   diffCountConfig,
   fileListMode,
+  guide,
+  icons,
   isSelected,
   pathConfig,
   removedW,
@@ -219,6 +244,8 @@ const FileRow = memo(function FileRow({
   row,
 }: {
   row: GitTreeFileRow
+  guide: string
+  icons: boolean
   addedW: number
   removedW: number
   isSelected: boolean
@@ -254,40 +281,29 @@ const FileRow = memo(function FileRow({
           </text>
         </box>
       ) : null}
-      <box flexGrow={1} overflow="hidden" paddingLeft={fileListMode === 'tree' ? row.depth * 2 : 0}>
-        {renderFileLabel(file, pathConfig, fileListMode)}
+      <box flexGrow={1} overflow="hidden">
+        {renderFileLabel(
+          file,
+          pathConfig,
+          fileListMode,
+          <Lead guide={guide} icon={icons ? fileIcon(file.path) : null} />
+        )}
       </box>
       {renderDiffCount(file, addedW, removedW, bg, diffCountConfig, hasNumstat)}
     </box>
   )
 })
 
-const TreeSection = memo(function TreeSection({
-  addedW,
-  diffCountConfig,
+const SectionHeader = memo(function SectionHeader({
+  count,
   fileListMode,
-  files,
-  marginTop,
-  pathConfig,
-  removedW,
-  repoPrefixes,
-  rows,
-  selectedEntryKey,
   showListModeToggle,
   title,
 }: {
   title: string
-  files: GitFileEntry[]
-  rows: (GitTreeFolderRow | GitTreeFileRow)[]
-  addedW: number
-  removedW: number
+  count: number
   fileListMode: GitFileListMode
-  selectedEntryKey: string | null | undefined
   showListModeToggle: boolean
-  pathConfig: GitPanePathConfig
-  diffCountConfig: GitPaneDiffCountConfig
-  marginTop: number
-  repoPrefixes: Record<string, string>
 }) {
   const t2 = useTheme()
   const nextFileListMode = fileListMode === 'tree' ? 'flat' : 'tree'
@@ -295,49 +311,44 @@ const TreeSection = memo(function TreeSection({
     dispatchGlobal({ type: 'git-mode-toggle-file-list-mode' })
     runSideEffectGlobal({ mode: nextFileListMode, type: 'persist-git-file-list-mode' })
   }, [nextFileListMode])
-  if (files.length === 0) return null
   return (
-    <box flexDirection="column" marginTop={marginTop}>
-      <box flexDirection="row" justifyContent="space-between">
-        <text selectable={false} fg={t2.text}>
-          <strong>
-            {title} ({files.length})
-          </strong>
-        </text>
-        {showListModeToggle ? (
-          <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
-            <text selectable={false} fg={fileListMode === 'tree' ? t2.primary : t2.textMuted}>
-              tree
-            </text>
-            <text selectable={false} fg={t2.textMuted}>
-              |
-            </text>
-            <text selectable={false} fg={fileListMode === 'flat' ? t2.primary : t2.textMuted}>
-              flat
-            </text>
-          </box>
-        ) : null}
-      </box>
-      {rows.map((row) =>
-        row.kind === 'folder' ? (
-          <FolderRow key={row.key} row={row} isSelected={row.key === selectedEntryKey} />
-        ) : (
-          <FileRow
-            key={row.key}
-            row={row}
-            addedW={addedW}
-            removedW={removedW}
-            isSelected={row.key === selectedEntryKey}
-            fileListMode={fileListMode}
-            pathConfig={pathConfig}
-            diffCountConfig={diffCountConfig}
-            repoPrefixes={repoPrefixes}
-          />
-        )
-      )}
+    <box flexDirection="row" justifyContent="space-between">
+      <text selectable={false} fg={t2.text}>
+        <strong>
+          {title} ({count})
+        </strong>
+      </text>
+      {showListModeToggle ? (
+        <box flexDirection="row" gap={1} onMouseDown={toggleListMode}>
+          <text selectable={false} fg={fileListMode === 'tree' ? t2.primary : t2.textMuted}>
+            tree
+          </text>
+          <text selectable={false} fg={t2.textMuted}>
+            |
+          </text>
+          <text selectable={false} fg={fileListMode === 'flat' ? t2.primary : t2.textMuted}>
+            flat
+          </text>
+        </box>
+      ) : null}
     </box>
   )
 })
+
+/**
+ * Every line of the panel, top to bottom: a blank line between sections, each
+ * section's heading, then its rows. Flat, so only the lines on screen are
+ * drawn — a working tree with thousands of changes is otherwise thousands of
+ * rows laid out on every keypress.
+ */
+type PanelLine =
+  | { kind: 'gap'; key: string }
+  | { kind: 'header'; key: string; section: GitFileSection; count: number }
+  | GitTreeFolderRow
+  | GitTreeFileRow
+
+/** The cursor stays in the middle of the panel, as it always has here. */
+const CENTRED = 999
 
 interface StatusPlaceholder {
   label: string
@@ -383,10 +394,6 @@ function computeStatusPlaceholder(
 
 const DEFAULT_PATH_CONFIG: GitPanePathConfig = { enabled: true }
 const DEFAULT_DIFF_COUNT_CONFIG: GitPaneDiffCountConfig = { enabled: true }
-const HIDDEN_SCROLLBAR_OPTIONS = { visible: false }
-const COLUMN_CONTENT_OPTIONS = { flexDirection: 'column' as const, gap: 0 }
-const EMPTY_FILES: GitFileEntry[] = []
-const EMPTY_ROWS: (GitTreeFolderRow | GitTreeFileRow)[] = []
 
 export const GitPanel = memo(function GitPanel({
   baseLabel,
@@ -405,9 +412,9 @@ export const GitPanel = memo(function GitPanel({
 }: GitPanelProps) {
   const t = useTheme()
   const repoPrefixes = useAppStore((s) => s.multiRepo.prefixes)
+  const icons = useAppStore((s) => s.gitPane.icons.enabled)
   const isSingleSection = headOffset > 0 || (baseLabel != null && baseLabel !== '')
   const sectionOrder = isSingleSection ? HISTORICAL_SECTION_ORDER : BASE_SECTION_ORDER
-  const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const tree = useMemo(
     () => buildGitTreeRows(gitPanel.files, collapsedFolders, fileListMode, compact),
     [collapsedFolders, compact, fileListMode, gitPanel.files]
@@ -427,15 +434,89 @@ export const GitPanel = memo(function GitPanel({
       null)
     : null
 
-  useEffect(() => {
-    const scrollbox = scrollRef.current
-    if (!scrollbox || !(selectedEntryKey != null && selectedEntryKey !== '')) return
-    const selectedIndex = tree.visibleRows.findIndex((row) => row.key === selectedEntryKey)
-    if (selectedIndex < 0) return
-    const viewportHeight = Math.max(1, scrollbox.viewport.height)
-    const target = Math.max(0, selectedIndex - Math.floor(viewportHeight / 2))
-    scrollbox.scrollTo({ x: 0, y: target })
-  }, [selectedEntryKey, tree.visibleRows])
+  const lines = useMemo(() => {
+    const out: PanelLine[] = []
+    for (const key of sectionOrder) {
+      const section = tree.sections.find((entry) => entry.section === key)
+      if (section === undefined || section.files.length === 0) continue
+      if (out.length > 0) out.push({ key: `gap:${key}`, kind: 'gap' })
+      out.push({ count: section.files.length, key: `header:${key}`, kind: 'header', section: key })
+      out.push(...section.rows)
+    }
+    return out
+  }, [sectionOrder, tree.sections])
+  const guides = useMemo(() => {
+    const out = new Map<string, string>()
+    if (fileListMode !== 'tree') return out
+    for (const section of tree.sections) {
+      const sectionGuides = treeGuides(section.rows)
+      for (const [i, row] of section.rows.entries()) out.set(row.key, sectionGuides[i] ?? '')
+    }
+    return out
+  }, [fileListMode, tree.sections])
+  const cursor = useMemo(
+    () => lines.findIndex((line) => line.key === selectedEntryKey),
+    [lines, selectedEntryKey]
+  )
+  const keyOf = useCallback((index: number) => lines[index]?.key ?? String(index), [lines])
+  const renderRow = useCallback(
+    (index: number): ReactNode => {
+      const line = lines[index]
+      switch (line?.kind) {
+        case undefined:
+        case 'gap':
+          return <box height={1} />
+        case 'header':
+          return (
+            <SectionHeader
+              title={sectionTitle(line.section, headOffset, baseLabel)}
+              count={line.count}
+              fileListMode={fileListMode}
+              showListModeToggle={line.section === toggleSection}
+            />
+          )
+        case 'folder':
+          return (
+            <FolderRow
+              row={line}
+              guide={guides.get(line.key) ?? ''}
+              icons={icons}
+              isSelected={line.key === selectedEntryKey}
+            />
+          )
+        case 'file':
+          return (
+            <FileRow
+              row={line}
+              guide={guides.get(line.key) ?? ''}
+              icons={icons}
+              addedW={addedW}
+              removedW={removedW}
+              isSelected={line.key === selectedEntryKey}
+              fileListMode={fileListMode}
+              pathConfig={pathConfig}
+              diffCountConfig={diffCountConfig}
+              repoPrefixes={repoPrefixes}
+            />
+          )
+      }
+    },
+    [
+      addedW,
+      baseLabel,
+      diffCountConfig,
+      fileListMode,
+      guides,
+      headOffset,
+      icons,
+      lines,
+      pathConfig,
+      removedW,
+      repoPrefixes,
+      selectedEntryKey,
+      toggleSection,
+    ]
+  )
 
   return (
     <box flexDirection="column" flexGrow={1} flexShrink={1} flexBasis={0} overflow="hidden" gap={0}>
@@ -445,38 +526,13 @@ export const GitPanel = memo(function GitPanel({
         </text>
       ) : null}
       {statusNode ?? (
-        <scrollbox
-          flexGrow={1}
-          ref={scrollRef}
-          scrollY
-          scrollbarOptions={HIDDEN_SCROLLBAR_OPTIONS}
-          viewportCulling
-          contentOptions={COLUMN_CONTENT_OPTIONS}
-        >
-          {sectionOrder.map((key, idx) => {
-            const section = tree.sections.find((entry) => entry.section === key)
-            const priorHasFiles = sectionOrder
-              .slice(0, idx)
-              .some((k) => (tree.sections.find((e) => e.section === k)?.files.length ?? 0) > 0)
-            return (
-              <TreeSection
-                key={key}
-                title={sectionTitle(key, headOffset, baseLabel)}
-                files={section?.files ?? EMPTY_FILES}
-                rows={section?.rows ?? EMPTY_ROWS}
-                addedW={addedW}
-                removedW={removedW}
-                fileListMode={fileListMode}
-                selectedEntryKey={selectedEntryKey}
-                showListModeToggle={key === toggleSection}
-                pathConfig={pathConfig}
-                diffCountConfig={diffCountConfig}
-                marginTop={priorHasFiles ? 1 : 0}
-                repoPrefixes={repoPrefixes}
-              />
-            )
-          })}
-        </scrollbox>
+        <VirtualRows
+          count={lines.length}
+          cursor={cursor}
+          keyOf={keyOf}
+          renderRow={renderRow}
+          scrolloff={CENTRED}
+        />
       )}
     </box>
   )

@@ -391,6 +391,9 @@ export interface PluginKit {
    * The resolved theme. The one thing a plugin must not hard-code: aimux ships
    * 34 themes and loads more from disk, and a plugin with its own colours is
    * the part of the screen that stops matching when the user switches.
+   *
+   * Beyond the theme's own tokens, `selectionInk` is the one colour that reads
+   * on a selected `List` row: everything drawn on that row takes it.
    */
   useTheme: () => Record<string, string>
   /** A titled container — what a bar widget and a full-screen view both are. */
@@ -413,8 +416,120 @@ export interface PluginKit {
     onSelect?: (index: number) => void
     onHover?: (index: number) => void
   }>
+  /**
+   * A list of any length, one line per item: only the rows on screen are
+   * drawn, so a tree of twenty thousand files moves as fast as one of twenty.
+   * The cursor is kept in view a few rows from the edge, the wheel scrolls
+   * without moving it, and a click hands back the index.
+   *
+   * `renderItem`'s `selected` is true on the cursor's row while the list has
+   * focus: that row is filled, and everything on it takes `selectionInk`.
+   * With `focused` false the row is lifted instead, in its usual colours.
+   */
+  VirtualList: PluginComponent<{
+    items: readonly unknown[]
+    selectedIndex?: number
+    keyOf?: (item: unknown, index: number) => string
+    renderItem: (item: unknown, index: number, selected: boolean) => PluginNode
+    empty?: PluginNode
+    focused?: boolean
+    onSelect?: (index: number) => void
+    onHover?: (index: number) => void
+  }>
+  /**
+   * The Nerd Font glyph aimux draws beside a file — git mode's sidebar uses
+   * the same table — and the theme token to colour it with: look it up in
+   * `useTheme()`. By name first (`package.json`), then extension.
+   */
+  fileIcon: (path: string) => PluginFileIcon
+  /** A folder's glyph, open or closed, as `fileIcon` draws files. */
+  folderIcon: (open: boolean) => PluginFileIcon
   /** The footer line every modal and screen ends with. */
   KeyHint: PluginComponent<{ hints: readonly { keys: string; label: string }[] }>
+  /**
+   * One file of the repository the user is working in, read-only, drawn by git
+   * mode's own renderers: syntax-highlighted code, rendered Markdown, images
+   * and PDFs. A file that has changed shows as git mode shows it, split
+   * against HEAD; anything else — untouched or untracked — is drawn once.
+   *
+   * It fills the room it is given and scrolls itself under the mouse. Keys are
+   * the host's to bind: hand it a `controller` and call `scroll` from an action.
+   */
+  FileView: PluginComponent<PluginFileViewProps>
+  /**
+   * A one-line text field as aimux draws its own — the git sidebar's filter,
+   * say: the text, a cursor, a placeholder when empty. Stateless: feed it what
+   * `ctx.ui.input.use()` returns.
+   */
+  TextField: PluginComponent<{ value: string; cursor: number; placeholder?: string }>
+}
+
+/** A Nerd Font glyph and the theme token it is drawn in. */
+export interface PluginFileIcon {
+  glyph: string
+  /** A key of `kit.useTheme()`: `syntaxType`, `textMuted`… */
+  tone: string
+}
+
+/** What a plugin hears from the text field it opened. */
+export interface PluginInputOptions {
+  /** What the field starts with. Empty by default. */
+  initial?: string
+  /** Every edit, as it is typed — what a filter narrows on. */
+  onChange?: (text: string) => void
+  /** ⏎: the text is kept. */
+  onSubmit?: (text: string) => void
+  /** Esc: the text is dropped. Put back whatever there was before. */
+  onCancel?: (text: string) => void
+}
+
+/**
+ * A line of text typed over the plugin's own screen. A view has keys, not
+ * input — every letter is a binding — so the host does the typing: while the
+ * field is open, keys edit it, ⏎ submits and Esc cancels, and the plugin's own
+ * bindings wait. Where the field is drawn is the plugin's: `use()` and
+ * `kit.TextField`.
+ */
+export interface PluginInputApi {
+  /** Opens the field, replacing one this plugin already had open. */
+  open: (options: PluginInputOptions) => void
+  /** Closes it without a word to the callbacks. */
+  close: () => void
+  /** The field as a hook: its text and cursor while open, null otherwise. */
+  use: () => { value: string; cursor: number } | null
+}
+
+/** What a plugin drives a `kit.FileView` with, from outside React. */
+export interface PluginFileViewController {
+  /** Lines for text, pages for a PDF — whatever the file shown scrolls by. */
+  scroll: (delta: number) => void
+}
+
+export interface PluginFileViewProps {
+  /** Relative to the repository root, as `git.files()` lists it. Null draws a prompt. */
+  path: string | null
+  /** `diff` (the default) shows a changed file as a change; `file` always as it is. */
+  prefer?: 'diff' | 'file'
+  /** How a Markdown file is drawn. `rendered` by default. */
+  markdown?: 'rendered' | 'source'
+  /** Change it to read the file again — after a refresh, say. */
+  revision?: number
+  /** Filled in while the view is mounted. */
+  controller?: { current: PluginFileViewController | null }
+}
+
+/** One file of the repository, tracked or not. */
+export interface PluginRepoFile {
+  path: string
+  /** Lines added against HEAD, or null when git did not count them (a binary, a clean file). */
+  added: number | null
+  /** Lines removed against HEAD, or null. */
+  removed: number | null
+  /**
+   * What git says changed, in the panel's letters — `M`, `A`, `D`, `R`, `?`
+   * for untracked — or null for a file exactly as HEAD has it.
+   */
+  status: string | null
 }
 
 /** One changed file, as the git panel sees it. */
@@ -474,6 +589,12 @@ export interface PluginGitApi {
   /** The panel's last refresh. */
   status: () => PluginGitStatus
   /**
+   * Every file of the repository the user is working in — the active
+   * workspace's checkout — tracked and untracked, ignored ones left out, sorted
+   * by path. Read fresh from git, not from the panel's poll.
+   */
+  files: () => Promise<PluginRepoFile[]>
+  /**
    * The diff of one file, unified. `staged` reads the index against HEAD; the
    * default reads the working tree against the index, which is what the
    * panel shows for an unstaged file. Empty for an untracked file — git has
@@ -525,6 +646,7 @@ export interface PluginUiApi {
   settings: PluginSettingsApi
   themes: PluginThemesApi
   toast: PluginToastApi
+  input: PluginInputApi
   panes: PluginPanesApi
   layout: PluginLayoutApi
   notifications: PluginNotificationsApi

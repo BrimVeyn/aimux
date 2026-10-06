@@ -17,12 +17,18 @@ import type { ThemeId } from '../../../themes'
 import { useAppStore } from '../../../../state/app-store'
 import { dispatchGlobal } from '../../../../state/dispatch-ref'
 import { useTheme } from '../../../theme'
-import { buildDiffSegments, firstChangeSegmentOffset, type SplitWidths } from './build-rows'
+import {
+  buildDiffSegments,
+  buildFileSegments,
+  firstChangeSegmentOffset,
+  type SplitWidths,
+} from './build-rows'
 import { SplitView, type SplitViewHandle } from './split-view'
 import { StackedView, type StackedViewHandle } from './stacked-view'
 import { useDiffPreparation } from './use-diff-preparation'
 
-export type DiffView = 'split' | 'stacked'
+/** `single` is a file read as it is: the diff's rows with nothing to compare. */
+export type DiffView = 'single' | 'split' | 'stacked'
 
 export interface PierreDiffHandle {
   leftScroll: ScrollBoxRenderable | null
@@ -71,10 +77,10 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   )
 
   const folds = useAppStore((s) => s.gitMode.folds[cacheKey]) ?? EMPTY_FOLDS
-  const segments = useMemo(
-    () => (file ? buildDiffSegments(file, folds).segments : []),
-    [file, folds]
-  )
+  const segments = useMemo(() => {
+    if (!file) return []
+    return view === 'single' ? buildFileSegments(file) : buildDiffSegments(file, folds).segments
+  }, [file, folds, view])
   const foldDispatch = useMemo<FoldDispatch>(
     () => ({
       adjust: (foldId, side, delta) =>
@@ -107,7 +113,7 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
   useEffect(() => {
     // Wait for the first measurement: offsets taken before it count every line
     // as one row, and a wrapped prologue would land the view short of the change.
-    if (!file || widths.left <= 0) return
+    if (!file || widths.left <= 0 || view === 'single') return
     const autoScrollKey = `${cacheKey}:${view}`
     if (autoScrollKeyRef.current === autoScrollKey) return
     autoScrollKeyRef.current = autoScrollKey
@@ -141,10 +147,11 @@ export const PierreDiff = forwardRef<PierreDiffHandle, Props>(function PierreDif
     )
   }
 
-  if (view === 'stacked') {
+  if (view !== 'split') {
     return (
       <StackedView
         ref={stackedRef}
+        single={view === 'single'}
         onMeasure={onStackedMeasure}
         width={widths.left}
         file={file}

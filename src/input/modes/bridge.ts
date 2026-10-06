@@ -28,6 +28,7 @@ const MODAL_MODE_IDS: Record<SupportedModalType, ModeId | null> = {
   'git-file-filter': 'modal.git-file-filter',
   'help': 'modal.help.filtering',
   'new-tab': 'modal.new-tab.command-edit',
+  'plugin-input': 'modal.plugin-input',
   'plugin-modal': null,
   'project-name': 'modal.project-name',
   'project-picker': 'modal.project-picker.filtering',

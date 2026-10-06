@@ -12,6 +12,7 @@ import {
   moveGitSelection,
   reconcileGitSelection,
   reconcileSelectedGitEntryKey,
+  visibleGitKeys,
 } from '../git-tree'
 import {
   type AppState,
@@ -326,6 +327,19 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         },
       }
     }
+    case 'git-mode-forget-diff': {
+      const prefix = `${action.key}|`
+      const highlights = Object.keys(state.gitMode.highlights).filter((k) => k.startsWith(prefix))
+      if (!(action.key in state.gitMode.parsedFiles) && highlights.length === 0) return state
+      const nextParsed = { ...state.gitMode.parsedFiles }
+      delete nextParsed[action.key]
+      const nextHighlights = { ...state.gitMode.highlights }
+      for (const k of highlights) delete nextHighlights[k]
+      return {
+        ...state,
+        gitMode: { ...state.gitMode, highlights: nextHighlights, parsedFiles: nextParsed },
+      }
+    }
     case 'git-mode-set-parsed': {
       const prevParsed = state.gitMode.parsedFiles[action.key]
       if (prevParsed && prevParsed.hash === action.hash) return state
@@ -570,13 +584,20 @@ export function reduceGitModeState(state: AppState, action: AppAction): AppState
         currentKey === movedCurrentKey && toSection !== null
           ? [gitFileKey({ path: action.path, section: toSection })]
           : []
+      const filter = activeGitFileFilter(state)
       const nextSelectedEntryKey = reconcileSelectedGitEntryKey(
-        filterGitFiles(nextFiles, activeGitFileFilter(state)),
+        filterGitFiles(nextFiles, filter),
         state.gitMode.collapsedFolders,
         state.gitPane.fileListMode,
         currentKey,
         preferredSelection,
-        state.gitPane.treeCompaction
+        state.gitPane.treeCompaction,
+        visibleGitKeys(
+          filterGitFiles(files, filter),
+          state.gitMode.collapsedFolders,
+          state.gitPane.fileListMode,
+          state.gitPane.treeCompaction
+        )
       )
 
       return {

@@ -14,7 +14,7 @@ import type { FileDiffMetadata } from '../../../../diff-parser'
 import type { DiffHighlights, FoldDispatch } from './pierre-diff'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
-import { scrollGitDiff } from '../../../git-view-controls'
+import { type DiffScrollSlot, useDiffScroll } from '../../../git-view-controls'
 import { useTheme } from '../../../theme'
 import {
   type DiffSegment,
@@ -59,6 +59,8 @@ interface Props {
   onMeasure: (width: number) => void
   requestSegmentHighlights: (segments: readonly DiffSegment[]) => void
   segments: DiffSegment[]
+  /** A file read as it is: one line number, no sign column. */
+  single?: boolean
   width: number
 }
 
@@ -68,20 +70,36 @@ interface RenderedSegment {
   segment: DiffSegment
 }
 
-function handleScroll(e: OtuiMouseEvent): void {
-  const delta = getScrollViewportDelta(e)
-  if (delta === null) return
-  e.preventDefault()
-  e.stopPropagation()
-  scrollGitDiff(delta)
+function useWheel(): (e: OtuiMouseEvent) => void {
+  const slot: DiffScrollSlot = useDiffScroll()
+  return useCallback(
+    (e: OtuiMouseEvent) => {
+      const delta = getScrollViewportDelta(e)
+      if (delta === null) return
+      e.preventDefault()
+      e.stopPropagation()
+      slot.scroll(delta)
+    },
+    [slot]
+  )
 }
 
 export const StackedView = forwardRef<StackedViewHandle, Props>(function StackedView(
-  { file, foldDispatch, highlights, onMeasure, requestSegmentHighlights, segments, width },
+  {
+    file,
+    foldDispatch,
+    highlights,
+    onMeasure,
+    requestSegmentHighlights,
+    segments,
+    single = false,
+    width,
+  },
   ref
 ) {
   const scrollRef = useRef<ScrollBoxRenderable | null>(null)
   const measuredHeightsRef = useRef<Record<string, number>>({})
+  const handleScroll = useWheel()
   const commitFrameRef = useRef(0)
   const [measurementVersion, setMeasurementVersion] = useState(0)
 
@@ -158,12 +176,14 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
   const gw = useMemo(() => gutterWidth(file), [file])
 
   // Read off the laid-out viewport, not worked out from the screen. Two line
-  // numbers and a sign come first: ` 12 34 ` and `+ `.
+  // numbers and a sign come first: ` 12 34 ` and `+ ` — one number, ` 12 `,
+  // for a file read as it is.
+  const prefix = single ? gw + 2 : gw * 2 + 5
   const measure = useCallback(() => {
     const viewport = scrollRef.current?.viewport.width ?? 0
     if (viewport <= 0) return
-    onMeasure(Math.max(1, viewport - (gw * 2 + 5)))
-  }, [gw, onMeasure])
+    onMeasure(Math.max(1, viewport - prefix))
+  }, [prefix, onMeasure])
 
   return (
     <scrollbox
@@ -184,6 +204,7 @@ export const StackedView = forwardRef<StackedViewHandle, Props>(function Stacked
             gw={gw}
             highlights={highlights}
             row={row}
+            single={single}
             textWidth={width}
           />
         ))
@@ -198,12 +219,14 @@ function UnifiedRowRender({
   gw,
   highlights,
   row,
+  single,
   textWidth,
 }: {
   foldDispatch: FoldDispatch
   gw: number
   highlights: DiffHighlights
   row: UnifiedRowOrHeader
+  single: boolean
   textWidth: number
 }) {
   const t = useTheme()
@@ -225,6 +248,14 @@ function UnifiedRowRender({
     n === undefined ? ' '.repeat(gw) : String(n).padStart(gw, ' ')
   if (row.type === 'context') {
     const tokens = highlights.add[row.lineIdx]
+    if (single) {
+      return (
+        <box flexDirection="row" height={row.height}>
+          <text flexShrink={0} fg={t.textMuted}>{` ${pad(row.addLineNumber)} `}</text>
+          <LineContent content={row.content} tokens={tokens} width={textWidth} />
+        </box>
+      )
+    }
     return (
       <box flexDirection="row" height={row.height}>
         <text

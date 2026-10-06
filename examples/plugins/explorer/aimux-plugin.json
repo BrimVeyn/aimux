@@ -1,0 +1,232 @@
+{
+  "id": "aimux-examples.explorer",
+  "name": "Explorer",
+  "version": "1.0.0",
+  "description": "Every file of the repository, read-only: code highlighted, changed files split against HEAD, Markdown, images and PDFs drawn",
+  "apiVersion": 1,
+  "entries": {
+    "ui": "src/ui.tsx"
+  },
+  "config": {
+    "icons": {
+      "type": "boolean",
+      "label": "File icons",
+      "description": "A Nerd Font glyph for each kind of file, as nvim-tree draws them. Turn off on a terminal without a Nerd Font, where they show as boxes.",
+      "default": true
+    }
+  },
+  "contributes": {
+    "keymaps": [
+      {
+        "id": "open",
+        "description": "Browse the repository's files",
+        "mode": "navigation",
+        "key": "<C-e>",
+        "action": "open"
+      },
+      {
+        "id": "open-insert",
+        "description": "Browse the repository's files while typing",
+        "mode": "terminal-input",
+        "key": "<C-e>",
+        "action": "open"
+      },
+      {
+        "id": "down",
+        "description": "Next row, or scroll the file down",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "j",
+        "action": "down"
+      },
+      {
+        "id": "up",
+        "description": "Previous row, or scroll the file up",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "k",
+        "action": "up"
+      },
+      {
+        "id": "enter",
+        "description": "Open or close the folder; on a file, read it",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "l",
+        "action": "enter"
+      },
+      {
+        "id": "enter-cr",
+        "description": "Open or close the folder; on a file, read it",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<CR>",
+        "action": "enter"
+      },
+      {
+        "id": "collapse",
+        "description": "Close the folder or go up to it; from the file, back to the tree",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "h",
+        "action": "collapse"
+      },
+      {
+        "id": "parent",
+        "description": "Go up to the folder you are in",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "P",
+        "action": "parent"
+      },
+      {
+        "id": "close-parent",
+        "description": "Close the folder you are in",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<BS>",
+        "action": "closeParent"
+      },
+      {
+        "id": "first-sibling",
+        "description": "First row of this folder",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "K",
+        "action": "firstSibling"
+      },
+      {
+        "id": "last-sibling",
+        "description": "Last row of this folder",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "J",
+        "action": "lastSibling"
+      },
+      {
+        "id": "top",
+        "description": "First row",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "gg",
+        "action": "top"
+      },
+      {
+        "id": "bottom",
+        "description": "Last row",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "G",
+        "action": "bottom"
+      },
+      {
+        "id": "switch-tab",
+        "description": "Changes or every file",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<Tab>",
+        "action": "switchTab"
+      },
+      {
+        "id": "collapse-all",
+        "description": "Close every folder",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "W",
+        "action": "collapseAll"
+      },
+      {
+        "id": "expand-all",
+        "description": "Open every folder",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "E",
+        "action": "expandAll"
+      },
+      {
+        "id": "search",
+        "description": "Fuzzy search the paths",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "/",
+        "action": "search"
+      },
+      {
+        "id": "next-change",
+        "description": "Next changed file",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "]",
+        "action": "nextChange"
+      },
+      {
+        "id": "previous-change",
+        "description": "Previous changed file",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "[",
+        "action": "previousChange"
+      },
+      {
+        "id": "scroll-down",
+        "description": "Scroll the file down",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<Down>",
+        "action": "scrollDown"
+      },
+      {
+        "id": "scroll-up",
+        "description": "Scroll the file up",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<Up>",
+        "action": "scrollUp"
+      },
+      {
+        "id": "page-down",
+        "description": "Scroll the file a page down",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<C-d>",
+        "action": "pageDown"
+      },
+      {
+        "id": "page-up",
+        "description": "Scroll the file a page up",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<C-u>",
+        "action": "pageUp"
+      },
+      {
+        "id": "toggle-diff",
+        "description": "A changed file as a diff, or as it is",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "s",
+        "action": "toggleDiff"
+      },
+      {
+        "id": "toggle-markdown",
+        "description": "Markdown rendered, or as source",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "m",
+        "action": "toggleMarkdown"
+      },
+      {
+        "id": "reload",
+        "description": "Read the files again",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "r",
+        "action": "reload"
+      },
+      {
+        "id": "help",
+        "description": "Every key of the explorer",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "?",
+        "action": "help"
+      },
+      {
+        "id": "back",
+        "description": "Back to the tree, clear the search, or close",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<Esc>",
+        "action": "back"
+      },
+      {
+        "id": "quit",
+        "description": "Close the explorer",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "q",
+        "action": "quit"
+      },
+      {
+        "id": "quit-toggle",
+        "description": "Close the explorer",
+        "mode": "plugin.aimux-examples.explorer.explorer",
+        "key": "<C-e>",
+        "action": "quit"
+      }
+    ]
+  }
+}

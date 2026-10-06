@@ -6,7 +6,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { DiffData } from '../../../../state/types'
 
 import { getScrollViewportDelta } from '../../../../app-runtime/terminal-mouse-adapter'
-import { overrideGitDiffScroller } from '../../../git-view-controls'
+import { useDiffScroll } from '../../../git-view-controls'
 import { detectGraphicsProtocol } from '../../../terminal-graphics/capabilities'
 import { formatBytes } from '../../../terminal-graphics/dimensions'
 import {
@@ -25,6 +25,8 @@ const MAX_LISTED_PAGES = 8
 
 interface PdfDiffViewProps {
   diff: DiffData
+  /** One document read as it is: no second side, nothing compared. */
+  single?: boolean
 }
 
 interface Counts {
@@ -112,7 +114,7 @@ const PdfPage = memo(function PdfPage({ bytes, count, label, page, preview }: Pa
 
   return (
     <box flexDirection="column" flexGrow={1} flexBasis={0} padding={1}>
-      <text fg={t.text}>{label}</text>
+      {label === '' ? null : <text fg={t.text}>{label}</text>}
       {notice === null && exists && preview && render.kind === 'ok' ? (
         <TerminalImagePane bytes={render.png} fit mime="image/png" />
       ) : (
@@ -125,7 +127,7 @@ const PdfPage = memo(function PdfPage({ bytes, count, label, page, preview }: Pa
   )
 })
 
-export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps) {
+export const PdfDiffView = memo(function PdfDiffView({ diff, single = false }: PdfDiffViewProps) {
   const t = useTheme()
   const renderer = useRenderer()
   const protocol = detectGraphicsProtocol(renderer)
@@ -150,6 +152,7 @@ export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps)
       ])
       if (cancelled) return
       setCounts({ after: a, before: b })
+      if (single) return
       // A side that is absent has no pages to compare: every page on the other is new.
       const [fb, fa] = await Promise.all([
         before ? pdfPageFingerprints(before) : [],
@@ -165,7 +168,7 @@ export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps)
     return () => {
       cancelled = true
     }
-  }, [before, after])
+  }, [before, after, single])
 
   const total = Math.max(1, counts?.before ?? 0, counts?.after ?? 0)
 
@@ -177,7 +180,8 @@ export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps)
     [total]
   )
 
-  useEffect(() => overrideGitDiffScroller(step), [step])
+  const slot = useDiffScroll()
+  useEffect(() => slot.override(step), [slot, step])
 
   const lastWheelRef = useRef(0)
   const handleScroll = useCallback(
@@ -221,7 +225,7 @@ export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps)
       <box paddingLeft={1} paddingRight={1}>
         <text fg={t.text}>
           page {page} / {total}
-          <span fg={t.textMuted}> · {changeSummary(changed, page)}</span>
+          {single ? null : <span fg={t.textMuted}> · {changeSummary(changed, page)}</span>}
         </text>
       </box>
       <box flexDirection="row" flexGrow={1}>
@@ -238,7 +242,7 @@ export const PdfDiffView = memo(function PdfDiffView({ diff }: PdfDiffViewProps)
           <PdfPage
             bytes={after}
             count={counts?.after ?? null}
-            label="new (working)"
+            label={single ? '' : 'new (working)'}
             page={page}
             preview={preview}
           />

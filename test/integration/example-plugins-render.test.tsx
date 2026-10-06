@@ -32,6 +32,7 @@ import { clearBarWidgets, getWidgetRenderer } from '../../src/ui/widgets/registr
 const EXAMPLES = join(new URL('../..', import.meta.url).pathname, 'examples', 'plugins')
 const TRANSPORT: PluginRpcTransport = { broadcast: () => {}, call: async () => null }
 const NAMES = [
+  'explorer',
   'ghstreak',
   'gitlog',
   'journal',
@@ -79,8 +80,8 @@ function useTempProfile(): void {
 /** The pane pulse registers. Panes only draw once opened, so it is named here. */
 const PANE_ID = 'aimux-examples.pulse.stats'
 
-/** The view gitlog registers. A view replaces the panes, so it is drawn apart. */
-const VIEW_ID = 'aimux-examples.gitlog.log'
+/** The views gitlog and explorer register. A view replaces the panes, so each is drawn apart. */
+const VIEW_IDS = ['aimux-examples.gitlog.log', 'aimux-examples.explorer.explorer']
 
 /** Every plugin widget, pane and status-bar tile, side by side in one tree. */
 function Everything({ widgetIds }: { widgetIds: readonly string[] }) {
@@ -98,9 +99,11 @@ function Everything({ widgetIds }: { widgetIds: readonly string[] }) {
       <PluginPaneContent paneId={PANE_ID} />
       {/* A view fills whatever it is given; boxed here so it cannot squash
           the widgets it is standing next to only in this test. */}
-      <box height={20} flexShrink={0}>
-        {getPluginView(VIEW_ID)?.render() ?? null}
-      </box>
+      {VIEW_IDS.map((id) => (
+        <box key={id} height={20} flexShrink={0}>
+          {getPluginView(id)?.render() ?? null}
+        </box>
+      ))}
     </box>
   )
 }
@@ -126,7 +129,7 @@ test('every example plugin loads and draws its first frame', async () => {
 
   const rendered = await renderPluginNode(<Everything widgetIds={widgetIds} />, {
     cols: 34,
-    rows: 60,
+    rows: 80,
   })
   // The gearbox tile, which is the one that crashed: a label the plugin
   // coloured itself, next to a value it coloured itself.
@@ -139,5 +142,8 @@ test('every example plugin loads and draws its first frame', async () => {
   // And the view, whose first frame is the one where the daemon has answered
   // neither the log nor the commit — the state a boot actually starts in.
   expect(rendered.frame).toContain('Commits')
+  // The explorer before it has listed anything, with no project to list.
+  expect(rendered.frame).toContain('Changes 0 · Files 0')
+  expect(rendered.frame).toContain('Select')
   rendered.dispose()
 })

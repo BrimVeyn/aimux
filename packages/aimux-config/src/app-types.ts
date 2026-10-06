@@ -109,6 +109,8 @@ export type ModalType =
    * rather than an arm on this union.
    */
   | 'plugin-modal'
+  /** A line of text a plugin asked for — a filter, a name — typed over its own UI. */
+  | 'plugin-input'
   | null
 
 export interface TerminalSpan {
@@ -362,6 +364,11 @@ export interface GitPaneDiffCountConfig {
   enabled: boolean
 }
 
+/** A Nerd Font glyph by file type beside each file. Off for a font without them. */
+export interface GitPaneIconsConfig {
+  enabled: boolean
+}
+
 export type GitPaneTab = 'diff' | 'github'
 
 export interface GitPaneState {
@@ -372,6 +379,7 @@ export interface GitPaneState {
   treeCompaction: boolean
   path: GitPanePathConfig
   diffCount: GitPaneDiffCountConfig
+  icons: GitPaneIconsConfig
   /** Prefetch this many neighbours around the selection. 0 disables prefetch. */
   prefetchRadius: number
 }
@@ -759,6 +767,16 @@ export interface ModalPlugin extends ModalBase {
   props?: unknown
 }
 
+/**
+ * A plugin's text field. The host does the typing — the buffer, the cursor,
+ * Esc and ⏎ — and the plugin hears about each change; what the text means and
+ * where it is drawn is the plugin's.
+ */
+export interface ModalPluginInput extends ModalBase {
+  type: 'plugin-input'
+  pluginId: string
+}
+
 export type ModalState =
   | ModalClosed
   | ModalNewTab
@@ -785,6 +803,7 @@ export type ModalState =
   | ModalSettingsSearch
   | ModalGitFileFilter
   | ModalPlugin
+  | ModalPluginInput
 
 export interface LayoutState {
   terminalCols: number
@@ -993,6 +1012,7 @@ export type BuiltinModeId =
   | 'modal.workspace-move'
   | 'modal.workspace-move-confirm'
   | 'modal.git-file-filter'
+  | 'modal.plugin-input'
   | 'modal.flash-jump'
   | 'modal.quotas'
   | 'settings'
@@ -1423,6 +1443,8 @@ export type GitModeAction =
   | { type: 'git-mode-toggle-tree-compaction' }
   | { type: 'git-pane-toggle-tab' }
   | { type: 'git-mode-set-diff'; key: string; diff: DiffData; hash: string }
+  /** Drops what was parsed and highlighted for a diff nobody is drawing any more. */
+  | { type: 'git-mode-forget-diff'; key: string }
   | {
       type: 'git-mode-set-parsed'
       key: string
@@ -1504,6 +1526,8 @@ export type PluginStateAction =
   | { type: 'open-plugin-view'; viewId: string }
   /** Returns from a plugin view to the panes. */
   | { type: 'close-plugin-view' }
+  /** Opens a plugin's text field. `close-modal` closes it; focus stays where it was. */
+  | { type: 'open-plugin-input'; pluginId: string; initial: string }
   /** Opens a plugin's modal over whatever is on screen. `close-modal` closes it. */
   | {
       type: 'open-plugin-modal'

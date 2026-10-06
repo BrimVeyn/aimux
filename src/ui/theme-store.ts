@@ -104,6 +104,11 @@ export function setMode(mode: ThemeMode): void {
   themeStore.setState({ mode })
 }
 
+/** The active theme's id, as a hook: what highlighting is cached under. */
+export function useThemeId(): ThemeId {
+  return useStore(themeStore, (s) => s.id)
+}
+
 export function useTransparent(): boolean {
   return useStore(themeStore, (s) => s.transparent)
 }

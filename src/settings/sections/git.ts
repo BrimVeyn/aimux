@@ -70,6 +70,17 @@ export const GIT_SECTION: SettingSection = {
       storage: 'settings',
     },
     {
+      apply: (value) =>
+        dispatchGlobal({ patch: { icons: { enabled: value === true } }, type: 'set-git-pane' }),
+      description: 'A Nerd Font glyph by file type. Turn off when the font has none.',
+      fallback: true,
+      fromConfig: (config) => config.gitPane?.icons?.enabled,
+      id: 'git.icons',
+      kind: 'toggle',
+      label: 'File icons',
+      storage: 'settings',
+    },
+    {
       apply: (value) => {
         if (typeof value === 'number') {
           dispatchGlobal({ patch: { prefetchRadius: value }, type: 'set-git-pane' })

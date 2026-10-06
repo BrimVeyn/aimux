@@ -689,6 +689,36 @@ export const commitGitFileFilter: KeyResult = r(
 
 export const cancelGitFileFilter: KeyResult = r([{ type: 'close-modal' }], [], 'git-mode')
 
+/**
+ * The effects a plugin's text field reports through, under the plugin's own
+ * id. `$` keeps them out of the verbs a plugin registers: no action of its own
+ * can collide with them.
+ */
+export const PLUGIN_INPUT_SUBMIT = '$input.submit'
+export const PLUGIN_INPUT_CANCEL = '$input.cancel'
+
+/** Closes a plugin's text field and tells the plugin how, with what was typed. */
+function finishPluginInput(effectId: string): ActionFn {
+  return (ctx: ModeContext) => {
+    const modal = ctx.state.modal
+    if (modal.type !== 'plugin-input') return r([{ type: 'close-modal' }])
+    return r(
+      [{ type: 'close-modal' }],
+      [
+        {
+          effectId,
+          payload: modal.editBuffer ?? '',
+          pluginId: modal.pluginId,
+          type: 'plugin-effect',
+        },
+      ]
+    )
+  }
+}
+
+export const submitPluginInput: ActionFn = finishPluginInput(PLUGIN_INPUT_SUBMIT)
+export const cancelPluginInput: ActionFn = finishPluginInput(PLUGIN_INPUT_CANCEL)
+
 export function selectGitFile(delta: -1 | 1): ActionFn {
   return (ctx: ModeContext) => {
     if (ctx.state.gitPanel.files.length === 0) return r([])
